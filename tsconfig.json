@@ -1,0 +1,54 @@
+{
+  "compilerOptions": {
+    // Параметры компилятора
+    "module": "CommonJS",
+    "target": "ESNext",
+    "moduleResolution": "node",
+
+    "baseUrl": "src",
+    "outDir": "build",
+
+    // Настройки компиляции в JavaScript
+    "alwaysStrict": true, // Все файлы ".js" будут иметь "use strict"
+    "sourceMap": false, // Создавать ".js.map" файлы
+    "resolveJsonModule": true, // Игнорировать импорт ".json" файлы
+
+    "declaration": false, // Создать ".d.ts" файлы
+    "skipLibCheck": true, // Не проверять типы
+    "listFiles": false, // Печатать имена файлов
+    "listEmittedFiles": true, // Печатать список всех выходных файлов
+    "removeComments": false, // Удалить все комментарии
+
+    "esModuleInterop": true, // Создать хелперы __importStar и __importDefault
+    "importHelpers": false, // Импортировать хелперы (__extends, __rest и так далее) из "tslib"
+    "noEmitHelpers": false, // Отключить создание пользовательских вспомогательных функций, таких как `__extends` в скомпилированном выводе
+
+    // Дополнительные настройки компилятора
+    "noFallthroughCasesInSwitch": true, // Сообщить об ошибке в случае обнаружения проваливания в конструкции switch-case?
+    "noImplicitReturns": false, // Сообщить об ошибке, когда не все пути кода в функции возвращают значение?
+    "strictNullChecks": false, // Значения "null" и "undefined" могут быть присвоены только значениям данного типа
+    "allowUnreachableCode": true, // Сообщить об ошибке в случае обнаружения кода, который никогда не будет выполнен?
+    "noImplicitThis": false, // Показывать ошибку на "this", если где-то задан тип "any".
+    "noImplicitAny": false, // Запрет на "any"
+    "noUnusedParameters": true, // Вызов ошибки, когда параметр функции не читается
+
+    //Сокращения
+    "paths": {
+      //Библиотеки
+      "@lib/*": ["./libs/*", "./dependencies/*"],
+
+      //Загрузчик
+      "@handlers/*": ["./handlers/*"],
+      "@handler": ["./libs/handler/index"],
+
+      //Дополнительные функции
+      "@env": ["./env"]
+    }
+  },
+
+  // Включить в сборку
+  "include": ["package.json", "tsconfig.json", "src"],
+
+  //Исключить из сборки
+  "exclude": ["node_modules"]
+}
