@@ -1,8 +1,12 @@
 import { SlashBuilder } from "@lib/discord/utils/SlashBuilder";
+import {CollectionAudioEvents} from "@lib/db/Global/Audio";
 import { Interact } from "@lib/discord/utils/Interact";
+import {AudioPlayerEvents} from "@lib/player";
 import { ClientEvents } from "discord.js";
+import {Song} from "@lib/player/queue";
 import { Client } from "@lib/discord";
 import { readdirSync } from "node:fs";
+import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
@@ -35,6 +39,8 @@ export class Handler<T> {
 
         const imported = this.imports(`${directory}/${dir}/${file}`);
 
+        if (!imported) continue;
+
         // Если при загрузке была получена ошибка
         if (imported instanceof Error) throw imported;
 
@@ -60,7 +66,7 @@ export class Handler<T> {
       //Удаляем кеш загрузки
       delete require.cache[require.resolve(path)];
 
-      if (!file?.default) return Error("Not found default import");
+      if (!file?.default) return null;
 
       return file.default;
     } catch (error) {
@@ -80,14 +86,14 @@ export namespace Handler {
    * @description Интерфейс для событий
    * @interface Event
    */
-  export interface Event<T extends keyof ClientEvents /*| keyof CollectionAudioEvents | keyof AudioPlayerEvents*/> {
+  export interface Event<T extends keyof ClientEvents | keyof CollectionAudioEvents | keyof AudioPlayerEvents> {
     /**
      * @description Название ивента
      * @default null
      * @readonly
      * @public
      */
-    name: keyof ClientEvents;
+    name: T extends keyof CollectionAudioEvents ? keyof CollectionAudioEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
 
     /**
      * @description Тип ивента
@@ -95,7 +101,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    type: "client";
+    type: T extends keyof CollectionAudioEvents | keyof AudioPlayerEvents ? "player" : "client";
 
     /**
      * @description Функция, которая будет запущена при вызове ивента
@@ -103,7 +109,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    execute: (client: Client, ...args: ClientEvents[T]) => void;
+    execute: T extends keyof CollectionAudioEvents ? CollectionAudioEvents[T] : T extends keyof AudioPlayerEvents ? (...args: Parameters<AudioPlayerEvents[T]>) => any : T extends keyof ClientEvents ? (client: Client, ...args: ClientEvents[T]) => void : never;
   }
 
   /**
@@ -134,7 +140,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    execute: (options: { message: Interact; args?: string[]; }) => void;
+    execute: (options: { message: Interact; args?: string[]; type: string}) => void;
   }
 
   /**
@@ -245,4 +251,288 @@ export namespace Constructor {
       Object.assign(this, options);
     }
   }
+
+  /**
+   * @author SNIPPIK
+   * @description База с циклами для дальнейшей работы этот класс надо подключить к другому
+   * @class Cycle
+   * @abstract
+   */
+  export abstract class Cycle<T = unknown> {
+    private readonly data = {
+      array: [] as T[],
+      time: 0
+    };
+
+    public readonly _config: TimeCycleConfig<T> = {
+      name: "timeCycle",
+      execute: null,
+      filter: null,
+      duration: 10e3,
+      custom: { push: null }
+    };
+
+    protected constructor(options: TimeCycleConfig<T>) {
+      Object.assign(this._config, options);
+    };
+
+    /**
+     * @description Выдаем коллекцию
+     * @public
+     */
+    public get array() { return this.data.array; }
+
+    /**
+     * @description Добавляем элемент в очередь
+     * @param item - Объект T
+     * @public
+     */
+    public set = (item: T) => {
+      if (this._config.custom?.push) this._config.custom?.push(item);
+      else if (this.data.array.includes(item)) this.remove(item);
+
+      //Добавляем данные в цикл
+      this.data.array.push(item);
+
+      //Запускаем цикл
+      if (this.data.array?.length === 1 && this.data.time === 0) {
+        this.data.time = Date.now();
+        setImmediate(this._stepCycle);
+      }
+    };
+
+    /**
+     * @description Удаляем элемент из очереди
+     * @param item - Объект T
+     * @public
+     */
+    public remove = (item: T) => {
+      const index = this.data.array.indexOf(item);
+
+      if (index !== -1) {
+        if (this._config.custom?.remove) this._config.custom.remove(item);
+        this.data.array.splice(index, 1);
+      }
+    };
+
+    /**
+     * @description Выполняем this._execute
+     * @private
+     */
+    private _stepCycle = (): void => {
+      if (this.data.array?.length === 0) {
+        this.data.time = 0;
+        return;
+      }
+
+      //Высчитываем время для выполнения
+      this.data.time += this._config.duration;
+
+      for (let item of this.data.array) {
+        const filtered = this._config.filter(item);
+
+        try {
+          if (filtered) this._config.execute(item);
+        } catch (error) {
+          this.remove(item);
+          console.log(error);
+        }
+      }
+
+      //Выполняем функцию через ~this._time ms
+      setTimeout(this._stepCycle, this.data.time - Date.now());
+    };
+  }
+
+  /**
+   * @author SNIPPIK
+   * @description Интерфейс для опций TimeCycle
+   */
+  interface TimeCycleConfig<T> {
+    //Название цикла
+    name: string;
+
+    //Функция выполнения
+    execute: (item: T) => void;
+
+    //Функция фильтрации
+    filter: (item: T) => boolean;
+
+    //Время через которое надо запустить цикл
+    duration: number;
+
+    //Модификации цикла, не обязательно
+    custom?: {
+      //Изменить логику добавления
+      push?: (item: T) => void;
+
+      //Изменить логику удаления
+      remove?: (item: T) => void;
+    };
+  }
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Классы для взаимодействия с API
+ * @namespace API
+ */
+export namespace API {
+  /**
+   * @author SNIPPIK
+   * @description Создаем класс запроса для взаимодействия с APIs
+   * @class item
+   * @abstract
+   */
+  export abstract class item<T extends callbacks> {
+    public readonly name: T;
+    public readonly filter?: RegExp;
+    public readonly callback?: (url: string, options: T extends "track" ? {audio?: boolean} : {limit?: number}) => callback<T>;
+    protected constructor(options: item<T>) {
+      Object.assign(this, options);
+    };
+  }
+
+  /**
+   * @author SNIPPIK
+   * @description Получаем ответ от локальной базы APIs
+   * @class response
+   */
+  export class response {
+    private readonly _api: request;
+    /**
+     * @description Выдаем название
+     * @return API.platform
+     * @public
+     */
+    public get platform() { return this._api.name; };
+
+    /**
+     * @description Выдаем RegExp
+     * @return RegExp
+     * @public
+     */
+    public get filter() { return this._api.filter; };
+
+
+    /**
+     * @description Выдаем bool, Недоступна ли платформа
+     * @return boolean
+     * @public
+     */
+    public get block() { return db.api.platforms.block.includes(this.platform); };
+
+    /**
+     * @description Выдаем bool, есть ли доступ к платформе
+     * @return boolean
+     * @public
+     */
+    public get auth() { return db.api.platforms.authorization.includes(this.platform); };
+
+    /**
+     * @description Выдаем bool, есть ли доступ к файлам аудио
+     * @return boolean
+     * @public
+     */
+    public get audio() { return db.api.platforms.audio.includes(this.platform); };
+
+    /**
+     * @description Выдаем int, цвет платформы
+     * @return number
+     * @public
+     */
+    public get color() { return this._api.color; };
+
+    /**
+     * @description Получаем функцию в зависимости от типа платформы и запроса
+     * @param type {find} Тип запроса
+     * @public
+     */
+    public find<T extends API.callbacks>(type: string | T): item<T> {
+      try {
+        const callback = this._api.requests.find((item) => item.name === type || item.filter && type.match(item.filter));
+
+        if (!callback) {
+          if (!type.startsWith("http")) {
+            const requests = this._api.requests.find((item) => item.name === "search");
+
+            //@ts-ignore
+            if (requests) return requests;
+          }
+
+          return null;
+        }
+
+        //@ts-ignore
+        return callback;
+      } catch {
+        return undefined;
+      }
+    };
+
+    /**
+     * @description Ищем платформу из доступных
+     * @param argument {API.platform} Имя платформы
+     * @public
+     */
+    public constructor(argument: API.platform | string) {
+      const temp = db.api.platforms.supported;
+
+      //Если была указана ссылка
+      if (argument.startsWith("http")) {
+        const platform = temp.find((info) => !!argument.match(info.filter));
+
+        //Если не найдена платформа тогда используем DISCORD
+        if (!platform) { this._api = temp.find((info) => info.name === "DISCORD"); return; }
+        this._api = platform; return;
+      }
+
+      //Если был указан текст
+      try {
+        const platform = temp.find((info) => info.name === argument);
+
+        //Не найдена платформа тогда используем YOUTUBE
+        if (!platform) { this._api = temp.find((info) => info.name === "YOUTUBE"); return; }
+
+        this._api = platform;
+      } catch { //Если произошла ошибка значит используем YOUTUBE
+        this._api = temp.find((info) => info.name === "YOUTUBE");
+      }
+    };
+  }
+
+  /**
+   * @author SNIPPIK
+   * @description Создаем класс для итоговой платформы для взаимодействия с APIs
+   * @interface request
+   * @abstract
+   */
+  export interface request {
+    name: platform;
+    url: string;
+    audio: boolean;
+    auth: boolean;
+    filter: RegExp;
+    color: number;
+    requests: item<callbacks>[];
+  }
+
+  /**
+   * @description Доступные платформы
+   * @type platform
+   */
+  export type platform = "YOUTUBE" | "SPOTIFY" | "VK" | "DISCORD" | "YANDEX";
+
+  /**
+   * @description Доступные запросы
+   * @type callbacks
+   */
+  export type callbacks = "track" | "playlist" | "search" | "album" | "author";
+
+  /**
+   * @description Функция запроса
+   * @type callback<callbacks>
+   */
+  export type callback<T> = Promise<(T extends "track" ? Song : T extends "playlist" | "album" ? Song.playlist : T extends "search" | "author" ? Song[] : never) | Error>
 }

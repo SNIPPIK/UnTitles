@@ -1,7 +1,7 @@
-import { GatewayOpcodes, GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData} from "discord-api-types/v10";
+import { GatewayOpcodes, GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData } from "discord-api-types/v10";
 import {stateDestroyer, VoiceSocket, VoiceSocketState, VoiceSocketStatusCode} from "./socket";
 import {TypedEmitter} from "tiny-typed-emitter";
-import {Constructor} from "@handler";
+import {Constructor} from "@lib/handler";
 
 /**
  * @author SNIPPIK

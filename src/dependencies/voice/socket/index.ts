@@ -1,6 +1,6 @@
+import {Encryption} from "@lib/voice/audio/Sodium";
 import {VoiceOpcodes} from "discord-api-types/voice/v4";
 import {TypedEmitter} from "tiny-typed-emitter";
-import {Encryption} from "../utils/Sodium";
 import {VoiceUDPSocket} from "./SocketUDP";
 import {WebSocket} from "@lib/request";
 
