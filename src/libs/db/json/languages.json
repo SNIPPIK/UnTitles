@@ -2,5 +2,16 @@
   "api.wait": {
     "ru": "test",
     "en-US": "test"
+  },
+
+
+
+
+
+
+
+  "command.play.file.fail": {
+    "ru": "",
+    "en-US": ""
   }
 }

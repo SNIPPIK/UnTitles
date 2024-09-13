@@ -30,16 +30,10 @@ export class locale {
      * @param args - Аргументы будут подставлены автоматически вместо "{ARGUMENT}" в порядке очереди
      */
     public static _ = (language: languages, context: locale_text, args?: any[]) => {
-        //@ts-ignore
-        let translate = locales[context] as string;
+        let translate = locales[context][language] as string;
 
         //Если нет такой строки
         if (!translate) return `Error: Not found locale ${context}`;
-
-        translate = translate[language] as string;
-
-        //Если нет такого перевода
-        if (!translate) translate = locales[context][this.language];
 
         //Если есть аргументы
         if (args && args.length > 0) {

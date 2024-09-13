@@ -321,6 +321,11 @@ class cAPI extends Constructor.Assign<API.request> {
 }
 
 
+/**
+ * @author SNIPPIK
+ * @description Этот ключ не является действительным, но он работает
+ * @public
+ */
 const generateKey = `AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc`
 
 /**

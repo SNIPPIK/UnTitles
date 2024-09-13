@@ -1,6 +1,6 @@
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {ApplicationCommandOptionType} from "discord.js";
-import {Constructor, Handler} from "@handler";
+import {API, Constructor, Handler} from "@handler";
 import {db} from "@lib/db";
 
 /**
@@ -12,8 +12,8 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
-                .setName("test")
-                .setDescription("Включение музыки!")
+                .setName("play")
+                .setDescription("Проигрывание музыки по вашему выбору!")
                 .setDescriptionLocale({
                     "en-US": "Playing music!"
                 })
@@ -77,6 +77,7 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                 const {author, member, guild} = message;
                 const queue = message.queue;
 
+
                 //Если пользователь прикрепил файл
                 if (type === "file") {
                     const attachment = message.options.getAttachment("input");
@@ -87,21 +88,12 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                     //    color: "Yellow"
                     //};
 
-                    message.send = {
-                        embeds: [
-                            {
-                                title: `File: ${attachment.title}`,
-                                description: `Desc: ${attachment.description}`
-                            }
-                        ]
-                    };
-
-                    db.audio.queue.events.emit("collection/api", message, ["DISCORD", attachment]);
+                    db.audio.queue.events.emit("request/api", message, ["DISCORD", attachment]);
                     return;
                 }
 
                 //Если пользователя пытается включить трек
-                db.audio.queue.events.emit("collection/api", message, args);
+                db.audio.queue.events.emit("request/api", message, args);
                 return;
             }
         });

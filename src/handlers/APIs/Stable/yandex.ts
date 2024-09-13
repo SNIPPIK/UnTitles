@@ -285,7 +285,7 @@ class cAPI extends Constructor.Assign<API.request> {
     };
 
     /**
-     * @description Из полученных данных подготавливаем трек для Player<Queue>
+     * @description Из полученных данных подготавливаем трек для Audio<Queue>
      * @param track {any} Любой трек с Yandex Music
      */
     protected static track = (track: any): Song => {

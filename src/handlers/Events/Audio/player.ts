@@ -2,11 +2,11 @@ import {Constructor, Handler} from "@handler";
 import {db} from "@lib/db";
 
 /**
- * @class onEnd
+ * @class eventPlayer_ended
  * @event player/ended
  * @description Завершение проигрывания трека
  */
-class onEnd extends Constructor.Assign<Handler.Event<"player/ended">> {
+class eventPlayer_ended extends Constructor.Assign<Handler.Event<"player/ended">> {
     public constructor() {
         super({
             name: "player/ended",
@@ -22,11 +22,11 @@ class onEnd extends Constructor.Assign<Handler.Event<"player/ended">> {
 }
 
 /**
- * @class onWait
+ * @class eventPlayer_wait
  * @event player/wait
  * @description Плеер ожидает действий
  */
-class onWait extends Constructor.Assign<Handler.Event<"player/wait">> {
+class eventPlayer_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
     public constructor() {
         super({
             name: "player/wait",
@@ -50,18 +50,18 @@ class onWait extends Constructor.Assign<Handler.Event<"player/wait">> {
                 }
 
                 //Включаем трек через время
-                setTimeout(() => queue.player.play(queue.songs.song), db.audio.options.timeout);
+                setTimeout(() => queue.player.play(queue.songs.song), 2e3);
             }
         });
-    }
+    };
 }
 
 /**
- * @class onError
+ * @class eventPlayer_error
  * @event player/error
  * @description Плеер словил ошибку
  */
-class onError extends Constructor.Assign<Handler.Event<"player/error">> {
+class eventPlayer_error extends Constructor.Assign<Handler.Event<"player/error">> {
     public constructor() {
         super({
             name: "player/error",
@@ -82,7 +82,7 @@ class onError extends Constructor.Assign<Handler.Event<"player/error">> {
                                     queue.songs.shift();
 
                                     //Включаем трек через время
-                                    setTimeout(() => queue.player.play(queue.songs.song), db.audio.options.timeout);
+                                    setTimeout(() => queue.player.play(queue.songs.song), 2e3);
                                 });
                             }
                             return;
@@ -100,11 +100,11 @@ class onError extends Constructor.Assign<Handler.Event<"player/error">> {
                 return db.audio.queue.events.emit("message/error", queue, err);
             }
         });
-    }
+    };
 }
 
 /**
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({onError, onWait, onEnd});
+export default Object.values({eventPlayer_error, eventPlayer_wait, eventPlayer_ended});

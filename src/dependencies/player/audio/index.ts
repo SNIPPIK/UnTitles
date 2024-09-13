@@ -25,8 +25,7 @@ export class AudioResource {
      * @private
      */
     private readonly _options = {
-        filters: null as string,
-        seek:    0 as number,
+        chunks:    0 as number,
         chunk:   20
     };
 
@@ -51,7 +50,7 @@ export class AudioResource {
      */
     public get packet(): Buffer {
         const packet = this.stream.read();
-        if (packet) this._options.seek++;
+        if (packet) this._options.chunks++;
 
         return packet;
     };
@@ -61,7 +60,7 @@ export class AudioResource {
      * @public
      */
     public get duration() {
-        const duration = ((this._options.seek * this._options.chunk) / 1e3).toFixed(0);
+        const duration = ((this._options.chunks * this._options.chunk) / 1e3).toFixed(0);
         return parseInt(duration);
     };
 
@@ -84,13 +83,15 @@ export class AudioResource {
      * @param options - Параметры для запуска
      * @private
      */
-    private set ffmpeg(options: {path: string, seek?: number;}) {
+    private set ffmpeg(options: {path: string, seek?: number; filters: string}) {
         const [type, file] = options.path.split(":|");
 
-        this._streams.push(new Process(["-vn",  "-loglevel", "panic", //"-timeout", `${db.audio.options.audio.timeout}`,
+        this._streams.push(new Process([
+            "-http_proxy", "http://127.0.0.1:8080",
+            "-vn",  "-loglevel", "panic", "-timeout", "2",
             ...(type === "link" ? ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
             "-ss", `${options.seek ?? 0}`, "-i", file,
-            //...(options.filters ? ["-af", options.filters] : []),
+            ...(options.filters ? ["-af", options.filters] : []),
             "-f", `${OpusEncoder.lib.ffmpeg}`, "pipe:1"
         ]));
     };
@@ -112,9 +113,9 @@ export class AudioResource {
      * @param options - Настройки кодировщика
      * @public
      */
-    public constructor(options: {path: string, seek?: number;}) {
-        //if (options.chunk > 0) this._options.chunk = 20 * options.chunk;
-        if (options.seek > 0) this._options.seek = (options.seek * 1e3) / this._options.chunk;
+    public constructor(options: {path: string, seek?: number; filters: string; chunk?: number}) {
+        if (options.chunk > 0) this._options.chunk = 20 * options.chunk;
+        if (options.seek > 0) this._options.chunks = (options.seek * 1e3) / this._options.chunk;
 
         this.ffmpeg = options;
         this.input = {
@@ -208,6 +209,3 @@ export class Process {
 
     throw Error("[WCritical]: FFmpeg/avconv not found!");
 })();
-
-//For ytdl, для рашки
-//-f 'bestaudio[ext=m4a]' --proxy socks5://user:pass@127.0.0.1:1080 --write-info-json

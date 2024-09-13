@@ -19,12 +19,7 @@ export class Database_Audio {
 
         options: {
             volume: parseInt(env.get("audio.volume")),
-            fade: parseInt(env.get("audio.fade")),
-            timeout: parseInt(env.get("player.timeout")),
-
-            audio: {
-                timeout: parseInt(env.get("audio.timeout")),
-            }
+            fade: parseInt(env.get("audio.fade"))
         }
     };
     /**
@@ -64,11 +59,10 @@ class Cycles {
         public constructor() {
             super({
                 name: "AudioPlayer",
-                duration: parseInt(env.get("player.duration")),
+                duration: 20,
                 filter: (item) => item.playing,
                 execute: (player: AudioPlayer) => {
                     if (player.connection?.state?.status !== "ready" || player?.status === "player/pause") return;
-                    else if (player?.status !== "player/playing") player.sendPacket = Buffer.from([0xf8, 0xff, 0xfe]);
                     else {
                         const packet = player.stream.packet;
 
@@ -79,7 +73,54 @@ class Cycles {
             });
         };
     };
+
+    /**
+     * @author SNIPPIK
+     * @description Здесь происходит управление сообщениями от плеера
+     * @private
+     */
+    private readonly _messages = new class extends Constructor.Cycle<Interact> {
+        public constructor() {
+            super({
+                name: "Message",
+                duration: 30e3,
+                filter: (message) => !!message.editable,
+                execute: (message) => {
+                    const {guild} = message;
+                    const queue = db.audio.queue.get(guild.id);
+
+                    if (!queue || !queue.songs.size) return this.remove(message);
+                    else if (!queue.player.playing || !message.editable) return;
+
+                    // Обновляем сообщение о текущем треке
+                    db.audio.queue.events.emit("message/playing", queue, message);
+                },
+                custom: {
+                    remove: (item) => {
+                        item.delete = 200;
+                    },
+                    push: (item) => {
+                        const old = this.array.find(msg => msg.guild.id === item.guild.id);
+
+                        //Если это-же сообщение есть в базе, то нечего не делаем
+                        if (old) this.remove(old);
+                    }
+                },
+            });
+        };
+    };
+
+    /**
+     * @description Выдаем базу циклов для работы плеера
+     * @public
+     */
     public get players() { return this._audioPlayers; };
+
+    /**
+     * @description Выдаем базу циклов сообщений для обновления сообщения
+     * @public
+     */
+    public get messages() { return this._messages; };
 }
 
 /**
@@ -158,8 +199,8 @@ export interface CollectionAudioEvents {
     "message/last": (track: Song, message: Interact) => void;
 
     // Добавляем и создаем очередь
-    "collection/api": (message: Interact, argument: (string | Attachment)[]) => void;
+    "request/api": (message: Interact, argument: (string | Attachment)[]) => void;
 
     // Если во время добавления трека или плейлиста произошла ошибка
-    "collection/error": (message: Interact, error: string, replied?: boolean, color?: "DarkRed" | "Yellow") => void;
+    "request/error": (message: Interact, error: string, replied?: boolean, color?: "DarkRed" | "Yellow") => void;
 }

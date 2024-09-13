@@ -4,6 +4,14 @@ import {MessageEvent as WebSocketEvent, WebSocket as WS} from "ws";
 import {request as httpsRequest, RequestOptions} from "node:https";
 import {VoiceOpcodes} from "discord-api-types/voice/v4";
 import {TypedEmitter} from "tiny-typed-emitter";
+import {SocksProxyAgent} from "socks-proxy-agent";
+import {env} from "@env";
+
+/**
+ * @author SNIPPIK
+ * @description Подключаемся к прокси серверу
+ */
+const agent = env.get("proxy.socks") ? new SocksProxyAgent('socks://127.0.0.1:1080'): null;
 
 /**
  * @author SNIPPIK
@@ -48,7 +56,7 @@ abstract class Request {
 
         //Добавлять рандомный user-agent
         useragent?: boolean;
-    } & RequestOptions = {};
+    } & RequestOptions = { agent };
     /**
      * @description Получаем протокол ссылки
      * @private

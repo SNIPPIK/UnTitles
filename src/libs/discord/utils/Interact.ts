@@ -1,4 +1,11 @@
-import type {ComponentData, EmbedData, GuildMember, CommandInteractionOption, GuildTextBasedChannel} from "discord.js"
+import {
+  ComponentData,
+  EmbedData,
+  GuildMember,
+  CommandInteractionOption,
+  GuildTextBasedChannel,
+  ActionRowBuilder, User, InteractionResponse
+} from "discord.js"
 import { BaseInteraction, Message, Attachment} from "discord.js";
 import {db} from "@lib/db";
 
@@ -12,6 +19,15 @@ export class Interact {
   private _replied: boolean = true;
 
   /**
+   * @description Уникальный номер кнопки
+   * @public
+   */
+  public get custom_id(): string {
+    if ("customId" in this._temp) return this._temp.customId as string;
+    return null;
+  };
+
+  /**
    * @description Проверяем возможно ли редактирование сообщения
    * @public
    */
@@ -19,6 +35,11 @@ export class Interact {
     if ("editable" in this._temp) return this._temp.editable;
     return false;
   };
+
+  public get locale() {
+    if ("locale" in this._temp) return this._temp.locale;
+    return "ru";
+  }
 
   /**
    * @description Получен ли ответ на сообщение
@@ -44,6 +65,21 @@ export class Interact {
    */
   public get queue() { return db.audio.queue.get(this.guild.id); };
 
+  /**
+   * @description Выдаем класс для сборки сообщений
+   * @public
+   */
+  public get builder() { return MessageBuilder; };
+
+  /**
+   * @description Получаем команду из названия если нет названия команда не будет получена
+   * @public
+   */
+  public get command() { //@ts-ignore
+    if ("commandName" in this._temp) return db.commands.get([this._temp.commandName, this.options._group]);
+    return null;
+  };
+
 
 
   /**
@@ -68,9 +104,9 @@ export class Interact {
    * @description Данные о текущем пользователе или авторе сообщения
    * @public
    */
-  public get author() {
+  public get author(): User {
     if ("author" in this._temp) return this._temp.author;
-    return this._temp.member;
+    return this._temp.member as any;
   };
 
   /**
@@ -80,33 +116,6 @@ export class Interact {
   public get member() { return this._temp.member; };
 
 
-
-  /**
-   * @description Получаем команду из названия если нет названия команда не будет получена
-   * @public
-   */
-  public get command() { //@ts-ignore
-    if ("commandName" in this._temp) return db.commands.get([this._temp.commandName, this.options._group]);
-    return null;
-  };
-
-  /**
-   * @description Отправляем сообщение со соответствием параметров
-   * @param options - Данные для отправки сообщения
-   */
-  public set send(options: {embeds?: EmbedData[], components?: ComponentData[]}) {
-    if (!this.replied) {
-      //@ts-ignore
-      if (!this._temp.deferred) this._temp.reply({...options, fetchReply: true });
-      //@ts-ignore
-      else this._temp.followUp({...options, fetchReply: true });
-      return;
-    }
-
-    //@ts-ignore
-    this._temp.channel.send({...options, fetchReply: true });
-  };
-
   /**
    * @description Удаление сообщения через указанное время
    * @param time - Через сколько удалить сообщение
@@ -114,7 +123,7 @@ export class Interact {
   public set delete(time: number) {
     //Удаляем сообщение через time время
     setTimeout(() => {
-      if (this.replied) (this._temp as any).deleteReply();
+      if (this.replied && "deleteReply" in this._temp) (this._temp as any).deleteReply();
       else (this._temp as any).delete();
     }, time || 15e3);
   };
@@ -125,5 +134,126 @@ export class Interact {
    */
   public constructor(data: Message | BaseInteraction) {
     this._temp = data;
+  };
+
+  /**
+   * @description Создаем сборщик компонентов
+   * @param options - Параметры сборщика
+   */
+  public createMessageComponentCollector: InteractionResponse["createMessageComponentCollector"] = (options: any) => {
+    return ((this._temp as any) as InteractionResponse).createMessageComponentCollector(options);
+  };
+
+  /**
+   * @description Отправляем сообщение со соответствием параметров
+   * @param options - Данные для отправки сообщения
+   */
+  public send = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[]}) => {
+    if (!this.replied) {
+      this._replied = false;
+      //@ts-ignore
+      if (!this._temp.deferred) return this._temp.reply({...options, fetchReply: true });
+      //@ts-ignore
+      return this._temp.followUp({...options, fetchReply: true });
+    }
+
+    //@ts-ignore
+    return this._temp.channel.send({...options, fetchReply: true });
+  };
+
+  public edit = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[]}) => {
+    if ("edit" in this._temp) return this._temp.edit(options as any);
+    return null;
+  };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description создаем продуманное сообщение
+ * @class MessageBuilder
+ */
+export class MessageBuilder {
+  public callback: (message: Message, pages: string[], page: number, embed: MessageBuilder["embeds"]) => void;
+  public promise: (msg: Interact) => void;
+  public components: (ComponentData | ActionRowBuilder)[] = [];
+  public embeds: (EmbedData)[] = [];
+  public time: number = 15e3;
+
+  /**
+   * @description Отправляем сообщение в текстовый канал
+   * @param interaction
+   */
+  public set send(interaction: Interact) {
+    interaction.send({embeds: this.embeds, components: this.components}).then((message) => {
+      //Удаляем сообщение через время если это возможно
+      if (this.time !== 0) interaction.delete = this.time;
+
+      //Если получить возврат не удалось, то ничего не делаем
+      if (!message) return;
+
+      const mod = new Interact(message);
+
+      //Если надо выполнить действия после
+      if (this.promise) this.promise(mod);
+    });
+  };
+
+  /**
+   * @description Добавляем embeds в базу для дальнейшей отправки
+   * @param data - MessageBuilder["configuration"]["embeds"]
+   */
+  public addEmbeds = (data: MessageBuilder["embeds"]) => {
+    Object.assign(this.embeds, data);
+
+    for (let embed of this.embeds) {
+      //Добавляем цвет по-умолчанию
+      if (!embed.color) embed.color = 258044;
+
+      //Исправляем fields, ну мало ли
+      if (embed.fields?.length > 0) {
+        for (const field of embed.fields) {
+          if (field === null) embed.fields = embed.fields.toSpliced(embed.fields.indexOf(field), 1);
+        }
+      }
+    }
+
+    return this;
+  };
+
+  /**
+   * @description Добавляем время удаления сообщения
+   * @param time - Время в миллисекундах
+   */
+  public setTime = (time: number) => {
+    this.time = time;
+    return this;
+  };
+
+  /**
+   * @description Добавляем сomponents в базу для дальнейшей отправки
+   * @param data - Компоненты под сообщением
+   */
+  public addComponents = (data: MessageBuilder["components"]) => {
+    Object.assign(this.components, data);
+    return this;
+  };
+
+  /**
+   * @description Добавляем функцию для управления данными после отправки
+   * @param func - Функция для выполнения после
+   */
+  public setPromise = (func: MessageBuilder["promise"]) => {
+    this.promise = func;
+    return this;
+  };
+
+  /**
+   * @description Добавляем функцию для управления данными после отправки, для menu
+   * @param func - Функция для выполнения после
+   */
+  public setCallback = (func: MessageBuilder["callback"]) => {
+    this.callback = func;
+    return this;
   };
 }
