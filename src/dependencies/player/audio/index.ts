@@ -88,7 +88,7 @@ export class AudioResource {
 
         this._streams.push(new Process([
             "-http_proxy", "http://127.0.0.1:8080",
-            "-vn",  "-loglevel", "panic", "-timeout", "2",
+            "-vn",  "-loglevel", "panic",
             ...(type === "link" ? ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
             "-ss", `${options.seek ?? 0}`, "-i", file,
             ...(options.filters ? ["-af", options.filters] : []),
