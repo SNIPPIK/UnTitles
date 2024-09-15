@@ -5,6 +5,7 @@ import os from "node:os";
 /**
  * @author SNIPPIK
  * @description Взаимодействуем с environment variables
+ * @class Environment
  */
 class Environment {
   private readonly dotenv = config();
@@ -65,6 +66,11 @@ class Environment {
   };
 }
 
+/**
+ * @author SNIPPIK
+ * @description Взаимодействуем с environment variables
+ * @class Environment
+ */
 export const env = new Environment();
 
 
