@@ -96,14 +96,6 @@ const prototypes: { type: any, name: string, value: any}[] = [
     }
   },
   {
-    type: Array.prototype, name: "time",
-    value: function () {
-      return this.reduce((total: number, item: {
-        duration: { seconds: number }
-      }) => total + (item.duration.seconds || 0), 0).duration();
-    }
-  },
-  {
     type: Array.prototype,
     name: "swap",
     value: function(position: number) {
@@ -172,13 +164,6 @@ declare global {
      * @param joined {string} Что добавить в конце
      */
     ArraySort(number: number, callback: (value: T, index?: number) => string, joined?: string): string[];
-
-    /**
-     * @prototype Array
-     * @description Совмещаем время всех треков из очереди
-     * @return string
-     */
-    time(): string;
 
     /**
      * @description Смена позиции в Array

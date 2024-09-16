@@ -15,7 +15,7 @@ class onError extends Constructor.Assign<Handler.Event<"message/error">> {
             name: "message/error",
             type: "player",
             execute: (queue, error) => {
-                const {color, author, image, title, requester} = queue.songs.last;
+                const {color, author, image, title, requester} = queue.songs.song;
                 new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image, timestamp: new Date(),
@@ -31,7 +31,7 @@ class onError extends Constructor.Assign<Handler.Event<"message/error">> {
                         ],
                         author: {name: author.title, url: author.url, iconURL: db.emojis.diskImage},
                         footer: {
-                            text: `${requester.username} | ${queue.songs.time()} | 🎶: ${queue.songs.size}`,
+                            text: `${requester.username} | ${queue.songs.time} | 🎶: ${queue.songs.size}`,
                             iconURL: requester?.avatar
                         }
                     }
@@ -61,8 +61,8 @@ class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
                         color: obj["color"] ?? Colors.Blue,
                         thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.emojis.noImage},
                         footer: {
-                            text: `${message.author.username}`,
-                            iconURL: message.author.displayAvatarURL({})
+                            text: `${author.title}`,
+                            iconURL: author.image.url
                         },
                         author: {
                             name: author?.title,
@@ -170,7 +170,7 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
 
                             //Следующий трек или треки
                             queue.songs.size > 1 ? (() => {
-                                const tracks = queue.songs.slice(1, 5).map((track, index) => {
+                                const tracks = queue.songs.next().map((track, index) => {
                                     return `\`${index + 2}\` ${track.titleReplaced}`;
                                 });
 
@@ -229,17 +229,36 @@ class PlayerProgress {
         }
     };
 
+    /**
+     * @description Получаем время плеера и текущее, для дальнейшего создания прогресс бара
+     * @private
+     */
     private get duration() { return this.options.duration; };
 
+    /**
+     * @description Получаем эмодзи для правильного отображения
+     * @private
+     */
     private get emoji() {
         if (!PlayerProgress.emoji) PlayerProgress.emoji = db.emojis.progress;
         return PlayerProgress.emoji;
     };
 
+    /**
+     * @description Получаем название платформы
+     * @private
+     */
     private get platform() { return this.options.platform; };
 
+    /**
+     * @description Получаем эмодзи кнопки
+     * @private
+     */
     private get bottom() { return this.emoji["bottom_" + this.platform] || this.emoji.bottom; };
 
+    /**
+     * @description Получаем готовый прогресс бар
+     */
     public get bar() {
         const size =  this.size, {current, total} = this.duration, emoji = this.emoji;
         const number = Math.round(size * (isNaN(current) ? 0 : current / total));
@@ -253,6 +272,10 @@ class PlayerProgress {
         return txt + (current >= total ? `${emoji.upped.right}` : `${emoji.empty.right}`);
     };
 
+    /**
+     * @description Создаем класс
+     * @param options - Параметры класса
+     */
     public constructor(options: PlayerProgress["options"]) {
         Object.assign(this.options, options);
         this.options.platform = options.platform.toLowerCase() as any;

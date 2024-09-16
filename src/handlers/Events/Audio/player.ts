@@ -34,19 +34,18 @@ class eventPlayer_wait extends Constructor.Assign<Handler.Event<"player/wait">> 
             execute: (player) => {
                 const queue = db.audio.queue.get(player.ID);
 
-                //Если нет треков в очереди
+                // Если нет треков в очереди
                 if (!queue?.songs?.song || !queue.player) return db.audio.queue.remove(queue.guild.id);
 
-                //Проверяем надо ли удалить из очереди трек
-                const removedSong = queue.repeat === "off" || queue.repeat === "songs" ? queue.songs.shift() : null;
-                if (removedSong && queue.repeat === "songs") queue.songs.push(removedSong);
+                // Проверяем надо ли удалить из очереди трек
+                if (queue.repeat === "off" || queue.repeat === "songs") {
+                    // Смена трек на следующий
+                    queue.songs.swapPosition++;
+                }
 
                 //Проверяем надо ли перетасовывать очередь
                 if (queue.shuffle && queue.repeat === "off") {
-                    for (let i = queue.songs.length - 1; i > 0; i--) {
-                        const j = Math.floor(Math.random() * (i + 1));
-                        [queue.songs[i], queue.songs[j]] = [queue.songs[j], queue.songs[i]];
-                    }
+                    //To do переработать класс треков
                 }
 
                 //Включаем трек через время

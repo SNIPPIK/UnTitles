@@ -26,7 +26,7 @@ export class Queue {
         { type: 2, emoji: {id: db.emojis.button.next},      custom_id: 'skip',          style: 2 },  //Skip song
         { type: 2, emoji: {id: db.emojis.button.loop},      custom_id: 'repeat',        style: 2 }   //Loop
     ];
-    private readonly _songs = new QueueSongs();
+    private readonly _songs = new ExtraSongs();
 
     /**
      * @description Получаем доступ к трекам
@@ -165,33 +165,95 @@ export class Queue {
     };
 }
 
+
 /**
  * @author SNIPPIK
- * @description Создаем Array с треками для очереди
- * @class QueueSongs
- * @private
+ * @description Продвинутая система треков, треки удаляются только после удаления очереди
+ * @class ExtraSongs
  */
-class QueueSongs extends Array<Song> {
+class ExtraSongs {
+    private readonly _songs: Song[] = [];
+    private _position = 0;
+
+    /**
+     * @description Все треки в очереди, даже те которые уже закончились
+     * @public
+     */
+    public get array() { return this._songs; }
+
+    /**
+     * @description На сколько сделать пропуск треков
+     * @param number - Позиция трека
+     * @public
+     */
+    public set swapPosition(number: number) {
+        this._position += number;
+    };
+
     /**
      * @description Получаем текущий трек
      * @return Song
      * @public
      */
-    public get song(): Song { return this.at(0); };
+    public get song() { return this._songs[this._position]; };
 
     /**
-     * @description Получаем последний трек в очереди
-     * @return Song
+     * @description Текущая позиция трека в очереди
+     * @return number
      * @public
      */
-    public get last(): Song { return this.at(-1); };
+    public get position() { return this._position; };
 
     /**
      * @description Кол-во треков в очереди
      * @return number
      * @public
      */
-    public get size(): number { return this.length; };
+    public get size() { return this._songs.length; };
+
+    /**
+     * @description Добавляем трек в очередь
+     * @param track - Сам трек
+     */
+    public push = (track: Song) => { this._songs.push(track); };
+
+    /**
+     * @description Общее время треков
+     * @public
+     */
+    public get time() {
+        return this._songs.slice(this._position).reduce((total: number, item: {duration: { seconds: number }}) => total + (item.duration.seconds || 0), 0).duration();
+    };
+
+    /**
+     * @description Получаем следующие n треков, не включает текущий
+     * @param length - Кол-во треков
+     * @public
+     */
+    public next = (length: number = 5) => {
+        return this._songs.slice(this._position + 1, this._position + length);
+    };
+
+    /**
+     * @description Получаем последние n треков, не включает текущий
+     * @param length - Кол-во треков
+     * @public
+     */
+    public last = (length: number = 5) => {
+        return this._songs.slice(this._position - 1 - length, this._position - 1 - length);
+    };
+
+    /**
+     * @description Перетасовка треков
+     * @public
+     * @dev Надо переработать
+     */
+    public shuffle = () => {
+        for (let i = this.size - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this._songs[i], this._songs[j]] = [this._songs[j], this._songs[i]];
+        }
+    }
 }
 
 
