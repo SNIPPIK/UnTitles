@@ -70,34 +70,17 @@ class eventPlayer_error extends Constructor.Assign<Handler.Event<"player/error">
                 const queue = db.audio.queue.get(player.ID);
 
                 //Если нет плеера, то нет смысла продолжать
-                if (!queue || !queue.player || !queue.player.play) return;
+                if (!queue || !queue.player) return;
 
-                setImmediate(() => {
-                    switch (crash) {
-                        //Если надо пропустить трек из-за ошибки
-                        case "skip": {
-                            //Если есть треки в очереди
-                            if (queue.songs.size > 0) {
-                                setImmediate(() => {
-                                    queue.songs.shift();
+                // Если возникла критическая ошибка
+                if (crash) db.audio.queue.remove(queue.guild.id);
+                else {
+                    // Заставляем плеер пропустить этот трек
+                    if (queue.songs.size > 0) player.status = "player/ended";
+                }
 
-                                    //Включаем трек через время
-                                    setTimeout(() => queue.player.play(queue.songs.song), 2e3);
-                                });
-                            }
-                            return;
-                        }
-
-                        //Если возникает критическая ошибка
-                        case "crash": {
-                            db.audio.queue.remove(queue.guild.id);
-                            return;
-                        }
-                    }
-                });
-
-                //Выводим сообщение об ошибке
-                return db.audio.queue.events.emit("message/error", queue, err);
+                // Выводим сообщение об ошибке
+                db.audio.queue.events.emit("message/error", queue, err);
             }
         });
     };

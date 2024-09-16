@@ -1,6 +1,6 @@
 import {ActionRowBuilder, Colors, StringSelectMenuBuilder} from "discord.js";
 import {API, Constructor, Handler} from "@handler";
-import {Queue, Song} from "@lib/player/queue";
+import {Song} from "@lib/player/queue";
 import {db} from "@lib/db";
 
 /**
@@ -52,56 +52,33 @@ class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
         super({
             name: "message/push",
             type: "player",
-            execute: (queue, obj) => {
+            execute: (message, obj) => {
+                const {author, image} = obj;
 
-                //Если был добавлен трек
-                if (queue instanceof Queue) {
-                    const {color, author, image, title, duration} = obj as Song;
-
-                    new queue.message.builder().addEmbeds([
-                        {
-                            color, thumbnail: image,
-                            author: author ? {
-                                name: author?.title,
-                                iconURL: db.emojis.diskImage,
-                                url: author?.url
-                            } : null,
-                            footer: {
-                                text: `${duration.full} | 🎶: ${queue.songs.size}`
-                            },
-                            fields: [
-                                {
-                                    name: `Был добавлен трек:`,
-                                    value: `\`\`\`${title}\`\`\`\ `
-                                }
-                            ]
-                        }
-                    ]).setTime(12e3).send = queue.message;
-                }
-
-                //Если был добавлен плейлист
-                else if ("items" in obj) {
-                    const {author, image, title, items} = obj;
-
-                    new queue.builder().addEmbeds([
-                        {
-                            color: Colors.Blue, timestamp: new Date(),
-                            author: {name: author?.title, url: author?.url, iconURL: db.emojis.diskImage},
-                            thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.emojis.noImage},
-
-                            footer: {
-                                text: `${queue.author.username} | ${items.time()} | 🎶: ${items?.length}`,
-                                iconURL: queue.author.displayAvatarURL({})
-                            },
-                            fields: [
-                                {
-                                    name: "Добавлен список треков:",
-                                    value: `\`\`\`${title}\`\`\`\ `
-                                }
-                            ]
-                        }
-                    ]).setTime(20e3).send = queue;
-                }
+                // Отправляем сообщение, о том что было добавлено в очередь
+                new message.builder().addEmbeds([
+                    {
+                        color: obj["color"] ?? Colors.Blue,
+                        thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.emojis.noImage},
+                        footer: {
+                            text: `${message.author.username}`,
+                            iconURL: message.author.displayAvatarURL({})
+                        },
+                        author: {
+                            name: author?.title,
+                            url: author?.url,
+                            iconURL: db.emojis.diskImage
+                        },
+                        fields: [
+                            {
+                                name: "Добавлено в очередь:",
+                                value: obj instanceof Song ? `\`\`\`${obj.title}\`\`\`\ ` : `\`\`\`${obj.items.slice(1, 5).map((track, index) => {
+                                    return `\`${index + 2}\` ${track.titleReplaced}`;
+                                }).toString()}\nAnd ${obj.items.length - 5} tracks...\`\`\``
+                            }
+                        ]
+                    }
+                ]).setTime(12e3).send = message;
             }
         });
     };
@@ -252,22 +229,16 @@ class PlayerProgress {
         }
     };
 
-    private get duration() {
-        return this.options.duration;
-    };
+    private get duration() { return this.options.duration; };
 
     private get emoji() {
         if (!PlayerProgress.emoji) PlayerProgress.emoji = db.emojis.progress;
         return PlayerProgress.emoji;
     };
 
-    private get platform() {
-        return this.options.platform.toLowerCase();
-    };
+    private get platform() { return this.options.platform; };
 
-    private get bottom() {
-        return this.emoji["bottom_" + this.platform.toLowerCase()] || this.emoji.bottom;
-    };
+    private get bottom() { return this.emoji["bottom_" + this.platform] || this.emoji.bottom; };
 
     public get bar() {
         const size =  this.size, {current, total} = this.duration, emoji = this.emoji;
@@ -284,6 +255,7 @@ class PlayerProgress {
 
     public constructor(options: PlayerProgress["options"]) {
         Object.assign(this.options, options);
+        this.options.platform = options.platform.toLowerCase() as any;
     };
 }
 

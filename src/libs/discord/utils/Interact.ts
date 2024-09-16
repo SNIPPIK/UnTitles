@@ -45,10 +45,7 @@ export class Interact {
    * @description Получен ли ответ на сообщение
    * @public
    */
-  public get replied() {
-    if ("replied" in this._temp) return this._temp.replied;
-    return this._replied;
-  };
+  public get replied() { return this._replied; };
 
   /**
    * @description Получаем опции взаимодействия пользователя с ботом
@@ -148,19 +145,23 @@ export class Interact {
    * @description Отправляем сообщение со соответствием параметров
    * @param options - Данные для отправки сообщения
    */
-  public send = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[]}) => {
-    if (!this.replied) {
-      this._replied = false;
-      //@ts-ignore
-      if (!this._temp.deferred) return this._temp.reply({...options, fetchReply: true });
-      //@ts-ignore
-      return this._temp.followUp({...options, fetchReply: true });
-    }
+  public send = async (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[]}): Promise<Message> => {
+    try {
+      if (this.replied) {
+        this._replied = false;
+        return this._temp["reply"]({...options, fetchReply: true});
+      } else await this._temp["deferReply"]();
 
-    //@ts-ignore
-    return this._temp.channel.send({...options, fetchReply: true });
+      return this._temp.channel["send"]({...options, fetchReply: true});
+    } catch {
+      /* ЕБАЛО ЗАВАЛИ */
+    }
   };
 
+  /**
+   * @description Редактируем сообщение
+   * @param options - Данные для замены сообщения
+   */
   public edit = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[]}) => {
     if ("edit" in this._temp) return this._temp.edit(options as any);
     return null;
@@ -186,16 +187,16 @@ export class MessageBuilder {
    */
   public set send(interaction: Interact) {
     interaction.send({embeds: this.embeds, components: this.components}).then((message) => {
-      //Удаляем сообщение через время если это возможно
-      if (this.time !== 0) interaction.delete = this.time;
-
       //Если получить возврат не удалось, то ничего не делаем
       if (!message) return;
 
-      const mod = new Interact(message);
+      const msg = new Interact(message);
+
+      //Удаляем сообщение через время если это возможно
+      if (this.time !== 0) msg.delete = this.time;
 
       //Если надо выполнить действия после
-      if (this.promise) this.promise(mod);
+      if (this.promise) this.promise(msg);
     });
   };
 

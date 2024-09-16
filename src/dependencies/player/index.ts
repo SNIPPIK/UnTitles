@@ -154,7 +154,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             }
 
             //Если возникает не исправимая ошибка, то выключаем плеер
-            this.emit("player/error", this, `${err}`, "crash");
+            this.emit("player/error", this, `${err}`, true);
         }
     };
 
@@ -172,7 +172,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         }
 
         const timeout = setTimeout(() => {
-            this.emit("player/error", this, "Timeout the stream has been exceeded!", "skip");
+            this.emit("player/error", this, "Timeout the stream has been exceeded!", false);
         }, 25e3);
 
         stream.stream
@@ -183,7 +183,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             })
             //Если происходит ошибка, то продолжаем читать этот же поток
             .once("error", () => {
-                this.emit("player/error", this, "Fail read stream", "skip");
+                this.emit("player/error", this, "Fail read stream", false);
                 clearTimeout(timeout);
             });
     };
@@ -204,20 +204,20 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         track.resource.then((path) => {
             // Если нет ссылки на аудио
             if (!path) {
-                this.emit("player/error", this, `Not found link audio!`, "skip");
+                this.emit("player/error", this, `Not found link audio!`, false);
                 return;
             }
 
             // Если получена ошибка вместо ссылки
             else if (path instanceof Error) {
-                this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, "skip");
+                this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, false);
                 return;
             }
 
             this.emit("player/ended", this, seek);
             this.read = {path, seek};
         }).catch((err) => {
-            this.emit("player/error", this, `${err}`, "skip");
+            this.emit("player/error", this, `${err}`, false);
             //Logger.log("ERROR", err);
         });
     };
@@ -287,7 +287,7 @@ export interface AudioPlayerEvents {
     "player/playing": (player: AudioPlayer) => void;
 
     //Плеер получил ошибку
-    "player/error": (player: AudioPlayer, err: string, type?: "crash" | "skip") => void;
+    "player/error": (player: AudioPlayer, err: string, critical?: boolean) => void;
 }
 
 /**

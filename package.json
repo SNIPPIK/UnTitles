@@ -20,7 +20,8 @@
   "scripts": {
     "run": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src",
 
-    "proxy": "cd proxy && bash start.sh"
+    "proxy": "cd proxy/target/release && ./sthp -p 8080 -s 127.0.0.1:1080",
+    "proxy-build": "cd proxy && cargo build --release && cd target/release && ./sthp -p 8080 -s 127.0.0.1:1080"
     },
   "engines": {
     "node": ">=22.0.0"

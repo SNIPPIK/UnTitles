@@ -97,6 +97,8 @@ class cAPI extends Constructor.Assign<API.request> {
                                         //Если надо получить аудио
                                         if (audio) {
                                             const format = await cAPI.extractFormat(result["streamingData"]);
+                                            //console.log(format)
+
                                             result["videoDetails"]["format"] = {url: format["url"]};
                                         }
 

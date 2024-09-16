@@ -166,8 +166,7 @@ class AudioQueues extends Constructor.Collection<Queue> {
         if (!queue) queue = new Queue(message);
 
         // Отправляем сообщение о том что было добавлено
-        if (item instanceof Song && queue.songs.size >= 1) db.audio.queue.events.emit("message/push", queue, item);
-        else if ("items" in item) db.audio.queue.events.emit("message/push", message, item);
+        if (item instanceof Song && queue.songs.size >= 1 || "items" in item) db.audio.queue.events.emit("message/push", message, item);
 
         // Добавляем треки в очередь
         for (const track of (item["items"] ?? [item]) as Song[]) {
@@ -184,7 +183,7 @@ class AudioQueues extends Constructor.Collection<Queue> {
  */
 export interface CollectionAudioEvents {
     // Сообщение о добавленном треке или плейлисте, альбоме
-    "message/push": (queue: Queue | Interact, items: Song | Song.playlist) => void;
+    "message/push": (message: Interact, items: Song | Song.playlist) => void;
 
     // Сообщение о текущем треке
     "message/playing": (queue: Queue, message?: Interact) => void;
