@@ -103,7 +103,7 @@ export class Interact {
    */
   public get author(): User {
     if ("author" in this._temp) return this._temp.author;
-    return this._temp.member as any;
+    return this._temp.member.user as any;
   };
 
   /**

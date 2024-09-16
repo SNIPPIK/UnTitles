@@ -12,6 +12,7 @@ import {db} from "@lib/db";
  * @public
  */
 export class Queue {
+    private readonly _songs = new ExtraSongs();
     private readonly _data = {
         repeat:     "off" as "off" | "song" | "songs",
         shuffle:    false as boolean,
@@ -25,8 +26,7 @@ export class Queue {
         { type: 2, emoji: {id: db.emojis.button.pause},     custom_id: 'resume_pause',  style: 2 },  //Resume/Pause
         { type: 2, emoji: {id: db.emojis.button.next},      custom_id: 'skip',          style: 2 },  //Skip song
         { type: 2, emoji: {id: db.emojis.button.loop},      custom_id: 'repeat',        style: 2 }   //Loop
-    ];
-    private readonly _songs = new ExtraSongs();
+    ]
 
     /**
      * @description Получаем доступ к трекам

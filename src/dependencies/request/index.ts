@@ -56,7 +56,7 @@ abstract class Request {
 
         //Добавлять рандомный user-agent
         useragent?: boolean;
-    } & RequestOptions = { agent };
+    } & RequestOptions = { headers: {}, agent };
     /**
      * @description Получаем протокол ссылки
      * @private

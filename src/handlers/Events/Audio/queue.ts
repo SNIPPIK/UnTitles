@@ -61,8 +61,8 @@ class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
                         color: obj["color"] ?? Colors.Blue,
                         thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.emojis.noImage},
                         footer: {
-                            text: `${author.title}`,
-                            iconURL: author.image.url
+                            text: `${message.author.username}`,
+                            iconURL: message.author.avatarURL()
                         },
                         author: {
                             name: author?.title,
@@ -72,8 +72,8 @@ class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
                         fields: [
                             {
                                 name: "Добавлено в очередь:",
-                                value: obj instanceof Song ? `\`\`\`${obj.title}\`\`\`\ ` : `\`\`\`${obj.items.slice(1, 5).map((track, index) => {
-                                    return `\`${index + 2}\` ${track.titleReplaced}`;
+                                value: obj instanceof Song ? `\`\`\`[${obj.duration.full}] - ${obj.author.title} ${obj.titleReplaced}\`\`\`\ ` : `\`\`\`${obj.items.slice(1, 5).map((track, index) => {
+                                    return `\`${index + 2}\` [${track.duration.full}] - ${track.author.title} ${track.titleReplaced}`;
                                 }).toString()}\nAnd ${obj.items.length - 5} tracks...\`\`\``
                             }
                         ]
@@ -95,51 +95,33 @@ class onSearch extends Constructor.Assign<Handler.Event<"message/search">> {
         super({
             name: "message/search",
             type: "player",
-            execute: (tracks, platform, message) => {
+            execute: (tracks, _, message) => {
+                // Если не нашлись треки
                 if (tracks?.length < 1 || !tracks) {
-                    message.send({
-                        embeds: [
-                            {
-                                description: "Не удалось что то найти, попробуй другое название!",
-                                color: Colors.DarkRed
-                            }
-                        ]
-                    });
+                    new message.builder().addEmbeds([
+                        {
+                            description: "Не удалось что то найти, попробуй другое название!",
+                            color: Colors.DarkRed
+                        }
+                    ]).setTime(7e3).send = message;
                     return;
                 }
 
-                new message.builder().addEmbeds([{description: "Все что удалось найти!"}]).setTime(30e3)
-                    .addComponents([new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId("menu-builder")
-                        .setOptions(...tracks.map((track) => {
-                                return {
-                                    label: `${track.title}`,
-                                    description: `${track.author.title} | ${track.duration.full}`,
-                                    value: track.url
-                                }
-                            }), {label: "Отмена", value: "stop"}
+                // Отправляем список найденных треков
+                new message.builder().addEmbeds([{description: "Все что удалось найти!"}]).setTime(30e3).addComponents([
+                    new ActionRowBuilder()
+                        .addComponents(new StringSelectMenuBuilder()
+                            .setCustomId("search-menu")
+                            .setOptions(...tracks.map((track) => {
+                                    return {
+                                        label: `${track.title}`,
+                                        description: `${track.author.title} | ${track.duration.full}`,
+                                        value: track.url
+                                    }
+                                }), {label: "Отмена", value: "stop"}
+                            )
                         )
-                    )]).setPromise((msg) => {
-                        //Создаем сборщик
-                        const collector = msg.createMessageComponentCollector({
-                            filter: (interaction) => !interaction.user.bot,
-                            time: 30e3,
-                            max: 1
-                        });
-
-                        //Что будет делать сборщик после выбора трека
-                        collector.once("collect", (interaction: any) => {
-                            const id = interaction.values[0];
-
-                            if (id && id !== "stop") db.audio.queue.events.emit("request/api", message, [platform, id])
-
-                            interaction?.deferReply();
-                            interaction?.deleteReply();
-
-                            //Удаляем данные
-                            msg.delete = 200;
-                            collector.stop();
-                        });
-                    }).send = message;
+                ]).send = message;
             }
         });
     };

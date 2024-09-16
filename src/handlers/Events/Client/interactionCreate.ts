@@ -33,11 +33,21 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     return;
                 }
 
+                // Если происходит взаимодействие с меню
+                else if (message.isStringSelectMenu()) {
+                    const msg = new Interact(message);
+
+                    if (message.customId === "search-menu") {
+                        db.audio.queue.events.emit("request/api", msg, [message.values[0], message.values[0]]);
+                        message.message.delete().catch(() => {});
+                        return;
+                    }
+                }
+
                 // Управление кнопками
                 else if (message.isButton()) {
                     // Если были задействованы кнопки плеера
                     if (player_bottoms.includes(message.customId)) return Interaction.bottom_Players(new Interact(message));
-
                 }
             }
         });
@@ -61,11 +71,9 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
         if (msg.custom_id === "shuffle") {
             // Если в очереди менее 2 треков
             if (queue.songs.size < 2) {
-                msg.send({
-                    embeds: [
-                        { description: "В очереди менее 2 треков!", color: Colors.Yellow }
-                    ]
-                });
+                new msg.builder().addEmbeds([
+                    { description: "В очереди менее 2 треков!", color: Colors.Yellow }
+                ]).setTime(7e3).send = msg;
                 return;
             }
 
@@ -74,12 +82,9 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
 
             // Отправляем сообщение о включении или выключении тасовки
-            msg.send({
-                embeds: [
-                    { description: "Перетасовка очереди" + queue.shuffle ? "включена" : "выключена"}
-                ]
-            })
-
+            new msg.builder().addEmbeds([
+                { description: "Перетасовка очереди" + queue.shuffle ? "включена" : "выключена", color: Colors.Green}
+            ]).setTime(7e3).send = msg;
             return;
         }
 
@@ -117,7 +122,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     {
                         description: "Приостановка проигрывания!"
                     }
-                ]).setTime(7e0).send = msg;
+                ]).setTime(7e3).send = msg;
                 return;
             }
 
@@ -131,7 +136,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     {
                         description: "Возобновление проигрывания!"
                     }
-                ]).setTime(7e0).send = msg;
+                ]).setTime(7e3).send = msg;
                 return;
             }
         }
@@ -149,11 +154,9 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             if (loop === "off") {
                 queue.repeat = "songs";
 
-                msg.send({
-                    embeds: [
-                        { description: "Включен повтор треков!" }
-                    ]
-                });
+                new msg.builder().addEmbeds([
+                    { description: "Включен повтор треков!", color: Colors.Green}
+                ]).setTime(7e3).send = msg;
                 return;
             }
 
@@ -161,20 +164,16 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             else if (loop === "songs") {
                 queue.repeat = "song";
 
-                msg.send({
-                    embeds: [
-                        { description: "Включен повтор текущего трека!" }
-                    ]
-                });
+                new msg.builder().addEmbeds([
+                    { description: "Включен повтор текущего трека!", color: Colors.Green}
+                ]).setTime(7e3).send = msg;
                 return;
             }
 
             queue.repeat = "off";
-            msg.send({
-                embeds: [
-                    { description: "Выключен повтор!" }
-                ]
-            });
+            new msg.builder().addEmbeds([
+                { description: "Повтор выключен!", color: Colors.Green}
+            ]).setTime(7e3).send = msg;
             return;
         }
     };

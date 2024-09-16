@@ -1,5 +1,6 @@
 import {API, Constructor, Handler} from "@handler";
 import {db} from "@lib/db";
+import {Colors} from "discord.js";
 
 /**
  * @author SNIPPIK
@@ -77,8 +78,14 @@ class userRequestError extends Constructor.Assign<Handler.Event<"request/error">
         super({
             name: "request/error",
             type: "player",
-            execute: (_, error) => {
-                console.log(error);
+            execute: (message, error) => {
+                new message.builder().addEmbeds([
+                    {
+                        title: "APIs error",
+                        description: `Hook error: ${error}`,
+                        color: Colors.DarkRed
+                    }
+                ]).setTime(15e3).send = message;
             }
         });
     };
