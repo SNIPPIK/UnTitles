@@ -79,33 +79,23 @@ export class AudioResource {
     public get process() { return this._streams.at(1) as Process; };
 
     /**
-     * @description Задаем параметры запуска ffmpeg
-     * @param options - Параметры для запуска
-     * @private
-     */
-    private set ffmpeg(options: {path: string, seek?: number; filters: string}) {
-        const [type, file] = options.path.split(":|");
-
-        this._streams.push(new Process([
-            "-http_proxy", "http://127.0.0.1:8080",
-            "-vn",  "-loglevel", "panic",
-            ...(type === "link" ? ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
-            "-ss", `${options.seek ?? 0}`, "-i", file,
-            ...(options.filters ? ["-af", options.filters] : []),
-            "-f", `${OpusEncoder.lib.ffmpeg}`, "pipe:1"
-        ]));
-    };
-
-    /**
      * @description Подключаем поток к ffmpeg
      * @param options - Параметры для запуска
      * @private
      */
-    private set input(options: {input: NodeJS.ReadWriteStream, events: string[]}) {
-        for (const event of options.events) options.input.once(event, this.destroy);
-        options.input.once("readable", () => { this._readable = true; });
+    private set input(options: {input: NodeJS.ReadWriteStream | Process, event?: string, events: string[]}) {
+        // Подключаем ивенты к потоку
+        for (const event of options.events) {
+            if (options.event) options.input[options.event].once(event, this.destroy);
+            else options.input["once"](event, this.destroy);
+        }
 
-        this.process.stdout.pipe(options.input);
+        // Добавляем процесс в класс для отслеживания
+        if (options.input instanceof Process) this._streams.push(options.input);
+        else {
+            options.input.once("readable", () => { this._readable = true; });
+            this.process.stdout.pipe(options.input);
+        }
     };
 
     /**
@@ -114,10 +104,25 @@ export class AudioResource {
      * @public
      */
     public constructor(options: {path: string, seek?: number; filters: string; chunk?: number}) {
+        const [type, file] = options.path.split(":|");
+
         if (options.chunk > 0) this._options.chunk = 20 * options.chunk;
         if (options.seek > 0) this._options.chunks = (options.seek * 1e3) / this._options.chunk;
 
-        this.ffmpeg = options;
+        // Процесс
+        this.input = {
+            events: ["error"],
+            event: "stdout",
+            input: new Process([ "-vn",  "-loglevel", "panic",
+                "-http_proxy", "http://127.0.0.1:8080",
+                ...(type === "link" ? ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
+                "-ss", `${options.seek ?? 0}`, "-i", file,
+                ...(options.filters ? ["-af", options.filters] : []),
+                "-f", `${OpusEncoder.lib.ffmpeg}`, "pipe:1"
+            ])
+        };
+
+        // Расшифровщик
         this.input = {
             input: this.stream as any,
             events: ["end", "close", "error"]
