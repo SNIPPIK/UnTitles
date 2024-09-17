@@ -72,13 +72,13 @@ class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
                         fields: [
                             {
                                 name: "Добавлено в очередь:",
-                                value: obj instanceof Song ? `\`\`\`[${obj.duration.full}] - ${obj.author.title} ${obj.titleReplaced}\`\`\`\ ` : `\`\`\`${obj.items.slice(1, 5).map((track, index) => {
-                                    return `\`${index + 2}\` [${track.duration.full}] - ${track.author.title} ${track.titleReplaced}`;
-                                }).toString()}\nAnd ${obj.items.length - 5} tracks...\`\`\``
+                                value: obj instanceof Song ? `${obj.titleReplaced}` : `${obj.items.slice(0, 5).map((track, index) => {
+                                    return `\`${index + 1}\` ${track.titleReplaced}`;
+                                }).join("\n")}${obj.items.length > 5 ? `\nAnd ${obj.items.length - 5} tracks...` : ""}`
                             }
                         ]
                     }
-                ]).setTime(12e3).send = message;
+                ]).setTime(20e3).send = message;
             }
         });
     };
@@ -139,7 +139,7 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
             name: "message/playing",
             type: "player",
             execute: (queue, message) => {
-                const {color, author, image, title, url, duration, requester, platform} = queue.songs.song;
+                const {color, author, image, title, url, duration, platform} = queue.songs.song;
                 const embed = new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image,

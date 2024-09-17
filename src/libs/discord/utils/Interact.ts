@@ -134,14 +134,6 @@ export class Interact {
   };
 
   /**
-   * @description Создаем сборщик компонентов
-   * @param options - Параметры сборщика
-   */
-  public createMessageComponentCollector: InteractionResponse["createMessageComponentCollector"] = (options: any) => {
-    return ((this._temp as any) as InteractionResponse).createMessageComponentCollector(options);
-  };
-
-  /**
    * @description Отправляем сообщение со соответствием параметров
    * @param options - Данные для отправки сообщения
    */
@@ -154,7 +146,7 @@ export class Interact {
 
       return this._temp.channel["send"]({...options, fetchReply: true});
     } catch {
-      /* ЕБАЛО ЗАВАЛИ */
+      return this._temp.channel["send"]({...options, fetchReply: true});
     }
   };
 

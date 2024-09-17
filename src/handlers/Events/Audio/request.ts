@@ -81,8 +81,8 @@ class userRequestError extends Constructor.Assign<Handler.Event<"request/error">
             execute: (message, error) => {
                 new message.builder().addEmbeds([
                     {
-                        title: "APIs error",
-                        description: `Hook error: ${error}`,
+                        title: "API error",
+                        description: error,
                         color: Colors.DarkRed
                     }
                 ]).setTime(15e3).send = message;

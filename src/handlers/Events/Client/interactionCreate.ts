@@ -90,23 +90,22 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
         // Прошлый трек
         else if (msg.custom_id === "last") {
-            // Если треков менее 2
-            if (queue.songs.size < 2) return;
-            else if (queue.songs.size > 1) {
-                const index = queue.songs.size - 1;
-                queue.songs[0] = queue.songs[index];
-                queue.songs[index] = queue.songs.song;
+            // Если играет 1 трек
+            if (queue.songs.position === 0) {
+                new msg.builder().addEmbeds([
+                    { description: "Играет только 1 трек, прошлых треков нет!", color: Colors.Yellow }
+                ]).setTime(10e3).send = msg;
+                return;
             }
 
-            // Пропускаем текущий трек
+            // Меняем позицию трека в очереди
             queue.player.stop();
+            queue.songs.swapPosition = queue.songs.position - 2;
 
-            msg.send({
-                embeds: [
-                    { description: "Трек бы вернут!" }
-                ]
-            })
-
+            // Уведомляем пользователя о смене трека
+            new msg.builder().addEmbeds([
+                { description: "Прошлый трек бы вернут!", color: Colors.Yellow }
+            ]).setTime(10e3).send = msg;
             return;
         }
 
@@ -143,7 +142,15 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
         // Следующий трек
         else if (msg.custom_id === "skip") {
-            return db.commands.get("skip").execute({ message: msg, args: ["1"], type: null });
+            queue.player.stop();
+
+            // Уведомляем пользователя о пропущенном треке
+            new msg.builder().addEmbeds([
+                {
+                    description: "Текущий трек был пропущен!", color: Colors.Green
+                }
+            ]).setTime(7e3).send = msg;
+            return;
         }
 
         // Повтор

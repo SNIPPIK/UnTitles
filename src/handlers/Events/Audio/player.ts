@@ -40,7 +40,7 @@ class eventPlayer_wait extends Constructor.Assign<Handler.Event<"player/wait">> 
                 // Проверяем надо ли удалить из очереди трек
                 if (queue.repeat === "off" || queue.repeat === "songs") {
                     // Смена трек на следующий
-                    queue.songs.swapPosition++;
+                    queue.songs.swapPosition = queue.songs.position + 1;
                 }
 
                 //Проверяем надо ли перетасовывать очередь

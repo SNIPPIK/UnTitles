@@ -187,7 +187,7 @@ class ExtraSongs {
      * @public
      */
     public set swapPosition(number: number) {
-        this._position += number;
+        this._position = number;
     };
 
     /**
@@ -209,7 +209,7 @@ class ExtraSongs {
      * @return number
      * @public
      */
-    public get size() { return this._songs.length; };
+    public get size() { return this._songs.length - this.position; };
 
     /**
      * @description Добавляем трек в очередь
