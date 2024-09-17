@@ -176,12 +176,6 @@ class ExtraSongs {
     private _position = 0;
 
     /**
-     * @description Все треки в очереди, даже те которые уже закончились
-     * @public
-     */
-    public get array() { return this._songs; }
-
-    /**
      * @description На сколько сделать пропуск треков
      * @param number - Позиция трека
      * @public
@@ -212,18 +206,18 @@ class ExtraSongs {
     public get size() { return this._songs.length - this.position; };
 
     /**
-     * @description Добавляем трек в очередь
-     * @param track - Сам трек
-     */
-    public push = (track: Song) => { this._songs.push(track); };
-
-    /**
      * @description Общее время треков
      * @public
      */
     public get time() {
         return this._songs.slice(this._position).reduce((total: number, item: {duration: { seconds: number }}) => total + (item.duration.seconds || 0), 0).duration();
     };
+
+    /**
+     * @description Добавляем трек в очередь
+     * @param track - Сам трек
+     */
+    public push = (track: Song) => { this._songs.push(track); };
 
     /**
      * @description Получаем следующие n треков, не включает текущий
@@ -253,7 +247,7 @@ class ExtraSongs {
             const j = Math.floor(Math.random() * (i + 1));
             [this._songs[i], this._songs[j]] = [this._songs[j], this._songs[i]];
         }
-    }
+    };
 }
 
 

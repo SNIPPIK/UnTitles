@@ -20,22 +20,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
-     * @description Задаем параметры плеера перед началом работы
-     * @param guild - ID сервера для аутентификации плеера
-     */
-    public constructor(guild: string) {
-        super();
-        this.id = guild;
-
-        // Загружаем ивенты плеера
-        for (const event of db.audio.queue.events.player)
-            this.on(event, (...args: any[]) => db.audio.queue.events.emit(event as any, ...args));
-
-        // Добавляем плеер в базу для отправки пакетов
-        db.audio.cycles.players.set(this);
-    };
-
-    /**
      * @description Выдаем ID сервера с которым работает плеер или аутентификатор плеера
      * @return string - ID сервера для аутентификации плеера
      * @public
@@ -186,6 +170,22 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 this.emit("player/error", this, "Fail read stream", false);
                 clearTimeout(timeout);
             });
+    };
+
+    /**
+     * @description Задаем параметры плеера перед началом работы
+     * @param guild - ID сервера для аутентификации плеера
+     */
+    public constructor(guild: string) {
+        super();
+        this.id = guild;
+
+        // Загружаем ивенты плеера
+        for (const event of db.audio.queue.events.player)
+            this.on(event, (...args: any[]) => db.audio.queue.events.emit(event as any, ...args));
+
+        // Добавляем плеер в базу для отправки пакетов
+        db.audio.cycles.players.set(this);
     };
 
     /**
