@@ -1,4 +1,4 @@
-import {AudioPlayer, AudioPlayerEvents} from "@lib/player";
+import {AudioPlayer, AudioPlayerEvents, SILENCE_FRAME} from "@lib/player";
 import {Interact} from "@lib/discord/utils/Interact";
 import {TypedEmitter} from "tiny-typed-emitter";
 import {Queue, Song} from "@lib/player/queue";
@@ -66,8 +66,11 @@ class Cycles {
                     else {
                         const packet = player.stream.packet;
 
-                        if (packet) player.sendPacket = packet;
-                        else player.stop();
+                        if (!packet) player.stop();
+                        else {
+                            if (packet === SILENCE_FRAME) player.stop();
+                            else player.sendPacket = packet;
+                        }
                     }
                 }
             });

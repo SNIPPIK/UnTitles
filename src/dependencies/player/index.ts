@@ -4,6 +4,9 @@ import {AudioResource} from "@lib/player/audio";
 import {VoiceConnection} from "@lib/voice";
 import {db} from "@lib/db";
 
+// The Opus "silent" frame
+export const SILENCE_FRAME = Buffer.from([0xf8, 0xff, 0xfe]);
+
 /**
  * @author SNIPPIK
  * @description Плеер для проигрывания музыки

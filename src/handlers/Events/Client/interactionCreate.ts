@@ -151,7 +151,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             else {
                 // Меняем позицию трека в очереди
                 if (queue.player.stream.duration < queue.songs.song.duration.seconds + 10) {
-                    queue.songs.swapPosition = queue.songs.position - 1;
+                    queue.songs.swapPosition = queue.songs.position + 1;
                     queue.player.play(queue.songs.song);
                 } else queue.player.stop();
             }
