@@ -89,8 +89,8 @@ class Cycles {
                     const {guild} = message;
                     const queue = db.audio.queue.get(guild.id);
 
-                    if (!queue || !queue.songs.size) return this.remove(message);
-                    else if (!queue.player?.playing || !message.editable) return;
+                    if (!queue || !queue.songs.size || !queue.player) return this.remove(message);
+                    else if (!queue.player.playing || !message.editable) return;
 
                     // Обновляем сообщение о текущем треке
                     db.audio.queue.events.emit("message/playing", queue, message);

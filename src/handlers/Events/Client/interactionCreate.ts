@@ -99,8 +99,13 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             }
 
             // Меняем позицию трека в очереди
-            queue.songs.swapPosition = queue.songs.position - 1;
-            queue.player.play(queue.songs.song);
+            if (queue.player.stream.duration < queue.songs.song.duration.seconds + 10) {
+                queue.songs.swapPosition = queue.songs.position - 1;
+                queue.player.play(queue.songs.song);
+            } else {
+                queue.player.stop();
+                queue.songs.swapPosition = queue.songs.position - 2;
+            }
 
             // Уведомляем пользователя о смене трека
             new msg.builder().addEmbeds([
@@ -145,8 +150,10 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             if (queue.songs.size < 1) queue.player.stop();
             else {
                 // Меняем позицию трека в очереди
-                queue.songs.swapPosition = queue.songs.position + 1;
-                queue.player.play(queue.songs.song);
+                if (queue.player.stream.duration < queue.songs.song.duration.seconds + 10) {
+                    queue.songs.swapPosition = queue.songs.position - 1;
+                    queue.player.play(queue.songs.song);
+                } else queue.player.stop();
             }
 
             // Уведомляем пользователя о пропущенном треке
