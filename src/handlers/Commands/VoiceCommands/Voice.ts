@@ -47,7 +47,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                     case "re-configure": {
                         const voiceConnection = Voice.get(guild.id);
 
-                        //Если бот не подключен к голосовому каналу
+                        // Если бот не подключен к голосовому каналу
                         if (!voiceConnection) return;
 
                         // Меняем регион голосового подключения
@@ -78,8 +78,11 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                     case "leave": {
                         const voiceConnection = Voice.get(guild.id);
 
-                        //Если бот не подключен к голосовому каналу
+                        // Если бот не подключен к голосовому каналу
                         if (!voiceConnection) return;
+
+                        // Если есть очередь, то удаляем ее!
+                        if (queue) queue.cleanup();
 
                         voiceConnection.disconnect();
 
