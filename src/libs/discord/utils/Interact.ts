@@ -28,6 +28,12 @@ export class Interact {
   };
 
   /**
+   * @description Главный класс бота
+   * @public
+   */
+  public get me() { return this._temp.client; }
+
+  /**
    * @description Проверяем возможно ли редактирование сообщения
    * @public
    */

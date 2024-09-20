@@ -108,8 +108,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public set stream(stream: AudioResource) {
         //Если есть текущий поток
-        if (this.stream && this.stream?.stream) {
+        if (this.stream) {
             this.stream?.stream?.emit("close");
+            this.stream.destroy();
             this.data.stream = null;
         }
 
