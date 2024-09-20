@@ -1,7 +1,6 @@
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {ApplicationCommandOptionType} from "discord.js";
 import {Constructor, Handler} from "@handler";
-import {Voice} from "@lib/voice";
 
 /**
  * @class Command_Voice
@@ -54,35 +53,25 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                         ]
                     }
                 ]).json,
+            rules: ["voice", "anotherVoice"],
             execute: async ({message, args, type}) => {
-                const { guild } = message;
                 const me = message.guild.members?.me;
 
                 switch (type) {
                     case "stage": {
-                        const voiceConnection = Voice.get(guild.id);
-
                         try {
                             if (args[0] === "join") await me.voice.setSuppressed(true);
                             else await me.voice.setRequestToSpeak(true);
                         } catch (err) {
-                            message.send({
-                                embeds: [
-                                    {
-                                        description: args[0] === "join" ? "При подключении произошла ошибка!" : "При отправке запроса произошла ошибка"
-                                    }
-                                ]
-                            });
+                            message.fastBuilder = {
+                                description: args[0] === "join" ? "При подключении произошла ошибка!" : "При отправке запроса произошла ошибка"
+                            };
                             return;
                         }
 
-                        message.send({
-                            embeds: [
-                                {
-                                    description: args[0] === "join" ? "Произведено подключение" : "Был отправлен запрос"
-                                }
-                            ]
-                        })
+                        message.fastBuilder = {
+                            description: args[0] === "join" ? "Произведено подключение" : "Был отправлен запрос"
+                        }
                         return;
                     }
                 }

@@ -1,8 +1,7 @@
 import {ChildProcessWithoutNullStreams, spawn, spawnSync} from "node:child_process";
-import {OpusEncoder} from "@lib/voice/audio/Opus";
+import {OpusEncoder, SILENCE_FRAME} from "@lib/voice/audio/Opus";
 import * as path from "node:path";
 import {env} from "@env";
-import {SILENCE_FRAME} from "@lib/player";
 
 /**
  * @author SNIPPIK

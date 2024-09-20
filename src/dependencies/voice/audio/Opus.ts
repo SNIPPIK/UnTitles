@@ -20,6 +20,9 @@ const OpusLibs = {
     },
 }, Opus: Methods = {};
 
+// The Opus "silent" frame
+export const SILENCE_FRAME = Buffer.from([0xf8, 0xff, 0xfe]);
+
 /**
  * @author SNIPPIK
  * @description Превращаем имя переменной в буфер

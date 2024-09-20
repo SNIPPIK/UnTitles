@@ -1,6 +1,6 @@
 import { SlashBuilder } from "@lib/discord/utils/SlashBuilder";
 import {CollectionAudioEvents} from "@lib/db/Global/Audio";
-import { Interact } from "@lib/discord/utils/Interact";
+import {Interact, InteractRules} from "@lib/discord/utils/Interact";
 import {AudioPlayerEvents} from "@lib/player";
 import { ClientEvents } from "discord.js";
 import {Song} from "@lib/player/queue";
@@ -133,6 +133,14 @@ export namespace Handler {
      * @public
      */
     owner?: boolean;
+
+    /**
+     * @description Права для использования той или иной команды
+     * @default null
+     * @readonly
+     * @public
+     */
+    rules?: InteractRules[]
 
     /**
      * @description Выполнение команды

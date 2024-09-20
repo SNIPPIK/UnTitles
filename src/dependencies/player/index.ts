@@ -4,9 +4,6 @@ import {AudioResource} from "@lib/player/audio";
 import {VoiceConnection} from "@lib/voice";
 import {db} from "@lib/db";
 
-// The Opus "silent" frame
-export const SILENCE_FRAME = Buffer.from([0xf8, 0xff, 0xfe]);
-
 /**
  * @author SNIPPIK
  * @description Плеер для проигрывания музыки
@@ -91,16 +88,16 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public set status(status: keyof AudioPlayerEvents) {
-        //Если новый статус не является старым
+        // Если был введен новый статус
         if (status !== this.data.status) {
-            if (status === "player/pause" || status === "player/wait") {
-                //this.connection.speak = false;
-                this.stream?.stream?.emit("pause");
-            } else this.connection.speak = true;
+            // Если начато воспроизведение, то даем возможность говорить боту
+            if (status === "player/playing") this.connection.speak = true;
 
+            // Запускаем ивент
             this.emit(status, this);
         }
 
+        // Записываем статус
         this.data.status = status;
     };
 
@@ -110,14 +107,15 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public set stream(stream: AudioResource) {
-        //Если есть текущий поток
+        // Если есть текущий поток
         if (this.stream) {
+            this.connection.speak = false;
             this.stream?.stream?.emit("close");
             this.stream.destroy();
             this.data.stream = null;
         }
 
-        //Подключаем новый поток
+        // Подключаем новый поток
         this.data.stream = stream;
         this.status = "player/playing";
     };
@@ -130,7 +128,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         try {
             if (packet) this.connection.playOpusPacket(packet)
         } catch (err) {
-            //Подключаемся к голосовому каналу заново
+            // Подключаемся к голосовому каналу заново
             if (`${err}`.includes("getaddrinfo")) {
                 this.status = "player/pause";
                 this.emit("player/error", this, `Attempt to reconnect to the voice channel!`);
@@ -153,7 +151,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public set read(options: {path: string, seek: number}) {
         const stream = new AudioResource(Object.assign(options, this.filters.compress));
 
-        //Если стрим можно прочитать
+        // Если стрим можно прочитать
         if (stream.readable) {
             this.stream = stream;
             return;
@@ -164,12 +162,12 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         }, 25e3);
 
         stream.stream
-            //Включаем поток когда можно будет начать читать
+            // Включаем поток когда можно будет начать читать
             .once("readable", () => {
                 this.stream = stream;
                 clearTimeout(timeout);
             })
-            //Если происходит ошибка, то продолжаем читать этот же поток
+            // Если происходит ошибка, то продолжаем читать этот же поток
             .once("error", () => {
                 this.emit("player/error", this, "Fail read stream", false);
                 clearTimeout(timeout);
@@ -259,11 +257,12 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public cleanup = () => {
         this.removeAllListeners();
-        //Выключаем плеер если сейчас играет трек
+        // Выключаем плеер если сейчас играет трек
         this.stop();
 
         try {
-            this.stream?.stream?.emit("end");
+            this.stream?.stream?.emit("close");
+            this.stream.destroy();
         } catch (err) {
             console.error(err)
         }

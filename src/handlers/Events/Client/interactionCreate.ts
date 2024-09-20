@@ -1,4 +1,4 @@
-import {Interact} from "@lib/discord/utils/Interact";
+import {Interact, InteractRule} from "@lib/discord/utils/Interact";
 import {Constructor, Handler} from "@handler";
 import {Colors, Events} from "discord.js";
 import {db} from "@lib/db";
@@ -21,13 +21,23 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
                 // Если пользователь использует команду
                 if (message.isCommand()) {
-                    const msg = new Interact(message);
-
                     const interact = new Interact(message);
+                    const command = interact.command;
+
+                    // Если нет команды
+                    if (!command) {
+                        interact.fastBuilder = { description: "Я не нахожу этой команды", color: Colors.DarkRed };
+                        return;
+                    }
+
+                    // Если права не соответствуют правде
+                    else if (!InteractRule.check(command.rules, interact)) return;
+
+                    // Выполняем команду
                     interact.command.execute({
-                        message: msg,
-                        args: msg.options?._hoistedOptions?.map((f) => `${f.value}`),
-                        type: msg.options._subcommand
+                        message: interact,
+                        args: interact.options?._hoistedOptions?.map((f) => `${f.value}`),
+                        type: interact.options._subcommand
                     });
 
                     return;
@@ -71,20 +81,15 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
         if (msg.custom_id === "shuffle") {
             // Если в очереди менее 2 треков
             if (queue.songs.size < 2) {
-                new msg.builder().addEmbeds([
-                    { description: "В очереди менее 2 треков!", color: Colors.Yellow }
-                ]).setTime(7e3).send = msg;
+                msg.fastBuilder = { description: "В очереди менее 2 треков!", color: Colors.Yellow }
                 return;
             }
 
             // Включение тасовки очереди
             queue.shuffle = !queue.shuffle;
 
-
             // Отправляем сообщение о включении или выключении тасовки
-            new msg.builder().addEmbeds([
-                { description: "Перетасовка очереди" + queue.shuffle ? "включена" : "выключена", color: Colors.Green}
-            ]).setTime(7e3).send = msg;
+            msg.fastBuilder = { description: "Перетасовка очереди" + queue.shuffle ? "включена" : "выключена", color: Colors.Green }
             return;
         }
 
@@ -108,9 +113,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             }
 
             // Уведомляем пользователя о смене трека
-            new msg.builder().addEmbeds([
-                { description: "Прошлый трек бы вернут!", color: Colors.Yellow }
-            ]).setTime(10e3).send = msg;
+            msg.fastBuilder = { description: "Прошлый трек бы вернут!", color: Colors.Yellow }
             return;
         }
 
@@ -122,11 +125,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 queue.player.pause();
 
                 // Сообщение о паузе
-                new msg.builder().addEmbeds([
-                    {
-                        description: "Приостановка проигрывания!"
-                    }
-                ]).setTime(7e3).send = msg;
+                msg.fastBuilder = { description: "Приостановка проигрывания!", color: Colors.Green }
                 return;
             }
 
@@ -136,11 +135,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 queue.player.resume();
 
                 // Сообщение о возобновлении
-                new msg.builder().addEmbeds([
-                    {
-                        description: "Возобновление проигрывания!"
-                    }
-                ]).setTime(7e3).send = msg;
+                msg.fastBuilder = { description: "Возобновление проигрывания!", color: Colors.Green }
                 return;
             }
         }
@@ -157,11 +152,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             }
 
             // Уведомляем пользователя о пропущенном треке
-            new msg.builder().addEmbeds([
-                {
-                    description: "Текущий трек был пропущен!", color: Colors.Green
-                }
-            ]).setTime(7e3).send = msg;
+            msg.fastBuilder = { description: "Текущий трек был пропущен!", color: Colors.Green }
             return;
         }
 
@@ -173,9 +164,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             if (loop === "off") {
                 queue.repeat = "songs";
 
-                new msg.builder().addEmbeds([
-                    { description: "Включен повтор треков!", color: Colors.Green}
-                ]).setTime(7e3).send = msg;
+                msg.fastBuilder = { description: "Включен повтор треков!", color: Colors.Green }
                 return;
             }
 
@@ -183,16 +172,12 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             else if (loop === "songs") {
                 queue.repeat = "song";
 
-                new msg.builder().addEmbeds([
-                    { description: "Включен повтор текущего трека!", color: Colors.Green}
-                ]).setTime(7e3).send = msg;
+                msg.fastBuilder = { description: "Включен повтор текущего трека!", color: Colors.Green }
                 return;
             }
 
             queue.repeat = "off";
-            new msg.builder().addEmbeds([
-                { description: "Повтор выключен!", color: Colors.Green}
-            ]).setTime(7e3).send = msg;
+            msg.fastBuilder = { description: "Повтор выключен!", color: Colors.Green }
             return;
         }
     };

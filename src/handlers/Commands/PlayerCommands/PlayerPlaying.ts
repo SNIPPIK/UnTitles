@@ -1,6 +1,6 @@
+import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
-import {ApplicationCommandOptionType} from "discord.js";
-import {API, Constructor, Handler} from "@handler";
+import {Constructor, Handler} from "@handler";
 import {db} from "@lib/db";
 
 /**
@@ -73,20 +73,17 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                     }
                 ])
                 .json,
+            rules: ["voice", "anotherVoice"],
             execute: ({message, args, type}) => {
-                const {author, member, guild} = message;
-                const queue = message.queue;
-
-
                 //Если пользователь прикрепил файл
                 if (type === "file") {
                     const attachment = message.options.getAttachment("input");
 
                     //Если пользователь подсунул фальшивку
-                    //if (!attachment.contentType.match("audio")) return {
-                    //    content: locale._(message.locale,"command.play.attachment.audio.need", [author]),
-                    //    color: "Yellow"
-                    //};
+                    if (!attachment.contentType.match("audio")) {
+                        message.fastBuilder = { description: "Я не нахожу здесь аудио дорожки!", color: Colors.Yellow }
+                        return;
+                    }
 
                     db.audio.queue.events.emit("request/api", message, ["DISCORD", attachment]);
                     return;

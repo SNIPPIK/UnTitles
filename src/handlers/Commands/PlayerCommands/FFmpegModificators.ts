@@ -29,8 +29,8 @@ class Command_Seek extends Constructor.Assign<Handler.Command> {
                         required: true,
                         type: ApplicationCommandOptionType["String"]
                     }
-                ])
-                .json,
+                ]).json,
+            rules: ["queue", "voice", "anotherVoice"],
             execute: ({message, args}) => {
                 const {author, guild} = message;
                 const queue = db.audio.queue.get(guild.id);
@@ -38,45 +38,25 @@ class Command_Seek extends Constructor.Assign<Handler.Command> {
 
                 //Если пользователь не указал время
                 if (!duration) {
-                    new message.builder().addEmbeds([
-                        {
-                            color: Colors.DarkRed,
-                            description: "ARG ERROR"
-                        }
-                    ]).setTime(7e3).send = message;
+                    message.fastBuilder = { color: Colors.DarkRed, description: "ARG ERROR" }
                     return;
                 }
 
                 //Если пользователь написал что-то не так
                 else if (isNaN(duration)) {
-                    new message.builder().addEmbeds([
-                        {
-                            color: Colors.DarkRed,
-                            description: "ARG is NaN"
-                        }
-                    ]).setTime(7e3).send = message;
+                    message.fastBuilder = { color: Colors.DarkRed, description: "ARG is NaN" }
                     return;
                 }
 
                 //Если пользователь указал времени больше чем в треке
                 else if (duration > queue.songs.song.duration.seconds) {
-                    new message.builder().addEmbeds([
-                        {
-                            color: Colors.DarkRed,
-                            description: "Arg so big"
-                        }
-                    ]).setTime(7e3).send = message;
+                    message.fastBuilder = { color: Colors.DarkRed, description: "Arg so big" }
                     return;
                 }
 
                 //Если музыку нельзя пропустить из-за плеера
                 else if (!queue.player.playing) {
-                    new message.builder().addEmbeds([
-                        {
-                            color: Colors.DarkRed,
-                            description: "Player not playing"
-                        }
-                    ]).setTime(7e3).send = message;
+                    message.fastBuilder = { color: Colors.DarkRed, description: "Player not playing" }
                     return;
                 }
 
@@ -84,12 +64,7 @@ class Command_Seek extends Constructor.Assign<Handler.Command> {
                 queue.player.play(queue.songs.song, duration);
 
                 //Отправляем сообщение о пропуске времени
-                new message.builder().addEmbeds([
-                    {
-                        color: Colors.Green,
-                        description: `Seeked ${duration}`
-                    }
-                ]).setTime(7e3).send = message;
+                message.fastBuilder = { color: Colors.Green, description: `Seeked ${duration}` }
             }
         });
     };

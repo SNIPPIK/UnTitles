@@ -1,5 +1,6 @@
-import {AudioPlayer, AudioPlayerEvents, SILENCE_FRAME} from "@lib/player";
+import {AudioPlayer, AudioPlayerEvents} from "@lib/player";
 import {Interact} from "@lib/discord/utils/Interact";
+import {SILENCE_FRAME} from "@lib/voice/audio/Opus";
 import {TypedEmitter} from "tiny-typed-emitter";
 import {Queue, Song} from "@lib/player/queue";
 import {Attachment} from "discord.js";

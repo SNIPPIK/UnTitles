@@ -36,10 +36,11 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                         type: ApplicationCommandOptionType.Subcommand
                     }
                 ]).json,
+            rules: ["voice", "anotherVoice"],
             execute: async ({message, type}) => {
-                const { author, member, guild } = message;
                 const VoiceChannel: VoiceChannel | StageChannel = message.voice.channel;
-                const queue = db.audio.queue.get(guild.id);
+                const queue = message.queue;
+                const { guild } = message;
 
                 switch (type) {
 

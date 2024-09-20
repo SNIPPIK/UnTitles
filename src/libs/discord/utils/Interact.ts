@@ -1,11 +1,5 @@
-import {
-  ComponentData,
-  EmbedData,
-  GuildMember,
-  CommandInteractionOption,
-  GuildTextBasedChannel,
-  ActionRowBuilder, User, InteractionResponse
-} from "discord.js"
+import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User, Colors} from "discord.js"
+import type { ComponentData, EmbedData, GuildMember} from "discord.js"
 import { BaseInteraction, Message, Attachment} from "discord.js";
 import {db} from "@lib/db";
 
@@ -73,6 +67,14 @@ export class Interact {
    * @public
    */
   public get builder() { return MessageBuilder; };
+
+  /**
+   * @description Отправляем быстрое сообщение
+   * @param embed - Embed data, для создания сообщения
+   */
+  public set fastBuilder(embed: EmbedData) {
+    new this.builder().addEmbeds([embed]).setTime(10e3).send = this;
+  };
 
   /**
    * @description Получаем команду из названия если нет названия команда не будет получена
@@ -166,13 +168,80 @@ export class Interact {
   };
 }
 
+/**
+* @author SNIPPIK
+* @description Поддержка ---
+*/
+const intends: {[key: string]: (message: Interact) => boolean } = {
+  "voice": (message) => {
+    const VoiceChannel = message.voice.channel;
+
+    // Если нет голосового подключения
+    if (!VoiceChannel) {
+      message.fastBuilder = { description: "Надо подключится к голосовому каналу!", color: Colors.Yellow }
+      return false;
+    }
+
+    return true;
+  },
+  "queue": (message) => {
+    // Если нет очереди
+    if (!message.queue) {
+      message.fastBuilder = { description: "Я не нахожу очередь для работы музыки!", color: Colors.Yellow }
+      return false;
+    }
+
+    return true;
+  },
+  "anotherVoice": (message) => {
+    const VoiceChannel = message.voice?.channel;
+    const queue = message.queue;
+
+    // Если музыка играет в другом голосовом канале
+    if (queue && queue.voice && VoiceChannel?.id !== queue.voice.id && message.guild.members.me.voice.channel) {
+      message.fastBuilder = { description: "Музыка играет в другом голосовом канале, я не могу подключится сейчас к вам!", color: Colors.Yellow }
+      return false
+    }
+
+    return true;
+  }
+};
+
+export type InteractRules = "voice" | "queue" | "anotherVoice";
+
+/**
+ * @author SNIPPIK
+ * @description
+ */
+export class InteractRule {
+  /**
+   * @description Проверяем команды на наличие
+   * @param array
+   * @param message
+   */
+  public static check = (array: InteractRules[], message: Interact) => {
+    if (!array || array?.length === 0) return;
+
+    // Проверяем всю базу
+    for (const key of array) {
+      const intent = intends[key];
+
+      //Если нет этого необходимости проверки запроса, то пропускаем
+      if (!intent) continue;
+      else return intent(message);
+    }
+
+    return null;
+  };
+}
+
 
 /**
  * @author SNIPPIK
  * @description создаем продуманное сообщение
  * @class MessageBuilder
  */
-export class MessageBuilder {
+class MessageBuilder {
   public callback: (message: Message, pages: string[], page: number, embed: MessageBuilder["embeds"]) => void;
   public promise: (msg: Interact) => void;
   public components: (ComponentData | ActionRowBuilder)[] = [];

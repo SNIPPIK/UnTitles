@@ -43,11 +43,11 @@ class eventPlayer_wait extends Constructor.Assign<Handler.Event<"player/wait">> 
                     queue.songs.swapPosition = queue.songs.position + 1;
                 }
 
-                //Проверяем надо ли перетасовывать очередь
+                // Проверяем надо ли перетасовывать очередь
                 if (queue.shuffle && queue.repeat === "off") queue.songs.shuffle();
 
-                //Включаем трек через время
-                queue.player.play(queue.songs.song);
+                // Получаем ссылки на трек и проигрываем ее
+                setTimeout(() => queue.player.play(queue.songs.song), 1e3);
             }
         });
     };
@@ -66,7 +66,7 @@ class eventPlayer_error extends Constructor.Assign<Handler.Event<"player/error">
             execute: (player, err, crash) => {
                 const queue = db.audio.queue.get(player.ID);
 
-                //Если нет плеера, то нет смысла продолжать
+                // Если нет плеера, то нет смысла продолжать
                 if (!queue || !queue.player) return;
 
                 // Если возникла критическая ошибка
