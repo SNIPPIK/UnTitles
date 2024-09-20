@@ -44,12 +44,10 @@ class eventPlayer_wait extends Constructor.Assign<Handler.Event<"player/wait">> 
                 }
 
                 //Проверяем надо ли перетасовывать очередь
-                if (queue.shuffle && queue.repeat === "off") {
-                    //To do переработать класс треков
-                }
+                if (queue.shuffle && queue.repeat === "off") queue.songs.shuffle();
 
                 //Включаем трек через время
-                setTimeout(() => queue.player.play(queue.songs.song), 2e3);
+                queue.player.play(queue.songs.song);
             }
         });
     };

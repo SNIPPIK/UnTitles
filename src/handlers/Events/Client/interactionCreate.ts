@@ -99,8 +99,8 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             }
 
             // Меняем позицию трека в очереди
-            queue.player.stop();
-            queue.songs.swapPosition = queue.songs.position - 2;
+            queue.songs.swapPosition = queue.songs.position - 1;
+            queue.player.play(queue.songs.song);
 
             // Уведомляем пользователя о смене трека
             new msg.builder().addEmbeds([
@@ -142,7 +142,12 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
         // Следующий трек
         else if (msg.custom_id === "skip") {
-            queue.player.stop();
+            if (queue.songs.size < 1) queue.player.stop();
+            else {
+                // Меняем позицию трека в очереди
+                queue.songs.swapPosition = queue.songs.position + 1;
+                queue.player.play(queue.songs.song);
+            }
 
             // Уведомляем пользователя о пропущенном треке
             new msg.builder().addEmbeds([

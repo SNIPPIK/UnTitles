@@ -10,8 +10,8 @@
 
 
 
-  "command.play.file.fail": {
-    "ru": "",
+  "player.voice.null": {
+    "ru": "{ARGUMENT}, но я не подключен к голосовому каналу",
     "en-US": ""
   }
 }
