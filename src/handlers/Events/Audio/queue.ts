@@ -2,6 +2,7 @@ import {ActionRowBuilder, Colors, StringSelectMenuBuilder} from "discord.js";
 import {API, Constructor, Handler} from "@handler";
 import {Song} from "@lib/player/queue";
 import {db} from "@lib/db";
+import {locale} from "@lib/locale";
 
 /**
  * @author SNIPPIK
@@ -21,11 +22,11 @@ class onError extends Constructor.Assign<Handler.Event<"message/error">> {
                         color, thumbnail: image, timestamp: new Date(),
                         fields: [
                             {
-                                name: `Щас играет;`,
+                                name: locale._(queue.message.locale, "player.current.playing"),
                                 value: `\`\`\`${title}\`\`\``
                             },
                             {
-                                name: `**Error:**`,
+                                name: locale._(queue.message.locale, "player.current.error"),
                                 value: `\`\`\`js\n${error}...\`\`\``
                             }
                         ],
@@ -71,7 +72,7 @@ class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
                         },
                         fields: [
                             {
-                                name: "Добавлено в очередь:",
+                                name: locale._(message.locale, "player.queue.push"),
                                 value: obj instanceof Song ? `${obj.titleReplaced}` : `${obj.items.slice(0, 5).map((track, index) => {
                                     return `\`${index + 1}\` ${track.titleReplaced}`;
                                 }).join("\n")}${obj.items.length > 5 ? `\nAnd ${obj.items.length - 5} tracks...` : ""}`
@@ -100,7 +101,7 @@ class onSearch extends Constructor.Assign<Handler.Event<"message/search">> {
                 if (tracks?.length < 1 || !tracks) {
                     new message.builder().addEmbeds([
                         {
-                            description: "Не удалось что то найти, попробуй другое название!",
+                            description: locale._(message.locale, "player.search.fail"),
                             color: Colors.DarkRed
                         }
                     ]).setTime(7e3).send = message;
@@ -108,7 +109,7 @@ class onSearch extends Constructor.Assign<Handler.Event<"message/search">> {
                 }
 
                 // Отправляем список найденных треков
-                new message.builder().addEmbeds([{description: "Все что удалось найти!"}]).setTime(30e3).addComponents([
+                new message.builder().addEmbeds([{description: locale._(message.locale, "player.search")}]).setTime(30e3).addComponents([
                     new ActionRowBuilder()
                         .addComponents(new StringSelectMenuBuilder()
                             .setCustomId("search-menu")
@@ -118,7 +119,7 @@ class onSearch extends Constructor.Assign<Handler.Event<"message/search">> {
                                         description: `${track.author.title} | ${track.duration.full}`,
                                         value: track.url
                                     }
-                                }), {label: "Отмена", value: "stop"}
+                                }), {label: locale._(message.locale, "cancel"), value: "stop"}
                             )
                         )
                 ]).send = message;
@@ -146,7 +147,7 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                         author: {name: author.title, url: author.url, iconURL: db.emojis.diskImage},
                         fields: [
                             {
-                                name: "Щас играет",
+                                name: locale._(queue.message.locale, "player.current.playing"),
                                 value: `\`\`\`${title}\`\`\``
                             },
 
@@ -157,10 +158,10 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                                 });
 
                                 if (queue.songs.size > 5) return {
-                                    name: `Следующее - [${queue.songs.size}]`,
+                                    name: locale._(queue.message.locale, "player.next.playing.alt", [queue.songs.size]),
                                     value: tracks.join("\n")
                                 };
-                                return {name: "Следующее:", value: tracks.join("\n")};
+                                return {name: locale._(queue.message.locale, "player.next.playing"), value: tracks.join("\n")};
                             })() : null,
 
                             {

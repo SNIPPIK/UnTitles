@@ -2,6 +2,7 @@ import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {Constructor, Handler} from "@handler";
 import {db} from "@lib/db";
+import {locale} from "@lib/locale";
 
 /**
  * @class PlayCommand
@@ -81,7 +82,7 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
 
                     //Если пользователь подсунул фальшивку
                     if (!attachment.contentType.match("audio")) {
-                        message.fastBuilder = { description: "Я не нахожу здесь аудио дорожки!", color: Colors.Yellow }
+                        message.fastBuilder = { description: locale._(message.locale, "attachment.audio.fail"), color: Colors.Yellow }
                         return;
                     }
 

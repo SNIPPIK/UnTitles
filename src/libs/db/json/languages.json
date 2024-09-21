@@ -1,7 +1,32 @@
 {
-  "api.wait": {
-    "ru": "test",
-    "en-US": "test"
+  "user": {
+    "ru": "Пользователь",
+    "en-US": "User"
+  },
+
+  "cancel": {
+    "ru": "Отмена",
+    "en-US": "Cancel"
+  },
+
+  "command.fail": {
+    "ru": "Я не нахожу этой команды",
+    "en-US": "Я не нахожу этой команды"
+  },
+
+  "track.live": {
+    "ru": "**{ARGUMENT}.{ARGUMENT}**\n\n**❯** **Live track is not supported**",
+    "en-US": "**{ARGUMENT}.{ARGUMENT}**\n\n**❯** **Live track is not supported**"
+  },
+
+  "queue.need": {
+    "ru": "{ARGUMENT}, музыка сейчас не играет!",
+    "en-US": "{ARGUMENT}, music not playing!"
+  },
+
+  "attachment.audio.fail": {
+    "ru": "Я не нахожу здесь аудио дорожки!",
+    "en-US": "I not found in track audio!"
   },
 
 
@@ -10,8 +35,239 @@
 
 
 
-  "player.voice.null": {
-    "ru": "{ARGUMENT}, но я не подключен к голосовому каналу",
-    "en-US": ""
+
+
+
+
+  "player.bottom.shuffle.on": {
+    "ru": "Перетасовка очереди включена",
+    "en-US": "Перетасовка очереди включена"
+  },
+
+  "player.bottom.shuffle.off": {
+    "ru": "Перетасовка очереди выключена",
+    "en-US": "Перетасовка очереди выключена"
+  },
+
+  "player.bottom.shuffle.fail": {
+    "ru": "В очереди менее 2 треков!",
+    "en-US": "В очереди менее 2 треков!"
+  },
+
+  "player.bottom.last": {
+    "ru": "Прошлый трек бы вернут!",
+    "en-US": "Прошлый трек бы вернут!"
+  },
+
+  "player.bottom.last.fail": {
+    "ru": "Играет только 1 трек, прошлых треков нет!",
+    "en-US": "Играет только 1 трек, прошлых треков нет!"
+  },
+
+  "player.bottom.resume": {
+    "ru": "Возобновление проигрывания!",
+    "en-US": "Возобновление проигрывания!"
+  },
+
+  "player.bottom.pause": {
+    "ru": "Приостановка проигрывания!",
+    "en-US": "Приостановка проигрывания!"
+  },
+
+  "player.bottom.skip": {
+    "ru": "Текущий трек был пропущен!",
+    "en-US": "Текущий трек был пропущен!"
+  },
+
+  "player.bottom.repeat.songs": {
+    "ru": "Включен повтор треков!",
+    "en-US": "Включен повтор треков!"
+  },
+
+  "player.bottom.repeat.song": {
+    "ru": "Включен повтор текущего трека!",
+    "en-US": "Включен повтор текущего трека!"
+  },
+
+  "player.bottom.repeat.off": {
+    "ru": "Повтор выключен!",
+    "en-US": "Повтор выключен!"
+  },
+
+
+
+
+
+
+
+
+
+
+
+  "voice.join": {
+    "ru": "Произведено подключение",
+    "en-US": "Join success"
+  },
+
+  "voice.join.fail": {
+    "ru": "При подключении произошла ошибка!",
+    "en-US": "The in joining to channel getting error!"
+  },
+
+  "voice.join.request": {
+    "ru": "Был отправлен запрос"
+  },
+
+  "voice.join.request.fail": {
+    "ru": "При отправке запроса произошла ошибка"
+  },
+
+  "voice.leave": {
+    "ru": "Я покинул голосовой канал",
+    "en-US": "Success to leave voice channel!"
+  },
+
+  "voice.rtc": {
+    "ru": "Смена RTC региона",
+    "en-US": "Change RTC region!"
+  },
+
+  "voice.rtc.fail": {
+    "ru": "Не удалось поменять RTC регион!",
+    "en-US": "Fail change RTC region!"
+  },
+
+  "voice.need": {
+    "ru": "{ARGUMENT}, необходимо подключится к голосовому каналу!",
+    "en-US": "{ARGUMENT}, needed to join voice channel!"
+  },
+
+  "voice.alt": {
+    "ru": "Музыка играет в другом голосовом канале, я не могу подключится сейчас к {ARGUMENT}!",
+    "en-US": "Music playing in alternative voice channel, i not join in your voice channel {ARGUMENT}!"
+  },
+
+
+
+
+
+
+
+
+
+
+
+  "player.playing.off": {
+    "ru": "Музыка сейчас не играет!",
+    "en-US": "Музыка сейчас не играет!"
+  },
+
+  "player.current.playing": {
+    "ru": "Щас играет:",
+    "en-US": "Current:"
+  },
+
+  "player.next.playing": {
+    "ru": "Следующее:",
+    "en-US": "Next:"
+  },
+
+  "player.next.playing.alt": {
+    "ru": "Следующее - [{ARGUMENT}]",
+    "en-US": "Next - [{ARGUMENT}]"
+  },
+
+  "player.current.error": {
+    "ru": "**Error:**",
+    "en-US": "**Error:**"
+  },
+
+  "player.queue.push": {
+    "ru": "Добавлено в очередь:",
+    "en-US": "Added in queue:"
+  },
+
+  "player.search": {
+    "ru": "Все что удалось найти!",
+    "en-US": "Founded tracks!"
+  },
+
+  "player.search.fail": {
+    "ru": "Не удалось что то найти, попробуй другое название!",
+    "en-US": "Not found tracks!"
+  },
+
+
+
+
+
+
+
+
+
+
+
+  "api.error": {
+    "ru": "API error",
+    "en-US": "API error"
+  },
+
+  "api.platform.block": {
+    "ru": "APIs block: This platform has currently been blocked by the developer",
+    "en-US": "APIs block: This platform has currently been blocked by the developer"
+  },
+
+  "api.platform.auth": {
+    "ru": "APIs auth: Problem with authorization data, contact the developer",
+    "en-US": "APIs auth: Problem with authorization data, contact the developer"
+  },
+
+  "api.platform.support": {
+    "ru": "APIs error: I don't have support for this type of request",
+    "en-US": "APIs error: I don't have support for this type of request"
+  },
+
+  "api.platform.request": {
+    "ru": "{ARGUMENT} Ожидание ответа от сервера...",
+    "en-US": "{ARGUMENT} Ожидание ответа от сервера..."
+  },
+
+  "api.platform.timeout": {
+    "ru": "Timeout server: The server refused to transmit data",
+    "en-US": "Timeout server: The server refused to transmit data"
+  },
+
+  "api.platform.error": {
+    "ru": "Critical Error: {ARGUMENT}",
+    "en-US": "Critical Error: {ARGUMENT}"
+  },
+
+
+
+
+
+
+
+
+
+
+  "command.seek.duration": {
+    "ru": "Error argument",
+    "en-US": "Error argument"
+  },
+
+  "command.seek.duration.nan": {
+    "ru": "Argument is NaN",
+    "en-US": "Argument is NaN"
+  },
+
+  "command.seek.duration.big": {
+    "ru": "Arg so big",
+    "en-US": "Arg so big"
+  },
+
+  "command.seek": {
+    "ru": "Seeked {ARGUMENT}",
+    "en-US": "Seeked {ARGUMENT}"
   }
 }

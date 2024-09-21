@@ -1,6 +1,7 @@
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
-import {ApplicationCommandOptionType} from "discord.js";
+import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {Constructor, Handler} from "@handler";
+import {locale} from "@lib/locale";
 
 /**
  * @class Command_Voice
@@ -64,13 +65,15 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                             else await me.voice.setRequestToSpeak(true);
                         } catch (err) {
                             message.fastBuilder = {
-                                description: args[0] === "join" ? "При подключении произошла ошибка!" : "При отправке запроса произошла ошибка"
+                                description: args[0] === "join" ? locale._(message.locale, "voice.join.fail") : locale._(message.locale, "voice.join.request.fail"),
+                                color: Colors.DarkRed
                             };
                             return;
                         }
 
                         message.fastBuilder = {
-                            description: args[0] === "join" ? "Произведено подключение" : "Был отправлен запрос"
+                            description: args[0] === "join" ? locale._(message.locale, "voice.join") : locale._(message.locale, "voice.join.request"),
+                            color: Colors.Green
                         }
                         return;
                     }

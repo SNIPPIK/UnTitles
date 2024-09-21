@@ -1,6 +1,7 @@
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {ApplicationCommandOptionType} from "discord.js";
 import {Constructor, Handler} from "@handler";
+import {locale} from "@lib/locale";
 
 /**
  * @class AvatarCommand
@@ -35,7 +36,7 @@ class AvatarCommand extends Constructor.Assign<Handler.Command> {
                 new message.builder().addEmbeds([
                     {
                         color: user.accentColor,
-                        description: `Пользователь <@!${user.id}>`,
+                        description: `${locale._(message.locale, "user")} <@!${user.id}>`,
                         timestamp: new Date,
                         image: { url: user.avatarURL({size: 1024, forceStatic: false}) },
                         footer: {

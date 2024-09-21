@@ -1,8 +1,8 @@
 import {ApplicationCommandOptionType, Colors, StageChannel, VoiceChannel} from "discord.js";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {Constructor, Handler} from "@handler";
+import {locale} from "@lib/locale";
 import {Voice} from "@lib/voice";
-import {db} from "@lib/db";
 
 /**
  * @class Command_Voice
@@ -60,7 +60,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                                 new message.builder().addEmbeds([
                                     {
                                         color: Colors.Green,
-                                        description: "Change RTC region!"
+                                        description: locale._(message.locale, "voice.rtc")
                                     }
                                 ]).setTime(10e3).send = message;
                             })
@@ -68,7 +68,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                                 new message.builder().addEmbeds([
                                     {
                                         color: Colors.DarkRed,
-                                        description: "Fail change RTC region!"
+                                        description: locale._(message.locale, "voice.rtc.fail")
                                     }
                                 ]).setTime(10e3).send = message;
                             });
@@ -90,7 +90,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                         new message.builder().addEmbeds([
                             {
                                 color: Colors.Green,
-                                description: "Success to leave voice channel!"
+                                description: locale._(message.locale, "voice.leave")
                             }
                         ]).setTime(10e3).send = message;
                     }

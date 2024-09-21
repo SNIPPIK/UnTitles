@@ -2,6 +2,7 @@ import {Interact, InteractRule} from "@lib/discord/utils/Interact";
 import {Constructor, Handler} from "@handler";
 import {Colors, Events} from "discord.js";
 import {db} from "@lib/db";
+import {locale} from "@lib/locale";
 
 const player_bottoms = ["shuffle", "last", "resume_pause", "skip", "repeat"];
 
@@ -26,7 +27,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
                     // Если нет команды
                     if (!command) {
-                        interact.fastBuilder = { description: "Я не нахожу этой команды", color: Colors.DarkRed };
+                        interact.fastBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
                         return;
                     }
 
@@ -83,7 +84,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
         if (msg.custom_id === "shuffle") {
             // Если в очереди менее 2 треков
             if (queue.songs.size < 2) {
-                msg.fastBuilder = { description: "В очереди менее 2 треков!", color: Colors.Yellow }
+                msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.shuffle.fail"), color: Colors.Yellow }
                 return;
             }
 
@@ -91,7 +92,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             queue.shuffle = !queue.shuffle;
 
             // Отправляем сообщение о включении или выключении тасовки
-            msg.fastBuilder = { description: "Перетасовка очереди" + queue.shuffle ? "включена" : "выключена", color: Colors.Green }
+            msg.fastBuilder = { description: locale._(msg.locale, queue.shuffle ? "player.bottom.shuffle.on" : "player.bottom.shuffle.off"), color: Colors.Green }
             return;
         }
 
@@ -100,7 +101,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             // Если играет 1 трек
             if (queue.songs.position === 0) {
                 new msg.builder().addEmbeds([
-                    { description: "Играет только 1 трек, прошлых треков нет!", color: Colors.Yellow }
+                    { description: locale._(msg.locale, "player.bottom.last.fail"), color: Colors.Yellow }
                 ]).setTime(10e3).send = msg;
                 return;
             }
@@ -115,7 +116,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             }
 
             // Уведомляем пользователя о смене трека
-            msg.fastBuilder = { description: "Прошлый трек бы вернут!", color: Colors.Yellow }
+            msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.last"), color: Colors.Yellow }
             return;
         }
 
@@ -127,7 +128,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 queue.player.pause();
 
                 // Сообщение о паузе
-                msg.fastBuilder = { description: "Приостановка проигрывания!", color: Colors.Green }
+                msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.pause"), color: Colors.Green }
                 return;
             }
 
@@ -137,7 +138,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 queue.player.resume();
 
                 // Сообщение о возобновлении
-                msg.fastBuilder = { description: "Возобновление проигрывания!", color: Colors.Green }
+                msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.resume"), color: Colors.Green }
                 return;
             }
         }
@@ -154,7 +155,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             }
 
             // Уведомляем пользователя о пропущенном треке
-            msg.fastBuilder = { description: "Текущий трек был пропущен!", color: Colors.Green }
+            msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.skip"), color: Colors.Green }
             return;
         }
 
@@ -166,7 +167,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             if (loop === "off") {
                 queue.repeat = "songs";
 
-                msg.fastBuilder = { description: "Включен повтор треков!", color: Colors.Green }
+                msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.repeat.songs"), color: Colors.Green }
                 return;
             }
 
@@ -174,12 +175,12 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             else if (loop === "songs") {
                 queue.repeat = "song";
 
-                msg.fastBuilder = { description: "Включен повтор текущего трека!", color: Colors.Green }
+                msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.repeat.song"), color: Colors.Green }
                 return;
             }
 
             queue.repeat = "off";
-            msg.fastBuilder = { description: "Повтор выключен!", color: Colors.Green }
+            msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.repeat.off"), color: Colors.Green }
             return;
         }
     };

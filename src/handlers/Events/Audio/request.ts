@@ -1,6 +1,7 @@
 import {API, Constructor, Handler} from "@handler";
-import {db} from "@lib/db";
+import {locale} from "@lib/locale";
 import {Colors} from "discord.js";
+import {db} from "@lib/db";
 import {env} from "@env";
 
 /**
@@ -18,13 +19,13 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
 
                 // Если платформа заблокирована
                 if (platform.block) {
-                    db.audio.queue.events.emit("request/error", message, `APIs block: This platform has currently been blocked by the developer.`);
+                    db.audio.queue.events.emit("request/error", message, locale._(message.locale, "api.platform.block"));
                     return;
                 }
 
                 // Если есть проблема с авторизацией на платформе
                 else if (platform.auth) {
-                    db.audio.queue.events.emit("request/error", message, `APIs auth: Problem with authorization data, contact the developer`);
+                    db.audio.queue.events.emit("request/error", message, locale._(message.locale, "api.platform.auth"));
                     return;
                 }
 
@@ -33,20 +34,20 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
 
                 // Если нет поддержки такого запроса!
                 if (!api || !api.name) {
-                    db.audio.queue.events.emit("request/error", message, `APIs error: I don't have support for this type of request`);
+                    db.audio.queue.events.emit("request/error", message, locale._(message.locale, "api.platform.support"));
                     return;
                 }
 
                 // Отправляем сообщение о том что запрос производится
                 message.fastBuilder = {
                     title: `${platform.platform}.${api.name}`,
-                    description: `${env.get("loading.emoji")} Ожидание ответа от сервера...`,
+                    description: locale._(message.locale, "api.platform.request", [env.get("loading.emoji")]),
                     color: platform.color
                 };
 
                 // Если ответ не был получен от сервера
                 const timeout = setTimeout(() => {
-                    db.audio.queue.events.emit("request/error", message, `Timeout server: The server refused to transmit data`);
+                    db.audio.queue.events.emit("request/error", message, locale._(message.locale, "api.platform.timeout"));
                 }, 10e3);
 
                 // Получаем данные в системе API
@@ -55,7 +56,7 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
 
                     // Если нет данных или была получена ошибка
                     if (item instanceof Error) {
-                        db.audio.queue.events.emit("request/error", message, `Critical Error: ${item}`);
+                        db.audio.queue.events.emit("request/error", message, locale._(message.locale, "api.platform.error", [item]));
                         return;
                     }
 
@@ -67,7 +68,7 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
 
                     else if ("duration" in item) {
                         if (item.duration.seconds === 0) {
-                            db.audio.queue.events.emit("request/error", message, `**${platform.platform}.${api.name}**\n\n**❯** **Live track is not supported**`, true);
+                            db.audio.queue.events.emit("request/error", message, locale._(message.locale, "track.live", [platform.platform, api.name]), true);
                             return
                         }
                     }
@@ -96,7 +97,7 @@ class userRequestError extends Constructor.Assign<Handler.Event<"request/error">
             execute: (message, error) => {
                 new message.builder().addEmbeds([
                     {
-                        title: "API error",
+                        title: locale._(message.locale, "api.error"),
                         description: error,
                         color: Colors.DarkRed
                     }

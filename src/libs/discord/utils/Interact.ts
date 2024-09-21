@@ -1,6 +1,8 @@
 import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User, Colors} from "discord.js"
 import type { ComponentData, EmbedData, GuildMember} from "discord.js"
 import { BaseInteraction, Message, Attachment} from "discord.js";
+import type {LocalizationMap} from "discord-api-types/v10";
+import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 
 /**
@@ -36,10 +38,15 @@ export class Interact {
     return false;
   };
 
-  public get locale() {
+  /**
+   * @description Получение языка пользователя
+   * @public
+   */
+  public get locale(): keyof LocalizationMap {
     if ("locale" in this._temp) return this._temp.locale;
+    else if ("guildLocale" in this._temp) return this._temp.guildLocale as any;
     return "ru";
-  }
+  };
 
   /**
    * @description Получен ли ответ на сообщение
@@ -178,7 +185,7 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
 
     // Если нет голосового подключения
     if (!VoiceChannel) {
-      message.fastBuilder = { description: "Надо подключится к голосовому каналу!", color: Colors.Yellow }
+      message.fastBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow }
       return false;
     }
 
@@ -187,7 +194,7 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
   "queue": (message) => {
     // Если нет очереди
     if (!message.queue) {
-      message.fastBuilder = { description: "Я не нахожу очередь для работы музыки!", color: Colors.Yellow }
+      message.fastBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow }
       return false;
     }
 
@@ -199,7 +206,7 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
 
     // Если музыка играет в другом голосовом канале
     if (queue && queue.voice && VoiceChannel?.id !== queue.voice.id && message.guild.members.me.voice.channel) {
-      message.fastBuilder = { description: "Музыка играет в другом голосовом канале, я не могу подключится сейчас к вам!", color: Colors.Yellow }
+      message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow }
       return false
     }
 

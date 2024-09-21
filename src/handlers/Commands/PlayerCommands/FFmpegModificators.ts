@@ -2,6 +2,7 @@ import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {Constructor, Handler} from "@handler";
 import {db} from "@lib/db";
+import {locale} from "@lib/locale";
 
 /**
  * @class Command_Seek
@@ -38,25 +39,25 @@ class Command_Seek extends Constructor.Assign<Handler.Command> {
 
                 //Если пользователь не указал время
                 if (!duration) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: "ARG ERROR" }
+                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration") }
                     return;
                 }
 
                 //Если пользователь написал что-то не так
                 else if (isNaN(duration)) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: "ARG is NaN" }
+                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.nan") }
                     return;
                 }
 
                 //Если пользователь указал времени больше чем в треке
                 else if (duration > queue.songs.song.duration.seconds) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: "Arg so big" }
+                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.big") }
                     return;
                 }
 
                 //Если музыку нельзя пропустить из-за плеера
                 else if (!queue.player.playing) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: "Player not playing" }
+                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "player.playing.off") }
                     return;
                 }
 
@@ -64,7 +65,7 @@ class Command_Seek extends Constructor.Assign<Handler.Command> {
                 queue.player.play(queue.songs.song, duration);
 
                 //Отправляем сообщение о пропуске времени
-                message.fastBuilder = { color: Colors.Green, description: `Seeked ${duration}` }
+                message.fastBuilder = { color: Colors.Green, description: locale._(message.locale, "command.seek", [duration]) }
             }
         });
     };
