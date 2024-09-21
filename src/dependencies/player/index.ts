@@ -128,17 +128,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         try {
             if (packet) this.connection.playOpusPacket(packet)
         } catch (err) {
-            // Подключаемся к голосовому каналу заново
-            if (`${err}`.includes("getaddrinfo")) {
-                this.status = "player/pause";
-                this.emit("player/error", this, `Attempt to reconnect to the voice channel!`);
-
-                for (let r = 0; r < 2; r++) {
-                    if (this.connection.state.status === "ready") break;
-                    this.connection.rejoin();
-                }
-            }
-
             //Если возникает не исправимая ошибка, то выключаем плеер
             this.emit("player/error", this, `${err}`, true);
         }

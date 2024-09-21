@@ -1,5 +1,5 @@
 import {ChildProcessWithoutNullStreams, spawn, spawnSync} from "node:child_process";
-import {OpusEncoder, SILENCE_FRAME} from "@lib/voice/audio/Opus";
+import {OpusEncoder} from "@lib/voice/audio/Opus";
 import * as path from "node:path";
 import {env} from "@env";
 
@@ -51,14 +51,11 @@ export class AudioResource {
     public get packet(): Buffer {
         const packet = this.stream.read();
 
-        // Если есть аудио пакеты, то отправляем
-        if (packet) {
-            this._options.chunks++;
-            return packet;
-        }
+        // Если есть аудио пакеты
+        if (packet) this._options.chunks++;
 
-        // Отправляем пустышку
-        return SILENCE_FRAME;
+        // Отправляем пакет
+        return packet;
     };
 
     /**

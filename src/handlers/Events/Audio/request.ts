@@ -1,6 +1,7 @@
 import {API, Constructor, Handler} from "@handler";
 import {db} from "@lib/db";
 import {Colors} from "discord.js";
+import {env} from "@env";
 
 /**
  * @author SNIPPIK
@@ -36,6 +37,13 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
                     return;
                 }
 
+                // Отправляем сообщение о том что запрос производится
+                message.fastBuilder = {
+                    title: `${platform.platform}.${api.name}`,
+                    description: `${env.get("loading.emoji")} Ожидание ответа от сервера...`,
+                    color: platform.color
+                };
+
                 // Если ответ не был получен от сервера
                 const timeout = setTimeout(() => {
                     db.audio.queue.events.emit("request/error", message, `Timeout server: The server refused to transmit data`);
@@ -55,6 +63,13 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
                     else if (item instanceof Array) {
                         db.audio.queue.events.emit("message/search", item, platform.platform, message);
                         return;
+                    }
+
+                    else if ("duration" in item) {
+                        if (item.duration.seconds === 0) {
+                            db.audio.queue.events.emit("request/error", message, `**${platform.platform}.${api.name}**\n\n**❯** **Live track is not supported**`, true);
+                            return
+                        }
                     }
 
                     // Запускаем проигрывание треков

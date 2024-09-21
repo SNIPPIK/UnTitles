@@ -31,7 +31,9 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     }
 
                     // Если права не соответствуют правде
-                    else if (!InteractRule.check(command.rules, interact)) return;
+                    if (command.rules && command.rules?.length > 0) {
+                        if (!InteractRule.check(command.rules, interact)) return;
+                    }
 
                     // Выполняем команду
                     interact.command.execute({
