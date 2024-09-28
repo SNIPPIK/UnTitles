@@ -1,8 +1,8 @@
 import {Interact, InteractRule} from "@lib/discord/utils/Interact";
 import {Constructor, Handler} from "@handler";
 import {Colors, Events} from "discord.js";
-import {db} from "@lib/db";
 import {locale} from "@lib/locale";
+import {db} from "@lib/db";
 
 const player_bottoms = ["shuffle", "last", "resume_pause", "skip", "repeat"];
 
@@ -129,7 +129,6 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
                 // Сообщение о паузе
                 msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.pause"), color: Colors.Green }
-                return;
             }
 
             // Если плеер на паузе
@@ -139,8 +138,8 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
                 // Сообщение о возобновлении
                 msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.resume"), color: Colors.Green }
-                return;
             }
+            return;
         }
 
         // Следующий трек
