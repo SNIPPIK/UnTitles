@@ -1,17 +1,17 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {Constructor, Handler} from "@handler";
-import {db} from "@lib/db";
 import {locale} from "@lib/locale";
+import {db} from "@lib/db";
 
 /**
- * @class Command_Seek
+ * @class SeekTrackCommand
  * @command seek
  * @description Пропуск времени в текущем треке
  *
  * @param value - Время для пропуска времени
  */
-class Command_Seek extends Constructor.Assign<Handler.Command> {
+class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
@@ -75,4 +75,4 @@ class Command_Seek extends Constructor.Assign<Handler.Command> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({Command_Seek});
+export default Object.values({SeekTrackCommand});
