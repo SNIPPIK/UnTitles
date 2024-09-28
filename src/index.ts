@@ -1,5 +1,6 @@
 import {Client, ShardManager} from "@lib/discord";
 import process from "node:process";
+import {Logger} from "@lib/logger";
 import {Colors} from "discord.js";
 import {env} from "@env";
 import {db} from "@lib/db";
@@ -21,18 +22,18 @@ else if (process["argv"].includes("--RemoveAllCommands")) {
 
     client.once("ready", () => {
         client.application.commands.set([]).then(() => {
-            //Logger.log("LOG", `Removed application SlashCommands!`);
+            Logger.log("LOG", `Removed application SlashCommands!`);
         });
 
-        for (const [key, guild] of client.guilds.cache) {
+        for (const [, guild] of client.guilds.cache) {
             guild.commands.set([]).then(() => {
-                //Logger.log("WARN", `[Guild - ${guild.id}] remove SlashCommands`);
+                Logger.log("WARN", `[Guild - ${guild.id}] remove SlashCommands`);
             })
         }
     });
 
     client.login(env.get("token.discord")).then(() => {
-        //Logger.log("LOG", `[Shard ${client.ID}] is connected to websocket`);
+        Logger.log("LOG", `[Shard ${client.ID}] is connected to websocket`);
     });
 }
 
@@ -41,9 +42,6 @@ else if (process["argv"].includes("--RemoveAllCommands")) {
  * @description Загрузка осколка
  */
 else {
-    //Если включен режим отладки, режим отладки запускается через --dbg
-    //if (process["argv"].includes("--dbg")) Logger.log("WARN", `[DEBUG MODE] Enabled...`);
-
     const client = new Client();
 
     /**
@@ -52,7 +50,7 @@ else {
     client.login(env.get("token.discord")).then(() => {
         //Запускаем загрузку модулей после инициализации бота
         client.once("ready", () => {
-            //Logger.log("LOG", `[Shard ${client.ID}] is connected to websocket`);
+            Logger.log("LOG", `[Shard ${client.ID}] is connected to websocket`);
             db.initialize = client;
         });
     });
@@ -61,8 +59,8 @@ else {
      * @description Удаляем копию клиента если процесс был закрыт
      */
     for (const event of ["exit"]) process.on(event, () => {
-        //Logger.log("DEBUG", "[Process]: is killed!");
-        client.destroy()//.catch((err) => Logger.log("ERROR", err));
+        Logger.log("DEBUG", "[Process]: is killed!");
+        client.destroy().catch((err) => Logger.log("ERROR", err));
         process.exit(0);
     });
 
@@ -86,16 +84,16 @@ else {
 
         //Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
         if (err.message?.match(/Critical/)) {
-            //Logger.log("ERROR", `[CODE: <14>]: Hooked critical error!`);
+            Logger.log("ERROR", `[CODE: <14>]: Hooked critical error!`);
             process.exit(14);
             //return;
         }
 
         //Если вдруг запущено несколько ботов
-        //else if (err.name?.match(/acknowledged./)) return Logger.log("WARN", `[CODE: <50490>]: Several bots are running!`);
+        else if (err.name?.match(/acknowledged./)) return Logger.log("WARN", `[CODE: <50490>]: Several bots are running!`);
 
         //Выводим ошибку
-        //Logger.log("ERROR", `\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n└ Stack:   ${err.stack}`);
+        Logger.log("ERROR", `\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n└ Stack:   ${err.stack}`);
     });
     process.on("unhandledRejection", (err: Error) => console.error(err.stack));
 }

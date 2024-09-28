@@ -95,15 +95,6 @@ const prototypes: { type: any, name: string, value: any}[] = [
       return pages;
     }
   },
-  {
-    type: Array.prototype,
-    name: "swap",
-    value: function(position: number) {
-      [this[0], this[position]] = [this[position], this[0]];
-
-      return this;
-    }
-  },
 
   //String
   {
@@ -164,12 +155,6 @@ declare global {
      * @param joined {string} Что добавить в конце
      */
     ArraySort(number: number, callback: (value: T, index?: number) => string, joined?: string): string[];
-
-    /**
-     * @description Смена позиции в Array
-     * @param position {number} Номер позиции
-     */
-    swap(position: number): this;
   }
   interface String {
     /**

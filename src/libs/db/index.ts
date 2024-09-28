@@ -4,6 +4,7 @@ import {Database_APIs} from "./Global/APIs";
 import {API, Handler} from "@handler";
 import {Client} from "@lib/discord";
 import {env} from "@env";
+import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -78,9 +79,13 @@ class Database {
      */
     public set initialize(client: Client) {
         (async () => {
+            Logger.log("LOG", `[Shard ${client.ID}] has initialize database`);
+
             //Постепенно загружаем директории с данными
             for (const handler of loaders) {
                 try {
+                    Logger.log("LOG", `[Shard ${client.ID}] has initialize ${handler.name}`);
+
                     for (const file of new Handler(handler.name).files)
                         handler.callback(client, file);
                 } catch (err) {

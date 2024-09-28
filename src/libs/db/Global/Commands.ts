@@ -1,5 +1,6 @@
 import {Handler} from "@lib/handler";
 import {Client} from "@lib/discord";
+import {Logger} from "@lib/logger";
 
 export class Database_Commands<T extends Handler.Command> extends Array<T> {
     public subCommands = 0;
@@ -46,7 +47,7 @@ export class Database_Commands<T extends Handler.Command> extends Array<T> {
 
             // Загрузка глобальных команд
             client.application.commands.set(this.map((command) => command.data) as any)
-                .then(() => console.log("DEBUG", `[Shard ${client.ID}] [SlashCommands | ${this.public.length}] has load public commands`))
+                .then(() => Logger.log("DEBUG", `[Shard ${client.ID}] [SlashCommands | ${this.public.length}] has load public commands`))
                 .catch(console.error);
 
             return resolve(true);

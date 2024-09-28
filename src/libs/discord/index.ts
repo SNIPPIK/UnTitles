@@ -1,5 +1,6 @@
 import { Client as DS_Client, IntentsBitField, Partials, ShardingManager, WebhookClient} from "discord.js";
 import type { WebhookMessageCreateOptions } from "discord.js";
+import {Logger} from "@lib/logger";
 import {env} from "@env";
 
 /**
@@ -16,17 +17,17 @@ export class ShardManager extends ShardingManager {
             execArgv: ["-r", "tsconfig-paths/register"],
             respawn: true
         });
-        //Logger.log("LOG", `[ShardManager/worker] running...`);
+        Logger.log("LOG", `[ShardManager/worker] running...`);
 
         //Слушаем ивент для создания осколка
-        this.on("shardCreate", (_) => {
-            //shard.on("spawn", () => Logger.log("LOG",`[Shard ${shard.id}] added to manager`));
-            //shard.on("ready", () => Logger.log("LOG",`[Shard ${shard.id}] is running`));
-            //shard.on("death", () => Logger.log("LOG",`[Shard ${shard.id}] is killed`));
+        this.on("shardCreate", (shard) => {
+            shard.on("spawn", () => Logger.log("LOG",`[Shard ${shard.id}] added to manager`));
+            shard.on("ready", () => Logger.log("LOG",`[Shard ${shard.id}] is running`));
+            shard.on("death", () => Logger.log("LOG",`[Shard ${shard.id}] is killed`));
         });
 
         //Создаем дубликат
-        this.spawn({ amount: "auto", delay: -1 })//.catch((err: Error) => Logger.log("ERROR",`[ShardManager]: ${err}`));
+        this.spawn({ amount: "auto", delay: -1 }).catch((err: Error) => Logger.log("ERROR",`[ShardManager]: ${err}`));
     };
 }
 
@@ -70,7 +71,7 @@ export class Client extends DS_Client {
      */
     public set sendWebhook(options: WebhookMessageCreateOptions) {
         if (this.webhook) this.webhook.send(options).catch(() => {
-            //Logger.log("WARN", "Fail to send webhook data for discord channel!");
+            Logger.log("WARN", "Fail to send webhook data for discord channel!");
         });
     };
 }
