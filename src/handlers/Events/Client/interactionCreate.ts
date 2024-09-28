@@ -4,7 +4,10 @@ import {Colors, Events} from "discord.js";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 
-const player_bottoms = ["shuffle", "last", "resume_pause", "skip", "repeat"];
+const player_bottoms = [
+    "shuffle", "last", "resume_pause", "skip", "repeat",
+    "replay", "queue", "stop_music", "filters_menu", "lyrics"
+];
 
 /**
  * @author SNIPPIK
@@ -78,7 +81,6 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
         //Если есть очередь и пользователь не подключен к тому же голосовому каналу
         if (!queue || msg.voice.channel?.id !== queue.voice.channel.id) return;
-
 
         // Случайный трек
         if (msg.custom_id === "shuffle") {
@@ -170,6 +172,26 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.repeat.off"), color: Colors.Green }
             return;
         }
+
+
+        // Повтор текущего трека
+        else if (msg.custom_id === "replay") {
+
+        }
+
+        // Список треков, с возможностью листания, не забывая про учет позиции трека
+        else if (msg.custom_id === "queue") {
+
+        }
+
+        // Очистка от очереди, с непосредственным удалением всего и вся
+        else if (msg.custom_id === "stop_music") {}
+
+        // Меню фильтров
+        else if (msg.custom_id === "filters_menu") {}
+
+        // Показать текст песни
+        else if (msg.custom_id === "lyrics") {}
     };
 }
 
