@@ -1,5 +1,5 @@
-import { config, DotenvPopulateInput } from "dotenv";
 import { readFileSync, writeFileSync } from "node:fs";
+import { config, DotenvPopulateInput } from "dotenv";
 import os from "node:os";
 
 /**
