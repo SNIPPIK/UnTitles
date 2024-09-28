@@ -107,13 +107,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             }
 
             // Меняем позицию трека в очереди
-            if (queue.player.stream.duration < queue.songs.song.duration.seconds + 10) {
-                queue.songs.swapPosition = queue.songs.position - 1;
-                queue.player.play(queue.songs.song);
-            } else {
-                queue.player.stop();
-                queue.songs.swapPosition = queue.songs.position - 2;
-            }
+            db.audio.queue.events.emit("request/time", queue, queue.songs.position - 1);
 
             // Уведомляем пользователя о смене трека
             msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.last"), color: Colors.Yellow }
@@ -144,14 +138,8 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
         // Следующий трек
         else if (msg.custom_id === "skip") {
-            if (queue.songs.size < 1) queue.player.stop();
-            else {
-                // Меняем позицию трека в очереди
-                if (queue.player.stream.duration < queue.songs.song.duration.seconds + 10) {
-                    queue.songs.swapPosition = queue.songs.position + 1;
-                    queue.player.play(queue.songs.song);
-                } else queue.player.stop();
-            }
+            // Меняем позицию трека в очереди
+            db.audio.queue.events.emit("request/time", queue, queue.songs.position + 1);
 
             // Уведомляем пользователя о пропущенном треке
             msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.skip"), color: Colors.Green }

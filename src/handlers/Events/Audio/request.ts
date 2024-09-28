@@ -87,6 +87,39 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
 /**
  * @author SNIPPIK
  * @description Если при выполнении запроса пользователя произошла ошибка
+ * @class userRequestTime
+ */
+class userRequestTime extends Constructor.Assign<Handler.Event<"request/time">> {
+    public constructor() {
+        super({
+            name: "request/time",
+            type: "player",
+            execute: (queue, position) => {
+                const old = queue.songs.position;
+
+                // Меняем позицию трека в очереди
+                if (queue.player.stream.duration < queue.songs.song.duration.seconds + 10) {
+                    queue.songs.swapPosition = position;
+                    queue.player.play(queue.songs.song);
+
+                    // Если не получилось начать чтение следующего трека
+                    queue.player.stream.stream.once("error", () => {
+                        // Возвращаем прошлый номер трека
+                        queue.songs.swapPosition = old;
+                    });
+                } else {
+                    // Если надо вернуть прошлый трек, но времени уже нет!
+                    if (queue.songs.position > position) queue.songs.swapPosition = position - 1;
+                    queue.player.stop();
+                }
+            }
+        });
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Если при выполнении запроса пользователя произошла ошибка
  * @class userRequestError
  */
 class userRequestError extends Constructor.Assign<Handler.Event<"request/error">> {
@@ -111,4 +144,4 @@ class userRequestError extends Constructor.Assign<Handler.Event<"request/error">
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({userRequestAPI, userRequestError});
+export default Object.values({userRequestAPI, userRequestError, userRequestTime});
