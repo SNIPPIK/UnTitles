@@ -186,11 +186,11 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                 // Если надо обновить сообщение
                 if (message) {
                     //Обновляем сообщение
-                    message.edit({ embeds: embed.embeds as any, components: [queue.components as any] });
+                    message.edit({ embeds: embed.embeds as any, components: queue.components as any });
                     return;
                 }
 
-                embed.setTime(0).addComponents([queue.components as any]).send = queue.message;
+                embed.setTime(0).addComponents(queue.components as any).send = queue.message;
             }
         });
     };

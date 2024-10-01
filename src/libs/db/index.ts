@@ -43,13 +43,18 @@ class Database {
      */
     public readonly emojis = {
         button: {
-            resume: env.get("button.resume"),
-            pause: env.get("button.pause"),
-            loop: env.get("button.loop"),
-            loop_one: env.get("button.loop_one"),
-            pref: env.get("button.pref"),
-            next: env.get("button.next"),
-            shuffle: env.get("button.shuffle")
+            resume:     env.get("button.resume"),
+            pause:      env.get("button.pause"),
+            loop:       env.get("button.loop"),
+            loop_one:   env.get("button.loop_one"),
+            pref:       env.get("button.pref"),
+            next:       env.get("button.next"),
+            shuffle:    env.get("button.shuffle"),
+            replay:     env.get("button.replay"),
+            queue:      env.get("button.queue"),
+            lyrics:     env.get("button.lyrics"),
+            filters:    env.get("button.filters"),
+            stop:       env.get("button.stop")
         },
         progress: {
             empty: {

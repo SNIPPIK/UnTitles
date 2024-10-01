@@ -21,12 +21,28 @@ export class Queue {
         player:     null as AudioPlayer
     };
     private readonly _components = [
-        { type: 2, emoji: {id: db.emojis.button.shuffle},   custom_id: 'shuffle',       style: 2 },  //Shuffle
-        { type: 2, emoji: {id: db.emojis.button.pref},      custom_id: 'last',          style: 2 },  //Last song
-        { type: 2, emoji: {id: db.emojis.button.pause},     custom_id: 'resume_pause',  style: 2 },  //Resume/Pause
-        { type: 2, emoji: {id: db.emojis.button.next},      custom_id: 'skip',          style: 2 },  //Skip song
-        { type: 2, emoji: {id: db.emojis.button.loop},      custom_id: 'repeat',        style: 2 }   //Loop
-    ];
+        {
+            type: 1,
+            components: [
+                { type: 2, emoji: {id: db.emojis.button.shuffle},   custom_id: 'shuffle',       style: 2 },  //Shuffle
+                { type: 2, emoji: {id: db.emojis.button.pref},      custom_id: 'last',          style: 2 },  //Last song
+                { type: 2, emoji: {id: db.emojis.button.pause},     custom_id: 'resume_pause',  style: 2 },  //Resume/Pause
+                { type: 2, emoji: {id: db.emojis.button.next},      custom_id: 'skip',          style: 2 },  //Skip song
+                { type: 2, emoji: {id: db.emojis.button.loop},      custom_id: 'repeat',        style: 2 }   //Loop
+            ]
+        },
+
+        {
+            type: 1,
+            components: [
+                { type: 2, emoji: {id: db.emojis.button.replay},        custom_id: 'replay',        style: 2 },  //Shuffle
+                { type: 2, emoji: {id: db.emojis.button.queue},         custom_id: 'queue',         style: 2 },  //Last song
+                { type: 2, emoji: {id: db.emojis.button.stop},          custom_id: 'stop_music',    style: 2 },  //Resume/Pause
+                { type: 2, emoji: {id: db.emojis.button.filters},       custom_id: 'filters_menu',  style: 2 },  //Skip song
+                { type: 2, emoji: {id: db.emojis.button.lyrics},        custom_id: 'lyrics',        style: 2 }   //Loop
+            ]
+        }
+    ]
 
     /**
      * @description Получаем доступ к трекам
@@ -39,18 +55,24 @@ export class Queue {
      * @public
      */
     public get components() {
-        if (this.shuffle) Object.assign(this._components[0], {style: 1});
-        else Object.assign(this._components[0], {style: 2});
+        const FirstComponent = this._components[0].components;
+
+        /**
+         * @description Модификация 1 сета кнопок
+         */
+        if (this.shuffle) Object.assign(FirstComponent[0], {style: 1});
+        else Object.assign(FirstComponent[0], {style: 2});
 
         //Делаем проверку на кнопку ПАУЗА/ПРОДОЛЖИТЬ
-        if (this.player.status === "player/pause") Object.assign(this._components[2], {emoji: {id: db.emojis.button.resume}});
-        else Object.assign(this._components[2], {emoji: {id: db.emojis.button.pause}});
+        if (this.player.status === "player/pause") Object.assign(FirstComponent[2], {emoji: {id: db.emojis.button.resume}});
+        else Object.assign(FirstComponent[2], {emoji: {id: db.emojis.button.pause}});
 
-        if (this.repeat === "song") Object.assign(this._components[4], { emoji: {id: db.emojis.button.loop_one}, style: 1 });
-        else if (this.repeat === "songs") Object.assign(this._components[4],{ emoji: {id: db.emojis.button.loop}, style: 1 });
-        else Object.assign(this._components[4],{ emoji: {id: db.emojis.button.loop}, style: 2 });
+        if (this.repeat === "song") Object.assign(FirstComponent[4], { emoji: {id: db.emojis.button.loop_one}, style: 1 });
+        else if (this.repeat === "songs") Object.assign(FirstComponent[4],{ emoji: {id: db.emojis.button.loop}, style: 1 });
+        else Object.assign(FirstComponent[4],{ emoji: {id: db.emojis.button.loop}, style: 2 });
+        /**/
 
-        return {type: 1, components: this._components};
+        return this._components;
     };
 
     /**

@@ -173,9 +173,11 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             return;
         }
 
+        // Временная заглушка
+        msg.fastBuilder = { description: "Not support this button", color: Colors.DarkRed }
 
         // Повтор текущего трека
-        else if (msg.custom_id === "replay") {
+        if (msg.custom_id === "replay") {
 
         }
 
