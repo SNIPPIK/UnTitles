@@ -2,8 +2,13 @@ import {Interact, InteractRule} from "@lib/discord/utils/Interact";
 import {Constructor, Handler} from "@handler";
 import {Colors, Events} from "discord.js";
 import {locale} from "@lib/locale";
+import {Voice} from "@lib/voice";
 import {db} from "@lib/db";
 
+/**
+ * @author SNIPPIK
+ * @description Имена кнопок плеера, для правильной фильтрации
+ */
 const player_bottoms = [
     "shuffle", "last", "resume_pause", "skip", "repeat",
     "replay", "queue", "stop_music", "filters_menu", "lyrics"
@@ -173,27 +178,87 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             return;
         }
 
-        // Временная заглушка
-        msg.fastBuilder = { description: "Not support this button", color: Colors.DarkRed }
-
         // Повтор текущего трека
-        if (msg.custom_id === "replay") {
+        else if (msg.custom_id === "replay") {
+            queue.player.play(queue.songs.song);
 
+            //Сообщаем о том что музыка начата с начала
+            msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.replay", [queue.songs.song.title]), color: Colors.Green };
+            return;
         }
 
         // Список треков, с возможностью листания, не забывая про учет позиции трека
         else if (msg.custom_id === "queue") {
+            // Временная заглушка
+            msg.fastBuilder = { description: "Not support this button", color: Colors.DarkRed }
+            return;
 
+            /*
+            let num = 0;
+            const pages = queue.songs.slice(1).ArraySort(5, (track) => { num++;
+                return `\`${num}\` - \`\`[${track.duration.full}]\`\` [${track.requester.username}](${track.author.url}) - [${track.title}](${track.url})`;
+            }, "\n");
+
+            new msg.builder().addEmbeds([
+                {
+                    title: locale._(message.locale,"queue", [message.guild.name]),
+                    color: Colors.Green,
+                    fields: [
+                        {
+                            name: locale._(message.locale,"player.message.playing.current"),
+                            value: `\`\`\`${queue.songs.song.title}\`\`\``
+                        },
+                        pages.length > 0 ? { name: locale._(message.locale,"player.message.playing.next"), value: pages[0] } : null
+                    ],
+                    footer: {
+                        text: locale._(message.locale,"global.listOf.queue", [queue.songs.song.requester.username, 1, pages.length, queue.songs.size, queue.songs.time()]),
+                        iconURL: queue.songs.song.requester.avatar
+                    }
+                }
+            ]).setPages(pages).setTime(60e3).setCallback((msg, pages: string[], page: number, embed) => {
+                return msg.edit({
+                    embeds: [
+                        {
+                            ...embed[0],
+                            fields: [
+                                embed[0].fields[0],
+                                { name: locale._(message.locale,"player.message.playing.next"), value: pages[page - 1] }
+                            ],
+                            footer: {
+                                ...embed[0].footer,
+                                text: locale._(message.locale,"global.listOf.queue", [message.author.username, page, pages.length, queue.songs.size, queue.songs.time()])
+                            }
+                        }
+                    ]
+                });
+            });
+
+             */
         }
 
         // Очистка от очереди, с непосредственным удалением всего и вся
-        else if (msg.custom_id === "stop_music") {}
+        else if (msg.custom_id === "stop_music") {
+            // Если есть очередь, то удаляем ее
+            if (queue) queue.cleanup();
+            Voice.remove(msg.guild.id);
+
+            msg.fastBuilder = { description: "Stop playing music!", color: Colors.Green };
+            return;
+        }
 
         // Меню фильтров
-        else if (msg.custom_id === "filters_menu") {}
+        else if (msg.custom_id === "filters_menu") {
+            // Временная заглушка
+            msg.fastBuilder = { description: "WIP", color: Colors.DarkRed };
+            return;
+        }
 
         // Показать текст песни
-        else if (msg.custom_id === "lyrics") {}
+        else if (msg.custom_id === "lyrics") {
+            // Временная заглушка
+            msg.fastBuilder = { description: "WIP", color: Colors.DarkRed };
+            return;
+        }
     };
 }
 

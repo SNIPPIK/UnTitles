@@ -93,6 +93,10 @@
     "ru": "Повтор выключен!",
     "en-US": "Повтор выключен!"
   },
+  "player.bottom.replay": {
+    "ru": "🔂 | Replay | {ARGUMENT}",
+    "en-US": "🔂 | Replay | {ARGUMENT}"
+  },
 
 
 
