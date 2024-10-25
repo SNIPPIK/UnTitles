@@ -3,15 +3,7 @@ import {ClientRequest, IncomingMessage, request as httpRequest} from "node:http"
 import {MessageEvent as WebSocketEvent, WebSocket as WS} from "ws";
 import {request as httpsRequest, RequestOptions} from "node:https";
 import {VoiceOpcodes} from "discord-api-types/voice/v4";
-import {SocksProxyAgent} from "socks-proxy-agent";
 import {TypedEmitter} from "tiny-typed-emitter";
-import {env} from "@env";
-
-/**
- * @author SNIPPIK
- * @description Подключаемся к прокси серверу
- */
-const agent = env.get("proxy.socks") ? new SocksProxyAgent(`socks://${env.get("proxy.socks")}`): null;
 
 /**
  * @author SNIPPIK
@@ -56,7 +48,7 @@ abstract class Request {
 
         //Добавлять рандомный user-agent
         useragent?: boolean;
-    } & RequestOptions = { headers: {}, agent };
+    } & RequestOptions = { headers: {} };
     /**
      * @description Получаем протокол ссылки
      * @private

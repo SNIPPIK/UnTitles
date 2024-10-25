@@ -167,14 +167,8 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                             {
                                 name: "",
                                 value: (() => {
-                                    const current = queue.player.stream?.duration || 0;
-                                    const progress = new PlayerProgress({ platform,
-                                        duration: { current,
-                                            total: duration.seconds
-                                        }
-                                    });
-
-                                    return `\n[|](${url})\`\`${current.duration()}\`\` ${progress.bar} \`\`${duration.full}\`\``;
+                                    const current = queue.player.stream?.current?.duration || 0;
+                                    return `\n[|](${url})\`\`${current.duration()}\`\` ${queue.player.progress.bar} \`\`${duration.full}\`\``;
                                 })()
                             }
                         ]
@@ -193,75 +187,6 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                 embed.setTime(0).addComponents(queue.components as any).send = queue.message;
             }
         });
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Обработчик прогресс бара трека
- * @class PlayerProgress
- */
-class PlayerProgress {
-    private static emoji: typeof db.emojis.progress = null;
-    private readonly size = 12;
-    private readonly options = {
-        platform: null as API.platform,
-        duration: {
-            current: 0 as number,
-            total: 0 as number
-        }
-    };
-
-    /**
-     * @description Получаем время плеера и текущее, для дальнейшего создания прогресс бара
-     * @private
-     */
-    private get duration() { return this.options.duration; };
-
-    /**
-     * @description Получаем эмодзи для правильного отображения
-     * @private
-     */
-    private get emoji() {
-        if (!PlayerProgress.emoji) PlayerProgress.emoji = db.emojis.progress;
-        return PlayerProgress.emoji;
-    };
-
-    /**
-     * @description Получаем название платформы
-     * @private
-     */
-    private get platform() { return this.options.platform; };
-
-    /**
-     * @description Получаем эмодзи кнопки
-     * @private
-     */
-    private get bottom() { return this.emoji["bottom_" + this.platform] || this.emoji.bottom; };
-
-    /**
-     * @description Получаем готовый прогресс бар
-     */
-    public get bar() {
-        const size =  this.size, {current, total} = this.duration, emoji = this.emoji;
-        const number = Math.round(size * (isNaN(current) ? 0 : current / total));
-        let txt = current > 0 ? `${emoji.upped.left}` : `${emoji.empty.left}`;
-
-        //Середина дорожки + точка
-        if (current === 0) txt += `${emoji.upped.center.repeat(number)}${emoji.empty.center.repeat((size + 1) - number)}`;
-        else if (current >= total) txt += `${emoji.upped.center.repeat(size)}`;
-        else txt += `${emoji.upped.center.repeat(number)}${this.bottom}${emoji.empty.center.repeat(size - number)}`;
-
-        return txt + (current >= total ? `${emoji.upped.right}` : `${emoji.empty.right}`);
-    };
-
-    /**
-     * @description Создаем класс
-     * @param options - Параметры класса
-     */
-    public constructor(options: PlayerProgress["options"]) {
-        Object.assign(this.options, options);
-        this.options.platform = options.platform.toLowerCase() as any;
     };
 }
 

@@ -12,7 +12,7 @@ class eventPlayer_ended extends Constructor.Assign<Handler.Event<"player/ended">
             name: "player/ended",
             type: "player",
             execute: (player,  seek) => {
-                const queue = db.audio.queue.get(player.ID);
+                const queue = db.audio.queue.get(player.id);
 
                 if (seek !== 0) return;
                 db.audio.queue.events.emit("message/playing", queue);
@@ -32,10 +32,10 @@ class eventPlayer_wait extends Constructor.Assign<Handler.Event<"player/wait">> 
             name: "player/wait",
             type: "player",
             execute: (player) => {
-                const queue = db.audio.queue.get(player.ID);
+                const queue = db.audio.queue.get(player.id);
 
                 // Если нет треков в очереди
-                if (!queue?.songs?.song || !queue.player) return db.audio.queue.remove(queue.guild.id);
+                if (!queue?.songs?.song || !queue.player) return db.audio.queue.remove(player.id);
 
                 // Проверяем надо ли удалить из очереди трек
                 if (queue.repeat === "off" || queue.repeat === "songs") {
@@ -64,7 +64,7 @@ class eventPlayer_error extends Constructor.Assign<Handler.Event<"player/error">
             name: "player/error",
             type: "player",
             execute: (player, err, crash) => {
-                const queue = db.audio.queue.get(player.ID);
+                const queue = db.audio.queue.get(player.id);
 
                 // Если нет плеера, то нет смысла продолжать
                 if (!queue || !queue.player) return;

@@ -117,7 +117,6 @@ export class AudioResource {
             events: ["error"],
             event: "stdout",
             input: new Process([ "-vn",  "-loglevel", "panic",
-                "-http_proxy", "http://127.0.0.1:8080",
                 ...(type === "link" ? ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
                 "-ss", `${options.seek ?? 0}`, "-i", file,
                 ...(options.filters ? ["-af", options.filters] : []),

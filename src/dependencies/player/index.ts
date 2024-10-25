@@ -2,85 +2,53 @@ import type {LocalizationMap} from "discord-api-types/v10";
 import {TypedEmitter} from "tiny-typed-emitter";
 import {AudioResource} from "@lib/player/audio";
 import {VoiceConnection} from "@lib/voice";
+import {Song} from "@lib/player/queue";
+import {API} from "@handler";
 import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
- * @description Плеер для проигрывания музыки
- * @class AudioPlayer
- * @extends TypedEmitter
+ * @description Плеер для проигрывания музыки на серверах
+ * @class ExtraPlayer
  */
-export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
-    private readonly id: string = null;
-    private readonly audioFilters = new AudioFilters();
-    private readonly data = {
-        status: "player/wait"   as keyof AudioPlayerEvents,
-        voice:  null            as VoiceConnection,
-        stream: null            as AudioResource
-    };
+export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
+    public readonly id: string = null;
+    private _status = "player/wait"   as keyof AudioPlayerEvents;
 
     /**
-     * @description Выдаем ID сервера с которым работает плеер или аутентификатор плеера
-     * @return string - ID сервера для аутентификации плеера
-     * @public
+     * @description Хранилище треков
      */
-    public get ID() { return this.id; };
+    private readonly _tracks = new PlayerSongs();
+
+    public get tracks() { return this._tracks; };
 
     /**
-     * @description Управляем фильтрами
-     * @return AudioFilters
-     * @public
+     * @description Хранилище аудио фильтров
      */
-    public get filters() { return this.audioFilters; };
+    private readonly _filters = new AudioFilters();
 
     /**
-     * @description Получение голосового подключения
-     * @return VoiceConnection
-     * @public
+     * @description Управление голосовыми состояниями
      */
-    public get connection() { return this.data.voice; };
+    private readonly _voice = new PlayerVoice();
+
+    public get voice() { return this._voice; };
+
+    /**
+     * @description Управление потоковым вещанием
+     */
+    private readonly _stream = new PlayerStreamSubSystem();
+
+    public get stream() { return this._stream; };
+
+
 
     /**
      * @description Текущий статус плеера
      * @return AudioPlayerStatus
      * @public
      */
-    public get status() { return this.data.status; };
-
-    /**
-     * @description Текущий стрим
-     * @return AudioResource
-     * @public
-     */
-    public get stream() { return this.data.stream; };
-
-    /**
-     * @description Проверяем играет ли плеер
-     * @return boolean
-     * @public
-     */
-    public get playing() {
-        if (this.status === "player/wait" || !this.connection) return false;
-
-        //Если больше не читается, переходим в состояние wait.
-        if (!this.stream?.readable) {
-            this.stream?.stream?.emit("end");
-            this.status = "player/wait";
-            return false;
-        }
-
-        return true;
-    };
-
-    /**
-     * @description Взаимодействие с голосовым подключением
-     * @param connection - Голосовое подключение
-     * @public
-     */
-    public set connection(connection: VoiceConnection) {
-        if (this.data.voice && this.data.voice.config.channelId === connection.config.channelId) return;
-        this.data.voice = connection;
-    };
+    public get status() { return this._status; };
 
     /**
      * @description Смена статуса плеера, если не знаешь что делаешь, то лучше не трогай!
@@ -89,95 +57,53 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public set status(status: keyof AudioPlayerEvents) {
         // Если был введен новый статус
-        if (status !== this.data.status) {
+        if (status !== this.status) {
             // Если начато воспроизведение, то даем возможность говорить боту
-            if (status === "player/playing") this.connection.speak = true;
+            if (status === "player/playing") this.voice.connection.speak = true;
 
             // Запускаем ивент
             this.emit(status, this);
         }
 
         // Записываем статус
-        this.data.status = status;
+        this._status = status;
     };
 
     /**
-     * @description Смена потока
-     * @param stream - Opus конвертор
+     * @description Проверяем играет ли плеер
+     * @return boolean
      * @public
      */
-    public set stream(stream: AudioResource) {
-        // Если есть текущий поток
-        if (this.stream) {
-            this.connection.speak = false;
-            this.stream?.stream?.emit("close");
-            this.stream.destroy();
-            this.data.stream = null;
+    public get playing() {
+        if (this.status === "player/wait" || !this.voice.connection) return false;
+
+        //Если больше не читается, переходим в состояние wait.
+        if (!this.stream.current?.readable) {
+            this.stream.current?.stream?.emit("end");
+            this.status = "player/wait";
+            return false;
         }
 
-        // Подключаем новый поток
-        this.data.stream = stream;
-        this.status = "player/playing";
+        return true;
     };
 
     /**
-     * @description Передача пакета в голосовой канал
+     * @description Строка состояния трека
      * @public
      */
-    public set sendPacket(packet: Buffer) {
-        try {
-            if (packet) this.connection.playOpusPacket(packet)
-        } catch (err) {
-            //Если возникает не исправимая ошибка, то выключаем плеер
-            this.emit("player/error", this, `${err}`, true);
-        }
+    public get progress() {
+        const {platform, duration} = this.tracks.song;
+
+        return new PlayerProgress({
+            platform: platform,
+            duration: {
+                total: duration.seconds,
+                current: this.stream?.current?.duration ?? 0
+            }
+        });
     };
 
-    /**
-     * @description Начинаем чтение стрима
-     * @public
-     */
-    public set read(options: {path: string, seek: number}) {
-        const stream = new AudioResource(Object.assign(options, this.filters.compress));
 
-        // Если стрим можно прочитать
-        if (stream.readable) {
-            this.stream = stream;
-            return;
-        }
-
-        const timeout = setTimeout(() => {
-            this.emit("player/error", this, "Timeout the stream has been exceeded!", false);
-        }, 25e3);
-
-        stream.stream
-            // Включаем поток когда можно будет начать читать
-            .once("readable", () => {
-                this.stream = stream;
-                clearTimeout(timeout);
-            })
-            // Если происходит ошибка, то продолжаем читать этот же поток
-            .once("error", () => {
-                this.emit("player/error", this, "Fail read stream", false);
-                clearTimeout(timeout);
-            });
-    };
-
-    /**
-     * @description Задаем параметры плеера перед началом работы
-     * @param guild - ID сервера для аутентификации плеера
-     */
-    public constructor(guild: string) {
-        super();
-        this.id = guild;
-
-        // Загружаем ивенты плеера
-        for (const event of db.audio.queue.events.player)
-            this.on(event, (...args: any[]) => db.audio.queue.events.emit(event as any, ...args));
-
-        // Добавляем плеер в базу для отправки пакетов
-        db.audio.cycles.players.set(this);
-    };
 
     /**
      * @description Функция отвечает за циклическое проигрывание
@@ -185,7 +111,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @param seek - Пропуск времени
      * @public
      */
-    public play = (track: AudioPlayerInput, seek: number = 0): void => {
+    public play = (track: PlayerInput, seek: number = 0): void => {
         if (!track || !("resource" in track)) {
             this.emit("player/wait", this);
             return;
@@ -206,10 +132,33 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             }
 
             this.emit("player/ended", this, seek);
-            this.read = {path, seek};
+            const stream = new AudioResource({path, seek, ...this._filters.compress});
+
+            // Если стрим можно прочитать
+            if (stream.readable) {
+                this.stream.current = stream;
+                this.status = "player/playing"
+                return;
+            }
+
+            const timeout = setTimeout(() => {
+                this.emit("player/error", this, "Timeout the stream has been exceeded!", false);
+            }, 25e3);
+
+            stream.stream
+                // Включаем поток когда можно будет начать читать
+                .once("readable", () => {
+                    this.stream.current = stream;
+                    this.status = "player/playing"
+                    clearTimeout(timeout);
+                })
+                // Если происходит ошибка, то продолжаем читать этот же поток
+                .once("error", () => {
+                    this.emit("player/error", this, "Fail read stream", false);
+                    clearTimeout(timeout);
+                });
         }).catch((err) => {
             this.emit("player/error", this, `${err}`, false);
-            //Logger.log("ERROR", err);
         });
     };
 
@@ -241,6 +190,22 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
+     * @description Задаем параметры плеера перед началом работы
+     * @param guild - ID сервера для аутентификации плеера
+     */
+    public constructor(guild: string) {
+        super();
+        this.id = guild;
+
+        // Загружаем ивенты плеера
+        for (const event of db.audio.queue.events.player)
+            this.on(event, (...args: any[]) => db.audio.queue.events.emit(event as any, ...args));
+
+        // Добавляем плеер в базу для отправки пакетов
+        db.audio.cycles.players.set(this);
+    };
+
+    /**
      * @description Удаляем ненужные данные
      * @public
      */
@@ -249,16 +214,259 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Выключаем плеер если сейчас играет трек
         this.stop();
 
-        try {
-            this.stream?.stream?.emit("close");
-            this.stream.destroy();
-        } catch (err) {
-            console.error(err)
+        // Вырубаем поток, если он есть
+        if (this.stream.current) {
+            this.stream.current.stream.emit("close");
+            this.stream.current.destroy();
         }
-
-        for (let str of Object.keys(this.data)) this.data[str] = null;
     };
 }
+
+/**
+ * @author SNIPPIK
+ * @description Класс для управления включенным потоком
+ * @class PlayerStreamSubSystem
+ */
+class PlayerStreamSubSystem {
+    private _stream = null as AudioResource;
+
+    /**
+     * @description Текущий стрим
+     * @return AudioResource
+     * @public
+     */
+    public get current() { return this._stream; };
+
+    /**
+     * @description Подключаем новый поток
+     * @param stream
+     */
+    public set current(stream) {
+        // Если есть текущий поток
+        if (this.current) {
+            this.current?.stream?.emit("close");
+            this.current.destroy();
+            this._stream = null;
+        }
+
+        // Подключаем новый поток
+        this._stream = stream;
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Класс для управления голосовыми подключениями
+ * @class PlayerVoice
+ */
+class PlayerVoice {
+    private voice = null as VoiceConnection;
+
+    /**
+     * @description Производим подключение к голосовому каналу
+     * @public
+     */
+    public set connection(connection: VoiceConnection) {
+        if (connection?.config) {
+            // Если боту нельзя говорить, то смысл продолжать
+            if (connection.config.selfMute) return;
+
+            // Если повторное подключение к тому же голосовому каналу
+            else if (this.voice && connection.config.channelId === this.voice.config.channelId) {
+                connection.configureSocket();
+            }
+        }
+
+        this.voice = connection;
+    };
+
+    /**
+     * @description Получение голосового подключения
+     * @return VoiceConnection
+     * @public
+     */
+    public get connection() { return this.voice; };
+
+    /**
+     * @description Отправляем пакет в голосовой канал
+     * @public
+     */
+    public set send(packet: Buffer) {
+        if (!packet) return;
+
+        // Отправляем пакет в голосовой канал
+        try {
+            if (packet) this.connection.playOpusPacket(packet);
+        } catch (err) {
+            //Если возникает не исправимая ошибка, то выключаем плеер
+            console.log(err);
+        }
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Все треки для проигрывания в плеере
+ * @class PlayerSongs
+ */
+class PlayerSongs {
+    private readonly _songs: Song[] = [];
+    private _position = 0;
+
+    /**
+     * @description На сколько сделать пропуск треков
+     * @param number - Позиция трека
+     * @public
+     */
+    public set swapPosition(number: number) {
+        this._position = number;
+    };
+
+    /**
+     * @description Получаем текущий трек
+     * @return Song
+     * @public
+     */
+    public get song() { return this._songs[this._position]; };
+
+    /**
+     * @description Текущая позиция трека в очереди
+     * @return number
+     * @public
+     */
+    public get position() { return this._position; };
+
+    /**
+     * @description Кол-во треков в очереди
+     * @return number
+     * @public
+     */
+    public get size() { return this._songs.length - this.position; };
+
+    /**
+     * @description Общее время треков
+     * @public
+     */
+    public get time() {
+        return this._songs.slice(this._position).reduce((total: number, item: {duration: { seconds: number }}) => total + (item.duration.seconds || 0), 0).duration();
+    };
+
+    /**
+     * @description Добавляем трек в очередь
+     * @param track - Сам трек
+     */
+    public push = (track: Song) => { this._songs.push(track); };
+
+    /**
+     * @description Получаем следующие n треков, не включает текущий
+     * @param length - Кол-во треков
+     * @public
+     */
+    public next = (length: number = 5) => {
+        return this._songs.slice(this._position + 1, this._position + length);
+    };
+
+    /**
+     * @description Получаем последние n треков, не включает текущий
+     * @param length - Кол-во треков
+     * @public
+     */
+    public last = (length: number = 5) => {
+        return this._songs.slice(this._position - 1 - length, this._position - 1 - length);
+    };
+
+    /**
+     * @description Перетасовка треков
+     * @public
+     * @dev Надо переработать
+     */
+    public shuffle = () => {
+        for (let i = this.size - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this._songs[i], this._songs[j]] = [this._songs[j], this._songs[i]];
+        }
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Обработчик прогресс бара трека
+ * @class PlayerProgress
+ */
+class PlayerProgress {
+    private static emoji: typeof db.emojis.progress = null;
+    private readonly size = 12;
+    private readonly options = {
+        platform: null as API.platform,
+        duration: {
+            current: 0 as number,
+            total: 0 as number
+        }
+    };
+
+    /**
+     * @description Получаем время плеера и текущее, для дальнейшего создания прогресс бара
+     * @private
+     */
+    private get duration() { return this.options.duration; };
+
+    /**
+     * @description Получаем эмодзи для правильного отображения
+     * @private
+     */
+    private get emoji() {
+        if (!PlayerProgress.emoji) PlayerProgress.emoji = db.emojis.progress;
+        return PlayerProgress.emoji;
+    };
+
+    /**
+     * @description Получаем название платформы
+     * @private
+     */
+    private get platform() { return this.options.platform; };
+
+    /**
+     * @description Получаем эмодзи кнопки
+     * @private
+     */
+    private get bottom() { return this.emoji["bottom_" + this.platform] || this.emoji.bottom; };
+
+    /**
+     * @description Получаем готовый прогресс бар
+     */
+    public get bar() {
+        const size =  this.size, {current, total} = this.duration, emoji = this.emoji;
+        const number = Math.round(size * (isNaN(current) ? 0 : current / total));
+        let txt = current > 0 ? `${emoji.upped.left}` : `${emoji.empty.left}`;
+
+        //Середина дорожки + точка
+        if (current === 0) txt += `${emoji.upped.center.repeat(number)}${emoji.empty.center.repeat((size + 1) - number)}`;
+        else if (current >= total) txt += `${emoji.upped.center.repeat(size)}`;
+        else txt += `${emoji.upped.center.repeat(number)}${this.bottom}${emoji.empty.center.repeat(size - number)}`;
+
+        return txt + (current >= total ? `${emoji.upped.right}` : `${emoji.empty.right}`);
+    };
+
+    /**
+     * @description Создаем класс
+     * @param options - Параметры класса
+     */
+    public constructor(options: PlayerProgress["options"]) {
+        Object.assign(this.options, options);
+        this.options.platform = options.platform.toLowerCase() as any;
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные входящие в качестве трека
+ * @interface PlayerInput
+ * @private
+ */
+interface PlayerInput {
+    resource: Promise<string | Error>
+}
+
 
 /**
  * @author SNIPPIK
@@ -267,29 +475,19 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
  */
 export interface AudioPlayerEvents {
     //Плеер начал играть новый трек
-    "player/ended": (player: AudioPlayer, seek: number) => void;
+    "player/ended": (player: ExtraPlayer, seek: number) => void;
 
     //Плеер закончил играть трек
-    "player/wait": (player: AudioPlayer) => void;
+    "player/wait": (player: ExtraPlayer) => void;
 
     //Плеер встал на паузу
-    "player/pause": (player: AudioPlayer) => void;
+    "player/pause": (player: ExtraPlayer) => void;
 
     //Плеер играет
-    "player/playing": (player: AudioPlayer) => void;
+    "player/playing": (player: ExtraPlayer) => void;
 
     //Плеер получил ошибку
-    "player/error": (player: AudioPlayer, err: string, critical?: boolean) => void;
-}
-
-/**
- * @author SNIPPIK
- * @description Данные входящие в качестве трека
- * @interface AudioPlayerInput
- * @private
- */
-interface AudioPlayerInput {
-    resource: Promise<string | Error>
+    "player/error": (player: ExtraPlayer, err: string, critical?: boolean) => void;
 }
 
 /**

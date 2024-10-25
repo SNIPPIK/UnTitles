@@ -1,6 +1,5 @@
-import {AudioPlayer, AudioPlayerEvents} from "@lib/player";
+import {ExtraPlayer, AudioPlayerEvents} from "@lib/player";
 import {Interact} from "@lib/discord/utils/Interact";
-import {SILENCE_FRAME} from "@lib/voice/audio/Opus";
 import {TypedEmitter} from "tiny-typed-emitter";
 import {Queue, Song} from "@lib/player/queue";
 import {Attachment} from "discord.js";
@@ -56,22 +55,19 @@ class Cycles {
      * @description Здесь происходит управление плеерами
      * @private
      */
-    private readonly _audioPlayers = new class extends Constructor.Cycle<AudioPlayer> {
+    private readonly _audioPlayers = new class extends Constructor.Cycle<ExtraPlayer> {
         public constructor() {
             super({
                 name: "AudioPlayer",
                 duration: 20,
                 filter: (item) => item.playing,
-                execute: (player: AudioPlayer) => {
-                    if (player.connection?.state?.status !== "ready" || player?.status === "player/pause") return;
+                execute: (player) => {
+                    if (player.voice.connection?.state?.status !== "ready" || player?.status === "player/pause") return;
                     else {
-                        const packet = player.stream.packet;
+                        const packet = player.stream.current.packet;
 
                         if (!packet) player.stop();
-                        else {
-                            if (packet === SILENCE_FRAME) player.stop();
-                            else player.sendPacket = packet;
-                        }
+                        else player.voice.send = packet;
                     }
                 }
             });

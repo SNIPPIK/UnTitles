@@ -1,6 +1,6 @@
 import {Interact} from "@lib/discord/utils/Interact";
 import {httpsClient} from "@lib/request";
-import {AudioPlayer} from "@lib/player";
+import {ExtraPlayer} from "@lib/player";
 import {Voice} from "@lib/voice";
 import {API} from "@handler";
 import {db} from "@lib/db";
@@ -12,13 +12,12 @@ import {db} from "@lib/db";
  * @public
  */
 export class Queue {
-    private readonly _songs = new ExtraSongs();
     private readonly _data = {
         repeat:     "off" as "off" | "song" | "songs",
         shuffle:    false as boolean,
 
         message:    null as Interact,
-        player:     null as AudioPlayer
+        player:     null as ExtraPlayer
     };
     private readonly _components = [
         {
@@ -48,7 +47,7 @@ export class Queue {
      * @description Получаем доступ к трекам
      * @public
      */
-    public get songs() { return this._songs; };
+    public get songs() { return this._data.player.tracks; };
 
     /**
      * @description Получение кнопок
@@ -142,7 +141,7 @@ export class Queue {
      * @public
      */
     public set voice(voice: Interact["voice"]) {
-        this.player.connection = Voice.join({
+        this.player.voice.connection = Voice.join({
             selfDeaf: true,
             selfMute: false,
 
@@ -160,7 +159,7 @@ export class Queue {
         const ID = message.guild.id;
 
         // Создаем плеер
-        this._data.player = new AudioPlayer(ID);
+        this._data.player = new ExtraPlayer(ID);
 
         // В конце функции выполнить запуск проигрывания
         setImmediate(() => {
@@ -184,91 +183,6 @@ export class Queue {
         this.player.cleanup();
 
         for (let item of Object.keys(this._data)) this._data[item] = null;
-    };
-}
-
-
-/**
- * @author SNIPPIK
- * @description Продвинутая система треков, треки удаляются только после удаления очереди
- * @class ExtraSongs
- */
-class ExtraSongs {
-    private readonly _songs: Song[] = [];
-    private _position = 0;
-
-    /**
-     * @description На сколько сделать пропуск треков
-     * @param number - Позиция трека
-     * @public
-     */
-    public set swapPosition(number: number) {
-        this._position = number;
-    };
-
-    /**
-     * @description Получаем текущий трек
-     * @return Song
-     * @public
-     */
-    public get song() { return this._songs[this._position]; };
-
-    /**
-     * @description Текущая позиция трека в очереди
-     * @return number
-     * @public
-     */
-    public get position() { return this._position; };
-
-    /**
-     * @description Кол-во треков в очереди
-     * @return number
-     * @public
-     */
-    public get size() { return this._songs.length - this.position; };
-
-    /**
-     * @description Общее время треков
-     * @public
-     */
-    public get time() {
-        return this._songs.slice(this._position).reduce((total: number, item: {duration: { seconds: number }}) => total + (item.duration.seconds || 0), 0).duration();
-    };
-
-    /**
-     * @description Добавляем трек в очередь
-     * @param track - Сам трек
-     */
-    public push = (track: Song) => { this._songs.push(track); };
-
-    /**
-     * @description Получаем следующие n треков, не включает текущий
-     * @param length - Кол-во треков
-     * @public
-     */
-    public next = (length: number = 5) => {
-        return this._songs.slice(this._position + 1, this._position + length);
-    };
-
-    /**
-     * @description Получаем последние n треков, не включает текущий
-     * @param length - Кол-во треков
-     * @public
-     */
-    public last = (length: number = 5) => {
-        return this._songs.slice(this._position - 1 - length, this._position - 1 - length);
-    };
-
-    /**
-     * @description Перетасовка треков
-     * @public
-     * @dev Надо переработать
-     */
-    public shuffle = () => {
-        for (let i = this.size - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this._songs[i], this._songs[j]] = [this._songs[j], this._songs[i]];
-        }
     };
 }
 

@@ -6,7 +6,6 @@
   "dependencies": {
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
-    "socks-proxy-agent": "^8.0.4",
     "sodium-native": "^4.1.1",
     "tiny-typed-emitter": "^2.1.0",
     "ws": "^8.18.0"
@@ -18,9 +17,7 @@
     "typescript": "^5.5.4"
   },
   "scripts": {
-    "run": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src --ShardManager",
-    "proxy": "cd proxy/target/release && ./sthp -p 8080 -s 192.168.0.84:1080",
-    "proxy-build": "cd proxy && cargo build --release && cd target/release && ./sthp -p 8080 -s 192.168.0.84:1080"
+    "run": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src --ShardManager"
   },
   "engines": {
     "node": ">=22.0.0"

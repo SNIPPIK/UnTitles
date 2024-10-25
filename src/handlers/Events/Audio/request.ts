@@ -76,6 +76,7 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
                     // Запускаем проигрывание треков
                     return db.audio.queue.create(message, item);
                 }).catch((err: Error) => { // Отправляем сообщение об ошибке
+                    console.log(err);
                     clearTimeout(timeout);
                     db.audio.queue.events.emit("request/error", message, `**${platform.platform}.${api.name}**\n\n**❯** **${err.message}**`, true);
                 });
@@ -98,12 +99,12 @@ class userRequestTime extends Constructor.Assign<Handler.Event<"request/time">> 
                 const old = queue.songs.position;
 
                 // Меняем позицию трека в очереди
-                if (queue.player.stream.duration < queue.songs.song.duration.seconds + 10) {
+                if (queue.player.stream.current.duration < queue.songs.song.duration.seconds + 10) {
                     queue.songs.swapPosition = position;
                     queue.player.play(queue.songs.song);
 
                     // Если не получилось начать чтение следующего трека
-                    queue.player.stream.stream.once("error", () => {
+                    queue.player.stream.current.stream.once("error", () => {
                         // Возвращаем прошлый номер трека
                         queue.songs.swapPosition = old;
                     });
