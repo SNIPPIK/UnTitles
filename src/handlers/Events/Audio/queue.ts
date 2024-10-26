@@ -146,9 +146,11 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                         color, thumbnail: image,
                         author: {name: author.title, url: author.url, iconURL: db.emojis.diskImage},
                         fields: [
+
+                            // Текущий трек
                             {
                                 name: locale._(queue.message.locale, "player.current.playing"),
-                                value: `\`\`\`${title}\`\`\``
+                                value: `\`\`\`${title}\`\`\`[|](${url})`
                             },
 
                             //Следующий трек или треки
@@ -164,11 +166,12 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                                 return {name: locale._(queue.message.locale, "player.next.playing"), value: tracks.join("\n")};
                             })() : null,
 
+                            // Прогресс бар
                             {
                                 name: "",
                                 value: (() => {
                                     const current = queue.player.stream?.current?.duration || 0;
-                                    return `\n[|](${url})\`\`${current.duration()}\`\` ${queue.player.progress.bar} \`\`${duration.full}\`\``;
+                                    return `\n\`\`${current.duration()}\`\` ${queue.player.progress.bar} \`\`${duration.full}\`\``;
                                 })()
                             }
                         ]

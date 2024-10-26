@@ -87,7 +87,7 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
 
 /**
  * @author SNIPPIK
- * @description Если при выполнении запроса пользователя произошла ошибка
+ * @description Проверяем можно ли включить трек с плавным проигрыванием
  * @class userRequestTime
  */
 class userRequestTime extends Constructor.Assign<Handler.Event<"request/time">> {

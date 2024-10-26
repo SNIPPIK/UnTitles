@@ -117,7 +117,7 @@ export class AudioResource {
             events: ["error"],
             event: "stdout",
             input: new Process([ "-vn",  "-loglevel", "panic",
-                ...(type === "link" ? ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
+                ...(type === "link" ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
                 "-ss", `${options.seek ?? 0}`, "-i", file,
                 ...(options.filters ? ["-af", options.filters] : []),
                 "-f", `${OpusEncoder.lib.ffmpeg}`, "pipe:1"

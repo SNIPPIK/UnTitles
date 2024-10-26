@@ -89,7 +89,7 @@ class Cycles {
                     const {guild} = message;
                     const queue = db.audio.queue.get(guild.id);
 
-                    if (!queue || !queue.songs.size || !queue.player) return this.remove(message);
+                    if (!queue || !queue.player) return this.remove(message);
                     else if (!queue.player.playing || !message.editable) return;
 
                     // Обновляем сообщение о текущем треке
@@ -164,6 +164,10 @@ class AudioQueues extends Constructor.Collection<Queue> {
 
         // Проверяем есть ли очередь в списке
         if (!queue) queue = new Queue(message);
+        else {
+            // Если нет треков, а очередь есть значит что-то сломалось
+            if (!queue.songs) queue = new Queue(message);
+        }
 
         // Отправляем сообщение о том что было добавлено
         if (item instanceof Song && queue.songs.size >= 1 || "items" in item) db.audio.queue.events.emit("message/push", message, item);

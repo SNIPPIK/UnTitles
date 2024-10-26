@@ -3,6 +3,7 @@ import {TypedEmitter} from "tiny-typed-emitter";
 import {AudioResource} from "@lib/player/audio";
 import {VoiceConnection} from "@lib/voice";
 import {Song} from "@lib/player/queue";
+import {Logger} from "@lib/logger";
 import {API} from "@handler";
 import {db} from "@lib/db";
 
@@ -20,6 +21,10 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     private readonly _tracks = new PlayerSongs();
 
+    /**
+     * @description Делаем tracks параметр публичным для использования вне класса
+     * @public
+     */
     public get tracks() { return this._tracks; };
 
     /**
@@ -32,6 +37,10 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     private readonly _voice = new PlayerVoice();
 
+    /**
+     * @description Делаем voice параметр публичным для использования вне класса
+     * @public
+     */
     public get voice() { return this._voice; };
 
     /**
@@ -39,6 +48,10 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     private readonly _stream = new PlayerStreamSubSystem();
 
+    /**
+     * @description Делаем stream параметр публичным для использования вне класса
+     * @public
+     */
     public get stream() { return this._stream; };
 
 
@@ -108,58 +121,95 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     /**
      * @description Функция отвечает за циклическое проигрывание
      * @param track - Трек который будет включен
-     * @param seek - Пропуск времени
+     * @param seek  - Пропуск времени
      * @public
      */
     public play = (track: PlayerInput, seek: number = 0): void => {
-        if (!track || !("resource" in track)) {
+        // Если больше нет треков
+        if (!track?.resource) {
+            this.emit("player/error", this, `Playing is ending`, false);
             this.emit("player/wait", this);
             return;
         }
 
-        // Получаем ссылку на исходный трек
-        track.resource.then((path) => {
-            // Если нет ссылки на аудио
-            if (!path) {
-                this.emit("player/error", this, `Not found link audio!`, false);
-                return;
-            }
+        // Получаем асинхронные данные в синхронном потоке
+        track.resource
+            // Если возникла ошибка
+            .catch((err) => {
+                    // Сообщаем об ошибке
+                    Logger.log("ERROR", `[Player]: ${err}`);
 
-            // Если получена ошибка вместо ссылки
-            else if (path instanceof Error) {
-                this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, false);
-                return;
-            }
+                    // Если сейчас не играет трек, то предпринимаем решение
+                    if (this.status === "player/wait") this.emit("player/error", this, `${err}`, false);
+                }
+            )
 
-            this.emit("player/ended", this, seek);
-            const stream = new AudioResource({path, seek, ...this._filters.compress});
+            // Если удалось получить исходный файл трека
+            .then((path) => {
+                    // Если нет исходника
+                    if (!path) {
+                        if (this.status === "player/wait") {
+                            this.emit("player/error", this, `Not found link audio!`, false);
+                        }
 
-            // Если стрим можно прочитать
-            if (stream.readable) {
-                this.stream.current = stream;
-                this.status = "player/playing"
-                return;
-            }
+                        return;
+                    }
 
-            const timeout = setTimeout(() => {
-                this.emit("player/error", this, "Timeout the stream has been exceeded!", false);
-            }, 25e3);
+                    // Если получена ошибка вместо исходника
+                    else if (path instanceof Error) {
+                        if (this.status === "player/wait") {
+                            this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, false);
+                        }
 
-            stream.stream
-                // Включаем поток когда можно будет начать читать
-                .once("readable", () => {
-                    this.stream.current = stream;
-                    this.status = "player/playing"
-                    clearTimeout(timeout);
-                })
-                // Если происходит ошибка, то продолжаем читать этот же поток
-                .once("error", () => {
-                    this.emit("player/error", this, "Fail read stream", false);
-                    clearTimeout(timeout);
-                });
-        }).catch((err) => {
-            this.emit("player/error", this, `${err}`, false);
-        });
+                        return;
+                    }
+
+                    // Создаем класс для управления потоком
+                    const stream = new AudioResource({path, seek, ...this._filters.compress});
+                    let timeout: NodeJS.Timeout = null;
+
+                    // Если стрим можно прочитать
+                    if (stream.readable) {
+                        this.stream.current = stream;
+                        this.status = "player/playing"
+
+                        return;
+                    }
+
+                    // Если поток нельзя читать, возможно что он еще грузится
+                    else if (this.status === "player/wait") {
+                        timeout = setTimeout(() => {
+                            this.emit("player/error", this, "Timeout the stream has been exceeded!", false);
+
+                            // Уничтожаем поток
+                            stream.destroy();
+                        }, 25e3);
+                    }
+
+                    // Подключаем ивенты для отслеживания работы потока (временные)
+                    stream.stream
+                        // Если возникнет ошибка во время загрузки потока
+                        .once("error", () => {
+                            clearTimeout(timeout);
+
+                            // Уничтожаем поток
+                            stream.destroy();
+                        })
+                        // Если уже можно читать поток
+                        .once("readable", () => {
+                            clearTimeout(timeout);
+
+                            this.stream.current = stream;
+                            this.status = "player/playing"
+                        })
+                }
+            )
+            // Создаем сообщение после всех действий
+            .finally(() => {
+                    // Создаем сообщение о текущем треке
+                    this.emit("player/ended", this, seek);
+                }
+            )
     };
 
     /**

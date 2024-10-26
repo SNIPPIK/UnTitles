@@ -36,7 +36,7 @@ export class Queue {
             components: [
                 { type: 2, emoji: {id: db.emojis.button.replay},        custom_id: 'replay',        style: 2 },  //Shuffle
                 { type: 2, emoji: {id: db.emojis.button.queue},         custom_id: 'queue',         style: 2 },  //Last song
-                { type: 2, emoji: {id: db.emojis.button.stop},          custom_id: 'stop_music',    style: 2 },  //Resume/Pause
+                { type: 2, emoji: {id: db.emojis.button.stop},          custom_id: 'stop_music',    style: 4 },  //Resume/Pause
                 { type: 2, emoji: {id: db.emojis.button.filters},       custom_id: 'filters_menu',  style: 2 },  //Skip song
                 { type: 2, emoji: {id: db.emojis.button.lyrics},        custom_id: 'lyrics',        style: 2 }   //Loop
             ]
