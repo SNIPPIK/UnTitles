@@ -6,6 +6,7 @@ import {Attachment} from "discord.js";
 import {Constructor} from "@handler";
 import {db} from "@lib/db";
 import {env} from "@env";
+import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -164,10 +165,6 @@ class AudioQueues extends Constructor.Collection<Queue> {
 
         // Проверяем есть ли очередь в списке
         if (!queue) queue = new Queue(message);
-        else {
-            // Если нет треков, а очередь есть значит что-то сломалось
-            if (!queue.songs) queue = new Queue(message);
-        }
 
         // Отправляем сообщение о том что было добавлено
         if (item instanceof Song && queue.songs.size >= 1 || "items" in item) db.audio.queue.events.emit("message/push", message, item);

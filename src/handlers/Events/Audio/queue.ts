@@ -1,8 +1,8 @@
 import {ActionRowBuilder, Colors, StringSelectMenuBuilder} from "discord.js";
-import {API, Constructor, Handler} from "@handler";
+import {Constructor, Handler} from "@handler";
 import {Song} from "@lib/player/queue";
-import {db} from "@lib/db";
 import {locale} from "@lib/locale";
+import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
@@ -16,6 +16,8 @@ class onError extends Constructor.Assign<Handler.Event<"message/error">> {
             name: "message/error",
             type: "player",
             execute: (queue, error) => {
+                if (queue?.songs || queue?.songs!.song) return;
+
                 const {color, author, image, title, requester} = queue.songs.song;
                 new queue.message.builder().addEmbeds([
                     {
@@ -150,7 +152,7 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                             // Текущий трек
                             {
                                 name: locale._(queue.message.locale, "player.current.playing"),
-                                value: `\`\`\`${title}\`\`\`[|](${url})`
+                                value: `\`\`\`${title}\`\`\`__[link to track](${url})__`
                             },
 
                             //Следующий трек или треки

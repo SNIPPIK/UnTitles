@@ -47,7 +47,10 @@ export class Queue {
      * @description Получаем доступ к трекам
      * @public
      */
-    public get songs() { return this._data.player.tracks; };
+    public get songs() {
+        if (!this._data.player) return;
+        return this._data.player.tracks;
+    };
 
     /**
      * @description Получение кнопок
