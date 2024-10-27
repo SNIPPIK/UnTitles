@@ -1,6 +1,6 @@
 # UTDMB
 - UTDMB - UnTitle Discord Music Bot
-## To do list
+## Todo list
 ```css
 Выполнено
 [V] Добавить сообщения для плеера
