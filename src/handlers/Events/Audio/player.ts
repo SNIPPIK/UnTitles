@@ -41,6 +41,9 @@ class eventPlayer_wait extends Constructor.Assign<Handler.Event<"player/wait">> 
                 if (queue.repeat === "off" || queue.repeat === "songs") {
                     // Смена трек на следующий
                     queue.songs.swapPosition = queue.songs.position + 1;
+
+                    // Если включен повтор и нет больше треков, значит включаем обратно все треки
+                    if (queue.repeat === "songs" && queue.songs.position >= queue.songs.size) queue.songs.swapPosition = 0;
                 }
 
                 // Проверяем надо ли перетасовывать очередь

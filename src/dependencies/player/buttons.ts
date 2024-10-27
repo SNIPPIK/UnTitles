@@ -18,7 +18,11 @@ export const PlayerBT = {
 
         // Если в очереди менее 2 треков
         if (queue.songs.size < 2) {
-            msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.shuffle.fail"), color: Colors.Yellow }
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.shuffle.fail"),
+                color: Colors.Yellow
+            };
+
             return;
         }
 
@@ -26,7 +30,10 @@ export const PlayerBT = {
         queue.shuffle = !queue.shuffle;
 
         // Отправляем сообщение о включении или выключении тасовки
-        msg.fastBuilder = { description: locale._(msg.locale, queue.shuffle ? "player.bottom.shuffle.on" : "player.bottom.shuffle.off"), color: Colors.Green }
+        msg.fastBuilder = {
+            description: locale._(msg.locale, queue.shuffle ? "player.button.shuffle.on" : "player.button.shuffle.off"),
+            color: Colors.Green
+        }
     },
 
     /**
@@ -38,9 +45,11 @@ export const PlayerBT = {
 
         // Если играет 1 трек
         if (queue.songs.position === 0) {
-            new msg.builder().addEmbeds([
-                { description: locale._(msg.locale, "player.bottom.last.fail"), color: Colors.Yellow }
-            ]).setTime(10e3).send = msg;
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.last.fail"),
+                color: Colors.Yellow
+            };
+
             return;
         }
 
@@ -48,7 +57,10 @@ export const PlayerBT = {
         db.audio.queue.events.emit("request/time", queue, queue.songs.position - 1);
 
         // Уведомляем пользователя о смене трека
-        msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.last"), color: Colors.Yellow }
+        msg.fastBuilder = {
+            description: locale._(msg.locale, "player.button.last"),
+            color: Colors.Yellow
+        }
     },
 
     /**
@@ -64,7 +76,10 @@ export const PlayerBT = {
             queue.player.pause();
 
             // Сообщение о паузе
-            msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.pause"), color: Colors.Green }
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.pause"),
+                color: Colors.Green
+            }
         }
 
         // Если плеер на паузе
@@ -73,7 +88,10 @@ export const PlayerBT = {
             queue.player.resume();
 
             // Сообщение о возобновлении
-            msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.resume"), color: Colors.Green }
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.resume"),
+                color: Colors.Green
+            }
         }
     },
 
@@ -88,7 +106,10 @@ export const PlayerBT = {
         db.audio.queue.events.emit("request/time", queue, queue.songs.position + 1);
 
         // Уведомляем пользователя о пропущенном треке
-        msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.skip"), color: Colors.Green }
+        msg.fastBuilder = {
+            description: locale._(msg.locale, "player.button.skip"),
+            color: Colors.Green
+        }
     },
 
     /**
@@ -102,7 +123,10 @@ export const PlayerBT = {
         if (loop === "off") {
             queue.repeat = "songs";
 
-            msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.repeat.songs"), color: Colors.Green }
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.repeat.songs"),
+                color: Colors.Green
+            }
             return;
         }
 
@@ -110,12 +134,18 @@ export const PlayerBT = {
         else if (loop === "songs") {
             queue.repeat = "song";
 
-            msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.repeat.song"), color: Colors.Green }
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.repeat.song"),
+                color: Colors.Green
+            }
             return;
         }
 
         queue.repeat = "off";
-        msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.repeat.off"), color: Colors.Green }
+        msg.fastBuilder = {
+            description: locale._(msg.locale, "player.button.repeat.off"),
+            color: Colors.Green
+        }
     },
 
     /**
@@ -129,7 +159,10 @@ export const PlayerBT = {
         queue.player.play(queue.songs.song);
 
         // Сообщаем о том что музыка начата с начала
-        msg.fastBuilder = { description: locale._(msg.locale, "player.bottom.replay", [queue.songs.song.title]), color: Colors.Green };
+        msg.fastBuilder = {
+            description: locale._(msg.locale, "player.button.replay", [queue.songs.song.title]),
+            color: Colors.Green
+        };
     },
 
     /**
@@ -143,7 +176,10 @@ export const PlayerBT = {
         if (queue) queue.cleanup();
         Voice.remove(msg.guild.id);
 
-        msg.fastBuilder = { description: "Stop playing music!", color: Colors.Green };
+        msg.fastBuilder = {
+            description: locale._(msg.locale, "player.button.stop"),
+            color: Colors.Green
+        };
     }
 };
 

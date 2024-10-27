@@ -99,12 +99,12 @@ class userRequestTime extends Constructor.Assign<Handler.Event<"request/time">> 
                 const old = queue.songs.position;
 
                 // Меняем позицию трека в очереди
-                if (queue.player.stream.current.duration < queue.songs.song.duration.seconds + 10) {
+                if (queue.player.audio.current.duration < queue.songs.song.duration.seconds + 10) {
                     queue.songs.swapPosition = position;
                     queue.player.play(queue.songs.song);
 
                     // Если не получилось начать чтение следующего трека
-                    queue.player.stream.current.stream.once("error", () => {
+                    queue.player.audio.current.stream.once("error", () => {
                         // Возвращаем прошлый номер трека
                         queue.songs.swapPosition = old;
                     });

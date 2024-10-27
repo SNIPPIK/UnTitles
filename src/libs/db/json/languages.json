@@ -39,63 +39,67 @@
 
 
 
-  "player.bottom.shuffle.on": {
+  "player.button.shuffle.on": {
     "ru": "Перетасовка очереди включена",
     "en-US": "Shuffle has enabled"
   },
 
-  "player.bottom.shuffle.off": {
+  "player.button.shuffle.off": {
     "ru": "Перетасовка очереди выключена",
     "en-US": "Shuffle has disabled"
   },
 
-  "player.bottom.shuffle.fail": {
+  "player.button.shuffle.fail": {
     "ru": "В очереди менее 2 треков!",
     "en-US": "In queue <2 tracks!"
   },
 
-  "player.bottom.last": {
+  "player.button.last": {
     "ru": "Прошлый трек бы вернут!",
     "en-US": "Return old track!"
   },
 
-  "player.bottom.last.fail": {
+  "player.button.last.fail": {
     "ru": "Играет только 1 трек, прошлых треков нет!",
     "en-US": "Playing only 1 track, not old tracks!"
   },
 
-  "player.bottom.resume": {
+  "player.button.resume": {
     "ru": "Возобновление проигрывания!",
     "en-US": "Resume playing!"
   },
 
-  "player.bottom.pause": {
+  "player.button.pause": {
     "ru": "Приостановка проигрывания!",
     "en-US": "Pause playing!"
   },
 
-  "player.bottom.skip": {
+  "player.button.skip": {
     "ru": "Пропускаем текущий трек!",
     "en-US": "Skip current track!"
   },
 
-  "player.bottom.repeat.songs": {
+  "player.button.repeat.songs": {
     "ru": "Включен повтор треков!",
     "en-US": "Enable repeat tracks!"
   },
 
-  "player.bottom.repeat.song": {
+  "player.button.repeat.song": {
     "ru": "Включен повтор текущего трека!",
     "en-US": "Enable repeat current track!"
   },
 
-  "player.bottom.repeat.off": {
+  "player.button.repeat.off": {
     "ru": "Повтор выключен!",
     "en-US": "Disable repeat!"
   },
-  "player.bottom.replay": {
+  "player.button.replay": {
     "ru": "🔂 | Replay | {ARGUMENT}",
     "en-US": "🔂 | Replay | {ARGUMENT}"
+  },
+  "player.button.stop": {
+    "ru": "Выключение музыки! Удаление очереди!",
+    "en-US": "Disable music! Remove queue!"
   },
 
 

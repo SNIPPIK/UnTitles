@@ -13,13 +13,41 @@ import {db} from "@lib/db";
  * @class ExtraPlayer
  */
 export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
+    /**
+     * @description Текущий статус плеера, при создании он должен быть в ожидании
+     * @private
+     */
+    private _status: keyof AudioPlayerEvents = "player/wait";
+
+    /**
+     * @description Плеер привязан к queue, и это его идентификатор
+     * @public
+     */
     public readonly id: string = null;
-    private _status = "player/wait"   as keyof AudioPlayerEvents;
 
     /**
      * @description Хранилище треков
+     * @private
      */
     private readonly _tracks = new PlayerSongs();
+
+    /**
+     * @description Хранилище аудио фильтров
+     * @private
+     */
+    private readonly _filters = new AudioFilters();
+
+    /**
+     * @description Управление голосовыми состояниями
+     * @private
+     */
+    private readonly _voice = new PlayerVoice();
+
+    /**
+     * @description Управление потоковым вещанием
+     * @private
+     */
+    private readonly _audio = new PlayerStreamSubSystem();
 
     /**
      * @description Делаем tracks параметр публичным для использования вне класса
@@ -28,31 +56,16 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     public get tracks() { return this._tracks; };
 
     /**
-     * @description Хранилище аудио фильтров
-     */
-    private readonly _filters = new AudioFilters();
-
-    /**
-     * @description Управление голосовыми состояниями
-     */
-    private readonly _voice = new PlayerVoice();
-
-    /**
      * @description Делаем voice параметр публичным для использования вне класса
      * @public
      */
     public get voice() { return this._voice; };
 
     /**
-     * @description Управление потоковым вещанием
-     */
-    private readonly _stream = new PlayerStreamSubSystem();
-
-    /**
      * @description Делаем stream параметр публичным для использования вне класса
      * @public
      */
-    public get stream() { return this._stream; };
+    public get audio() { return this._audio; };
 
 
 
@@ -91,8 +104,8 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (this.status === "player/wait" || !this.voice.connection) return false;
 
         //Если больше не читается, переходим в состояние wait.
-        if (!this.stream.current?.readable) {
-            this.stream.current?.stream?.emit("end");
+        if (!this.audio.current?.readable) {
+            this.audio.current?.stream?.emit("end");
             this.status = "player/wait";
             return false;
         }
@@ -107,16 +120,33 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     public get progress() {
         const {platform, duration} = this.tracks.song;
 
+        // Создаем прогресс бар
         return new PlayerProgress({
             platform: platform,
             duration: {
                 total: duration.seconds,
-                current: this.stream?.current?.duration ?? 0
+                current: this.audio?.current?.duration ?? 0
             }
         });
     };
 
 
+
+    /**
+     * @description Задаем параметры плеера перед началом работы
+     * @param guild - ID сервера для аутентификации плеера
+     */
+    public constructor(guild: string) {
+        super();
+        this.id = guild;
+
+        // Загружаем ивенты плеера
+        for (const event of db.audio.queue.events.player)
+            this.on(event, (...args: any[]) => db.audio.queue.events.emit(event as any, ...args));
+
+        // Добавляем плеер в базу для отправки пакетов
+        db.audio.cycles.players.set(this);
+    };
 
     /**
      * @description Функция отвечает за циклическое проигрывание
@@ -170,7 +200,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                     // Если стрим можно прочитать
                     if (stream.readable) {
-                        this.stream.current = stream;
+                        this.audio.current = stream;
                         this.status = "player/playing"
 
                         return;
@@ -199,11 +229,12 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
                         .once("readable", () => {
                             clearTimeout(timeout);
 
-                            this.stream.current = stream;
+                            this.audio.current = stream;
                             this.status = "player/playing"
                         })
                 }
             )
+
             // Создаем сообщение после всех действий
             .finally(() => {
                     // Создаем сообщение о текущем треке
@@ -240,22 +271,6 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
-     * @description Задаем параметры плеера перед началом работы
-     * @param guild - ID сервера для аутентификации плеера
-     */
-    public constructor(guild: string) {
-        super();
-        this.id = guild;
-
-        // Загружаем ивенты плеера
-        for (const event of db.audio.queue.events.player)
-            this.on(event, (...args: any[]) => db.audio.queue.events.emit(event as any, ...args));
-
-        // Добавляем плеер в базу для отправки пакетов
-        db.audio.cycles.players.set(this);
-    };
-
-    /**
      * @description Удаляем ненужные данные
      * @public
      */
@@ -265,9 +280,9 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         this.stop();
 
         // Вырубаем поток, если он есть
-        if (this.stream.current) {
-            this.stream.current.stream.emit("close");
-            this.stream.current.destroy();
+        if (this.audio.current) {
+            this.audio.current.stream.emit("close");
+            this.audio.current.destroy();
         }
     };
 }

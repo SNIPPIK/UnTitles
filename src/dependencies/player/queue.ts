@@ -20,6 +20,11 @@ export class Queue {
         player:     null as ExtraPlayer
     };
     private readonly _components = [
+
+        /**
+         * @description Первый сет кнопок
+         * @private
+         */
         {
             type: 1,
             components: [
@@ -31,6 +36,10 @@ export class Queue {
             ]
         },
 
+        /**
+         * @description Второй сет кнопок
+         * @private
+         */
         {
             type: 1,
             components: [
@@ -57,42 +66,35 @@ export class Queue {
      * @public
      */
     public get components() {
-        /**
-         * @description Модификация 1 сета кнопок
-         */
-        const FirstComponent = this._components[0].components;
+        const first = this._components[0].components;
+        const two = this._components[1].components;
 
         // Кнопка перетасовки очереди
-        if (this.shuffle) Object.assign(FirstComponent[0], {style: 1});
-        else Object.assign(FirstComponent[0], {style: 2});
+        if (this.shuffle) Object.assign(first[0], {style: 1});
+        else Object.assign(first[0], {style: 2});
 
         // Делаем проверку на кнопку ПАУЗА/ПРОДОЛЖИТЬ
-        if (this.player.status === "player/pause") Object.assign(FirstComponent[2], {emoji: {id: db.emojis.button.resume}});
-        else Object.assign(FirstComponent[2], {emoji: {id: db.emojis.button.pause}});
+        if (this.player.status === "player/pause") Object.assign(first[2], {emoji: {id: db.emojis.button.resume}});
+        else Object.assign(first[2], {emoji: {id: db.emojis.button.pause}});
 
         // Кнопка повтора
-        if (this.repeat === "song") Object.assign(FirstComponent[4], { emoji: {id: db.emojis.button.loop_one}, style: 1 });
-        else if (this.repeat === "songs") Object.assign(FirstComponent[4],{ emoji: {id: db.emojis.button.loop}, style: 1 });
-        else Object.assign(FirstComponent[4],{ emoji: {id: db.emojis.button.loop}, style: 2 });
+        if (this.repeat === "song") Object.assign(first[4], { emoji: {id: db.emojis.button.loop_one}, style: 1 });
+        else if (this.repeat === "songs") Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 1 });
+        else Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 2 });
 
         // Если это первый трек в списке, то не позволяем пользователям возвращать трек
-        if (this.songs.position === 1) Object.assign(FirstComponent[1], { disabled: false, style: 3 });
-        else Object.assign(FirstComponent[1], { disabled: true });
-
-        // Если всего один трек, то не позволяем его пропустить
-        if (this.songs.size > 1) Object.assign(FirstComponent[3], { disabled: false, style: 3 });
-        else Object.assign(FirstComponent[3], { disabled: true });
-        /**/
-
-        /**
-         * @description Модификация 2 сета кнопок
-         */
-        const TwoComponent = this._components[1].components;
+        if (this.songs.position === 1) Object.assign(first[1], { disabled: false, style: 3 });
+        else Object.assign(first[1], { disabled: true });
 
         // Если есть еще треки, то можно будет посмотреть очередь
-        if (this.songs.size > 1) Object.assign(TwoComponent[1], { disabled: false });
-        else Object.assign(TwoComponent[1], { disabled: true });
-        /**/
+        // Если всего один трек, то не позволяем его пропустить
+        if (this.songs.size > 1) {
+            Object.assign(first[3], { disabled: false, style: 3 });
+            Object.assign(two[1], { disabled: false });
+        } else {
+            Object.assign(first[3], { disabled: true });
+            Object.assign(two[1], { disabled: true });
+        }
 
         return this._components;
     };

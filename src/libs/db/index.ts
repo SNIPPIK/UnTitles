@@ -42,6 +42,11 @@ class Database {
      * @public
      */
     public readonly emojis = {
+        /**
+         * @description Кнопки плеера
+         * @readonly
+         * @public
+         */
         button: {
             resume:     env.get("button.resume"),
             pause:      env.get("button.pause"),
@@ -56,6 +61,12 @@ class Database {
             filters:    env.get("button.filters"),
             stop:       env.get("button.stop")
         },
+
+        /**
+         * @description Эмодзи для 'прогресс' бара, для красоты
+         * @readonly
+         * @public
+         */
         progress: {
             empty: {
                 left: env.get("progress.empty.left"),
@@ -73,6 +84,12 @@ class Database {
             bottom_youtube: env.get("progress.bottom.youtube"),
             bottom_spotify: env.get("progress.bottom.spotify"),
         },
+
+        /**
+         * @description Прочие картинки
+         * @readonly
+         * @public
+         */
         noImage: env.get("image.not"),
         diskImage: env.get("image.currentPlay")
     };

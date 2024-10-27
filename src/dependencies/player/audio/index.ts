@@ -24,9 +24,9 @@ export class AudioResource {
      * @description Данные для запуска процесса буферизации
      * @private
      */
-    private readonly _options = {
-        chunks:    0 as number,
-        chunk:   20
+    private readonly chunks = {
+        length:    0,
+        size:     20
     };
 
     /**
@@ -52,7 +52,7 @@ export class AudioResource {
         const packet = this.stream.read();
 
         // Если есть аудио пакеты
-        if (packet) this._options.chunks++;
+        if (packet) this.chunks.length++;
 
         // Отправляем пакет
         return packet;
@@ -63,7 +63,7 @@ export class AudioResource {
      * @public
      */
     public get duration() {
-        const duration = ((this._options.chunks * this._options.chunk) / 1e3).toFixed(0);
+        const duration = ((this.chunks.length * this.chunks.size) / 1e3).toFixed(0);
         return parseInt(duration);
     };
 
@@ -109,8 +109,8 @@ export class AudioResource {
     public constructor(options: {path: string, seek?: number; filters: string; chunk?: number}) {
         const [type, file] = options.path.split(":|");
 
-        if (options.chunk > 0) this._options.chunk = 20 * options.chunk;
-        if (options.seek > 0) this._options.chunks = (options.seek * 1e3) / this._options.chunk;
+        if (options.chunk > 0) this.chunks.size = 20 * options.chunk;
+        if (options.seek > 0) this.chunks.length = (options.seek * 1e3) / this.chunks.size;
 
         // Процесс
         this.input = {
@@ -127,7 +127,7 @@ export class AudioResource {
         // Расшифровщик
         this.input = {
             input: this.stream as any,
-            events: ["end", "close", "error"]
+            events: ["end", "close", "error", "drain"]
         };
     };
 
@@ -140,6 +140,7 @@ export class AudioResource {
             for (const stream of this._streams) {
                 if (stream instanceof Process) stream.destroy();
                 else {
+                    stream.emit("close");
                     stream?.destroy();
                     stream?.end();
                 }
@@ -148,7 +149,7 @@ export class AudioResource {
             this._streams.splice(0, this._streams.length);
         });
 
-        Object.keys(this._options).forEach(key => this._options[key] = null);
+        Object.keys(this.chunks).forEach(key => this.chunks[key] = null);
         this._readable = null;
     };
 }
@@ -186,7 +187,7 @@ export class Process {
      */
     public constructor(args: string[], name: string = env.get("ffmpeg.path")) {
         this._process = spawn(name, args, {shell: false});
-        ["end", "close", "error"].forEach((event) => this.process.once(event, this.destroy));
+        ["end", "close", "error", "disconnect", "exit"].forEach((event) => this.process.once(event, this.destroy));
     };
 
     /**

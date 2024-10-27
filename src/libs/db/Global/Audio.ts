@@ -65,7 +65,7 @@ class Cycles {
                 execute: (player) => {
                     if (player.voice.connection?.state?.status !== "ready" || player?.status === "player/pause") return;
                     else {
-                        const packet = player.stream.current.packet;
+                        const packet = player.audio.current.packet;
 
                         if (!packet) player.stop();
                         else player.voice.send = packet;
