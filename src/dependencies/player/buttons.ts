@@ -148,6 +148,8 @@ export const PlayerBT = {
         }
     },
 
+
+
     /**
      * @description Кнопка паузы/проигрывания
      * @param msg
@@ -163,6 +165,30 @@ export const PlayerBT = {
             description: locale._(msg.locale, "player.button.replay", [queue.songs.song.title]),
             color: Colors.Green
         };
+    },
+
+    /**
+     * @description Кнопка очереди, для просмотра всех треков
+     * @param msg
+     */
+    "queue": (msg: Interact) => {
+        msg.fastBuilder = { description: "Sorry in WIP", color: Colors.White };
+    },
+
+    /**
+     * @description Кнопка фильтров, тут можно глянуть только включенные фильтры
+     * @param msg
+     */
+    "filters_menu": (msg: Interact) => {
+        msg.fastBuilder = { description: "Sorry in WIP", color: Colors.White };
+    },
+
+    /**
+     * @description Кнопка текста для песни (возможно будет синхронизация с временем)
+     * @param msg
+     */
+    "lyrics": (msg: Interact) => {
+        msg.fastBuilder = { description: "Sorry in WIP", color: Colors.White };
     },
 
     /**
