@@ -83,7 +83,7 @@ export class Queue {
         else Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 2 });
 
         // Если это первый трек в списке, то не позволяем пользователям возвращать трек
-        if (this.songs.position === 1) Object.assign(first[1], { disabled: false, style: 3 });
+        if (this.songs.position > 0) Object.assign(first[1], { disabled: false, style: 3 });
         else Object.assign(first[1], { disabled: true });
 
         // Если есть еще треки, то можно будет посмотреть очередь

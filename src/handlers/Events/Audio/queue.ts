@@ -152,7 +152,7 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                             // Текущий трек
                             {
                                 name: locale._(queue.message.locale, "player.current.playing"),
-                                value: `\`\`\`${title}\`\`\`__[link to track](${url})__`
+                                value: `\`\`\`${title}\`\`\`**__[link to track](${url})__**`
                             },
 
                             //Следующий трек или треки
