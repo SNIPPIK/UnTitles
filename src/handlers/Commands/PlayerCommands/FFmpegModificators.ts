@@ -1,6 +1,8 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
+import filters from "@lib/db/json/filters.json";
 import {Constructor, Handler} from "@handler";
+import {AudioFilter} from "@lib/player";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 
@@ -71,8 +73,200 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
     };
 }
 
+
+/**
+ * @class AudioFiltersCommand
+ * @command filter
+ * @description Управление модификаторами аудио треков
+ */
+class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
+    public constructor() {
+        super({
+            data: new SlashBuilder()
+                .setName("filter")
+                .setDescription("Управление фильтрами аудио!")
+                .addSubCommands([
+                    {
+                        name: "off",
+                        description: "Отключение всех фильтров!",
+                        descriptionLocalizations: {
+                            "en-US": "Disable all filters!"
+                        },
+                        type: ApplicationCommandOptionType.Subcommand
+                    },
+                    {
+                        name: "push",
+                        description: "Добавление фильтров!",
+                        descriptionLocalizations: {
+                            "en-US": "Adding filters!"
+                        },
+                        type: ApplicationCommandOptionType.Subcommand,
+                        options: [
+                            {
+                                name: "filters",
+                                description: "Необходимо выбрать фильтр! Все доступные фильтры - all",
+                                descriptionLocalizations: {
+                                    "en-US": "You need to select a filter! All available filters are all"
+                                },
+                                type: ApplicationCommandOptionType["String"],
+                                required: true,
+                                choices: filters.length < 25 ? filters.map((filter) => {
+                                    return {
+                                        name: `${filter.name} | ${filter.description.length > 75 ? `${filter.description.substring(0, 75)}...` : filter.description}`,
+                                        nameLocalizations: {
+                                            "en-US": `${filter.name} | ${filter.description_localizations["en-US"].length > 75 ? `${filter.description_localizations["en-US"].substring(0, 75)}...` : filter.description_localizations["en-US"]}`
+                                        },
+                                        value: filter.name
+                                    }
+                                }) : []
+                            },
+                            {
+                                name: "argument",
+                                description: "Аргумент для фильтра, если он необходим!",
+                                descriptionLocalizations: {
+                                    "en-US": "An argument for the filter, if necessary!"
+                                },
+                                type: ApplicationCommandOptionType["String"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "remove",
+                        description: "Удаление фильтров!",
+                        descriptionLocalizations: {
+                            "en-US": "Removing filters!"
+                        },
+                        type: ApplicationCommandOptionType.Subcommand,
+                        options: [
+                            {
+                                name: "filters",
+                                description: "Необходимо выбрать фильтр! Все доступные фильтры - all",
+                                descriptionLocalizations: {
+                                    "en-US": "You need to select a filter! All available filters are all"
+                                },
+                                type: ApplicationCommandOptionType["String"],
+                                required: true,
+                                choices: filters.length < 25 ? filters.map((filter) => {
+                                    return {
+                                        name: `${filter.name} | ${filter.description.length > 75 ? `${filter.description.substring(0, 75)}...` : filter.description}`,
+                                        nameLocalizations: {
+                                            "en-US": `${filter.name} | ${filter.description_localizations["en-US"].length > 75 ? `${filter.description_localizations["en-US"].substring(0, 75)}...` : filter.description_localizations["en-US"]}`
+                                        },
+                                        value: filter.name
+                                    }
+                                }) : []
+                            }
+                        ]
+                    },
+                ]).json,
+            rules: ["queue", "voice", "anotherVoice"],
+            execute: ({message, args, type}) => {
+                const {author, guild} = message;
+                const queue = db.audio.queue.get(guild.id);
+
+                //Если статус плеера не позволяет пропустить поток
+                if (!queue.player.playing) {
+                    message.fastBuilder = {
+                        description: locale._(message.locale, "player.playing.off"),
+                        color: Colors.Yellow
+                    };
+
+                    return;
+                }
+
+                const seek: number = queue.player.audio.current?.duration ?? 0;
+                const name = args[args.length - 2 || args?.length - 1] ?? args[0];
+                const arg = args.length > 1 ? Number(args[args?.length - 1]) : null;
+                const Filter = filters.find((item) => item.name === name) as AudioFilter;
+                const index = queue.player.filters.enable.indexOf(Filter);
+
+                switch (type) {
+                    // Выключаем все фильтры
+                    case "off": {
+                        // Если нет фильтров
+                        if (queue.player.filters.enable.length === 0) {
+                            message.fastBuilder = { description: "Temple text, code:flt2670" };
+                            return;
+                        }
+
+                        // Удаляем фильтры
+                        queue.player.filters.enable.splice(0, queue.player.filters.enable.length);
+                        queue.player.play(queue.songs.song, seek);
+                        return;
+                    }
+
+                    // Добавляем фильтр
+                    case "push": {
+                        // Пользователь пытается включить включенный фильтр
+                        if (index !== -1) {
+                            message.fastBuilder = { description: "Temple text, code:flt2671" };
+                            return;
+                        }
+
+                        // Делаем проверку на аргументы
+                        else if (Filter.args) {
+                            // Если аргументы подходят
+                            if (arg && arg >= Filter.args[0] && arg <= Filter.args[1]) Filter.user_arg = arg;
+                            else {
+                                message.fastBuilder = { description: "Temple text, code:flt2672" };
+                                return;
+                            }
+                        }
+
+                        // Делаем проверку на совместимость
+                        for (let i = 0; i < queue.player.filters.enable.length; i++) {
+                            const filter = queue.player.filters[i];
+
+                            // Если фильтры не совместимы
+                            if (Filter.unsupported.includes(filter.name)) {
+                                message.fastBuilder = {
+                                    description: "Unsupported filter",
+                                    color: Colors.DarkRed
+                                };
+
+                                return;
+                            }
+                        }
+
+                        // Добавляем и включаем фильтр
+                        queue.player.filters.enable.push(Filter);
+                        queue.player.play(queue.songs.song, seek);
+
+                        // Сообщаем о новом фильтре
+                        message.fastBuilder = {
+                            description: locale._(message.locale, "command.filter.pushed", [Filter.name]),
+                            color: Colors.Green
+                        };
+                        return;
+                    }
+
+                    // Удаляем фильтр из включенных
+                    case "remove": {
+                        // Пользователь пытается выключить выключенный фильтр
+                        if (index === -1) {
+                            message.fastBuilder = { description: "Temple text, code:flt2670" };
+                            return;
+                        }
+
+                        // Удаляем фильтр
+                        queue.player.filters.enable.splice(index, 1);
+                        queue.player.play(queue.songs.song, seek);
+
+                        // Сообщаем об удалении фильтра
+                        message.fastBuilder = {
+                            description: locale._(message.locale, "command.filter.removed", [Filter.name]),
+                            color: Colors.Green
+                        };
+                        return;
+                    }
+                }
+            }
+        });
+    };
+}
+
 /**
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({SeekTrackCommand});
+export default Object.values({SeekTrackCommand, AudioFiltersCommand});

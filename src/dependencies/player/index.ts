@@ -56,6 +56,12 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     public get tracks() { return this._tracks; };
 
     /**
+     * @description Делаем filters параметр публичным для использования вне класса
+     * @public
+     */
+    public get filters() { return this._filters; };
+
+    /**
      * @description Делаем voice параметр публичным для использования вне класса
      * @public
      */

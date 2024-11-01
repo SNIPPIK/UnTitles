@@ -55,7 +55,7 @@
   },
 
   "player.button.last": {
-    "ru": "Прошлый трек бы вернут!",
+    "ru": "Прошлый трек был вернут!",
     "en-US": "Return old track!"
   },
 
@@ -278,6 +278,22 @@
 
   "command.seek": {
     "ru": "Seeked {ARGUMENT}",
+    "en-US": "Seeked {ARGUMENT}"
+  },
+
+
+  "command.filter.pushed": {
+    "ru": "Added filter",
+    "en-US": "Seeked {ARGUMENT}"
+  },
+
+  "command.filter.removed": {
+    "ru": "Added filter **{ARGUMENT}**",
+    "en-US": "Seeked {ARGUMENT}"
+  },
+
+  "command.filter.unsupported": {
+    "ru": "Added filter",
     "en-US": "Seeked {ARGUMENT}"
   }
 }
