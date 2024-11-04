@@ -220,7 +220,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                             // Если фильтры не совместимы
                             if (Filter.unsupported.includes(filter.name)) {
                                 message.fastBuilder = {
-                                    description: "Unsupported filter",
+                                    description: locale._(message.locale, "command.filter.unsupported"),
                                     color: Colors.DarkRed
                                 };
 
@@ -234,8 +234,8 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
 
                         // Сообщаем о новом фильтре
                         message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.pushed", [Filter.name]),
-                            color: Colors.Green
+                            description: locale._(message.locale, "command.filter.pushed", [Filter.name, Filter.description_localizations[message.locale] ?? Filter.description]),
+                            color: Colors.Green, timestamp: new Date()
                         };
                         return;
                     }
@@ -254,7 +254,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
 
                         // Сообщаем об удалении фильтра
                         message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.removed", [Filter.name]),
+                            description: locale._(message.locale, "command.filter.removed", [Filter.name, Filter.description_localizations[message.locale] ?? Filter.description]),
                             color: Colors.Green
                         };
                         return;

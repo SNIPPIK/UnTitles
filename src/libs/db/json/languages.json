@@ -267,13 +267,13 @@
   },
 
   "command.seek.duration.nan": {
-    "ru": "Argument is NaN",
-    "en-US": "Argument is NaN"
+    "ru": "Аргумент не является числом",
+    "en-US": "The argument is not a number"
   },
 
   "command.seek.duration.big": {
-    "ru": "Arg so big",
-    "en-US": "Arg so big"
+    "ru": "Аргумент слишком большой! Укажи меньше!",
+    "en-US": "The argument is too big! Specify less!"
   },
 
   "command.seek": {
@@ -283,17 +283,17 @@
 
 
   "command.filter.pushed": {
-    "ru": "Added filter",
-    "en-US": "Seeked {ARGUMENT}"
+    "ru": "Добавлен аудио фильтр\n **❯**{ARGUMENT}\n **❯**{ARGUMENT}",
+    "en-US": "Added audio filter\n **❯**{ARGUMENT}\n **❯**{ARGUMENT}"
   },
 
   "command.filter.removed": {
-    "ru": "Added filter **{ARGUMENT}**",
-    "en-US": "Seeked {ARGUMENT}"
+    "ru": "Отключен аудио фильтр\n **❯**{ARGUMENT}\n **❯**{ARGUMENT}",
+    "en-US":"Remove audio filter\n **❯**{ARGUMENT}\n **❯**{ARGUMENT}"
   },
 
   "command.filter.unsupported": {
-    "ru": "Added filter",
-    "en-US": "Seeked {ARGUMENT}"
+    "ru": "Аудио фильтр не совместим с текущим списком фильтров",
+    "en-US": "The audio filter is not compatible with the current filter list"
   }
 }
