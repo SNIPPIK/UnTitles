@@ -10,18 +10,30 @@ import {TypedEmitter} from "tiny-typed-emitter";
  * @description Список ивент функций для ClientRequest
  */
 const requests: { name: string, callback: (req: ClientRequest, url?: string) => any }[] = [
+    /**
+     * @description Ивент если превышено время ожидания подключения
+     * @public
+     */
     {
         name: "timeout",
         callback: (_, url) => {
             return Error(`[APIs]: Connection Timeout Exceeded ${url}:443`);
         }
     },
+    /**
+     * @description Ивент если подключение было сорвано
+     * @public
+     */
     {
         name: "close",
         callback: (request) => {
             request.destroy();
         }
     },
+    /**
+     * @description Ивент если что-то пошло не так или была получена ошибка
+     * @public
+     */
     {
         name: "error",
         callback: () => {
@@ -55,8 +67,6 @@ abstract class Request {
      */
     private get protocol() {
         const protocol = this.data.protocol?.split(":")[0];
-
-        //Logger.log("DEBUG", `${protocol}Client: [${this.data.method}:|${this.data.hostname}${this.data.path}]`);
         return protocol === "https" ? httpsRequest : httpRequest;
     };
 
@@ -67,10 +77,9 @@ abstract class Request {
     public get request(): Promise<IncomingMessage | Error> {
         return new Promise((resolve) => {
             const request = this.protocol(this.data, (res) => {
+                // Если надо сделать редирект на другой ресурс
                 if ((res.statusCode >= 300 && res.statusCode < 400) && res.headers?.location) {
                     this.data.path = res.headers.location;
-
-                    //Logger.log("DEBUG", `request/redirect: [${res.headers.location}]`);
                     return resolve(this.request);
                 }
 
@@ -134,21 +143,25 @@ export class httpsClient extends Request {
      * @public
      */
     public get toString(): Promise<string | Error> {
-        return new Promise((resolve) => {
-           this.request.then((res) => {
+        return new Promise<string | Error>((resolve) => {
+            this.request.then((res) => {
                 if (res instanceof Error) return resolve(res);
 
                 const encoding = res.headers["content-encoding"];
                 let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage = res, data = "";
 
-                if (encoding === "br") decoder = res.pipe(createBrotliDecompress()  as any);
-                else if (encoding === "gzip") decoder = res.pipe(createGunzip()     as any);
+                // Делаем выбор расшифровщика UFT-8
+                if (encoding === "br") decoder = res.pipe(createBrotliDecompress() as any);
+                else if (encoding === "gzip") decoder = res.pipe(createGunzip() as any);
                 else if (encoding === "deflate") decoder = res.pipe(createDeflate() as any);
 
-                decoder.setEncoding("utf-8").on("data", (c) => data += c).once("end", () => {
-                    setImmediate(() => { data = null });
-                    return resolve(data);
-                });
+                // Запускаем расшифровку
+                decoder.setEncoding("utf-8")
+                    .on("data", (c) => data += c)
+                    .once("end", () => {
+                        setImmediate(() => { data = null });
+                        return resolve(data);
+                    });
             }).catch((err) => {
                 return resolve(err);
             });
@@ -179,12 +192,14 @@ export class httpsClient extends Request {
         return new Promise(async (resolve) => {
             const body = await this.toString;
 
+            // Если была получена ошибка
             if (body instanceof Error) return resolve(Error("Not found XML data!"));
 
+            // Ищем данные в XML странице для дальнейшего вывода
             const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
             const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
             return resolve(filtered.filter((text) => text.trim() !== ""));
-        })
+        });
     };
 
     /**
@@ -217,11 +232,15 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
     public set keepAlive(ms: number) {
         if (this.KeepAlive.interval !== undefined) clearInterval(this.KeepAlive.interval);
 
+        // Если есть время для проверки жизни
         if (ms > 0) this.KeepAlive.interval = setInterval(() => {
             if (this.KeepAlive.send !== 0 && this.KeepAlive.miss >= 3) this.destroy(0);
 
+            // Задаем время и прочие параметры для правильной работы
             this.KeepAlive.send = Date.now();
             this.KeepAlive.miss++;
+
+            // Отправляем пакет
             this.packet = {
                 op: VoiceOpcodes.Heartbeat,
                 d: this.KeepAlive.send
@@ -257,6 +276,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
             else Socket[`on${event}`] = (arg: WebSocketEvent) => this.emit(event as any, arg);
         }
 
+        // Задаем сокет в класс
         this.socket = Socket;
     };
 
@@ -270,6 +290,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
         try {
             const packet = JSON.parse(event.data);
 
+            // Если надо обновить интервал жизни
             if (packet.op === VoiceOpcodes.HeartbeatAck) this.KeepAlive.miss = 0;
 
             this.emit("packet", packet);

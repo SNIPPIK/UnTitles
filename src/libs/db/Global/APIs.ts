@@ -79,13 +79,17 @@ export class Database_APIs {
         return new Promise(async (resolve) => {
             const api = new API.response(track.platform).find("track");
 
-            //Если нет такого запроса
+            // Если нет такого запроса
             if (!api) return resolve(Error(`[Song/${track.platform}]: not found callback for track`));
 
+            // Если исходник уже не актуален, то получаем новый
             try {
                 const song = await api.callback(track.url, {audio: true});
 
+                // Если не удалось получить новый исходник
                 if (song instanceof Error) return resolve(song);
+
+                // Выдаем новый исходник
                 return resolve(song.link);
             } catch (err) {
                 return resolve(err);
@@ -102,12 +106,15 @@ export class Database_APIs {
             const platform = new API.response(this.platforms.supported.find((plt) => plt.requests.length >= 2 && plt.audio).name);
 
             try {
+                // Ищем подходящий трек
                 const tracks = await platform.find("search").callback(`${track.author.title} - ${track.title}`, {limit: 5});
                 if (tracks instanceof Error || tracks.length === 0) return resolve(null);
 
+                // Если он был найден, то получаем исходник трека
                 const song = await platform.find("track").callback(tracks?.at(0)?.url, {audio: true});
                 if (song instanceof Error || !song.link) return resolve(null);
 
+                // Отдаем исходник трека
                 return resolve(song.link);
             } catch (err) {
                 return resolve(Error(err));

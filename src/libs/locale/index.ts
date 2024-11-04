@@ -1,6 +1,5 @@
 import type {LocalizationMap} from "discord-api-types/v10";
 import locales from "@lib/db/json/languages.json";
-import {env} from "@env";
 
 /**
  * @author SNIPPIK
@@ -22,7 +21,6 @@ type locale_text = keyof typeof locales;
  * @class locale
  */
 export class locale {
-    private static readonly language = env.get("language");
     /**
      * @description Перевод на другие языки, перевод берется из базы
      * @param language - Тип locale для перевода

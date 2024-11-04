@@ -7,6 +7,78 @@ import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
+ * @description Функции правил проверки
+ */
+const intends: {[key: string]: (message: Interact) => boolean } = {
+  "voice": (message) => {
+    const VoiceChannel = message.voice.channel;
+
+    // Если нет голосового подключения
+    if (!VoiceChannel) {
+      message.fastBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow }
+      return false;
+    }
+
+    return true;
+  },
+  "queue": (message) => {
+    // Если нет очереди
+    if (!message.queue) {
+      message.fastBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow }
+      return false;
+    }
+
+    return true;
+  },
+  "anotherVoice": (message) => {
+    const VoiceChannel = message.voice?.channel;
+    const queue = message.queue;
+
+    // Если музыка играет в другом голосовом канале
+    if (queue && queue.voice && VoiceChannel?.id !== queue.voice.id && message.guild.members.me.voice.channel) {
+      message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow }
+      return false
+    }
+
+    return true;
+  }
+};
+
+/**
+ * @author SNIPPIK
+ * @description Поддерживаемые правила проверки
+ */
+export type InteractRules = "voice" | "queue" | "anotherVoice";
+
+/**
+ * @author SNIPPIK
+ * @description Класс для проверки, используется в командах
+ */
+export class InteractRule {
+  /**
+   * @description Проверяем команды на наличие
+   * @param array
+   * @param message
+   */
+  public static check = (array: InteractRules[], message: Interact) => {
+    if (!array || array?.length === 0) return;
+
+    // Проверяем всю базу
+    for (const key of array) {
+      const intent = intends[key];
+
+      //Если нет этого необходимости проверки запроса, то пропускаем
+      if (!intent) continue;
+      else return intent(message);
+    }
+
+    return null;
+  };
+}
+
+
+/**
+ * @author SNIPPIK
  * @description Взаимодействие с discord message
  * @class Interact
  */
@@ -175,73 +247,6 @@ export class Interact {
   };
 }
 
-/**
-* @author SNIPPIK
-* @description Поддержка ---
-*/
-const intends: {[key: string]: (message: Interact) => boolean } = {
-  "voice": (message) => {
-    const VoiceChannel = message.voice.channel;
-
-    // Если нет голосового подключения
-    if (!VoiceChannel) {
-      message.fastBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow }
-      return false;
-    }
-
-    return true;
-  },
-  "queue": (message) => {
-    // Если нет очереди
-    if (!message.queue) {
-      message.fastBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow }
-      return false;
-    }
-
-    return true;
-  },
-  "anotherVoice": (message) => {
-    const VoiceChannel = message.voice?.channel;
-    const queue = message.queue;
-
-    // Если музыка играет в другом голосовом канале
-    if (queue && queue.voice && VoiceChannel?.id !== queue.voice.id && message.guild.members.me.voice.channel) {
-      message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow }
-      return false
-    }
-
-    return true;
-  }
-};
-
-export type InteractRules = "voice" | "queue" | "anotherVoice";
-
-/**
- * @author SNIPPIK
- * @description
- */
-export class InteractRule {
-  /**
-   * @description Проверяем команды на наличие
-   * @param array
-   * @param message
-   */
-  public static check = (array: InteractRules[], message: Interact) => {
-    if (!array || array?.length === 0) return;
-
-    // Проверяем всю базу
-    for (const key of array) {
-      const intent = intends[key];
-
-      //Если нет этого необходимости проверки запроса, то пропускаем
-      if (!intent) continue;
-      else return intent(message);
-    }
-
-    return null;
-  };
-}
-
 
 /**
  * @author SNIPPIK
@@ -260,18 +265,19 @@ class MessageBuilder {
    * @param interaction
    */
   public set send(interaction: Interact) {
-    interaction.send({embeds: this.embeds, components: this.components}).then((message) => {
-      //Если получить возврат не удалось, то ничего не делаем
-      if (!message) return;
+    interaction.send({embeds: this.embeds, components: this.components})
+        .then((message) => {
+          //Если получить возврат не удалось, то ничего не делаем
+          if (!message) return;
 
-      const msg = new Interact(message);
+          const msg = new Interact(message);
 
-      //Удаляем сообщение через время если это возможно
-      if (this.time !== 0) msg.delete = this.time;
+          //Удаляем сообщение через время если это возможно
+          if (this.time !== 0) msg.delete = this.time;
 
-      //Если надо выполнить действия после
-      if (this.promise) this.promise(msg);
-    });
+          //Если надо выполнить действия после
+          if (this.promise) this.promise(msg);
+        });
   };
 
   /**
@@ -306,7 +312,7 @@ class MessageBuilder {
   };
 
   /**
-   * @description Добавляем сomponents в базу для дальнейшей отправки
+   * @description Добавляем components в базу для дальнейшей отправки
    * @param data - Компоненты под сообщением
    */
   public addComponents = (data: MessageBuilder["components"]) => {

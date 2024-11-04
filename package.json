@@ -1,23 +1,23 @@
 {
   "name": "UTDMB",
-  "version": "0.0.1",
+  "version": "0.0.1a",
   "description": "Музыкальный бот!",
   "license": "BSD-3-Clause",
   "dependencies": {
+    "tiny-typed-emitter": "^2.1.0",
+    "sodium-native": "^4.1.1",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
-    "sodium-native": "^4.1.1",
-    "tiny-typed-emitter": "^2.1.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@types/node": "^22.5.4",
     "@types/websocket": "^1.0.10",
     "tsconfig-paths": "^4.2.0",
+    "@types/node": "^22.5.4",
     "typescript": "^5.5.4"
   },
   "scripts": {
-    "run": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src --ShardManager"
+    "start": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src --ShardManager"
   },
   "engines": {
     "node": ">=22.0.0"

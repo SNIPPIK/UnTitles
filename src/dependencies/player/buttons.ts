@@ -175,14 +175,14 @@ export const PlayerBT = {
         const queue = msg.queue;
 
         // Если треков менее 5
-        if (queue.songs.size < 5) {
+        if (queue.songs.total < 5) {
             msg.fastBuilder = { description: "Current tracks so small size!", color: Colors.White };
 
             return;
         }
 
         // Отправляем список треков с уничтожением через 40 сек
-        msg.fastBuilder = { description: `Total songs: ${queue.songs.size}`, color: Colors.White };
+        msg.fastBuilder = { description: `Total songs: ${queue.songs.total}`, color: Colors.White };
     },
 
     /**
@@ -191,16 +191,17 @@ export const PlayerBT = {
      */
     "filters_menu": (msg: Interact) => {
         const queue = msg.queue;
+        const filters = queue.player.filters.enable;
 
         // Если нет фильтров
-        if (queue.player.filters.enable.length === 0) {
+        if (filters.length === 0) {
             msg.fastBuilder = { description: "Current filters is null", color: Colors.White };
 
             return;
         }
 
         // Отправляем список включенных фильтров
-        msg.fastBuilder = { description: `Enabled filters: ${queue.player.filters.enable.join(", ")}`, color: Colors.White };
+        msg.fastBuilder = { description: `Filters: ${filters.length}\nEnabled filters: ${filters.join(", ")}`, color: Colors.White };
     },
 
     /**

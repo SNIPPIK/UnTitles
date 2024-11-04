@@ -426,7 +426,6 @@ export class Song {
                         if (status) break
                         else this.link = null;
                     } catch (err) {
-                        //Logger.log("ERROR", err);
                         this.link = null;
                     }
                 }

@@ -1,5 +1,5 @@
-import {PlayerBT, PlayerBTNames} from "@lib/player/buttons";
 import {Interact, InteractRule} from "@lib/discord/utils/Interact";
+import {PlayerBT, PlayerBTNames} from "@lib/player/buttons";
 import {Constructor, Handler} from "@handler";
 import {Colors, Events} from "discord.js";
 import {locale} from "@lib/locale";
@@ -60,7 +60,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 // Управление кнопками
                 else if (message.isButton()) {
                     // Если были задействованы кнопки плеера
-                    if (PlayerBTNames.includes(message.customId)) return Interaction.botton_Players(new Interact(message));
+                    if (PlayerBTNames.includes(message.customId)) return Interaction.BTPlayer(new Interact(message));
                 }
             }
         });
@@ -70,7 +70,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
      * @description Управление кнопками плеера
      * @param msg - Модифицированное сообщение
      */
-    private static readonly botton_Players = (msg: Interact): void => {
+    private static readonly BTPlayer = (msg: Interact): void => {
         // Если пользователь не подключен к голосовым каналам и нет очереди
         if (!msg.voice.channel || !msg.guild.members.me.voice.channel) return;
 

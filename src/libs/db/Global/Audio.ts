@@ -6,7 +6,6 @@ import {Attachment} from "discord.js";
 import {Constructor} from "@handler";
 import {db} from "@lib/db";
 import {env} from "@env";
-import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -131,29 +130,31 @@ class Cycles {
  * @private
  */
 class AudioQueues extends Constructor.Collection<Queue> {
-    private readonly _local = {
-        emitter: new class extends TypedEmitter<CollectionAudioEvents & AudioPlayerEvents> {
-            private _playerEvents: (keyof AudioPlayerEvents)[] = null;
+    /**
+     * @description Ивенты привязанные к плееру и очереди
+     * @private
+     */
+    private readonly emitter = new class extends TypedEmitter<CollectionAudioEvents & AudioPlayerEvents> {
+        private _playerEvents: (keyof AudioPlayerEvents)[] = null;
 
-            /**
-             * @description Ивенты плеера
-             * @return (keyof AudioPlayerEvents)[]
-             */
-            public get player() {
-                if (this._playerEvents) return this._playerEvents;
+        /**
+         * @description Ивенты плеера
+         * @return (keyof AudioPlayerEvents)[]
+         */
+        public get player() {
+            if (this._playerEvents) return this._playerEvents;
 
-                this._playerEvents = this.eventNames().filter((item: keyof AudioPlayerEvents) => item.match(/player\//)) as (keyof AudioPlayerEvents)[];
-                return this._playerEvents;
-            };
-        },
-    };
+            this._playerEvents = this.eventNames().filter((item: keyof AudioPlayerEvents) => item.match(/player\//)) as (keyof AudioPlayerEvents)[];
+            return this._playerEvents;
+        };
+    }
 
     /**
      * @description Получаем ивенты для плеера
      * @return CollectionAudioEvents
      * @public
      */
-    public get events() { return this._local.emitter; };
+    public get events() { return this.emitter; };
 
     /**
      * @description Проверяем надо ли создать очередь и добавляем треки в нее
@@ -163,11 +164,13 @@ class AudioQueues extends Constructor.Collection<Queue> {
     public create = (message: Interact, item: any) => {
         let queue = db.audio.queue.get(message.guild.id);
 
-        // Проверяем есть ли очередь в списке
+        // Проверяем есть ли очередь в списке, если нет то создаем
         if (!queue) queue = new Queue(message);
 
         // Отправляем сообщение о том что было добавлено
-        if (item instanceof Song && queue.songs.size >= 1 || "items" in item) db.audio.queue.events.emit("message/push", message, item);
+        else if ((item instanceof Song && queue.songs.size >= 1) || "items" in item) {
+            db.audio.queue.events.emit("message/push", message, item);
+        }
 
         // Добавляем треки в очередь
         for (const track of (item["items"] ?? [item]) as Song[]) {

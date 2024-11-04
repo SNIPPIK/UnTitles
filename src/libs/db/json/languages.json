@@ -248,8 +248,8 @@
   },
 
   "api.platform.error": {
-    "ru": "Critical Error: {ARGUMENT}",
-    "en-US": "Critical Error: {ARGUMENT}"
+    "ru": "**Critical Error:** {ARGUMENT}",
+    "en-US": "**Critical Error:** {ARGUMENT}"
   },
 
 
@@ -283,17 +283,32 @@
 
 
   "command.filter.pushed": {
-    "ru": "Добавлен аудио фильтр\n **❯**{ARGUMENT}\n **❯**{ARGUMENT}",
-    "en-US": "Added audio filter\n **❯**{ARGUMENT}\n **❯**{ARGUMENT}"
+    "ru": "Добавлен аудио фильтр\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "en-US": "Added audio filter\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
+  },
+
+  "command.filter.re.pushed": {
+    "ru": "Невозможно включить фильтр повторно!",
+    "en-US": "The filter cannot be turned on again!"
+  },
+
+  "command.filter.arg.fail": {
+    "ru": "Найдено несоответствие аргументов!",
+    "en-US": "Argument mismatch found!"
   },
 
   "command.filter.removed": {
-    "ru": "Отключен аудио фильтр\n **❯**{ARGUMENT}\n **❯**{ARGUMENT}",
-    "en-US":"Remove audio filter\n **❯**{ARGUMENT}\n **❯**{ARGUMENT}"
+    "ru": "Отключен аудио фильтр\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "en-US":"Remove audio filter\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
   },
 
   "command.filter.unsupported": {
     "ru": "Аудио фильтр не совместим с текущим списком фильтров",
     "en-US": "The audio filter is not compatible with the current filter list"
+  },
+
+  "command.filter.null": {
+    "ru": "Список включенных фильтров пуст!",
+    "en-US": "The list of enabled filters is empty!"
   }
 }

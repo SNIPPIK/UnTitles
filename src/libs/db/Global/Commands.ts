@@ -11,12 +11,20 @@ export class Database_Commands<T extends Handler.Command> extends Array<T> {
      * @public
      */
     public get = (names: string | string[]): T => {
+        // Перебираем весь список команд, этот метод быстрее чем filter или find на 2 ms
         for (const cmd of this) {
-            if (names instanceof Array) {
+
+            // Если указанное имя совпало с именем команды
+            if (cmd.data.name === names) return cmd;
+
+            // Проверяем имена если это список
+            else if (names instanceof Array) {
+                // Проверяем все указанные имена команды
                 for (const name of names) {
+                    // Если нашлась подходящая
                     if (cmd.data.name === name || cmd.data.name === name) return cmd;
                 }
-            } else if (cmd.data.name === names) return cmd;
+            }
         }
 
         return null;

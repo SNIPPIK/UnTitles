@@ -207,6 +207,7 @@ export class Process {
 (() => {
     const names = [`${env.get("cached.dir")}/FFmpeg/ffmpeg`, env.get("cached.dir"), env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 
+    // Проверяем имена, если есть FFmpeg/avconv
     for (const name of [...names, "ffmpeg", "avconv"]) {
         try {
             const result = spawnSync(name, ['-h'], {windowsHide: true});
@@ -215,5 +216,6 @@ export class Process {
         } catch {}
     }
 
+    // Выдаем ошибку если нет FFmpeg/avconv
     throw Error("[WCritical]: FFmpeg/avconv not found!");
 })();

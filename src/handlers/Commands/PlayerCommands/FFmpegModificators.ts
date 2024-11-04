@@ -185,7 +185,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     case "off": {
                         // Если нет фильтров
                         if (queue.player.filters.enable.length === 0) {
-                            message.fastBuilder = { description: "Temple text, code:flt2670" };
+                            message.fastBuilder = { description: locale._(message.locale, "command.filter.null") };
                             return;
                         }
 
@@ -199,7 +199,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     case "push": {
                         // Пользователь пытается включить включенный фильтр
                         if (index !== -1) {
-                            message.fastBuilder = { description: "Temple text, code:flt2671" };
+                            message.fastBuilder = { description: locale._(message.locale, "command.filter.arg.fail") };
                             return;
                         }
 
@@ -208,7 +208,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                             // Если аргументы подходят
                             if (arg && arg >= Filter.args[0] && arg <= Filter.args[1]) Filter.user_arg = arg;
                             else {
-                                message.fastBuilder = { description: "Temple text, code:flt2672" };
+                                message.fastBuilder = { description: locale._(message.locale, "command.filter.re.pushed") };
                                 return;
                             }
                         }

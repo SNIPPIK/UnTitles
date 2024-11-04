@@ -50,15 +50,17 @@ const OGG = {
 
 /**
  * @author SNIPPIK
- * @description Делаем проверку на наличие библиотек Opus
+ * @description Проверяем на наличие библиотек, если будет найдена библиотека то она будет использоваться
  */
 (() => {
     const names = Object.keys(OpusLibs)
 
+    // Проверяем на наличие библиотек
     for (const name of names) {
         try {
             const library = require(name);
 
+            // Добавляем библиотеку если она конечно есть
             Object.assign(Opus, {...OpusLibs[name](library), name});
             delete require.cache[require.resolve(name)];
         } catch {}
@@ -246,10 +248,10 @@ export class OpusEncoder extends Transform {
      */
     _destroy = () => {
         if (typeof this.encoder?.delete === "function") this.encoder!.delete!();
+        for (let name of Object.keys(this._temp)) this._temp[name] = null;
+
         // @ts-ignore
         this["encoder"] = null;
-
-        for (let name of Object.keys(this._temp)) this._temp[name] = null;
     };
 }
 

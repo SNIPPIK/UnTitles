@@ -408,11 +408,18 @@ class PlayerSongs {
     public get position() { return this._position; };
 
     /**
-     * @description Кол-во треков в очереди
+     * @description Кол-во треков в очереди с учетом текущей позиции
      * @return number
      * @public
      */
     public get size() { return this._songs.length - this.position; };
+
+    /**
+     * @description Кол-во треков в очереди
+     * @return number
+     * @public
+     */
+    public get total() { return this._songs.length; };
 
     /**
      * @description Общее время треков
