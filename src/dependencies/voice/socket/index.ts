@@ -149,7 +149,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
     };
 
     /**
-     * @description Отправляет аудио пакет, ранее подготовленный с помощью prepare Global Packet(opus Packet).
+     * @description Отправляет аудио пакет, ранее подготовленный с помощью prepare modules Packet(opus Packet).
      * Аудио пакет израсходован и не может быть отправлен повторно.
      *
      * @public

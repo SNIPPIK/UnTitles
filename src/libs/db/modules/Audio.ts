@@ -9,7 +9,7 @@ import {env} from "@env";
 
 /**
  * @author SNIPPIK
- * @description Коллекция для взаимодействия с Global
+ * @description Коллекция для взаимодействия с modules
  * @abstract
  */
 export class Database_Audio {

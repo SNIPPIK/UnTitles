@@ -1,10 +1,10 @@
-import {Database_Commands} from "./Global/Commands";
-import {Database_Audio} from "./Global/Audio";
-import {Database_APIs} from "./Global/APIs";
+import {Database_Commands} from "@lib/db/modules/Commands";
+import {Database_Audio} from "@lib/db/modules/Audio";
+import {Database_APIs} from "@lib/db/modules/APIs";
 import {API, Handler} from "@handler";
 import {Client} from "@lib/discord";
-import {env} from "@env";
 import {Logger} from "@lib/logger";
+import {env} from "@env";
 
 /**
  * @author SNIPPIK

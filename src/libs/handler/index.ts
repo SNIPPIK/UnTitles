@@ -1,5 +1,5 @@
 import { SlashBuilder } from "@lib/discord/utils/SlashBuilder";
-import {CollectionAudioEvents} from "@lib/db/Global/Audio";
+import {CollectionAudioEvents} from "@lib/db/modules/Audio";
 import {Interact, InteractRules} from "@lib/discord/utils/Interact";
 import {AudioPlayerEvents} from "@lib/player";
 import { ClientEvents } from "discord.js";

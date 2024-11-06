@@ -5,6 +5,13 @@ import {env} from "@env";
 
 /**
  * @author SNIPPIK
+ * @description API ключ для доступа к видео на youtube
+ * @protected
+ */
+const AIza = env.check("token.youtube") ? env.get("token.youtube") : "AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc";
+
+/**
+ * @author SNIPPIK
  * @description Динамически загружаемый класс
  * @class cAPI
  */
@@ -18,7 +25,7 @@ class cAPI extends Constructor.Assign<API.request> {
         super({
             name: "YOUTUBE",
             audio: true,
-            auth: env.check("token.youtube"),
+            auth: true,
 
             color: 16711680,
             filter: /https?:\/\/(?:youtu\.be|(?:(?:www|m|music|gaming)\.)?youtube\.com)/gi,
@@ -89,7 +96,7 @@ class cAPI extends Constructor.Assign<API.request> {
 
                                     try {
                                         //Создаем запрос
-                                        const result = await AIza_Decoder.API(ID);
+                                        const result = await cAPI.API(ID, true);
 
                                         ///Если при получении данных возникла ошибка
                                         if (result instanceof Error) return reject(result);
@@ -193,11 +200,56 @@ class cAPI extends Constructor.Assign<API.request> {
 
     /**
      * @description Получаем страницу и ищем на ней данные
-     * @param url {string} Ссылка на видео
+     * @param ID - Ссылка на видео или ID видео
+     * @param AIza - Использовать доступ к аудио через ключ
      */
-    protected static API = (url: string): Promise<Error | any> => {
+    protected static API = (ID: string, AIza: boolean = false): Promise<Error | any> => {
         return new Promise((resolve) => {
-            new httpsClient(url, {useragent: true,
+            // Если надо использовать ключ доступа
+            if (AIza) {
+                new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${AIza}&prettyPrint=false`, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        context: {
+                            client: {
+                                clientName: 'IOS',
+                                clientVersion: '19.09.3',
+                                deviceModel: 'iPhone14,3',
+                                userAgent: 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)',
+                                hl: 'en',
+                                timeZone: 'UTC',
+                                utcOffsetMinutes: 0
+                            }
+                        },
+                        videoId: ID,
+                        playbackContext: { contentPlaybackContext: { html5Preference: 'HTML5_PREF_WANTS' } },
+                        contentCheckOk: true,
+                        racyCheckOk: true
+                    }),
+                    headers: {
+                        'X-YouTube-Client-Name': '5',
+                        'X-YouTube-Client-Version': '19.09.3',
+                        Origin: 'https://www.youtube.com',
+                        'User-Agent': 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)',
+                        'content-type': 'application/json'
+                    }
+                }).toJson.then((api) => {
+                    //Если возникает ошибка при получении страницы
+                    if (api instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
+
+                    //Если есть статус, то проверяем
+                    if (api["playabilityStatus"]?.status) {
+                        if (api["playabilityStatus"]?.status === "LOGIN_REQUIRED") return resolve(Error(`[APIs]: Данное видео невозможно включить из-за проблем с авторизацией!`));
+                        else if (api["playabilityStatus"]?.status !== "OK") return resolve(Error(`[APIs]: Не удалось получить данные! Status: ${api["playabilityStatus"]?.status}`));
+                    }
+
+                    return resolve(api);
+                }).catch((err) => resolve(Error(`[APIs]: ${err}`)));
+                return;
+            }
+
+            // Если не надо использовать ключ, то делаем используем систему поиска данных по странице
+            new httpsClient(ID, {useragent: true,
                 headers: { "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7", "accept-encoding": "gzip, deflate, br" }
             }).toString.then((api) => {
                 //Если возникает ошибка при получении страницы
@@ -319,87 +371,6 @@ class cAPI extends Constructor.Assign<API.request> {
                 link: track?.format?.url || undefined
             })
         }
-    };
-}
-
-
-/**
- * @author SNIPPIK
- * @description Этот ключ не является действительным, но он работает
- * @public
- */
-const generateKey = `AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc`
-
-/**
- * @author SNIPPIK
- * @description Создаем запрос при помощи ключа
- * @class AIza_Decoder
- */
-class AIza_Decoder {
-    private static AIza = env.check("token.youtube") ? env.get("token.youtube").length < generateKey.length ? generateKey : env.get("token.youtube") : generateKey
-
-    /**
-     * @description Делаем запрос через API player youtubeAI
-     * @param ID {string} ID данных
-     */
-    public static API = (ID: string): Promise<Error | any> => {
-        return new Promise((resolve) => {
-            new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${this.AIza}&prettyPrint=false`, {
-                method: "POST",
-                body: JSON.stringify({
-                    context: {
-                        client: {
-                            clientName: 'IOS',
-                            clientVersion: '19.09.3',
-                            deviceModel: 'iPhone14,3',
-                            userAgent: 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)',
-                            hl: 'en',
-                            timeZone: 'UTC',
-                            utcOffsetMinutes: 0
-                        }
-                    },
-                    videoId: ID,
-                    playbackContext: { contentPlaybackContext: { html5Preference: 'HTML5_PREF_WANTS' } },
-                    contentCheckOk: true,
-                    racyCheckOk: true
-                }),
-                headers: {
-                    'X-YouTube-Client-Name': '5',
-                    'X-YouTube-Client-Version': '19.09.3',
-                    Origin: 'https://www.youtube.com',
-                    'User-Agent': 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)',
-                    'content-type': 'application/json'
-                }
-            }).toJson.then((api) => {
-                //Если возникает ошибка при получении страницы
-                if (api instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
-
-                //Если есть статус, то проверяем
-                if (api["playabilityStatus"]?.status) {
-                    if (api["playabilityStatus"]?.status === "LOGIN_REQUIRED") return resolve(Error(`[APIs]: Данное видео невозможно включить из-за проблем с авторизацией!`));
-                    else if (api["playabilityStatus"]?.status !== "OK") return resolve(Error(`[APIs]: Не удалось получить данные! Status: ${api["playabilityStatus"]?.status}`));
-                }
-
-                return resolve(api);
-            }).catch((err) => resolve(Error(`[APIs]: ${err}`)));
-        });
-    };
-
-    /**
-     * @description Генерируем ключ для запросов на youtube
-     * @param length - Размер ключа
-     * @private
-     */
-    public static AIkey = (length: number) => {
-        let result = '';
-        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        const charactersLength = characters.length;
-        let counter = 0;
-        while (counter < length) {
-            result += characters.charAt(Math.floor(Math.random() * charactersLength));
-            counter += 1;
-        }
-        return result;
     };
 }
 
