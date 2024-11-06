@@ -140,7 +140,13 @@ const prototypes: { type: any, name: string, value: any}[] = [
     }
   }
 ];
-for (const property of prototypes) Object.defineProperty(property.type, property.name, {value: property.value});
+
+/**
+ * @description Задаем функции для их использования в проекте
+ */
+for (const property of prototypes) {
+  Object.defineProperty(property.type, property.name, {value: property.value});
+}
 
 /**
  * @description Декларируем их для typescript

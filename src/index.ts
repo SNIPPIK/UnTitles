@@ -48,7 +48,7 @@ else {
      * @description Подключаемся к api discord
      */
     client.login(env.get("token.discord")).then(() => {
-        //Запускаем загрузку модулей после инициализации бота
+        // Запускаем загрузку модулей после инициализации бота
         client.once("ready", () => {
             Logger.log("LOG", `[Shard ${client.ID}] is connected to websocket`);
             db.initialize = client;
