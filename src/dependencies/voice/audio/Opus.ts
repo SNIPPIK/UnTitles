@@ -1,5 +1,6 @@
 import {Transform, TransformOptions} from "node:stream";
 import {Buffer} from "node:buffer";
+import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -19,9 +20,6 @@ const OpusLibs = {
         return { args: [48000, 2], encoder: lib.OpusEncoder }
     },
 }, Opus: Methods = {};
-
-// The Opus "silent" frame
-export const SILENCE_FRAME = Buffer.from([0xf8, 0xff, 0xfe]);
 
 /**
  * @author SNIPPIK
@@ -65,6 +63,9 @@ const OGG = {
             delete require.cache[require.resolve(name)];
         } catch {}
     }
+
+    // Выдаем предупреждение если нет Opus
+    Logger.log("WARN", "[Warning] Opus library has not found! Using native compression!");
 })();
 
 /**

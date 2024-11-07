@@ -1,5 +1,6 @@
 import {ConnectionData} from "../socket";
 import {Buffer} from "node:buffer";
+import process from "node:process";
 
 /**
  * @author SNIPPIK
@@ -75,7 +76,7 @@ const SUPPORTED_ENCRYPTION_MODES = [ "_lite", "_suffix", ""].map(item => `xsalsa
         } catch {}
     }
 
-    throw new Error(`[WCritical]: No encryption package is installed. Set one to choose from. ${libs}`);
+    throw new Error(`[Critical]: No encryption package is installed. Set one to choose from. ${libs}`);
 })();
 
 /**
