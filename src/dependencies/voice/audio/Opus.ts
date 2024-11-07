@@ -51,7 +51,7 @@ const OGG = {
  * @description Проверяем на наличие библиотек, если будет найдена библиотека то она будет использоваться
  */
 (() => {
-    const names = Object.keys(OpusLibs)
+    const names = Object.keys(OpusLibs);
 
     // Проверяем на наличие библиотек
     for (const name of names) {
@@ -60,12 +60,12 @@ const OGG = {
 
             // Добавляем библиотеку если она конечно есть
             Object.assign(Opus, {...OpusLibs[name](library), name});
+            // Выдаем сообщение об использовании opus
+            //Logger.log("LOG", `[Opus] Using <${name}> opus library!`);
             delete require.cache[require.resolve(name)];
+            return;
         } catch {}
     }
-
-    // Выдаем предупреждение если нет Opus
-    Logger.log("WARN", "[Warning] Opus library has not found! Using native compression!");
 })();
 
 /**

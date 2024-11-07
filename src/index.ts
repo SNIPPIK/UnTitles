@@ -2,40 +2,14 @@ import {Client, ShardManager} from "@lib/discord";
 import process from "node:process";
 import {Logger} from "@lib/logger";
 import {Colors} from "discord.js";
-import {env} from "@env";
 import {db} from "@lib/db";
+import {env} from "@env";
 
 /**
  * @name ShardManager
  * @description Загрузка менеджера осколков
  */
-if (process["argv"].includes("--ShardManager")) {
-    new ShardManager(__filename);
-}
-
-/**
- * @name "RemoveAllCommands"
- * @description Удаление всех команд бота
- */
-else if (process["argv"].includes("--RemoveAllCommands")) {
-    const client = new Client();
-
-    client.once("ready", () => {
-        client.application.commands.set([]).then(() => {
-            Logger.log("LOG", `Removed application SlashCommands!`);
-        });
-
-        for (const [, guild] of client.guilds.cache) {
-            guild.commands.set([]).then(() => {
-                Logger.log("WARN", `[Guild - ${guild.id}] remove SlashCommands`);
-            })
-        }
-    });
-
-    client.login(env.get("token.discord")).then(() => {
-        Logger.log("LOG", `[Shard ${client.ID}] is connected to websocket`);
-    });
-}
+if (process["argv"].includes("--ShardManager")) new ShardManager(__filename);
 
 /**
  * @name "default"
@@ -59,7 +33,7 @@ else {
      * @description Удаляем копию клиента если процесс был закрыт
      */
     for (const event of ["exit"]) process.on(event, () => {
-        Logger.log("DEBUG", "[Process]: is killed!");
+        Logger.log("DEBUG", "[Process] is killed!");
         client.destroy().catch((err) => Logger.log("ERROR", err));
         process.exit(0);
     });
@@ -84,13 +58,13 @@ else {
 
         //Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
         if (err.message?.match(/Critical/)) {
-            Logger.log("ERROR", `[CODE: <14>]: Hooked critical error!`);
+            Logger.log("ERROR", `[CODE: <14>] Hooked critical error!`);
             process.exit(14);
             //return;
         }
 
         //Если вдруг запущено несколько ботов
-        else if (err.name?.match(/acknowledged./)) return Logger.log("WARN", `[CODE: <50490>]: Several bots are running!`);
+        else if (err.name?.match(/acknowledged./)) return Logger.log("WARN", `[CODE: <50490>] Several bots are running!`);
 
         //Выводим ошибку
         Logger.log("ERROR", `\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n└ Stack:   ${err.stack}`);

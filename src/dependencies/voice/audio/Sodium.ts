@@ -1,6 +1,6 @@
 import {ConnectionData} from "../socket";
 import {Buffer} from "node:buffer";
-import process from "node:process";
+import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -72,6 +72,7 @@ const SUPPORTED_ENCRYPTION_MODES = [ "_lite", "_suffix", ""].map(item => `xsalsa
 
             Object.assign(Sodium, SodiumLibs[name](library));
             delete require.cache[require.resolve(name)];
+            //Logger.log("LOG", `[Sodium] Using <${name}> sodium library!`);
             return;
         } catch {}
     }

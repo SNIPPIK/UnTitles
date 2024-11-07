@@ -222,7 +222,7 @@ export class Track {
      * @description Здесь хранятся данные с какой платформы был взят трек
      * @private
      */
-    private readonly _api: { platform: API.platform; color: number; } = null;
+    private readonly _api: { platform: API.platform; color: number; } = { platform: null, color: null};
 
     /**
      * @description Здесь хранятся данные времени трека
@@ -235,13 +235,19 @@ export class Track {
      * @private
      */
     private readonly _track: Track.data & { user?: Track.user; duration?: { split: string; total: number; }} = {
-        title: null, url: null, image: null, artist: null, duration: null, time: null
+        title: null, url: null, image: null, artist: null, duration: null, time: null, audio: { url: null, type: "url" }
     };
     /**
      * @description Получаем платформу у которого был взят трек
      * @public
      */
     public get platform() { return this._api.platform; };
+
+    /**
+     * @description Добавление данных платформы
+     * @public
+     */
+    public set api(api: Track["_api"]) { Object.assign(this._api, api); };
 
     /**
      * @description Получаем цвет трека
@@ -389,8 +395,6 @@ export class Track {
             else this._duration = { split: total.duration(), total };
         }
 
-        const api = new API.response(track.url);
-
         //Изображения трека
         track["image"] = track?.image ?? { url: db.emojis.noImage };
 
@@ -399,7 +403,6 @@ export class Track {
 
         //Добавляем данные
         Object.assign(this._track, track);
-        this._api = {platform: api.platform, color: api.color };
     };
 }
 

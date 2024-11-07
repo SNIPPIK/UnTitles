@@ -66,11 +66,28 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
                         return;
                     }
 
+                    // Добавляем данные о платформе для плейлиста
+                    if ("items" in item) item.items.map((track) => {
+                        // Добавляем данные о платформе
+                        track.api = {
+                            platform: platform.platform,
+                            color: platform.color
+                        };
+                    });
+
+                    // Добавляем данные о платформе для трека
                     else if ("time" in item) {
+                        // Если был получен трек являющийся потоковым
                         if (item.time.total === 0) {
                             db.audio.queue.events.emit("request/error", message, locale._(message.locale, "track.live", [platform.platform, api.name]), true);
-                            return
+                            return;
                         }
+
+                        // Добавляем данные о платформе
+                        item.api = {
+                            platform: platform.platform,
+                            color: platform.color
+                        };
                     }
 
                     // Запускаем проигрывание треков

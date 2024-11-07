@@ -70,7 +70,10 @@ class sAPI extends Constructor.Assign<API.request> {
                                         }
 
                                         return resolve(track);
-                                    } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
+                                    } catch (e) {
+                                        console.log(e);
+                                        return reject(Error(`[APIs]: ${e}`))
+                                    }
                                 });
                             }
                         });

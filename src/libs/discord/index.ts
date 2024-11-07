@@ -27,7 +27,7 @@ export class ShardManager extends ShardingManager {
         });
 
         //Создаем дубликат
-        this.spawn({ amount: "auto", delay: -1 }).catch((err: Error) => Logger.log("ERROR",`[ShardManager]: ${err}`));
+        this.spawn({ amount: "auto", delay: -1 }).catch((err: Error) => Logger.log("ERROR",`[ShardManager] ${err}`));
     };
 }
 
