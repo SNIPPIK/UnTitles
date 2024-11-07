@@ -1,4 +1,4 @@
-import {API, Constructor, Handler} from "@handler";
+import {Constructor, Handler, API} from "@handler";
 import {locale} from "@lib/locale";
 import {Colors} from "discord.js";
 import {db} from "@lib/db";
@@ -66,8 +66,8 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
                         return;
                     }
 
-                    else if ("duration" in item) {
-                        if (item.duration.seconds === 0) {
+                    else if ("time" in item) {
+                        if (item.time.total === 0) {
                             db.audio.queue.events.emit("request/error", message, locale._(message.locale, "track.live", [platform.platform, api.name]), true);
                             return
                         }
@@ -99,7 +99,7 @@ class userRequestTime extends Constructor.Assign<Handler.Event<"request/time">> 
                 const old = queue.songs.position;
 
                 // Меняем позицию трека в очереди
-                if (queue.player.audio.current.duration < queue.songs.song.duration.seconds + 10) {
+                if (queue.player.audio.current.duration < queue.songs.song.time.total + 10) {
                     queue.songs.swapPosition = position;
                     queue.player.play(queue.songs.song);
 

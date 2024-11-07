@@ -1,5 +1,5 @@
-import {Song} from "@lib/player/queue";
 import {API} from "@lib/handler";
+import {Track} from "@lib/player/queue";
 import {env} from "@env";
 
 /**
@@ -75,7 +75,7 @@ export class Database_APIs {
      * @description Ищем аудио если платформа может самостоятельно выдать аудио
      * @param track - трек у которого нет аудио
      */
-    public readonly fetchAllow = (track: Song): Promise<string | Error> => {
+    public readonly fetchAllow = (track: Track): Promise<string | Error> => {
         return new Promise(async (resolve) => {
             const api = new API.response(track.platform).find("track");
 
@@ -101,13 +101,13 @@ export class Database_APIs {
      * @description Получаем ссылку на трек если прошлая уже не актуальна
      * @param track - трек у которого нет аудио
      */
-    public readonly fetch = (track: Song): Promise<string | Error> => {
+    public readonly fetch = (track: Track): Promise<string | Error> => {
         return new Promise(async (resolve) => {
             const platform = new API.response(this.platforms.supported.find((plt) => plt.requests.length >= 2 && plt.audio).name);
 
             try {
                 // Ищем подходящий трек
-                const tracks = await platform.find("search").callback(`${track.author.title} - ${track.title}`, {limit: 5});
+                const tracks = await platform.find("search").callback(`${track.artist.title} - ${track.title}`, {limit: 5});
                 if (tracks instanceof Error || tracks.length === 0) return resolve(null);
 
                 // Если он был найден, то получаем исходник трека

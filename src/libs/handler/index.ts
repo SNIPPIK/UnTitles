@@ -1,9 +1,9 @@
+import {Interact, InteractRules} from "@lib/discord/utils/Interact";
 import { SlashBuilder } from "@lib/discord/utils/SlashBuilder";
 import {CollectionAudioEvents} from "@lib/db/modules/Audio";
-import {Interact, InteractRules} from "@lib/discord/utils/Interact";
 import {AudioPlayerEvents} from "@lib/player";
 import { ClientEvents } from "discord.js";
-import {Song} from "@lib/player/queue";
+import {Track} from "@lib/player/queue";
 import { Client } from "@lib/discord";
 import { readdirSync } from "node:fs";
 import {db} from "@lib/db";
@@ -394,9 +394,31 @@ export namespace API {
    * @abstract
    */
   export abstract class item<T extends callbacks> {
+    /**
+     * @description Имя запроса на платформу
+     */
     public readonly name: T;
+
+    /**
+     * @description Фильтр поиска при использовании поиска по типу
+     */
     public readonly filter?: RegExp;
+
+    /**
+     * @description Пример как должен быть получен ID
+     */
+    public readonly get_id?: (url: string) => number | string;
+
+    /**
+     * @description Выполняем запрос
+     */
     public readonly callback?: (url: string, options: T extends "track" ? {audio?: boolean} : {limit?: number}) => callback<T>;
+
+    /**
+     * @description Создаем класс
+     * @param options
+     * @protected
+     */
     protected constructor(options: item<T>) {
       Object.assign(this, options);
     };
@@ -517,13 +539,40 @@ export namespace API {
    * @abstract
    */
   export interface request {
-    name: platform;
-    url: string;
-    audio: boolean;
-    auth: boolean;
-    filter: RegExp;
-    color: number;
-    requests: item<callbacks>[];
+    /**
+     * @description Имя платформы
+     */
+    readonly name: platform;
+
+    /**
+     * @description Ссылка для работы фильтра
+     */
+    readonly url: string;
+
+    /**
+     * @description Доступ к аудио
+     */
+    readonly audio: boolean;
+
+    /**
+     * @description Доступ с авторизацией
+     */
+    readonly auth: boolean;
+
+    /**
+     * @description Фильтр ссылки для работы определения
+     */
+    readonly filter: RegExp;
+
+    /**
+     * @description Цвет платформы
+     */
+    readonly color: number;
+
+    /**
+     * @description Запросы платформы
+     */
+    readonly requests: item<callbacks>[];
   }
 
   /**
@@ -542,5 +591,5 @@ export namespace API {
    * @description Функция запроса
    * @type callback<callbacks>
    */
-  export type callback<T> = Promise<(T extends "track" ? Song : T extends "playlist" | "album" ? Song.playlist : T extends "search" | "author" ? Song[] : never) | Error>
+  export type callback<T> = Promise<(T extends "track" ? Track : T extends "playlist" | "album" ? Track.playlist : T extends "search" | "author" ? Track[] : never) | Error>
 }

@@ -37,7 +37,7 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                                 required: true,
                                 choices: db.api.allow.map((platform) => {
                                     return {
-                                        name: `[${platform.requests.length}] ${platform.url} | ${platform.name}`,
+                                        name: `[${platform.requests.length}] - ${platform.name} | ${platform.url}`,
                                         value: platform.name
                                     }
                                 })

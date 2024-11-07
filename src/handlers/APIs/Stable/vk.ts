@@ -1,6 +1,6 @@
 import {API, Constructor} from "@handler";
 import {httpsClient} from "@lib/request";
-import {Song} from "@lib/player/queue";
+import {Track} from "@lib/player/queue";
 import {env} from "@env";
 
 /**
@@ -8,7 +8,7 @@ import {env} from "@env";
  * @description Динамически загружаемый класс
  * @API VK
  */
-class cAPI extends Constructor.Assign<API.request> {
+class sAPI extends Constructor.Assign<API.request> {
     /**
      * @description Данные для создания запросов
      * @protected
@@ -20,7 +20,7 @@ class cAPI extends Constructor.Assign<API.request> {
 
     /**
      * @description Создаем экземпляр запросов
-     * @constructor cAPI
+     * @constructor sAPI
      * @public
      */
     public constructor() {
@@ -47,18 +47,18 @@ class cAPI extends Constructor.Assign<API.request> {
                             callback: (url) => {
                                 const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi.exec(url).pop();
 
-                                return new Promise<Song>(async (resolve, reject) => {
+                                return new Promise<Track>(async (resolve, reject) => {
                                     //Если ID трека не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
 
                                     try {
                                         //Создаем запрос
-                                        const api = await cAPI.API("audio", "getById", `&audios=${ID}`);
+                                        const api = await sAPI.API("audio", "getById", `&audios=${ID}`);
 
                                         //Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
 
-                                        const track = cAPI.track(api.response.pop(), url);
+                                        const track = sAPI.track(api.response.pop(), url);
 
                                         //Если нет ссылки на трек
                                         if (!track.link) return reject(Error("[APIs]: Невозможно получить файл аудио!"));
@@ -82,14 +82,14 @@ class cAPI extends Constructor.Assign<API.request> {
                         super({
                             name: "search",
                             callback: (url, {limit}) => {
-                                return new Promise<Song[]>(async (resolve, reject) => {
+                                return new Promise<Track[]>(async (resolve, reject) => {
                                     try {
                                         //Создаем запрос
-                                        const api = await cAPI.API("audio", "search", `&q=${url}`);
+                                        const api = await sAPI.API("audio", "search", `&q=${url}`);
 
                                         //Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
-                                        const tracks = (api.response.items.splice(0, limit)).map((track: any) => cAPI.track(track));
+                                        const tracks = (api.response.items.splice(0, limit)).map((track: any) => sAPI.track(track));
 
                                         return resolve(tracks);
                                     } catch (e) {
@@ -128,16 +128,19 @@ class cAPI extends Constructor.Assign<API.request> {
      * @param track {any} Любой трек из VK
      * @param url - Ссылка на трек
      */
-    protected static track = (track: any, url: string = null): Song => {
+    protected static track = (track: any, url: string = null): Track => {
         const image = track?.album?.["thumb"];
 
-        return new Song({
+        return new Track({
             url: url || `https://vk.com/audio${track["owner_id"]}_${track.id}`,
             title: track.title,
-            author: this.author(track),
+            artist: this.author(track),
             image: { url: image?.["photo_1200"] ?? image?.["photo_600"] ?? image?.["photo_300"] ?? image?.["photo_270"] ?? undefined },
-            duration: { seconds: track.duration.toFixed(0) },
-            link: track?.url
+            time: { total: track.duration.toFixed(0) },
+            audio: {
+                type: "url",
+                url: track?.url
+            }
         });
     };
 
@@ -145,7 +148,7 @@ class cAPI extends Constructor.Assign<API.request> {
      * @description Из полученных данных подготавливаем данные об авторе для ISong.track
      * @param user {any} Любой автор трека
      */
-    protected static author = (user: any): Song.author => {
+    protected static author = (user: any): Track.artist => {
         const url = `https://vk.com/audio?performer=1&q=${user.artist.replaceAll(" ", "").toLowerCase()}`;
 
         return { url, title: user.artist };
@@ -156,4 +159,4 @@ class cAPI extends Constructor.Assign<API.request> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({cAPI});
+export default Object.values({cAPI: sAPI});

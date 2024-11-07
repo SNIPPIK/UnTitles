@@ -1,6 +1,6 @@
 import {API, Constructor} from "@handler";
 import {httpsClient} from "@lib/request";
-import {Song} from "@lib/player/queue";
+import {Track} from "@lib/player/queue";
 import {env} from "@env";
 
 /**
@@ -8,17 +8,17 @@ import {env} from "@env";
  * @description API ключ для доступа к видео на youtube
  * @protected
  */
-const AIza = env.check("token.youtube") ? env.get("token.youtube") : "AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc";
+const AIza_key = env.check("token.youtube") ? env.get("token.youtube") : "AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc";
 
 /**
  * @author SNIPPIK
  * @description Динамически загружаемый класс
- * @class cAPI
+ * @class sAPI
  */
-class cAPI extends Constructor.Assign<API.request> {
+class sAPI extends Constructor.Assign<API.request> {
     /**
      * @description Создаем экземпляр запросов
-     * @constructor cAPI
+     * @constructor sAPI
      * @public
      */
     public constructor() {
@@ -43,32 +43,32 @@ class cAPI extends Constructor.Assign<API.request> {
                             filter: /playlist\?list=[a-zA-Z0-9-_]+/gi,
                             callback: (url: string, {limit}) => {
                                 const ID = url.match(this.filter).pop();
-                                let author = null;
+                                let artist = null;
 
-                                return new Promise<Song.playlist>(async (resolve, reject) => {
+                                return new Promise<Track.playlist>(async (resolve, reject) => {
                                     //Если ID плейлиста не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не удалось получить ID плейлиста!"));
 
                                     try {
                                         //Создаем запрос
-                                        const details = await cAPI.API(`https://www.youtube.com/${ID}`);
+                                        const details = await sAPI.API(`https://www.youtube.com/${ID}`);
 
                                         if (details instanceof Error) return reject(details);
 
                                         const sidebar: any[] = details["sidebar"]["playlistSidebarRenderer"]["items"];
                                         const microformat: any = details["microformat"]["microformatDataRenderer"];
-                                        const items: Song[] = details["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]
+                                        const items: Track[] = details["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]
                                             .content["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]
-                                            .splice(0, limit).map(({playlistVideoRenderer}) => cAPI.track(playlistVideoRenderer));
+                                            .splice(0, limit).map(({playlistVideoRenderer}) => sAPI.track(playlistVideoRenderer));
 
                                         //Если нет автора плейлиста, то это альбом автора
                                         if (sidebar.length > 1) {
                                             const authorData = details["sidebar"]["playlistSidebarRenderer"].items[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
-                                            author = await cAPI.getChannel({ id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"], name: authorData.title["runs"][0].text });
-                                        } else author = items.at(-1).author;
+                                            artist = await sAPI.getChannel({ id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"], name: authorData.title["runs"][0].text });
+                                        } else artist = items.at(-1).artist;
 
                                         return resolve({
-                                            url, title: microformat.title, items, author,
+                                            url, title: microformat.title, items, artist,
                                             image: microformat.thumbnail["thumbnails"].pop()
                                         });
                                     } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
@@ -90,26 +90,26 @@ class cAPI extends Constructor.Assign<API.request> {
                             callback: (url: string, { audio}) => {
                                 const ID = this.filter.exec(url)?.at(0) ?? this.filter.exec(url)[0];
 
-                                return new Promise<Song>(async (resolve, reject) => {
+                                return new Promise<Track>(async (resolve, reject) => {
                                     //Если ID видео не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не удалось получить ID трека!"));
 
                                     try {
                                         //Создаем запрос
-                                        const result = await cAPI.API(ID, true);
+                                        const result = await sAPI.API(ID, true);
 
                                         ///Если при получении данных возникла ошибка
                                         if (result instanceof Error) return reject(result);
 
                                         //Если надо получить аудио
                                         if (audio) {
-                                            const format = await cAPI.extractFormat(result["streamingData"]);
+                                            const format = await sAPI.extractFormat(result["streamingData"]);
                                             //console.log(format)
 
                                             result["videoDetails"]["format"] = {url: format["url"]};
                                         }
 
-                                        const track = cAPI.track(result["videoDetails"]);
+                                        const track = sAPI.track(result["videoDetails"]);
                                         return resolve(track);
                                     } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                                 });
@@ -128,7 +128,7 @@ class cAPI extends Constructor.Assign<API.request> {
                             name: "author",
                             filter: /\/(channel)?(@)/gi,
                             callback: (url: string, {limit}) => {
-                                return new Promise<Song[]>(async (resolve, reject) => {
+                                return new Promise<Track[]>(async (resolve, reject) => {
                                     try {
                                         let ID: string;
 
@@ -136,7 +136,7 @@ class cAPI extends Constructor.Assign<API.request> {
                                         else ID = `channel/${url.split("channel/")[1]}`;
 
                                         //Создаем запрос
-                                        const details = await cAPI.API(`https://www.youtube.com/${ID}/videos`);
+                                        const details = await sAPI.API(`https://www.youtube.com/${ID}/videos`);
 
                                         if (details instanceof Error) return reject(details);
 
@@ -171,11 +171,11 @@ class cAPI extends Constructor.Assign<API.request> {
                     public constructor() {
                         super({
                             name: "search",
-                            callback: (url: string, {limit}) => {
-                                return new Promise<Song[]>(async (resolve, reject) => {
+                            callback: (url: string, {limit}): Promise<Track[] | Error> => {
+                                return new Promise<Track[] | Error>(async (resolve, reject) => {
                                     try {
                                         //Создаем запрос
-                                        const details = await cAPI.API(`https://www.youtube.com/results?search_query=${url.split(" ").join("+")}`);
+                                        const details = await sAPI.API(`https://www.youtube.com/results?search_query=${url.split(" ").join("+")}`);
 
                                         //Если при получении данных возникла ошибка
                                         if (details instanceof Error) return reject(details);
@@ -185,7 +185,7 @@ class cAPI extends Constructor.Assign<API.request> {
                                         if (vanilla_videos?.length === 0 || !vanilla_videos) return reject(Error(`[APIs]: Не удалось найти: ${url}`));
 
                                         let filtered_ = vanilla_videos?.filter((video: any) => video && video?.["videoRenderer"] && video?.["videoRenderer"]?.["videoId"])?.splice(0, limit);
-                                        let videos = filtered_.map(({ videoRenderer }: any) => cAPI.track(videoRenderer));
+                                        let videos: Track[] = filtered_.map(({ videoRenderer }: any) => sAPI.track(videoRenderer));
 
                                         return resolve(videos);
                                     } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
@@ -207,7 +207,7 @@ class cAPI extends Constructor.Assign<API.request> {
         return new Promise((resolve) => {
             // Если надо использовать ключ доступа
             if (AIza) {
-                new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${AIza}&prettyPrint=false`, {
+                new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${AIza_key}&prettyPrint=false`, {
                     method: "POST",
                     body: JSON.stringify({
                         context: {
@@ -319,8 +319,8 @@ class cAPI extends Constructor.Assign<API.request> {
      * @param id {string} ID канала
      * @param name {string} Название канала
      */
-    protected static getChannel = ({ id, name }: { id: string, name?: string }): Promise<Song.author> => {
-        return new Promise<Song.author>((resolve) => {
+    protected static getChannel = ({ id, name }: { id: string, name?: string }): Promise<Track.artist> => {
+        return new Promise<Track.artist>((resolve) => {
             new httpsClient(`https://www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`, {
                 headers: {
                     "x-youtube-client-name": "1",
@@ -350,25 +350,36 @@ class cAPI extends Constructor.Assign<API.request> {
      */
     protected static track(track: any): any {
         try {
-            return new Song({
+            return new Track({
                 url: `https://youtu.be/${track["videoId"]}`,
                 title: track.title?.["runs"][0]?.text ?? track.title,
-                author: {
+                artist: {
                     title: track["shortBylineText"]["runs"][0].text ?? track.author ?? undefined,
                     url: `https://www.youtube.com${track["shortBylineText"]["runs"][0]["navigationEndpoint"]["browseEndpoint"]["canonicalBaseUrl"] || track["shortBylineText"]["runs"][0]["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"].url}`,
                 },
-                duration: { seconds: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0 },
+                time: { total: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0 },
                 image: track.thumbnail["thumbnails"].pop(),
-                link: track?.format?.url || undefined
+                audio: {
+                    type: "url",
+                    url: track?.format?.url || undefined,
+                }
             });
         } catch {
-            return new Song({
-                author: { title: track.author, url: `https://www.youtube.com/channel/${track.channelId}` },
+            return new Track({
+                artist: {
+                    title: track.author,
+                    url: `https://www.youtube.com/channel/${track.channelId}`
+                },
                 url: `https://youtu.be/${track["videoId"]}`,
                 title: track.title,
-                duration: { seconds: track["lengthSeconds"] ?? 0 },
+                time: {
+                    total: track["lengthSeconds"] ?? 0
+                },
                 image: track.thumbnail["thumbnails"].pop(),
-                link: track?.format?.url || undefined
+                audio: {
+                    type: "url",
+                    url: track?.format?.url || undefined
+                }
             })
         }
     };
@@ -378,4 +389,4 @@ class cAPI extends Constructor.Assign<API.request> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({cAPI});
+export default Object.values({cAPI: sAPI});

@@ -1,7 +1,7 @@
 import {ExtraPlayer, AudioPlayerEvents} from "@lib/player";
 import {Interact} from "@lib/discord/utils/Interact";
 import {TypedEmitter} from "tiny-typed-emitter";
-import {Queue, Song} from "@lib/player/queue";
+import {Queue, Track} from "@lib/player/queue";
 import {Attachment} from "discord.js";
 import {Constructor} from "@handler";
 import {db} from "@lib/db";
@@ -168,13 +168,13 @@ class AudioQueues extends Constructor.Collection<Queue> {
         if (!queue) queue = new Queue(message);
 
         // Отправляем сообщение о том что было добавлено
-        else if ((item instanceof Song && queue.songs.size >= 1) || "items" in item) {
+        else if ((item instanceof Track && queue.songs.size >= 1) || "items" in item) {
             db.audio.queue.events.emit("message/push", message, item);
         }
 
         // Добавляем треки в очередь
-        for (const track of (item["items"] ?? [item]) as Song[]) {
-            track.requester = message.author as any;
+        for (const track of (item["items"] ?? [item]) as Track[]) {
+            track.user = message.author;
             queue.songs.push(track);
         }
     };
@@ -187,7 +187,7 @@ class AudioQueues extends Constructor.Collection<Queue> {
  */
 export interface CollectionAudioEvents {
     // Сообщение о добавленном треке или плейлисте, альбоме
-    "message/push": (message: Interact, items: Song | Song.playlist) => void;
+    "message/push": (message: Interact, items: Track | Track.playlist) => void;
 
     // Сообщение о текущем треке
     "message/playing": (queue: Queue, message?: Interact) => void;
@@ -196,10 +196,10 @@ export interface CollectionAudioEvents {
     "message/error": (queue: Queue, error?: string | Error) => void;
 
     // Сообщение о поиске и выборе трека
-    "message/search": (tracks: Song[], platform: string, message: Interact) => void;
+    "message/search": (tracks: Track[], platform: string, message: Interact) => void;
 
     // Сообщение о последнем треке
-    "message/last": (track: Song, message: Interact) => void;
+    "message/last": (track: Track, message: Interact) => void;
 
     // Добавляем и создаем очередь
     "request/api": (message: Interact, argument: (string | Attachment)[]) => void;

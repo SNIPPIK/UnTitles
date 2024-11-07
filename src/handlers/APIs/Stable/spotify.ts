@@ -1,6 +1,6 @@
 import {API, Constructor} from "@handler";
 import {httpsClient} from "@lib/request";
-import {Song} from "@lib/player/queue";
+import {Track} from "@lib/player/queue";
 import {env} from "@env";
 
 /**
@@ -8,7 +8,7 @@ import {env} from "@env";
  * @description Динамически загружаемый класс
  * @API Spotify
  */
-class cAPI extends Constructor.Assign<API.request> {
+class sAPI extends Constructor.Assign<API.request> {
     /**
      * @description Данные для создания запросов
      * @protected
@@ -26,7 +26,7 @@ class cAPI extends Constructor.Assign<API.request> {
 
     /**
      * @description Создаем экземпляр запросов
-     * @constructor cAPI
+     * @constructor sAPI
      * @public
      */
     public constructor() {
@@ -52,17 +52,17 @@ class cAPI extends Constructor.Assign<API.request> {
                             callback: (url: string) => {
                                 const ID = /track\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("track\/")?.pop();
 
-                                return new Promise<Song>(async (resolve, reject) => {
+                                return new Promise<Track>(async (resolve, reject) => {
                                     //Если ID трека не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
 
                                     try {
                                         //Создаем запрос
-                                        const api = await cAPI.API(`tracks/${ID}`);
+                                        const api = await sAPI.API(`tracks/${ID}`);
 
                                         //Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
-                                        const track = cAPI.track(api)
+                                        const track = sAPI.track(api)
 
                                         return resolve(track);
                                     } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
@@ -84,20 +84,20 @@ class cAPI extends Constructor.Assign<API.request> {
                             callback: (url, {limit}) => {
                                 const ID = /album\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("album\/")?.pop();
 
-                                return new Promise<Song.playlist>(async (resolve, reject) => {
+                                return new Promise<Track.playlist>(async (resolve, reject) => {
                                     //Если ID альбома не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не найден ID альбома!"));
 
                                     try {
                                         //Создаем запрос
-                                        const api: Error | any = await cAPI.API(`albums/${ID}?offset=0&limit=${limit}`);
+                                        const api: Error | any = await sAPI.API(`albums/${ID}?offset=0&limit=${limit}`);
 
                                         //Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
 
-                                        const tracks = api.tracks.items.map(cAPI.track)
+                                        const tracks = api.tracks.items.map(sAPI.track)
 
-                                        return resolve({ url, title: api.name, image: api.images[0], items: tracks, author: api?.["artists"][0] });
+                                        return resolve({ url, title: api.name, image: api.images[0], items: tracks, artist: api?.["artists"][0] });
                                     } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                                 });
                             }
@@ -117,17 +117,17 @@ class cAPI extends Constructor.Assign<API.request> {
                             callback: (url, {limit}) => {
                                 const ID = /playlist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("playlist\/")?.pop();
 
-                                return new Promise<Song.playlist>(async (resolve, reject) => {
+                                return new Promise<Track.playlist>(async (resolve, reject) => {
                                     //Если ID плейлиста не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не найден ID плейлиста!"));
 
                                     try {
                                         //Создаем запрос
-                                        const api: Error | any = await cAPI.API(`playlists/${ID}?offset=0&limit=${limit}`);
+                                        const api: Error | any = await sAPI.API(`playlists/${ID}?offset=0&limit=${limit}`);
 
                                         //Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
-                                        const tracks = api.tracks.items.map(({ track }) => cAPI.track(track));
+                                        const tracks = api.tracks.items.map(({ track }) => sAPI.track(track));
 
                                         return resolve({ url, title: api.name, image: api.images[0], items: tracks });
                                     } catch (e) {
@@ -151,18 +151,18 @@ class cAPI extends Constructor.Assign<API.request> {
                             callback: (url, {limit}) => {
                                 const ID = /artist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("artist\/")?.pop();
 
-                                return new Promise<Song[]>(async (resolve, reject) => {
+                                return new Promise<Track[]>(async (resolve, reject) => {
                                     //Если ID автора не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не найден ID автора!"));
 
                                     try {
                                         //Создаем запрос
-                                        const api = await cAPI.API(`artists/${ID}/top-tracks?market=ES&limit=${limit}`);
+                                        const api = await sAPI.API(`artists/${ID}/top-tracks?market=ES&limit=${limit}`);
 
                                         //Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
 
-                                        return resolve((api.tracks?.items ?? api.tracks).map(cAPI.track));
+                                        return resolve((api.tracks?.items ?? api.tracks).map(sAPI.track));
                                     } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                                 });
                             }
@@ -179,15 +179,15 @@ class cAPI extends Constructor.Assign<API.request> {
                         super({
                             name: "search",
                             callback: (url, {limit}) => {
-                                return new Promise<Song[]>(async (resolve, reject) => {
+                                return new Promise<Track[]>(async (resolve, reject) => {
                                     try {
                                         //Создаем запрос
-                                        const api: Error | any = await cAPI.API(`search?q=${url}&type=track&limit=${limit}`);
+                                        const api: Error | any = await sAPI.API(`search?q=${url}&type=track&limit=${limit}`);
 
                                         //Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
 
-                                        return resolve(api.tracks.items.map(cAPI.track));
+                                        return resolve(api.tracks.items.map(sAPI.track));
                                     } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                                 });
                             }
@@ -246,15 +246,15 @@ class cAPI extends Constructor.Assign<API.request> {
      * @description Собираем трек в готовый образ
      * @param track {any} Трек из Spotify API
      */
-    protected static track = (track: any): Song => {
-        return new Song({
+    protected static track = (track: any): Track => {
+        return new Track({
             title: track.name,
             url: track["external_urls"]["spotify"],
-            author: {
+            artist: {
                 title: track["artists"][0].name,
                 url: track["artists"][0]["external_urls"]["spotify"]
             },
-            duration: { seconds: (track["duration_ms"] / 1000).toFixed(0) },
+            time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
             image: track.album.images.sort((item1, item2) => item1.width > item2.width)[0],
         });
     };
@@ -264,4 +264,4 @@ class cAPI extends Constructor.Assign<API.request> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({cAPI});
+export default Object.values({cAPI: sAPI});

@@ -1,6 +1,6 @@
 import {ActionRowBuilder, Colors, StringSelectMenuBuilder} from "discord.js";
 import {Constructor, Handler} from "@handler";
-import {Song} from "@lib/player/queue";
+import {Track} from "@lib/player/queue";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 
@@ -18,7 +18,7 @@ class onError extends Constructor.Assign<Handler.Event<"message/error">> {
             execute: (queue, error) => {
                 if (queue?.songs || queue?.songs!.song) return;
 
-                const {color, author, image, title, requester} = queue.songs.song;
+                const {color, artist, image, title, user} = queue.songs.song;
                 new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image, timestamp: new Date(),
@@ -32,10 +32,10 @@ class onError extends Constructor.Assign<Handler.Event<"message/error">> {
                                 value: `\`\`\`js\n${error}...\`\`\``
                             }
                         ],
-                        author: {name: author.title, url: author.url, iconURL: db.emojis.diskImage},
+                        author: {name: artist.title, url: artist.url, iconURL: db.emojis.diskImage},
                         footer: {
-                            text: `${requester.username} | ${queue.songs.time} | 🎶: ${queue.songs.size}`,
-                            iconURL: requester?.avatar
+                            text: `${user.username} | ${queue.songs.time} | 🎶: ${queue.songs.size}`,
+                            iconURL: user?.avatar
                         }
                     }
                 ]).setTime(10e3).send = queue.message;
@@ -56,7 +56,7 @@ class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
             name: "message/push",
             type: "player",
             execute: (message, obj) => {
-                const {author, image} = obj;
+                const {artist, image } = obj;
 
                 // Отправляем сообщение, о том что было добавлено в очередь
                 new message.builder().addEmbeds([
@@ -68,14 +68,14 @@ class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
                             iconURL: message.author.avatarURL()
                         },
                         author: {
-                            name: author?.title,
-                            url: author?.url,
+                            name: artist?.title,
+                            url: artist?.url,
                             iconURL: db.emojis.diskImage
                         },
                         fields: [
                             {
                                 name: locale._(message.locale, "player.queue.push"),
-                                value: obj instanceof Song ? `${obj.titleReplaced}` : `${obj.items.slice(0, 5).map((track, index) => {
+                                value: obj instanceof Track ? `${obj.titleReplaced}` : `${obj.items.slice(0, 5).map((track, index) => {
                                     return `\`${index + 1}\` ${track.titleReplaced}`;
                                 }).join("\n")}${obj.items.length > 5 ? `\nAnd ${obj.items.length - 5} tracks...` : ""}`
                             }
@@ -118,7 +118,7 @@ class onSearch extends Constructor.Assign<Handler.Event<"message/search">> {
                             .setOptions(...tracks.map((track) => {
                                     return {
                                         label: `${track.title}`,
-                                        description: `${track.author.title} | ${track.duration.full}`,
+                                        description: `${track.artist.title} | ${track.time.split}`,
                                         value: track.url
                                     }
                                 }), {label: locale._(message.locale, "cancel"), value: "stop"}
@@ -142,11 +142,11 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
             name: "message/playing",
             type: "player",
             execute: (queue, message) => {
-                const {color, author, image, title, url, duration, platform} = queue.songs.song;
+                const {color, artist, image, title, url, time, platform} = queue.songs.song;
                 const embed = new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image,
-                        author: {name: author.title, url: author.url, iconURL: db.emojis.diskImage},
+                        author: {name: artist.title, url: artist.url, iconURL: db.emojis.diskImage},
                         fields: [
 
                             // Текущий трек
@@ -173,7 +173,7 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
                                 name: "",
                                 value: (() => {
                                     const current = queue.player.audio?.current?.duration || 0;
-                                    return `\n\`\`${current.duration()}\`\` ${queue.player.progress.bar} \`\`${duration.full}\`\``;
+                                    return `\n\`\`${current.duration()}\`\` ${queue.player.progress.bar} \`\`${time.split}\`\``;
                                 })()
                             }
                         ]

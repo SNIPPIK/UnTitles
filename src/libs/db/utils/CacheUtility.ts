@@ -10,6 +10,7 @@ class CacheUtility {
 /**
  * @author SNIPPIK
  * @description Класс для сохранения данных о треке
+ * @support track, author
  * @protected
  */
 class CacheData {

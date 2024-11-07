@@ -1,15 +1,15 @@
 import {API, Constructor} from "@handler";
-import {Song} from "@lib/player/queue";
+import {Track} from "@lib/player/queue";
 import {Attachment} from "discord.js";
 
 /**
  * @author SNIPPIK
  * @description Динамически загружаемый класс
  */
-class cAPI extends Constructor.Assign<API.request> {
+class sAPI extends Constructor.Assign<API.request> {
     /**
      * @description Создаем экземпляр запросов
-     * @constructor cAPI
+     * @constructor sAPI
      * @public
      */
     public constructor() {
@@ -33,14 +33,18 @@ class cAPI extends Constructor.Assign<API.request> {
                             filter: /attachments|ephemeral-attachments/,
                             //@ts-ignore
                             callback: (attachment: Attachment) => {
-                                return new Promise<Song>((resolve) => {
-                                    const track = new Song({
-                                        title: attachment.name, author: null,
+                                return new Promise<Track>((resolve) => {
+                                    const track = new Track({
+                                        url: attachment.url,
+                                        title: attachment.name, artist: null,
                                         image: {url: attachment.proxyURL},
-                                        duration: {
-                                            seconds: ((attachment.size / 1024) / 39.2).toFixed(0)  //((attachment.size / 1024) / 16.5).toFixed(0)
+                                        time: {
+                                            total: ((attachment.size / 1024) / 39.2).toFixed(0) as any  //((attachment.size / 1024) / 16.5).toFixed(0)
                                         },
-                                        link: attachment.url, url: attachment.url
+                                        audio: {
+                                            type: "url",
+                                            url: attachment.url
+                                        }
                                     });
 
                                     return resolve(track);
@@ -58,4 +62,4 @@ class cAPI extends Constructor.Assign<API.request> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({cAPI});
+export default Object.values({cAPI: sAPI});

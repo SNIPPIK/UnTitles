@@ -52,7 +52,7 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                 }
 
                 //Если пользователь указал времени больше чем в треке
-                else if (duration > queue.songs.song.duration.seconds) {
+                else if (duration > queue.songs.song.time.total) {
                     message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.big") }
                     return;
                 }

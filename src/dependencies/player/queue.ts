@@ -211,108 +211,31 @@ export class Queue {
     };
 }
 
-
-/**
- * @author SNIPPIK
- * @description Все интерфейсы для работы системы треков
- * @namespace Song
- * @public
- */
-export namespace Song {
-    /**
-     * @description Какие данные доступны в <song>.requester
-     * @interface
-     */
-    export interface requester {
-        //ID Пользователя
-        id: string;
-
-        //Ник пользователя
-        username: string;
-
-        //Ссылка на аватар пользователя
-        avatar: string | null;
-    }
-
-    /**
-     * @description Пример получаемого трека
-     * @interface
-     */
-    export interface track {
-        //Название трека
-        title: string;
-
-        //Ссылка на трек
-        url: string;
-
-        //Картинка трека
-        image: image;
-
-        //Автор трека
-        author: author,
-
-        //Время
-        duration: {
-            //Длительность в секундах
-            seconds: string;
-        };
-
-        //Исходный файл
-        link?: string | null;
-    }
-
-    /**
-     * @description Пример получаемого автора трека
-     * @interface
-     */
-    export interface author {
-        //Имя автора
-        title: string;
-
-        //Ссылка на автора
-        url: string | undefined;
-        image?: image;
-    }
-
-    /**
-     * @description Пример получаемого плейлиста
-     * @interface
-     */
-    export interface playlist {
-        url: string;
-        title: string;
-        items: Song[];
-        image: { url: string; };
-        author?: author;
-    }
-
-    /**
-     * @description Параметры картинки
-     * @interface
-     */
-    export interface image {
-        //Ссылка на картинку
-        url: string;
-
-        //Длина
-        height?: number;
-
-        //Высота
-        width?: number
-    }
-}
-
 /**
  * @author SNIPPIK
  * @description Ключевой элемент музыки
- * @class Song
+ * @class Track
  * @public
  */
-export class Song {
+export class Track {
+    /**
+     * @description Здесь хранятся данные с какой платформы был взят трек
+     * @private
+     */
     private readonly _api: { platform: API.platform; color: number; } = null;
-    private readonly _duration: { full: string; seconds: number; } = null;
-    private readonly _track: Song.track & { requester?: Song.requester; duration?: { full: string; seconds: number; }} = {
-        title: null, url: null, image: null, author: null, duration: null
+
+    /**
+     * @description Здесь хранятся данные времени трека
+     * @private
+     */
+    private readonly _duration: { split: string; total: number; } = null;
+
+    /**
+     * @description Сами данные трека
+     * @private
+     */
+    private readonly _track: Track.data & { user?: Track.user; duration?: { split: string; total: number; }} = {
+        title: null, url: null, image: null, artist: null, duration: null, time: null
     };
     /**
      * @description Получаем платформу у которого был взят трек
@@ -343,8 +266,8 @@ export class Song {
         // Удаляем лишнее скобки
         const title = `[${this.title.replace(/[\(\)\[\]"]/g, "").substring(0, 45)}](${this.url})`;
 
-        if (this.platform === "YOUTUBE") return `\`\`[${this.duration.full}]\`\` ${title}`;
-        return `\`\`[${this.duration.full}]\`\` [${this.author.title}](${this.author.url}) - ${title}`;
+        if (this.platform === "YOUTUBE") return `\`\`[${this.time.split}]\`\` ${title}`;
+        return `\`\`[${this.time.split}]\`\` [${this.artist.title}](${this.artist.url}) - ${title}`;
     };
 
     /**
@@ -357,13 +280,13 @@ export class Song {
      * @description Получаем данные автора трека
      * @public
      */
-    public get author() { return this._track.author; };
+    public get artist() { return this._track.artist; };
 
     /**
      * @description Получаем время трека
      * @public
      */
-    public get duration() { return this._duration; };
+    public get time() { return this._duration; };
 
     /**
      * @description Получаем картинки автора и трека
@@ -375,22 +298,22 @@ export class Song {
      * @description Получаем пользователя который включил трек
      * @public
      */
-    public get requester() { return this._track.requester; };
+    public get user() { return this._track.user; };
 
     /**
      * @description Добавляем запросчика трека
      * @param author - Автор запроса
      */
-    public set requester(author) {
+    public set user(author) {
         const { username, id, avatar } = author;
 
         //Если нет автора трека, то автором станет сам пользователь
-        if (!this.author) this._track.author = {
+        if (!this.artist) this._track.artist = {
             title: username, url: `https://discordapp.com/users/${id}`
         };
 
         //Пользователь, который включил трек
-        this._track.requester = {
+        this._track.user = {
             username, id,
             avatar: `https://cdn.discordapp.com/avatars/${id}/${avatar}.webp`
         };
@@ -400,13 +323,13 @@ export class Song {
      * @description Получаем ссылку на исходный файл
      * @public
      */
-    public get link() { return this._track.link; };
+    public get link() { return this._track.audio.url; };
 
     /**
      * @description Добавление ссылки на трек
      * @param url - Ссылка или путь
      */
-    public set link(url: string) { this._track.link = url; };
+    public set link(url: string) { this._track.audio.url = url; };
 
     /**
      * @description Проверяем ссылку на доступность и выдаем ее если ссылка имеет код !==200, то обновляем
@@ -454,16 +377,16 @@ export class Song {
      * @description Создаем трек
      * @param track - Данные трека с учетом <Song.track>
      */
-    public constructor(track: Song.track) {
+    public constructor(track: Track.data) {
         //Высчитываем время
-        if (track.duration.seconds.match(/:/)) {
-            this._duration = { full: track.duration.seconds, seconds: track.duration.seconds.duration() };
+        if (track.time.total.match(/:/)) {
+            this._duration = { split: track.time.total, total: track.time.total.duration() };
         } else {
-            const seconds = parseInt(track.duration.seconds) || 321;
+            const total = parseInt(track.time.total) || 321;
 
             //Время трека
-            if (isNaN(seconds) || !seconds) this._duration = { full: "Live", seconds: 0 };
-            else this._duration = { full: seconds.duration(), seconds };
+            if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };
+            else this._duration = { split: total.duration(), total };
         }
 
         const api = new API.response(track.url);
@@ -472,10 +395,118 @@ export class Song {
         track["image"] = track?.image ?? { url: db.emojis.noImage };
 
         //Удаляем ненужные данные
-        delete track.duration;
+        delete track.time;
 
         //Добавляем данные
         Object.assign(this._track, track);
         this._api = {platform: api.platform, color: api.color };
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Все интерфейсы для работы системы треков
+ * @namespace Track
+ * @public
+ */
+export namespace Track {
+    /**
+     * @description Данные трека для работы класса
+     * @interface data
+     */
+    export interface data {
+        /**
+         * @description Название трека
+         */
+        title: string;
+
+        /**
+         * @description Ссылка на трек, именно на трек
+         */
+        url: string;
+
+        /**
+         * @description Данные об авторе трека
+         */
+        artist: artist;
+
+        /**
+         * @description База с картинками трека и автора
+         */
+        image: { url: string };
+
+        /**
+         * @description Данные о времени трека
+         */
+        time: {
+            /**
+             * @description Общее время трека
+             */
+            total: string;
+
+            /**
+             * @description Время конвертированное в 00:00
+             */
+            split?: string;
+        }
+
+        /**
+         * @description Данные об исходном файле, он же сам трек
+         */
+        audio?: {
+            type: "file" | "url";
+            url: string;
+        }
+    }
+
+    /**
+     * @description Пример получаемого плейлиста
+     * @interface playlist
+     */
+    export interface playlist {
+        url: string;
+        title: string;
+        items: Track[];
+        image: { url: string; };
+        artist?: artist;
+    }
+
+    /**
+     * @description Данные об авторе трека или плейлиста
+     * @interface artist
+     */
+    export interface artist {
+        /**
+         * @description Ник/имя автора трека
+         */
+        title: string;
+
+        /**
+         * @description Ссылка на автора трека
+         */
+        url: string;
+
+        image?: {url: string}
+    }
+
+    /**
+     * @description Данные о пользователе для отображения об пользователе включившем трек
+     * @interface user
+     */
+    export interface user {
+        /**
+         * @description ID пользователя
+         */
+        id: string;
+
+        /**
+         * @description Имя/ник пользователя
+         */
+        username: string;
+
+        /**
+         * @description Ссылка на аватар пользователя
+         */
+        avatar: string | null;
+    }
 }

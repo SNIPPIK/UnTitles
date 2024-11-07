@@ -2,7 +2,7 @@ import type {LocalizationMap} from "discord-api-types/v10";
 import {TypedEmitter} from "tiny-typed-emitter";
 import {AudioResource} from "@lib/player/audio";
 import {VoiceConnection} from "@lib/voice";
-import {Song} from "@lib/player/queue";
+import {Track} from "@lib/player/queue";
 import {Logger} from "@lib/logger";
 import {API} from "@handler";
 import {db} from "@lib/db";
@@ -124,13 +124,13 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public get progress() {
-        const {platform, duration} = this.tracks.song;
+        const {platform, time} = this.tracks.song;
 
         // Создаем прогресс бар
         return new PlayerProgress({
             platform: platform,
             duration: {
-                total: duration.seconds,
+                total: time.total,
                 current: this.audio?.current?.duration ?? 0
             }
         });
@@ -381,7 +381,7 @@ class PlayerVoice {
  * @class PlayerSongs
  */
 class PlayerSongs {
-    private readonly _songs: Song[] = [];
+    private readonly _songs: Track[] = [];
     private _position = 0;
 
     /**
@@ -426,14 +426,14 @@ class PlayerSongs {
      * @public
      */
     public get time() {
-        return this._songs.slice(this._position).reduce((total: number, item: {duration: { seconds: number }}) => total + (item.duration.seconds || 0), 0).duration();
+        return this._songs.slice(this._position).reduce((total: number, item: {time: { total: number }}) => total + (item.time.total || 0), 0).duration();
     };
 
     /**
      * @description Добавляем трек в очередь
      * @param track - Сам трек
      */
-    public push = (track: Song) => { this._songs.push(track); };
+    public push = (track: Track) => { this._songs.push(track); };
 
     /**
      * @description Получаем следующие n треков, не включает текущий
