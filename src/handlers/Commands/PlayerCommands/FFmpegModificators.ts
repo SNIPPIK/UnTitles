@@ -164,7 +164,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                 const {author, guild} = message;
                 const queue = db.audio.queue.get(guild.id);
 
-                //Если статус плеера не позволяет пропустить поток
+                // Если статус плеера не позволяет пропустить поток
                 if (!queue.player.playing) {
                     message.fastBuilder = {
                         description: locale._(message.locale, "player.playing.off"),

@@ -1,6 +1,5 @@
 import {Transform, TransformOptions} from "node:stream";
 import {Buffer} from "node:buffer";
-import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -51,17 +50,13 @@ const OGG = {
  * @description Проверяем на наличие библиотек, если будет найдена библиотека то она будет использоваться
  */
 (() => {
-    const names = Object.keys(OpusLibs);
-
     // Проверяем на наличие библиотек
-    for (const name of names) {
+    for (const name of Object.keys(OpusLibs)) {
         try {
             const library = require(name);
 
             // Добавляем библиотеку если она конечно есть
             Object.assign(Opus, {...OpusLibs[name](library), name});
-            // Выдаем сообщение об использовании opus
-            //Logger.log("LOG", `[Opus] Using <${name}> opus library!`);
             delete require.cache[require.resolve(name)];
             return;
         } catch {}
@@ -200,7 +195,7 @@ export class OpusEncoder extends Transform {
      * @description При получении данных через pipe или write, модифицируем их для одобрения со стороны discord
      * @public
      */
-    _transform = (chunk: Buffer, _: any, done: () => any) => {
+    public _transform = (chunk: Buffer, _: any, done: () => any) => {
         let index = this._temp.index, packet = () => chunk;
 
         // Если есть подключенная библиотека расшифровки opus, то используем ее
@@ -238,7 +233,7 @@ export class OpusEncoder extends Transform {
      * @description Удаляем данные по окончанию
      * @public
      */
-    _final = (cb: () => void) => {
+    public _final = (cb: () => void) => {
         this.destroy();
         cb();
     };
@@ -247,7 +242,7 @@ export class OpusEncoder extends Transform {
      * @description Удаляем данные по завершению
      * @public
      */
-    _destroy = () => {
+    public _destroy = () => {
         if (typeof this.encoder?.delete === "function") this.encoder!.delete!();
         for (let name of Object.keys(this._temp)) this._temp[name] = null;
 

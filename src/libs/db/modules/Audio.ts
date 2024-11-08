@@ -102,7 +102,7 @@ class Cycles {
                     push: (item) => {
                         const old = this.array.find(msg => msg.guild.id === item.guild.id);
 
-                        //Если это-же сообщение есть в базе, то нечего не делаем
+                        // Если это-же сообщение есть в базе, то нечего не делаем
                         if (old) this.remove(old);
                     }
                 },

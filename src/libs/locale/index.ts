@@ -30,10 +30,10 @@ export class locale {
     public static _ = (language: languages, context: locale_text, args?: any[]) => {
         let translate = locales[context][language] as string;
 
-        //Если нет такой строки
+        // Если нет такой строки
         if (!translate) return `Error: Not found locale ${context}`;
 
-        //Если есть аргументы
+        // Если есть аргументы
         if (args && args.length > 0) {
             for (let i = 0; i < args.length; i++) {
                 translate = translate.replace("{ARGUMENT}", args[i]);

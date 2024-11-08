@@ -76,11 +76,11 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                 .json,
             rules: ["voice", "anotherVoice"],
             execute: ({message, args, type}) => {
-                //Если пользователь прикрепил файл
+                // Если пользователь прикрепил файл
                 if (type === "file") {
                     const attachment = message.options.getAttachment("input");
 
-                    //Если пользователь подсунул фальшивку
+                    // Если пользователь подсунул фальшивку
                     if (!attachment.contentType.match("audio")) {
                         message.fastBuilder = { description: locale._(message.locale, "attachment.audio.fail"), color: Colors.Yellow }
                         return;
@@ -90,7 +90,7 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                     return;
                 }
 
-                //Если пользователя пытается включить трек
+                // Если пользователя пытается включить трек
                 db.audio.queue.events.emit("request/api", message, args);
                 return;
             }

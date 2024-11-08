@@ -7,13 +7,52 @@ import {ApplicationCommandOption} from "discord.js";
  * @class SlashBuilder
  */
 export class SlashBuilder {
+    /**
+     * @description Название команды
+     * @private
+     */
     private name: string = undefined;
+
+    /**
+     * @description Переводы названия команды на другие языки
+     * @private
+     */
     private name_localizations: LocalizationMap = undefined
+
+    /**
+     * @description Описание команды
+     * @private
+     */
     private description: string = undefined;
+
+    /**
+     * @description Описание команды на другие языки
+     * @private
+     */
     private description_localizations: LocalizationMap = undefined;
+
+    /**
+     * @description Можно ли использовать команду в личном текстовом канале
+     * @private
+     */
     private dm_permission: boolean = undefined;
+
+    /**
+     * @description Права на использование команды
+     * @private
+     */
     private default_member_permissions: Permissions | null | undefined = undefined;
+
+    /**
+     * @description 18+ доступ
+     * @private
+     */
     private nsfw: boolean = false
+
+    /**
+     * @description Доп параметры для работы slashCommand
+     * @private
+     */
     private options: ApplicationCommandOption[] = [];
 
     /**

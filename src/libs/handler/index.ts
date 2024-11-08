@@ -299,10 +299,10 @@ export namespace Constructor {
       if (this._config.custom?.push) this._config.custom?.push(item);
       else if (this.data.array.includes(item)) this.remove(item);
 
-      //Добавляем данные в цикл
+      // Добавляем данные в цикл
       this.data.array.push(item);
 
-      //Запускаем цикл
+      // Запускаем цикл
       if (this.data.array?.length === 1 && this.data.time === 0) {
         this.data.time = Date.now();
         setImmediate(this._stepCycle);
@@ -333,7 +333,7 @@ export namespace Constructor {
         return;
       }
 
-      //Высчитываем время для выполнения
+      // Высчитываем время для выполнения
       this.data.time += this._config.duration;
 
       for (let item of this.data.array) {
@@ -347,7 +347,7 @@ export namespace Constructor {
         }
       }
 
-      //Выполняем функцию через ~this._time ms
+      // Выполняем функцию через ~this._time ms
       setTimeout(this._stepCycle, this.data.time - Date.now());
     };
   }
@@ -357,24 +357,24 @@ export namespace Constructor {
    * @description Интерфейс для опций TimeCycle
    */
   interface TimeCycleConfig<T> {
-    //Название цикла
+    // Название цикла
     name: string;
 
-    //Функция выполнения
+    // Функция выполнения
     execute: (item: T) => void;
 
-    //Функция фильтрации
+    // Функция фильтрации
     filter: (item: T) => boolean;
 
-    //Время через которое надо запустить цикл
+    // Время через которое надо запустить цикл
     duration: number;
 
-    //Модификации цикла, не обязательно
+    // Модификации цикла, не обязательно
     custom?: {
-      //Изменить логику добавления
+      // Изменить логику добавления
       push?: (item: T) => void;
 
-      //Изменить логику удаления
+      // Изменить логику удаления
       remove?: (item: T) => void;
     };
   }

@@ -2,7 +2,6 @@ import {ChildProcessWithoutNullStreams, spawn, spawnSync} from "node:child_proce
 import {OpusEncoder} from "@lib/voice/audio/Opus";
 import * as path from "node:path";
 import {env} from "@env";
-import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -213,12 +212,10 @@ export class Process {
         try {
             const result = spawnSync(name, ['-h'], {windowsHide: true});
             if (result.error) continue;
-
-            //Logger.log("LOG", `[FFmpeg/avconv] was found here ${name}`);
             return env.set("ffmpeg.path", name);
         } catch {}
     }
 
     // Выдаем ошибку если нет FFmpeg/avconv
-    throw Error("[WCritical]: FFmpeg/avconv not found!");
+    throw Error("[Critical]: FFmpeg/avconv not found!");
 })();

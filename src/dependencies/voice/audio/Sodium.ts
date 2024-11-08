@@ -1,6 +1,5 @@
 import {ConnectionData} from "../socket";
 import {Buffer} from "node:buffer";
-import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -72,12 +71,11 @@ const SUPPORTED_ENCRYPTION_MODES = [ "_lite", "_suffix", ""].map(item => `xsalsa
 
             Object.assign(Sodium, SodiumLibs[name](library));
             delete require.cache[require.resolve(name)];
-            //Logger.log("LOG", `[Sodium] Using <${name}> sodium library!`);
             return;
         } catch {}
     }
 
-    throw new Error(`[Critical]: No encryption package is installed. Set one to choose from. ${libs}`);
+    throw Error(`[Critical]: No encryption package is installed. Set one to choose from. ${libs}`);
 })();
 
 /**

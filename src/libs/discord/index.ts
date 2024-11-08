@@ -10,6 +10,10 @@ import {env} from "@env";
  * @public
  */
 export class ShardManager extends ShardingManager {
+    /**
+     * @description Создаем класс и запускаем процесс деления бота на сервера
+     * @param path
+     */
     public constructor(path: string) {
         super(path, {
             token: env.get("token.discord"), mode: "worker",
@@ -17,16 +21,18 @@ export class ShardManager extends ShardingManager {
             execArgv: ["-r", "tsconfig-paths/register"],
             respawn: true
         });
+
+        // Сообщаем о запуске ShardManager
         Logger.log("LOG", `[ShardManager/worker] running...`);
 
-        //Слушаем ивент для создания осколка
+        // Слушаем ивент для создания осколка
         this.on("shardCreate", (shard) => {
             shard.on("spawn", () => Logger.log("LOG",`[Shard ${shard.id}] added to manager`));
             shard.on("ready", () => Logger.log("LOG",`[Shard ${shard.id}] is running`));
             shard.on("death", () => Logger.log("LOG",`[Shard ${shard.id}] is killed`));
         });
 
-        //Создаем дубликат
+        // Создаем дубликат
         this.spawn({ amount: "auto", delay: -1 }).catch((err: Error) => Logger.log("ERROR",`[ShardManager] ${err}`));
     };
 }
@@ -39,20 +45,34 @@ export class ShardManager extends ShardingManager {
 export class Client extends DS_Client {
     private readonly webhook = env.get("webhook.id") && env.get("webhook.token") ?
         new WebhookClient({id: env.get("webhook.id"), token: env.get("webhook.token")}) : null;
+
+    /**
+     * @description Создаем класс и задаем параметры боту
+     * @public
+     */
     public constructor() {
         super({
+            // Какие данные не надо кешировать (для экономии памяти)
             allowedMentions: {
                 parse: ["roles", "users"],
                 repliedUser: true,
             },
+
+            // Права бота
             intents: [
                 IntentsBitField.Flags["GuildEmojisAndStickers"],
                 IntentsBitField.Flags["GuildIntegrations"],
                 IntentsBitField.Flags["GuildVoiceStates"],
                 IntentsBitField.Flags["Guilds"]
             ],
+
+            // Данные которые обязательно надо кешировать
             partials: [Partials.Channel, Partials.GuildMember, Partials.Message, Partials.Reaction, Partials.User],
+
+            // Кол-во сервером на осколок
             shardCount: parseInt(env.get("shard.server")) || 1e3,
+
+            // Кол-во осколков
             shards: "auto",
         });
     };

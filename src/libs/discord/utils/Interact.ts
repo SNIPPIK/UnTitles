@@ -254,10 +254,22 @@ export class Interact {
  * @class MessageBuilder
  */
 class MessageBuilder {
-  public callback: (message: Message, pages: string[], page: number, embed: MessageBuilder["embeds"]) => void;
-  public promise: (msg: Interact) => void;
-  public components: (ComponentData | ActionRowBuilder)[] = [];
-  public embeds: (EmbedData)[] = [];
+  /**
+   * @description Временная база данных с embed json data в array
+   * @public
+   */
+  public readonly embeds: (EmbedData)[] = [];
+
+  /**
+   * @description Временная база данных с ComponentData или классом ActionRowBuilder в array
+   * @public
+   */
+  public readonly components: (ComponentData | ActionRowBuilder)[] = [];
+
+  /**
+   * @description Время жизни сообщения по умолчанию
+   * @public
+   */
   public time: number = 15e3;
 
   /**
@@ -279,6 +291,18 @@ class MessageBuilder {
           if (this.promise) this.promise(msg);
         });
   };
+
+  /**
+   * @description Функция позволяющая бесконечно выполнять обновление сообщения
+   * @public
+   */
+  public callback: (message: Message, pages: string[], page: number, embed: MessageBuilder["embeds"]) => void;
+
+  /**
+   * @description Функция которая будет выполнена после отправления сообщения
+   * @public
+   */
+  public promise: (msg: Interact) => void;
 
   /**
    * @description Добавляем embeds в базу для дальнейшей отправки

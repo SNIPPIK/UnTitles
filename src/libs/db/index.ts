@@ -103,7 +103,7 @@ class Database {
         (async () => {
             Logger.log("LOG", `[Shard ${client.ID}] has initialize database`);
 
-            //Постепенно загружаем директории с данными
+            // Постепенно загружаем директории с данными
             for (const handler of loaders) {
                 try {
                     Logger.log("LOG", `[Shard ${client.ID}] has initialize ${handler.name}`);
@@ -115,7 +115,7 @@ class Database {
                 }
             }
 
-            //Отправляем данные о командах на сервера discord
+            // Отправляем данные о командах на сервера discord
             await this.commands.register(client);
         })();
     };
