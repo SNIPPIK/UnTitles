@@ -18,8 +18,8 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                     "ru": "воспроизведение"
                 })
                 .setDescription({
-                    "en-US": "Playing music!",
-                    "ru": "Play music of your choice!"
+                    "en-US": "Play music of your choice!",
+                    "ru": "Включайте музыку по вашему выбору!"
                 })
                 .addSubCommands([
                     {
