@@ -443,12 +443,29 @@ class PlayerSongs {
     public push = (track: Track) => { this._songs.push(track); };
 
     /**
+     * @description Получаем прошлый трек или текущий в зависимости от позиции
+     * @param position - позиция трека, номер в очереди
+     */
+    public get = (position: number) => {
+        return this._songs[position];
+    };
+
+    /**
      * @description Получаем следующие n треков, не включает текущий
      * @param length - Кол-во треков
      * @public
      */
     public next = (length: number = 5) => {
         return this._songs.slice(this._position + 1, this._position + length);
+    };
+
+    /**
+     * @description Удаляем из очереди неугодный трек
+     * @param position - позиция трека, номер в очереди
+     */
+    public remove = (position: number) => {
+        // Удаляем из очереди
+        this._songs.splice(position, 1);
     };
 
     /**

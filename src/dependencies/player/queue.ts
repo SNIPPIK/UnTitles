@@ -205,7 +205,7 @@ export class Queue {
      */
     public cleanup = () => {
         db.audio.cycles.players.remove(this.player);
-        this.player.cleanup();
+        if (this.player) this.player.cleanup();
 
         for (let item of Object.keys(this._data)) this._data[item] = null;
     };

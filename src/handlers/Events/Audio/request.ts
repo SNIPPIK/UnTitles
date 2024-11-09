@@ -115,6 +115,12 @@ class userRequestTime extends Constructor.Assign<Handler.Event<"request/time">> 
             execute: (queue, position) => {
                 const old = queue.songs.position;
 
+                // Если всего один трек в очереди
+                if (queue.songs.size === 1) {
+                    queue.player.stop();
+                    return;
+                }
+
                 // Меняем позицию трека в очереди
                 if (queue.player.audio.current.duration < queue.songs.song.time.total + 10) {
                     queue.songs.swapPosition = position;
