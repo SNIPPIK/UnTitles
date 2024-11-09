@@ -23,7 +23,8 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                 .addSubCommands([
                     {
                         names: {
-                            "en-US": "leave"
+                            "en-US": "leave",
+                            "ru": "отключение"
                         },
                         descriptions: {
                             "en-US": "Disconnecting from the voice channel!",
@@ -33,7 +34,8 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                     },
                     {
                         names: {
-                            "en-US": "re-configure"
+                            "en-US": "re-configure",
+                            "ru": "переконфигурация"
                         },
                         descriptions: {
                             "en-US": "Reconnect to the voice channel!",

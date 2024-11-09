@@ -15,15 +15,17 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
             data: new SlashBuilder()
                 .setName({
                     "en-US": "play",
+                    "ru": "воспроизведение"
                 })
                 .setDescription({
                     "en-US": "Playing music!",
-                    "ru": "Проигрывание музыки по вашему выбору!"
+                    "ru": "Play music of your choice!"
                 })
                 .addSubCommands([
                     {
                         names: {
                             "en-US": "api",
+                            "ru": "api"
                         },
                         descriptions: {
                             "en-US": "Turn on music by link or title!",
@@ -33,7 +35,8 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                         options: [
                             {
                                 names: {
-                                    "en-US": "select"
+                                    "en-US": "select",
+                                    "ru": "платформа"
                                 },
                                 descriptions: {
                                     "en-US": "Which platform does the request belong to?",
@@ -50,7 +53,8 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                             },
                             {
                                 names: {
-                                    "en-US": "request"
+                                    "en-US": "request",
+                                    "ru": "запрос"
                                 },
                                 descriptions: {
                                     "en-US": "You must specify the link or the name of the track!",
@@ -63,7 +67,8 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                     },
                     {
                         names: {
-                            "en-US": "file"
+                            "en-US": "file",
+                            "ru": "файл"
                         },
                         descriptions: {
                             "en-US": "Turning on music using a file!",
@@ -73,7 +78,8 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                         options: [
                             {
                                 names: {
-                                    "en-US": "input"
+                                    "en-US": "input",
+                                    "ru": "файл"
                                 },
                                 descriptions: {
                                     "en-US": "You need to attach a file!",

@@ -14,6 +14,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
             data: new SlashBuilder()
                 .setName({
                     "en-US": "tribune",
+                    "ru": "трибуна"
                 })
                 .setDescription({
                     "en-US": "Interaction with voice connections",
@@ -22,7 +23,8 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                 .addSubCommands([
                     {
                         names: {
-                            "en-US": "stage"
+                            "en-US": "stage",
+                            "ru": "состояние"
                         },
                         descriptions: {
                             "en-US": "Request to broadcast music to the podium!",
@@ -32,7 +34,8 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                         options: [
                             {
                                 names: {
-                                    "en-US": "choice"
+                                    "en-US": "choice",
+                                    "ru": "выбор"
                                 },
                                 descriptions: {
                                     "en-US": "Options for interacting with the stands!",
@@ -42,19 +45,17 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                                 type: ApplicationCommandOptionType["String"],
                                 choices: [
                                     {
-                                        name: "join - Подключение к трибуне",
+                                        name: "join - Connecting to the podium",
                                         nameLocalizations: {
-                                            "en-US": "join - Connecting to the podium"
+                                            "ru": "join - Подключение к трибуне"
                                         },
-                                        //@ts-ignore
                                         value: "join"
                                     },
                                     {
-                                        name: "request - Запрос на подключение",
+                                        name: "request - Connection request",
                                         nameLocalizations: {
-                                            "en-US": "request - Connection request"
+                                            "ru": "request - Запрос на подключение"
                                         },
-                                        //@ts-ignore
                                         value: "request"
                                     }
                                 ]

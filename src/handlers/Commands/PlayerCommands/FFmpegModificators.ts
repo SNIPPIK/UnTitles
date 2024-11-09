@@ -89,7 +89,8 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
         super({
             data: new SlashBuilder()
                 .setName({
-                    "en-US": "filter"
+                    "en-US": "filter",
+                    "ru": "фильтр"
                 })
                 .setDescription({
                     "en-US": "Setting filters",
@@ -98,7 +99,8 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                 .addSubCommands([
                     {
                         names: {
-                            "en-US": "off"
+                            "en-US": "off",
+                            "ru": "выкл"
                         },
                         descriptions: {
                             "en-US": "Disable all filters!",
@@ -108,7 +110,8 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     },
                     {
                         names: {
-                            "en-US": "push"
+                            "en-US": "push",
+                            "ru": "добавить"
                         },
                         descriptions: {
                             "en-US": "Adding filters!",
@@ -118,7 +121,8 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         options: [
                             {
                                 names: {
-                                    "en-US": "filters"
+                                    "en-US": "filters",
+                                    "ru": "фильтры"
                                 },
                                 descriptions: {
                                     "en-US": "You need to select a filter!",
@@ -138,7 +142,8 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                             },
                             {
                                 names: {
-                                    "en-US": "argument"
+                                    "en-US": "argument",
+                                    "ru": "аргумент"
                                 },
                                 descriptions: {
                                     "en-US": "An argument for the filter, if necessary!",
@@ -150,17 +155,19 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     },
                     {
                         names: {
-                            "en-US": "remove"
+                            "en-US": "disable",
+                            "ru": "отключить"
                         },
                         descriptions: {
-                          "en-US": "Removing filters!",
-                            "ru": "Удаление фильтров!"
+                          "en-US": "Disabled filters!",
+                            "ru": "Отключение фильтров!"
                         },
                         type: ApplicationCommandOptionType.Subcommand,
                         options: [
                             {
                                 names: {
-                                    "en-US": "filters"
+                                    "en-US": "filters",
+                                    "ru": "фильтры"
                                 },
                                 descriptions: {
                                     "en-US": "You need to select a filter!",

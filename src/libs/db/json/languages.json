@@ -93,14 +93,42 @@
     "ru": "Повтор выключен!",
     "en-US": "Disable repeat!"
   },
+
   "player.button.replay": {
     "ru": "🔂 | Replay | {ARGUMENT}",
     "en-US": "🔂 | Replay | {ARGUMENT}"
   },
+
   "player.button.stop": {
     "ru": "Выключение музыки! Удаление очереди!",
     "en-US": "Disable music! Remove queue!"
   },
+
+  "player.button.queue.small": {
+    "ru": "В очереди слишком мало треков!",
+    "en-US": "There are too few tracks in the queue!"
+  },
+
+  "player.button.queue": {
+    "ru": "Всего треков: {ARGUMENT}\nБольше информации будет позже!",
+    "en-US": "Total songs: {ARGUMENT}\nMore information will come later!"
+  },
+
+  "player.button.filter.zero": {
+    "ru": "В данный момент нет включенных аудио фильтров",
+    "en-US": "There are currently no audio filters enabled"
+  },
+
+  "player.button.filter": {
+    "ru": "Фильтры: {ARGUMENT}\nВключенные фильтры: {ARGUMENT}",
+    "en-US": "Filters: {ARGUMENT}\nEnabled filters: {ARGUMENT}"
+  },
+
+  "player.button.lyrics": {
+    "ru": "Данная функция еще не доступна! ID: Lyrics",
+    "en-US": "This feature is not available yet! ID: Lyrics"
+  },
+
 
 
 

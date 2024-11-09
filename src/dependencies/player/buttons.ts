@@ -176,13 +176,13 @@ export const PlayerBT = {
 
         // Если треков менее 5
         if (queue.songs.total < 5) {
-            msg.fastBuilder = { description: "Current tracks so small size!", color: Colors.White };
+            msg.fastBuilder = { description: locale._(msg.locale, "player.button.queue.small"), color: Colors.White };
 
             return;
         }
 
         // Отправляем список треков с уничтожением через 40 сек
-        msg.fastBuilder = { description: `Total songs: ${queue.songs.total}`, color: Colors.White };
+        msg.fastBuilder = { description: locale._(msg.locale, "player.button.queue", [queue.songs.total]), color: Colors.White };
     },
 
     /**
@@ -195,13 +195,16 @@ export const PlayerBT = {
 
         // Если нет фильтров
         if (filters.length === 0) {
-            msg.fastBuilder = { description: "Current filters is null", color: Colors.White };
+            msg.fastBuilder = { description: locale._(msg.locale, "player.button.filter.zero"), color: Colors.White };
 
             return;
         }
 
         // Отправляем список включенных фильтров
-        msg.fastBuilder = { description: `Filters: ${filters.length}\nEnabled filters: ${filters.join(", ")}`, color: Colors.White };
+        msg.fastBuilder = {
+            description: locale._(msg.locale, "player.button.filter", [filters.length, filters.join(", ")]),
+            color: Colors.White
+        };
     },
 
     /**
@@ -209,7 +212,7 @@ export const PlayerBT = {
      * @param msg
      */
     "lyrics": (msg: Interact) => {
-        msg.fastBuilder = { description: "Sorry in WIP", color: Colors.White };
+        msg.fastBuilder = { description: locale._(msg.locale, "player.button.lyrics"), color: Colors.White };
     },
 
     /**

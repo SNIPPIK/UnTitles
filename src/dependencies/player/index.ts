@@ -295,7 +295,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
 
 /**
  * @author SNIPPIK
- * @description Класс для управления включенным потоком
+ * @description Класс для управления включенным потоком, хранит в себе все данные потока
  * @class PlayerStreamSubSystem
  */
 class PlayerStreamSubSystem {
@@ -327,7 +327,7 @@ class PlayerStreamSubSystem {
 
 /**
  * @author SNIPPIK
- * @description Класс для управления голосовыми подключениями
+ * @description Класс для управления голосовыми подключениями, хранит в себе все данные голосового подключения
  * @class PlayerVoice
  */
 class PlayerVoice {
@@ -384,7 +384,7 @@ class PlayerVoice {
 
 /**
  * @author SNIPPIK
- * @description Все треки для проигрывания в плеере
+ * @description Все треки для проигрывания в плеере, хранит в себе все данные треков
  * @class PlayerSongs
  */
 class PlayerSongs {
@@ -498,7 +498,7 @@ class PlayerSongs {
 
 /**
  * @author SNIPPIK
- * @description Обработчик прогресс бара трека
+ * @description Обработчик прогресс бара трека, создается постоянно при обновлении сообщения
  * @class PlayerProgress
  */
 class PlayerProgress {
@@ -600,7 +600,7 @@ export interface AudioPlayerEvents {
 
 /**
  * @author SNIPPIK
- * @description Управление фильтрами
+ * @description Управление фильтрами, хранит и конвертирует в string для FFmpeg
  */
 export class AudioFilters {
     /**
