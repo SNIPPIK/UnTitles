@@ -42,10 +42,24 @@ export class Database_APIs {
      * @readonly
      */
     protected readonly _limits = {
+        /**
+         * @description Кол-во получаемых элементов трека при получении плейлиста
+         */
         playlist: parseInt(env.get("APIs.limit.playlist")),
+
+        /**
+         * @description Кол-во получаемых элементов трека при получении альбома
+         */
         album: parseInt(env.get("APIs.limit.album")),
 
+        /**
+         * @description Кол-во получаемых элементов трека при поиске
+         */
         search: parseInt(env.get("APIs.limit.search")),
+
+        /**
+         * @description Кол-во получаемых элементов трека при запросе треков автора
+         */
         author: parseInt(env.get("APIs.limit.author"))
     };
 
@@ -68,7 +82,9 @@ export class Database_APIs {
      * @return API.request[]
      * @public
      */
-    public get allow() { return this._platforms.supported.filter((platform) => platform.name !== "DISCORD" && platform.auth); };
+    public get allow() {
+        return this._platforms.supported.filter((platform) => platform.name !== "DISCORD" && platform.auth);
+    };
 
     /**
      * @author SNIPPIK

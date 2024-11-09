@@ -13,25 +13,31 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
-                .setName("voice")
-                .setDescription("Взаимодействие с голосовыми подключениями")
-                .setDescriptionLocale({
-                    "en-US": "Interaction with voice connections"
+                .setName({
+                    "en-US": "voice"
+                })
+                .setDescription({
+                    "en-US": "Interaction with voice connections",
+                    "ru": "Взаимодействие с голосовыми подключениями"
                 })
                 .addSubCommands([
                     {
-                        name: "leave",
-                        description: "Отключение от голосового канала!",
-                        descriptionLocalizations: {
-                            "en-US": "Disconnecting from the voice channel!"
+                        names: {
+                            "en-US": "leave"
+                        },
+                        descriptions: {
+                            "en-US": "Disconnecting from the voice channel!",
+                            "ru": "Отключение от голосового канала!"
                         },
                         type: ApplicationCommandOptionType.Subcommand
                     },
                     {
-                        name: "re-configure",
-                        description: "Переподключение к голосовому каналу!",
-                        descriptionLocalizations: {
-                            "en-US": "Reconnect to the voice channel!"
+                        names: {
+                            "en-US": "re-configure"
+                        },
+                        descriptions: {
+                            "en-US": "Reconnect to the voice channel!",
+                            "ru": "Переподключение к голосовому каналу!"
                         },
                         type: ApplicationCommandOptionType.Subcommand
                     }

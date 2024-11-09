@@ -1,6 +1,5 @@
 import {API, Constructor} from "@handler";
 import {Track} from "@lib/player/queue";
-import {Attachment} from "discord.js";
 
 /**
  * @author SNIPPIK
@@ -31,8 +30,7 @@ class sAPI extends Constructor.Assign<API.request> {
                         super({
                             name: "track",
                             filter: /attachments|ephemeral-attachments/,
-                            //@ts-ignore
-                            callback: (attachment: Attachment) => {
+                            callback: (attachment: any) => {
                                 return new Promise<Track>((resolve) => {
                                     const track = new Track({
                                         url: attachment.url,

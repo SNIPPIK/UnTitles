@@ -17,22 +17,27 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
-                .setName("seek")
-                .setDescription("Пропуск времени в текущем треке!")
-                .setDescriptionLocale({
-                    "en-US": "Skipping the time in the current track!"
+                .setName({
+                    "en-US": "seek"
+                })
+                .setDescription({
+                    "en-US": "Skipping the time in the current track!",
+                    "ru": "Пропуск времени в текущем треке!"
                 })
                 .addSubCommands([
                     {
-                        name: "value",
-                        description: "Пример - 00:00",
-                        descriptionLocalizations: {
-                            "en-US": "Example - 00:00"
+                        type: ApplicationCommandOptionType["String"],
+                        names: {
+                            "en-US": "value"
+                        },
+                        descriptions: {
+                            "en-US": "Example - 00:00",
+                            "ru": "Пример - 00:00"
                         },
                         required: true,
-                        type: ApplicationCommandOptionType["String"]
                     }
-                ]).json,
+                ])
+                .json,
             rules: ["queue", "voice", "anotherVoice"],
             execute: ({message, args}) => {
                 const {author, guild} = message;
@@ -83,82 +88,100 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
-                .setName("filter")
-                .setDescription("Управление фильтрами аудио!")
+                .setName({
+                    "en-US": "filter"
+                })
+                .setDescription({
+                    "en-US": "Setting filters",
+                    "ru": "Управление фильтрами аудио!"
+                })
                 .addSubCommands([
                     {
-                        name: "off",
-                        description: "Отключение всех фильтров!",
-                        descriptionLocalizations: {
-                            "en-US": "Disable all filters!"
+                        names: {
+                            "en-US": "off"
+                        },
+                        descriptions: {
+                            "en-US": "Disable all filters!",
+                            "ru": "Отключение всех фильтров!"
                         },
                         type: ApplicationCommandOptionType.Subcommand
                     },
                     {
-                        name: "push",
-                        description: "Добавление фильтров!",
-                        descriptionLocalizations: {
-                            "en-US": "Adding filters!"
+                        names: {
+                            "en-US": "push"
+                        },
+                        descriptions: {
+                            "en-US": "Adding filters!",
+                            "ru": "Добавление фильтров!"
                         },
                         type: ApplicationCommandOptionType.Subcommand,
                         options: [
                             {
-                                name: "filters",
-                                description: "Необходимо выбрать фильтр! Все доступные фильтры - all",
-                                descriptionLocalizations: {
-                                    "en-US": "You need to select a filter! All available filters are all"
+                                names: {
+                                    "en-US": "filters"
+                                },
+                                descriptions: {
+                                    "en-US": "You need to select a filter!",
+                                    "ru": "Необходимо выбрать фильтр!"
                                 },
                                 type: ApplicationCommandOptionType["String"],
                                 required: true,
                                 choices: filters.length < 25 ? filters.map((filter) => {
                                     return {
-                                        name: `${filter.name} | ${filter.description.length > 75 ? `${filter.description.substring(0, 75)}...` : filter.description}`,
-                                        nameLocalizations: {
-                                            "en-US": `${filter.name} | ${filter.description_localizations["en-US"].length > 75 ? `${filter.description_localizations["en-US"].substring(0, 75)}...` : filter.description_localizations["en-US"]}`
-                                        },
+                                        name: `${filter.name}`,
+                                        description: filter.description,
+                                        descriptionLocalizations: filter.description_localizations,
+                                        type: ApplicationCommandOptionType["String"],
                                         value: filter.name
                                     }
                                 }) : []
                             },
                             {
-                                name: "argument",
-                                description: "Аргумент для фильтра, если он необходим!",
-                                descriptionLocalizations: {
-                                    "en-US": "An argument for the filter, if necessary!"
+                                names: {
+                                    "en-US": "argument"
+                                },
+                                descriptions: {
+                                    "en-US": "An argument for the filter, if necessary!",
+                                    "ru": "Аргумент для фильтра, если он необходим!"
                                 },
                                 type: ApplicationCommandOptionType["String"]
                             }
                         ]
                     },
                     {
-                        name: "remove",
-                        description: "Удаление фильтров!",
-                        descriptionLocalizations: {
-                            "en-US": "Removing filters!"
+                        names: {
+                            "en-US": "remove"
+                        },
+                        descriptions: {
+                          "en-US": "Removing filters!",
+                            "ru": "Удаление фильтров!"
                         },
                         type: ApplicationCommandOptionType.Subcommand,
                         options: [
                             {
-                                name: "filters",
-                                description: "Необходимо выбрать фильтр! Все доступные фильтры - all",
-                                descriptionLocalizations: {
-                                    "en-US": "You need to select a filter! All available filters are all"
+                                names: {
+                                    "en-US": "filters"
+                                },
+                                descriptions: {
+                                    "en-US": "You need to select a filter!",
+                                    "ru": "Необходимо выбрать фильтр!"
                                 },
                                 type: ApplicationCommandOptionType["String"],
                                 required: true,
                                 choices: filters.length < 25 ? filters.map((filter) => {
                                     return {
-                                        name: `${filter.name} | ${filter.description.length > 75 ? `${filter.description.substring(0, 75)}...` : filter.description}`,
-                                        nameLocalizations: {
-                                            "en-US": `${filter.name} | ${filter.description_localizations["en-US"].length > 75 ? `${filter.description_localizations["en-US"].substring(0, 75)}...` : filter.description_localizations["en-US"]}`
-                                        },
+                                        name: `${filter.name}`,
+                                        description: filter.description,
+                                        descriptionLocalizations: filter.description_localizations,
+                                        type: ApplicationCommandOptionType["String"],
                                         value: filter.name
                                     }
                                 }) : []
                             }
                         ]
                     },
-                ]).json,
+                ])
+                .json,
             rules: ["queue", "voice", "anotherVoice"],
             execute: ({message, args, type}) => {
                 const {author, guild} = message;

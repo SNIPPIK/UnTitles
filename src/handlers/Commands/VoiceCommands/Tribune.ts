@@ -12,25 +12,31 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
-                .setName("tribune")
-                .setDescription("Взаимодействие с подключением к трибуне")
-                .setDescriptionLocale({
-                    "en-US": "Interaction with voice connections"
+                .setName({
+                    "en-US": "tribune",
+                })
+                .setDescription({
+                    "en-US": "Interaction with voice connections",
+                    "ru": "Взаимодействие с подключением к трибуне"
                 })
                 .addSubCommands([
                     {
-                        name: "stage",
-                        description: "Запрос на транслирование музыки в трибуну!",
-                        descriptionLocalizations: {
-                            "en-US": "Request to broadcast music to the podium!"
+                        names: {
+                            "en-US": "stage"
+                        },
+                        descriptions: {
+                            "en-US": "Request to broadcast music to the podium!",
+                            "ru": "Запрос на транслирование музыки в трибуну!"
                         },
                         type: ApplicationCommandOptionType.Subcommand,
                         options: [
                             {
-                                name: "choice",
-                                description: "Варианты взаимодействия с трибунами!",
-                                descriptionLocalizations: {
-                                    "en-US": "Options for interacting with the stands!"
+                                names: {
+                                    "en-US": "choice"
+                                },
+                                descriptions: {
+                                    "en-US": "Options for interacting with the stands!",
+                                    "ru": "Варианты взаимодействия с трибунами"
                                 },
                                 required: true,
                                 type: ApplicationCommandOptionType["String"],
@@ -40,6 +46,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                                         nameLocalizations: {
                                             "en-US": "join - Connecting to the podium"
                                         },
+                                        //@ts-ignore
                                         value: "join"
                                     },
                                     {
@@ -47,6 +54,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                                         nameLocalizations: {
                                             "en-US": "request - Connection request"
                                         },
+                                        //@ts-ignore
                                         value: "request"
                                     }
                                 ]

@@ -159,8 +159,8 @@ export class Interact {
    * @description Получаем команду из названия если нет названия команда не будет получена
    * @public
    */
-  public get command() { //@ts-ignore
-    if ("commandName" in this._temp) return db.commands.get([this._temp.commandName, this.options._group]);
+  public get command() {
+    if ("commandName" in this._temp) return db.commands.get([this._temp.commandName as string, this.options._group]);
     return null;
   };
 

@@ -299,7 +299,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
  * @class PlayerStreamSubSystem
  */
 class PlayerStreamSubSystem {
-    private _stream = null as AudioResource;
+    private _stream: AudioResource = null;
 
     /**
      * @description Текущий стрим
@@ -447,6 +447,9 @@ class PlayerSongs {
      * @param position - позиция трека, номер в очереди
      */
     public get = (position: number) => {
+        // Если позиция трека больше чем всего треков или меньше
+        //if (position > this.total || position < this.total) return;
+
         return this._songs[position];
     };
 
@@ -464,6 +467,9 @@ class PlayerSongs {
      * @param position - позиция трека, номер в очереди
      */
     public remove = (position: number) => {
+        // Если позиция трека больше чем всего треков или меньше
+        //if (position > this.total || position < this.total) return;
+
         // Удаляем из очереди
         this._songs.splice(position, 1);
     };

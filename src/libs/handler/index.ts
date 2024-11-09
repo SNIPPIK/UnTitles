@@ -150,19 +150,6 @@ export namespace Handler {
      */
     execute: (options: { message: Interact; args?: string[]; type: string}) => void;
   }
-
-  /**
-   * @author SNIPPIK
-   * @description Интерфейс для плагинов
-   * @interface Plugin
-   */
-  export interface Plugin {
-    /**
-     * @description При загрузке плагина будет выполнена это функция
-     * @public
-     */
-    start: (options: { client: Client }) => void;
-  }
 }
 
 /**
@@ -348,7 +335,7 @@ export namespace Constructor {
       }
 
       // Выполняем функцию через ~this._time ms
-      setTimeout(this._stepCycle, this.data.time - Date.now());
+      setTimeout(this._stepCycle, this.data.time - Date.now() || 1);
     };
   }
 
@@ -403,11 +390,6 @@ export namespace API {
      * @description Фильтр поиска при использовании поиска по типу
      */
     public readonly filter?: RegExp;
-
-    /**
-     * @description Пример как должен быть получен ID
-     */
-    public readonly get_id?: (url: string) => number | string;
 
     /**
      * @description Выполняем запрос
@@ -487,15 +469,13 @@ export namespace API {
           if (!type.startsWith("http")) {
             const requests = this._api.requests.find((item) => item.name === "search");
 
-            //@ts-ignore
-            if (requests) return requests;
+            if (requests) return requests as item<T>;
           }
 
           return null;
         }
 
-        //@ts-ignore
-        return callback;
+        return callback as item<T>;
       } catch {
         return undefined;
       }

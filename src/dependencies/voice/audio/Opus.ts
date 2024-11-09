@@ -246,7 +246,7 @@ export class OpusEncoder extends Transform {
         if (typeof this.encoder?.delete === "function") this.encoder!.delete!();
         for (let name of Object.keys(this._temp)) this._temp[name] = null;
 
-        // @ts-ignore
+        //@ts-expect-error
         this["encoder"] = null;
     };
 }

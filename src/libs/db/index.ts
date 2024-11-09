@@ -68,20 +68,47 @@ class Database {
          * @public
          */
         progress: {
+            /**
+             * @description Пустой прогресс бар
+             */
             empty: {
                 left: env.get("progress.empty.left"),
                 center: env.get("progress.empty.center"),
                 right: env.get("progress.empty.right")
             },
+
+            /**
+             * @description Не пустой прогресс бар
+             */
             upped: {
                 left: env.get("progress.not_empty.left"),
                 center: env.get("progress.not_empty.center"),
                 right: env.get("progress.not_empty.right")
             },
+
+            /**
+             * @description Разделение прогресс бара, поддерживает платформы
+             */
             bottom: env.get("progress.bottom"),
+
+            /**
+             * @description Разделение прогресс бара, поддерживает платформы
+             */
             bottom_vk: env.get("progress.bottom.vk"),
+
+            /**
+             * @description Разделение прогресс бара, поддерживает платформы
+             */
             bottom_yandex: env.get("progress.bottom.yandex"),
+
+            /**
+             * @description Разделение прогресс бара, поддерживает платформы
+             */
             bottom_youtube: env.get("progress.bottom.youtube"),
+
+            /**
+             * @description Разделение прогресс бара, поддерживает платформы
+             */
             bottom_spotify: env.get("progress.bottom.spotify"),
         },
 
@@ -162,7 +189,6 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
         name: "handlers/Events",
         callback: (client, item: Handler.Event<any>) => {
             if (item.type === "client") client.on(item.name as any, (...args) => item.execute(client, ...args));
-            //@ts-ignore
             else db.audio.queue.events.on(item.name as any, (...args) => item.execute(...args));
         }
     }

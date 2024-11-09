@@ -13,20 +13,26 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
-                .setName("skip")
-                .setDescription("Пропуск треков до указанного трека!")
-                .setDescriptionLocale({
-                    "en-US": "Skip tracks to the specified track!"
+                .setName({
+                    "en-US": "skip",
+                    "ru": "пропуск"
+                })
+                .setDescription({
+                    "en-US": "Skip tracks to the specified track!",
+                    "ru": "Пропуск треков до указанного трека!"
                 })
                 .addSubCommands([
                     {
-                        name: "value",
-                        description: "Номер трека!",
-                        descriptionLocalizations: {
-                            "en-US": "Number track in queue"
-                        },
                         type: ApplicationCommandOptionType["Number"],
-                        required: true
+                        required: true,
+                        names: {
+                            "en-US": "value",
+                            "ru": "число"
+                        },
+                        descriptions: {
+                            "en-US": "Number track in queue!",
+                            "ru": "Номер трека!"
+                        }
                     }
                 ])
                 .json,
@@ -86,26 +92,32 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
-                .setName("remove")
-                .setDescription("Удаление трека из очереди, без возможности восстановить!")
-                .setDescriptionLocale({
-                    "en-US": "Deleting a track from the queue, without the possibility of recovery!"
+                .setName({
+                    "en-US": "remove",
+                    "ru": "удалить"
+                })
+                .setDescription({
+                    "en-US": "Deleting a track from the queue, without the possibility of recovery!",
+                    "ru": "Удаление трека из очереди, без возможности восстановить!"
                 })
                 .addSubCommands([
                     {
-                        name: "value",
-                        description: "Номер трека!",
-                        descriptionLocalizations: {
-                            "en-US": "Number track in queue"
-                        },
                         type: ApplicationCommandOptionType["Number"],
-                        required: true
+                        required: true,
+                        names: {
+                            "en-US": "value",
+                            "ru": "число"
+                        },
+                        descriptions: {
+                            "en-US": "Number track in queue!",
+                            "ru": "Номер трека!"
+                        }
                     }
                 ])
                 .json,
             rules: ["voice", "anotherVoice", "queue"],
             execute: ({message, args}) => {
-                const { author, member, guild } = message;
+                const { author, guild } = message;
                 const queue = db.audio.queue.get(guild.id);
                 const arg = args.length > 0 ? parseInt(args.pop()) : 1;
 

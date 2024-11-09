@@ -107,7 +107,7 @@ abstract class Request {
         if (url.startsWith("http")) {
             const {hostname, pathname, search, port, protocol} = new URL(url);
 
-            //Создаем стандартные настройки
+            // Создаем стандартные настройки
             Object.assign(this.data, {
                 port, hostname, path: pathname + search, protocol
             });
@@ -116,7 +116,7 @@ abstract class Request {
         // Надо ли генерировать user-agent
         if (options?.useragent) {
             const OS = [ "(X11; Linux x86_64)", "(Windows NT 10.0; Win64; x64)" ];
-            const version = `${(123).random(96)}.0.${(6250).random(1280)}.${(250).random(59)}`;
+            const version = `${(130).random(96)}.0.${(6250).random(1280)}.${(250).random(59)}`;
 
             Object.assign(this.data.headers, {
                 "User-Agent": `Mozilla/5.0 ${OS[(OS.length - 1).random(0)]} AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`,

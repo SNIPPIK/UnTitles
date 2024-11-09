@@ -1,8 +1,8 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {Constructor, Handler} from "@handler";
-import {db} from "@lib/db";
 import {locale} from "@lib/locale";
+import {db} from "@lib/db";
 
 /**
  * @class PlayCommand
@@ -13,25 +13,31 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
-                .setName("play")
-                .setDescription("Проигрывание музыки по вашему выбору!")
-                .setDescriptionLocale({
-                    "en-US": "Playing music!"
+                .setName({
+                    "en-US": "play",
+                })
+                .setDescription({
+                    "en-US": "Playing music!",
+                    "ru": "Проигрывание музыки по вашему выбору!"
                 })
                 .addSubCommands([
                     {
-                        name: "api",
-                        description: "Включение музыки по ссылке или названию!",
-                        descriptionLocalizations: {
-                            "en-US": "Turn on music by link or title!"
+                        names: {
+                            "en-US": "api",
+                        },
+                        descriptions: {
+                            "en-US": "Turn on music by link or title!",
+                            "ru": "Включение музыки по ссылке или названию!"
                         },
                         type: ApplicationCommandOptionType.Subcommand,
                         options: [
                             {
-                                name: "select",
-                                description: "К какой платформе относится запрос?",
-                                descriptionLocalizations: {
-                                    "en-US": "Which platform does the request belong to?"
+                                names: {
+                                    "en-US": "select"
+                                },
+                                descriptions: {
+                                    "en-US": "Which platform does the request belong to?",
+                                    "ru": "К какой платформе относится запрос?"
                                 },
                                 type: ApplicationCommandOptionType["String"],
                                 required: true,
@@ -43,10 +49,12 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                                 })
                             },
                             {
-                                name: "request",
-                                description: "Необходимо указать ссылку или название трека!",
-                                descriptionLocalizations: {
-                                    "en-US": "You must specify the link or the name of the track!"
+                                names: {
+                                    "en-US": "request"
+                                },
+                                descriptions: {
+                                    "en-US": "You must specify the link or the name of the track!",
+                                    "ru": "Необходимо указать ссылку или название трека!"
                                 },
                                 required: true,
                                 type: ApplicationCommandOptionType["String"]
@@ -54,18 +62,22 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                         ],
                     },
                     {
-                        name: "file",
-                        description: "Включение музыки с использованием файла!",
-                        descriptionLocalizations: {
-                            "en-US": "Turning on music using a file!"
+                        names: {
+                            "en-US": "file"
+                        },
+                        descriptions: {
+                            "en-US": "Turning on music using a file!",
+                            "ru": "Включение музыки с использованием файла!"
                         },
                         type: ApplicationCommandOptionType.Subcommand,
                         options: [
                             {
-                                name: "input",
-                                description: "Необходимо прикрепить файл!",
-                                descriptionLocalizations: {
-                                    "en-US": "You need to attach a file!"
+                                names: {
+                                    "en-US": "input"
+                                },
+                                descriptions: {
+                                    "en-US": "You need to attach a file!",
+                                    "ru": "Необходимо прикрепить файл!"
                                 },
                                 type: ApplicationCommandOptionType["Attachment"],
                                 required: true

@@ -12,17 +12,23 @@ class AvatarCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
-                .setName("avatar")
-                .setDescription("Если хочется глянуть аватар пользователя я к вашим услугам!")
-                .setDescriptionLocale({
-                    "en-US": "Если хочется глянуть аватар пользователя я к вашим услугам!"
+                .setName({
+                    "en-US": "avatar",
+                    "ru": "аватар"
+                })
+                .setDescription({
+                    "en-US": "If you want to look at the user's avatar, I'm at your service!",
+                    "ru": "Если хочется глянуть аватар пользователя я к вашим услугам!"
                 })
                 .addSubCommands([
                     {
-                        name: "user",
-                        description: "Укажи пользователя!",
-                        descriptionLocalizations: {
-                            "en-US": "Need user!"
+                        names: {
+                            "en-US": "user",
+                            "ru": "пользователь"
+                        },
+                        descriptions: {
+                            "en-US": "Specify the user!",
+                            "ru": "Укажи пользователя!"
                         },
                         type: ApplicationCommandOptionType["User"],
                         required: true

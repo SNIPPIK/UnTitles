@@ -73,7 +73,6 @@ class Environment {
  */
 export const env = new Environment();
 
-
 /**
  * @description Все prototype объектов
  * @remark

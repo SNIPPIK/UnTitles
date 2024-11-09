@@ -17,7 +17,7 @@ export class SlashBuilder {
      * @description Переводы названия команды на другие языки
      * @private
      */
-    private name_localizations: LocalizationMap = undefined
+    private name_localizations: LocalizationMap = undefined;
 
     /**
      * @description Описание команды
@@ -73,40 +73,24 @@ export class SlashBuilder {
             options: this.options,
             nsfw: this.nsfw
         };
-    }
-
-    /**
-     * @description Устанавливаем название команды
-     * @param name - Имя команды
-     */
-    public setName(name: string) {
-        this.name = name;
-        return this;
     };
 
     /**
-     * @description Устанавливаем перевод имени команды
+     * @description Устанавливаем название команды, первый в списке язык будет выбран основным
      * @param locale - Object, с именами для перевода
      */
-    public setNameLocale(locale: LocalizationMap) {
+    public setName = (locale: LocalizationMap) => {
+        this.name = locale[Object.keys(locale).at(-1)];
         this.name_localizations = locale;
         return this;
     };
 
     /**
-     * @description Устанавливаем описание команды
-     * @param description - Описание команды
-     */
-    public setDescription(description: string) {
-        this.description = description;
-        return this;
-    };
-
-    /**
-     * @description Устанавливаем перевод описания команды
+     * @description Устанавливаем описание команды, первый в списке язык будет выбран основным
      * @param locale - Object, с именами для перевода
      */
-    public setDescriptionLocale(locale: LocalizationMap) {
+    public setDescription(locale: LocalizationMap) {
+        this.description = locale[Object.keys(locale).at(-1)];
         this.description_localizations = locale;
         return this;
     };
@@ -124,8 +108,82 @@ export class SlashBuilder {
      * @description Устанавливаем параметры для команды
      * @param subcommands - Sub commands
      */
-    public addSubCommands(subcommands: ApplicationCommandOption[]) {
-        this.options.push(...subcommands);
+    public addSubCommands(subcommands: SlashComponent[]) {
+        // Создаем компонент команды для discord
+        for (let obj of subcommands) {
+
+            // Если надо подменить данные для работы с discord
+            const component = {
+                ...obj,
+                name: obj.names[Object.keys(obj.names)[0]],
+                nameLocalizations: obj.names,
+                description: obj.descriptions[Object.keys(obj.descriptions)[0]],
+                descriptionLocalizations: obj.descriptions,
+                options: obj.options ? obj.options.map((option) => {
+                    return {
+                        ...option,
+                        name: option.names[Object.keys(option.names)[0]],
+                        nameLocalizations: option.names,
+                        description: option.descriptions[Object.keys(option.descriptions)[0]],
+                        descriptionLocalizations: option.descriptions,
+                    };
+                }) : []
+            };
+
+            this.options.push(component as any);
+        }
+
         return this;
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Упрощающий элемент создания компонентов для команд
+ */
+interface SlashComponent {
+    /**
+     * @description Имена команды на разных языках
+     */
+    names: ApplicationCommandOption['nameLocalizations'];
+
+    /**
+     * @description Описание команды на разных языках
+     */
+    descriptions: ApplicationCommandOption["descriptionLocalizations"];
+
+    /**
+     * @description Тип вводимых данных
+     */
+    type: ApplicationCommandOption["type"];
+
+    /**
+     * @description Ввод данных обязателен
+     */
+    required?: boolean;
+
+    /**
+     * @description Доп команды к команде или к подкоманде. Внимание нельзя нарушать структуру discord а то команды не будут приняты
+     */
+    options?: SlashComponent[];
+
+    /**
+     * @description Список действий на выбор пользователей
+     */
+    choices?: {
+        /**
+         * @description Имя действия
+         */
+        name: string;
+
+        /**
+         * @description Тип возврата данных, нужен для кода разработчика
+         */
+        value: string;
+
+        /**
+         * @description Перевод имен действий на разные языки
+         */
+        nameLocalizations?: LocalizationMap;
+    }[]
 }
