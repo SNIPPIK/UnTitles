@@ -369,13 +369,6 @@ class PlayerVoice {
         try {
             if (packet) this.connection.playOpusPacket(packet);
         } catch (err) {
-            if (`${err}`.match(/UDP port on your IP/)) {
-                // Реконфигурация сокета, переподключение!
-                setTimeout(() => {
-                    this.voice.configureSocket();
-                }, 5e3);
-            }
-
             // Если возникает ошибка, то сообщаем о ней
             console.log(err);
         }

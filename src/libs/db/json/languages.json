@@ -15,7 +15,7 @@
   },
 
   "track.live": {
-    "ru": "**{ARGUMENT}.{ARGUMENT}**\n\n**❯** **Live track is not supported**",
+    "ru": "**{ARGUMENT}.{ARGUMENT}**\n\n**❯** **Потоковые треки пока не поддерживаются**",
     "en-US": "**{ARGUMENT}.{ARGUMENT}**\n\n**❯** **Live track is not supported**"
   },
 

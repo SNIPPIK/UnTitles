@@ -14,7 +14,8 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
         super({
             data: new SlashBuilder()
                 .setName({
-                    "en-US": "voice"
+                    "en-US": "voice",
+                    "ru": "голос"
                 })
                 .setDescription({
                     "en-US": "Interaction with voice connections",

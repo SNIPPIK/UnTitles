@@ -28,11 +28,12 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                     {
                         type: ApplicationCommandOptionType["String"],
                         names: {
-                            "en-US": "value"
+                            "en-US": "time",
+                            "ru": "время"
                         },
                         descriptions: {
-                            "en-US": "Example - 00:00",
-                            "ru": "Пример - 00:00"
+                            "en-US": "It is necessary to specify what time to arrive. Example - 00:00",
+                            "ru": "Необходимо указать к какому времени прейти. Пример - 00:00"
                         },
                         required: true,
                     }

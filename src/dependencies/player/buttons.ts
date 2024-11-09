@@ -202,7 +202,7 @@ export const PlayerBT = {
 
         // Отправляем список включенных фильтров
         msg.fastBuilder = {
-            description: locale._(msg.locale, "player.button.filter", [filters.length, filters.join(", ")]),
+            description: locale._(msg.locale, "player.button.filter", [filters.length, filters.map((flt) => flt.name).join(", ")]),
             color: Colors.White
         };
     },

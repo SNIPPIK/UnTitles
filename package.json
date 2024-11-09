@@ -1,6 +1,6 @@
 {
   "name": "UTDMB",
-  "version": "0.0.1a",
+  "version": "0.0.1",
   "description": "Музыкальный бот!",
   "license": "BSD-3-Clause",
   "dependencies": {
@@ -17,7 +17,8 @@
     "typescript": "^5.5.4"
   },
   "scripts": {
-    "start": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src --ShardManager"
+    "start": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src --ShardManager",
+    "shard": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src"
   },
   "engines": {
     "node": ">=22.0.0"
