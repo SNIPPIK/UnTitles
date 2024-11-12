@@ -310,6 +310,23 @@
   },
 
 
+  "command.skip.arg.track": {
+    "ru": "Были пропущены все треки до {ARGUMENT}\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**",
+    "en-US": "All tracks up to {ARGUMENT} were skipped\n\n**Will be played:**\n**❯** **{ARGUMENT}**"
+  },
+
+  "command.skip.one.track": {
+    "ru": "Был пропущен текущий трек\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**",
+    "en-US": "The current track was skipped\n\n**Will be played:**\n**❯** **{ARGUMENT}**"
+  },
+
+
+  "command.remove.track": {
+    "ru": "Был удален из очереди трек\n\n**❯** **{ARGUMENT}**",
+    "en-US": "A track has been removed from the queue\n\n**❯** **{ARGUMENT}**"
+  },
+
+
   "command.filter.pushed": {
     "ru": "Добавлен аудио фильтр\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
     "en-US": "Added audio filter\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"

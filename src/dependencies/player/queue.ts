@@ -12,13 +12,10 @@ import {db} from "@lib/db";
  * @public
  */
 export class Queue {
-    private readonly _data = {
-        repeat:     "off" as "off" | "song" | "songs",
-        shuffle:    false as boolean,
-
-        message:    null as Interact,
-        player:     null as ExtraPlayer
-    };
+    /**
+     * @description Кнопки для сообщения
+     * @private
+     */
     private readonly _components = [
 
         /**
@@ -50,7 +47,68 @@ export class Queue {
                 { type: 2, emoji: {id: db.emojis.button.lyrics},        custom_id: 'lyrics',        style: 2, disable: true }   //Loop
             ]
         }
-    ]
+    ];
+
+    /**
+     * @description Данные временно хранящиеся в очереди
+     * @private
+     */
+    private readonly _data = {
+        /**
+         * @description Тип повтора
+         * @public
+         */
+        repeat:     "off" as "off" | "song" | "songs",
+
+        /**
+         * @description Смешивание треков
+         * @public
+         */
+        shuffle:    false as boolean,
+
+        /**
+         * @description Сообщение пользователя
+         * @public
+         */
+        message:    null as Interact,
+
+        /**
+         * @description Плеер для проигрывания музыки
+         * @public
+         */
+        player:     null as ExtraPlayer
+    };
+
+    /**
+     * @description Выдаем плеер привязанный к очереди
+     * @return AudioPlayer
+     * @public
+     */
+    public get player() { return this._data.player; };
+
+    /**
+     * @description Выдаем голосовой канал
+     * @return VoiceChannel
+     * @public
+     */
+    public get voice() { return this._data.message.voice; };
+
+    /**
+     * @description Записываем голосовой канал в базу для дальнейшего использования
+     * @param voice - Сохраняемый голосовой канал
+     * @public
+     */
+    public set voice(voice: Interact["voice"]) {
+        this.player.voice.connection = Voice.join({
+            selfDeaf: true,
+            selfMute: false,
+
+            guildId: this.guild.id,
+            channelId: voice.channel.id
+        }, this.guild.voiceAdapterCreator);
+    };
+
+
 
     /**
      * @description Получаем доступ к трекам
@@ -60,6 +118,34 @@ export class Queue {
         if (!this._data.player) return;
         return this._data.player.tracks;
     };
+
+    /**
+     * @description Получаем данные перетасовки
+     * @public
+     */
+    public get shuffle(): boolean { return this._data.shuffle; };
+
+    /**
+     * @description Сохраняем данные перетасовки
+     * @param bol - Параметр boolean
+     * @public
+     */
+    public set shuffle(bol) { this._data.shuffle = bol; };
+
+    /**
+     * @description Сохраняем тип повтора
+     * @param loop - Тип повтора
+     * @public
+     */
+    public set repeat(loop: "off" | "song" | "songs") { this._data.repeat = loop; };
+
+    /**
+     * @description Получаем тип повтора
+     * @public
+     */
+    public get repeat() { return this._data.repeat; };
+
+
 
     /**
      * @description Получение кнопок
@@ -100,44 +186,11 @@ export class Queue {
     };
 
     /**
-     * @description Получаем данные перетасовки
-     * @public
-     */
-    public get shuffle(): boolean { return this._data.shuffle; };
-
-    /**
-     * @description Сохраняем данные перетасовки
-     * @param bol - Параметр boolean
-     * @public
-     */
-    public set shuffle(bol) { this._data.shuffle = bol; };
-
-    /**
-     * @description Сохраняем тип повтора
-     * @param loop - Тип повтора
-     * @public
-     */
-    public set repeat(loop: "off" | "song" | "songs") { this._data.repeat = loop; };
-
-    /**
-     * @description Получаем тип повтора
-     * @public
-     */
-    public get repeat() { return this._data.repeat; };
-
-    /**
      * @description Выдаем сообщение
      * @return Client.message
      * @public
      */
     public get message() { return this._data.message; };
-
-    /**
-     * @description Выдаем голосовой канал
-     * @return VoiceChannel
-     * @public
-     */
-    public get voice() { return this._data.message.voice; };
 
     /**
      * @description Выдаем сервер к которому привязана очередь
@@ -147,33 +200,11 @@ export class Queue {
     public get guild() { return this.message.guild; };
 
     /**
-     * @description Выдаем плеер привязанный к очереди
-     * @return AudioPlayer
-     * @public
-     */
-    public get player() { return this._data.player; };
-
-    /**
      * @description Записываем сообщение в базу для дальнейшего использования
      * @param message - Сохраняемое сообщение
      * @public
      */
     public set message(message: Interact) { this._data.message = message; };
-
-    /**
-     * @description Записываем голосовой канал в базу для дальнейшего использования
-     * @param voice - Сохраняемый голосовой канал
-     * @public
-     */
-    public set voice(voice: Interact["voice"]) {
-        this.player.voice.connection = Voice.join({
-            selfDeaf: true,
-            selfMute: false,
-
-            guildId: this.guild.id,
-            channelId: voice.channel.id
-        }, this.guild.voiceAdapterCreator);
-    };
 
     /**
      * @description Создаем очередь для дальнейшей работы, все подключение находятся здесь

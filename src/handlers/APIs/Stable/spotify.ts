@@ -264,4 +264,4 @@ class sAPI extends Constructor.Assign<API.request> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({cAPI: sAPI});
+export default Object.values({ sAPI });

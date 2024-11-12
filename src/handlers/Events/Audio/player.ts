@@ -6,7 +6,7 @@ import {db} from "@lib/db";
  * @event player/ended
  * @description Завершение проигрывания трека
  */
-class eventPlayer_ended extends Constructor.Assign<Handler.Event<"player/ended">> {
+class player_ended extends Constructor.Assign<Handler.Event<"player/ended">> {
     public constructor() {
         super({
             name: "player/ended",
@@ -26,7 +26,7 @@ class eventPlayer_ended extends Constructor.Assign<Handler.Event<"player/ended">
  * @event player/wait
  * @description Плеер ожидает действий
  */
-class eventPlayer_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
+class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
     public constructor() {
         super({
             name: "player/wait",
@@ -61,7 +61,7 @@ class eventPlayer_wait extends Constructor.Assign<Handler.Event<"player/wait">> 
  * @event player/error
  * @description Плеер словил ошибку
  */
-class eventPlayer_error extends Constructor.Assign<Handler.Event<"player/error">> {
+class player_error extends Constructor.Assign<Handler.Event<"player/error">> {
     public constructor() {
         super({
             name: "player/error",
@@ -90,4 +90,4 @@ class eventPlayer_error extends Constructor.Assign<Handler.Event<"player/error">
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({eventPlayer_error, eventPlayer_wait, eventPlayer_ended});
+export default Object.values({player_ended, player_wait, player_error});

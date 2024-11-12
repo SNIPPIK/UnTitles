@@ -9,7 +9,7 @@ import {env} from "@env";
  * @description Выполнение запроса пользователя через внутреннее API
  * @class userRequestAPI
  */
-class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
+class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
     public constructor() {
         super({
             name: "request/api",
@@ -107,7 +107,7 @@ class userRequestAPI extends Constructor.Assign<Handler.Event<"request/api">> {
  * @description Проверяем можно ли включить трек с плавным проигрыванием
  * @class userRequestTime
  */
-class userRequestTime extends Constructor.Assign<Handler.Event<"request/time">> {
+class request_time extends Constructor.Assign<Handler.Event<"request/time">> {
     public constructor() {
         super({
             name: "request/time",
@@ -146,7 +146,7 @@ class userRequestTime extends Constructor.Assign<Handler.Event<"request/time">> 
  * @description Если при выполнении запроса пользователя произошла ошибка
  * @class userRequestError
  */
-class userRequestError extends Constructor.Assign<Handler.Event<"request/error">> {
+class request_error extends Constructor.Assign<Handler.Event<"request/error">> {
     public constructor() {
         super({
             name: "request/error",
@@ -168,4 +168,4 @@ class userRequestError extends Constructor.Assign<Handler.Event<"request/error">
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({userRequestAPI, userRequestError, userRequestTime});
+export default Object.values({request_api, request_time, request_error});

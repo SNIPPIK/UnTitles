@@ -50,18 +50,6 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     private readonly _audio = new PlayerStreamSubSystem();
 
     /**
-     * @description Делаем tracks параметр публичным для использования вне класса
-     * @public
-     */
-    public get tracks() { return this._tracks; };
-
-    /**
-     * @description Делаем filters параметр публичным для использования вне класса
-     * @public
-     */
-    public get filters() { return this._filters; };
-
-    /**
      * @description Делаем voice параметр публичным для использования вне класса
      * @public
      */
@@ -72,6 +60,24 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public get audio() { return this._audio; };
+
+    /**
+     * @description Проверяем играет ли плеер
+     * @return boolean
+     * @public
+     */
+    public get playing() {
+        if (this.status === "player/wait" || !this.voice.connection) return false;
+
+        //Если больше не читается, переходим в состояние wait.
+        if (!this.audio.current?.readable) {
+            this.audio.current?.stream?.emit("end");
+            this.status = "player/wait";
+            return false;
+        }
+
+        return true;
+    };
 
 
 
@@ -102,24 +108,6 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
-     * @description Проверяем играет ли плеер
-     * @return boolean
-     * @public
-     */
-    public get playing() {
-        if (this.status === "player/wait" || !this.voice.connection) return false;
-
-        //Если больше не читается, переходим в состояние wait.
-        if (!this.audio.current?.readable) {
-            this.audio.current?.stream?.emit("end");
-            this.status = "player/wait";
-            return false;
-        }
-
-        return true;
-    };
-
-    /**
      * @description Строка состояния трека
      * @public
      */
@@ -135,6 +123,20 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
             }
         });
     };
+
+
+
+    /**
+     * @description Делаем tracks параметр публичным для использования вне класса
+     * @public
+     */
+    public get tracks() { return this._tracks; };
+
+    /**
+     * @description Делаем filters параметр публичным для использования вне класса
+     * @public
+     */
+    public get filters() { return this._filters; };
 
 
 

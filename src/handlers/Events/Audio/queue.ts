@@ -10,7 +10,7 @@ import {db} from "@lib/db";
  * @event message/error
  * @description Сообщение об ошибке
  */
-class onError extends Constructor.Assign<Handler.Event<"message/error">> {
+class message_error extends Constructor.Assign<Handler.Event<"message/error">> {
     public constructor() {
         super({
             name: "message/error",
@@ -50,7 +50,7 @@ class onError extends Constructor.Assign<Handler.Event<"message/error">> {
  * @event message/push
  * @description Сообщение о добавленном треке или плейлисте
  */
-class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
+class message_push extends Constructor.Assign<Handler.Event<"message/push">> {
     public constructor() {
         super({
             name: "message/push",
@@ -93,7 +93,7 @@ class onPush extends Constructor.Assign<Handler.Event<"message/push">> {
  * @event message/search
  * @description Сообщение с выбором трека
  */
-class onSearch extends Constructor.Assign<Handler.Event<"message/search">> {
+class message_search extends Constructor.Assign<Handler.Event<"message/search">> {
     public constructor() {
         super({
             name: "message/search",
@@ -136,7 +136,7 @@ class onSearch extends Constructor.Assign<Handler.Event<"message/search">> {
  * @event message/playing
  * @description Сообщение о том что сейчас играет
  */
-class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
+class message_playing extends Constructor.Assign<Handler.Event<"message/playing">> {
     public constructor() {
         super({
             name: "message/playing",
@@ -199,4 +199,4 @@ class onPlaying extends Constructor.Assign<Handler.Event<"message/playing">> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({onPlaying, onError, onSearch, onPush});
+export default Object.values({message_playing, message_search, message_push, message_error});
