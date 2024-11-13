@@ -1,5 +1,5 @@
-import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
+import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {Constructor, Handler} from "@handler";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
@@ -70,7 +70,7 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                     return;
                 }
 
-                const {title, url, color} = songs.get(arg - 1);
+                const {title, url, color} = songs.get(arg > 1 ? arg : arg - 1);
 
                 // Если аргумент больше 1, то ищем трек
                 if (arg > 1) {
