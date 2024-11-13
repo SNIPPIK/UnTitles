@@ -29,6 +29,8 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
                 const channel = oldState?.channel || newState?.channel;
                 const me = channel.members.get(client.user.id);
                 const guild = oldState.guild || newState.guild;
+
+                // Если нет сервера или канала, то игнорируем
                 if (!guild || !channel) return;
 
                 const members = channel.members.filter(member => !member.user.bot).size;
@@ -44,26 +46,33 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
 
                 // Если пользователей менее 1
                 else if (members < 1) {
+                    // Если есть очередь
                     if (queue) {
+                        // Ставим плеер на паузу
                         if (queue.player.status === "player/playing") queue.player.pause();
                     }
+
+                    // Если нет таймера для удаления очереди
                     if (!temp) temple_db.set(guild.id, {
                         guildID: guild.id,
+
+                        // Таймер удаления очереди
                         timeout: setTimeout(() => {
-                            if (queue)
-                                db.audio.queue.remove(guild.id);
-                            if (meVoice)
-                                Voice.remove(guild.id);
+                            if (queue) db.audio.queue.remove(guild.id);
+                            if (meVoice) Voice.remove(guild.id);
                         }, timeout * 1e3)
                     });
                 }
 
                 // Если не подошли прошлые аргументы
                 else {
+                    // Если есть очередь
                     if (queue) {
+                        // Снимаем плеер с паузы
                         if (queue.player.status === "player/pause") queue.player.resume();
                     }
 
+                    // Если есть таймер для удаления очереди
                     if (temp) {
                         clearTimeout(temp.timeout);
                         temple_db.remove(guild.id);

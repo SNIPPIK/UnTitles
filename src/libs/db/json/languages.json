@@ -14,6 +14,11 @@
     "en-US": "I not found this command"
   },
 
+  "button.fail": {
+    "ru": "Откуда ты взял эту кнопку. У меня ее нет!",
+    "en-US": "Where did you get this button? I don't have it!"
+  },
+
   "track.live": {
     "ru": "**{ARGUMENT}.{ARGUMENT}**\n\n**❯** **Потоковые треки пока не поддерживаются**",
     "en-US": "**{ARGUMENT}.{ARGUMENT}**\n\n**❯** **Live track is not supported**"

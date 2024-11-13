@@ -84,7 +84,10 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
         // Временная заглушка
         if (!button) {
-            msg.fastBuilder = { description: "WIP", color: Colors.DarkRed };
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "button.fail"),
+                color: Colors.DarkRed
+            };
             return;
         }
 
