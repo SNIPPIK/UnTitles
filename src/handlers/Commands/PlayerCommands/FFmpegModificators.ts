@@ -1,8 +1,8 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
+import {AudioFilter} from "@lib/db/utils/AudioFilters";
 import filters from "@lib/db/json/filters.json";
 import {Constructor, Handler} from "@handler";
-import {AudioFilter} from "@lib/player";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 
@@ -131,15 +131,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                                 },
                                 type: ApplicationCommandOptionType["String"],
                                 required: true,
-                                choices: filters.length < 25 ? filters.map((filter) => {
-                                    return {
-                                        name: `${filter.name}`,
-                                        description: filter.description,
-                                        descriptionLocalizations: filter.description_localizations,
-                                        type: ApplicationCommandOptionType["String"],
-                                        value: filter.name
-                                    }
-                                }) : []
+                                choices: db.filters.discord_command
                             },
                             {
                                 names: {
@@ -176,15 +168,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                                 },
                                 type: ApplicationCommandOptionType["String"],
                                 required: true,
-                                choices: filters.length < 25 ? filters.map((filter) => {
-                                    return {
-                                        name: `${filter.name}`,
-                                        description: filter.description,
-                                        descriptionLocalizations: filter.description_localizations,
-                                        type: ApplicationCommandOptionType["String"],
-                                        value: filter.name
-                                    }
-                                }) : []
+                                choices: db.filters.discord_command
                             }
                         ]
                     },
@@ -265,7 +249,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
 
                         // Сообщаем о новом фильтре
                         message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.pushed", [Filter.name, Filter.description_localizations[message.locale] ?? Filter.description]),
+                            description: locale._(message.locale, "command.filter.pushed", [Filter.name, Filter.locale[message.locale]]),
                             color: Colors.Green, timestamp: new Date()
                         };
                         return;
@@ -285,7 +269,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
 
                         // Сообщаем об удалении фильтра
                         message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.removed", [Filter.name, Filter.description_localizations[message.locale] ?? Filter.description]),
+                            description: locale._(message.locale, "command.filter.removed", [Filter.name, Filter.locale[message.locale]]),
                             color: Colors.Green
                         };
                         return;

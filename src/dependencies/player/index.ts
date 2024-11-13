@@ -1,4 +1,4 @@
-import type {LocalizationMap} from "discord-api-types/v10";
+import {AudioFilters} from "@lib/db/utils/AudioFilters";
 import {TypedEmitter} from "tiny-typed-emitter";
 import {AudioResource} from "@lib/player/audio";
 import {VoiceConnection} from "@lib/voice";
@@ -591,75 +591,4 @@ export interface AudioPlayerEvents {
 
     //Плеер получил ошибку
     "player/error": (player: ExtraPlayer, err: string, critical?: boolean) => void;
-}
-
-/**
- * @author SNIPPIK
- * @description Управление фильтрами, хранит и конвертирует в string для FFmpeg
- */
-export class AudioFilters {
-    /**
-     * @description Включенные фильтры
-     * @private
-     */
-    private readonly enables: AudioFilter[] = [];
-
-    /**
-     * @description Получаем список включенных фильтров
-     * @public
-     */
-    public get enable() { return this.enables; };
-
-    /**
-     * @description Сжимаем фильтры для работы ffmpeg
-     */
-    public get compress() {
-        const realFilters: string[] = [`volume=${db.audio.options.volume / 100}`, `afade=t=in:st=0:d=${db.audio.options.fade}`];
-        let chunk = 0;
-
-        // Берем данные из всех фильтров
-        for (const filter of this.enable) {
-            const filterString = filter.args ? `${filter.filter}${filter.user_arg ?? ""}` : filter.filter;
-            realFilters.push(filterString);
-
-            // Если есть модификация скорости, то изменяем размер пакета
-            if (filter.speed) {
-                if (typeof filter.speed === "number") chunk += Number(filter.speed);
-                else chunk += Number(this.enable.slice(this.enable.indexOf(filter) + 1));
-            }
-        }
-
-        return { filters: realFilters.join(","), chunk };
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Как выглядит фильтр
- * @interface AudioFilter
- */
-export interface AudioFilter {
-    //Имена
-    name: string;
-
-    //Имена несовместимых фильтров
-    unsupported: string[];
-
-    //Описание
-    description: string;
-
-    //Перевод фильтров
-    description_localizations: LocalizationMap;
-
-    //Сам фильтр
-    filter: string;
-
-    //Аргументы
-    args: false | [number, number];
-
-    //Аргумент пользователя
-    user_arg?: any;
-
-    //Меняется ли скорость
-    speed?: string | number;
 }

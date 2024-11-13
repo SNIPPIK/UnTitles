@@ -141,7 +141,7 @@ export class SlashBuilder {
  * @author SNIPPIK
  * @description Упрощающий элемент создания компонентов для команд
  */
-interface SlashComponent {
+export interface SlashComponent {
     /**
      * @description Имена команды на разных языках
      */

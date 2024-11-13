@@ -1,4 +1,5 @@
 import {Database_Commands} from "@lib/db/modules/Commands";
+import {ExtraFilters} from "@lib/db/utils/AudioFilters";
 import {Database_Audio} from "@lib/db/modules/Audio";
 import {Database_APIs} from "@lib/db/modules/APIs";
 import {API, Handler} from "@handler";
@@ -9,33 +10,33 @@ import {env} from "@env";
 /**
  * @author SNIPPIK
  * @class Database
- * @description База данных бота
+ * @description Локальная база данных бота
  * @public
  */
 class Database {
-    private readonly loaded = {
-        commands:   new Database_Commands(),
-        audio:      new Database_Audio(),
-        apis:       new Database_APIs()
-    };
+    /**
+     * @description Загружаем класс для взаимодействия с фильтрами
+     * @private
+     */
+    private readonly _filters = new ExtraFilters();
 
     /**
-     * @description База для управления музыкой
-     * @public
+     * @description Загружаем класс для хранения команд
+     * @private
      */
-    public get audio() { return this.loaded.audio };
+    private readonly _commands = new Database_Commands();
 
     /**
-     * @description База для управления APIs
-     * @public
+     * @description Загружаем класс для хранения очередей, плееров, циклов
+     * @private
      */
-    public get api() { return this.loaded.apis };
+    private readonly _audio = new Database_Audio();
 
     /**
-     * @description Выдаем класс с командами
-     * @public
+     * @description Загружаем класс для хранения запросов на платформы
+     * @private
      */
-    public get commands() { return this.loaded.commands; };
+    private readonly _apis = new Database_APIs();
 
     /**
      * @description Выдаем все необходимые смайлики
@@ -122,7 +123,31 @@ class Database {
     };
 
     /**
-     * @description Запускаем index
+     * @description Выдаем класс для работы с базой фильтров
+     * @public
+     */
+    public get filters() { return this._filters; };
+
+    /**
+     * @description База для управления музыкой
+     * @public
+     */
+    public get audio() { return this._audio };
+
+    /**
+     * @description База для управления APIs
+     * @public
+     */
+    public get api() { return this._apis };
+
+    /**
+     * @description Выдаем класс с командами
+     * @public
+     */
+    public get commands() { return this._commands; };
+
+    /**
+     * @descriptionЗапускаем и загружаем базу данных
      * @param client {Client} Класс клиента
      * @public
      */
@@ -167,7 +192,7 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
         }
     },
     /**
-     * @description Загрузчик handlers/Commands, загружает slashcommand для взаимодействия с ботом
+     * @description Загрузчик handlers/Commands, загружает slash commands для взаимодействия с ботом
      */
     {
         name: "handlers/Commands",
@@ -189,7 +214,7 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
         name: "handlers/Events",
         callback: (client, item: Handler.Event<any>) => {
             if (item.type === "client") client.on(item.name as any, (...args) => item.execute(client, ...args));
-            else db.audio.queue.events.on(item.name as any, (...args) => item.execute(...args));
+            else db.audio.queue.events.on(item.name as any, (...args: any) => item.execute(...args));
         }
     }
 ];

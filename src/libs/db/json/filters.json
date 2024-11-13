@@ -1,163 +1,162 @@
 [
   {
     "name": "loudnorm",
-    "unsupported": [],
-    "description": "Нормализует тон звуковой дорожки",
-    "description_localizations": {
-      "en-US": "Normalizes the tone of the audio track"
+    "locale": {
+      "en-US": "Normalizes the tone of the audio track",
+      "ru": "Нормализует тон звуковой дорожки"
     },
+    "unsupported": [],
     "filter": "loudnorm",
     "args": false
   },
   {
     "name": "mono",
-    "unsupported": ["8d", "chorus", "chorus2d", "chorus3d"],
-    "description": "Используется только один аудиоканал для воспроизведения",
-    "description_localizations": {
-      "en-US": "Only one audio channel is used for playback"
+    "locale": {
+      "en-US": "Only one audio channel is used for playback",
+      "ru": "Используется только один аудио канал для воспроизведения"
     },
+    "unsupported": ["8d", "chorus", "chorus2d", "chorus3d"],
     "filter": "pan=mono|c0=.5*c0+.5*c1",
     "args": false
   },
   {
     "name": "treble",
-    "unsupported": [],
-    "description": "Высокие частоты описывают тона высокой частоты или высокого тона в диапазоне от 6 кГц до 20 кГц",
-    "description_localizations": {
-      "en-US": "High frequencies describe tones of high frequency or high pitch in the range from 6 kHz to 20 kHz"
+    "locale": {
+      "en-US": "High frequencies describe tones of high frequency or high pitch in the range from 6 kHz to 20 kHz",
+      "ru": "Высокие частоты описывают тона высокой частоты или высокого тона в диапазоне от 6 кГц до 20 кГц"
     },
+    "unsupported": [],
     "filter": "treble=g=5",
     "args": false
   },
   {
     "name": "reverse",
-    "unsupported": [],
-    "description": "Все будет играть задом на перед",
-    "description_localizations": {
-      "en-US": "Everything will be played backwards"
+    "locale": {
+      "en-US": "Everything will be played backwards",
+      "ru": "Все будет играть задом на перед"
     },
+    "unsupported": [],
     "filter": "areverse",
     "args": false
   },
   {
     "name": "surround",
-    "unsupported": [],
-    "description": "Метод повышения точности и глубины воспроизведения звука за счет использования нескольких аудиоканалов от динамиков",
-    "description_localizations": {
-      "en-US": "A method to increase the accuracy and depth of sound reproduction by using multiple audio channels from speakers"
+    "locale": {
+      "en-US": "A method to increase the accuracy and depth of sound reproduction by using multiple audio channels from speakers",
+      "ru": "Метод повышения точности и глубины воспроизведения звука за счет использования нескольких аудио каналов от динамиков"
     },
+    "unsupported": [],
     "filter": "surround",
     "args": false
   },
   {
     "name": "flanger",
-    "unsupported": [],
-    "description": "Смешивания двух идентичных сигналов вместе, один сигнал задерживается на небольшой и постепенно меняющийся период",
-    "description_localizations": {
-      "en-US": "By mixing two identical signals together, one signal is delayed for a small and gradually changing period"
+    "locale": {
+      "en-US": "By mixing two identical signals together, one signal is delayed for a small and gradually changing period",
+      "ru": "Смешивания двух идентичных сигналов вместе, один сигнал задерживается на небольшой и постепенно меняющийся период"
     },
+    "unsupported": [],
     "filter": "flanger",
     "args": false
   },
   {
     "name": "haas",
-    "unsupported": [],
-    "description": "Бинауральный психоакустический эффект, состоящий из двух частей",
-    "description_localizations": {
-      "en-US": "При смешивании двух идентичных сигналов один из них задерживается на небольшой и постепенно изменяющийся период"
+    "locale": {
+      "en-US": "При смешивании двух идентичных сигналов один из них задерживается на небольшой и постепенно изменяющийся период",
+      "ru": "Бинауральный психоакустический эффект, состоящий из двух частей"
     },
     "filter": "haas",
     "args": false
   },
   {
     "name": "nightcore",
-    "unsupported": ["vaporwave", "vw"],
-    "description": "Высота звука увеличивается, а исходный материал ускоряется примерно на 35%",
-    "description_localizations": {
-      "en-US": "The pitch of the sound increases, and the source material accelerates by about 35%"
+    "locale": {
+      "en-US": "The pitch of the sound increases, and the source material accelerates by about 35%",
+      "ru": "Высота звука увеличивается, а исходный материал ускоряется примерно на 35%"
     },
+    "unsupported": ["vaporwave", "vw"],
     "filter": "asetrate=48000*1.25,aresample=48000,bass=g=5",
     "args": false,
     "speed": 1.25
   },
   {
     "name": "echo",
-    "unsupported": [],
-    "description": "Отражение звука, которое доходит до слушателя с задержкой после прямого звука",
-    "description_localizations": {
-      "en-US": "The reflection of the sound that reaches the listener with a delay after the direct sound"
+    "locale": {
+      "en-US": "The reflection of the sound that reaches the listener with a delay after the direct sound",
+      "ru": "Отражение звука, которое доходит до слушателя с задержкой после прямого звука"
     },
+    "unsupported": [],
     "filter": "aecho=0.8:0.9:1000:0.3",
     "args": false
   },
   {
     "name": "8d",
-    "unsupported": [],
-    "description": "Отражение звука, которое доходит до слушателя с задержкой после прямого звука",
-    "description_localizations": {
-      "en-US": "The reflection of the sound that reaches the listener with a delay after the direct sound"
+    "locale": {
+      "en-US": "The reflection of the sound that reaches the listener with a delay after the direct sound",
+      "ru": "Отражение звука, которое доходит до слушателя с задержкой после прямого звука"
     },
+    "unsupported": [],
     "filter": "apulsator=hz=0.09",
     "args": false
   },
   {
     "name": "speed",
-    "unsupported": [],
-    "description": "Скорость проигрывания музыки",
-    "description_localizations": {
-      "en-US": "The speed of music playback"
+    "locale": {
+      "en-US": "The speed of music playback",
+      "ru": "Скорость проигрывания музыки"
     },
+    "unsupported": [],
     "filter": "atempo=",
     "args": [1, 3],
     "speed": "arg"
   },
   {
     "name": "bass",
-    "unsupported": [],
-    "description": "Тоны низкой частоты, высоты тона и диапазона от 16 до 256 Гц",
-    "description_localizations": {
-      "en-US": "Tones of low frequency, pitch and range from 16 to 256 Hz"
+    "locale": {
+      "en-US": "Tones of low frequency, pitch and range from 16 to 256 Hz",
+      "ru": "Тоны низкой частоты, высоты тона и диапазона от 16 до 256 Гц"
     },
+    "unsupported": [],
     "filter": "bass=g=",
     "args": [1, 30]
   },
   {
     "name": "sub_boost",
-    "unsupported": [],
-    "description": "Глубокие, низкочастотные тона",
-    "description_localizations": {
-      "en-US": "Deep, low-frequency tones"
+    "locale": {
+      "en-US": "Deep, low-frequency tones",
+      "ru": "Глубокие, низкочастотные тона"
     },
+    "unsupported": [],
     "filter": "asubboost",
     "args": false
   },
   {
     "name": "vibro",
-    "unsupported": [],
-    "description": "Волны звуковых колебаний сохраняются в виде канавки",
-    "description_localizations": {
-      "en-US": "The waves of sound vibrations are stored in the form of a groove"
+    "locale": {
+      "en-US": "The waves of sound vibrations are stored in the form of a groove",
+      "ru": "Волны звуковых колебаний сохраняются в виде канавки"
     },
+    "unsupported": [],
     "filter": "vibrato=f=6.5",
     "args": false
   },
   {
     "name": "phaser",
-    "unsupported": [],
-    "description": "Электронный звуковой процессор, используемый для фильтрации сигнала",
-    "description_localizations": {
-      "en-US": "An electronic sound processor used to filter the signal"
+    "locale": {
+      "en-US": "An electronic sound processor used to filter the signal",
+      "ru": "Электронный звуковой процессор, используемый для фильтрации сигнала"
     },
+    "unsupported": [],
     "filter": "aphaser=in_gain=0.4",
     "args": false
   },
   {
     "name": "vaporwave",
-    "unsupported": ["nightcore", "night"],
-    "description": "Противоположность nightcore",
-    "description_localizations": {
-      "en-US": "The opposite of nightcore"
+    "locale": {
+      "en-US": "The opposite of nightcore",
+      "ru": "Противоположность nightcore"
     },
+    "unsupported": ["nightcore", "night"],
     "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1",
     "args": false,
     "speed": 1.1
