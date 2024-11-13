@@ -56,19 +56,31 @@ export class ExtraFilters {
      * @public
      */
     public get discord_command() {
-        if (filters.length > 25) return [];
-
         const temples: SlashComponent["choices"] = [];
 
+        // Если фильтров слишком много
+        if (filters.length > 25) return temples;
+
         // Перебираем фильтр
-        for (const [key, value] of Object.entries(filters as AudioFilter[])) {
-            const default_locale = Object.keys(value.locale)[0];
+        for (const filter of filters as AudioFilter[]) {
+            const default_locale = Object.keys(filter.locale)[0];
+
+            // Проверяем кол-во символов на допустимость discord (100 шт.)
+            for (const [key, value] of Object.entries(filter.locale)) {
+                if (value.startsWith("[")) continue;
+
+                // Добавляем диапазон
+                if (filter.args) filter.locale[key] = `<${filter.args[0]}-${filter.args[1]}> - ${filter.locale[key]}`;
+
+                // Удаляем лишний размер описания
+                filter.locale[key] = value.length > 75 ? `[${filter.name}] - ${filter.locale[key].substring(0, 75)}...` : `[${filter.name}] - ${filter.locale[key]}`;
+            }
 
             // Создаем список для показа фильтров в командах
             temples.push({
-                name: value.locale[default_locale],
-                nameLocalizations: value.locale,
-                value: value.name
+                name: filter.locale[default_locale],
+                nameLocalizations: filter.locale,
+                value: filter.name
             });
         }
 

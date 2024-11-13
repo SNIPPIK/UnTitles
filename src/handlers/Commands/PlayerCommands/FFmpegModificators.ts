@@ -126,8 +126,8 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                                     "ru": "фильтры"
                                 },
                                 descriptions: {
-                                    "en-US": "You need to select a filter!",
-                                    "ru": "Необходимо выбрать фильтр!"
+                                    "en-US": "You need to select a filter! [names] - <allowable range> - description",
+                                    "ru": "Необходимо выбрать фильтр! [названия] - <допустимый диапазон> - описание"
                                 },
                                 type: ApplicationCommandOptionType["String"],
                                 required: true,
@@ -163,8 +163,8 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                                     "ru": "фильтры"
                                 },
                                 descriptions: {
-                                    "en-US": "You need to select a filter!",
-                                    "ru": "Необходимо выбрать фильтр!"
+                                    "en-US": "You need to select a filter! [names] - <not required> - description",
+                                    "ru": "Необходимо выбрать фильтр! [названия] - <не требуется> - описание"
                                 },
                                 type: ApplicationCommandOptionType["String"],
                                 required: true,
