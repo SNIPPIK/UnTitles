@@ -2,8 +2,8 @@
   {
     "name": "loudnorm",
     "locale": {
-      "en-US": "Normalizes the tone of the audio track",
-      "ru": "Нормализует тон звуковой дорожки"
+      "en-US": "Makes the sound more uniform",
+      "ru": "Делает звук более равномерным"
     },
     "unsupported": [],
     "filter": "loudnorm",
@@ -22,8 +22,8 @@
   {
     "name": "treble",
     "locale": {
-      "en-US": "High frequencies describe tones of high frequency or high pitch in the range from 6 kHz to 20 kHz",
-      "ru": "Высокие частоты описывают тона высокой частоты или высокого тона в диапазоне от 6 кГц до 20 кГц"
+      "en-US": "Increases sound clarity up to 20 kHz!",
+      "ru": "Увеличивает чистоту звучания до 20 kHz!"
     },
     "unsupported": [],
     "filter": "treble=g=5",
@@ -32,8 +32,8 @@
   {
     "name": "reverse",
     "locale": {
-      "en-US": "Everything will be played backwards",
-      "ru": "Все будет играть задом на перед"
+      "en-US": "The music will play backwards!",
+      "ru": "Музыка будет играть задом на перед!"
     },
     "unsupported": [],
     "filter": "areverse",
@@ -42,8 +42,8 @@
   {
     "name": "surround",
     "locale": {
-      "en-US": "A method to increase the accuracy and depth of sound reproduction by using multiple audio channels from speakers",
-      "ru": "Метод повышения точности и глубины воспроизведения звука за счет использования нескольких аудио каналов от динамиков"
+      "en-US": "Makes the sound more voluminous!",
+      "ru": "Делает звук более объемным!"
     },
     "unsupported": [],
     "filter": "surround",
@@ -52,8 +52,8 @@
   {
     "name": "flanger",
     "locale": {
-      "en-US": "By mixing two identical signals together, one signal is delayed for a small and gradually changing period",
-      "ru": "Смешивания двух идентичных сигналов вместе, один сигнал задерживается на небольшой и постепенно меняющийся период"
+      "en-US": "Reminds me of a «flying» sound.",
+      "ru": "Напоминает «летящее» звучание."
     },
     "unsupported": [],
     "filter": "flanger",
@@ -62,8 +62,8 @@
   {
     "name": "haas",
     "locale": {
-      "en-US": "При смешивании двух идентичных сигналов один из них задерживается на небольшой и постепенно изменяющийся период",
-      "ru": "Бинауральный психоакустический эффект, состоящий из двух частей"
+      "en-US": "Haas effect, otherwise known as the «precedence» effect",
+      "ru": "Эффект Хааса, иначе называемый эффектом «предшествования»"
     },
     "filter": "haas",
     "args": false
@@ -71,8 +71,8 @@
   {
     "name": "nightcore",
     "locale": {
-      "en-US": "The pitch of the sound increases, and the source material accelerates by about 35%",
-      "ru": "Высота звука увеличивается, а исходный материал ускоряется примерно на 35%"
+      "en-US": "Increases track speed by 25-35%!",
+      "ru": "Увеличивает скорость трека на 25-35%!"
     },
     "unsupported": ["vaporwave", "vw"],
     "filter": "asetrate=48000*1.25,aresample=48000,bass=g=5",
@@ -82,8 +82,8 @@
   {
     "name": "echo",
     "locale": {
-      "en-US": "The reflection of the sound that reaches the listener with a delay after the direct sound",
-      "ru": "Отражение звука, которое доходит до слушателя с задержкой после прямого звука"
+      "en-US": "Repeated repetition several times in a row",
+      "ru": "Многократное повторения несколько раз подряд"
     },
     "unsupported": [],
     "filter": "aecho=0.8:0.9:1000:0.3",
@@ -92,8 +92,8 @@
   {
     "name": "8d",
     "locale": {
-      "en-US": "The reflection of the sound that reaches the listener with a delay after the direct sound",
-      "ru": "Отражение звука, которое доходит до слушателя с задержкой после прямого звука"
+      "en-US": "Spatial Reverb and Mixing",
+      "ru": "Пространственная реверберация и микширование"
     },
     "unsupported": [],
     "filter": "apulsator=hz=0.09",
@@ -113,8 +113,8 @@
   {
     "name": "bass",
     "locale": {
-      "en-US": "Tones of low frequency, pitch and range from 16 to 256 Hz",
-      "ru": "Тоны низкой частоты, высоты тона и диапазона от 16 до 256 Гц"
+      "en-US": "This is the lower limit of the sound spectrum",
+      "ru": "Это нижняя граница звукового спектра"
     },
     "unsupported": [],
     "filter": "bass=g=",
@@ -123,28 +123,18 @@
   {
     "name": "sub_boost",
     "locale": {
-      "en-US": "Deep, low-frequency tones",
-      "ru": "Глубокие, низкочастотные тона"
+      "en-US": "Something similar to bass but sounds deeper",
+      "ru": "Что-то похожее на bass но более звучит глубже"
     },
     "unsupported": [],
     "filter": "asubboost",
     "args": false
   },
   {
-    "name": "vibro",
-    "locale": {
-      "en-US": "The waves of sound vibrations are stored in the form of a groove",
-      "ru": "Волны звуковых колебаний сохраняются в виде канавки"
-    },
-    "unsupported": [],
-    "filter": "vibrato=f=6.5",
-    "args": false
-  },
-  {
     "name": "phaser",
     "locale": {
-      "en-US": "An electronic sound processor used to filter the signal",
-      "ru": "Электронный звуковой процессор, используемый для фильтрации сигнала"
+      "en-US": "Filters the audio signal with subsequent generation",
+      "ru": "Фильтрует аудио сигнал с последующей генерацией"
     },
     "unsupported": [],
     "filter": "aphaser=in_gain=0.4",
@@ -153,8 +143,8 @@
   {
     "name": "vaporwave",
     "locale": {
-      "en-US": "The opposite of nightcore",
-      "ru": "Противоположность nightcore"
+      "en-US": "Micro genre of electronic music",
+      "ru": "Микро жанр электронной музыки"
     },
     "unsupported": ["nightcore", "night"],
     "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1",
