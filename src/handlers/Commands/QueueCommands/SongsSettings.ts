@@ -45,28 +45,19 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
 
                 // Если аргумент не является числом
                 if (isNaN(arg)) {
-                    message.fastBuilder = {
-                        description: locale._(message.locale, "command.seek.duration.nan"),
-                        color: Colors.DarkRed
-                    };
+                    message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.nan"), color: Colors.DarkRed };
                     return;
                 }
 
                 // Если музыку нельзя пропустить из-за плеера
                 else if (!player.playing) {
-                    message.fastBuilder = {
-                        description: locale._(message.locale, "player.playing.off"),
-                        color: Colors.DarkRed
-                    };
+                    message.fastBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
                     return;
                 }
 
                 // Если пользователь укажет больше чем есть в очереди или меньше
                 else if (arg > songs.size && arg < songs.size) {
-                    message.fastBuilder = {
-                        description: locale._(message.locale, "command.seek.duration.big"),
-                        color: Colors.DarkRed
-                    };
+                    message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
                     return;
                 }
 
@@ -76,20 +67,14 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                 if (arg > 1) {
                     // Меняем позицию трека в очереди
                     db.audio.queue.events.emit("request/time", queue, songs.position + arg);
-                    message.fastBuilder = {
-                        description: locale._(message.locale, "command.skip.arg.track", [arg, `[${title}](${url})`]),
-                        color
-                    };
+                    message.fastBuilder = { description: locale._(message.locale, "command.skip.arg.track", [arg, `[${title}](${url})`]), color };
 
                     return;
                 }
 
                 // Пропускаем текущий трек
                 db.audio.queue.events.emit("request/time", queue, songs.position + 1);
-                message.fastBuilder = {
-                    description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]),
-                    color
-                };
+                message.fastBuilder = { description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]), color };
                 return;
             }
         });
@@ -136,28 +121,19 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
 
                 // Если аргумент не является числом
                 if (isNaN(arg)) {
-                    message.fastBuilder = {
-                        description: locale._(message.locale, "command.seek.duration.nan"),
-                        color: Colors.DarkRed
-                    };
+                    message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.nan"), color: Colors.DarkRed };
                     return;
                 }
 
                 // Если аргумент больше кол-ва треков
                 else if (arg > queue.songs.size && arg < queue.songs.size) {
-                    message.fastBuilder = {
-                        description: locale._(message.locale, "command.seek.duration.big"),
-                        color: Colors.DarkRed
-                    };
+                    message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
                     return;
                 }
 
                 // Если музыку нельзя пропустить из-за плеера
                 else if (!queue.player.playing) {
-                    message.fastBuilder = {
-                        description: locale._(message.locale, "player.playing.off"),
-                        color: Colors.DarkRed
-                    };
+                    message.fastBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
                     return;
                 }
 
@@ -170,10 +146,7 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                     queue.songs.remove(arg - 1);
                 }
 
-                message.fastBuilder = {
-                    description: locale._(message.locale, "command.remove.track", [`[${title}](${url})`]),
-                    color
-                };
+                message.fastBuilder = { description: locale._(message.locale, "command.remove.track", [`[${title}](${url})`]), color };
                 return;
             }
         });

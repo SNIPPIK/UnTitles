@@ -61,8 +61,8 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
                 // Управление кнопками
                 else if (message.isButton()) {
-                    const button = db.buttons.get(message.customId as any);
                     const msg = new Interact(message);
+                    const button = db.buttons.get(msg.custom_id as any);
 
                     // Если пользователь не подключен к голосовым каналам и нет очереди
                     if (!msg.voice.channel || !msg.guild.members.me.voice.channel) return;
@@ -72,17 +72,11 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     // Если есть очередь и пользователь не подключен к тому же голосовому каналу
                     if (!queue || msg.voice.channel?.id !== queue.voice.channel.id) return;
 
-
                     // Если была найдена кнопка
-                    if (button) button.callback(msg);
+                    else if (button) button.callback(msg);
 
                     // Если кнопка была не найдена
-                    else {
-                        msg.fastBuilder = {
-                            description: locale._(msg.locale, "button.fail"),
-                            color: Colors.DarkRed
-                        };
-                    }
+                    else msg.fastBuilder = { description: locale._(msg.locale, "button.fail"), color: Colors.DarkRed };
 
                     // Завершаем действие
                     return;

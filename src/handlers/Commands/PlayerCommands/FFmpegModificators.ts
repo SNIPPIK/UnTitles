@@ -18,11 +18,12 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
         super({
             data: new SlashBuilder()
                 .setName({
-                    "en-US": "seek"
+                    "en-US": "seek",
+                    "ru": "переход"
                 })
                 .setDescription({
-                    "en-US": "Skipping the time in the current track!",
-                    "ru": "Пропуск времени в текущем треке!"
+                    "en-US": "Jump to a specific track time!",
+                    "ru": "Переход к конкретному времени трека!"
                 })
                 .addSubCommands([
                     {
@@ -47,19 +48,19 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
 
                 //Если пользователь написал что-то не так
                 if (isNaN(duration)) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.nan") }
+                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.nan") };
                     return;
                 }
 
                 //Если пользователь указал времени больше чем в треке
                 else if (duration > queue.songs.song.time.total) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.big") }
+                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.big") };
                     return;
                 }
 
                 //Если музыку нельзя пропустить из-за плеера
                 else if (!queue.player.playing) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "player.playing.off") }
+                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "player.playing.off") };
                     return;
                 }
 
@@ -67,7 +68,7 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                 queue.player.play(queue.songs.song, duration);
 
                 //Отправляем сообщение о пропуске времени
-                message.fastBuilder = { color: Colors.Green, description: locale._(message.locale, "command.seek", [duration]) }
+                message.fastBuilder = { color: Colors.Green, description: locale._(message.locale, "command.seek", [duration]) };
             }
         });
     };

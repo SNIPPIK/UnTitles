@@ -83,7 +83,16 @@ export class InteractRule {
  * @class Interact
  */
 export class Interact {
+  /**
+   * @description Сообщение принятое с discord.js
+   * @private
+   */
   private readonly _temp: Message | BaseInteraction;
+
+  /**
+   * @description Не был получен ответ
+   * @private
+   */
   private _replied: boolean = true;
 
   /**

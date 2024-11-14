@@ -100,7 +100,7 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
 
                     // Если пользователь подсунул фальшивку
                     if (!attachment.contentType.match("audio")) {
-                        message.fastBuilder = { description: locale._(message.locale, "attachment.audio.fail"), color: Colors.Yellow }
+                        message.fastBuilder = { description: locale._(message.locale, "attachment.audio.fail"), color: Colors.Yellow };
                         return;
                     }
 
