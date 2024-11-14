@@ -25,12 +25,12 @@ class CacheData {
         /**
          * @description Кешированные треки
          */
-        tracks: null,
+        tracks: new class extends Constructor.Collection<Track> {},
 
         /**
          * @description Кешированные авторы треков
          */
-        artists: null
+        artists: new class extends Constructor.Collection<Track.artist> {}
     };
 
 }
