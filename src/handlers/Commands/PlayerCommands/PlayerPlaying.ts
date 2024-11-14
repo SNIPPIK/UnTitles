@@ -92,7 +92,7 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                     }
                 ])
                 .json,
-            rules: ["voice", "anotherVoice"],
+            rules: ["voice", "another_voice"],
             execute: ({message, args, type}) => {
                 // Если пользователь прикрепил файл
                 if (type === "file") {

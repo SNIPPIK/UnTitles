@@ -48,7 +48,7 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
  * @author SNIPPIK
  * @description Поддерживаемые правила проверки
  */
-export type InteractRules = "voice" | "queue" | "anotherVoice";
+export type InteractRules = "voice" | "queue" | "another_voice";
 
 /**
  * @author SNIPPIK

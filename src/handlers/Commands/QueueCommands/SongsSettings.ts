@@ -36,7 +36,7 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                     }
                 ])
                 .json,
-            rules: ["voice", "anotherVoice", "queue"],
+            rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
                 const { guild } = message;
                 const queue = db.audio.queue.get(guild.id);
@@ -128,7 +128,7 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                     }
                 ])
                 .json,
-            rules: ["voice", "anotherVoice", "queue"],
+            rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
                 const { guild } = message;
                 const queue = db.audio.queue.get(guild.id);

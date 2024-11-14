@@ -39,9 +39,9 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                     }
                 ])
                 .json,
-            rules: ["queue", "voice", "anotherVoice"],
+            rules: ["queue", "voice", "another_voice"],
             execute: ({message, args}) => {
-                const {author, guild} = message;
+                const {guild} = message;
                 const queue = db.audio.queue.get(guild.id);
                 const duration = args[0]?.duration();
 
@@ -174,9 +174,9 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     },
                 ])
                 .json,
-            rules: ["queue", "voice", "anotherVoice"],
+            rules: ["queue", "voice", "another_voice"],
             execute: ({message, args, type}) => {
-                const {author, guild} = message;
+                const {guild} = message;
                 const queue = db.audio.queue.get(guild.id);
 
                 // Если статус плеера не позволяет пропустить поток
@@ -249,7 +249,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
 
                         // Сообщаем о новом фильтре
                         message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.pushed", [Filter.name, Filter.locale[message.locale]]),
+                            description: locale._(message.locale, "command.filter.pushed", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
                             color: Colors.Green, timestamp: new Date()
                         };
                         return;
@@ -269,7 +269,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
 
                         // Сообщаем об удалении фильтра
                         message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.removed", [Filter.name, Filter.locale[message.locale]]),
+                            description: locale._(message.locale, "command.filter.removed", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
                             color: Colors.Green
                         };
                         return;
