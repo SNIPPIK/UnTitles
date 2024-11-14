@@ -521,36 +521,50 @@ export namespace API {
   export interface request {
     /**
      * @description Имя платформы
+     * @readonly
+     * @public
      */
     readonly name: platform;
 
     /**
      * @description Ссылка для работы фильтра
+     * @readonly
+     * @public
      */
     readonly url: string;
 
     /**
      * @description Доступ к аудио
+     * @readonly
+     * @public
      */
     readonly audio: boolean;
 
     /**
      * @description Доступ с авторизацией
+     * @readonly
+     * @public
      */
     readonly auth: boolean;
 
     /**
      * @description Фильтр ссылки для работы определения
+     * @readonly
+     * @public
      */
     readonly filter: RegExp;
 
     /**
      * @description Цвет платформы
+     * @readonly
+     * @public
      */
     readonly color: number;
 
     /**
      * @description Запросы платформы
+     * @readonly
+     * @public
      */
     readonly requests: item<callbacks>[];
   }

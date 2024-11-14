@@ -256,17 +256,17 @@
   },
 
   "api.platform.block": {
-    "ru": "APIs block: This platform has currently been blocked by the developer",
+    "ru": "Блокировка API: эта платформа в настоящее время заблокирована разработчиком",
     "en-US": "APIs block: This platform has currently been blocked by the developer"
   },
 
   "api.platform.auth": {
-    "ru": "APIs auth: Problem with authorization data, contact the developer",
+    "ru": "API auth: Проблема с данными авторизации, обратитесь к разработчику",
     "en-US": "APIs auth: Problem with authorization data, contact the developer"
   },
 
   "api.platform.support": {
-    "ru": "APIs error: I don't have support for this type of request",
+    "ru": "Ошибка API: у меня нет поддержки для этого типа запроса",
     "en-US": "APIs error: I don't have support for this type of request"
   },
 
@@ -276,12 +276,12 @@
   },
 
   "api.platform.timeout": {
-    "ru": "Timeout server: The server refused to transmit data",
+    "ru": "Истекло время ожидания сервера: сервер отказался передавать данные",
     "en-US": "Timeout server: The server refused to transmit data"
   },
 
   "api.platform.error": {
-    "ru": "**Critical Error:** {ARGUMENT}",
+    "ru": "**Критическая ошибка:** {ARGUMENT}",
     "en-US": "**Critical Error:** {ARGUMENT}"
   },
 
@@ -294,23 +294,18 @@
 
 
 
-  "command.seek.duration": {
-    "ru": "Error argument",
-    "en-US": "Error argument"
-  },
-
   "command.seek.duration.nan": {
     "ru": "Аргумент не является числом",
     "en-US": "The argument is not a number"
   },
 
   "command.seek.duration.big": {
-    "ru": "Аргумент слишком большой! Укажи меньше!",
-    "en-US": "The argument is too big! Specify less!"
+    "ru": "Аргумент слишком большой или слишком маленький!",
+    "en-US": "The argument is too big or too small!"
   },
 
   "command.seek": {
-    "ru": "Seeked {ARGUMENT}",
+    "ru": "Пропуск до {ARGUMENT}",
     "en-US": "Seeked {ARGUMENT}"
   },
 

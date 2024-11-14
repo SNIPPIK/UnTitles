@@ -45,14 +45,8 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                 const queue = db.audio.queue.get(guild.id);
                 const duration = args[0]?.duration();
 
-                //Если пользователь не указал время
-                if (!duration) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration") }
-                    return;
-                }
-
                 //Если пользователь написал что-то не так
-                else if (isNaN(duration)) {
+                if (isNaN(duration)) {
                     message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.nan") }
                     return;
                 }
