@@ -15,7 +15,7 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
 
     // Если нет голосового подключения
     if (!VoiceChannel) {
-      message.fastBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow }
+      message.fastBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow };
       return false;
     }
 
@@ -24,20 +24,24 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
   "queue": (message) => {
     // Если нет очереди
     if (!message.queue) {
-      message.fastBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow }
+      message.fastBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow };
       return false;
     }
 
     return true;
   },
-  "anotherVoice": (message) => {
+  "another_voice": (message) => {
     const VoiceChannel = message.voice?.channel;
     const queue = message.queue;
 
     // Если музыка играет в другом голосовом канале
     if (queue && queue.voice && VoiceChannel?.id !== queue.voice.id && message.guild.members.me.voice.channel) {
-      message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow }
-      return false
+
+      // Если в гс есть другие пользователи, здесь нет учета других ботов
+      if (queue.voice.channel.members.size != 1) {
+        message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
+        return false;
+      }
     }
 
     return true;
