@@ -1,10 +1,8 @@
 import {Interact, InteractRule} from "@lib/discord/utils/Interact";
-import {PlayerBT, PlayerBTNames} from "@lib/player/buttons";
 import {Constructor, Handler} from "@handler";
 import {Colors, Events} from "discord.js";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
-
 
 /**
  * @author SNIPPIK
@@ -43,6 +41,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                         type: interact.options._subcommand
                     });
 
+                    // Завершаем действие
                     return;
                 }
 
@@ -55,44 +54,41 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                         message.message.delete().catch(() => {});
                         return;
                     }
+
+                    // Завершаем действие
+                    return;
                 }
 
                 // Управление кнопками
                 else if (message.isButton()) {
-                    // Если были задействованы кнопки плеера
-                    if (PlayerBTNames.includes(message.customId)) return Interaction.BTPlayer(new Interact(message));
+                    const button = db.buttons.get(message.customId as any);
+                    const msg = new Interact(message);
+
+                    // Если пользователь не подключен к голосовым каналам и нет очереди
+                    if (!msg.voice.channel || !msg.guild.members.me.voice.channel) return;
+
+                    const queue = msg.queue;
+
+                    // Если есть очередь и пользователь не подключен к тому же голосовому каналу
+                    if (!queue || msg.voice.channel?.id !== queue.voice.channel.id) return;
+
+
+                    // Если была найдена кнопка
+                    if (button) button.callback(msg);
+
+                    // Если кнопка была не найдена
+                    else {
+                        msg.fastBuilder = {
+                            description: locale._(msg.locale, "button.fail"),
+                            color: Colors.DarkRed
+                        };
+                    }
+
+                    // Завершаем действие
+                    return;
                 }
             }
         });
-    };
-
-    /**
-     * @description Управление кнопками плеера
-     * @param msg - Модифицированное сообщение
-     */
-    private static readonly BTPlayer = (msg: Interact): void => {
-        // Если пользователь не подключен к голосовым каналам и нет очереди
-        if (!msg.voice.channel || !msg.guild.members.me.voice.channel) return;
-
-        const queue = msg.queue;
-
-        // Если есть очередь и пользователь не подключен к тому же голосовому каналу
-        if (!queue || msg.voice.channel?.id !== queue.voice.channel.id) return;
-
-        // Получаем действие кнопки
-        const button = PlayerBT[msg.custom_id];
-
-        // Временная заглушка
-        if (!button) {
-            msg.fastBuilder = {
-                description: locale._(msg.locale, "button.fail"),
-                color: Colors.DarkRed
-            };
-            return;
-        }
-
-        // Выполняем действие кнопки
-        return button(msg);
     };
 }
 

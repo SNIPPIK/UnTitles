@@ -41,7 +41,6 @@ class sAPI extends Constructor.Assign<API.request> {
                 new class extends API.item<"track"> {
                     public constructor() {
                         super({
-                            //https://vk.com/audio-2001033886_126033886
                             name: "track",
                             filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi,
                             callback: (url) => {

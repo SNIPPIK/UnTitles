@@ -30,7 +30,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
                 }
 
                 // Получаем функцию запроса данных с платформы
-                const api = platform.find(typeof argument[1] !== "string" ? argument[1].url : argument[1]);
+                const api = platform.get(typeof argument[1] !== "string" ? argument[1].url : argument[1]);
 
                 // Если нет поддержки такого запроса!
                 if (!api || !api.name) {

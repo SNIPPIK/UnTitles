@@ -25,11 +25,11 @@ export class Queue {
         {
             type: 1,
             components: [
-                { type: 2, emoji: {id: db.emojis.button.shuffle},   custom_id: 'shuffle',       style: 2 },  //Shuffle
-                { type: 2, emoji: {id: db.emojis.button.pref},      custom_id: 'last',          style: 2 },  //Last song
-                { type: 2, emoji: {id: db.emojis.button.pause},     custom_id: 'resume_pause',  style: 2 },  //Resume/Pause
-                { type: 2, emoji: {id: db.emojis.button.next},      custom_id: 'skip',          style: 2 },  //Skip song
-                { type: 2, emoji: {id: db.emojis.button.loop},      custom_id: 'repeat',        style: 2 }   //Loop
+                { type: 2, emoji: {id: db.emojis.button.shuffle},   custom_id: 'shuffle',       style: 2, disable: true },
+                { type: 2, emoji: {id: db.emojis.button.pref},      custom_id: 'last',          style: 2, disable: true },
+                { type: 2, emoji: {id: db.emojis.button.pause},     custom_id: 'resume_pause',  style: 2 },
+                { type: 2, emoji: {id: db.emojis.button.next},      custom_id: 'skip',          style: 2, disable: true },
+                { type: 2, emoji: {id: db.emojis.button.loop},      custom_id: 'repeat',        style: 2 }
             ]
         },
 
@@ -40,11 +40,11 @@ export class Queue {
         {
             type: 1,
             components: [
-                { type: 2, emoji: {id: db.emojis.button.replay},        custom_id: 'replay',        style: 2 },  //Shuffle
-                { type: 2, emoji: {id: db.emojis.button.queue},         custom_id: 'queue',         style: 2 },  //Last song
-                { type: 2, emoji: {id: db.emojis.button.stop},          custom_id: 'stop_music',    style: 4 },  //Resume/Pause
-                { type: 2, emoji: {id: db.emojis.button.filters},       custom_id: 'filters_menu',  style: 2, disable: true },  //Skip song
-                { type: 2, emoji: {id: db.emojis.button.lyrics},        custom_id: 'lyrics',        style: 2, disable: true }   //Loop
+                { type: 2, emoji: {id: db.emojis.button.queue},         custom_id: 'queue',         style: 2, disable: true },
+                { type: 2, emoji: {id: db.emojis.button.lyrics},        custom_id: 'lyrics',        style: 2, disable: true },
+                { type: 2, emoji: {id: db.emojis.button.stop},          custom_id: 'stop_music',    style: 4 },
+                { type: 2, emoji: {id: db.emojis.button.filters},       custom_id: 'filters_menu',  style: 2, disable: true },
+                { type: 2, emoji: {id: db.emojis.button.replay},        custom_id: 'replay',        style: 2 },
             ]
         }
     ];
@@ -172,12 +172,22 @@ export class Queue {
         if (this.songs.position > 0) Object.assign(first[1], { disabled: false, style: 3 });
         else Object.assign(first[1], { disabled: true });
 
+
+        // Ограничиваем кнопку очередь
+        if (this.songs.size > 5) {
+            Object.assign(two[0], { disabled: false });
+        } else {
+            Object.assign(two[0], { disabled: true });
+        }
+
         // Если есть еще треки, то можно будет посмотреть очередь
         // Если всего один трек, то не позволяем его пропустить
         if (this.songs.size > 1) {
+            Object.assign(first[0], { disabled: false });
             Object.assign(first[3], { disabled: false, style: 3 });
             Object.assign(two[1], { disabled: false });
         } else {
+            Object.assign(first[0], { disabled: true });
             Object.assign(first[3], { disabled: true });
             Object.assign(two[1], { disabled: true });
         }
@@ -217,17 +227,17 @@ export class Queue {
         // Создаем плеер
         this._data.player = new ExtraPlayer(ID);
 
-        // В конце функции выполнить запуск проигрывания
-        setImmediate(() => {
-            this.player.play(this.songs.song);
-        });
-
         // Добавляем данные в класс
         this.message = message;
         this.voice = message.voice;
 
         // Добавляем очередь в список очередей
         db.audio.queue.set(ID, this);
+
+        // В конце функции выполнить запуск проигрывания
+        setImmediate(() => {
+            this.player.play(this.songs.song);
+        });
     };
 
     /**

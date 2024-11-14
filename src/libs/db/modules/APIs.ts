@@ -93,7 +93,7 @@ export class Database_APIs {
      */
     public readonly fetchAllow = (track: Track): Promise<string | Error> => {
         return new Promise(async (resolve) => {
-            const api = new API.response(track.platform).find("track");
+            const api = new API.response(track.platform).get("track");
 
             // Если нет такого запроса
             if (!api) return resolve(Error(`[Song/${track.platform}]: not found callback for track`));
@@ -123,11 +123,11 @@ export class Database_APIs {
 
             try {
                 // Ищем подходящий трек
-                const tracks = await platform.find("search").callback(`${track.artist.title} - ${track.title}`, {limit: 5});
+                const tracks = await platform.get("search").callback(`${track.artist.title} - ${track.title}`, {limit: 5});
                 if (tracks instanceof Error || tracks.length === 0) return resolve(null);
 
                 // Если он был найден, то получаем исходник трека
-                const song = await platform.find("track").callback(tracks?.at(0)?.url, {audio: true});
+                const song = await platform.get("track").callback(tracks?.at(0)?.url, {audio: true});
                 if (song instanceof Error || !song.link) return resolve(null);
 
                 // Отдаем исходник трека

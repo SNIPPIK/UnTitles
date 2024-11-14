@@ -6,6 +6,7 @@ import {API, Handler} from "@handler";
 import {Client} from "@lib/discord";
 import {Logger} from "@lib/logger";
 import {env} from "@env";
+import {Database_Buttons} from "@lib/db/modules/Buttons";
 
 /**
  * @author SNIPPIK
@@ -37,6 +38,12 @@ class Database {
      * @private
      */
     private readonly _apis = new Database_APIs();
+
+    /**
+     * @description Загружаем класс для хранения кнопок бота
+     * @private
+     */
+    private readonly _buttons = new Database_Buttons();
 
     /**
      * @description Выдаем все необходимые смайлики
@@ -139,6 +146,12 @@ class Database {
      * @public
      */
     public get api() { return this._apis };
+
+    /**
+     * @description База для управления кнопками в текущем виде хранит в себе кнопки
+     * @public
+     */
+    public get buttons() { return this._buttons; };
 
     /**
      * @description Выдаем класс с командами

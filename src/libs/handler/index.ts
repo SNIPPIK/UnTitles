@@ -163,14 +163,15 @@ export namespace Constructor {
    * @description Коллекция
    * @abstract
    */
-  export abstract class Collection<K> {
-    private readonly data = new Map<string, K>();
+  export abstract class Collection<K, T = string> {
+    private readonly data = new Map<T, K>();
+
     /**
      * @description Получаем объект из ID
      * @param ID - ID объекта
      * @public
      */
-    public get = (ID: string) => {
+    public get = (ID: T) => {
       return this.data.get(ID);
     };
 
@@ -181,7 +182,7 @@ export namespace Constructor {
      * @param promise - Если надо сделать действие с объектом
      * @public
      */
-    public set = (ID: string, value: K, promise?: (item: K) => void) => {
+    public set = (ID: T, value: K, promise?: (item: K) => void) => {
       const item = this.get(ID);
 
       if (!item) {
@@ -194,11 +195,26 @@ export namespace Constructor {
     };
 
     /**
+     * @description Фильтруем данные по принципу подбора
+     * @param fn - функция фильтрации
+     */
+    public match = (fn: (item: K) => boolean) => {
+      for (const [key, value] of this.data) {
+        const check = fn(value);
+
+        // Если найдено совпадение
+        if (check) return check;
+      }
+
+      return null;
+    };
+
+    /**
      * @description Удаляем элемент из списка
      * @param ID - ID Сервера
      * @public
      */
-    public remove = (ID: string) => {
+    public remove = (ID: T) => {
       const item: any = this.data.get(ID);
 
       if (item) {
@@ -219,7 +235,7 @@ export namespace Constructor {
       const key = keys[Math.floor(Math.random() * keys.length)];
 
       return this.get(key);
-    }
+    };
 
     /**
      * @description Получаем кол-во объектов в списке
@@ -227,7 +243,7 @@ export namespace Constructor {
      */
     public get size() {
       return this.data.size;
-    }
+    };
   }
 
   /**
@@ -421,14 +437,6 @@ export namespace API {
     public get platform() { return this._api.name; };
 
     /**
-     * @description Выдаем RegExp
-     * @return RegExp
-     * @public
-     */
-    public get filter() { return this._api.filter; };
-
-
-    /**
      * @description Выдаем bool, Недоступна ли платформа
      * @return boolean
      * @public
@@ -443,13 +451,6 @@ export namespace API {
     public get auth() { return db.api.platforms.authorization.includes(this.platform); };
 
     /**
-     * @description Выдаем bool, есть ли доступ к файлам аудио
-     * @return boolean
-     * @public
-     */
-    public get audio() { return db.api.platforms.audio.includes(this.platform); };
-
-    /**
      * @description Выдаем int, цвет платформы
      * @return number
      * @public
@@ -458,26 +459,30 @@ export namespace API {
 
     /**
      * @description Получаем функцию в зависимости от типа платформы и запроса
-     * @param type {find} Тип запроса
+     * @param type {get} Тип запроса
      * @public
      */
-    public find<T extends API.callbacks>(type: string | T): item<T> {
-      try {
-        const callback = this._api.requests.find((item) => item.name === type || item.filter && type.match(item.filter));
+    public get<T extends API.callbacks>(type: string | T): item<T> {
+      const requests = this._api.requests;
 
-        if (!callback) {
-          if (!type.startsWith("http")) {
-            const requests = this._api.requests.find((item) => item.name === "search");
-
-            if (requests) return requests as item<T>;
-          }
-
-          return null;
+      // Если указана ссылка
+      if (type.startsWith("http")) {
+        // Ищем класс поиска в платформе
+        for (const item of requests) {
+          if (item.name === type || item.filter && !!type.match(item.filter)) return item as item<T>;
         }
 
-        return callback as item<T>;
-      } catch {
-        return undefined;
+        return null;
+      }
+
+      // Скорее всего надо произвести поиск
+      else {
+        // Ищем класс поиска в платформе
+        for (const item of requests) {
+          if (item.name === "search" || item.name === type) return item as item<T>;
+        }
+
+        return null;
       }
     };
 
