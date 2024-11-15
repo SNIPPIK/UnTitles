@@ -31,16 +31,25 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
     return true;
   },
   "another_voice": (message) => {
-    const VoiceChannel = message.voice?.channel;
     const queue = message.queue;
+    const VoiceChannel = (message.member as GuildMember).voice?.channel;
+    const QueueVoiceChannel = queue?.message?.voice?.channel?.id;
 
     // Если музыка играет в другом голосовом канале
-    if (queue && queue.voice && VoiceChannel?.id !== queue.voice.id && message.guild.members.me.voice.channel) {
+    if (queue && queue.message?.voice && VoiceChannel?.id !== QueueVoiceChannel || message.guild.members.me.voice?.channel?.id !== VoiceChannel.id ) {
 
       // Если в гс есть другие пользователи, здесь нет учета других ботов
-      if (queue.voice.channel.members.size != 1) {
+      if (queue.voice.channel.members.size > 1) {
         message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
         return false;
+      }
+
+      // Если нет пользователей в том голосовом канале
+      else {
+        queue.voice = message.voice;
+        queue.message = message;
+        message.fastBuilder = { description: locale._(message.locale, "voice.new", [message.voice.channel]), color: Colors.Yellow };
+        return true;
       }
     }
 
@@ -67,16 +76,18 @@ export class InteractRule {
   public static check = (array: InteractRules[], message: Interact) => {
     if (!array || array?.length === 0) return;
 
+    let onError = true;
+
     // Проверяем всю базу
     for (const key of array) {
       const intent = intends[key];
 
       //Если нет этого необходимости проверки запроса, то пропускаем
       if (!intent) continue;
-      else return intent(message);
+      else onError = intent(message);
     }
 
-    return null;
+    return onError;
   };
 }
 

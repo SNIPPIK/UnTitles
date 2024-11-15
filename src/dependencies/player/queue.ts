@@ -99,6 +99,13 @@ export class Queue {
      * @public
      */
     public set voice(voice: Interact["voice"]) {
+        // Если уже есть голосовое подключение
+        if (this.player.voice.connection) {
+            // Удаляем старое голосовое подключение, для предотвращения утечек памяти
+            this.player.voice.connection.destroy();
+        }
+
+        // Задаем новое голосовое подключение
         this.player.voice.connection = Voice.join({
             selfDeaf: true,
             selfMute: false,

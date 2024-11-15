@@ -190,6 +190,11 @@
     "en-US": "Music playing in alternative voice channel, i not join in your voice channel {ARGUMENT}!"
   },
 
+  "voice.new": {
+    "ru": "В том голосовом канале никого нет, я пере подключился сюда {ARGUMENT}!",
+    "en-US": "There is no one in that voice channel, I reconnected here {ARGUMENT}!"
+  },
+
 
 
 
