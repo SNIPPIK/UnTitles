@@ -80,7 +80,7 @@ export class SlashBuilder {
      * @param locale - Object, с именами для перевода
      */
     public setName = (locale: LocalizationMap) => {
-        this.name = locale[Object.keys(locale).at(-1)];
+        this.name = locale[Object.keys(locale)[0]];
         this.name_localizations = locale;
         return this;
     };
@@ -90,7 +90,7 @@ export class SlashBuilder {
      * @param locale - Object, с именами для перевода
      */
     public setDescription(locale: LocalizationMap) {
-        this.description = locale[Object.keys(locale).at(-1)];
+        this.description = locale[Object.keys(locale)[0]];
         this.description_localizations = locale;
         return this;
     };
