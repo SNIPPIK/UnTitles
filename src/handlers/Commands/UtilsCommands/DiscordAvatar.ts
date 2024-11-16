@@ -4,9 +4,9 @@ import {Constructor, Handler} from "@handler";
 import {locale} from "@lib/locale";
 
 /**
- * @class AvatarCommand
- * @command avatar
+ * @author SNIPPIK
  * @description Просмотр аватара пользователя
+ * @class AvatarCommand
  */
 class AvatarCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {

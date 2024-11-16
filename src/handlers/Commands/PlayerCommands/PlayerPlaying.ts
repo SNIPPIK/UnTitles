@@ -5,9 +5,9 @@ import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 
 /**
- * @class PlayCommand
- * @command play
+ * @author SNIPPIK
  * @description Включение музыки
+ * @class PlayCommand
  */
 class PlayCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {

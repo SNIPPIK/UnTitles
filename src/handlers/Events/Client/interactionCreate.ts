@@ -42,7 +42,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 }
 
                 // Если нет пользователя в системе ожидания
-                if (!user) {
+                else if (!user) {
                     // Добавляем пользователя в систему ожидания
                     temple_db.set(message.user.id, Date.now() + 5e3);
                 }
@@ -61,6 +61,8 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     // Удаляем пользователя из базы
                     temple_db.delete(message.user.id);
                 }
+
+
 
                 // Если пользователь использует команду
                 if (message.isCommand()) {

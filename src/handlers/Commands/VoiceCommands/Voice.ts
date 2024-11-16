@@ -5,9 +5,9 @@ import {locale} from "@lib/locale";
 import {Voice} from "@lib/voice";
 
 /**
- * @class Command_Voice
- * @command voice
+ * @author SNIPPIK
  * @description Управление голосовыми подключениями
+ * @class Command_Voice
  */
 class Command_Voice extends Constructor.Assign<Handler.Command> {
     public constructor() {

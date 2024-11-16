@@ -7,17 +7,17 @@ import {Buffer} from "node:buffer";
  */
 const OpusLibs = {
     "opusscript": (lib: any): Methods => {
-        return { args: [48000, 2, 2049], encoder: lib }
+        return { args: [48000, 2, 2049], encoder: lib };
     },
     "mediaplex": (lib: any): Methods => {
-        return { args: [48000, 2], encoder: lib.OpusEncoder }
+        return { args: [48000, 2], encoder: lib.OpusEncoder };
     },
     "@evan/opus": (lib: any): Methods => {
-        return { args: [{ channels: 2, sample_rate: 48000 }], encoder: lib.Encoder }
+        return { args: [{ channels: 2, sample_rate: 48000 }], encoder: lib.Encoder };
     },
     "@discordjs/opus": (lib: any): Methods => {
-        return { args: [48000, 2], encoder: lib.OpusEncoder }
-    },
+        return { args: [48000, 2], encoder: lib.OpusEncoder };
+    }
 }, Opus: Methods = {};
 
 /**
@@ -26,7 +26,7 @@ const OpusLibs = {
  * @param name - Имя переменной
  */
 const bufferCode = (name: string) => {
-    return Buffer.from([...`${name}`].map((x: string) => x.charCodeAt(0)))
+    return Buffer.from([...`${name}`].map((x: string) => x.charCodeAt(0)));
 };
 
 /**

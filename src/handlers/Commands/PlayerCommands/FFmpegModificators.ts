@@ -7,11 +7,9 @@ import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 
 /**
+ * @author SNIPPIK
+ * @description Управление временем, дает возможность пропускать время в треке
  * @class SeekTrackCommand
- * @command seek
- * @description Пропуск времени в текущем треке
- *
- * @param value - Время для пропуска времени
  */
 class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
@@ -76,9 +74,9 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
 
 
 /**
- * @class AudioFiltersCommand
- * @command filter
+ * @author SNIPPIK
  * @description Управление модификаторами аудио треков
+ * @class AudioFiltersCommand
  */
 class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {

@@ -15,12 +15,10 @@ const SodiumLibs = {
 
             return null;
         },
-
         random(num: number, buffer: Buffer = Buffer.allocUnsafe(num)) {
             sodium.randombytes_buf(buffer);
             return buffer;
         },
-
         close: (opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array) => {
             const output = Buffer.allocUnsafe(opusPacket.length + sodium.crypto_box_MACBYTES);
             sodium.crypto_secretbox_easy(output, opusPacket, nonce, secretKey);
@@ -44,7 +42,7 @@ const SodiumLibs = {
         open: tweetnacl.secretbox.open,
         close: tweetnacl.secretbox,
         random: tweetnacl.randomBytes,
-    }),
+    })
 }, Sodium: Methods = {};
 
 /**

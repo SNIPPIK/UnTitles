@@ -2,6 +2,7 @@ import {Constructor, Handler} from "@handler";
 import {db} from "@lib/db";
 
 /**
+ * @author SNIPPIK
  * @class eventPlayer_ended
  * @event player/ended
  * @description Завершение проигрывания трека
@@ -22,6 +23,7 @@ class player_ended extends Constructor.Assign<Handler.Event<"player/ended">> {
 }
 
 /**
+ * @author SNIPPIK
  * @class eventPlayer_wait
  * @event player/wait
  * @description Плеер ожидает действий
@@ -57,6 +59,7 @@ class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
 }
 
 /**
+ * @author SNIPPIK
  * @class eventPlayer_error
  * @event player/error
  * @description Плеер словил ошибку

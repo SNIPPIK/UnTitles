@@ -31,7 +31,10 @@ export class locale {
         let translate = locales[context][language] as string;
 
         // Если нет такой строки
-        if (!translate) return `Error: Not found locale ${context}`;
+        if (!translate) {
+            // По умолчанию будет выведен английский язык
+            translate = locales[context]["en-US"];
+        }
 
         // Если есть аргументы
         if (args && args.length > 0) {

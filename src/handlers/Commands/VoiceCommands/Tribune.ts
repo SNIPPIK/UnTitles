@@ -4,11 +4,11 @@ import {Constructor, Handler} from "@handler";
 import {locale} from "@lib/locale";
 
 /**
- * @class Command_Voice
- * @command voice
+ * @author SNIPPIK
  * @description Управление голосовыми подключениями
+ * @class VoiceCommand
  */
-class Command_Voice extends Constructor.Assign<Handler.Command> {
+class VoiceCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
             data: new SlashBuilder()
@@ -96,4 +96,4 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({Command_Voice});
+export default Object.values({VoiceCommand});

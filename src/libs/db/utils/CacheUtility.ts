@@ -1,5 +1,4 @@
 import {Track} from "@lib/player/queue";
-import {Constructor} from "@handler";
 
 /**
  * @author SNIPPIK
@@ -25,12 +24,12 @@ class CacheData {
         /**
          * @description Кешированные треки
          */
-        tracks: new class extends Constructor.Collection<Track> {},
+        tracks: new Map<string, Track>(),
 
         /**
          * @description Кешированные авторы треков
          */
-        artists: new class extends Constructor.Collection<Track.artist> {}
+        artists: new Map<string, Track.artist>()
     };
 
 }
@@ -56,7 +55,7 @@ class CacheAudio {
      * @readonly
      * @private
      */
-    private readonly audios = new class extends Constructor.Collection<string> {};
+    private readonly audios = new Map<string, string>();
 
     /**
      * @description Функция сохранения исходника трека
