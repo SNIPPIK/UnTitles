@@ -25,14 +25,21 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 // Игнорируем ботов
                 if ((message.user || message?.member?.user).bot) return;
 
-                // Если включен режим белого списка
-                else if (db.whitelist.toggle) {
-                    // Если нет пользователя в списке просто его игнорируем
-                    if (!db.whitelist.ids.includes(message.user.id)) return;
-                }
-
                 const interact = new Interact(message);
                 const user = temple_db.get(message.user.id);
+
+                // Если включен режим белого списка
+                if (db.whitelist.toggle) {
+                    // Если нет пользователя в списке просто его игнорируем
+                    if (!db.whitelist.ids.includes(message.user.id)) {
+                        interact.fastBuilder = {
+                            description: locale._(interact.locale, "whitelist.message", [interact.author]),
+                            color: Colors.Yellow
+                        }
+
+                        return;
+                    }
+                }
 
                 // Если нет пользователя в системе ожидания
                 if (!user) {

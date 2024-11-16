@@ -7,7 +7,7 @@ import {db} from "@lib/db";
  * @author SNIPPIK
  * @description Временная база данных
  */
-const temple_db = new class extends Constructor.Collection<{guildID: string, timeout: NodeJS.Timeout}> {};
+const temple_db = new Map<string, NodeJS.Timeout>();
 
 /**
  * @author SNIPPIK
@@ -57,8 +57,8 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
 
                             // Если есть таймер для удаления очереди
                             if (temp) {
-                                clearTimeout(temp.timeout);
-                                temple_db.remove(guild.id);
+                                clearTimeout(temp);
+                                temple_db.delete(guild.id);
                             }
                         }
 
@@ -68,15 +68,10 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
                             if (queue.player.status === "player/playing") queue.player.pause();
 
                             // Если нет таймера для удаления очереди
-                            if (!temp) temple_db.set(guild.id, {
-                                guildID: guild.id,
-
-                                // Таймер удаления очереди
-                                timeout: setTimeout(() => {
-                                    if (queue) db.audio.queue.remove(guild.id);
-                                    if (voice) Voice.remove(guild.id);
-                                }, timeout * 1e3)
-                            });
+                            if (!temp) temple_db.set(guild.id, setTimeout(() => {
+                                if (queue) db.audio.queue.remove(guild.id);
+                                if (voice) Voice.remove(guild.id);
+                            }, timeout * 1e3));
                         }
                     }
 

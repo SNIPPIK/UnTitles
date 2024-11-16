@@ -135,7 +135,7 @@ class Database {
      */
     public readonly whitelist = {
         toggle: env.get("whitelist")              as boolean,
-        ids: env.get("whitelist.list").split(",") as string[]
+        ids: env.check("whitelist.list") ? env.get("whitelist.list").split(",") as string[] : []
     };
 
     /**
