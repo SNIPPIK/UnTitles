@@ -100,7 +100,7 @@ export class Queue {
      */
     public set voice(voice: Interact["voice"]) {
         // Если уже есть голосовое подключение
-        if (this.player.voice.connection) {
+        if (this.player?.voice?.connection) {
             // Удаляем старое голосовое подключение, для предотвращения утечек памяти
             this.player.voice.connection.destroy();
         }

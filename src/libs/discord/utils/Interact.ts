@@ -7,7 +7,9 @@ import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
- * @description Функции правил проверки
+ * @description Функции правил проверки, возвращает true или false
+ * @true - Разрешено
+ * @false - Запрещено
  */
 const intends: {[key: string]: (message: Interact) => boolean } = {
   "voice": (message) => {
@@ -32,24 +34,36 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
   },
   "another_voice": (message) => {
     const queue = message.queue;
-    const VoiceChannel = (message.member as GuildMember).voice?.channel;
-    const QueueVoiceChannel = queue?.message?.voice?.channel?.id;
+    const VoiceChannel = (message.member as GuildMember)?.voice?.channel;
 
     // Если музыка играет в другом голосовом канале
-    if (queue && queue.message?.voice && VoiceChannel?.id !== QueueVoiceChannel || message.guild.members.me.voice?.channel?.id !== VoiceChannel.id ) {
+    if (message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
 
-      // Если в гс есть другие пользователи, здесь нет учета других ботов
-      if (queue.voice.channel.members.size > 1) {
-        message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
-        return false;
+      // Если есть голосовое подключение к каналу
+      if (queue) {
+
+        // Если есть голосовое подключение
+        if (queue.voice && queue.voice.channel) {
+
+          // Если в гс есть другие пользователи
+          if (queue.voice.channel?.members?.size > 1) {
+            message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
+            return false;
+          }
+
+          // Если нет пользователей, то подключаемся к другому пользователю
+          else {
+            queue.voice = message.voice;
+            queue.message = message;
+            message.fastBuilder = { description: locale._(message.locale, "voice.new", [message.voice.channel]), color: Colors.Yellow };
+            return true;
+          }
+        }
       }
 
-      // Если нет пользователей в том голосовом канале
+      // Если нет очереди, но есть голосовое подключение
       else {
-        queue.voice = message.voice;
-        queue.message = message;
-        message.fastBuilder = { description: locale._(message.locale, "voice.new", [message.voice.channel]), color: Colors.Yellow };
-        return true;
+        // TODO придумать что с этом можно сделать
       }
     }
 

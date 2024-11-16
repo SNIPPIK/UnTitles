@@ -29,25 +29,25 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Хранилище треков
      * @private
      */
-    private readonly _tracks = new PlayerSongs();
+    private readonly _tracks: PlayerSongs = new PlayerSongs();
 
     /**
      * @description Хранилище аудио фильтров
      * @private
      */
-    private readonly _filters = new AudioFilters();
+    private readonly _filters: AudioFilters = new AudioFilters();
 
     /**
      * @description Управление голосовыми состояниями
      * @private
      */
-    private readonly _voice = new PlayerVoice();
+    private readonly _voice: PlayerVoice = new PlayerVoice();
 
     /**
      * @description Управление потоковым вещанием
      * @private
      */
-    private readonly _audio = new PlayerStreamSubSystem();
+    private readonly _audio: PlayerStreamSubSystem = new PlayerStreamSubSystem();
 
     /**
      * @description Делаем voice параметр публичным для использования вне класса

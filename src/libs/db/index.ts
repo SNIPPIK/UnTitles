@@ -130,6 +130,15 @@ class Database {
     };
 
     /**
+     * @description Для управления белым списком пользователей
+     * @public
+     */
+    public readonly whitelist = {
+        toggle: env.get("whitelist")              as boolean,
+        ids: env.get("whitelist.list").split(",") as string[]
+    };
+
+    /**
      * @description Выдаем класс для работы с базой фильтров
      * @public
      */

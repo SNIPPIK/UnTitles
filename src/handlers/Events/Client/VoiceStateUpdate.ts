@@ -1,7 +1,7 @@
+import {Events, VoiceChannel} from "discord.js";
 import {Constructor, Handler} from "@handler";
-import {Events} from "discord.js";
-import {db} from "@lib/db";
 import {Voice} from "@lib/voice";
+import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
@@ -25,9 +25,7 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
         super({
             name: Events.VoiceStateUpdate,
             type: "client",
-            execute: (_, oldState, newState) => setImmediate(() => {
-                //TODO данный ивент должен отслеживать именно канал очереди сервера а не все гс
-
+            execute: (client, oldState, newState) => setImmediate(() => {
                 const guild = oldState.guild || newState.guild;
                 const voice = Voice.get(guild.id);
                 const queue = db.audio.queue.get(guild.id);
@@ -84,8 +82,7 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
 
                     // Если нет очереди, но есть голосовое подключение
                     else {
-                        const channel = oldState?.channel || newState?.channel;
-                        const members = channel.members.filter(member => !member.user.bot).size;
+                        const members = (client.channels.cache.get(voice.config.channelId) as VoiceChannel).members.filter(member => !member.user.bot).size;
 
                         // Если есть пользователи
                         if (members > 0) return;

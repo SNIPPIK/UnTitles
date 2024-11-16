@@ -6,6 +6,13 @@ import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
+ * @description База данных для системы ожидания
+ * @private
+ */
+const temple_db = new Map<string, number>;
+
+/**
+ * @author SNIPPIK
  * @description Класс для взаимодействия бота с slash commands, buttons
  * @class InteractionCreate
  */
@@ -18,9 +25,38 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 // Игнорируем ботов
                 if ((message.user || message?.member?.user).bot) return;
 
+                // Если включен режим белого списка
+                else if (db.whitelist.toggle) {
+                    // Если нет пользователя в списке просто его игнорируем
+                    if (!db.whitelist.ids.includes(message.user.id)) return;
+                }
+
+                const interact = new Interact(message);
+                const user = temple_db.get(message.user.id);
+
+                // Если нет пользователя в системе ожидания
+                if (!user) {
+                    // Добавляем пользователя в систему ожидания
+                    temple_db.set(message.user.id, Date.now() + 5e3);
+                }
+
+                // Если пользователя уже в списке
+                else {
+                    // Если время еще не прошло говорим пользователю об этом
+                    if (user >= Date.now()) {
+                        interact.fastBuilder = {
+                            description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0)]),
+                            color: Colors.Yellow
+                        }
+                        return;
+                    }
+
+                    // Удаляем пользователя из базы
+                    temple_db.delete(message.user.id);
+                }
+
                 // Если пользователь использует команду
                 if (message.isCommand()) {
-                    const interact = new Interact(message);
                     const command = interact.command;
 
                     // Если нет команды
@@ -47,10 +83,9 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
                 // Если происходит взаимодействие с меню
                 else if (message.isStringSelectMenu()) {
-                    const msg = new Interact(message);
 
                     if (message.customId === "search-menu") {
-                        db.audio.queue.events.emit("request/api", msg, [message.values[0], message.values[0]]);
+                        db.audio.queue.events.emit("request/api", interact, [message.values[0], message.values[0]]);
                         message.message.delete().catch(() => {});
                         return;
                     }
@@ -61,22 +96,21 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
                 // Управление кнопками
                 else if (message.isButton()) {
-                    const msg = new Interact(message);
-                    const button = db.buttons.get(msg.custom_id as any);
+                    const button = db.buttons.get(interact.custom_id as any);
 
                     // Если пользователь не подключен к голосовым каналам и нет очереди
-                    if (!msg.voice.channel || !msg.guild.members.me.voice.channel) return;
+                    if (!interact.voice.channel || !interact.guild.members.me.voice.channel) return;
 
-                    const queue = msg.queue;
+                    const queue = interact.queue;
 
                     // Если есть очередь и пользователь не подключен к тому же голосовому каналу
-                    if (!queue || msg.voice.channel?.id !== queue.voice.channel.id) return;
+                    if (!queue || interact.voice.channel?.id !== queue.voice.channel.id) return;
 
                     // Если была найдена кнопка
-                    else if (button) button.callback(msg);
+                    else if (button) button.callback(interact);
 
                     // Если кнопка была не найдена
-                    else msg.fastBuilder = { description: locale._(msg.locale, "button.fail"), color: Colors.DarkRed };
+                    else interact.fastBuilder = { description: locale._(interact.locale, "button.fail"), color: Colors.DarkRed };
 
                     // Завершаем действие
                     return;

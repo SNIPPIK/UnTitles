@@ -35,6 +35,12 @@
   },
 
 
+  "cooldown.message": {
+    "ru": "{ARGUMENT} ты слишком часто отправляешь сообщение, охлади свой пыл!\nОсталось: <t:{ARGUMENT}>",
+    "en-US": "{ARGUMENT} you send messages too often, cool your ardor!\nRemaining: <t:{ARGUMENT}>"
+  },
+
+
 
 
 
