@@ -324,6 +324,10 @@
     "en-US": "Seeked {ARGUMENT}"
   },
 
+  "command.position": {
+    "ru": "Переход к позиции {ARGUMENT}\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**",
+    "en-US": "Jump to position {ARGUMENT}\n\n**Will be played:**\n**❯** **{ARGUMENT}**"
+  },
 
   "command.skip.arg.track": {
     "ru": "Были пропущены все треки до {ARGUMENT}\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**",

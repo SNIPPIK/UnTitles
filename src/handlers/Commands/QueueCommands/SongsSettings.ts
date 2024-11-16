@@ -5,9 +5,9 @@ import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 
 /**
- * @class SkipTracksCommand
- * @command skip
+ * @author SNIPPIK
  * @description Пропуск треков до указанного трека!
+ * @class SkipTracksCommand
  */
 class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
@@ -82,9 +82,77 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
 }
 
 /**
- * @class RemoveTrackCommand
- * @command remove
+ * @author SNIPPIK
+ * @description Возврат к конкретному треку
+ * @class BackTrackCommand
+ */
+class BackTrackCommand extends Constructor.Assign<Handler.Command> {
+    public constructor() {
+        super({
+            data: new SlashBuilder()
+                .setName({
+                    "en-US": "position",
+                    "ru": "позиция"
+                })
+                .setDescription({
+                    "en-US": "Move current track to new or past",
+                    "ru": "Переход текущего трека к новому или прошлому"
+                })
+                .addSubCommands([
+                    {
+                        names: {
+                            "en-US": "value",
+                            "ru": "число"
+                        },
+                        descriptions: {
+                            "en-US": "You need to specify the track number!",
+                            "ru": "Нужно указать номер трека!"
+                        },
+                        required: true,
+                        type: ApplicationCommandOptionType["Number"]
+                    }
+                ])
+                .json,
+            rules: ["voice", "another_voice", "queue"],
+            execute: ({message, args}) => {
+                const { guild } = message;
+                const queue = db.audio.queue.get(guild.id);
+                const {player, songs} = queue;
+                const arg = args.length > 0 ? parseInt(args.pop()) : 1;
+
+                // Если аргумент не является числом
+                if (isNaN(arg)) {
+                    message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.nan"), color: Colors.DarkRed };
+                    return;
+                }
+
+                // Если музыку нельзя пропустить из-за плеера
+                else if (!player.playing) {
+                    message.fastBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
+                    return;
+                }
+
+                // Если пользователь укажет больше чем есть в очереди или меньше
+                else if (arg > songs.total && arg < songs.total) {
+                    message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
+                    return;
+                }
+
+                const {title, url, color} = songs.get(arg > 1 ? arg : arg - 1);
+
+                // Меняем позицию трека в очереди
+                db.audio.queue.events.emit("request/time", queue, arg);
+                message.fastBuilder = { description: locale._(message.locale, "command.position", [arg, `[${title}](${url})`]), color };
+                return;
+            }
+        });
+    };
+}
+
+/**
+ * @author SNIPPIK
  * @description Удаление трека из очереди
+ * @class RemoveTrackCommand
  */
 class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
@@ -157,4 +225,4 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({SkipTracksCommand, RemoveTrackCommand});
+export default Object.values({SkipTracksCommand, BackTrackCommand, RemoveTrackCommand});
