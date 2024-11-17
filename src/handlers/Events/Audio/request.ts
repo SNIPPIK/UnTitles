@@ -113,27 +113,27 @@ class request_time extends Constructor.Assign<Handler.Event<"request/time">> {
             name: "request/time",
             type: "player",
             execute: (queue, position) => {
-                const old = queue.songs.position;
+                const old = queue.tracks.position;
 
                 // Если всего один трек в очереди
-                if (queue.songs.size === 1) {
+                if (queue.tracks.size === 1) {
                     queue.player.stop();
                     return;
                 }
 
                 // Меняем позицию трека в очереди
-                if (queue.player.audio.current.duration < queue.songs.song.time.total + 10) {
-                    queue.songs.swapPosition = position;
-                    queue.player.play(queue.songs.song);
+                if (queue.player.audio.current.duration < queue.tracks.song.time.total + 10) {
+                    queue.tracks.swapPosition = position;
+                    queue.player.play(queue.tracks.song);
 
                     // Если не получилось начать чтение следующего трека
                     queue.player.audio.current.stream.once("error", () => {
                         // Возвращаем прошлый номер трека
-                        queue.songs.swapPosition = old;
+                        queue.tracks.swapPosition = old;
                     });
                 } else {
                     // Если надо вернуть прошлый трек, но времени уже нет!
-                    if (queue.songs.position > position) queue.songs.swapPosition = position - 1;
+                    if (queue.tracks.position > position) queue.tracks.swapPosition = position - 1;
                     queue.player.stop();
                 }
             }

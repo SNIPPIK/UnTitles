@@ -30,7 +30,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 const queue = msg.queue;
 
                 // Если в очереди менее 2 треков
-                if (queue.songs.size < 2) {
+                if (queue.tracks.size < 2) {
                     msg.fastBuilder = {
                         description: locale._(msg.locale, "player.button.shuffle.fail"),
                         color: Colors.Yellow
@@ -59,7 +59,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 const queue = msg.queue;
 
                 // Если играет 1 трек
-                if (queue.songs.position === 0) {
+                if (queue.tracks.position === 0) {
                     msg.fastBuilder = {
                         description: locale._(msg.locale, "player.button.last.fail"),
                         color: Colors.Yellow
@@ -69,7 +69,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 }
 
                 // Меняем позицию трека в очереди
-                db.audio.queue.events.emit("request/time", queue, queue.songs.position - 1);
+                db.audio.queue.events.emit("request/time", queue, queue.tracks.position - 1);
 
                 // Уведомляем пользователя о смене трека
                 msg.fastBuilder = {
@@ -122,7 +122,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 const queue = msg.queue;
 
                 // Меняем позицию трека в очереди
-                db.audio.queue.events.emit("request/time", queue, queue.songs.position + 1);
+                db.audio.queue.events.emit("request/time", queue, queue.tracks.position + 1);
 
                 // Уведомляем пользователя о пропущенном треке
                 msg.fastBuilder = {
@@ -180,11 +180,11 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 const queue = msg.queue;
 
                 // Запускаем проигрывание текущего трека
-                queue.player.play(queue.songs.song);
+                queue.player.play(queue.tracks.song);
 
                 // Сообщаем о том что музыка начата с начала
                 msg.fastBuilder = {
-                    description: locale._(msg.locale, "player.button.replay", [queue.songs.song.title]),
+                    description: locale._(msg.locale, "player.button.replay", [queue.tracks.song.title]),
                     color: Colors.Green
                 };
             }
@@ -200,14 +200,14 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 const queue = msg.queue;
 
                 // Если треков менее 5
-                if (queue.songs.total < 5) {
+                if (queue.tracks.total < 5) {
                     msg.fastBuilder = { description: locale._(msg.locale, "player.button.queue.small"), color: Colors.White };
 
                     return;
                 }
 
                 // Отправляем список треков с уничтожением через 40 сек
-                msg.fastBuilder = { description: locale._(msg.locale, "player.button.queue", [queue.songs.total]), color: Colors.White };
+                msg.fastBuilder = { description: locale._(msg.locale, "player.button.queue", [queue.tracks.total]), color: Colors.White };
             }
         });
 

@@ -4,7 +4,6 @@ import {AudioResource} from "@lib/player/audio";
 import {VoiceConnection} from "@lib/voice";
 import {Track} from "@lib/player/queue";
 import {Logger} from "@lib/logger";
-import {API} from "@handler";
 import {db} from "@lib/db";
 
 /**
@@ -24,6 +23,12 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public readonly id: string = null;
+
+    /**
+     * @description Подключаем класс для отображения прогресс бара
+     * @private
+     */
+    private readonly _progress = new PlayerProgress(12);
 
     /**
      * @description Хранилище треков
@@ -113,13 +118,16 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public get progress() {
         const {platform, time} = this.tracks.song;
+        let current = this.audio?.current?.duration;
+
+        // Скорее всего трек играет следующий трек
+        if (current > time.total || !this.playing) current = 0;
 
         // Создаем прогресс бар
-        return new PlayerProgress({
-            platform: platform,
-            duration: {
-                total: time.total,
-                current: this.audio?.current?.duration ?? 0
+        return this._progress.bar({
+            platform,
+            duration: { current,
+                total: time.total
             }
         });
     };
@@ -493,70 +501,52 @@ class PlayerSongs {
 
 /**
  * @author SNIPPIK
- * @description Обработчик прогресс бара трека, создается постоянно при обновлении сообщения
+ * @description Обработчик прогресс бара трека
  * @class PlayerProgress
  */
 class PlayerProgress {
+    /**
+     * @description Размер прогресс бара
+     * @readonly
+     * @private
+     */
+    private readonly size: number = null;
+
+    /**
+     * @description Эмодзи в качестве дизайнерского решения
+     * @readonly
+     * @static
+     * @private
+     */
     private static emoji: typeof db.emojis.progress = null;
-    private readonly size = 12;
-    private readonly options = {
-        platform: null as API.platform,
-        duration: {
-            current: 0 as number,
-            total: 0 as number
-        }
-    };
 
     /**
-     * @description Получаем время плеера и текущее, для дальнейшего создания прогресс бара
-     * @private
+     * @description Создаем класс для отображения прогресс бара
+     * @param size - Размер
      */
-    private get duration() { return this.options.duration; };
-
-    /**
-     * @description Получаем эмодзи для правильного отображения
-     * @private
-     */
-    private get emoji() {
+    public constructor(size: number = 12) {
         if (!PlayerProgress.emoji) PlayerProgress.emoji = db.emojis.progress;
-        return PlayerProgress.emoji;
+        this.size = size;
     };
-
-    /**
-     * @description Получаем название платформы
-     * @private
-     */
-    private get platform() { return this.options.platform; };
-
-    /**
-     * @description Получаем эмодзи кнопки
-     * @private
-     */
-    private get bottom() { return this.emoji["bottom_" + this.platform] || this.emoji.bottom; };
 
     /**
      * @description Получаем готовый прогресс бар
      */
-    public get bar() {
-        const size =  this.size, {current, total} = this.duration, emoji = this.emoji;
+    public readonly bar = (options: {duration: {current: number; total: number}, platform: string}) => {
+        const emoji = PlayerProgress.emoji;
+        const button = emoji["bottom_" + options.platform.toLowerCase()] || emoji.bottom;
+        const {current, total} = options.duration;
+        const size = this.size;
+
         const number = Math.round(size * (isNaN(current) ? 0 : current / total));
         let txt = current > 0 ? `${emoji.upped.left}` : `${emoji.empty.left}`;
 
         //Середина дорожки + точка
         if (current === 0) txt += `${emoji.upped.center.repeat(number)}${emoji.empty.center.repeat((size + 1) - number)}`;
         else if (current >= total) txt += `${emoji.upped.center.repeat(size)}`;
-        else txt += `${emoji.upped.center.repeat(number)}${this.bottom}${emoji.empty.center.repeat(size - number)}`;
+        else txt += `${emoji.upped.center.repeat(number)}${button}${emoji.empty.center.repeat(size - number)}`;
 
         return txt + (current >= total ? `${emoji.upped.right}` : `${emoji.empty.right}`);
-    };
-
-    /**
-     * @description Создаем класс
-     * @param options - Параметры класса
-     */
-    public constructor(options: PlayerProgress["options"]) {
-        Object.assign(this.options, options);
-        this.options.platform = options.platform.toLowerCase() as any;
     };
 }
 

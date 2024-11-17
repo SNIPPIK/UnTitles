@@ -13,34 +13,46 @@ import {env} from "@env";
  * @abstract
  */
 export class Database_Audio {
-    private readonly data = {
-        queue: new AudioQueues(),
-        cycles: new Cycles(),
+    /**
+     * @description Хранилище очередей
+     * @private
+     */
+    private readonly _queue = new AudioQueues();
 
-        options: {
-            volume: parseInt(env.get("audio.volume")),
-            fade: parseInt(env.get("audio.fade"))
-        }
+    /**
+     * @description Хранилище циклов для работы музыки
+     * @private
+     */
+    private readonly _cycles = new Cycles();
+
+    /**
+     * @description Здесь хранятся модификаторы аудио
+     * @private
+     */
+    private readonly _options = {
+        volume: parseInt(env.get("audio.volume")),
+        fade: parseInt(env.get("audio.fade"))
     };
+
     /**
      * @description Получаем циклы процесса
      * @return CollectionCycles
      * @public
      */
-    public get cycles() { return this.data.cycles; };
+    public get cycles() { return this._cycles; };
 
     /**
      * @description Выдаем данные для запуска AudioResource
      * @public
      */
-    public get options() { return this.data.options; };
+    public get options() { return this._options; };
 
     /**
      * @description Получаем CollectionQueue
      * @return CollectionQueue
      * @public
      */
-    public get queue() { return this.data.queue; };
+    public get queue() { return this._queue; };
 }
 
 /**
@@ -61,7 +73,7 @@ class Cycles {
                 name: "AudioPlayer",
                 duration: 20,
                 filter: (item) => item.playing,
-                execute: (player) => {
+                execute: (player): void => {
                     if (player.voice.connection?.state?.status !== "ready" || player?.status === "player/pause") return;
                     else {
                         const packet = player.audio.current.packet;
@@ -85,7 +97,7 @@ class Cycles {
                 name: "Message",
                 duration: 30e3,
                 filter: (message) => !!message.editable,
-                execute: (message) => {
+                execute: (message): void => {
                     const {guild} = message;
                     const queue = db.audio.queue.get(guild.id);
 
@@ -102,7 +114,7 @@ class Cycles {
                     push: (item) => {
                         const old = this.array.find(msg => msg.guild.id === item.guild.id);
 
-                        // Если это-же сообщение есть в базе, то нечего не делаем
+                        // Удаляем прошлое сообщение
                         if (old) this.remove(old);
                     }
                 },
@@ -168,14 +180,14 @@ class AudioQueues extends Constructor.Collection<Queue> {
         if (!queue) queue = new Queue(message);
 
         // Отправляем сообщение о том что было добавлено
-        else if ((item instanceof Track && queue.songs.size >= 1) || "items" in item) {
+        else if ((item instanceof Track && queue.tracks.size >= 1) || "items" in item) {
             db.audio.queue.events.emit("message/push", message, item);
         }
 
         // Добавляем треки в очередь
         for (const track of (item["items"] ?? [item]) as Track[]) {
             track.user = message.author;
-            queue.songs.push(track);
+            queue.tracks.push(track);
         }
     };
 }

@@ -55,12 +55,36 @@ export const Voice = new class Voice extends Constructor.Collection<VoiceConnect
  * @description Подключение к голосовому серверу Гильдии может использоваться для воспроизведения аудио в голосовых каналах.
  */
 export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
-    private _state: VoiceConnectionState;
+    /**
+     * @description Конфигурация голосового подключения
+     * @private
+     */
     private readonly _config: VoiceConfig;
+
+    /**
+     * @description Текущее состояние голосового подключения
+     * @private
+     */
+    private _state: VoiceConnectionState;
+
+    /**
+     * @description Пакеты для работы с голосовым подключением
+     * @private
+     */
     private readonly _packets = {
+        /**
+         * @description Пакет состояния на сервере
+         * @private
+         */
         server: undefined as GatewayVoiceServerUpdateDispatchData,
+
+        /**
+         * @description Пакет текущего состояния
+         * @private
+         */
         state: undefined  as GatewayVoiceStateUpdateDispatchData
     };
+
     /**
      * @description Текущий VoiceConfig
      * @public
@@ -90,13 +114,17 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             }
         );
 
-        //В случае уничтожения адаптер также может быть уничтожен, чтобы пользователь мог его очистить
-        if (oldState.status !== VoiceConnectionStatus.Destroyed && newState.status === VoiceConnectionStatus.Destroyed) oldState.adapter.destroy();
+        // Уничтожаем старый адаптер
+        if (oldState.status !== VoiceConnectionStatus.Destroyed && newState.status === VoiceConnectionStatus.Destroyed) {
+            oldState.adapter.destroy();
+        }
 
         this._state = newState;
 
-        this.emit("stateChange", oldState, newState);
-        if (oldState.status !== newState.status) this.emit(newState.status as any, oldState, newState);
+        // Меняем текущий статус
+        if (oldState.status !== newState.status) {
+            this.emit(newState.status as any, oldState, newState);
+        }
     };
 
     /**
@@ -106,7 +134,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public set speak(enabled: boolean) {
+        // Если голосовое подключение еще не готово
         if (this.state.status !== VoiceConnectionStatus.Ready) return;
+
+        // Меняем параметр голоса на указанный
         this.state.networking.speaking = enabled;
     };
 
@@ -163,7 +194,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public playOpusPacket = (buffer: Buffer) => {
+        // Если голосовое подключение еще не готово
         if (this.state.status !== VoiceConnectionStatus.Ready) return;
+
+        // Отправляем пакет
         this.state.networking.playAudioPacket = buffer;
     };
 
@@ -177,11 +211,13 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         this._config.channelId = null;
 
+        // Отправляем в discord сообщение об отключении бота
         if (!this.state.adapter.sendPayload(Voice.payload(this.config))) {
             this.state = { adapter: this.state.adapter, status: VoiceConnectionStatus.Disconnected, reason: VoiceConnectionDisconnectReason.AdapterUnavailable };
             return false;
         }
 
+        // Меняем статус на VoiceConnectionStatus.Disconnected
         this.state = { adapter: this.state.adapter, reason: VoiceConnectionDisconnectReason.Manual, status: VoiceConnectionStatus.Disconnected };
         return true;
     };
@@ -201,18 +237,20 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public rejoin = (joinConfig?: VoiceConfig) => {
+        const state = this.state;
+
         // Если статус не дает переподключиться
-        if (this.state.status === VoiceConnectionStatus.Destroyed) return false;
+        if (state.status === VoiceConnectionStatus.Destroyed) return false;
 
         // Если еще можно переподключиться
-        if (this.state.adapter.sendPayload(Voice.payload(this.config))) {
-            if (this.state.status !== VoiceConnectionStatus.Ready) this.state = { ...this.state, status: VoiceConnectionStatus.Signalling };
+        if (state.adapter.sendPayload(Voice.payload(this.config))) {
+            if (this.state.status !== VoiceConnectionStatus.Ready) this.state = { ...state, status: VoiceConnectionStatus.Signalling };
             return true;
         }
 
         // Если надо создать новое голосовое подключение
         this.state = {
-            adapter: this.state.adapter,
+            adapter: state.adapter,
             status: VoiceConnectionStatus.Disconnected,
             reason: VoiceConnectionDisconnectReason.AdapterUnavailable
         };
@@ -235,20 +273,23 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @private
      */
     private readonly onSocketClose = (code: number) => {
-        if (this.state.status === VoiceConnectionStatus.Destroyed) return;
+        const state = this.state;
 
-        //Если подключение к сети завершится, попробуйте снова подключиться к голосовому каналу.
+        // Если голосовое подключение уже уничтожено
+        if (state.status === VoiceConnectionStatus.Destroyed) return;
+
+        // Если подключение к сети завершится, пробуем снова подключиться к голосовому каналу.
         if (code === 4_014) {
-            //Отключен - сеть здесь уже разрушена
-            this.state = { ...this.state, closeCode: code,
+            // Отключен - сеть здесь уже разрушена
+            this.state = { ...state, closeCode: code,
                 status: VoiceConnectionStatus.Disconnected,
                 reason: VoiceConnectionDisconnectReason.WebSocketClose
             };
         } else {
-            this.state = { ...this.state, status: VoiceConnectionStatus.Signalling };
+            this.state = { ...state, status: VoiceConnectionStatus.Signalling };
 
-            if (!this.state.adapter.sendPayload(Voice.payload(this.config))) this.state = {
-                ...this.state, status: VoiceConnectionStatus.Disconnected,
+            if (!state.adapter.sendPayload(Voice.payload(this.config))) this.state = {
+                ...state, status: VoiceConnectionStatus.Disconnected,
                 reason: VoiceConnectionDisconnectReason.AdapterUnavailable
             };
         }
@@ -261,9 +302,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @private
      */
     private readonly onSocketStateChange = (oldState: VoiceSocketState, newState: VoiceSocketState) => {
-        if (oldState.code === newState.code || this.state.status !== VoiceConnectionStatus.Connecting && this.state.status !== VoiceConnectionStatus.Ready) return;
-        if (newState.code === VoiceSocketStatusCode.ready) this.state = { ...this.state, status: VoiceConnectionStatus.Ready };
-        else if (newState.code !== VoiceSocketStatusCode.close) this.state = { ...this.state, status: VoiceConnectionStatus.Connecting };
+        const state = this.state;
+
+        if (oldState.code === newState.code || state.status !== VoiceConnectionStatus.Connecting && state.status !== VoiceConnectionStatus.Ready) return;
+        if (newState.code === VoiceSocketStatusCode.ready) this.state = { ...state, status: VoiceConnectionStatus.Ready };
+        else if (newState.code !== VoiceSocketStatusCode.close) this.state = { ...state, status: VoiceConnectionStatus.Connecting };
     };
 
     /**
@@ -282,11 +325,13 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @private
      */
     private readonly addServerPacket = (packet: GatewayVoiceServerUpdateDispatchData) => {
+        const state = this.state;
+
         this._packets.server = packet;
 
         if (packet.endpoint) this.configureSocket();
-        else if (this.state.status !== VoiceConnectionStatus.Destroyed) {
-            this.state = { ...this.state, status: VoiceConnectionStatus.Disconnected, reason: VoiceConnectionDisconnectReason.EndpointRemoved };
+        else if (state.status !== VoiceConnectionStatus.Destroyed) {
+            this.state = { ...state, status: VoiceConnectionStatus.Disconnected, reason: VoiceConnectionDisconnectReason.EndpointRemoved };
         }
     };
 
@@ -298,10 +343,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      */
     private readonly addStatePacket = (packet: GatewayVoiceStateUpdateDispatchData) => {
         this._packets.state = packet;
-
-        if (packet.self_deaf)  this._config.selfDeaf  = packet.self_deaf;
-        if (packet.self_mute)  this._config.selfMute  = packet.self_mute;
-        if (packet.channel_id) this._config.channelId = packet.channel_id;
+        Object.assign(this._config, packet);
     };
 
     /**
@@ -312,8 +354,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public destroy = (adapterAvailable = false) => {
-        if (this.state.status === VoiceConnectionStatus.Destroyed) throw new Error("Cannot destroy VoiceConnection - it has already been destroyed");
-        if (adapterAvailable) this.state.adapter.sendPayload(Voice.payload(this.config));
+        const state = this.state;
+
+        if (state.status === VoiceConnectionStatus.Destroyed) throw new Error("Cannot destroy VoiceConnection - it has already been destroyed");
+        if (adapterAvailable) state.adapter.sendPayload(Voice.payload(this.config));
 
         this.state = { status: VoiceConnectionStatus.Destroyed };
     };

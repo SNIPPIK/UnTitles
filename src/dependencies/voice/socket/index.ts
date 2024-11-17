@@ -88,9 +88,27 @@ const socketStatus = [
  * @class VoiceSocket
  */
 export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
+    /**
+     * @description Текущий статус подключения
+     * @private
+     */
     private _state: VoiceSocketState = {
+        /**
+         * @description Код подключения
+         * @private
+         */
         code: VoiceSocketStatusCode.upWS,
+
+        /**
+         * @description Данные подключения
+         * @private
+         */
         connectionOptions: null,
+
+        /**
+         * @description Класс WebSocket
+         * @private
+         */
         ws: null
     };
     /**
@@ -143,8 +161,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
             d: {
                 speaking: speaking ? 1 : 0,
                 delay: 0,
-                ssrc: state.connectionData.ssrc,
-            },
+                ssrc: state.connectionData.ssrc
+            }
         };
     };
 
@@ -162,7 +180,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
 
         // Если есть готовый пакет для отправки
         if (opusPacket) {
-            const {connectionData} = state;
+            const {connectionData, udp} = state;
             connectionData.packetsPlayed++;
             connectionData.sequence++;
             connectionData.timestamp += TIMESTAMP_INC;
@@ -170,10 +188,11 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
             if (connectionData.sequence >= 2 ** 16) connectionData.sequence = 0;
             else if (connectionData.timestamp >= 2 ** 32) connectionData.timestamp = 0;
 
+            // Принудительно включаем передачу голоса
             this.speaking = true;
 
             // Зашифровываем пакет для отправки на сервера discord
-            state.udp.packet = Encryption.packet(opusPacket, state.connectionData);
+            udp.packet = Encryption.packet(opusPacket, connectionData);
         }
     };
 
@@ -210,7 +229,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
         const isWs = state.code === VoiceSocketStatusCode.upWS;
 
         if (isResume || isWs) {
-            if (isWs) this.state = { ...this.state, code: VoiceSocketStatusCode.identify } as IdentifyState;
+            if (isWs) this.state = { ...state, code: VoiceSocketStatusCode.identify } as IdentifyState;
 
             state.ws.packet = {
                 op: isResume ? VoiceOpcodes.Resume : VoiceOpcodes.Identify,
@@ -218,7 +237,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                     server_id: state.connectionOptions.serverId,
                     session_id: state.connectionOptions.sessionId,
                     user_id: isWs ? state.connectionOptions.userId : null,
-                    token: state.connectionOptions.token,
+                    token: state.connectionOptions.token
                 }
             };
         }
@@ -251,15 +270,18 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
     };
 
     /**
-     * @description Вызывается при получении пакета на WebSocket соединения.
+     * @description Вызывается при получении пакета от WebSocket
      * @param packet - Полученный пакет
      * @private
      */
     private readonly WebSocketPacket = (packet: {d: any, op: VoiceOpcodes}): void => {
-        const status = socketStatus.find((item) => item.name === packet.op);
-
-        // Если есть возможность выполнить функцию
-        if (status && status.callback) status.callback(this, packet);
+        for (const status of socketStatus) {
+            // Если найден подходящий статус
+            if (status.name === packet.op) {
+                // Если есть возможность выполнить функцию
+                if (status && status.callback) status.callback(this, packet);
+            }
+        }
     };
 
     /**
@@ -278,9 +300,11 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @readonly
      */
     private readonly UDPClose = (): void => {
+        const state = this.state;
+
         // Если статус код соответствует с VoiceSocketStatusCode.ready, то возобновляем работу
-        if (this.state.code === VoiceSocketStatusCode.ready) this.state = { ...this.state,
-            ws: this.createWebSocket(this.state.connectionOptions.endpoint),
+        if (state.code === VoiceSocketStatusCode.ready) this.state = { ...state,
+            ws: this.createWebSocket(state.connectionOptions.endpoint),
             code: VoiceSocketStatusCode.resume
         };
     };

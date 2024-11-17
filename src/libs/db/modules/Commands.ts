@@ -3,6 +3,10 @@ import {Client} from "@lib/discord";
 import {Logger} from "@lib/logger";
 
 export class Database_Commands<T extends Handler.Command> extends Array<T> {
+    /**
+     * @description Доп команды, бывают команды, которые могут содержать несколько доп команд
+     * @public
+     */
     public subCommands = 0;
 
     /**

@@ -56,25 +56,25 @@ export class Queue {
     private readonly _data = {
         /**
          * @description Тип повтора
-         * @public
+         * @private
          */
         repeat:     "off" as "off" | "song" | "songs",
 
         /**
          * @description Смешивание треков
-         * @public
+         * @private
          */
         shuffle:    false as boolean,
 
         /**
          * @description Сообщение пользователя
-         * @public
+         * @private
          */
         message:    null as Interact,
 
         /**
          * @description Плеер для проигрывания музыки
-         * @public
+         * @private
          */
         player:     null as ExtraPlayer
     };
@@ -121,7 +121,7 @@ export class Queue {
      * @description Получаем доступ к трекам
      * @public
      */
-    public get songs() {
+    public get tracks() {
         if (!this._data.player) return;
         return this._data.player.tracks;
     };
@@ -176,12 +176,12 @@ export class Queue {
         else Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 2 });
 
         // Если это первый трек в списке, то не позволяем пользователям возвращать трек
-        if (this.songs.position > 0) Object.assign(first[1], { disabled: false, style: 3 });
+        if (this.tracks.position > 0) Object.assign(first[1], { disabled: false, style: 3 });
         else Object.assign(first[1], { disabled: true });
 
 
         // Ограничиваем кнопку очередь
-        if (this.songs.size > 5) {
+        if (this.tracks.size > 5) {
             Object.assign(two[0], { disabled: false });
         } else {
             Object.assign(two[0], { disabled: true });
@@ -189,7 +189,7 @@ export class Queue {
 
         // Если есть еще треки, то можно будет посмотреть очередь
         // Если всего один трек, то не позволяем его пропустить
-        if (this.songs.size > 1) {
+        if (this.tracks.size > 1) {
             Object.assign(first[0], { disabled: false });
             Object.assign(first[3], { disabled: false, style: 3 });
             Object.assign(two[1], { disabled: false });
@@ -243,7 +243,7 @@ export class Queue {
 
         // В конце функции выполнить запуск проигрывания
         setImmediate(() => {
-            this.player.play(this.songs.song);
+            this.player.play(this.tracks.song);
         });
     };
 

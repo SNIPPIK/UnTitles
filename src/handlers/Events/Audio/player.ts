@@ -37,22 +37,22 @@ class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
                 const queue = db.audio.queue.get(player.id);
 
                 // Если нет треков в очереди
-                if (!queue?.songs?.song || !queue.player) return db.audio.queue.remove(player.id);
+                if (!queue?.tracks?.song || !queue.player) return db.audio.queue.remove(player.id);
 
                 // Проверяем надо ли удалить из очереди трек
                 if (queue.repeat === "off" || queue.repeat === "songs") {
                     // Смена трек на следующий
-                    queue.songs.swapPosition = queue.songs.position + 1;
+                    queue.tracks.swapPosition = queue.tracks.position + 1;
 
                     // Если включен повтор и нет больше треков, значит включаем обратно все треки
-                    if (queue.repeat === "songs" && queue.songs.position >= queue.songs.total) queue.songs.swapPosition = 0;
+                    if (queue.repeat === "songs" && queue.tracks.position >= queue.tracks.total) queue.tracks.swapPosition = 0;
                 }
 
                 // Проверяем надо ли перетасовывать очередь
-                if (queue.shuffle && queue.repeat === "off") queue.songs.shuffle();
+                if (queue.shuffle && queue.repeat === "off") queue.tracks.shuffle();
 
                 // Получаем ссылки на трек и проигрываем ее
-                setTimeout(() => queue.player.play(queue.songs.song), 2e3);
+                setTimeout(() => queue.player.play(queue.tracks.song), 2e3);
             }
         });
     };
@@ -79,7 +79,7 @@ class player_error extends Constructor.Assign<Handler.Event<"player/error">> {
                 if (crash) db.audio.queue.remove(queue.guild.id);
                 else {
                     // Заставляем плеер пропустить этот трек
-                    if (queue.songs.size > 0) player.status = "player/ended";
+                    if (queue.tracks.size > 0) player.status = "player/ended";
                 }
 
                 // Выводим сообщение об ошибке

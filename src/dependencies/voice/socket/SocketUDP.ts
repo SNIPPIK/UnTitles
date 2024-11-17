@@ -9,8 +9,29 @@ import {isIPv4} from "node:net";
  * @class VoiceUDPSocket
  */
 export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
-    private readonly remote: {ip: string; port: number} = {ip: null, port: 443};
+    /**
+     * @description Socket UDP подключения
+     * @private
+     */
     private readonly socket: Socket = createSocket("udp4");
+
+    /**
+     * @description Данные сервера к которому надо подключится
+     * @private
+     */
+    private readonly remote = {
+        /**
+         * @description Прямой ip сервера
+         * @private
+         */
+        ip: null,
+
+        /**
+         * @description Порт сервера
+         * @private
+         */
+        port: 443
+    };
 
     /**
      * @description Отправляем буфер в Discord
@@ -61,7 +82,9 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
                         const packet = Buffer.from(msg);
                         const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
 
-                        if (!isIPv4(ip)) return reject(new Error("Malformed IP address"));
+                        // Если нет IPv4
+                        if (!isIPv4(ip)) return reject(new Error("Not found IPv4 address"));
+
                         return resolve({ip, port: packet.readUInt16BE(packet.length - 2)});
                     } catch {
                         return resolve(null);

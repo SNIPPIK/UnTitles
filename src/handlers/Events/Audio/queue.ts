@@ -16,9 +16,9 @@ class message_error extends Constructor.Assign<Handler.Event<"message/error">> {
             name: "message/error",
             type: "player",
             execute: (queue, error) => {
-                if (queue?.songs || queue?.songs!.song) return;
+                if (queue?.tracks || queue?.tracks!.song) return;
 
-                const {color, artist, image, title, user} = queue.songs.song;
+                const {color, artist, image, title, user} = queue.tracks.song;
                 new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image, timestamp: new Date(),
@@ -34,7 +34,7 @@ class message_error extends Constructor.Assign<Handler.Event<"message/error">> {
                         ],
                         author: {name: artist.title, url: artist.url, iconURL: db.emojis.diskImage},
                         footer: {
-                            text: `${user.username} | ${queue.songs.time} | 🎶: ${queue.songs.size}`,
+                            text: `${user.username} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
                             iconURL: user?.avatar
                         }
                     }
@@ -142,7 +142,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
             name: "message/playing",
             type: "player",
             execute: (queue, message) => {
-                const {color, artist, image, title, url, time, platform} = queue.songs.song;
+                const {color, artist, image, title, url, time, platform} = queue.tracks.song;
                 const embed = new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image,
@@ -156,13 +156,13 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                             },
 
                             //Следующий трек или треки
-                            queue.songs.size > 1 ? (() => {
-                                const tracks = queue.songs.next().map((track, index) => {
+                            queue.tracks.size > 1 ? (() => {
+                                const tracks = queue.tracks.next().map((track, index) => {
                                     return `\`${index + 2}\` ${track.titleReplaced}`;
                                 });
 
-                                if (queue.songs.size > 5) return {
-                                    name: locale._(queue.message.locale, "player.next.playing.alt", [queue.songs.size]),
+                                if (queue.tracks.size > 5) return {
+                                    name: locale._(queue.message.locale, "player.next.playing.alt", [queue.tracks.size]),
                                     value: tracks.join("\n")
                                 };
                                 return {name: locale._(queue.message.locale, "player.next.playing"), value: tracks.join("\n")};
@@ -173,7 +173,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                                 name: "",
                                 value: (() => {
                                     const current = queue.player.audio?.current?.duration || 0;
-                                    return `\n\`\`${current.duration()}\`\` ${queue.player.progress.bar} \`\`${time.split}\`\``;
+                                    return `\n\`\`${current.duration()}\`\` ${queue.player.progress} \`\`${time.split}\`\``;
                                 })()
                             }
                         ]
