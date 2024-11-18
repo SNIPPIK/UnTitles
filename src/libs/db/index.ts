@@ -1,4 +1,5 @@
 import {Database_Commands} from "@lib/db/modules/Commands";
+import {Database_Buttons} from "@lib/db/modules/Buttons";
 import {ExtraFilters} from "@lib/db/utils/AudioFilters";
 import {Database_Audio} from "@lib/db/modules/Audio";
 import {Database_APIs} from "@lib/db/modules/APIs";
@@ -6,7 +7,6 @@ import {API, Handler} from "@handler";
 import {Client} from "@lib/discord";
 import {Logger} from "@lib/logger";
 import {env} from "@env";
-import {Database_Buttons} from "@lib/db/modules/Buttons";
 
 /**
  * @author SNIPPIK
@@ -221,8 +221,7 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
         callback: (_, item: Handler.Command) => {
             if (item.data.options) {
                 for (const option of item.data.options) {
-                    if ("options" in option)
-                        db.commands.subCommands += option.options.length;
+                    if ("options" in option) db.commands.subCommands += option.options.length;
                 }
                 db.commands.subCommands += item.data.options.length;
             }
