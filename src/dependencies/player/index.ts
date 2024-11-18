@@ -287,6 +287,30 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
+     * @description Работает по принципу stop, но с плавным переходом
+     * @param position - номер трека
+     */
+    public stop_fade = (position: number) => {
+        const old = this.tracks.position;
+
+        // Меняем позицию трека в очереди
+        if (this.audio.current.duration < this.tracks.song.time.total + 10) {
+            this.tracks.swapPosition = position;
+            this.play(this.tracks.song);
+
+            // Если не получилось начать чтение следующего трека
+            this.audio.current.stream.once("error", () => {
+                // Возвращаем прошлый номер трека
+                this.tracks.swapPosition = old;
+            });
+        } else {
+            // Если надо вернуть прошлый трек, но времени уже нет!
+            if (this.tracks.position > position) this.tracks.swapPosition = position - 1;
+            this.stop();
+        }
+    };
+
+    /**
      * @description Удаляем ненужные данные
      * @public
      */

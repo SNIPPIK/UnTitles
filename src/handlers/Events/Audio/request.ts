@@ -104,45 +104,6 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
 
 /**
  * @author SNIPPIK
- * @description Проверяем можно ли включить трек с плавным проигрыванием
- * @class userRequestTime
- */
-class request_time extends Constructor.Assign<Handler.Event<"request/time">> {
-    public constructor() {
-        super({
-            name: "request/time",
-            type: "player",
-            execute: (queue, position) => {
-                const old = queue.tracks.position;
-
-                // Если всего один трек в очереди
-                if (queue.tracks.size === 1) {
-                    queue.player.stop();
-                    return;
-                }
-
-                // Меняем позицию трека в очереди
-                if (queue.player.audio.current.duration < queue.tracks.song.time.total + 10) {
-                    queue.tracks.swapPosition = position;
-                    queue.player.play(queue.tracks.song);
-
-                    // Если не получилось начать чтение следующего трека
-                    queue.player.audio.current.stream.once("error", () => {
-                        // Возвращаем прошлый номер трека
-                        queue.tracks.swapPosition = old;
-                    });
-                } else {
-                    // Если надо вернуть прошлый трек, но времени уже нет!
-                    if (queue.tracks.position > position) queue.tracks.swapPosition = position - 1;
-                    queue.player.stop();
-                }
-            }
-        });
-    };
-}
-
-/**
- * @author SNIPPIK
  * @description Если при выполнении запроса пользователя произошла ошибка
  * @class userRequestError
  */
@@ -168,4 +129,4 @@ class request_error extends Constructor.Assign<Handler.Event<"request/error">> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({request_api, request_time, request_error});
+export default Object.values({request_api, request_error});

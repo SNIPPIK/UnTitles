@@ -218,7 +218,4 @@ export interface CollectionAudioEvents {
 
     // Если во время добавления трека или плейлиста произошла ошибка
     "request/error": (message: Interact, error: string, replied?: boolean, color?: "DarkRed" | "Yellow") => void;
-
-    // Включен трека при условии, что уже включен трек
-    "request/time": (queue: Queue, position: number) => void;
 }

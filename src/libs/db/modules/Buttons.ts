@@ -3,7 +3,6 @@ import {Constructor} from "@handler";
 import {locale} from "@lib/locale";
 import {Colors} from "discord.js";
 import {Voice} from "@lib/voice";
-import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
@@ -69,7 +68,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 }
 
                 // Меняем позицию трека в очереди
-                db.audio.queue.events.emit("request/time", queue, queue.tracks.position - 1);
+                queue.player.stop_fade(queue.tracks.position - 1);
 
                 // Уведомляем пользователя о смене трека
                 msg.fastBuilder = {
@@ -122,7 +121,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 const queue = msg.queue;
 
                 // Меняем позицию трека в очереди
-                db.audio.queue.events.emit("request/time", queue, queue.tracks.position + 1);
+                queue.player.stop_fade(queue.tracks.position + 1);
 
                 // Уведомляем пользователя о пропущенном треке
                 msg.fastBuilder = {
@@ -144,21 +143,14 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 if (loop === "off") {
                     queue.repeat = "songs";
 
-                    msg.fastBuilder = {
-                        description: locale._(msg.locale, "player.button.repeat.songs"),
-                        color: Colors.Green
-                    }
+                    msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.songs"), color: Colors.Green };
                     return;
                 }
 
                 // Включение повтора трека
                 else if (loop === "songs") {
                     queue.repeat = "song";
-
-                    msg.fastBuilder = {
-                        description: locale._(msg.locale, "player.button.repeat.song"),
-                        color: Colors.Green
-                    }
+                    msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.song"), color: Colors.Green };
                     return;
                 }
 
@@ -202,7 +194,6 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 // Если треков менее 5
                 if (queue.tracks.total < 5) {
                     msg.fastBuilder = { description: locale._(msg.locale, "player.button.queue.small"), color: Colors.White };
-
                     return;
                 }
 
@@ -224,7 +215,6 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 // Если нет фильтров
                 if (filters.length === 0) {
                     msg.fastBuilder = { description: locale._(msg.locale, "player.button.filter.zero"), color: Colors.White };
-
                     return;
                 }
 
