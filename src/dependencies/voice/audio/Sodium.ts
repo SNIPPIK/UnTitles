@@ -1,49 +1,53 @@
 import {ConnectionData} from "../socket";
 import {Buffer} from "node:buffer";
+import crypto from "node:crypto";
 
 /**
  * @author SNIPPIK
- * @description Доступные библиотеки для включения
+ * @description Поддерживаемые библиотеки
  */
-const SodiumLibs = {
-    "sodium-native": (sodium: any): Methods => ({
-        open(buffer, nonce, secretKey) {
-            if (buffer) {
-                const output = Buffer.allocUnsafe(buffer.length - sodium.crypto_box_MACBYTES);
-                if (sodium.crypto_secretbox_open_easy(output, buffer, nonce, secretKey)) return output;
-            }
+const support_libs: Methods.supported = {
+    "sodium": (lib) => ({
+        crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText, additionalData, nonce, key) => {
+            const message = Buffer.alloc(cipherText.length - lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
+            lib.crypto_aead_xchacha20poly1305_ietf_decrypt(message, null, cipherText, additionalData, nonce, key);
+            return message;
+        },
+        crypto_aead_xchacha20poly1305_ietf_encrypt: (plaintext, additionalData, nonce, key) => {
+            const cipherText = Buffer.alloc(plaintext.length + lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
+            lib.crypto_aead_xchacha20poly1305_ietf_encrypt(cipherText, plaintext, additionalData, null, nonce, key);
+            return cipherText;
+        }
+    }),
 
-            return null;
+    "sodium-native": (lib) => ({
+        crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText, additionalData, nonce, key) => {
+            const message = Buffer.alloc(cipherText.length - lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
+            lib.crypto_aead_xchacha20poly1305_ietf_decrypt(message, null, cipherText, additionalData, nonce, key);
+            return message;
         },
-        random(num: number, buffer: Buffer = Buffer.allocUnsafe(num)) {
-            sodium.randombytes_buf(buffer);
-            return buffer;
-        },
-        close: (opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array) => {
-            const output = Buffer.allocUnsafe(opusPacket.length + sodium.crypto_box_MACBYTES);
-            sodium.crypto_secretbox_easy(output, opusPacket, nonce, secretKey);
-            return output;
+        crypto_aead_xchacha20poly1305_ietf_encrypt: (plaintext, additionalData, nonce, key) => {
+            const cipherText = Buffer.alloc(plaintext.length + lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
+            lib.crypto_aead_xchacha20poly1305_ietf_encrypt(cipherText, plaintext, additionalData, null, nonce, key);
+            return cipherText;
         }
     }),
-    "sodium": (sodium: any): Methods => ({
-        open: sodium.api.crypto_secretbox_open_easy,
-        close: sodium.api.crypto_secretbox_easy,
-        random: (num, buffer: Buffer = Buffer.allocUnsafe(num)) => {
-            sodium.api.randombytes_buf(buffer);
-            return buffer;
+
+    "libsodium-wrappers": (lib) => ({
+        crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike) => {
+            return lib.crypto_aead_xchacha20poly1305_ietf_decrypt(null, cipherText, additionalData, nonce, key);
+        },
+        crypto_aead_xchacha20poly1305_ietf_encrypt: (plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike) => {
+            return lib.crypto_aead_xchacha20poly1305_ietf_encrypt(plaintext, additionalData, null, nonce, key);
         }
-    }),
-    "libsodium-wrappers": (sodium: any): Methods => ({
-        open: sodium.crypto_secretbox_open_easy,
-        close: sodium.crypto_secretbox_easy,
-        random: sodium.randombytes_buf,
-    }),
-    "tweetnacl": (tweetnacl: any): Methods => ({
-        open: tweetnacl.secretbox.open,
-        close: tweetnacl.secretbox,
-        random: tweetnacl.randomBytes,
     })
-}, Sodium: Methods = {};
+};
+
+/**
+ * @author SNIPPIK
+ * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
+ */
+const loaded_lib: Methods.supported = {};
 
 /**
  * @description Максимальный размер пакета
@@ -53,28 +57,14 @@ const MAX_NONCE_SIZE = 2 ** 32 - 1;
 /**
  * @description Доступные заголовки для отправки opus пакетов
  */
-const SUPPORTED_ENCRYPTION_MODES = [ "_lite", "_suffix", ""].map(item => `xsalsa20_poly1305${item}`);
+const SUPPORTED_ENCRYPTION_MODES = [
+    "aead_xchacha20_poly1305_rtpsize",
 
-/**
- * @author SNIPPIK
- * @description Делаем проверку на наличие библиотек Sodium
- */
-(async () => {
-    const names = Object.keys(SodiumLibs), libs = `\n - ${names.join("\n - ")}`;
-
-    for (const name of names) {
-        try {
-            const library = require(name);
-            if (library?.ready) await library.ready;
-
-            Object.assign(Sodium, SodiumLibs[name](library));
-            delete require.cache[require.resolve(name)];
-            return;
-        } catch {}
-    }
-
-    throw Error(`[Critical]: No encryption package is installed. Set one to choose from. ${libs}`);
-})();
+    // Старые модификаторы
+    "xsalsa20_poly1305",
+    "xsalsa20_poly1305_lite",
+    "xsalsa20_poly1305_suffix"
+];
 
 /**
  * @author SNIPPIK
@@ -88,41 +78,59 @@ export class Encryption {
      * @param connectionData - Текущие данные подключения экземпляра
      */
     public static packet = (packet: Buffer, connectionData: ConnectionData) => {
-        const {sequence, timestamp, ssrc} = connectionData;
+        const rtp_packet = Buffer.alloc(12);
+        rtp_packet[0] = 0x80;
+        rtp_packet[1] = 0x78;
 
-        const opusPacket = Buffer.alloc(12);
-        opusPacket[0] = 0x80;
-        opusPacket[1] = 0x78;
+        const { sequence, timestamp, ssrc } = connectionData;
 
-        opusPacket.writeUIntBE(sequence, 2, 2);
-        opusPacket.writeUIntBE(timestamp, 4, 4);
-        opusPacket.writeUIntBE(ssrc, 8, 4);
-        opusPacket.copy(Buffer.alloc(24), 0, 0, 12);
+        rtp_packet.writeUIntBE(sequence, 2, 2);
+        rtp_packet.writeUIntBE(timestamp, 4, 4);
+        rtp_packet.writeUIntBE(ssrc, 8, 4);
 
-        return Buffer.concat([opusPacket, ...Encryption.crypto(packet, connectionData)]);
+        rtp_packet.copy(Buffer.alloc(24), 0, 0, 12);
+        return Buffer.concat([rtp_packet, ...this.crypto(packet, connectionData, rtp_packet)]);
     };
 
     /**
      * @description Шифрует пакет Opus, используя формат, согласованный экземпляром и Discord.
      * @param packet - Пакет Opus для шифрования
      * @param connectionData - Текущие данные подключения экземпляра
+     * @param additionalData
      */
-    private static crypto = (packet: Buffer, connectionData: ConnectionData) => {
-        const {secretKey, encryptionMode} = connectionData;
+    private static crypto = (packet: Buffer, connectionData: ConnectionData, additionalData: Buffer) => {
+        const { secretKey, encryptionMode } = connectionData;
 
-        //Режимы расшифровщики
+        // Оба поддерживаемых метода шифрования требуют, чтобы одноразовое число было инкрементным целым числом.
+        connectionData.nonce++;
+        if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
+        connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
+
+        // 4 дополнительных байта заполнения в конце зашифрованного пакета
+        const noncePadding = connectionData.nonceBuffer.subarray(0, 4);
         switch (encryptionMode) {
+            /**
+             * @description Новые методы шифрования
+             */
+            case "aead_aes256_gcm_rtpsize": {
+                const cipher = crypto.createCipheriv('aes-256-gcm', secretKey, connectionData.nonceBuffer);
+                cipher.setAAD(additionalData);
+                return [Buffer.concat([cipher.update(packet), cipher.final(), cipher.getAuthTag()]), noncePadding];
+            }
+            case "aead_xchacha20_poly1305_rtpsize": {
+                return [(loaded_lib as Methods._new).crypto_aead_xchacha20poly1305_ietf_encrypt(packet, additionalData, connectionData.nonceBuffer, secretKey), noncePadding];
+            }
+
+            /**
+             * @description Старые методы шифрования
+             */
             case "xsalsa20_poly1305_suffix": {
-                const random = Sodium.random(24, connectionData.nonceBuffer);
-                return [Sodium.close(packet, random, secretKey), random];
+                const random = (loaded_lib as Methods._old).random(24, connectionData.nonceBuffer);
+                return [(loaded_lib as Methods._old).close(packet, random, secretKey), random];
             }
             case "xsalsa20_poly1305_lite": {
-                connectionData.nonce++;
-                if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
-                connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
-                return [Sodium.close(packet, connectionData.nonceBuffer, secretKey), connectionData.nonceBuffer.subarray(0, 4)];
+                return [(loaded_lib as Methods._old).close(packet, connectionData.nonceBuffer, secretKey), noncePadding];
             }
-            default: return [Sodium.close(packet, Buffer.alloc(24), secretKey)];
         }
     }
 
@@ -147,10 +155,56 @@ export class Encryption {
 }
 
 /**
- * @description Выдаваемы методы для работы voice
+ * @author SNIPPIK
+ * @description Поддерживаемые методы шифровки пакетов
+ * @namespace Methods
  */
-interface Methods {
-    close?(opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array): Buffer;
-    open?(buffer: Buffer, nonce: Buffer, secretKey: Uint8Array): Buffer | null;
-    random?(bytes: number, nonce: Buffer): Buffer;
+namespace Methods {
+    /**
+     * @description Поддерживаемый запрос к библиотеке
+     */
+    export type supported = {
+        [name: string]: (lib: any) => _new | _old
+    }
+
+    /**
+     * @description Новый тип шифровки пакетов
+     * @interface _new
+     */
+    export interface _new {
+        crypto_aead_xchacha20poly1305_ietf_decrypt?(cipherText: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike): Buffer;
+        crypto_aead_xchacha20poly1305_ietf_encrypt?(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike): Buffer;
+    }
+
+    /**
+     * @description Старый тип шифровки пакетов
+     * @interface _old
+     */
+    export interface _old {
+        close?(opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array): Buffer;
+        open?(buffer: Buffer, nonce: Buffer, secretKey: Uint8Array): Buffer | null;
+        random?(bytes: number, nonce: Buffer): Buffer;
+    }
 }
+
+
+
+/**
+ * @author SNIPPIK
+ * @description Делаем проверку на наличие библиотек Sodium
+ */
+(async () => {
+    const names = Object.keys(support_libs), libs = `\n - ${names.join("\n - ")}`;
+
+    for (const name of names) {
+        try {
+            const library = require(name);
+            if (library?.ready) await library.ready;
+            Object.assign(loaded_lib, support_libs[name](library));
+            delete require.cache[require.resolve(name)];
+            return;
+        } catch {}
+    }
+
+    throw Error(`[Critical]: No encryption package is installed. Set one to choose from. ${libs}`);
+})();
