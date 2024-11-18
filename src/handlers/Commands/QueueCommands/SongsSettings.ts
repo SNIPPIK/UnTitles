@@ -56,7 +56,7 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                 }
 
                 // Если пользователь укажет больше чем есть в очереди или меньше
-                else if (arg > tracks.size || arg < tracks.size) {
+                else if (arg > tracks.size || arg < 1) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
                     return;
                 }
@@ -133,7 +133,7 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
                 }
 
                 // Если пользователь укажет больше чем есть в очереди или меньше
-                else if (arg > tracks.total || arg < tracks.total) {
+                else if (arg > tracks.size || arg < 1) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
                     return;
                 }
@@ -194,7 +194,7 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                 }
 
                 // Если аргумент больше кол-ва треков
-                else if (arg > queue.tracks.size || arg < queue.tracks.size) {
+                else if (arg > queue.tracks.size || arg < 1) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
                     return;
                 }
