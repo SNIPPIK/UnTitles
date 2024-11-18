@@ -173,14 +173,14 @@ class AudioQueues extends Constructor.Collection<Queue> {
      * @param message - Сообщение пользователя
      * @param item    - Добавляемый объект
      */
-    public create = (message: Interact, item: any) => {
+    public create = (message: Interact, item: Track.playlist | Track) => {
         let queue = db.audio.queue.get(message.guild.id);
 
         // Проверяем есть ли очередь в списке, если нет то создаем
         if (!queue) queue = new Queue(message);
 
         // Отправляем сообщение о том что было добавлено
-        else if ((item instanceof Track && queue.tracks.size >= 1) || "items" in item) {
+        if ("items" in item || item instanceof Track && queue.tracks.total > 0) {
             db.audio.queue.events.emit("message/push", message, item);
         }
 

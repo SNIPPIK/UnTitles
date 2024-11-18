@@ -124,12 +124,9 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (current > time.total || !this.playing) current = 0;
 
         // Создаем прогресс бар
-        return this._progress.bar({
-            platform,
-            duration: { current,
-                total: time.total
-            }
-        });
+        const bar =  this._progress.bar({ platform, duration: { current, total: time.total } });
+
+        return `\n\`\`${current.duration()}\`\` ${bar} \`\`${time.split}\`\``;
     };
 
 

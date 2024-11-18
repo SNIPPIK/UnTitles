@@ -8,6 +8,7 @@ import crypto from "node:crypto";
  */
 const support_libs: Methods.supported = {
     "sodium": (lib) => ({
+        close: lib.api.crypto_secretbox_easy,
         crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText, additionalData, nonce, key) => {
             const message = Buffer.alloc(cipherText.length - lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
             lib.crypto_aead_xchacha20poly1305_ietf_decrypt(message, null, cipherText, additionalData, nonce, key);
@@ -21,6 +22,11 @@ const support_libs: Methods.supported = {
     }),
 
     "sodium-native": (lib) => ({
+        close: (opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array) => {
+            const output = Buffer.allocUnsafe(opusPacket.length + lib.crypto_box_MACBYTES);
+            lib.crypto_secretbox_easy(output, opusPacket, nonce, secretKey);
+            return output;
+        },
         crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText, additionalData, nonce, key) => {
             const message = Buffer.alloc(cipherText.length - lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
             lib.crypto_aead_xchacha20poly1305_ietf_decrypt(message, null, cipherText, additionalData, nonce, key);
@@ -34,6 +40,7 @@ const support_libs: Methods.supported = {
     }),
 
     "libsodium-wrappers": (lib) => ({
+        close: lib.crypto_secretbox_easy,
         crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike) => {
             return lib.crypto_aead_xchacha20poly1305_ietf_decrypt(null, cipherText, additionalData, nonce, key);
         },
@@ -47,7 +54,7 @@ const support_libs: Methods.supported = {
  * @author SNIPPIK
  * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
  */
-const loaded_lib: Methods.supported = {};
+const loaded_lib: Methods._new = {};
 
 /**
  * @description Максимальный размер пакета
@@ -59,11 +66,6 @@ const MAX_NONCE_SIZE = 2 ** 32 - 1;
  */
 const SUPPORTED_ENCRYPTION_MODES = [
     "aead_xchacha20_poly1305_rtpsize",
-
-    // Старые модификаторы
-    "xsalsa20_poly1305",
-    "xsalsa20_poly1305_lite",
-    "xsalsa20_poly1305_suffix"
 ];
 
 /**
@@ -118,19 +120,13 @@ export class Encryption {
                 return [Buffer.concat([cipher.update(packet), cipher.final(), cipher.getAuthTag()]), noncePadding];
             }
             case "aead_xchacha20_poly1305_rtpsize": {
-                return [(loaded_lib as Methods._new).crypto_aead_xchacha20poly1305_ietf_encrypt(packet, additionalData, connectionData.nonceBuffer, secretKey), noncePadding];
+                return [loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, additionalData, connectionData.nonceBuffer, secretKey), noncePadding];
             }
 
             /**
-             * @description Старые методы шифрования
+             * @description Старый метод при отсутствии поддержки новых стандартов
              */
-            case "xsalsa20_poly1305_suffix": {
-                const random = (loaded_lib as Methods._old).random(24, connectionData.nonceBuffer);
-                return [(loaded_lib as Methods._old).close(packet, random, secretKey), random];
-            }
-            case "xsalsa20_poly1305_lite": {
-                return [(loaded_lib as Methods._old).close(packet, connectionData.nonceBuffer, secretKey), noncePadding];
-            }
+            default: return [loaded_lib.close(packet, Buffer.alloc(24), secretKey)];
         }
     }
 
@@ -162,9 +158,10 @@ export class Encryption {
 namespace Methods {
     /**
      * @description Поддерживаемый запрос к библиотеке
+     * @type supported
      */
     export type supported = {
-        [name: string]: (lib: any) => _new | _old
+        [name: string]: (lib: any) => _new
     }
 
     /**
@@ -174,16 +171,7 @@ namespace Methods {
     export interface _new {
         crypto_aead_xchacha20poly1305_ietf_decrypt?(cipherText: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike): Buffer;
         crypto_aead_xchacha20poly1305_ietf_encrypt?(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike): Buffer;
-    }
-
-    /**
-     * @description Старый тип шифровки пакетов
-     * @interface _old
-     */
-    export interface _old {
         close?(opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array): Buffer;
-        open?(buffer: Buffer, nonce: Buffer, secretKey: Uint8Array): Buffer | null;
-        random?(bytes: number, nonce: Buffer): Buffer;
     }
 }
 

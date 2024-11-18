@@ -225,6 +225,11 @@
     "en-US": "Current:"
   },
 
+  "player.current.link": {
+    "ru": "**__[link to track]({ARGUMENT})__**",
+    "en-US": "**__[link to track]({ARGUMENT})__**"
+  },
+
   "player.next.playing": {
     "ru": "Следующее:",
     "en-US": "Next:"
@@ -243,6 +248,11 @@
   "player.queue.push": {
     "ru": "Добавлено в очередь:",
     "en-US": "Added in queue:"
+  },
+
+  "player.queue.push.more": {
+    "ru": "\nТак-же {ARGUMENT} трек(ов)...",
+    "en-US": "\nAnd {ARGUMENT} tracks..."
   },
 
   "player.search": {

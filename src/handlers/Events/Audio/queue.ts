@@ -77,7 +77,7 @@ class message_push extends Constructor.Assign<Handler.Event<"message/push">> {
                                 name: locale._(message.locale, "player.queue.push"),
                                 value: obj instanceof Track ? `${obj.titleReplaced}` : `${obj.items.slice(0, 5).map((track, index) => {
                                     return `\`${index + 1}\` ${track.titleReplaced}`;
-                                }).join("\n")}${obj.items.length > 5 ? `\nAnd ${obj.items.length - 5} tracks...` : ""}`
+                                }).join("\n")}${obj.items.length > 5 ? locale._(message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}`
                             }
                         ]
                     }
@@ -152,7 +152,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                             // Текущий трек
                             {
                                 name: locale._(queue.message.locale, "player.current.playing"),
-                                value: `\`\`\`${title}\`\`\`**__[link to track](${url})__**`
+                                value: `\`\`\`${title}\`\`\`` + locale._(queue.message.locale, "player.current.link", [url])
                             },
 
                             //Следующий трек или треки
@@ -171,10 +171,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                             // Прогресс бар
                             {
                                 name: "",
-                                value: (() => {
-                                    const current = queue.player.audio?.current?.duration || 0;
-                                    return `\n\`\`${current.duration()}\`\` ${queue.player.progress} \`\`${time.split}\`\``;
-                                })()
+                                value: queue.player.progress
                             }
                         ]
                     }
