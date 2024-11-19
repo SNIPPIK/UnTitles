@@ -15,6 +15,8 @@ const temple_db = new Map<string, number>;
  * @author SNIPPIK
  * @description Класс для взаимодействия бота с slash commands, buttons
  * @class InteractionCreate
+ * @event Events.InteractionCreate
+ * @public
  */
 class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCreate>> {
     public constructor() {

@@ -10,6 +10,7 @@ import {db} from "@lib/db";
  * @author SNIPPIK
  * @description Плеер для проигрывания музыки на серверах
  * @class ExtraPlayer
+ * @public
  */
 export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     /**
@@ -331,6 +332,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
  * @author SNIPPIK
  * @description Класс для управления включенным потоком, хранит в себе все данные потока
  * @class PlayerStreamSubSystem
+ * @protected
  */
 class PlayerStreamSubSystem {
     private _stream: AudioResource = null;
@@ -363,6 +365,7 @@ class PlayerStreamSubSystem {
  * @author SNIPPIK
  * @description Класс для управления голосовыми подключениями, хранит в себе все данные голосового подключения
  * @class PlayerVoice
+ * @protected
  */
 class PlayerVoice {
     private voice = null as VoiceConnection;
@@ -413,6 +416,7 @@ class PlayerVoice {
  * @author SNIPPIK
  * @description Все треки для проигрывания в плеере, хранит в себе все данные треков
  * @class PlayerSongs
+ * @protected
  */
 class PlayerSongs {
     private readonly _songs: Track[] = [];
@@ -527,6 +531,7 @@ class PlayerSongs {
  * @author SNIPPIK
  * @description Обработчик прогресс бара трека
  * @class PlayerProgress
+ * @protected
  */
 class PlayerProgress {
     /**

@@ -6,7 +6,8 @@ import {env} from "@env";
 /**
  * @author SNIPPIK
  * @description Динамически загружаемый класс
- * @API Spotify
+ * @class sAPI
+ * @public
  */
 class sAPI extends Constructor.Assign<API.request> {
     /**

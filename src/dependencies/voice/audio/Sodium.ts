@@ -86,6 +86,7 @@ const SUPPORTED_ENCRYPTION_MODES = [
  * @author SNIPPIK
  * @description Выдаваемы методы для использования sodium
  * @class Encryption
+ * @public
  */
 export class Encryption {
     /**

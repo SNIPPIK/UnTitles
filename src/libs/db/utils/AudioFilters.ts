@@ -6,8 +6,8 @@ import {db} from "@lib/db";
 /**
  * @author SNIPPIK
  * @description Управление фильтрами, хранит и конвертирует в string для FFmpeg
- * @need ExtraPlayer
  * @class AudioFilters
+ * @public
  */
 export class AudioFilters {
     /**
@@ -49,6 +49,7 @@ export class AudioFilters {
  * @author SNIPPIK
  * @description Взаимодействие с фильтрами через класс для удобства
  * @class ExtraFilters
+ * @public
  */
 export class ExtraFilters {
     /**
@@ -92,6 +93,7 @@ export class ExtraFilters {
  * @author SNIPPIK
  * @description Как выглядит фильтр
  * @interface AudioFilter
+ * @public
  */
 export interface AudioFilter {
     //Имена

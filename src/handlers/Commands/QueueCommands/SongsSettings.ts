@@ -8,6 +8,7 @@ import {db} from "@lib/db";
  * @author SNIPPIK
  * @description Пропуск треков до указанного трека!
  * @class SkipTracksCommand
+ * @public
  */
 class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
@@ -85,6 +86,7 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
  * @author SNIPPIK
  * @description Возврат к конкретному треку
  * @class BackTrackCommand
+ * @public
  */
 class BackTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
@@ -153,6 +155,7 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
  * @author SNIPPIK
  * @description Удаление трека из очереди
  * @class RemoveTrackCommand
+ * @public
  */
 class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {

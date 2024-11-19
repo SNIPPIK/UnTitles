@@ -6,6 +6,7 @@ import os from "node:os";
  * @author SNIPPIK
  * @description Взаимодействуем с environment variables
  * @class Environment
+ * @public
  */
 class Environment {
   private readonly dotenv = config();

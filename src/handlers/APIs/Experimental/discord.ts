@@ -4,6 +4,8 @@ import {Track} from "@lib/player/queue";
 /**
  * @author SNIPPIK
  * @description Динамически загружаемый класс
+ * @class sAPI
+ * @public
  */
 class sAPI extends Constructor.Assign<API.request> {
     /**

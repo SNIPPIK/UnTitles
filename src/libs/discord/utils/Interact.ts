@@ -80,6 +80,8 @@ export type InteractRules = "voice" | "queue" | "another_voice";
 /**
  * @author SNIPPIK
  * @description Класс для проверки, используется в командах
+ * @class InteractRule
+ * @public
  */
 export class InteractRule {
   /**
@@ -110,6 +112,7 @@ export class InteractRule {
  * @author SNIPPIK
  * @description Взаимодействие с discord message
  * @class Interact
+ * @public
  */
 export class Interact {
   /**

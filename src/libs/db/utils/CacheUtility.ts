@@ -3,6 +3,7 @@ import {Track} from "@lib/player/queue";
 /**
  * @author SNIPPIK
  * @description Класс для кеширования аудио и картинок
+ * @class CacheUtility
  * @public
  */
 class CacheUtility {
@@ -13,6 +14,7 @@ class CacheUtility {
  * @author SNIPPIK
  * @description Класс для сохранения данных о треке
  * @support track, author
+ * @class CacheData
  * @protected
  */
 class CacheData {
@@ -38,6 +40,7 @@ class CacheData {
  * @author SNIPPIK
  * @description Класс для сохранения картинок
  * @support jpg, png
+ * @class CacheImage
  * @protected
  */
 class CacheImage {
@@ -48,6 +51,8 @@ class CacheImage {
  * @author SNIPPIK
  * @description Класс для сохранения аудио файлов
  * @support ogg/opus
+ * @class CacheAudio
+ * @protected
  */
 class CacheAudio {
     /**

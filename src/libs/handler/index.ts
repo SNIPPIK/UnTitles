@@ -12,6 +12,7 @@ import {db} from "@lib/db";
  * @author SNIPPIK
  * @description Класс для загрузки других классов
  * @class Handler
+ * @public
  */
 export class Handler<T> {
   private readonly _files: T[] = [];
@@ -20,9 +21,7 @@ export class Handler<T> {
    * @description Выдаем все загруженные файлы
    * @public
    */
-  public get files() {
-    return this._files;
-  }
+  public get files() { return this._files; };
 
   /**
    * @description Загружаем файлы
@@ -53,7 +52,7 @@ export class Handler<T> {
         else this._files.push(new (imported as any)(null));
       }
     }
-  }
+  };
 
   /**
    * @description Загружаем файл
@@ -79,12 +78,14 @@ export class Handler<T> {
  * @author SNIPPIK
  * @description Интерфейсы для загрузки
  * @namespace Handler
+ * @public
  */
 export namespace Handler {
   /**
    * @author SNIPPIK
    * @description Интерфейс для событий
    * @interface Event
+   * @public
    */
   export interface Event<T extends keyof ClientEvents | keyof CollectionAudioEvents | keyof AudioPlayerEvents> {
     /**
@@ -116,6 +117,7 @@ export namespace Handler {
    * @author SNIPPIK
    * @description Интерфейс для команд
    * @interface Command
+   * @public
    */
   export interface Command {
     /**
@@ -156,12 +158,14 @@ export namespace Handler {
  * @author SNIPPIK
  * @description Вспомогательные классы
  * @namespace Constructor
+ * @public
  */
 export namespace Constructor {
   /**
    * @author SNIPPIK
    * @description Коллекция
    * @abstract
+   * @public
    */
   export abstract class Collection<K, T = string> {
     private readonly data = new Map<T, K>();
@@ -251,6 +255,7 @@ export namespace Constructor {
    * @description Загрузчик классов
    * @class Assign
    * @abstract
+   * @public
    */
   export abstract class Assign<T> {
     /**
@@ -268,6 +273,7 @@ export namespace Constructor {
    * @description База с циклами для дальнейшей работы этот класс надо подключить к другому
    * @class Cycle
    * @abstract
+   * @public
    */
   export abstract class Cycle<T = unknown> {
     private readonly data = {
@@ -358,6 +364,7 @@ export namespace Constructor {
   /**
    * @author SNIPPIK
    * @description Интерфейс для опций TimeCycle
+   * @private
    */
   interface TimeCycleConfig<T> {
     // Название цикла
@@ -388,6 +395,7 @@ export namespace Constructor {
  * @author SNIPPIK
  * @description Классы для взаимодействия с API
  * @namespace API
+ * @public
  */
 export namespace API {
   /**
@@ -395,6 +403,7 @@ export namespace API {
    * @description Создаем класс запроса для взаимодействия с APIs
    * @class item
    * @abstract
+   * @public
    */
   export abstract class item<T extends callbacks> {
     /**
@@ -426,6 +435,7 @@ export namespace API {
    * @author SNIPPIK
    * @description Получаем ответ от локальной базы APIs
    * @class response
+   * @public
    */
   export class response {
     private readonly _api: request;
@@ -522,6 +532,7 @@ export namespace API {
    * @description Создаем класс для итоговой платформы для взаимодействия с APIs
    * @interface request
    * @abstract
+   * @public
    */
   export interface request {
     /**
@@ -577,18 +588,21 @@ export namespace API {
   /**
    * @description Доступные платформы
    * @type platform
+   * @public
    */
   export type platform = "YOUTUBE" | "SPOTIFY" | "VK" | "DISCORD" | "YANDEX";
 
   /**
    * @description Доступные запросы
    * @type callbacks
+   * @public
    */
   export type callbacks = "track" | "playlist" | "search" | "album" | "author";
 
   /**
    * @description Функция запроса
    * @type callback<callbacks>
+   * @public
    */
   export type callback<T> = Promise<(T extends "track" ? Track : T extends "playlist" | "album" ? Track.playlist : T extends "search" | "author" ? Track[] : never) | Error>
 }

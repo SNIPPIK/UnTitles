@@ -18,6 +18,8 @@ const timeout = 15;
  * @author SNIPPIK
  * @description Класс ивента VoiceStateUpdate
  * @class VoiceStateUpdate
+ * @event Events.VoiceStateUpdate
+ * @public
  */
 class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStateUpdate>> {
     public constructor() {

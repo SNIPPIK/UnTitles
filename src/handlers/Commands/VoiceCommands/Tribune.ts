@@ -7,6 +7,7 @@ import {locale} from "@lib/locale";
  * @author SNIPPIK
  * @description Управление голосовыми подключениями
  * @class VoiceCommand
+ * @public
  */
 class VoiceCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {

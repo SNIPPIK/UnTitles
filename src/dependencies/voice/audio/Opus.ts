@@ -47,6 +47,7 @@ const OGG = {
  * @description Создаем кодировщик в opus
  * @class OpusEncoder
  * @extends Transform
+ * @public
  */
 export class OpusEncoder extends Transform {
     /**

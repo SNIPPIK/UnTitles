@@ -3,9 +3,10 @@ import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
+ * @description Завершение проигрывания трека
  * @class eventPlayer_ended
  * @event player/ended
- * @description Завершение проигрывания трека
+ * @public
  */
 class player_ended extends Constructor.Assign<Handler.Event<"player/ended">> {
     public constructor() {
@@ -24,9 +25,10 @@ class player_ended extends Constructor.Assign<Handler.Event<"player/ended">> {
 
 /**
  * @author SNIPPIK
+ * @description Плеер ожидает действий
  * @class eventPlayer_wait
  * @event player/wait
- * @description Плеер ожидает действий
+ * @public
  */
 class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
     public constructor() {
@@ -60,9 +62,10 @@ class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
 
 /**
  * @author SNIPPIK
+ * @description Плеер поймал ошибку
  * @class eventPlayer_error
  * @event player/error
- * @description Плеер словил ошибку
+ * @public
  */
 class player_error extends Constructor.Assign<Handler.Event<"player/error">> {
     public constructor() {

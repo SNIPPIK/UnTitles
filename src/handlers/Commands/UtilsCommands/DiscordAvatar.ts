@@ -7,6 +7,7 @@ import {locale} from "@lib/locale";
  * @author SNIPPIK
  * @description Просмотр аватара пользователя
  * @class AvatarCommand
+ * @public
  */
 class AvatarCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {

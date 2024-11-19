@@ -10,6 +10,7 @@ import {db} from "@lib/db";
  * @author SNIPPIK
  * @description Управление временем, дает возможность пропускать время в треке
  * @class SeekTrackCommand
+ * @public
  */
 class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
@@ -77,6 +78,7 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
  * @author SNIPPIK
  * @description Управление модификаторами аудио треков
  * @class AudioFiltersCommand
+ * @public
  */
 class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {

@@ -8,6 +8,7 @@ import {TypedEmitter} from "tiny-typed-emitter";
 /**
  * @author SNIPPIK
  * @description Список ивент функций для ClientRequest
+ * @private
  */
 const requests: { name: string, callback: (req: ClientRequest, url?: string) => any }[] = [
     /**
@@ -46,6 +47,7 @@ const requests: { name: string, callback: (req: ClientRequest, url?: string) => 
  * @author SNIPPIK
  * @description Класс создающий запрос
  * @class Request
+ * @public
  * @abstract
  */
 abstract class Request {
@@ -213,13 +215,23 @@ export class httpsClient extends Request {
     };
 }
 
-
 /**
  * @author SNIPPIK
  * @description WebSocket для node.js
+ * @class WebSocket
+ * @public
  */
 export class WebSocket extends TypedEmitter<WebSocketEvents> {
+    /**
+     * @description Класс сокета для подключения к серверам discord
+     * @private
+     */
     private readonly socket: WS;
+
+    /**
+     * @description Данные для проверки жизни
+     * @private
+     */
     private readonly KeepAlive = {
         interval: null as NodeJS.Timeout, miss: 0, send: 0
     };

@@ -8,7 +8,7 @@ import {env} from "@env";
  * @author SNIPPIK
  * @description Динамически загружаемый класс
  * @class sAPI
- * @API Yandex music
+ * @public
  */
 class sAPI extends Constructor.Assign<API.request> {
     /**

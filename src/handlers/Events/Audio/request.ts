@@ -7,7 +7,9 @@ import {env} from "@env";
 /**
  * @author SNIPPIK
  * @description Выполнение запроса пользователя через внутреннее API
- * @class userRequestAPI
+ * @class request_api
+ * @event request/api
+ * @public
  */
 class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
     public constructor() {
@@ -105,7 +107,9 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
 /**
  * @author SNIPPIK
  * @description Если при выполнении запроса пользователя произошла ошибка
- * @class userRequestError
+ * @class request_error
+ * @event request/error
+ * @public
  */
 class request_error extends Constructor.Assign<Handler.Event<"request/error">> {
     public constructor() {

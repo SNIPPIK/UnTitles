@@ -8,6 +8,7 @@ import {db} from "@lib/db";
  * @author SNIPPIK
  * @description Включение музыки
  * @class PlayCommand
+ * @public
  */
 class PlayCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {

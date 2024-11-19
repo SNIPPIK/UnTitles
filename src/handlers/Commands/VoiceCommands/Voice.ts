@@ -8,6 +8,7 @@ import {db} from "@lib/db";
  * @author SNIPPIK
  * @description Управление голосовыми подключениями
  * @class Command_Voice
+ * @public
  */
 class Command_Voice extends Constructor.Assign<Handler.Command> {
     public constructor() {

@@ -5,6 +5,8 @@ import {TypedEmitter} from "tiny-typed-emitter";
 /**
  * @class VoiceConnection
  * @description Подключение к голосовому серверу Гильдии может использоваться для воспроизведения аудио в голосовых каналах.
+ * @class VoiceConnection
+ * @public
  */
 export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     /**

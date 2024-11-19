@@ -7,6 +7,7 @@ import {isIPv4} from "node:net";
  * @author SNIPPIK
  * @description Создает udp подключение к api discord
  * @class VoiceUDPSocket
+ * @public
  */
 export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /**

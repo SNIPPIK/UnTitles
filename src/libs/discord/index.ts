@@ -39,6 +39,7 @@ export class ShardManager extends ShardingManager {
 
 /**
  * @author SNIPPIK
+ * @description Класс осколка или же клиента кому как удобнее
  * @class Client
  * @public
  */

@@ -7,6 +7,7 @@ import {env} from "@env";
  * @author SNIPPIK
  * @description Конвертирует аудио в нужный формат
  * @class AudioResource
+ * @public
  */
 export class AudioResource {
     /**
@@ -160,8 +161,9 @@ export class AudioResource {
  * @author SNIPPIK
  * @description Для уничтожения использовать <class>.emit("close")
  * @class Process
+ * @private
  */
-export class Process {
+class Process {
     /**
      * @description Процесс запущенный через spawn
      * @private

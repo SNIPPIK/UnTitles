@@ -13,7 +13,7 @@ if (process["argv"].includes("--ShardManager")) new ShardManager(__filename);
 
 /**
  * @name "default"
- * @description Загрузка осколка
+ * @description Загрузка клиента или осколка
  */
 else {
     const client = new Client();

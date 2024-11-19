@@ -5,6 +5,7 @@ import {ApplicationCommandOption} from "discord.js";
  * @author SNIPPIK
  * @description Создаем slash command, просто и быстро.
  * @class SlashBuilder
+ * @public
  */
 export class SlashBuilder {
     /**

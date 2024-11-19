@@ -19,6 +19,7 @@ type locale_text = keyof typeof locales;
  * @author SNIPPIK
  * @description Переводчик на разные языки
  * @class locale
+ * @public
  */
 export class locale {
     /**

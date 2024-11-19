@@ -11,8 +11,8 @@ import {env} from "@env";
 
 /**
  * @author SNIPPIK
- * @class Database
  * @description Локальная база данных бота
+ * @class Database
  * @public
  */
 class Database {

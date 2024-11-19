@@ -6,9 +6,10 @@ import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
- * @class onError
- * @event message/error
  * @description Сообщение об ошибке
+ * @class message_error
+ * @event message/error
+ * @public
  */
 class message_error extends Constructor.Assign<Handler.Event<"message/error">> {
     public constructor() {
@@ -46,9 +47,10 @@ class message_error extends Constructor.Assign<Handler.Event<"message/error">> {
 
 /**
  * @author SNIPPIK
- * @class onPush
- * @event message/push
  * @description Сообщение о добавленном треке или плейлисте
+ * @class message_push
+ * @event message/push
+ * @public
  */
 class message_push extends Constructor.Assign<Handler.Event<"message/push">> {
     public constructor() {
@@ -89,9 +91,10 @@ class message_push extends Constructor.Assign<Handler.Event<"message/push">> {
 
 /**
  * @author SNIPPIK
- * @class onSearch
- * @event message/search
  * @description Сообщение с выбором трека
+ * @class message_search
+ * @event message/search
+ * @public
  */
 class message_search extends Constructor.Assign<Handler.Event<"message/search">> {
     public constructor() {
@@ -132,9 +135,10 @@ class message_search extends Constructor.Assign<Handler.Event<"message/search">>
 
 /**
  * @author SNIPPIK
- * @class onPlaying
- * @event message/playing
  * @description Сообщение о том что сейчас играет
+ * @class message_playing
+ * @event message/playing
+ * @public
  */
 class message_playing extends Constructor.Assign<Handler.Event<"message/playing">> {
     public constructor() {

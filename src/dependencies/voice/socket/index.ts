@@ -86,6 +86,7 @@ const socketStatus = [
  * @author SNIPPIK
  * @description Интерфейс для подключения WS с UDP для передачи пакетов на сервера discord
  * @class VoiceSocket
+ * @public
  */
 export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
     /**
