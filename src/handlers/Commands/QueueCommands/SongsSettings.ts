@@ -18,8 +18,8 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                     "ru": "пропуск"
                 })
                 .setDescription({
-                    "en-US": "Skip tracks to the specified track!",
-                    "ru": "Пропуск треков до указанного трека!"
+                    "en-US": "Skip tracks to the specified track! The specified track will be current!",
+                    "ru": "Пропуск треков до указанного трека! Указанный трек будет текущим!"
                 })
                 .addSubCommands([
                     {
@@ -61,12 +61,12 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                     return;
                 }
 
-                const {title, url, color} = tracks.get(arg > 1 ? arg : arg - 1);
+                const {title, url, color} = tracks.get(arg > 1 ? queue.tracks.position + arg - 1 : queue.tracks.position - 1);
 
                 // Если аргумент больше 1, то ищем трек
                 if (arg > 1) {
                     // Меняем позицию трека в очереди
-                    queue.player.stop_fade(tracks.position + arg);
+                    queue.player.stop_fade(tracks.position + arg - 1);
                     message.fastBuilder = { description: locale._(message.locale, "command.skip.arg.track", [arg, `[${title}](${url})`]), color };
 
                     return;
@@ -91,12 +91,12 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
         super({
             data: new SlashBuilder()
                 .setName({
-                    "en-US": "position",
-                    "ru": "позиция"
+                    "en-US": "back",
+                    "ru": "назад"
                 })
                 .setDescription({
-                    "en-US": "Move current track to new or past",
-                    "ru": "Переход текущего трека к новому или прошлому"
+                    "en-US": "Move current track to past",
+                    "ru": "Переход от текущего трека к прошлому"
                 })
                 .addSubCommands([
                     {
@@ -163,8 +163,8 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                     "ru": "удалить"
                 })
                 .setDescription({
-                    "en-US": "Deleting a track from the queue, without the possibility of recovery!",
-                    "ru": "Удаление трека из очереди, без возможности восстановить!"
+                    "en-US": "Deleting a track from the queue, without the possibility of recovery! Past tracks count!",
+                    "ru": "Удаление трека из очереди, без возможности восстановить! Прошлые треки идут в счет!"
                 })
                 .addSubCommands([
                     {
