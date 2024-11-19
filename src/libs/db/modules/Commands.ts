@@ -2,6 +2,12 @@ import {Handler} from "@lib/handler";
 import {Client} from "@lib/discord";
 import {Logger} from "@lib/logger";
 
+/**
+ * @author SNIPPIK
+ * @description Класс хранящий в себе управление командами
+ * @class Database_Commands
+ * @public
+ */
 export class Database_Commands<T extends Handler.Command> extends Array<T> {
     /**
      * @description Доп команды, бывают команды, которые могут содержать несколько доп команд

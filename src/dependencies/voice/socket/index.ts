@@ -374,14 +374,7 @@ interface Socket_udp_State {
  * @description Все статусы
  * @class VoiceSocket
  */
-export type VoiceSocketState =
-    WebSocketState
-    | IdentifyState
-    | UDPSocketState
-    | ProtocolState
-    | ReadyState
-    | ResumeState
-    | CloseState;
+export type VoiceSocketState = WebSocketState | IdentifyState | UDPSocketState | ProtocolState | ReadyState | ResumeState | CloseState;
 
 /**
  * @status VoiceSocketStatusCode.close

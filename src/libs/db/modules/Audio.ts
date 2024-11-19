@@ -10,7 +10,8 @@ import {env} from "@env";
 /**
  * @author SNIPPIK
  * @description Коллекция для взаимодействия с modules
- * @abstract
+ * @class Database_Audio
+ * @public
  */
 export class Database_Audio {
     /**
@@ -23,7 +24,7 @@ export class Database_Audio {
      * @description Хранилище циклов для работы музыки
      * @private
      */
-    private readonly _cycles = new Cycles();
+    private readonly _cycles = new AudioCycles();
 
     /**
      * @description Здесь хранятся модификаторы аудио
@@ -57,11 +58,68 @@ export class Database_Audio {
 
 /**
  * @author SNIPPIK
- * @description Циклы для работы аудио, лучше не трогать без понимания как все это работает
- * @class Cycles
+ * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
+ * @class AudioQueues
  * @private
  */
-class Cycles {
+class AudioQueues extends Constructor.Collection<Queue> {
+    /**
+     * @description Ивенты привязанные к плееру и очереди
+     * @private
+     */
+    private readonly emitter = new class extends TypedEmitter<CollectionAudioEvents & AudioPlayerEvents> {
+        private _playerEvents: (keyof AudioPlayerEvents)[] = null;
+
+        /**
+         * @description Ивенты плеера
+         * @return (keyof AudioPlayerEvents)[]
+         */
+        public get player() {
+            if (this._playerEvents) return this._playerEvents;
+
+            this._playerEvents = this.eventNames().filter((item: keyof AudioPlayerEvents) => item.match(/player\//)) as (keyof AudioPlayerEvents)[];
+            return this._playerEvents;
+        };
+    }
+
+    /**
+     * @description Получаем ивенты для плеера
+     * @return CollectionAudioEvents
+     * @public
+     */
+    public get events() { return this.emitter; };
+
+    /**
+     * @description Проверяем надо ли создать очередь и добавляем треки в нее
+     * @param message - Сообщение пользователя
+     * @param item    - Добавляемый объект
+     */
+    public create = (message: Interact, item: Track.playlist | Track) => {
+        let queue = db.audio.queue.get(message.guild.id);
+
+        // Проверяем есть ли очередь в списке, если нет то создаем
+        if (!queue) queue = new Queue(message);
+
+        // Отправляем сообщение о том что было добавлено
+        if ("items" in item || item instanceof Track && queue.tracks.total > 0) {
+            db.audio.queue.events.emit("message/push", message, item);
+        }
+
+        // Добавляем треки в очередь
+        for (const track of (item["items"] ?? [item]) as Track[]) {
+            track.user = message.author;
+            queue.tracks.push(track);
+        }
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Циклы для работы аудио, лучше не трогать без понимания как все это работает
+ * @class AudioCycles
+ * @private
+ */
+class AudioCycles {
     /**
      * @author SNIPPIK
      * @description Здесь происходит управление плеерами
@@ -133,63 +191,6 @@ class Cycles {
      * @public
      */
     public get messages() { return this._messages; };
-}
-
-/**
- * @author SNIPPIK
- * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
- * @class AudioQueues
- * @private
- */
-class AudioQueues extends Constructor.Collection<Queue> {
-    /**
-     * @description Ивенты привязанные к плееру и очереди
-     * @private
-     */
-    private readonly emitter = new class extends TypedEmitter<CollectionAudioEvents & AudioPlayerEvents> {
-        private _playerEvents: (keyof AudioPlayerEvents)[] = null;
-
-        /**
-         * @description Ивенты плеера
-         * @return (keyof AudioPlayerEvents)[]
-         */
-        public get player() {
-            if (this._playerEvents) return this._playerEvents;
-
-            this._playerEvents = this.eventNames().filter((item: keyof AudioPlayerEvents) => item.match(/player\//)) as (keyof AudioPlayerEvents)[];
-            return this._playerEvents;
-        };
-    }
-
-    /**
-     * @description Получаем ивенты для плеера
-     * @return CollectionAudioEvents
-     * @public
-     */
-    public get events() { return this.emitter; };
-
-    /**
-     * @description Проверяем надо ли создать очередь и добавляем треки в нее
-     * @param message - Сообщение пользователя
-     * @param item    - Добавляемый объект
-     */
-    public create = (message: Interact, item: Track.playlist | Track) => {
-        let queue = db.audio.queue.get(message.guild.id);
-
-        // Проверяем есть ли очередь в списке, если нет то создаем
-        if (!queue) queue = new Queue(message);
-
-        // Отправляем сообщение о том что было добавлено
-        if ("items" in item || item instanceof Track && queue.tracks.total > 0) {
-            db.audio.queue.events.emit("message/push", message, item);
-        }
-
-        // Добавляем треки в очередь
-        for (const track of (item["items"] ?? [item]) as Track[]) {
-            track.user = message.author;
-            queue.tracks.push(track);
-        }
-    };
 }
 
 /**

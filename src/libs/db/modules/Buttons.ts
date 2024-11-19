@@ -2,7 +2,7 @@ import {Interact} from "@lib/discord/utils/Interact";
 import {Constructor} from "@handler";
 import {locale} from "@lib/locale";
 import {Colors} from "discord.js";
-import {Voice} from "@lib/voice";
+import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
@@ -15,6 +15,7 @@ type SupportButtons = "shuffle" | "last" | "resume_pause" | "skip" | "repeat" | 
  * @author SNIPPIK
  * @description Класс хранящий в себе все кнопки для бота
  * @class Database_Buttons
+ * @public
  */
 export class Database_Buttons extends Constructor.Collection<button, SupportButtons> {
     public constructor() {
@@ -247,7 +248,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
 
                 // Если есть очередь, то удаляем ее
                 if (queue) queue.cleanup();
-                Voice.remove(msg.guild.id);
+                db.voice.remove(msg.guild.id);
 
                 msg.fastBuilder = {
                     description: locale._(msg.locale, "player.button.stop"),

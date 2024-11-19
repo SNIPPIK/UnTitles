@@ -2,7 +2,7 @@ import {ApplicationCommandOptionType, Colors, StageChannel, VoiceChannel} from "
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {Constructor, Handler} from "@handler";
 import {locale} from "@lib/locale";
-import {Voice} from "@lib/voice";
+import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
@@ -55,7 +55,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
 
                     // Переконфигурация голосового канала
                     case "re-configure": {
-                        const voiceConnection = Voice.get(guild.id);
+                        const voiceConnection = db.voice.get(guild.id);
 
                         // Если бот не подключен к голосовому каналу
                         if (!voiceConnection) return;
@@ -86,7 +86,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
 
                     // Отключение от голосового канала
                     case "leave": {
-                        const voiceConnection = Voice.get(guild.id);
+                        const voiceConnection = db.voice.get(guild.id);
 
                         // Если бот не подключен к голосовому каналу
                         if (!voiceConnection) return;

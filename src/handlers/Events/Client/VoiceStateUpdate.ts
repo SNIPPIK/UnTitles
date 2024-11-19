@@ -1,6 +1,5 @@
 import {Events, VoiceChannel} from "discord.js";
 import {Constructor, Handler} from "@handler";
-import {Voice} from "@lib/voice";
 import {db} from "@lib/db";
 
 /**
@@ -27,7 +26,7 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
             type: "client",
             execute: (client, oldState, newState) => setImmediate(() => {
                 const guild = oldState.guild || newState.guild;
-                const voice = Voice.get(guild.id);
+                const voice = db.voice.get(guild.id);
                 const queue = db.audio.queue.get(guild.id);
                 const temp = temple_db.get(guild.id);
 
@@ -70,7 +69,7 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
                             // Если нет таймера для удаления очереди
                             if (!temp) temple_db.set(guild.id, setTimeout(() => {
                                 if (queue) db.audio.queue.remove(guild.id);
-                                if (voice) Voice.remove(guild.id);
+                                if (voice) db.voice.remove(guild.id);
                             }, timeout * 1e3));
                         }
                     }

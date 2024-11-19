@@ -9,6 +9,10 @@ import crypto from "node:crypto";
 const support_libs: Methods.supported = {
     "sodium": (lib) => ({
         close: lib.api.crypto_secretbox_easy,
+        random: (num, buffer: Buffer = Buffer.allocUnsafe(num)) => {
+            lib.api.randombytes_buf(buffer);
+            return buffer;
+        },
         crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText, additionalData, nonce, key) => {
             const message = Buffer.alloc(cipherText.length - lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
             lib.crypto_aead_xchacha20poly1305_ietf_decrypt(message, null, cipherText, additionalData, nonce, key);
@@ -27,6 +31,10 @@ const support_libs: Methods.supported = {
             lib.crypto_secretbox_easy(output, opusPacket, nonce, secretKey);
             return output;
         },
+        random(num: number, buffer: Buffer = Buffer.allocUnsafe(num)) {
+            lib.randombytes_buf(buffer);
+            return buffer;
+        },
         crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText, additionalData, nonce, key) => {
             const message = Buffer.alloc(cipherText.length - lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
             lib.crypto_aead_xchacha20poly1305_ietf_decrypt(message, null, cipherText, additionalData, nonce, key);
@@ -41,6 +49,7 @@ const support_libs: Methods.supported = {
 
     "libsodium-wrappers": (lib) => ({
         close: lib.crypto_secretbox_easy,
+        random: lib.randombytes_buf,
         crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike) => {
             return lib.crypto_aead_xchacha20poly1305_ietf_decrypt(null, cipherText, additionalData, nonce, key);
         },
@@ -66,6 +75,11 @@ const MAX_NONCE_SIZE = 2 ** 32 - 1;
  */
 const SUPPORTED_ENCRYPTION_MODES = [
     "aead_xchacha20_poly1305_rtpsize",
+
+    // Старые модификаторы
+    "xsalsa20_poly1305",
+    "xsalsa20_poly1305_lite",
+    "xsalsa20_poly1305_suffix"
 ];
 
 /**
@@ -124,6 +138,20 @@ export class Encryption {
             }
 
             /**
+             * @description Старые методы шифрования
+             */
+            case "xsalsa20_poly1305_suffix": {
+                const random = loaded_lib.random(24, connectionData.nonceBuffer);
+                return [loaded_lib.close(packet, random, secretKey), random];
+            }
+            case "xsalsa20_poly1305_lite": {
+                connectionData.nonce++;
+                if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
+                connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
+                return [loaded_lib.close(packet, connectionData.nonceBuffer, secretKey), connectionData.nonceBuffer.subarray(0, 4)];
+            }
+
+            /**
              * @description Старый метод при отсутствии поддержки новых стандартов
              */
             default: return [loaded_lib.close(packet, Buffer.alloc(24), secretKey)];
@@ -172,6 +200,7 @@ namespace Methods {
         crypto_aead_xchacha20poly1305_ietf_decrypt?(cipherText: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike): Buffer;
         crypto_aead_xchacha20poly1305_ietf_encrypt?(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike): Buffer;
         close?(opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array): Buffer;
+        random?(bytes: number, nonce: Buffer): Buffer;
     }
 }
 
@@ -180,6 +209,7 @@ namespace Methods {
 /**
  * @author SNIPPIK
  * @description Делаем проверку на наличие библиотек Sodium
+ * @async
  */
 (async () => {
     const names = Object.keys(support_libs), libs = `\n - ${names.join("\n - ")}`;

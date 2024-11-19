@@ -110,8 +110,8 @@
   },
 
   "player.button.replay": {
-    "ru": "🔂 | Replay | {ARGUMENT}",
-    "en-US": "🔂 | Replay | {ARGUMENT}"
+    "ru": "**Повтор трека:**\n\n**❯** **{ARGUMENT}**",
+    "en-US": "**Replay track:**\n\n**❯** **{ARGUMENT}**"
   },
 
   "player.button.stop": {

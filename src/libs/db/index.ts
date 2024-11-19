@@ -2,6 +2,7 @@ import {Database_Commands} from "@lib/db/modules/Commands";
 import {Database_Buttons} from "@lib/db/modules/Buttons";
 import {ExtraFilters} from "@lib/db/utils/AudioFilters";
 import {Database_Audio} from "@lib/db/modules/Audio";
+import {Database_Voice} from "@lib/db/modules/Voice";
 import {Database_APIs} from "@lib/db/modules/APIs";
 import {API, Handler} from "@handler";
 import {Client} from "@lib/discord";
@@ -38,6 +39,12 @@ class Database {
      * @private
      */
     private readonly _apis = new Database_APIs();
+
+    /**
+     * @description Загружаем класс для хранения голосовых подключений
+     * @private
+     */
+    private readonly _voice = new Database_Voice();
 
     /**
      * @description Загружаем класс для хранения кнопок бота
@@ -149,6 +156,12 @@ class Database {
      * @public
      */
     public get audio() { return this._audio };
+
+    /**
+     * @description База для управления голосовыми подключениями
+     * @public
+     */
+    public get voice() { return this._voice };
 
     /**
      * @description База для управления APIs

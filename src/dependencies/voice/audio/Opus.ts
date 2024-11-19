@@ -5,20 +5,17 @@ import {Buffer} from "node:buffer";
  * @author SNIPPIK
  * @description Доступные библиотеки для включения
  */
-const OpusLibs = {
-    "opusscript": (lib: any): Methods => {
-        return { args: [48000, 2, 2049], encoder: lib };
-    },
-    "mediaplex": (lib: any): Methods => {
-        return { args: [48000, 2], encoder: lib.OpusEncoder };
-    },
-    "@evan/opus": (lib: any): Methods => {
-        return { args: [{ channels: 2, sample_rate: 48000 }], encoder: lib.Encoder };
-    },
-    "@discordjs/opus": (lib: any): Methods => {
-        return { args: [48000, 2], encoder: lib.OpusEncoder };
-    }
-}, Opus: Methods = {};
+const support_libs: Methods.supported = {
+    "opusscript": (lib) => ({ args: [48000, 2, 2049], encoder: lib }),
+    "mediaplex": (lib) => ({ args: [48000, 2], encoder: lib.OpusEncoder }),
+    "@evan/opus": (lib) => ({ args: [{ channels: 2, sample_rate: 48000 }], encoder: lib.Encoder })
+};
+
+/**
+ * @author SNIPPIK
+ * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
+ */
+const loaded_lib: Methods.current = {};
 
 /**
  * @author SNIPPIK
@@ -47,30 +44,21 @@ const OGG = {
 
 /**
  * @author SNIPPIK
- * @description Проверяем на наличие библиотек, если будет найдена библиотека то она будет использоваться
- */
-(() => {
-    // Проверяем на наличие библиотек
-    for (const name of Object.keys(OpusLibs)) {
-        try {
-            const library = require(name);
-
-            // Добавляем библиотеку если она конечно есть
-            Object.assign(Opus, {...OpusLibs[name](library), name});
-            delete require.cache[require.resolve(name)];
-            return;
-        } catch {}
-    }
-})();
-
-/**
- * @author SNIPPIK
  * @description Создаем кодировщик в opus
  * @class OpusEncoder
  * @extends Transform
  */
 export class OpusEncoder extends Transform {
+    /**
+     * @description Расшифровщик если он найдет
+     * @private
+     */
     private readonly encoder: any = null;
+
+    /**
+     * @description Временные данные
+     * @private
+     */
     private readonly _temp = {
         remaining: null as Buffer,
         buffer: null    as Buffer,
@@ -79,13 +67,14 @@ export class OpusEncoder extends Transform {
         argument: true  as boolean,
         index: 0
     };
+
     /**
      * @description Название библиотеки и тип аудио для ffmpeg
      * @return {name: string, ffmpeg: string}
      * @public
      */
     public static get lib(): {name: string, ffmpeg: string} {
-        if (Opus?.name) return { name: Opus.name, ffmpeg: "s16le" };
+        if (loaded_lib?.name) return { name: loaded_lib.name, ffmpeg: "s16le" };
         return { name: "Native/Opus", ffmpeg: "opus" };
     };
 
@@ -107,9 +96,9 @@ export class OpusEncoder extends Transform {
         super(Object.assign({ readableObjectMode: true }, options));
 
         //Если была найдена opus library
-        if (Opus?.name) {
+        if (loaded_lib?.name) {
             //Подключаем opus library
-            this.encoder = new Opus.encoder(...Opus.args);
+            this.encoder = new loaded_lib.encoder(...loaded_lib.args);
             this._temp.buffer = Buffer.alloc(0);
         }
     };
@@ -252,15 +241,52 @@ export class OpusEncoder extends Transform {
 }
 
 /**
- * @description Выдаваемы методы для работы opus encoder
+ * @author SNIPPIK
+ * @description Типы для правильной работы typescript
  */
-interface Methods {
-    //Имя библиотеки
-    name?: string;
+namespace Methods {
+    /**
+     * @author SNIPPIK
+     * @description Поддерживаемый запрос к библиотеке
+     * @type supported
+     */
+    export type supported = {
+        [name: string]: (lib: any) => current
+    }
 
-    //Аргументы для запуска
-    args?: any[];
+    /**
+     * @author SNIPPIK
+     * @description Выдаваемы методы для работы opus encoder
+     */
+    export interface current {
+        //Имя библиотеки
+        name?: string;
 
-    //Класс для расшифровки
-    encoder?: any;
+        //Аргументы для запуска
+        args?: any[];
+
+        //Класс для расшифровки
+        encoder?: any;
+    }
 }
+
+
+
+/**
+ * @author SNIPPIK
+ * @description Проверяем на наличие библиотек, если будет найдена библиотека то она будет использоваться
+ * @async
+ */
+(async () => {
+    const names = Object.keys(support_libs);
+
+    for (const name of names) {
+        try {
+            const library = require(name);
+            if (library?.ready) await library.ready;
+            Object.assign(loaded_lib, support_libs[name](library));
+            delete require.cache[require.resolve(name)];
+            return;
+        } catch {}
+    }
+})();

@@ -167,7 +167,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @param seek  - Пропуск времени
      * @public
      */
-    public play = (track: PlayerInput, seek: number = 0): void => {
+    public play = (track: Track, seek: number = 0): void => {
         // Если больше нет треков
         if (!track?.resource) {
             this.emit("player/error", this, `Playing is ending`, false);
@@ -316,11 +316,14 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Выключаем плеер если сейчас играет трек
         this.stop();
 
-        // Вырубаем поток, если он есть
-        if (this.audio.current) {
-            this.audio.current.stream.emit("close");
-            this.audio.current.destroy();
-        }
+        // Удаляем текущий поток, поскольку он больше не нужен
+        setImmediate(() => {
+            // Вырубаем поток, если он есть
+            if (this.audio.current) {
+                this.audio.current.stream.emit("close");
+                this.audio.current.destroy();
+            }
+        });
     };
 }
 
@@ -570,17 +573,6 @@ class PlayerProgress {
         return txt + (current >= total ? `${emoji.upped.right}` : `${emoji.empty.right}`);
     };
 }
-
-/**
- * @author SNIPPIK
- * @description Данные входящие в качестве трека
- * @interface PlayerInput
- * @private
- */
-interface PlayerInput {
-    resource: Promise<string | Error>
-}
-
 
 /**
  * @author SNIPPIK

@@ -1,7 +1,6 @@
 import {Interact} from "@lib/discord/utils/Interact";
 import {httpsClient} from "@lib/request";
 import {ExtraPlayer} from "@lib/player";
-import {Voice} from "@lib/voice";
 import {API} from "@handler";
 import {db} from "@lib/db";
 
@@ -106,7 +105,7 @@ export class Queue {
         }
 
         // Задаем новое голосовое подключение
-        this.player.voice.connection = Voice.join({
+        this.player.voice.connection = db.voice.join({
             selfDeaf: true,
             selfMute: false,
 
@@ -318,7 +317,7 @@ export class Track {
      */
     public get titleReplaced() {
         // Удаляем лишнее скобки
-        const title = `[${this.title.replace(/[\(\)\[\]"]/g, "").substring(0, 45)}](${this.url})`;
+        const title = `[${this.title.replace(/[()\[\]"]/g, "").substring(0, 45)}](${this.url})`;
 
         if (this.platform === "YOUTUBE") return `\`\`[${this.time.split}]\`\` ${title}`;
         return `\`\`[${this.time.split}]\`\` [${this.artist.title}](${this.artist.url}) - ${title}`;

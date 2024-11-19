@@ -137,6 +137,7 @@ export class AudioResource {
      * @public
      */
     public destroy = () => {
+        // Удаляем поток после всех действий, даже если он будет включен заново он все равно будет удален
         setImmediate(() => {
             for (const stream of this._streams) {
                 if (stream instanceof Process) stream.destroy();
