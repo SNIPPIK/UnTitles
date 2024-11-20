@@ -7,20 +7,31 @@ import {WebSocket} from "@lib/request";
 /**
  * @author SNIPPIK
  * @description Время до следующей проверки жизни
+ * @private
  */
 const TIMESTAMP_INC = (48_000 / 100) * 2;
 
 /**
  * @author SNIPPIK
  * @description Статусы голосового подключения
+ * @private
  */
 const socketStatus = [
+    /**
+     * @description Устанавливаем соединение
+     * @private
+     */
     {
         name: VoiceOpcodes.Hello,
         callback: (socket: VoiceSocket, packet: {d: any, op: VoiceOpcodes}) => {
             if (socket.state.code !== VoiceSocketStatusCode.close) socket.state.ws.keepAlive = packet.d.heartbeat_interval;
         }
     },
+
+    /**
+     * @description Сообщаем класс и соединение о готовности
+     * @private
+     */
     {
         name: VoiceOpcodes.Ready,
         callback: (socket: VoiceSocket, packet: {d: any, op: VoiceOpcodes}) => {
@@ -50,6 +61,11 @@ const socketStatus = [
             }
         }
     },
+
+    /**
+     * @description Задаем описание сессии
+     * @private
+     */
     {
         name: VoiceOpcodes.SessionDescription,
         callback: (socket: VoiceSocket, packet: {d: any, op: VoiceOpcodes}) => {
@@ -71,6 +87,11 @@ const socketStatus = [
             }
         }
     },
+
+    /**
+     * @description Сообщаем о продолжении подключения
+     * @private
+     */
     {
         name: VoiceOpcodes.Resumed,
         callback: (socket: VoiceSocket) => {

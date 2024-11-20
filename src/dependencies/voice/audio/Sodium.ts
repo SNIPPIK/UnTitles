@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 /**
  * @author SNIPPIK
  * @description Поддерживаемые библиотеки
+ * @private
  */
 const support_libs: Methods.supported = {
     "sodium": (lib) => ({
@@ -62,16 +63,21 @@ const support_libs: Methods.supported = {
 /**
  * @author SNIPPIK
  * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
+ * @private
  */
 const loaded_lib: Methods._new = {};
 
 /**
+ * @author SNIPPIK
  * @description Максимальный размер пакета
+ * @private
  */
 const MAX_NONCE_SIZE = 2 ** 32 - 1;
 
 /**
+ * @author SNIPPIK
  * @description Доступные заголовки для отправки opus пакетов
+ * @private
  */
 const SUPPORTED_ENCRYPTION_MODES = [
     "aead_xchacha20_poly1305_rtpsize",
@@ -183,6 +189,7 @@ export class Encryption {
  * @author SNIPPIK
  * @description Поддерживаемые методы шифровки пакетов
  * @namespace Methods
+ * @private
  */
 namespace Methods {
     /**

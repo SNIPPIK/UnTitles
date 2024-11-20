@@ -15,13 +15,31 @@ class sAPI extends Constructor.Assign<API.request> {
      * @protected
      */
     protected static authorization = {
+        /**
+         * @description Ссылки для работы API
+         * @protected
+         */
         urls: {
             api: "https://api.spotify.com/v1",
             account: "https://accounts.spotify.com/api",
         },
 
+        /**
+         * @description Данные для авторизации
+         * @protected
+         */
         auth: env.check("token.spotify") ? env.get("token.spotify"): null,
+
+        /**
+         * @description Токен авторизации
+         * @protected
+         */
         token: "",
+
+        /**
+         * @description Время жизни токена
+         * @protected
+         */
         time: 0
     };
 

@@ -4,6 +4,7 @@ import {Buffer} from "node:buffer";
 /**
  * @author SNIPPIK
  * @description Доступные библиотеки для включения
+ * @private
  */
 const support_libs: Methods.supported = {
     "opusscript": (lib) => ({ args: [48000, 2, 2049], encoder: lib }),
@@ -14,6 +15,7 @@ const support_libs: Methods.supported = {
 /**
  * @author SNIPPIK
  * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
+ * @private
  */
 const loaded_lib: Methods.current = {};
 
@@ -21,6 +23,7 @@ const loaded_lib: Methods.current = {};
  * @author SNIPPIK
  * @description Превращаем имя переменной в буфер
  * @param name - Имя переменной
+ * @private
  */
 const bufferCode = (name: string) => {
     return Buffer.from([...`${name}`].map((x: string) => x.charCodeAt(0)));
@@ -29,12 +32,14 @@ const bufferCode = (name: string) => {
 /**
  * @author SNIPPIK
  * @description Доступный формат для отправки opus пакетов
+ * @private
  */
 const bit = 960 * 2 * 2;
 
 /**
  * @author SNIPPIK
  * @description Заголовки для поиска в chuck
+ * @private
  */
 const OGG = {
     "OGGs_HEAD": bufferCode("OggS"),

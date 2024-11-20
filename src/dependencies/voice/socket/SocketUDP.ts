@@ -12,12 +12,14 @@ import {isIPv4} from "node:net";
 export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /**
      * @description Socket UDP подключения
+     * @readonly
      * @private
      */
     private readonly socket: Socket = createSocket("udp4");
 
     /**
      * @description Данные сервера к которому надо подключится
+     * @readonly
      * @private
      */
     private readonly remote = {

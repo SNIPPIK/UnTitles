@@ -15,7 +15,16 @@ class sAPI extends Constructor.Assign<API.request> {
      * @protected
      */
     protected static authorization = {
+        /**
+         * @description Ссылка на метод API
+         * @protected
+         */
         api: "https://api.vk.com/method",
+
+        /**
+         * @description Токен для авторизации
+         * @protected
+         */
         token: env.check("token.vk") ? env.get("token.vk") : null
     };
 

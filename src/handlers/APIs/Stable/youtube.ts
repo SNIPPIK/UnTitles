@@ -5,18 +5,18 @@ import {env} from "@env";
 
 /**
  * @author SNIPPIK
- * @description API ключ для доступа к видео на youtube
- * @protected
- */
-const AIza_key = env.check("token.youtube") ? env.get("token.youtube") : "AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc";
-
-/**
- * @author SNIPPIK
  * @description Динамически загружаемый класс
  * @class sAPI
  * @public
  */
 class sAPI extends Constructor.Assign<API.request> {
+    /**
+     * @author SNIPPIK
+     * @description API ключ для доступа к видео на youtube
+     * @private
+     */
+    private static readonly AIzaKey = env.check("token.youtube") ? env.get("token.youtube") : "AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc";
+
     /**
      * @description Создаем экземпляр запросов
      * @constructor sAPI
@@ -208,7 +208,7 @@ class sAPI extends Constructor.Assign<API.request> {
         return new Promise((resolve) => {
             // Если надо использовать ключ доступа
             if (AIza) {
-                new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${AIza_key}&prettyPrint=false`, {
+                new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${this.AIzaKey}&prettyPrint=false`, {
                     method: "POST",
                     body: JSON.stringify({
                         context: {

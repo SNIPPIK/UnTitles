@@ -16,8 +16,17 @@ class sAPI extends Constructor.Assign<API.request> {
      * @protected
      */
     protected static authorization = {
-        token: env.check("token.yandex") ? env.get("token.yandex") : null,
-        api: "https://api.music.yandex.net"
+        /**
+         * @description Ссылка на метод API
+         * @protected
+         */
+        api: "https://api.music.yandex.net",
+
+        /**
+         * @description Токен для авторизации
+         * @protected
+         */
+        token: env.check("token.yandex") ? env.get("token.yandex") : null
     };
 
     /**
