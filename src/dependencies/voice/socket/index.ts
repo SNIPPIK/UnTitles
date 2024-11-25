@@ -149,7 +149,11 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
             Reflect.get(this._state, "ws") as WebSocket,
             Reflect.get(newState, "ws") as WebSocket,
             (oldS) => {
-                oldS.off("error", this.GettingError).off("open", this.WebSocketOpen).off("packet", this.WebSocketPacket).off("close", this.WebSocketClose)
+                oldS
+                    .off("error", this.GettingError)
+                    .off("open", this.WebSocketOpen)
+                    .off("packet", this.WebSocketPacket)
+                    .off("close", this.WebSocketClose)
             }
         );
 
@@ -158,7 +162,9 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
             Reflect.get(this._state, "udp") as VoiceUDPSocket,
             Reflect.get(newState, "udp") as VoiceUDPSocket,
             (oldS) => {
-                oldS.off("error", this.GettingError).off("close", this.UDPClose);
+                oldS
+                    .off("error", this.GettingError)
+                    .off("close", this.UDPClose);
             }
         );
 

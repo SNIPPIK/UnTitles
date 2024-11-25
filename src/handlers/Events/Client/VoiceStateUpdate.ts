@@ -82,7 +82,7 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
 
                         // Если есть пользователи
                         if (members > 0) return;
-                        else voice.destroy();
+                        else voice.disconnect();
                     }
                 }
             })

@@ -8,24 +8,6 @@ import crypto from "node:crypto";
  * @private
  */
 const support_libs: Methods.supported = {
-    "sodium": (lib) => ({
-        close: lib.api.crypto_secretbox_easy,
-        random: (num, buffer: Buffer = Buffer.allocUnsafe(num)) => {
-            lib.api.randombytes_buf(buffer);
-            return buffer;
-        },
-        crypto_aead_xchacha20poly1305_ietf_decrypt: (cipherText, additionalData, nonce, key) => {
-            const message = Buffer.alloc(cipherText.length - lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
-            lib.crypto_aead_xchacha20poly1305_ietf_decrypt(message, null, cipherText, additionalData, nonce, key);
-            return message;
-        },
-        crypto_aead_xchacha20poly1305_ietf_encrypt: (plaintext, additionalData, nonce, key) => {
-            const cipherText = Buffer.alloc(plaintext.length + lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
-            lib.crypto_aead_xchacha20poly1305_ietf_encrypt(cipherText, plaintext, additionalData, null, nonce, key);
-            return cipherText;
-        }
-    }),
-
     "sodium-native": (lib) => ({
         close: (opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array) => {
             const output = Buffer.allocUnsafe(opusPacket.length + lib.crypto_box_MACBYTES);

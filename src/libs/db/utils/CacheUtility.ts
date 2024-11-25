@@ -63,7 +63,7 @@ export class CacheUtility {
 /**
  * @author SNIPPIK
  * @description Класс для сохранения данных о треке
- * @support track, author
+ * @support track
  * @class CacheData
  * @protected
  */
@@ -76,12 +76,7 @@ class CacheData {
         /**
          * @description Кешированные треки
          */
-        tracks: new Map<string, Track>(),
-
-        /**
-         * @description Кешированные авторы треков
-         */
-        artists: new Map<string, Track.artist>()
+        tracks: new Map<string, Track>()
     };
 
     /**

@@ -2,8 +2,8 @@ import {API, Constructor} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/queue";
 import crypto from "node:crypto";
-import {env} from "@env";
 import {db} from "@lib/db";
+import {env} from "@env";
 
 /**
  * @author SNIPPIK

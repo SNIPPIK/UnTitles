@@ -63,8 +63,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             Reflect.get(oldState, "networking") as VoiceSocket,
             Reflect.get(newState, "networking") as VoiceSocket,
             (old) => {
-                old.off("error", this.onSocketError).off("close", this.onSocketClose).off("stateChange", this.onSocketStateChange);
-                old.destroy();
+                old
+                    .off("error", this.onSocketError)
+                    .off("close", this.onSocketClose)
+                    .off("stateChange", this.onSocketStateChange)
+                    .destroy();
             }
         );
 
@@ -103,9 +106,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
             // Создаем адаптер
             adapter: options.adapterCreator({
-                onVoiceServerUpdate: (data) => this.addServerPacket(data),
-                onVoiceStateUpdate: (data) => this.addStatePacket(data),
-                destroy: () => this.destroy(false)
+                onVoiceServerUpdate: this.addServerPacket,
+                onVoiceStateUpdate: this.addStatePacket,
+                destroy: this.destroy
             })
         };
     };

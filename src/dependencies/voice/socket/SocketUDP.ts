@@ -54,7 +54,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         super();
         Object.assign(this.remote, options);
 
-        //Добавляем ивенты
+        // Добавляем ивенты
         for (let event of ["message", "error", "close"]) {
             this.socket.on(event, (...args) => this.emit(event as any, ...args));
         }
@@ -72,7 +72,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         discoveryBuffer.writeUInt32BE(ssrc, 4);
         this.packet = discoveryBuffer;
 
-        //Передаем данные об IP-адресе и порте
+        // Передаем данные об IP-адресе и порте
         return new Promise((resolve, reject) => {
             this.socket
                 .once("close", () => {
