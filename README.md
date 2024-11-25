@@ -1,6 +1,6 @@
 # UnTitles | Private
 - Автор: [`SNIPPIK`](https://github.com/SNIPPIK)
-- Collaborators: [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS)
+- Collaborator: [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS)
 
 ### About
 ```
@@ -42,10 +42,10 @@
     - skip, remove, play, filter, voice (leave, re-configure), avatar, seek
 [V] Добавить env файл
 [V] Новый logger, модификация старого от WatKLOK
+[V] Система кеширования (аудио в виде файлов, данных пока в памяти)
 
 
 В разработке
 [~] Система lyrics (текст для песни, пока без синхронизации со временем)
-[~] Система кеширования (аудио, данных, картинок)
 [?] История прослушивания для каждого пользователя будет своя
 ```

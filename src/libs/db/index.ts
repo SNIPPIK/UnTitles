@@ -8,6 +8,7 @@ import {API, Handler} from "@handler";
 import {Client} from "@lib/discord";
 import {Logger} from "@lib/logger";
 import {env} from "@env";
+import {CacheUtility} from "@lib/db/utils/CacheUtility";
 
 /**
  * @author SNIPPIK
@@ -51,6 +52,12 @@ class Database {
      * @private
      */
     private readonly _buttons = new Database_Buttons();
+
+    /**
+     * @description Класс кеширования
+     * @private
+     */
+    private readonly _cache = new CacheUtility();
 
     /**
      * @description Выдаем все необходимые смайлики
@@ -180,6 +187,12 @@ class Database {
      * @public
      */
     public get commands() { return this._commands; };
+
+    /**
+     * @description Выдаем класс ждя управления кешированием
+     * @public
+     */
+    public get cache() { return this._cache; };
 
     /**
      * @descriptionЗапускаем и загружаем базу данных

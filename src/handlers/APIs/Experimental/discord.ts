@@ -35,6 +35,7 @@ class sAPI extends Constructor.Assign<API.request> {
                             callback: (attachment: any) => {
                                 return new Promise<Track>((resolve) => {
                                     const track = new Track({
+                                        id: null,
                                         url: attachment.url,
                                         title: attachment.name, artist: null,
                                         image: {url: attachment.proxyURL},

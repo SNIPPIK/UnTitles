@@ -209,7 +209,7 @@ class Process {
  * @description Делаем проверку на наличие FFmpeg/avconv
  */
 (() => {
-    const names = [`${env.get("cached.dir")}/FFmpeg/ffmpeg`, env.get("cached.dir"), env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
+    const names = [`${env.get("cache.dir")}/FFmpeg/ffmpeg`, env.get("cache.dir"), env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 
     // Проверяем имена, если есть FFmpeg/avconv
     for (const name of [...names, "ffmpeg", "avconv"]) {

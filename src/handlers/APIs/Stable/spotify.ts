@@ -1,6 +1,7 @@
 import {API, Constructor} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/queue";
+import {db} from "@lib/db";
 import {env} from "@env";
 
 /**
@@ -75,13 +76,21 @@ class sAPI extends Constructor.Assign<API.request> {
                                     //Если ID трека не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
 
+                                    // Интеграция с утилитой кеширования
+                                    const cache = db.cache.get(ID);
+
+                                    // Если найден трек или похожий объект
+                                    if (cache) return resolve(cache);
+
                                     try {
                                         //Создаем запрос
                                         const api = await sAPI.API(`tracks/${ID}`);
 
                                         //Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
-                                        const track = sAPI.track(api)
+                                        const track = sAPI.track(api);
+
+                                        db.cache.set(track);
 
                                         return resolve(track);
                                     } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
@@ -267,6 +276,7 @@ class sAPI extends Constructor.Assign<API.request> {
      */
     protected static track = (track: any): Track => {
         return new Track({
+            id: track.id,
             title: track.name,
             url: track["external_urls"]["spotify"],
             artist: {

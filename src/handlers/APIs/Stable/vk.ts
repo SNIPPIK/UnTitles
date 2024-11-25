@@ -1,6 +1,7 @@
 import {API, Constructor} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/queue";
+import {db} from "@lib/db";
 import {env} from "@env";
 
 /**
@@ -60,6 +61,12 @@ class sAPI extends Constructor.Assign<API.request> {
                                     //Если ID трека не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
 
+                                    // Интеграция с утилитой кеширования
+                                    const cache = db.cache.get(ID);
+
+                                    // Если найден трек или похожий объект
+                                    if (cache) return resolve(cache);
+
                                     try {
                                         //Создаем запрос
                                         const api = await sAPI.API("audio", "getById", `&audios=${ID}`);
@@ -71,6 +78,9 @@ class sAPI extends Constructor.Assign<API.request> {
 
                                         //Если нет ссылки на трек
                                         if (!track.link) return reject(Error("[APIs]: Невозможно получить файл аудио!"));
+
+                                        // Сохраняем кеш в системе
+                                        db.cache.set(track);
 
                                         return resolve(track);
                                     } catch (e) {
@@ -141,6 +151,7 @@ class sAPI extends Constructor.Assign<API.request> {
         const image = track?.album?.["thumb"];
 
         return new Track({
+            id: `${track["owner_id"]}_${track.id}`,
             url: url || `https://vk.com/audio${track["owner_id"]}_${track.id}`,
             title: track.title,
             artist: this.author(track),

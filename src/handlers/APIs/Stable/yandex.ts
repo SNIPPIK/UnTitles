@@ -3,6 +3,7 @@ import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/queue";
 import crypto from "node:crypto";
 import {env} from "@env";
+import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
@@ -58,25 +59,35 @@ class sAPI extends Constructor.Assign<API.request> {
                                 const ID = /track\/[0-9]+/gi.exec(url)?.pop()?.split("track")?.pop();
 
                                 return new Promise<Track>(async (resolve, reject) => {
-                                    try {
-                                        if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
+                                    // Если ID трека не удалось извлечь из ссылки
+                                    if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
 
-                                        //Делаем запрос
+                                    // Интеграция с утилитой кеширования
+                                    const cache = db.cache.get(ID);
+
+                                    // Если найден трек или похожий объект
+                                    if (cache) return resolve(cache);
+
+                                    try {
+                                        // Делаем запрос
                                         const api = await sAPI.API(`tracks/${ID}`);
 
-                                        //Обрабатываем ошибки
+                                        // Обрабатываем ошибки
                                         if (api instanceof Error) return reject(api);
                                         else if (!api[0]) return reject(Error("[APIs]: Не удалось получить данные о треке!"));
 
                                         const track = sAPI.track(api[0]);
 
-                                        //Надо ли получать аудио
+                                        // Надо ли получать аудио
                                         if (audio) {
                                             const link = await sAPI.getAudio(ID);
 
                                             if (link instanceof Error) return reject(api);
                                             track.link = link;
                                         }
+
+                                        // Сохраняем кеш в системе
+                                        db.cache.set(track);
 
                                         return resolve(track);
                                     } catch (e) {
@@ -305,6 +316,7 @@ class sAPI extends Constructor.Assign<API.request> {
         const album = track["albums"]?.length ? track["albums"][0] : track["albums"];
 
         return new Track({
+            id: `${album.id}_${track.id}`,
             title: `${track?.title ?? track?.name}` + (track.version ? ` - ${track.version}` : ""),
             image: this.parseImage({image: track?.["ogImage"] || track?.["coverUri"]}) ?? null,
             url: `https://music.yandex.ru/album/${album.id}/track/${track.id}`,

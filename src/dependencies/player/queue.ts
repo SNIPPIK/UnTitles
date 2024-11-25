@@ -3,6 +3,13 @@ import {httpsClient} from "@lib/request";
 import {ExtraPlayer} from "@lib/player";
 import {API} from "@handler";
 import {db} from "@lib/db";
+import {env} from "@env";
+
+/**
+ * @author SNIPPIK
+ * @description Проверяем включено ли кеширование аудио
+ */
+const cache = env.get("cache");
 
 /**
  * @author SNIPPIK
@@ -282,8 +289,15 @@ export class Track {
      * @private
      */
     private readonly _track: Track.data & { user?: Track.user; duration?: { split: string; total: number; }} = {
-        title: null, url: null, image: null, artist: null, duration: null, time: null, audio: { url: null, type: "url" }
+        id: null, title: null, url: null, image: null, artist: null, duration: null, time: null, audio: { url: null, type: "url" }
     };
+
+    /**
+     * @description Выдаем id трека
+     * @public
+     */
+    public get id() { return this._track.id; };
+
     /**
      * @description Получаем платформу у которого был взят трек
      * @public
@@ -314,7 +328,7 @@ export class Track {
     /**
      * @description Получаем отредактированное название трека
      * @public
-     */
+     */else
     public get titleReplaced() {
         // Удаляем лишнее скобки
         const title = `[${this.title.replace(/[()\[\]"]/g, "").substring(0, 45)}](${this.url})`;
@@ -390,11 +404,21 @@ export class Track {
      * @public
      */
     public get resource(): Promise<string | Error> {
+        const download = cache && this.platform !== "DISCORD";
+
         return new Promise(async (resolve) => {
-            //Проверяем ссылку на работоспособность, если 3 раза будет неудача ссылка будет удалена
+            // Смотрим если ли кеш аудио
+            if (download) {
+                const status = db.cache.audio.status(this);
+
+                // Если есть кеш аудио, то выдаем его
+                if (status.status === "final") return resolve(status.path);
+            }
+
+            // Проверяем ссылку на работоспособность, если 3 раза будет неудача ссылка будет удалена
             for (let ref = 0; ref < 3; ref++) {
 
-                //Проверяем ссылку на актуальность
+                // Проверяем ссылку на актуальность
                 if (this.link && this.link.startsWith("http")) {
                     try {
                         const status = await new httpsClient(this.link, {method: "HEAD"}).status;
@@ -406,11 +430,11 @@ export class Track {
                     }
                 }
 
-                //Если нет ссылки, то ищем замену
+                // Если нет ссылки, то ищем замену
                 if (!this.link) {
                     const link = !db.api.platforms.audio.includes(this.platform) ? await db.api.fetchAllow(this) : await db.api.fetch(this);
 
-                    //Если вместо ссылки получили ошибку
+                    // Если вместо ссылки получили ошибку
                     if (link instanceof Error || !link) {
                         if (ref < 3) continue;
                         else return resolve("Fail find other track, requested a max 3!");
@@ -420,8 +444,11 @@ export class Track {
                 }
             }
 
-            //Если не удается найти ссылку через n попыток
+            // Если не удается найти ссылку через n попыток
             if (!this.link) return resolve(Error(`[SONG]: Fail update link resource`));
+
+            // Сохраняем аудио кеш
+            else if (download && this.link) db.cache.audio.set(this);
             return resolve(`link:|${this.link}`);
         });
     };
@@ -465,6 +492,11 @@ export namespace Track {
      * @interface data
      */
     export interface data {
+        /**
+         * @description Уникальный id трека
+         */
+        id: string
+
         /**
          * @description Название трека
          */

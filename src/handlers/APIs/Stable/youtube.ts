@@ -2,6 +2,7 @@ import {API, Constructor} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/queue";
 import {env} from "@env";
+import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
@@ -92,25 +93,33 @@ class sAPI extends Constructor.Assign<API.request> {
                                 const ID = this.filter.exec(url)?.at(0) ?? this.filter.exec(url)[0];
 
                                 return new Promise<Track>(async (resolve, reject) => {
-                                    //Если ID видео не удалось извлечь из ссылки
+                                    // Если ID видео не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не удалось получить ID трека!"));
 
+                                    // Интеграция с утилитой кеширования
+                                    const cache = db.cache.get(ID);
+
+                                    // Если найден трек или похожий объект
+                                    if (cache) return resolve(cache);
+
                                     try {
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const result = await sAPI.API(ID, true);
 
-                                        ///Если при получении данных возникла ошибка
+                                        /// Если при получении данных возникла ошибка
                                         if (result instanceof Error) return reject(result);
 
-                                        //Если надо получить аудио
+                                        // Если надо получить аудио
                                         if (audio) {
                                             const format = await sAPI.extractFormat(result["streamingData"]);
-                                            //console.log(format)
-
                                             result["videoDetails"]["format"] = {url: format["url"]};
                                         }
 
                                         const track = sAPI.track(result["videoDetails"]);
+
+                                        // Сохраняем кеш в системе
+                                        db.cache.set(track);
+
                                         return resolve(track);
                                     } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                                 });
@@ -352,6 +361,7 @@ class sAPI extends Constructor.Assign<API.request> {
     protected static track(track: any): any {
         try {
             return new Track({
+                id: track["videoId"],
                 url: `https://youtu.be/${track["videoId"]}`,
                 title: track.title?.["runs"][0]?.text ?? track.title,
                 artist: {
@@ -367,6 +377,7 @@ class sAPI extends Constructor.Assign<API.request> {
             });
         } catch {
             return new Track({
+                id: track["videoId"],
                 artist: {
                     title: track.author,
                     url: `https://www.youtube.com/channel/${track.channelId}`
