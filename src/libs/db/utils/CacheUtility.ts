@@ -175,15 +175,9 @@ class CacheAudio extends Constructor.Cycle<Track> {
     public status = (track: Track): { status: "not" | "final" | "download", path: string } => {
         try {
             const dir = `${path.resolve(`${cache}/Audio/[${track.id}]`)}`;
+            const isOpus = existsSync(`${dir}.opus`), isRaw = existsSync(`${dir}.raw`);
 
-            // Если еще идет скачивание
-            if (existsSync(`${dir}.raw`)) return { status: "download", path: dir + `.raw` };
-
-            // Если файл уже скачан
-            else if (existsSync(`${dir}.opus`)) return { status: "final", path: dir + `.opus` };
-
-            // Если что-то пошло не так
-            return { status: "not", path: dir };
+            return {status: isOpus ? "final" : isRaw ? "download" : "not", path: dir + (isOpus ? `.opus` : `.raw`)}
         } catch {
             return {status: "not", path: null};
         }

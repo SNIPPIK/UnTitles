@@ -412,7 +412,7 @@ export class Track {
                 const status = db.cache.audio.status(this);
 
                 // Если есть кеш аудио, то выдаем его
-                if (status.status === "final") return resolve(status.path);
+                if (status.status === "final") return resolve(`file:|${status.path}`);
             }
 
             // Проверяем ссылку на работоспособность, если 3 раза будет неудача ссылка будет удалена
