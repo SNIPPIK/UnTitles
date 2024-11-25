@@ -448,7 +448,7 @@ export class Track {
             if (!this.link) return resolve(Error(`[SONG]: Fail update link resource`));
 
             // Сохраняем аудио кеш
-            else if (download && this.link) db.cache.audio.set(this);
+            else if (download && this.link) void (db.cache.audio.set(this));
             return resolve(`link:|${this.link}`);
         });
     };

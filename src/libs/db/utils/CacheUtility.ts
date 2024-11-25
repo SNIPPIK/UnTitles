@@ -2,7 +2,6 @@ import {createWriteStream, existsSync, mkdirSync, rename} from "node:fs";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/queue";
 import {Constructor} from "@handler";
-import {Logger} from "@lib/logger";
 import path from "node:path";
 import {env} from "@env";
 
@@ -138,23 +137,32 @@ class CacheAudio extends Constructor.Cycle<Track> {
                     if (req instanceof Error) return resolve(false);
                     else if ("pipe" in req) {
                         const status = this.status(track);
-                        const file = createWriteStream(status.path);
+                        const file = createWriteStream(status.path)
+                            // Если произошла ошибка при создании файла
+                            .once("error", console.warn)
 
-                        file.once("ready", () => req.pipe(file as any));
-                        file.once("error", console.warn);
-                        file.once("finish", () => {
-                            const refreshName = this.status(track).path.split(".raw")[0];
-                            rename(status.path, `${refreshName}.opus`, () => null);
+                            // Производим запись в файл
+                            .once("ready", () => {
+                                req.pipe(file);
+                            })
 
-                            if (!req.destroyed) req.destroy();
-                            if (!file.destroyed) {
-                                file.destroy();
-                                file.end();
-                            }
-                            Logger.log("DEBUG", `[Download] in ${refreshName}`);
+                            // Если запись была завершена
+                            .once("finish", () => {
+                                const name = this.status(track).path.split(".raw")[0];
 
-                            return resolve(true);
-                        });
+                                // Заканчиваем запись на файл
+                                if (!file.destroyed) {
+                                    file.destroy();
+                                    file.end();
+                                }
+
+                                // Удаляем подключение
+                                if (!req.destroyed) req.destroy();
+
+                                // Меняем тип файла на opus
+                                rename(status.path, `${name}.opus`, () => null);
+                                return resolve(true);
+                            })
                     }
 
                     return resolve(false);
