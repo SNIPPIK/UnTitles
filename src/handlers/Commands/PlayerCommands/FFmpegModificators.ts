@@ -188,7 +188,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                 const name = args[args.length - 2 || args?.length - 1] ?? args[0];
                 const arg = args.length > 1 ? Number(args[args?.length - 1]) : null;
                 const Filter = filters.find((item) => item.name === name) as AudioFilter;
-                const index = queue.player.filters.enable.indexOf(Filter);
+                const findFilter = queue.player.filters.enable.find((fl) => fl.name === Filter.name);
 
                 switch (type) {
                     // Выключаем все фильтры
@@ -208,7 +208,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     // Добавляем фильтр
                     case "push": {
                         // Пользователь пытается включить включенный фильтр
-                        if (index !== -1) {
+                        if (findFilter) {
                             message.fastBuilder = { description: locale._(message.locale, "command.filter.arg.fail") };
                             return;
                         }
@@ -253,12 +253,16 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     // Удаляем фильтр из включенных
                     case "remove": {
                         // Пользователь пытается выключить выключенный фильтр
-                        if (index === -1) {
-                            message.fastBuilder = { description: "Temple text, code:flt2670" };
+                        if (findFilter) {
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.filter.re.removed"),
+                                color: Colors.Yellow
+                            };
                             return;
                         }
 
                         // Удаляем фильтр
+                        const index = queue.player.filters.enable.indexOf(findFilter);
                         queue.player.filters.enable.splice(index, 1);
                         queue.player.play(queue.tracks.song, seek);
 

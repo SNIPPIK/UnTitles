@@ -376,6 +376,11 @@
     "en-US":"Remove audio filter\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
   },
 
+  "command.filter.re.removed": {
+    "ru": "Невозможно выключить фильтр, поскольку он не включен!",
+    "en-US":"The filter cannot be turned off because it is not enabled!"
+  },
+
   "command.filter.unsupported": {
     "ru": "Аудио фильтр не совместим с текущим списком фильтров",
     "en-US": "The audio filter is not compatible with the current filter list"
