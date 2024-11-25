@@ -187,8 +187,8 @@ namespace Methods {
      * @interface _new
      */
     export interface _new {
-        crypto_aead_xchacha20poly1305_ietf_decrypt?(cipherText: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike): Buffer;
-        crypto_aead_xchacha20poly1305_ietf_encrypt?(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike): Buffer;
+        crypto_aead_xchacha20poly1305_ietf_decrypt?(cipherText: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike | Uint8Array): Buffer;
+        crypto_aead_xchacha20poly1305_ietf_encrypt?(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike | Uint8Array): Buffer;
         close?(opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array): Buffer;
         random?(bytes: number, nonce: Buffer): Buffer;
     }

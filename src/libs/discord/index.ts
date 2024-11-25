@@ -74,7 +74,7 @@ export class Client extends DS_Client {
             shardCount: parseInt(env.get("shard.server")) || 1e3,
 
             // Кол-во осколков
-            shards: "auto",
+            shards: "auto"
         });
     };
 
