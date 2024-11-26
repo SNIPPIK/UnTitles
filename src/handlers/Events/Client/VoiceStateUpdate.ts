@@ -78,7 +78,7 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
 
                     // Если нет очереди, но есть голосовое подключение
                     else {
-                        const members = (client.channels.cache.get(voice.config.channelId) as VoiceChannel).members.filter(member => !member.user.bot).size;
+                        const members = (client.channels.cache.get(voice.config.channelId) as VoiceChannel)?.members?.filter(member => !member.user.bot).size;
 
                         // Если есть пользователи
                         if (members > 0) return;
