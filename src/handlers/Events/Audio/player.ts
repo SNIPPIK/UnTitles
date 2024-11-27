@@ -54,7 +54,7 @@ class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
                 if (queue.shuffle && queue.repeat === "off") queue.tracks.shuffle();
 
                 // Получаем ссылки на трек и проигрываем ее
-                setTimeout(() => queue.player.play(queue.tracks.song), 2e3);
+                setTimeout(() => queue.player.play(), 2e3);
             }
         });
     };

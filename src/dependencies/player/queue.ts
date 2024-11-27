@@ -249,7 +249,7 @@ export class Queue {
 
         // В конце функции выполнить запуск проигрывания
         setImmediate(() => {
-            this.player.play(this.tracks.song);
+            this.player.play();
         });
     };
 
@@ -423,7 +423,11 @@ export class Track {
                     try {
                         const status = await new httpsClient(this.link, {method: "HEAD"}).status;
 
-                        if (status) break
+                        if (status) {
+                            // Сохраняем аудио кеш
+                            if (download) void (db.cache.audio.set(this));
+                            break;
+                        }
                         else this.link = null;
                     } catch (err) {
                         this.link = null;
@@ -446,9 +450,6 @@ export class Track {
 
             // Если не удается найти ссылку через n попыток
             if (!this.link) return resolve(Error(`[SONG]: Fail update link resource`));
-
-            // Сохраняем аудио кеш
-            else if (download && this.link) void (db.cache.audio.set(this));
             return resolve(`link:|${this.link}`);
         });
     };

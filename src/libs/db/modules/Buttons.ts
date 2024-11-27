@@ -69,7 +69,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 }
 
                 // Меняем позицию трека в очереди
-                queue.player.stop_fade(queue.tracks.position - 1);
+                queue.player.stop(queue.tracks.position - 1);
 
                 // Уведомляем пользователя о смене трека
                 msg.fastBuilder = {
@@ -122,7 +122,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 const queue = msg.queue;
 
                 // Меняем позицию трека в очереди
-                queue.player.stop_fade(queue.tracks.position + 1);
+                queue.player.stop(queue.tracks.position + 1);
 
                 // Уведомляем пользователя о пропущенном треке
                 msg.fastBuilder = {
@@ -173,7 +173,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                 const queue = msg.queue;
 
                 // Запускаем проигрывание текущего трека
-                queue.player.play(queue.tracks.song);
+                queue.player.play();
 
                 // Сообщаем о том что музыка начата с начала
                 msg.fastBuilder = {

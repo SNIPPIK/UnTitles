@@ -164,13 +164,14 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
 
     /**
      * @description Функция отвечает за циклическое проигрывание
-     * @param track - Трек который будет включен
      * @param seek  - Пропуск времени
      * @public
      */
-    public play = (track: Track, seek: number = 0): void => {
+    public play = (seek: number = 0): void => {
+        const track = this._tracks?.song;
+
         // Если больше нет треков
-        if (!track?.resource) {
+        if (!track?.resource || !track) {
             this.emit("player/error", this, `Playing is ending`, false);
             this.emit("player/wait", this);
             return;
@@ -276,25 +277,24 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
-     * @description Останавливаем воспроизведение текущего трека
-     * @public
+     * @description Останавливаем воспроизведение текущего трека, поддерживает плавный переход
+     * @param position - номер трека, по умолчанию следующий
+     * @param emitted - принудительное выключение, аннулирует плавный пропуск
      */
-    public stop = (): void => {
-        if (this.status === "player/wait") return;
-        this.status = "player/wait";
-    };
+    public stop = (position: number = this._tracks.position + 1, emitted: boolean = false) => {
+        // Принудительно выключить трек
+        if (emitted) {
+            if (this.status === "player/wait") return;
+            this.status = "player/wait";
+            return;
+        }
 
-    /**
-     * @description Работает по принципу stop, но с плавным переходом
-     * @param position - номер трека
-     */
-    public stop_fade = (position: number) => {
         const old = this.tracks.position;
 
         // Меняем позицию трека в очереди
         if (this.audio.current.duration < this.tracks.song.time.total + 10) {
             this.tracks.swapPosition = position;
-            this.play(this.tracks.song);
+            this.play();
 
             // Если не получилось начать чтение следующего трека
             this.audio.current.stream.once("error", () => {
@@ -304,7 +304,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         } else {
             // Если надо вернуть прошлый трек, но времени уже нет!
             if (this.tracks.position > position) this.tracks.swapPosition = position - 1;
-            this.stop();
+            this.stop(0, true);
         }
     };
 

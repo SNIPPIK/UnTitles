@@ -64,7 +64,7 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                 }
 
                 //Начинаем проигрывание трека с <пользователем указанного тайм кода>
-                queue.player.play(queue.tracks.song, duration);
+                queue.player.play(duration);
 
                 //Отправляем сообщение о пропуске времени
                 message.fastBuilder = { color: Colors.Green, description: locale._(message.locale, "command.seek", [duration]) };
@@ -201,7 +201,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
 
                         // Удаляем фильтры
                         queue.player.filters.enable.splice(0, queue.player.filters.enable.length);
-                        queue.player.play(queue.tracks.song, seek);
+                        queue.player.play(seek);
                         return;
                     }
 
@@ -240,7 +240,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
 
                         // Добавляем и включаем фильтр
                         queue.player.filters.enable.push(Filter);
-                        queue.player.play(queue.tracks.song, seek);
+                        queue.player.play(seek);
 
                         // Сообщаем о новом фильтре
                         message.fastBuilder = {
@@ -264,7 +264,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         // Удаляем фильтр
                         const index = queue.player.filters.enable.indexOf(findFilter);
                         queue.player.filters.enable.splice(index, 1);
-                        queue.player.play(queue.tracks.song, seek);
+                        queue.player.play(seek);
 
                         // Сообщаем об удалении фильтра
                         message.fastBuilder = {

@@ -67,14 +67,14 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                 // Если аргумент больше 1, то ищем трек
                 if (arg > 1) {
                     // Меняем позицию трека в очереди
-                    queue.player.stop_fade(tracks.position + arg - 1);
+                    queue.player.stop(tracks.position + arg - 1);
                     message.fastBuilder = { description: locale._(message.locale, "command.skip.arg.track", [arg, `[${title}](${url})`]), color };
 
                     return;
                 }
 
                 // Пропускаем текущий трек
-                queue.player.stop_fade(tracks.position + 1);
+                queue.player.stop(tracks.position + 1);
                 message.fastBuilder = { description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]), color };
                 return;
             }
@@ -143,7 +143,7 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
                 const {title, url, color} = tracks.get(arg > 1 ? arg : arg - 1);
 
                 // Меняем позицию трека в очереди
-                queue.player.stop_fade(arg);
+                queue.player.stop(arg);
                 message.fastBuilder = { description: locale._(message.locale, "command.position", [arg, `[${title}](${url})`]), color };
                 return;
             }
@@ -213,7 +213,7 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                 // Удаляем трек указанный пользователем
                 if (arg !== 1) queue.tracks.remove(arg - 1);
                 else {
-                    queue.player.stop_fade(queue.tracks.position + 1);
+                    queue.player.stop(queue.tracks.position + 1);
                     queue.tracks.remove(arg - 1);
                 }
 
