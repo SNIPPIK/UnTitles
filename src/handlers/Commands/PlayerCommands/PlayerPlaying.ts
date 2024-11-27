@@ -16,7 +16,7 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
             data: new SlashBuilder()
                 .setName({
                     "en-US": "play",
-                    "ru": "воспроизведение"
+                    "ru": "играть"
                 })
                 .setDescription({
                     "en-US": "Play music of your choice!",

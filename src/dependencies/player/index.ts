@@ -163,7 +163,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
-     * @description Функция отвечает за циклическое проигрывание
+     * @description Функция отвечает за циклическое проигрывание, если хотим воспроизвести следующий трек надо избавится от текущего
      * @param seek  - Пропуск времени
      * @public
      */
@@ -171,7 +171,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         const track = this._tracks?.song;
 
         // Если больше нет треков
-        if (!track?.resource || !track) {
+        if (!track?.resource) {
             this.emit("player/error", this, `Playing is ending`, false);
             this.emit("player/wait", this);
             return;
@@ -277,18 +277,19 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
-     * @description Останавливаем воспроизведение текущего трека, поддерживает плавный переход
-     * @param position - номер трека, по умолчанию следующий
-     * @param emitted - принудительное выключение, аннулирует плавный пропуск
+     * @description Останавливаем воспроизведение текущего трека
+     * @public
      */
-    public stop = (position: number = this._tracks.position + 1, emitted: boolean = false) => {
-        // Принудительно выключить трек
-        if (emitted) {
-            if (this.status === "player/wait") return;
-            this.status = "player/wait";
-            return;
-        }
+    public stop = (): void => {
+        if (this.status === "player/wait") return;
+        this.status = "player/wait";
+    };
 
+    /**
+     * @description Работает по принципу stop, но с плавным переходом
+     * @param position - номер трека
+     */
+    public stop_fade = (position: number) => {
         const old = this.tracks.position;
 
         // Меняем позицию трека в очереди
@@ -304,7 +305,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         } else {
             // Если надо вернуть прошлый трек, но времени уже нет!
             if (this.tracks.position > position) this.tracks.swapPosition = position - 1;
-            this.stop(0, true);
+            this.stop();
         }
     };
 

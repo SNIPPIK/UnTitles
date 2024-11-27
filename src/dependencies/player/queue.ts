@@ -425,7 +425,11 @@ export class Track {
 
                         if (status) {
                             // Сохраняем аудио кеш
-                            if (download) void (db.cache.audio.set(this));
+                            if (download) setImmediate(() => {
+                                db.cache.audio.set(this);
+                            });
+
+                            // Завершаем цикл
                             break;
                         }
                         else this.link = null;

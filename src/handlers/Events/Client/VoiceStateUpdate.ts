@@ -44,8 +44,8 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
                     if (queue) {
 
                         // Если голосовое подключение не установлено
-                        if (!queue.voice.channel.members) {
-                            console.log(`${guild.id}/${queue.message.channel.id}`);
+                        if (!queue.voice?.channel?.members) {
+                            console.log(`${guild.id}/${queue?.message?.channel?.id}`);
                             return;
                         }
 

@@ -39,13 +39,12 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                 .json,
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
-                const { guild } = message;
-                const queue = db.audio.queue.get(guild.id);
+                const queue = db.audio.queue.get(message.guild.id);
                 const {player, tracks} = queue;
-                const arg = args.length > 0 ? parseInt(args.pop()) : 1;
+                const number = args.length > 0 ? parseInt(args.pop()) : 1;
 
                 // Если аргумент не является числом
-                if (isNaN(arg)) {
+                if (isNaN(number)) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.nan"), color: Colors.DarkRed };
                     return;
                 }
@@ -57,24 +56,24 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                 }
 
                 // Если пользователь укажет больше чем есть в очереди или меньше
-                else if (arg > tracks.size || arg < 1) {
+                else if (number > tracks.size || number < 1) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
                     return;
                 }
 
-                const {title, url, color} = tracks.get(arg > 1 ? queue.tracks.position + arg - 1 : queue.tracks.position - 1);
+                const {title, url, color} = tracks.get(number > 1 ? queue.tracks.position + number - 1 : queue.tracks.position - 1);
 
                 // Если аргумент больше 1, то ищем трек
-                if (arg > 1) {
+                if (number > 1) {
                     // Меняем позицию трека в очереди
-                    queue.player.stop(tracks.position + arg - 1);
-                    message.fastBuilder = { description: locale._(message.locale, "command.skip.arg.track", [arg, `[${title}](${url})`]), color };
+                    queue.player.stop_fade(tracks.position + number - 1);
+                    message.fastBuilder = { description: locale._(message.locale, "command.skip.arg.track", [number, `[${title}](${url})`]), color };
 
                     return;
                 }
 
                 // Пропускаем текущий трек
-                queue.player.stop(tracks.position + 1);
+                queue.player.stop_fade(tracks.position + 1);
                 message.fastBuilder = { description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]), color };
                 return;
             }
@@ -117,13 +116,12 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
                 .json,
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
-                const { guild } = message;
-                const queue = db.audio.queue.get(guild.id);
+                const queue = db.audio.queue.get(message.guild.id);
                 const {player, tracks} = queue;
-                const arg = args.length > 0 ? parseInt(args.pop()) : 1;
+                const number = args.length > 0 ? parseInt(args.pop()) : 1;
 
                 // Если аргумент не является числом
-                if (isNaN(arg)) {
+                if (isNaN(number)) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.nan"), color: Colors.DarkRed };
                     return;
                 }
@@ -135,16 +133,16 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
                 }
 
                 // Если пользователь укажет больше чем есть в очереди или меньше
-                else if (arg > tracks.size || arg < 1) {
+                else if (number > tracks.size || number < 1) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
                     return;
                 }
 
-                const {title, url, color} = tracks.get(arg > 1 ? arg : arg - 1);
+                const {title, url, color} = tracks.get(number > 1 ? number : number - 1);
 
                 // Меняем позицию трека в очереди
-                queue.player.stop(arg);
-                message.fastBuilder = { description: locale._(message.locale, "command.position", [arg, `[${title}](${url})`]), color };
+                queue.player.stop_fade(number);
+                message.fastBuilder = { description: locale._(message.locale, "command.position", [number, `[${title}](${url})`]), color };
                 return;
             }
         });
@@ -186,18 +184,17 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                 .json,
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
-                const { guild } = message;
-                const queue = db.audio.queue.get(guild.id);
-                const arg = args.length > 0 ? parseInt(args.pop()) : 1;
+                const queue = db.audio.queue.get(message.guild.id);
+                const number = args.length > 0 ? parseInt(args.pop()) : 1;
 
                 // Если аргумент не является числом
-                if (isNaN(arg)) {
+                if (isNaN(number)) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.nan"), color: Colors.DarkRed };
                     return;
                 }
 
                 // Если аргумент больше кол-ва треков
-                else if (arg > queue.tracks.size || arg < 1) {
+                else if (number > queue.tracks.size || number < 1) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
                     return;
                 }
@@ -208,13 +205,13 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                     return;
                 }
 
-                let {title, color, url} = queue.tracks.get(arg - 1);
+                let {title, color, url} = queue.tracks.get(number - 1);
 
                 // Удаляем трек указанный пользователем
-                if (arg !== 1) queue.tracks.remove(arg - 1);
+                if (number !== 1) queue.tracks.remove(number - 1);
                 else {
-                    queue.player.stop(queue.tracks.position + 1);
-                    queue.tracks.remove(arg - 1);
+                    queue.player.stop_fade(queue.tracks.position + 1);
+                    queue.tracks.remove(number - 1);
                 }
 
                 message.fastBuilder = { description: locale._(message.locale, "command.remove.track", [`[${title}](${url})`]), color };
