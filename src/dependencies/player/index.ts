@@ -164,7 +164,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
 
     /**
      * @description Функция отвечает за циклическое проигрывание, если хотим воспроизвести следующий трек надо избавится от текущего
-     * @param seek  - Пропуск времени
+     * @param seek  - Время трека для пропуска аудио дорожки
      * @public
      */
     public play = (seek: number = 0): void => {
@@ -479,9 +479,6 @@ class PlayerSongs {
      * @param position - позиция трека, номер в очереди
      */
     public get = (position: number) => {
-        // Если позиция трека больше чем всего треков или меньше
-        //if (position > this.total || position < this.total) return;
-
         return this._songs[position];
     };
 
@@ -499,9 +496,6 @@ class PlayerSongs {
      * @param position - позиция трека, номер в очереди
      */
     public remove = (position: number) => {
-        // Если позиция трека больше чем всего треков или меньше
-        //if (position > this.total || position < this.total) return;
-
         // Удаляем из очереди
         this._songs.splice(position, 1);
     };
@@ -521,10 +515,10 @@ class PlayerSongs {
      * @dev Надо переработать
      */
     public shuffle = () => {
-        for (let i = this.size - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this._songs[i], this._songs[j]] = [this._songs[j], this._songs[i]];
-        }
+        const i = this.size.random();
+
+        // Меняем трек текущий позиции на случайный
+        [this._songs[this._position], this._songs[i]] = [this._songs[i], this._songs[this._position]];
     };
 }
 
