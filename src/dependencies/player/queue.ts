@@ -261,7 +261,7 @@ export class Queue {
         db.audio.cycles.players.remove(this.player);
         if (this.player) this.player.cleanup();
 
-        for (let item of Object.keys(this._data)) this._data[item] = null;
+        for (let key of Object.keys(this._data)) this._data[key] = null;
     };
 }
 
@@ -328,7 +328,7 @@ export class Track {
     /**
      * @description Получаем отредактированное название трека
      * @public
-     */else
+     */
     public get titleReplaced() {
         // Удаляем лишнее скобки
         const title = `[${this.title.replace(/[()\[\]"]/g, "").substring(0, 45)}](${this.url})`;
@@ -412,11 +412,11 @@ export class Track {
                 const status = db.cache.audio.status(this);
 
                 // Если есть кеш аудио, то выдаем его
-                if (status.status === "final") return resolve(`file:|${status.path}`);
+                if (status.status === "final") return resolve(status.path);
             }
 
             // Проверяем ссылку на работоспособность, если 3 раза будет неудача ссылка будет удалена
-            for (let ref = 0; ref < 3; ref++) {
+            for (let refresh = 0; refresh < 3; refresh++) {
 
                 // Проверяем ссылку на актуальность
                 if (this.link && this.link.startsWith("http")) {
@@ -436,7 +436,7 @@ export class Track {
 
                     // Если вместо ссылки получили ошибку
                     if (link instanceof Error || !link) {
-                        if (ref < 3) continue;
+                        if (refresh < 3) continue;
                         else return resolve("Fail find other track, requested a max 3!");
                     }
 
@@ -452,7 +452,7 @@ export class Track {
             }
 
             // Отдаем ссылку на трек
-            return resolve(`link:|${this.link}`);
+            return resolve(this.link);
         });
     };
 

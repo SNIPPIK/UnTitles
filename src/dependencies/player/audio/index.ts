@@ -108,8 +108,6 @@ export class AudioResource {
      * @public
      */
     public constructor(options: {path: string, seek?: number; filters: string; chunk?: number}) {
-        const [type, file] = options.path.split(":|");
-
         if (options.chunk > 0) this.chunks.size = 20 * options.chunk;
         if (options.seek > 0) this.chunks.length = (options.seek * 1e3) / this.chunks.size;
 
@@ -118,8 +116,8 @@ export class AudioResource {
             events: ["error"],
             event: "stdout",
             input: new Process([ "-vn",  "-loglevel", "panic",
-                ...(type === "link" ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
-                "-ss", `${options.seek ?? 0}`, "-i", file,
+                ...(options.path.startsWith("http") ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
+                "-ss", `${options.seek ?? 0}`, "-i", options.path,
                 ...(options.filters ? ["-af", options.filters] : []),
                 "-f", `${OpusEncoder.lib.ffmpeg}`,
                 "pipe:1"

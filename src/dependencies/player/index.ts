@@ -5,6 +5,7 @@ import {VoiceConnection} from "@lib/voice";
 import {Track} from "@lib/player/queue";
 import {Logger} from "@lib/logger";
 import {db} from "@lib/db";
+import queue from "@handlers/Events/Audio/queue";
 
 /**
  * @author SNIPPIK
@@ -168,11 +169,11 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public play = (seek: number = 0): void => {
-        const track = this._tracks?.song;
+        const track = this.tracks?.song;
 
         // Если больше нет треков
-        if (!track?.resource) {
-            this.emit("player/error", this, `Playing is ending`, false);
+        if (!track) {
+            this.emit("player/error", this, `Not found new tracks!`, false);
             this.emit("player/wait", this);
             return;
         }
@@ -420,7 +421,17 @@ class PlayerVoice {
  * @protected
  */
 class PlayerSongs {
+    /**
+     * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
+     * @readonly
+     * @private
+     */
     private readonly _songs: Track[] = [];
+
+    /**
+     * @description Текущая позиция в списке
+     * @private
+     */
     private _position = 0;
 
     /**
@@ -428,9 +439,7 @@ class PlayerSongs {
      * @param number - Позиция трека
      * @public
      */
-    public set swapPosition(number: number) {
-        this._position = number;
-    };
+    public set swapPosition(number: number) { this._position = number; };
 
     /**
      * @description Получаем текущий трек
@@ -478,9 +487,7 @@ class PlayerSongs {
      * @description Получаем прошлый трек или текущий в зависимости от позиции
      * @param position - позиция трека, номер в очереди
      */
-    public get = (position: number) => {
-        return this._songs[position];
-    };
+    public get = (position: number) => { return this._songs[position]; };
 
     /**
      * @description Получаем следующие n треков, не включает текущий
