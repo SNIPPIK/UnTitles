@@ -96,7 +96,6 @@ class CacheData {
         // Если уже сохранен трек
         if (song) return;
 
-        // @ts-ignore
         this.data.tracks.set(track.id, track);
     };
 }
@@ -131,8 +130,8 @@ class CacheAudio extends Constructor.Cycle<Track> {
                 return true;
             },
             execute: (track) => {
-                return new Promise<boolean>((resolve) => {
-                    setImmediate(() => this.remove(track));
+                return new Promise<boolean>((resolve, reject) => {
+                    //setImmediate(() => this.remove(track));
 
                     new httpsClient(track.link).request.then((req) => {
                         if (req instanceof Error) return resolve(false);
@@ -140,7 +139,9 @@ class CacheAudio extends Constructor.Cycle<Track> {
                             const status = this.status(track);
                             const file = createWriteStream(status.path)
                                 // Если произошла ошибка при создании файла
-                                .once("error", console.warn)
+                                .once("error", (error) => {
+                                    return reject(error);
+                                })
 
                                 // Производим запись в файл
                                 .once("ready", () => {
@@ -163,7 +164,7 @@ class CacheAudio extends Constructor.Cycle<Track> {
                                     // Меняем тип файла на opus
                                     rename(status.path, `${name}.opus`, () => null);
                                     return resolve(true);
-                                })
+                                });
                         }
 
                         return resolve(false);

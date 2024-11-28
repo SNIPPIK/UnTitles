@@ -203,7 +203,7 @@ export namespace Constructor {
      * @param fn - функция фильтрации
      */
     public match = (fn: (item: K) => boolean) => {
-      for (const [key, value] of this.data) {
+      for (const [_, value] of this.data) {
         const check = fn(value);
 
         // Если найдено совпадение
@@ -334,11 +334,10 @@ export namespace Constructor {
 
     /**
      * @description Выполняем this._execute
+     * @readonly
      * @private
      */
-    private _stepCycle = (): void => {
-      console.log(this._config.name);
-
+    private readonly _stepCycle = (): void => {
       if (this.data.array?.length === 0) {
         this.data.time = 0;
         return;

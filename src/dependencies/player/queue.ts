@@ -423,15 +423,7 @@ export class Track {
                     try {
                         const status = await new httpsClient(this.link, {method: "HEAD"}).status;
 
-                        if (status) {
-                            // Сохраняем аудио кеш
-                            if (download) setImmediate(() => {
-                                db.cache.audio.set(this);
-                            });
-
-                            // Завершаем цикл
-                            break;
-                        }
+                        if (status) break;
                         else this.link = null;
                     } catch (err) {
                         this.link = null;
@@ -454,6 +446,12 @@ export class Track {
 
             // Если не удается найти ссылку через n попыток
             if (!this.link) return resolve(Error(`[SONG]: Fail update link resource`));
+            else {
+                // Сохраняем аудио кеш
+                if (download) db.cache.audio.set(this);
+            }
+
+            // Отдаем ссылку на трек
             return resolve(`link:|${this.link}`);
         });
     };
