@@ -124,7 +124,7 @@
     "name": "sub_boost",
     "locale": {
       "en-US": "Something similar to bass but sounds deeper",
-      "ru": "Что-то похожее на bass но более звучит глубже"
+      "ru": "Что-то похожее на bass но звучит более глубже"
     },
     "unsupported": [],
     "filter": "asubboost",

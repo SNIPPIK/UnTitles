@@ -510,12 +510,11 @@ class PlayerSongs {
     };
 
     /**
-     * @description Перетасовка треков
+     * @description Перетасовка треков без нарушения текущий позиции
      * @public
-     * @dev Надо переработать
      */
     public shuffle = () => {
-        const i = this.size.random();
+        const i = this.size.random(1);
 
         // Меняем трек текущий позиции на случайный
         [this._songs[this._position], this._songs[i]] = [this._songs[i], this._songs[this._position]];

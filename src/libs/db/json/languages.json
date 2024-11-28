@@ -389,5 +389,10 @@
   "command.filter.null": {
     "ru": "Список включенных фильтров пуст!",
     "en-US": "The list of enabled filters is empty!"
+  },
+
+  "command.filter.off": {
+    "ru": "Все фильтры были выключены!",
+    "en-US": "All filters has disabled!"
   }
 }

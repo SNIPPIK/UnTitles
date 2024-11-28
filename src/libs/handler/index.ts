@@ -337,27 +337,52 @@ export namespace Constructor {
      * @private
      */
     private _stepCycle = (): void => {
+      console.log(this._config.name);
+
       if (this.data.array?.length === 0) {
         this.data.time = 0;
         return;
       }
 
-      // Высчитываем время для выполнения
-      this.data.time += this._config.duration;
+      // Если цикл запущен с режимом обещания
+      if (this._config.duration === "promise") {
+        // Высчитываем время для выполнения
+        this.data.time += 10e3;
 
-      for (let item of this.data.array) {
-        const filtered = this._config.filter(item);
+        for (const item of this.data.array) {
+          (this._config.execute(item) as Promise<boolean>)
+              // Если скачивание завершено
+              .then((bool) => {
+                if (!bool) this.remove(item);
+              })
 
-        try {
-          if (filtered) this._config.execute(item);
-        } catch (error) {
-          this.remove(item);
-          console.log(error);
+              // Если произошла ошибка при скачивании
+              .catch((error) => {
+                this.remove(item);
+                console.log(error);
+              });
+        }
+      }
+
+      // Если запущен стандартный цикл
+      else {
+        // Высчитываем время для выполнения
+        this.data.time += this._config.duration;
+
+        for (let item of this.data.array) {
+          const filtered = this._config.filter(item);
+
+          try {
+            if (filtered) this._config.execute(item);
+          } catch (error) {
+            this.remove(item);
+            console.log(error);
+          }
         }
       }
 
       // Выполняем функцию через ~this._time ms
-      setTimeout(this._stepCycle, this.data.time - Date.now() || 1);
+      setTimeout(this._stepCycle, this.data.time - Date.now());
     };
   }
 
@@ -371,13 +396,13 @@ export namespace Constructor {
     name: string;
 
     // Функция выполнения
-    execute: (item: T) => void;
+    execute: (item: T) => void | Promise<boolean>;
 
     // Функция фильтрации
     filter: (item: T) => boolean;
 
     // Время через которое надо запустить цикл
-    duration: number;
+    duration: number | "promise";
 
     // Модификации цикла, не обязательно
     custom?: {

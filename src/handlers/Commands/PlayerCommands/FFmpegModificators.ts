@@ -173,6 +173,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
             execute: ({message, args, type}) => {
                 const {guild} = message;
                 const queue = db.audio.queue.get(guild.id);
+                const seek: number = queue.player.audio.current?.duration ?? 0;
 
                 // Если статус плеера не позволяет пропустить поток
                 if (!queue.player.playing) {
@@ -184,27 +185,32 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     return;
                 }
 
-                const seek: number = queue.player.audio.current?.duration ?? 0;
+                // Выключаем все фильтры
+                else if (type === "off") {
+                    // Если нет фильтров
+                    if (queue.player.filters.enable.length === 0) {
+                        message.fastBuilder = { description: locale._(message.locale, "command.filter.null") };
+                        return;
+                    }
+
+                    // Удаляем фильтры
+                    queue.player.filters.enable.splice(0, queue.player.filters.enable.length);
+                    queue.player.play(seek);
+
+                    // Сообщаем о выключении фильтров
+                    message.fastBuilder = {
+                        description: locale._(message.locale, "command.filter.off"),
+                        color: Colors.Green, timestamp: new Date()
+                    };
+                    return;
+                }
+
                 const name = args[args.length - 2 || args?.length - 1] ?? args[0];
                 const arg = args.length > 1 ? Number(args[args?.length - 1]) : null;
                 const Filter = filters.find((item) => item.name === name) as AudioFilter;
                 const findFilter = queue.player.filters.enable.find((fl) => fl.name === Filter.name);
 
                 switch (type) {
-                    // Выключаем все фильтры
-                    case "off": {
-                        // Если нет фильтров
-                        if (queue.player.filters.enable.length === 0) {
-                            message.fastBuilder = { description: locale._(message.locale, "command.filter.null") };
-                            return;
-                        }
-
-                        // Удаляем фильтры
-                        queue.player.filters.enable.splice(0, queue.player.filters.enable.length);
-                        queue.player.play(seek);
-                        return;
-                    }
-
                     // Добавляем фильтр
                     case "push": {
                         // Пользователь пытается включить включенный фильтр
@@ -228,7 +234,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                             const filter = queue.player.filters[i];
 
                             // Если фильтры не совместимы
-                            if (Filter.unsupported.includes(filter.name)) {
+                            if (filter && Filter.unsupported.includes(filter?.name)) {
                                 message.fastBuilder = {
                                     description: locale._(message.locale, "command.filter.unsupported"),
                                     color: Colors.DarkRed

@@ -112,7 +112,7 @@ class CacheAudio extends Constructor.Cycle<Track> {
     public constructor() {
         super({
             name: "AudioFile",
-            duration: 20e3,
+            duration: "promise",
             filter: (item) => {
                 const names = this.status(item);
 
@@ -130,44 +130,46 @@ class CacheAudio extends Constructor.Cycle<Track> {
                 }
                 return true;
             },
-            execute: (track) => new Promise<boolean>((resolve) => {
-                setImmediate(() => this.remove(track));
+            execute: (track) => {
+                return new Promise<boolean>((resolve) => {
+                    setImmediate(() => this.remove(track));
 
-                new httpsClient(track.link).request.then((req) => {
-                    if (req instanceof Error) return resolve(false);
-                    else if ("pipe" in req) {
-                        const status = this.status(track);
-                        const file = createWriteStream(status.path)
-                            // Если произошла ошибка при создании файла
-                            .once("error", console.warn)
+                    new httpsClient(track.link).request.then((req) => {
+                        if (req instanceof Error) return resolve(false);
+                        else if ("pipe" in req) {
+                            const status = this.status(track);
+                            const file = createWriteStream(status.path)
+                                // Если произошла ошибка при создании файла
+                                .once("error", console.warn)
 
-                            // Производим запись в файл
-                            .once("ready", () => {
-                                req.pipe(file);
-                            })
+                                // Производим запись в файл
+                                .once("ready", () => {
+                                    req.pipe(file);
+                                })
 
-                            // Если запись была завершена
-                            .once("finish", () => {
-                                const name = this.status(track).path.split(".raw")[0];
+                                // Если запись была завершена
+                                .once("finish", () => {
+                                    const name = this.status(track).path.split(".raw")[0];
 
-                                // Заканчиваем запись на файл
-                                if (!file.destroyed) {
-                                    file.destroy();
-                                    file.end();
-                                }
+                                    // Заканчиваем запись на файл
+                                    if (!file.destroyed) {
+                                        file.destroy();
+                                        file.end();
+                                    }
 
-                                // Удаляем подключение
-                                if (!req.destroyed) req.destroy();
+                                    // Удаляем подключение
+                                    if (!req.destroyed) req.destroy();
 
-                                // Меняем тип файла на opus
-                                rename(status.path, `${name}.opus`, () => null);
-                                return resolve(true);
-                            })
-                    }
+                                    // Меняем тип файла на opus
+                                    rename(status.path, `${name}.opus`, () => null);
+                                    return resolve(true);
+                                })
+                        }
 
-                    return resolve(false);
+                        return resolve(false);
+                    });
                 });
-            })
+            }
         });
     };
 
