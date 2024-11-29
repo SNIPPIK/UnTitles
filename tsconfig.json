@@ -2,7 +2,7 @@
   "compilerOptions": {
     // Параметры компилятора
     "module": "CommonJS",
-    "target": "ESNext",
+    "target": "ES6",
     "moduleResolution": "node",
 
     "baseUrl": "src",
@@ -25,7 +25,7 @@
 
     // Дополнительные настройки компилятора
     "noFallthroughCasesInSwitch": true, // Сообщить об ошибке в случае обнаружения проваливания в конструкции switch-case?
-    "noImplicitReturns": false, // Сообщить об ошибке, когда не все пути кода в функции возвращают значение?
+    "noImplicitReturns": true, // Сообщить об ошибке, когда не все пути кода в функции возвращают значение?
     "strictNullChecks": false, // Значения "null" и "undefined" могут быть присвоены только значениям данного типа
     "allowUnreachableCode": true, // Сообщить об ошибке в случае обнаружения кода, который никогда не будет выполнен?
     "noImplicitThis": false, // Показывать ошибку на "this", если где-то задан тип "any".

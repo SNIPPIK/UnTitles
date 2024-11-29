@@ -90,7 +90,7 @@ export class InteractRule {
    * @param message
    */
   public static check = (array: InteractRules[], message: Interact) => {
-    if (!array || array?.length === 0) return;
+    if (!array || array?.length === 0) return false;
 
     let onError = true;
 
@@ -353,15 +353,11 @@ class MessageBuilder {
     Object.assign(this.embeds, data);
 
     for (let embed of this.embeds) {
-      //Добавляем цвет по-умолчанию
+      // Добавляем цвет по-умолчанию
       if (!embed.color) embed.color = 258044;
 
-      //Исправляем fields, ну мало ли
-      if (embed.fields?.length > 0) {
-        for (const field of embed.fields) {
-          if (field === null) embed.fields = embed.fields.toSpliced(embed.fields.indexOf(field), 1);
-        }
-      }
+      // Исправляем fields, ну мало ли
+      if (embed.fields?.length > 0) embed.fields = embed.fields.filter((item) => !!item);
     }
 
     return this;
