@@ -13,10 +13,10 @@ import {env} from "@env";
 class sAPI extends Constructor.Assign<API.request> {
     /**
      * @author SNIPPIK
-     * @description API ключ для доступа к видео на youtube
+     * @description API ключ для доступа к видео на youtube, он сгенерирован если что!!!
      * @private
      */
-    private static readonly AIzaKey = env.check("token.youtube") ? env.get("token.youtube") : "AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc";
+    private static AIzaKey = env.check("token.youtube") ? env.get("token.youtube") : "AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc";
 
     /**
      * @description Создаем экземпляр запросов
@@ -106,6 +106,8 @@ class sAPI extends Constructor.Assign<API.request> {
                                         // Создаем запрос
                                         const result = await sAPI.API(ID, true);
 
+                                        console.log(result["streamingData"])
+
                                         /// Если при получении данных возникла ошибка
                                         if (result instanceof Error) return reject(result);
 
@@ -113,6 +115,8 @@ class sAPI extends Constructor.Assign<API.request> {
                                         if (audio) {
                                             const format = await sAPI.extractFormat(result["streamingData"]);
                                             result["videoDetails"]["format"] = {url: format["url"]};
+
+                                            console.log(format["url"])
                                         }
 
                                         const track = sAPI.track(result["videoDetails"]);
@@ -217,32 +221,42 @@ class sAPI extends Constructor.Assign<API.request> {
         return new Promise((resolve) => {
             // Если надо использовать ключ доступа
             if (AIza) {
+                this.updateAIzaKey();
                 new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${this.AIzaKey}&prettyPrint=false`, {
+                    useragent: true,
                     method: "POST",
                     body: JSON.stringify({
-                        context: {
-                            client: {
-                                clientName: 'IOS',
-                                clientVersion: '19.09.3',
-                                deviceModel: 'iPhone14,3',
-                                userAgent: 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)',
-                                hl: 'en',
-                                timeZone: 'UTC',
-                                utcOffsetMinutes: 0
+                        "context": {
+                            "client": {
+                                "hl": 'en',
+                                "timeZone": 'UTC',
+                                "clientName": 'IOS',
+                                "clientVersion": '17.36.4',
+                            },
+                            "user": {
+                                "lockedSafetyMode": false
+                            },
+                            "request": {
+                                "useSsl": true,
+                                "internalExperimentFlags": [],
+                                "consistencyTokenJars": []
                             }
                         },
-                        videoId: ID,
-                        playbackContext: { contentPlaybackContext: { html5Preference: 'HTML5_PREF_WANTS' } },
-                        contentCheckOk: true,
-                        racyCheckOk: true
+                        "videoId": ID,
+                        "playbackContext": {
+                            "contentPlaybackContext": {
+                                "vis": 0,
+                                "splay": false,
+                                "autoCaptionsDefaultOn": false,
+                                "autonavState": "STATE_NONE",
+                                "html5Preference": "HTML5_PREF_WANTS",
+                                "lactMilliseconds": "-1"
+                            }
+                        },
+                        "racyCheckOk": false,
+                        "contentCheckOk": false
                     }),
-                    headers: {
-                        'X-YouTube-Client-Name': '5',
-                        'X-YouTube-Client-Version': '19.09.3',
-                        Origin: 'https://www.youtube.com',
-                        'User-Agent': 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)',
-                        'content-type': 'application/json'
-                    }
+                    headers: { 'content-type': 'application/json' }
                 }).toJson.then((api) => {
                     //Если возникает ошибка при получении страницы
                     if (api instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
@@ -277,6 +291,24 @@ class sAPI extends Constructor.Assign<API.request> {
                 return resolve(data);
             }).catch((err) => resolve(Error(`[APIs]: ${err}`)));
         });
+    };
+
+    /**
+     * @description Генерируем ключи для YouTube player
+     * @protected
+     * @static
+     */
+    protected static updateAIzaKey = () => {
+        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+        let result = 'AIzaSy', position = 0;
+
+        // Постепенно генерим ключи
+        while (position < 33) {
+            position++;
+            result += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+
+        this.AIzaKey = result;
     };
 
     /**
@@ -375,7 +407,7 @@ class sAPI extends Constructor.Assign<API.request> {
                     url: track?.format?.url || undefined,
                 }
             });
-        } catch {
+        } catch (err) {
             return new Track({
                 id: track["videoId"],
                 artist: {
