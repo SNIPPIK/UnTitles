@@ -106,8 +106,6 @@ class sAPI extends Constructor.Assign<API.request> {
                                         // Создаем запрос
                                         const result = await sAPI.API(ID, true);
 
-                                        console.log(result["streamingData"])
-
                                         /// Если при получении данных возникла ошибка
                                         if (result instanceof Error) return reject(result);
 
@@ -115,8 +113,6 @@ class sAPI extends Constructor.Assign<API.request> {
                                         if (audio) {
                                             const format = await sAPI.extractFormat(result["streamingData"]);
                                             result["videoDetails"]["format"] = {url: format["url"]};
-
-                                            console.log(format["url"])
                                         }
 
                                         const track = sAPI.track(result["videoDetails"]);
@@ -231,7 +227,7 @@ class sAPI extends Constructor.Assign<API.request> {
                                 "hl": 'en',
                                 "timeZone": 'UTC',
                                 "clientName": 'IOS',
-                                "clientVersion": '17.36.4',
+                                "clientVersion": `${(19).random(17)}.36.4`, //17.36.4
                             },
                             "user": {
                                 "lockedSafetyMode": false
