@@ -62,7 +62,7 @@ export class OpusEncoder extends Transform {
     private readonly encoder: any = null;
 
     /**
-     * @description Временные данные
+     * @description Временные данные, используются в this.encoder
      * @private
      */
     private readonly _temp = {

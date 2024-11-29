@@ -5,7 +5,6 @@ import {VoiceConnection} from "@lib/voice";
 import {Track} from "@lib/player/queue";
 import {Logger} from "@lib/logger";
 import {db} from "@lib/db";
-import queue from "@handlers/Events/Audio/queue";
 
 /**
  * @author SNIPPIK
@@ -173,13 +172,12 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Если больше нет треков
         if (!track) {
-            this.emit("player/error", this, `Not found new tracks!`, false);
             this.emit("player/wait", this);
             return;
         }
 
         // Получаем асинхронные данные в синхронном потоке
-        track.resource
+        track?.resource
             // Если возникла ошибка
             .catch((err) => {
                     // Сообщаем об ошибке
@@ -213,6 +211,9 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
                     // Создаем класс для управления потоком
                     const stream = new AudioResource({path, seek, ...this._filters.compress});
                     let timeout: NodeJS.Timeout = null;
+
+                    // Создаем сообщение после всех действий
+                    this.emit("player/ended", this, seek);
 
                     // Если стрим можно прочитать
                     if (stream.readable) {
@@ -249,14 +250,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
                             this.status = "player/playing"
                         })
                 }
-            )
-
-            // Создаем сообщение после всех действий
-            .finally(() => {
-                    // Создаем сообщение о текущем треке
-                    this.emit("player/ended", this, seek);
-                }
-            )
+            );
     };
 
     /**

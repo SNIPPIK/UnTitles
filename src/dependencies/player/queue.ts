@@ -128,7 +128,7 @@ export class Queue {
      * @public
      */
     public get tracks() {
-        if (!this._data.player) return;
+        if (!this._data.player) return null;
         return this._data.player.tracks;
     };
 
@@ -426,6 +426,8 @@ export class Track {
                         if (status) break;
                         else this.link = null;
                     } catch (err) {
+                        console.log(err);
+
                         this.link = null;
                     }
                 }

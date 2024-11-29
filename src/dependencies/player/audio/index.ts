@@ -116,9 +116,14 @@ export class AudioResource {
             events: ["error"],
             event: "stdout",
             input: new Process([ "-vn",  "-loglevel", "panic",
+                // Если это ссылка, то просим ffmpeg переподключиться при сбросе соединения
                 ...(options.path.startsWith("http") ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
                 "-ss", `${options.seek ?? 0}`, "-i", options.path,
+
+                // Подключаем фильтры
                 ...(options.filters ? ["-af", options.filters] : []),
+
+                // Указываем формат аудио
                 "-f", `${OpusEncoder.lib.ffmpeg}`,
                 "pipe:1"
             ])
@@ -207,7 +212,8 @@ class Process {
  * @description Делаем проверку на наличие FFmpeg/avconv
  */
 (() => {
-    const names = [`${env.get("cache.dir")}/FFmpeg/ffmpeg`, env.get("cache.dir"), env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
+    const cache = env.get("cache.dir");
+    const names = [`${cache}/FFmpeg/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 
     // Проверяем имена, если есть FFmpeg/avconv
     for (const name of [...names, "ffmpeg", "avconv"]) {

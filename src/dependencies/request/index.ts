@@ -51,18 +51,13 @@ const requests: { name: string, callback: (req: ClientRequest, url?: string) => 
  * @abstract
  */
 abstract class Request {
-    protected readonly data: {
-        method?: "POST" | "GET" | "HEAD" | "PATCH";
+    /**
+     * @description Данные хранимые для произведения запроса
+     * @protected
+     * @readonly
+     */
+    protected readonly data: RequestData = { headers: {} };
 
-        //Headers запроса
-        headers?: RequestOptions["headers"];
-
-        //Если мы хотим что-то отправить серверу
-        body?: string;
-
-        //Добавлять рандомный user-agent
-        useragent?: boolean;
-    } & RequestOptions = { headers: {} };
     /**
      * @description Получаем протокол ссылки
      * @private
@@ -118,7 +113,7 @@ abstract class Request {
         // Надо ли генерировать user-agent
         if (options?.useragent) {
             const OS = [ "(X11; Linux x86_64)", "(Windows NT 10.0; Win64; x64)" ];
-            const version = `${(130).random(96)}.0.${(6250).random(1280)}.${(250).random(59)}`;
+            const version = `${(128).random(96)}.0.${(6250).random(1280)}.${(250).random(59)}`;
 
             Object.assign(this.data.headers, {
                 "User-Agent": `Mozilla/5.0 ${OS[(OS.length - 1).random(0)]} AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`,
@@ -131,6 +126,26 @@ abstract class Request {
 
         Object.assign(this.data, options);
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные для произведения запроса
+ * @interface RequestData
+ * @private
+ */
+interface RequestData extends RequestOptions {
+    // Метод запроса
+    method?: "POST" | "GET" | "HEAD" | "PATCH";
+
+    //Headers запроса
+    headers?: RequestOptions["headers"];
+
+    //Если мы хотим что-то отправить серверу
+    body?: string;
+
+    //Добавлять рандомный user-agent
+    useragent?: boolean;
 }
 
 /**
@@ -210,7 +225,9 @@ export class httpsClient extends Request {
      */
     public get status(): Promise<boolean> | false {
         return this.request.then((resource: IncomingMessage) => {
-            return resource?.statusCode && resource.statusCode >= 200 && resource.statusCode < 400;
+            console.log(resource.statusCode, resource.statusMessage);
+
+            return resource?.statusCode && resource.statusCode >= 200 && resource.statusCode <= 400;
         });
     };
 }

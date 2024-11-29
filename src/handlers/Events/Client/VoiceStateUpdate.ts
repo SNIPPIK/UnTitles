@@ -42,14 +42,7 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
                 else {
                     // Если есть очередь на сервере и голосовое подключение
                     if (queue) {
-
-                        // Если голосовое подключение не установлено
-                        if (!queue.voice?.channel?.members) {
-                            console.log(`${guild.id}/${queue?.message?.channel?.id}`);
-                            return;
-                        }
-
-                        const members = queue.voice.channel.members.filter(member => !member.user.bot).size;
+                        const members = queue.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
 
                         // Если есть пользователи
                         if (members > 0) {
