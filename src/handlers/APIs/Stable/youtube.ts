@@ -331,9 +331,6 @@ class sAPI extends Constructor.Assign<API.request> {
             else if (data["playabilityStatus"]?.status !== "OK") return Error(`[APIs]: Fail getting data! Status: ${data["playabilityStatus"]?.status}`);
         }
 
-        // Если нету статуса
-        else return Error("[APIs]: Fail getting data!");
-
         // Выдаем данные
         return data;
     };
