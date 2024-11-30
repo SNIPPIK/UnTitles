@@ -486,6 +486,20 @@ class PlayerSongs {
     public get = (position: number) => { return this._songs[position]; };
 
     /**
+     * @description Сортируем все треки в Array<Array, Array>
+     * @param size - Кол-во треков в одном списке
+     */
+    public arraySort = (size: number = 5) => {
+        let number = 0;
+
+        // Создаем Array
+        return this._songs.ArraySort(size, (track) => {
+            number++;
+            return `\`${number}\` - ${track.titleReplaced}`;
+        }, "\n");
+    };
+
+    /**
      * @description Получаем следующие n треков, не включает текущий
      * @param length - Кол-во треков
      * @public

@@ -1,5 +1,5 @@
 import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User, Colors} from "discord.js"
-import type { ComponentData, EmbedData, GuildMember} from "discord.js"
+import type { ComponentData, EmbedData, GuildMember,  InteractionCollector, ButtonInteraction} from "discord.js"
 import { BaseInteraction, Message, Attachment} from "discord.js";
 import type {LocalizationMap} from "discord-api-types/v10";
 import {locale} from "@lib/locale";
@@ -265,12 +265,12 @@ export class Interact {
    * @description Отправляем сообщение со соответствием параметров
    * @param options - Данные для отправки сообщения
    */
-  public send = async (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[]}): Promise<Message> => {
+  public send = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[]}): Promise<Message> => {
     try {
       if (this.replied) {
         this._replied = false;
         return this._temp["reply"]({...options, fetchReply: true});
-      } else await this._temp["deferReply"]();
+      }
 
       return this._temp.channel["send"]({...options, fetchReply: true});
     } catch {
@@ -313,6 +313,9 @@ class MessageBuilder {
    */
   public time: number = 15e3;
 
+  public page: number = 1;
+  public pages: string[] = [];
+
   /**
    * @description Отправляем сообщение в текстовый канал
    * @param interaction
@@ -327,6 +330,9 @@ class MessageBuilder {
 
           //Удаляем сообщение через время если это возможно
           if (this.time !== 0) msg.delete = this.time;
+
+          //Если меню, то не надо удалять
+          if (this.pages && this.pages.length > 1) this.createMenuTable(message);
 
           //Если надо выполнить действия после
           if (this.promise) this.promise(msg);
@@ -397,5 +403,73 @@ class MessageBuilder {
   public setCallback = (func: MessageBuilder["callback"]) => {
     this.callback = func;
     return this;
+  };
+
+  /**
+   * @description Добавляем pages в базу для дальнейшей обработки
+   * @param list - Список данных для обновления
+   */
+  public setPages = (list: string[]) => {
+    this.pages = list;
+
+    // Добавляем кнопки
+    if (this.pages && this.pages.length > 1) this.components.push(
+        {
+          type: 1, components: [// @ts-ignore
+            {type: 2, emoji: {name: "⬅"}, custom_id: "back", style: 2},// @ts-ignore
+            {type: 2, emoji: {name: "➡"}, custom_id: "next", style: 2},// @ts-ignore
+            {type: 2, emoji: {name: "🗑️"}, custom_id: "cancel", style: 4}
+          ]
+        }
+    )
+
+    return this;
+  };
+
+  /**
+   * @description Задаем страницу по умолчанию, с нее будет начат отсчет
+   * @param page - Номер страницы
+   */
+  public setPage = (page: number) => {
+    this.page = page;
+
+    return this;
+  };
+
+  /**
+   * @description Создаем меню с объектами
+   * @param msg - Сообщение пользователя
+   * @return void
+   */
+  private createMenuTable = (msg: Message) => {
+    const pages = this.pages;
+    let page = this.page;
+
+    // Создаем сборщик
+    const collector = msg.createMessageComponentCollector({
+      time: 60e3, componentType: 2,
+      filter: (click) => click.user.id !== msg.client.user.id
+    });
+
+    // Собираем кнопки на которые нажал пользователь
+    collector.on("collect", (i) => {
+      // Игнорируем ошибки
+      try { i.deferReply(); i.deleteReply(); } catch {}
+
+      // Если нельзя поменять страницу
+      if (page === pages.length || page < 0) return;
+
+      // Кнопка переключения на предыдущую страницу
+      if (i.customId === "back") page--;
+      // Кнопка переключения на следующую страницу
+      else if (i.customId === "next") page++;
+      // Кнопка отмены и удаления сообщения
+      else if (i.customId === "cancel") {
+        msg.delete();
+        return;
+      }
+
+      return this.callback(msg as any, pages, page, this.embeds);
+    });
   };
 }

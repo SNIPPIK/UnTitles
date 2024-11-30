@@ -42,7 +42,7 @@ else {
      * @description Ловим попытки сломать процесс
      */
     process.on("uncaughtException", (err: Error) => {
-        //Отправляем данные об ошибке и отправляем через систему webhook
+        // Отправляем данные об ошибке и отправляем через систему webhook
         client.sendWebhook = {
             username: client.user.username, avatarURL: client.user.avatarURL(),
             embeds: [{
@@ -56,18 +56,21 @@ else {
             }],
         }
 
-        //Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
+        // Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
         if (err.message?.match(/Critical/)) {
             Logger.log("ERROR", `[CODE: <14>] Hooked critical error!`);
             process.exit(14);
             //return;
         }
 
-        //Если вдруг запущено несколько ботов
+        // Если вдруг запущено несколько ботов
         else if (err.name?.match(/acknowledged./)) return Logger.log("WARN", `[CODE: <50490>] Several bots are running!`);
 
         //Выводим ошибку
         Logger.log("ERROR", `\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n└ Stack:   ${err.stack}`);
     });
-    process.on("unhandledRejection", (err: Error) => console.error(err.stack));
+    process.on("unhandledRejection", (err: Error) => {
+        //if (`${err}`.match(/DiscordAPIError/)) return;
+        console.log(err);
+    });
 }

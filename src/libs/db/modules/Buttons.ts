@@ -191,15 +191,51 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
         this.set("queue", {
             callback: (msg: Interact) => {
                 const queue = msg.queue;
+                const page = parseInt((queue.tracks.position / 5).toFixed(0));
+                const pages = queue.tracks.arraySort(5);
 
-                // Если треков менее 5
-                if (queue.tracks.total < 5) {
-                    msg.fastBuilder = { description: locale._(msg.locale, "player.button.queue.small"), color: Colors.White };
-                    return;
-                }
-
-                // Отправляем список треков с уничтожением через 40 сек
-                msg.fastBuilder = { description: locale._(msg.locale, "player.button.queue", [queue.tracks.total]), color: Colors.White };
+                return new msg.builder().addEmbeds([
+                    {
+                        color: Colors.Green,
+                        author: {
+                            name: `${locale._(msg.locale, "queue")} - ${msg.guild.name}`,
+                            iconURL: msg.guild.iconURL()
+                        },
+                        thumbnail: {
+                            url: db.emojis.diskImage
+                        },
+                        fields: [
+                            {
+                                name: locale._(msg.locale, "player.current.playing"),
+                                value: `\`${queue.tracks.position + 1}\` - ${queue.tracks.song.titleReplaced}`
+                            },
+                            pages.length > 0 ? { name: locale._(msg.locale, "queue"), value: pages[page] } : null
+                        ],
+                        footer: {
+                            text: locale._(msg.locale,"player.button.queue.footer", [queue.tracks.song.user.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time]),
+                            iconURL: queue.tracks.song.user.avatar
+                        }
+                    }
+                ]).setPage(page).setPages(pages).setTime(60e3).setCallback((message, pages: string[], page: number, embed) => {
+                    return message.edit({
+                        embeds: [ //@ts-ignore
+                            {
+                                ...embed[0],
+                                fields: [
+                                    embed[0].fields[0],
+                                    {
+                                        name: locale._(msg.locale, "queue"),
+                                        value: pages[page]
+                                    }
+                                ],
+                                footer: {
+                                    ...embed[0].footer,
+                                    text: locale._(msg.locale, "player.button.queue.footer", [msg.author.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time])
+                                }
+                            }
+                        ]
+                    });
+                }).send = msg;
             }
         });
 

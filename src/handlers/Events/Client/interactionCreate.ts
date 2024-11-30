@@ -27,6 +27,11 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 // Игнорируем ботов
                 if ((message.user || message?.member?.user).bot) return;
 
+                // Системные кнопки которые не отслеживаются здесь!
+                if ("customId" in message) {
+                    if (message.customId === "back" || message.customId === "next" || message.customId === "cancel") return;
+                }
+
                 const interact = new Interact(message);
                 const user = temple_db.get(message.user.id);
 

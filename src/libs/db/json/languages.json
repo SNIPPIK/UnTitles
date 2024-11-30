@@ -9,6 +9,11 @@
     "en-US": "Cancel"
   },
 
+  "queue": {
+    "ru": "Очередь",
+    "en-US": "Queue"
+  },
+
   "command.fail": {
     "ru": "Я не нахожу этой команды",
     "en-US": "I not found this command"
@@ -119,15 +124,11 @@
     "en-US": "Disable music! Remove queue!"
   },
 
-  "player.button.queue.small": {
-    "ru": "В очереди слишком мало треков!",
-    "en-US": "There are too few tracks in the queue!"
+  "player.button.queue.footer": {
+    "ru": "{ARGUMENT} | Лист {ARGUMENT} из {ARGUMENT} | Треков: {ARGUMENT} / {ARGUMENT}",
+    "en-US": "{ARGUMENT} | Page {ARGUMENT} of {ARGUMENT} | Songs: {ARGUMENT} / {ARGUMENT}"
   },
 
-  "player.button.queue": {
-    "ru": "Всего треков: {ARGUMENT}\nБольше информации будет позже!",
-    "en-US": "Total songs: {ARGUMENT}\nMore information will come later!"
-  },
 
   "player.button.filter.zero": {
     "ru": "В данный момент нет включенных аудио фильтров",
