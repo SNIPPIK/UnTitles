@@ -356,43 +356,61 @@
   },
 
 
-  "command.filter.pushed": {
-    "ru": "Добавлен аудио фильтр\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
-    "en-US": "Added audio filter\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
+
+  "command.filter.push.two": {
+    "ru": "Данный фильтр уже включен!",
+    "en-US": "Current filter has enabled!"
   },
 
-  "command.filter.re.pushed": {
-    "ru": "Невозможно включить фильтр повторно!",
-    "en-US": "The filter cannot be turned on again!"
+  "command.filter.push.argument": {
+    "ru": "Необходимо указать аргумент в диапазоне от {ARGUMENT} до {ARGUMENT}!",
+    "en-US": "An argument must be in the range from {ARGUMENT} to {ARGUMENT}!"
   },
 
-  "command.filter.arg.fail": {
-    "ru": "Найдено несоответствие аргументов!",
-    "en-US": "Argument mismatch found!"
+  "command.filter.push.unsupported": {
+    "ru": "Этот фильтр {ARGUMENT} не совместим с {ARGUMENT}, его необходимо необходимо отключить!",
+    "en-US": "This filter {ARGUMENT} is not compatible with {ARGUMENT}, it must be disabled!"
   },
 
-  "command.filter.removed": {
-    "ru": "Отключен аудио фильтр\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
-    "en-US":"Remove audio filter\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
+  "command.filter.push.before": {
+    "ru": "Добавлен аудио фильтр, он будет включен немедленно!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "en-US": "Added audio filter, it will be enabled immediately!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
   },
 
-  "command.filter.re.removed": {
-    "ru": "Невозможно выключить фильтр, поскольку он не включен!",
-    "en-US":"The filter cannot be turned off because it is not enabled!"
+  "command.filter.push.after": {
+    "ru": "Добавлен аудио фильтр, он будет включен со следующим треком!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "en-US": "Added audio filter, it will be enabled with the next track!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
   },
 
-  "command.filter.unsupported": {
-    "ru": "Аудио фильтр не совместим с текущим списком фильтров",
-    "en-US": "The audio filter is not compatible with the current filter list"
+
+  "command.filter.remove.two": {
+    "ru": "Данный фильтр не включен!",
+    "en-US": "This filter is not enabled!"
   },
 
-  "command.filter.null": {
+  "command.filter.remove.before": {
+    "ru": "Удален аудио фильтр, он будет выключен со следующим треком!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "en-US": "Audio filter removed, will be disabled with next track!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
+  },
+
+  "command.filter.remove.after": {
+    "ru": "Удален аудио фильтр, он будет выключен немедленно!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "en-US": "Audio filter removed, will be disabled immediately!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
+  },
+
+
+  "command.filter.off.null": {
     "ru": "Список включенных фильтров пуст!",
     "en-US": "The list of enabled filters is empty!"
   },
 
-  "command.filter.off": {
-    "ru": "Все фильтры были выключены!",
-    "en-US": "All filters has disabled!"
+  "command.filter.off.before": {
+    "ru": "Все фильтры будут выключены со следующим треком!",
+    "en-US": "All filters will be turned off with the next track!"
+  },
+
+  "command.filter.off.after": {
+    "ru": "Все фильтры будут выключены сейчас!",
+    "en-US": "All filters will be turned off now!"
   }
 }

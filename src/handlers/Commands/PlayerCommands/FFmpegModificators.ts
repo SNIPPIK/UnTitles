@@ -174,6 +174,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                 const {guild} = message;
                 const queue = db.audio.queue.get(guild.id);
                 const seek: number = queue.player.audio.current?.duration ?? 0;
+                const player = queue.player;
 
                 // Если статус плеера не позволяет пропустить поток
                 if (!queue.player.playing) {
@@ -189,19 +190,32 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                 else if (type === "off") {
                     // Если нет фильтров
                     if (queue.player.filters.enable.length === 0) {
-                        message.fastBuilder = { description: locale._(message.locale, "command.filter.null") };
+                        message.fastBuilder = { description: locale._(message.locale, "command.filter.off.null") };
                         return;
                     }
 
                     // Удаляем фильтры
                     queue.player.filters.enable.splice(0, queue.player.filters.enable.length);
-                    queue.player.play(seek);
 
-                    // Сообщаем о выключении фильтров
-                    message.fastBuilder = {
-                        description: locale._(message.locale, "command.filter.off"),
-                        color: Colors.Green, timestamp: new Date()
-                    };
+                    // Если можно выключить фильтр или фильтры сейчас
+                    if (player.audio.current.duration < player.tracks.song.time.total + 10) {
+                        queue.player.play(seek);
+
+                        // Сообщаем о выключении фильтров
+                        message.fastBuilder = {
+                            description: locale._(message.locale, "command.filter.off.after"),
+                            color: Colors.Green, timestamp: new Date()
+                        };
+                    }
+
+                    // Если нельзя выключить фильтр или фильтры сейчас
+                    else {
+                        // Сообщаем о выключении фильтров
+                        message.fastBuilder = {
+                            description: locale._(message.locale, "command.filter.off.before"),
+                            color: Colors.Green, timestamp: new Date()
+                        };
+                    }
                     return;
                 }
 
@@ -215,7 +229,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     case "push": {
                         // Пользователь пытается включить включенный фильтр
                         if (findFilter) {
-                            message.fastBuilder = { description: locale._(message.locale, "command.filter.arg.fail") };
+                            message.fastBuilder = { description: locale._(message.locale, "command.filter.push.two") };
                             return;
                         }
 
@@ -224,7 +238,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                             // Если аргументы подходят
                             if (arg && arg >= Filter.args[0] && arg <= Filter.args[1]) Filter.user_arg = arg;
                             else {
-                                message.fastBuilder = { description: locale._(message.locale, "command.filter.re.pushed") };
+                                message.fastBuilder = { description: locale._(message.locale, "command.filter.push.argument", Filter.args) };
                                 return;
                             }
                         }
@@ -236,7 +250,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                             // Если фильтры не совместимы
                             if (filter && Filter.unsupported.includes(filter?.name)) {
                                 message.fastBuilder = {
-                                    description: locale._(message.locale, "command.filter.unsupported"),
+                                    description: locale._(message.locale, "command.filter.push.unsupported", [filter.name, Filter.name]),
                                     color: Colors.DarkRed
                                 };
 
@@ -244,15 +258,28 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                             }
                         }
 
-                        // Добавляем и включаем фильтр
+                        // Добавляем фильтр
                         queue.player.filters.enable.push(Filter);
-                        queue.player.play(seek);
 
-                        // Сообщаем о новом фильтре
-                        message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.pushed", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
-                            color: Colors.Green, timestamp: new Date()
-                        };
+                        // Если можно включить фильтр или фильтры сейчас
+                        if (player.audio.current.duration < player.tracks.song.time.total + 10) {
+                            queue.player.play(seek);
+
+                            // Сообщаем о включении фильтров
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.filter.push.after", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                                color: Colors.Green, timestamp: new Date()
+                            };
+                        }
+
+                        // Если нельзя включить фильтр или фильтры сейчас
+                        else {
+                            // Сообщаем о включении фильтров
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.filter.push.before", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                                color: Colors.Green, timestamp: new Date()
+                            };
+                        }
                         return;
                     }
 
@@ -261,7 +288,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         // Пользователь пытается выключить выключенный фильтр
                         if (findFilter) {
                             message.fastBuilder = {
-                                description: locale._(message.locale, "command.filter.re.removed"),
+                                description: locale._(message.locale, "command.filter.remove.two"),
                                 color: Colors.Yellow
                             };
                             return;
@@ -270,13 +297,26 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         // Удаляем фильтр
                         const index = queue.player.filters.enable.indexOf(findFilter);
                         queue.player.filters.enable.splice(index, 1);
-                        queue.player.play(seek);
 
-                        // Сообщаем об удалении фильтра
-                        message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.removed", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
-                            color: Colors.Green
-                        };
+                        // Если можно выключить фильтр или фильтры сейчас
+                        if (player.audio.current.duration < player.tracks.song.time.total + 10) {
+                            queue.player.play(seek);
+
+                            // Сообщаем о включении фильтров
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.filter.remove.after", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                                color: Colors.Green, timestamp: new Date()
+                            };
+                        }
+
+                        // Если нельзя выключить фильтр или фильтры сейчас
+                        else {
+                            // Сообщаем о включении фильтров
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.filter.remove.before", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                                color: Colors.Green, timestamp: new Date()
+                            };
+                        }
                         return;
                     }
                 }
