@@ -18,7 +18,7 @@ const requests: { name: string, callback: (req: ClientRequest, url?: string) => 
     {
         name: "timeout",
         callback: (_, url) => {
-            return Error(`[APIs]: Connection Timeout Exceeded ${url}:443`);
+            return new Error(`[APIs]: Connection Timeout Exceeded ${url}:443`);
         }
     },
     /**
@@ -225,8 +225,6 @@ export class httpsClient extends Request {
      */
     public get status(): Promise<boolean> | false {
         return this.request.then((resource: IncomingMessage) => {
-            console.log(resource.statusCode, resource.statusMessage);
-
             return resource?.statusCode && resource.statusCode >= 200 && resource.statusCode <= 400;
         });
     };

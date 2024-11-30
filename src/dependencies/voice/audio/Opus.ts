@@ -190,7 +190,7 @@ export class OpusEncoder extends Transform {
      * @description При получении данных через pipe или write, модифицируем их для одобрения со стороны discord
      * @public
      */
-    public _transform = (chunk: Buffer, _: any, done: () => any) => {
+   public _transform = (chunk: Buffer, _: any, done: () => any) => {
         let index = this._temp.index, packet = () => chunk;
 
         // Если есть подключенная библиотека расшифровки opus, то используем ее
@@ -239,7 +239,7 @@ export class OpusEncoder extends Transform {
      */
     public _destroy = () => {
         if (typeof this.encoder?.delete === "function") this.encoder!.delete!();
-        for (let name of Object.keys(this._temp)) this._temp[name] = null;
+        for (let key of Object.keys(this._temp)) this._temp[key] = null;
 
         //@ts-expect-error
         this["encoder"] = null;

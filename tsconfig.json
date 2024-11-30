@@ -2,7 +2,7 @@
   "compilerOptions": {
     // Параметры компилятора
     "module": "CommonJS",
-    "target": "ES6",
+    "target": "ESNext",
     "moduleResolution": "node",
 
     "baseUrl": "src",

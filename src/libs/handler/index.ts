@@ -347,36 +347,40 @@ export namespace Constructor {
       if (this._config.duration === "promise") {
         // Высчитываем время для выполнения
         this.data.time += 10e3;
-
-        for (const item of this.data.array) {
-          (this._config.execute(item) as Promise<boolean>)
-              // Если скачивание завершено
-              .then((bool) => {
-                if (!bool) this.remove(item);
-              })
-
-              // Если произошла ошибка при скачивании
-              .catch((error) => {
-                this.remove(item);
-                console.log(error);
-              });
-        }
       }
 
       // Если запущен стандартный цикл
       else {
         // Высчитываем время для выполнения
         this.data.time += this._config.duration;
+      }
 
-        for (let item of this.data.array) {
-          const filtered = this._config.filter(item);
+      for (let item of this.data.array) {
+        const filtered = this._config.filter(item);
 
-          try {
-            if (filtered) this._config.execute(item);
-          } catch (error) {
-            this.remove(item);
-            console.log(error);
+        try {
+          if (filtered) {
+            // Если цикл запущен с режимом обещания
+            if (item instanceof Promise) {
+              (this._config.execute(item) as Promise<boolean>)
+                  // Если скачивание завершено
+                  .then((bool) => {
+                    if (!bool) this.remove(item);
+                  })
+
+                  // Если произошла ошибка при скачивании
+                  .catch((error) => {
+                    this.remove(item);
+                    console.log(error);
+                  });
+            }
+
+            // Если запущен стандартный цикл
+            else this._config.execute(item);
           }
+        } catch (error) {
+          this.remove(item);
+          console.log(error);
         }
       }
 

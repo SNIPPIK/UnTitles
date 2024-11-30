@@ -184,7 +184,7 @@ export class Queue {
         // Если это первый трек в списке, то не позволяем пользователям возвращать трек
         if (this.tracks.position > 0) Object.assign(first[1], { disabled: false, style: 3 });
         else Object.assign(first[1], { disabled: true });
-
+        
 
         // Ограничиваем кнопку очередь
         if (this.tracks.size > 5) {

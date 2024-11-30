@@ -17,8 +17,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@types/node": "^22.9.3",
-    "@types/websocket": "^1.0.10",
+    "@types/node": "^22.10.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.2"
   },

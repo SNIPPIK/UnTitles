@@ -7,12 +7,6 @@ import {env} from "@env";
 
 /**
  * @author SNIPPIK
- * @description Путь до директории с кешированными данными
- */
-const cache = env.get("cache.dir");
-
-/**
- * @author SNIPPIK
  * @description Класс для кеширования аудио и картинок
  * @class CacheUtility
  * @public
@@ -108,6 +102,12 @@ class CacheData {
  * @protected
  */
 class CacheAudio extends Constructor.Cycle<Track> {
+    /**
+     * @author SNIPPIK
+     * @description Путь до директории с кешированными данными
+     */
+    private readonly cache = env.get("cache.dir");
+
     public constructor() {
         super({
             name: "AudioFile",
@@ -131,7 +131,7 @@ class CacheAudio extends Constructor.Cycle<Track> {
             },
             execute: (track) => {
                 return new Promise<boolean>((resolve, reject) => {
-                    //setImmediate(() => this.remove(track));
+                    setImmediate(() => this.remove(track));
 
                     new httpsClient(track.link).request.then((req) => {
                         if (req instanceof Error) return resolve(false);
@@ -180,7 +180,7 @@ class CacheAudio extends Constructor.Cycle<Track> {
      */
     public status = (track: Track): { status: "not" | "final" | "download", path: string } => {
         try {
-            const dir = `${path.resolve(`${cache}/Audio/[${track.id}]`)}`;
+            const dir = `${path.resolve(`${this.cache}/Audio/[${track.id}]`)}`;
             const isOpus = existsSync(`${dir}.opus`), isRaw = existsSync(`${dir}.raw`);
 
             return {status: isOpus ? "final" : isRaw ? "download" : "not", path: dir + (isOpus ? `.opus` : `.raw`)}

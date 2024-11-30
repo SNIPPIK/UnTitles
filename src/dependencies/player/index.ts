@@ -168,7 +168,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public play = (seek: number = 0): void => {
-        const track = this.tracks?.song;
+        const track = this._tracks?.song;
 
         // Если больше нет треков
         if (!track) {
@@ -212,9 +212,6 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
                     const stream = new AudioResource({path, seek, ...this._filters.compress});
                     let timeout: NodeJS.Timeout = null;
 
-                    // Создаем сообщение после всех действий
-                    this.emit("player/ended", this, seek);
-
                     // Если стрим можно прочитать
                     if (stream.readable) {
                         this.audio.current = stream;
@@ -250,7 +247,12 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
                             this.status = "player/playing"
                         })
                 }
-            );
+            )
+
+            // Создаем сообщение после всех действий
+            .finally(() => {
+                this.emit("player/ended", this, seek);
+            });
     };
 
     /**

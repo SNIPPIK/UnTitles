@@ -13,10 +13,10 @@ import {env} from "@env";
 class sAPI extends Constructor.Assign<API.request> {
     /**
      * @author SNIPPIK
-     * @description API ключ для доступа к видео на youtube, он сгенерирован если что!!!
+     * @description API ключ для доступа к видео на youtube
      * @private
      */
-    private static AIzaKey = env.check("token.youtube") ? env.get("token.youtube") : "AIzaSyB-63vPrdThhKuerbB2N_l7Jswcxj6yUAc";
+    private static AIzaKey = env.check("token.youtube") ? env.get("token.youtube") : "";
 
     /**
      * @description Создаем экземпляр запросов
@@ -217,7 +217,7 @@ class sAPI extends Constructor.Assign<API.request> {
         return new Promise((resolve) => {
             // Если надо использовать ключ доступа
             if (AIza) {
-                this.updateAIzaKey();
+                if (!this.AIzaKey) this.AIzaKey = this.generateAIzaKey;
                 new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${this.AIzaKey}&prettyPrint=false`, {
                     useragent: true,
                     method: "POST",
@@ -294,17 +294,18 @@ class sAPI extends Constructor.Assign<API.request> {
      * @protected
      * @static
      */
-    protected static updateAIzaKey = () => {
-        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    protected static get generateAIzaKey() {
+        const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
         let result = 'AIzaSy', position = 0;
 
         // Постепенно генерим ключи
-        while (position < 33) {
+        while (position <= 33) {
             position++;
             result += characters.charAt(Math.floor(Math.random() * characters.length));
         }
 
-        this.AIzaKey = result;
+        // Выдаем готовый ключ
+        return result;
     };
 
     /**
@@ -316,20 +317,24 @@ class sAPI extends Constructor.Assign<API.request> {
         const startIndex = input.indexOf(startPattern);
         const endIndex = input.indexOf("};", startIndex + startPattern.length);
 
-        //Если нет данных
+        // Если нет данных
         if (startIndex === -1 && endIndex === -1) return null;
 
         const data = JSON.parse(input.substring(startIndex + startPattern.length, endIndex + 1));
 
-        //Если при получении данных происходит что-то не так
-        if (!data) return Error("[APIs]: Не удалось получить данные!");
+        // Если при получении данных происходит что-то не так
+        if (!data) return Error("[APIs]: Not found video data!");
 
-        //Если есть статус, то проверяем
+        // Если есть статус, то проверяем
         if (data["playabilityStatus"]?.status) {
-            if (data["playabilityStatus"]?.status === "LOGIN_REQUIRED") return Error(`[APIs]: Данное видео невозможно включить из-за проблем с авторизацией!`);
-            else if (data["playabilityStatus"]?.status !== "OK") return Error(`[APIs]: Не удалось получить данные! Status: ${data["playabilityStatus"]?.status}`);
+            if (data["playabilityStatus"]?.status === "LOGIN_REQUIRED") return Error(`[APIs]: Sorry this video a 18+!`);
+            else if (data["playabilityStatus"]?.status !== "OK") return Error(`[APIs]: Fail getting data! Status: ${data["playabilityStatus"]?.status}`);
         }
 
+        // Если нету статуса
+        else return Error("[APIs]: Fail getting data!");
+
+        // Выдаем данные
         return data;
     };
 
@@ -338,7 +343,7 @@ class sAPI extends Constructor.Assign<API.request> {
      * @param data {any} <videoData>.streamingData
      */
     protected static extractFormat = (data: any) => {
-        return new Promise(async (resolve) => {
+        return new Promise((resolve) => {
             // Проверяем все форматы аудио и видео
             for (const format of (data["adaptiveFormats"])) {
                 if (!format.url) continue;

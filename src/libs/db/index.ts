@@ -1,6 +1,7 @@
 import {Database_Commands} from "@lib/db/modules/Commands";
 import {Database_Buttons} from "@lib/db/modules/Buttons";
 import {ExtraFilters} from "@lib/db/utils/AudioFilters";
+import {CacheUtility} from "@lib/db/utils/CacheUtility";
 import {Database_Audio} from "@lib/db/modules/Audio";
 import {Database_Voice} from "@lib/db/modules/Voice";
 import {Database_APIs} from "@lib/db/modules/APIs";
@@ -8,7 +9,6 @@ import {API, Handler} from "@handler";
 import {Client} from "@lib/discord";
 import {Logger} from "@lib/logger";
 import {env} from "@env";
-import {CacheUtility} from "@lib/db/utils/CacheUtility";
 
 /**
  * @author SNIPPIK
