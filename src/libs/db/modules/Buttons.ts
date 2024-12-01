@@ -25,28 +25,26 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @description Включение случайного трека
          * @button shuffle
          */
-        this.set("shuffle", {
-            callback: (msg) => {
-                const queue = msg.queue;
+        this.set("shuffle", (msg) => {
+            const queue = msg.queue;
 
-                // Если в очереди менее 2 треков
-                if (queue.tracks.size < 2) {
-                    msg.fastBuilder = {
-                        description: locale._(msg.locale, "player.button.shuffle.fail"),
-                        color: Colors.Yellow
-                    };
-
-                    return;
-                }
-
-                // Включение тасовки очереди
-                queue.shuffle = !queue.shuffle;
-
-                // Отправляем сообщение о включении или выключении тасовки
+            // Если в очереди менее 2 треков
+            if (queue.tracks.size < 2) {
                 msg.fastBuilder = {
-                    description: locale._(msg.locale, queue.shuffle ? "player.button.shuffle.on" : "player.button.shuffle.off"),
-                    color: Colors.Green
-                }
+                    description: locale._(msg.locale, "player.button.shuffle.fail"),
+                    color: Colors.Yellow
+                };
+
+                return;
+            }
+
+            // Включение тасовки очереди
+            queue.shuffle = !queue.shuffle;
+
+            // Отправляем сообщение о включении или выключении тасовки
+            msg.fastBuilder = {
+                description: locale._(msg.locale, queue.shuffle ? "player.button.shuffle.on" : "player.button.shuffle.off"),
+                color: Colors.Green
             }
         });
 
@@ -54,28 +52,26 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @description Включение прошлого трека
          * @button last
          */
-        this.set("last", {
-            callback: (msg) => {
-                const queue = msg.queue;
+        this.set("last", (msg) => {
+            const queue = msg.queue;
 
-                // Если играет 1 трек
-                if (queue.tracks.position === 0) {
-                    msg.fastBuilder = {
-                        description: locale._(msg.locale, "player.button.last.fail"),
-                        color: Colors.Yellow
-                    };
-
-                    return;
-                }
-
-                // Меняем позицию трека в очереди
-                queue.player.stop_fade(queue.tracks.position - 1);
-
-                // Уведомляем пользователя о смене трека
+            // Если играет 1 трек
+            if (queue.tracks.position === 0) {
                 msg.fastBuilder = {
-                    description: locale._(msg.locale, "player.button.last"),
+                    description: locale._(msg.locale, "player.button.last.fail"),
                     color: Colors.Yellow
-                }
+                };
+
+                return;
+            }
+
+            // Меняем позицию трека в очереди
+            queue.player.stop_fade(queue.tracks.position - 1);
+
+            // Уведомляем пользователя о смене трека
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.last"),
+                color: Colors.Yellow
             }
         });
 
@@ -83,32 +79,30 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @description Кнопка паузы/проигрывания
          * @button resume_pause
          */
-        this.set("resume_pause", {
-            callback: (msg) => {
-                const queue = msg.queue;
+        this.set("resume_pause", (msg) => {
+            const queue = msg.queue;
 
-                // Если плеер уже проигрывает трек
-                if (queue.player.status === "player/playing") {
-                    // Приостанавливаем музыку если она играет
-                    queue.player.pause();
+            // Если плеер уже проигрывает трек
+            if (queue.player.status === "player/playing") {
+                // Приостанавливаем музыку если она играет
+                queue.player.pause();
 
-                    // Сообщение о паузе
-                    msg.fastBuilder = {
-                        description: locale._(msg.locale, "player.button.pause"),
-                        color: Colors.Green
-                    }
+                // Сообщение о паузе
+                msg.fastBuilder = {
+                    description: locale._(msg.locale, "player.button.pause"),
+                    color: Colors.Green
                 }
+            }
 
-                // Если плеер на паузе
-                else if (queue.player.status === "player/pause") {
-                    // Возобновляем проигрывание если это возможно
-                    queue.player.resume();
+            // Если плеер на паузе
+            else if (queue.player.status === "player/pause") {
+                // Возобновляем проигрывание если это возможно
+                queue.player.resume();
 
-                    // Сообщение о возобновлении
-                    msg.fastBuilder = {
-                        description: locale._(msg.locale, "player.button.resume"),
-                        color: Colors.Green
-                    }
+                // Сообщение о возобновлении
+                msg.fastBuilder = {
+                    description: locale._(msg.locale, "player.button.resume"),
+                    color: Colors.Green
                 }
             }
         });
@@ -117,18 +111,16 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @description Кнопка пропуска текущего трека
          * @button skip
          */
-        this.set("skip", {
-            callback: (msg) => {
-                const queue = msg.queue;
+        this.set("skip", (msg) => {
+            const queue = msg.queue;
 
-                // Меняем позицию трека в очереди
-                queue.player.stop_fade(queue.tracks.position + 1);
+            // Меняем позицию трека в очереди
+            queue.player.stop_fade(queue.tracks.position + 1);
 
-                // Уведомляем пользователя о пропущенном треке
-                msg.fastBuilder = {
-                    description: locale._(msg.locale, "player.button.skip"),
-                    color: Colors.Green
-                }
+            // Уведомляем пользователя о пропущенном треке
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.skip"),
+                color: Colors.Green
             }
         });
 
@@ -136,30 +128,31 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @description Включение и выключение повтора
          * @button repeat
          */
-        this.set("repeat", {
-            callback: (msg) => {
-                const queue = msg.queue, loop = queue.repeat;
+        this.set("repeat", (msg) => {
+            const queue = msg.queue, loop = queue.repeat;
 
-                // Включение всех треков
-                if (loop === "off") {
-                    queue.repeat = "songs";
+            // Включение всех треков
+            if (loop === "off") {
+                queue.repeat = "songs";
 
-                    msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.songs"), color: Colors.Green };
-                    return;
-                }
-
-                // Включение повтора трека
-                else if (loop === "songs") {
-                    queue.repeat = "song";
-                    msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.song"), color: Colors.Green };
-                    return;
-                }
-
-                queue.repeat = "off";
                 msg.fastBuilder = {
-                    description: locale._(msg.locale, "player.button.repeat.off"),
+                    description: locale._(msg.locale, "player.button.repeat.songs"),
                     color: Colors.Green
-                }
+                };
+                return;
+            }
+
+            // Включение повтора трека
+            else if (loop === "songs") {
+                queue.repeat = "song";
+                msg.fastBuilder = {description: locale._(msg.locale, "player.button.repeat.song"), color: Colors.Green};
+                return;
+            }
+
+            queue.repeat = "off";
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.repeat.off"),
+                color: Colors.Green
             }
         });
 
@@ -168,19 +161,17 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @description Повтор текущего трека
          * @button replay
          */
-        this.set("replay", {
-            callback: (msg: Interact) => {
-                const queue = msg.queue;
+        this.set("replay", (msg: Interact) => {
+            const queue = msg.queue;
 
-                // Запускаем проигрывание текущего трека
-                queue.player.play();
+            // Запускаем проигрывание текущего трека
+            queue.player.play();
 
-                // Сообщаем о том что музыка начата с начала
-                msg.fastBuilder = {
-                    description: locale._(msg.locale, "player.button.replay", [queue.tracks.song.title]),
-                    color: Colors.Green
-                };
-            }
+            // Сообщаем о том что музыка начата с начала
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.replay", [queue.tracks.song.title]),
+                color: Colors.Green
+            };
         });
 
 
@@ -188,55 +179,53 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @description Показ текущих треков
          * @button queue
          */
-        this.set("queue", {
-            callback: (msg: Interact) => {
-                const queue = msg.queue;
-                const page = parseInt((queue.tracks.position / 5).toFixed(0));
-                const pages = queue.tracks.arraySort(5);
+        this.set("queue", (msg: Interact) => {
+            const queue = msg.queue;
+            const page = parseInt((queue.tracks.position / 5).toFixed(0));
+            const pages = queue.tracks.arraySort(5);
 
-                return new msg.builder().addEmbeds([
-                    {
-                        color: Colors.Green,
-                        author: {
-                            name: `${locale._(msg.locale, "queue")} - ${msg.guild.name}`,
-                            iconURL: msg.guild.iconURL()
+            return new msg.builder().addEmbeds([
+                {
+                    color: Colors.Green,
+                    author: {
+                        name: `${locale._(msg.locale, "queue")} - ${msg.guild.name}`,
+                        iconURL: db.emojis.diskImage
+                    },
+                    thumbnail: {
+                        url: msg.guild.iconURL()
+                    },
+                    fields: [
+                        {
+                            name: locale._(msg.locale, "player.current.playing"),
+                            value: `\`${queue.tracks.position + 1}\` - ${queue.tracks.song.titleReplaced}`
                         },
-                        thumbnail: {
-                            url: db.emojis.diskImage
-                        },
-                        fields: [
-                            {
-                                name: locale._(msg.locale, "player.current.playing"),
-                                value: `\`${queue.tracks.position + 1}\` - ${queue.tracks.song.titleReplaced}`
-                            },
-                            pages.length > 0 ? { name: locale._(msg.locale, "queue"), value: pages[page] } : null
-                        ],
-                        footer: {
-                            text: locale._(msg.locale,"player.button.queue.footer", [queue.tracks.song.user.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time]),
-                            iconURL: queue.tracks.song.user.avatar
-                        }
+                        pages.length > 0 ? {name: locale._(msg.locale, "queue"), value: pages[page]} : null
+                    ],
+                    footer: {
+                        text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.song.user.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time]),
+                        iconURL: queue.tracks.song.user.avatar
                     }
-                ]).setPage(page).setPages(pages).setTime(60e3).setCallback((message, pages: string[], page: number, embed) => {
-                    return message.edit({
-                        embeds: [ //@ts-ignore
-                            {
-                                ...embed[0],
-                                fields: [
-                                    embed[0].fields[0],
-                                    {
-                                        name: locale._(msg.locale, "queue"),
-                                        value: pages[page]
-                                    }
-                                ],
-                                footer: {
-                                    ...embed[0].footer,
-                                    text: locale._(msg.locale, "player.button.queue.footer", [msg.author.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time])
+                }
+            ]).setPage(page).setPages(pages).setTime(60e3).setCallback((message, pages: string[], page: number, embed) => {
+                return message.edit({
+                    embeds: [ //@ts-ignore
+                        {
+                            ...embed[0],
+                            fields: [
+                                embed[0].fields[0],
+                                {
+                                    name: locale._(msg.locale, "queue"),
+                                    value: pages[page]
                                 }
+                            ],
+                            footer: {
+                                ...embed[0].footer,
+                                text: locale._(msg.locale, "player.button.queue.footer", [msg.author.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time])
                             }
-                        ]
-                    });
-                }).send = msg;
-            }
+                        }
+                    ]
+                });
+            }).send = msg;
         });
 
 
@@ -244,23 +233,21 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @description Показ включенных фильтров
          * @button filters_menu
          */
-        this.set("filters_menu", {
-            callback: (msg) => {
-                const queue = msg.queue;
-                const filters = queue.player.filters.enable;
+        this.set("filters_menu", (msg) => {
+            const queue = msg.queue;
+            const filters = queue.player.filters.enable;
 
-                // Если нет фильтров
-                if (filters.length === 0) {
-                    msg.fastBuilder = { description: locale._(msg.locale, "player.button.filter.zero"), color: Colors.White };
-                    return;
-                }
-
-                // Отправляем список включенных фильтров
-                msg.fastBuilder = {
-                    description: locale._(msg.locale, "player.button.filter", [filters.length, filters.map((flt) => flt.name).join(", ")]),
-                    color: Colors.White
-                };
+            // Если нет фильтров
+            if (filters.length === 0) {
+                msg.fastBuilder = {description: locale._(msg.locale, "player.button.filter.zero"), color: Colors.White};
+                return;
             }
+
+            // Отправляем список включенных фильтров
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.filter", [filters.length, filters.map((flt) => flt.name).join(", ")]),
+                color: Colors.White
+            };
         });
 
 
@@ -268,29 +255,25 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @description Показ теста трека
          * @button lyrics
          */
-        this.set("lyrics", {
-            callback: (msg) => {
-                msg.fastBuilder = { description: locale._(msg.locale, "player.button.lyrics"), color: Colors.White };
-            }
+        this.set("lyrics", (msg) => {
+            msg.fastBuilder = {description: locale._(msg.locale, "player.button.lyrics"), color: Colors.White};
         });
 
         /**
          * @description Остановка проигрывания
          * @button stop_music
          */
-        this.set("stop_music", {
-            callback: (msg) => {
-                const queue = msg.queue;
+        this.set("stop_music", (msg) => {
+            const queue = msg.queue;
 
-                // Если есть очередь, то удаляем ее
-                if (queue) queue.cleanup();
-                db.voice.remove(msg.guild.id);
+            // Если есть очередь, то удаляем ее
+            if (queue) queue.cleanup();
+            db.voice.remove(msg.guild.id);
 
-                msg.fastBuilder = {
-                    description: locale._(msg.locale, "player.button.stop"),
-                    color: Colors.Green
-                };
-            }
+            msg.fastBuilder = {
+                description: locale._(msg.locale, "player.button.stop"),
+                color: Colors.Green
+            };
         });
     };
 }
@@ -300,6 +283,4 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
  * @description Что хранит в себе объект кнопки
  * @interface button
  */
-interface button {
-    callback: (msg: Interact) => void;
-}
+type button = (msg: Interact) => void

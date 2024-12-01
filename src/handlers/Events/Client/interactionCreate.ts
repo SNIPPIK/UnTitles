@@ -123,7 +123,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     if (!queue || interact.voice.channel?.id !== queue.voice.channel.id) return;
 
                     // Если была найдена кнопка
-                    else if (button) button.callback(interact);
+                    else if (button) button(interact);
 
                     // Если кнопка была не найдена
                     else interact.fastBuilder = { description: locale._(interact.locale, "button.fail"), color: Colors.DarkRed };
