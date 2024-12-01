@@ -39,9 +39,8 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                 .json,
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
-                const queue = db.audio.queue.get(message.guild.id);
-                const {player, tracks} = queue;
                 const number = args.length > 0 ? parseInt(args.pop()) : 1;
+                const {player, tracks} = db.audio.queue.get(message.guild.id);
 
                 // Если аргумент не является числом
                 if (isNaN(number)) {
@@ -61,19 +60,19 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                     return;
                 }
 
-                const {title, url, color} = tracks.get(number > 1 ? queue.tracks.position + number - 1 : queue.tracks.position - 1);
+                const {title, url, color} = tracks.get(number > 1 ? tracks.position + number - 1 : tracks.position - 1);
 
                 // Если аргумент больше 1, то ищем трек
                 if (number > 1) {
                     // Меняем позицию трека в очереди
-                    queue.player.stop_fade(tracks.position + number - 1);
+                    player.stop_fade(tracks.position + number - 1);
                     message.fastBuilder = { description: locale._(message.locale, "command.skip.arg.track", [number, `[${title}](${url})`]), color };
 
                     return;
                 }
 
                 // Пропускаем текущий трек
-                queue.player.stop_fade(tracks.position + 1);
+                player.stop_fade(tracks.position + 1);
                 message.fastBuilder = { description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]), color };
                 return;
             }

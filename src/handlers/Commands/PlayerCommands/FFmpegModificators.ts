@@ -52,7 +52,7 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                 }
 
                 //Если пользователь указал времени больше чем в треке
-                else if (duration > queue.tracks.song.time.total) {
+                else if (duration > queue.tracks.track.time.total) {
                     message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.big") };
                     return;
                 }
@@ -198,7 +198,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     queue.player.filters.enable.splice(0, queue.player.filters.enable.length);
 
                     // Если можно выключить фильтр или фильтры сейчас
-                    if (player.audio.current.duration < player.tracks.song.time.total + 10) {
+                    if (player.audio.current.duration < player.tracks.track.time.total + 10) {
                         queue.player.play(seek);
 
                         // Сообщаем о выключении фильтров
@@ -262,7 +262,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         queue.player.filters.enable.push(Filter);
 
                         // Если можно включить фильтр или фильтры сейчас
-                        if (player.audio.current.duration < player.tracks.song.time.total + 10) {
+                        if (player.audio.current.duration < player.tracks.track.time.total + 10) {
                             queue.player.play(seek);
 
                             // Сообщаем о включении фильтров
@@ -299,7 +299,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         queue.player.filters.enable.splice(index, 1);
 
                         // Если можно выключить фильтр или фильтры сейчас
-                        if (player.audio.current.duration < player.tracks.song.time.total + 10) {
+                        if (player.audio.current.duration < player.tracks.track.time.total + 10) {
                             queue.player.play(seek);
 
                             // Сообщаем о включении фильтров

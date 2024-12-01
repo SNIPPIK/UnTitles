@@ -9,7 +9,13 @@ import os from "node:os";
  * @public
  */
 class Environment {
+  /**
+   * @description Загружаем .env файл
+   * @readonly
+   * @private
+   */
   private readonly dotenv = config();
+
   /**
    * @description Получаем значение
    * @param name {string} Имя

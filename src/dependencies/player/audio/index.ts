@@ -26,7 +26,10 @@ export class AudioResource {
      * @private
      */
     private readonly chunks = {
+        // Кол-во пакетов
         length:    0,
+
+        // Размер пакета
         size:     20
     };
 

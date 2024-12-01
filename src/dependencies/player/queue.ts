@@ -13,7 +13,7 @@ const cache = env.get("cache");
 
 /**
  * @author SNIPPIK
- * @description Список очередей для работы плеера
+ * @description Класс очереди для управления всей системой, бесконтрольное использование ведет к поломке всего процесса!!!
  * @class Queue
  * @public
  */
@@ -205,6 +205,10 @@ export class Queue {
             Object.assign(two[1], { disabled: true });
         }
 
+        // Если нет включенных фильтров
+        if (this.player.filters.enable.length === 0) Object.assign(two[3], { disabled: true });
+        else Object.assign(two[3], { disabled: false });
+
         return this._components;
     };
 
@@ -267,7 +271,7 @@ export class Queue {
 
 /**
  * @author SNIPPIK
- * @description Ключевой элемент музыки
+ * @description Класс трека, хранит все данные трека, время и возможность получить аудио ссылку или путь до файла
  * @class Track
  * @public
  */

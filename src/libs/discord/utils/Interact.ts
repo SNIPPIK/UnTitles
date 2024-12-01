@@ -1,5 +1,5 @@
 import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User, Colors} from "discord.js"
-import type { ComponentData, EmbedData, GuildMember,  InteractionCollector, ButtonInteraction} from "discord.js"
+import type { ComponentData, EmbedData, GuildMember} from "discord.js"
 import { BaseInteraction, Message, Attachment} from "discord.js";
 import type {LocalizationMap} from "discord-api-types/v10";
 import {locale} from "@lib/locale";
@@ -39,7 +39,7 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
     // Если музыка играет в другом голосовом канале
     if (message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
 
-      // Если есть голосовое подключение к каналу
+      // Если включена музыка на сервере
       if (queue) {
 
         // Если есть голосовое подключение
@@ -63,7 +63,10 @@ const intends: {[key: string]: (message: Interact) => boolean } = {
 
       // Если нет очереди, но есть голосовое подключение
       else {
-        // TODO придумать что с этом можно сделать
+        const connection = db.voice.get(message.guild.id);
+
+        // Отключаемся от голосового канала
+        if (connection) connection.disconnect();
       }
     }
 

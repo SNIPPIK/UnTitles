@@ -17,9 +17,9 @@ class message_error extends Constructor.Assign<Handler.Event<"message/error">> {
             name: "message/error",
             type: "player",
             execute: (queue, error) => {
-                if (queue?.tracks || queue?.tracks!.song) return;
+                if (queue?.tracks || queue?.tracks!.track) return;
 
-                const {color, artist, image, title, user} = queue.tracks.song;
+                const {color, artist, image, title, user} = queue.tracks.track;
                 new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image, timestamp: new Date(),
@@ -146,7 +146,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
             name: "message/playing",
             type: "player",
             execute: (queue, message) => {
-                const {color, artist, image, title, url, time, platform} = queue.tracks.song;
+                const {color, artist, image, title, url, time, platform} = queue.tracks.track;
                 const embed = new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image,

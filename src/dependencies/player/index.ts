@@ -35,7 +35,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Хранилище треков
      * @private
      */
-    private readonly _tracks: PlayerSongs = new PlayerSongs();
+    private readonly _tracks: PlayerTracks = new PlayerTracks();
 
     /**
      * @description Хранилище аудио фильтров
@@ -118,7 +118,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public get progress() {
-        const {platform, time} = this.tracks.song;
+        const {platform, time} = this.tracks.track;
         let current = this.audio?.current?.duration;
 
         // Скорее всего трек играет следующий трек
@@ -168,7 +168,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public play = (seek: number = 0): void => {
-        const track = this._tracks?.song;
+        const track = this._tracks?.track;
 
         // Если больше нет треков
         if (!track) {
@@ -290,7 +290,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         const old = this.tracks.position;
 
         // Меняем позицию трека в очереди
-        if (this.audio.current.duration < this.tracks.song.time.total + 10) {
+        if (this.audio.current.duration < this.tracks.track.time.total + 10) {
             this.tracks.swapPosition = position;
             this.play();
 
@@ -413,16 +413,16 @@ class PlayerVoice {
 /**
  * @author SNIPPIK
  * @description Все треки для проигрывания в плеере, хранит в себе все данные треков
- * @class PlayerSongs
+ * @class PlayerTracks
  * @protected
  */
-class PlayerSongs {
+class PlayerTracks {
     /**
      * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
      * @readonly
      * @private
      */
-    private readonly _songs: Track[] = [];
+    private readonly _tracks: Track[] = [];
 
     /**
      * @description Текущая позиция в списке
@@ -438,52 +438,64 @@ class PlayerSongs {
     public set swapPosition(number: number) { this._position = number; };
 
     /**
-     * @description Получаем текущий трек
-     * @return Song
-     * @public
-     */
-    public get song() { return this._songs[this._position]; };
-
-    /**
      * @description Текущая позиция трека в очереди
      * @return number
      * @public
      */
     public get position() { return this._position; };
 
+
     /**
      * @description Кол-во треков в очереди с учетом текущей позиции
      * @return number
      * @public
      */
-    public get size() { return this._songs.length - this.position; };
+    public get size() { return this._tracks.length - this.position; };
 
     /**
      * @description Кол-во треков в очереди
      * @return number
      * @public
      */
-    public get total() { return this._songs.length; };
+    public get total() { return this._tracks.length; };
 
     /**
      * @description Общее время треков
      * @public
      */
     public get time() {
-        return this._songs.slice(this._position).reduce((total: number, item: {time: { total: number }}) => total + (item.time.total || 0), 0).duration();
+        const tracks = this._tracks.slice(this._position);
+        const total = tracks.reduce((total: number, item: {time: { total: number }}) => total + (item.time.total || 0), 0);
+
+        return total.duration();
+    };
+
+
+    /**
+     * @description Получаем текущий трек
+     * @return Song
+     * @public
+     */
+    public get track() { return this._tracks[this._position]; };
+
+
+    /**
+     * @description Получаем последние n треков, не включает текущий
+     * @param size - Кол-во треков
+     * @public
+     */
+    public last = (size: number = 5) => {
+        return this._tracks.slice(this._position - 1 - size, this._position - 1 - size);
     };
 
     /**
-     * @description Добавляем трек в очередь
-     * @param track - Сам трек
+     * @description Получаем следующие n треков, не включает текущий
+     * @param size - Кол-во треков
+     * @public
      */
-    public push = (track: Track) => { this._songs.push(track); };
-
-    /**
-     * @description Получаем прошлый трек или текущий в зависимости от позиции
-     * @param position - позиция трека, номер в очереди
-     */
-    public get = (position: number) => { return this._songs[position]; };
+    public next = (size: number = 5) => {
+        return this._tracks.slice(this._position + 1, this._position + size);
+    };
 
     /**
      * @description Сортируем все треки в Array<Array, Array>
@@ -493,38 +505,12 @@ class PlayerSongs {
         let number = 0;
 
         // Создаем Array
-        return this._songs.ArraySort(size, (track) => {
+        return this._tracks.ArraySort(size, (track) => {
             number++;
             return `\`${number}\` - ${track.titleReplaced}`;
         }, "\n");
     };
 
-    /**
-     * @description Получаем следующие n треков, не включает текущий
-     * @param length - Кол-во треков
-     * @public
-     */
-    public next = (length: number = 5) => {
-        return this._songs.slice(this._position + 1, this._position + length);
-    };
-
-    /**
-     * @description Удаляем из очереди неугодный трек
-     * @param position - позиция трека, номер в очереди
-     */
-    public remove = (position: number) => {
-        // Удаляем из очереди
-        this._songs.splice(position, 1);
-    };
-
-    /**
-     * @description Получаем последние n треков, не включает текущий
-     * @param length - Кол-во треков
-     * @public
-     */
-    public last = (length: number = 5) => {
-        return this._songs.slice(this._position - 1 - length, this._position - 1 - length);
-    };
 
     /**
      * @description Перетасовка треков без нарушения текущий позиции
@@ -534,7 +520,29 @@ class PlayerSongs {
         const i = this.size.random(1);
 
         // Меняем трек текущий позиции на случайный
-        [this._songs[this._position], this._songs[i]] = [this._songs[i], this._songs[this._position]];
+        [this._tracks[this._position], this._tracks[i]] = [this._tracks[i], this._tracks[this._position]];
+    };
+
+
+    /**
+     * @description Добавляем трек в очередь
+     * @param track - Сам трек
+     */
+    public push = (track: Track) => { this._tracks.push(track); };
+
+    /**
+     * @description Получаем прошлый трек или текущий в зависимости от позиции
+     * @param position - позиция трека, номер в очереди
+     */
+    public get = (position: number) => { return this._tracks[position]; };
+
+    /**
+     * @description Удаляем из очереди неугодный трек
+     * @param position - позиция трека, номер в очереди
+     */
+    public remove = (position: number) => {
+        // Удаляем из очереди
+        this._tracks.splice(position, 1);
     };
 }
 

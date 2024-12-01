@@ -39,7 +39,7 @@ class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
                 const queue = db.audio.queue.get(player.id);
 
                 // Если нет треков в очереди
-                if (!queue?.tracks?.song || !queue.player) return db.audio.queue.remove(player.id);
+                if (!queue?.tracks?.track || !queue.player) return db.audio.queue.remove(player.id);
 
                 // Проверяем надо ли удалить из очереди трек
                 if (queue.repeat === "off" || queue.repeat === "songs") {

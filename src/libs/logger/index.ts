@@ -5,19 +5,26 @@ import {threadId} from "node:worker_threads";
  * @description База данных
  */
 const db = {
+    /**
+     * @description Цвета текста
+     */
     colors: {
         "DEBUG": "\x1b[90m",
         "WARN": "\x1b[33m",
         "ERROR": "\x1b[31m",
         "LOG": ""
     },
+
+    /**
+     * @description Цвета фона
+     */
     status: {
         "DEBUG": "\x1b[34mi\x1b[0m",
         "WARN": "\x1b[33mi\x1b[0m",
         "ERROR": "\x1b[31mi\x1b[0m",
         "LOG": "\x1b[32mi\x1b[0m"
     }
-}
+};
 
 /**
  * @author SNIPPIK

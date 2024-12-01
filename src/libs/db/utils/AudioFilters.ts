@@ -70,7 +70,7 @@ export class ExtraFilters {
             for (const [key, value] of Object.entries(filter.locale)) {
                 if (value.startsWith("[")) continue;
 
-                // Добавляем диапазон
+                // Добавляем диапазон аргументов
                 if (filter.args) filter.locale[key] = `<${filter.args[0]}-${filter.args[1]}> - ${filter.locale[key]}`;
 
                 // Удаляем лишний размер описания

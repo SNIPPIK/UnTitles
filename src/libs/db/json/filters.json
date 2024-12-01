@@ -15,7 +15,7 @@
       "en-US": "Only one audio channel is used for playback",
       "ru": "Используется только один аудио канал для воспроизведения"
     },
-    "unsupported": ["8d", "chorus", "chorus2d", "chorus3d"],
+    "unsupported": ["8d"],
     "filter": "pan=mono|c0=.5*c0+.5*c1",
     "args": false
   },
@@ -74,7 +74,7 @@
       "en-US": "Increases track speed by 25-35%!",
       "ru": "Увеличивает скорость трека на 25-35%!"
     },
-    "unsupported": ["vaporwave", "vw"],
+    "unsupported": ["vaporwave"],
     "filter": "asetrate=48000*1.25,aresample=48000,bass=g=5",
     "args": false,
     "speed": 1.25
@@ -146,7 +146,7 @@
       "en-US": "Micro genre of electronic music",
       "ru": "Микро жанр электронной музыки"
     },
-    "unsupported": ["nightcore", "night"],
+    "unsupported": ["nightcore"],
     "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1",
     "args": false,
     "speed": 1.1

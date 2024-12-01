@@ -169,7 +169,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
 
             // Сообщаем о том что музыка начата с начала
             msg.fastBuilder = {
-                description: locale._(msg.locale, "player.button.replay", [queue.tracks.song.title]),
+                description: locale._(msg.locale, "player.button.replay", [queue.tracks.track.title]),
                 color: Colors.Green
             };
         });
@@ -197,13 +197,13 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                     fields: [
                         {
                             name: locale._(msg.locale, "player.current.playing"),
-                            value: `\`${queue.tracks.position + 1}\` - ${queue.tracks.song.titleReplaced}`
+                            value: `\`${queue.tracks.position + 1}\` - ${queue.tracks.track.titleReplaced}`
                         },
                         pages.length > 0 ? {name: locale._(msg.locale, "queue"), value: pages[page]} : null
                     ],
                     footer: {
-                        text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.song.user.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time]),
-                        iconURL: queue.tracks.song.user.avatar
+                        text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time]),
+                        iconURL: queue.tracks.track.user.avatar
                     }
                 }
             ]).setPage(page).setPages(pages).setTime(60e3).setCallback((message, pages: string[], page: number, embed) => {
