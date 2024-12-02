@@ -244,10 +244,27 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
             }
 
             // Отправляем список включенных фильтров
-            msg.fastBuilder = {
-                description: locale._(msg.locale, "player.button.filter", [filters.length, filters.map((flt) => flt.name).join(", ")]),
-                color: Colors.White
-            };
+            new msg.builder().addEmbeds([
+                {
+                    description: locale._(msg.locale, "player.button.filter"),
+                    color: Colors.White,
+                    author: {
+                        name: `${locale._(msg.locale, "filters")} - ${msg.guild.name}`,
+                        iconURL: db.emojis.diskImage
+                    },
+                    thumbnail: {
+                        url: msg.guild.iconURL()
+                    },
+
+                    fields: filters.map((item) => {
+                        return {
+                            name: item.name,
+                            value: item.locale[msg.locale] ?? item.locale["en-US"],
+                            inline: true
+                        }
+                    })
+                }
+            ]).send = msg;
         });
 
 

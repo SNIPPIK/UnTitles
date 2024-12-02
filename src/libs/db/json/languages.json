@@ -14,6 +14,11 @@
     "en-US": "Queue"
   },
 
+  "filters": {
+    "ru": "Фильтры",
+    "en-US": "Filters"
+  },
+
   "command.fail": {
     "ru": "Я не нахожу этой команды",
     "en-US": "I not found this command"
@@ -135,9 +140,11 @@
     "en-US": "There are currently no audio filters enabled"
   },
 
+
+
   "player.button.filter": {
-    "ru": "Фильтры: {ARGUMENT}\nВключенные фильтры: {ARGUMENT}",
-    "en-US": "Filters: {ARGUMENT}\nEnabled filters: {ARGUMENT}"
+    "ru": "Включенные фильтры:",
+    "en-US": "Enabled filters:"
   },
 
   "player.button.lyrics": {
