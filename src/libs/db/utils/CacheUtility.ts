@@ -13,11 +13,16 @@ import {env} from "@env";
  */
 export class CacheUtility {
     /**
-     * @description Класс кеширования данных
+     * @description База данных треков
      * @readonly
      * @private
      */
-    private readonly _data = new CacheData();
+    private readonly data = {
+        /**
+         * @description Кешированные треки
+         */
+        tracks: new Map<string, Track>()
+    };
 
     /**
      * @description Класс кеширования аудио файлов
@@ -37,11 +42,12 @@ export class CacheUtility {
      * @param track
      */
     public set = (track: Track) => {
-        const f_track = this._data.getTrack(track.id);
+        const song = this.data.tracks.get(track.id);
 
-        if (f_track) return;
+        // Если уже сохранен трек
+        if (song) return;
 
-        this._data.setTrack(track);
+        this.data.tracks.set(track.id, track);
     };
 
     /**
@@ -49,48 +55,7 @@ export class CacheUtility {
      * @param ID
      */
     public get = (ID: string) => {
-        return this._data.getTrack(ID);
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Класс для сохранения данных о треке
- * @support track
- * @class CacheData
- * @protected
- */
-class CacheData {
-    /**
-     * @description База данных треков
-     * @private
-     */
-    private readonly data = {
-        /**
-         * @description Кешированные треки
-         */
-        tracks: new Map<string, Track>()
-    };
-
-    /**
-     * @description Выдает сохраненный трек из базы
-     * @param ID
-     */
-    public getTrack = (ID: string) => {
         return this.data.tracks.get(ID);
-    };
-
-    /**
-     * @description Сохраняет трек в базу данных
-     * @param track
-     */
-    public setTrack = (track: Track) => {
-        const song = this.data.tracks.get(track.id);
-
-        // Если уже сохранен трек
-        if (song) return;
-
-        this.data.tracks.set(track.id, track);
     };
 }
 
