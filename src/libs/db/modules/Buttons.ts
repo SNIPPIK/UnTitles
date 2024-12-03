@@ -204,7 +204,8 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                     footer: {
                         text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time]),
                         iconURL: queue.tracks.track.user.avatar
-                    }
+                    },
+                    timestamp: new Date()
                 }
             ]).setPage(page).setPages(pages).setTime(60e3).setCallback((message, pages: string[], page: number, embed) => {
                 return message.edit({
@@ -262,7 +263,8 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                             value: item.locale[msg.locale] ?? item.locale["en-US"],
                             inline: true
                         }
-                    })
+                    }),
+                    timestamp: new Date()
                 }
             ]).send = msg;
         });
@@ -273,7 +275,21 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          * @button lyrics
          */
         this.set("lyrics", (msg) => {
-            msg.fastBuilder = {description: locale._(msg.locale, "player.button.lyrics"), color: Colors.White};
+            const queue = msg.queue;
+
+            // Отправляем сообщение с текстом песни
+            new msg.builder().addEmbeds([
+                {
+                    color: Colors.White,
+                    thumbnail: queue.tracks.track.image,
+                    author: {
+                        name: `${locale._(msg.locale, "player.button.lyrics.title")} - ${queue.tracks.track.titleReplaced}`,
+                        iconURL: db.emojis.diskImage
+                    },
+                    description: `\`\`\`css\n${locale._(msg.locale, "player.button.lyrics.description")}\n\`\`\``,
+                    timestamp: new Date()
+                }
+            ]).setTime(20e3).send = msg;
         });
 
         /**

@@ -140,16 +140,20 @@
     "en-US": "There are currently no audio filters enabled"
   },
 
-
-
   "player.button.filter": {
     "ru": "Включенные фильтры:",
     "en-US": "Enabled filters:"
   },
 
-  "player.button.lyrics": {
-    "ru": "Данная функция еще не доступна! ID: Lyrics",
-    "en-US": "This feature is not available yet! ID: Lyrics"
+
+  "player.button.lyrics.title": {
+    "ru": "Lyrics: ",
+    "en-US": "Lyrics: "
+  },
+
+  "player.button.lyrics.description": {
+    "ru": "Извините но данная функция еще в разработке!",
+    "en-US": "Sorry this in WIP"
   },
 
 
