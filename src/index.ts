@@ -12,7 +12,7 @@ import {env} from "@env";
 if (process["argv"].includes("--ShardManager")) new ShardManager(__filename);
 
 /**
- * @name "default"
+ * @name "shard"
  * @description Загрузка клиента или осколка
  */
 else {
@@ -32,7 +32,7 @@ else {
     /**
      * @description Удаляем копию клиента если процесс был закрыт
      */
-    for (const event of ["exit"]) process.on(event, () => {
+    for (const event of ["exit"]) process.once(event, () => {
         Logger.log("DEBUG", "[Process] is killed!");
         client.destroy().catch((err) => Logger.log("ERROR", err));
         process.exit(0);

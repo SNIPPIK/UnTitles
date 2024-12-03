@@ -186,7 +186,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                 // Если надо обновить сообщение
                 if (message) {
                     //Обновляем сообщение
-                    message.edit({ embeds: embed.embeds as any, components: queue.components as any });
+                    message.edit({ embeds: embed.embeds, components: queue.components as any });
                     return;
                 }
 

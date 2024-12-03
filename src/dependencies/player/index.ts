@@ -333,6 +333,10 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
  * @protected
  */
 class PlayerStreamSubSystem {
+    /**
+     * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
+     * @private
+     */
     private _stream: AudioResource = null;
 
     /**
@@ -366,7 +370,11 @@ class PlayerStreamSubSystem {
  * @protected
  */
 class PlayerVoice {
-    private voice = null as VoiceConnection;
+    /**
+     * @description Текущее голосовое подключение к каналу на сервере
+     * @private
+     */
+    private _voice: VoiceConnection = null;
 
     /**
      * @description Производим подключение к голосовому каналу
@@ -378,12 +386,12 @@ class PlayerVoice {
             if (connection.config.selfMute) return;
 
             // Если повторное подключение к тому же голосовому каналу
-            else if (this.voice && connection.config.channelId === this.voice.config.channelId) {
+            else if (this._voice && connection.config.channelId === this._voice.config.channelId) {
                 connection.configureSocket();
             }
         }
 
-        this.voice = connection;
+        this._voice = connection;
     };
 
     /**
@@ -391,7 +399,7 @@ class PlayerVoice {
      * @return VoiceConnection
      * @public
      */
-    public get connection() { return this.voice; };
+    public get connection() { return this._voice; };
 
     /**
      * @description Отправляем пакет в голосовой канал

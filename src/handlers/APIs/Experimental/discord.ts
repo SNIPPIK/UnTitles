@@ -42,10 +42,7 @@ class sAPI extends Constructor.Assign<API.request> {
                                         time: {
                                             total: ((attachment.size / 1024) / 39.2).toFixed(0) as any  //((attachment.size / 1024) / 16.5).toFixed(0)
                                         },
-                                        audio: {
-                                            type: "url",
-                                            url: attachment.url
-                                        }
+                                        audio: attachment.url
                                     });
 
                                     return resolve(track);

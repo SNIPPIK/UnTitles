@@ -82,7 +82,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     }
 
                     // Если права не соответствуют правде
-                    if (command.rules) {
+                    else if (command.rules) {
                         if (!InteractRule.check(command.rules, interact)) return;
                     }
 
@@ -113,14 +113,13 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 // Управление кнопками
                 else if (message.isButton()) {
                     const button = db.buttons.get(interact.custom_id as any);
+                    const queue = interact?.queue;
 
                     // Если пользователь не подключен к голосовым каналам и нет очереди
                     if (!interact.voice.channel || !interact.guild.members.me.voice.channel) return;
 
-                    const queue = interact.queue;
-
                     // Если есть очередь и пользователь не подключен к тому же голосовому каналу
-                    if (!queue || interact.voice.channel?.id !== queue.voice.channel.id) return;
+                    else if (!queue || interact.voice.channel?.id !== queue.voice.channel.id) return;
 
                     // Если была найдена кнопка
                     else if (button) button(interact);

@@ -68,15 +68,15 @@ class sAPI extends Constructor.Assign<API.request> {
                                     if (cache) return resolve(cache);
 
                                     try {
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const api = await sAPI.API("audio", "getById", `&audios=${ID}`);
 
-                                        //Если запрос выдал ошибку то
+                                        // Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
 
                                         const track = sAPI.track(api.response.pop(), url);
 
-                                        //Если нет ссылки на трек
+                                        // Если нет ссылки на трек
                                         if (!track.link) return reject(Error("[APIs]: Невозможно получить файл аудио!"));
 
                                         // Сохраняем кеш в системе
@@ -103,10 +103,10 @@ class sAPI extends Constructor.Assign<API.request> {
                             callback: (url, {limit}) => {
                                 return new Promise<Track[]>(async (resolve, reject) => {
                                     try {
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const api = await sAPI.API("audio", "search", `&q=${url}`);
 
-                                        //Если запрос выдал ошибку то
+                                        // Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
                                         const tracks = (api.response.items.splice(0, limit)).map((track: any) => sAPI.track(track));
 
@@ -157,10 +157,7 @@ class sAPI extends Constructor.Assign<API.request> {
             artist: this.author(track),
             image: { url: image?.["photo_1200"] ?? image?.["photo_600"] ?? image?.["photo_300"] ?? image?.["photo_270"] ?? undefined },
             time: { total: track.duration.toFixed(0) },
-            audio: {
-                type: "url",
-                url: track?.url
-            }
+            audio: track?.url
         });
     };
 

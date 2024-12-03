@@ -113,14 +113,14 @@ class sAPI extends Constructor.Assign<API.request> {
                                 const ID = /[0-9]+/gi.exec(url)?.pop()?.split("album")?.pop();
 
                                 return new Promise<Track.playlist>(async (resolve, reject) => {
-                                    //Если ID альбома не удалось извлечь из ссылки
+                                    // Если ID альбома не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не удалось получить ID альбома!"));
 
                                     try {
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const api = await sAPI.API(`albums/${ID}/with-tracks`);
 
-                                        //Если запрос выдал ошибку то
+                                        // Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
                                         else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return reject(Error("[APIs]: Я не нахожу треков в этом альбоме!"));
 
@@ -155,10 +155,10 @@ class sAPI extends Constructor.Assign<API.request> {
                                     else if (!ID[2]) return reject(Error("[APIs]: Не найден ID плейлиста!"));
 
                                     try {
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const api = await sAPI.API(ID.at(0));
 
-                                        //Если запрос выдал ошибку то
+                                        // Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
                                         else if (api?.tracks?.length === 0) return reject(Error("[APIs]: Я не нахожу треков в этом плейлисте!"));
 
@@ -193,14 +193,14 @@ class sAPI extends Constructor.Assign<API.request> {
                                 const ID = this.filter.exec(url)?.pop()?.split("artist")?.pop();
 
                                 return new Promise<Track[]>(async (resolve, reject) => {
-                                    //Если ID автора не удалось извлечь из ссылки
+                                    // Если ID автора не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не удалось получить ID автора!"));
 
                                     try {
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const api = await sAPI.API(`artists/${ID}/tracks`);
 
-                                        //Если запрос выдал ошибку то
+                                        // Если запрос выдал ошибку то
                                         if (api instanceof Error) return reject(api);
                                         const tracks = api.tracks.splice(0, limit).map(sAPI.track);
 
@@ -223,10 +223,10 @@ class sAPI extends Constructor.Assign<API.request> {
                             callback: (url , {limit}) => {
                                 return new Promise<Track[]>(async (resolve, reject) => {
                                     try {
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const api = await sAPI.API(`search?type=all&text=${url.split(" ").join("%20")}&page=0&nococrrect=false`);
 
-                                        //Обрабатываем ошибки
+                                        // Обрабатываем ошибки
                                         if (api instanceof Error) return reject(api);
                                         else if (!api.tracks) return reject(Error(`[APIs]: На Yandex music нет такого трека!`));
 

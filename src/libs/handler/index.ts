@@ -15,6 +15,11 @@ import {db} from "@lib/db";
  * @public
  */
 export class Handler<T> {
+  /**
+   * @description Загруженные файлы
+   * @readonly
+   * @private
+   */
   private readonly _files: T[] = [];
 
   /**
@@ -56,13 +61,14 @@ export class Handler<T> {
 
   /**
    * @description Загружаем файл
+   * @readonly
    * @private
    */
-  private imports = (path: string): Error | T => {
+  private readonly imports = (path: string): Error | T => {
     try {
       const file = require(`../../${path}`);
 
-      //Удаляем кеш загрузки
+      // Удаляем кеш загрузки
       delete require.cache[require.resolve(path)];
 
       if (!file?.default) return null;
@@ -94,7 +100,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    name: T extends keyof CollectionAudioEvents ? keyof CollectionAudioEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
+    readonly name: T extends keyof CollectionAudioEvents ? keyof CollectionAudioEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
 
     /**
      * @description Тип ивента
@@ -102,7 +108,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    type: T extends keyof CollectionAudioEvents | keyof AudioPlayerEvents ? "player" : "client";
+    readonly type: T extends keyof CollectionAudioEvents | keyof AudioPlayerEvents ? "player" : "client";
 
     /**
      * @description Функция, которая будет запущена при вызове ивента
@@ -110,7 +116,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    execute: T extends keyof CollectionAudioEvents ? CollectionAudioEvents[T] : T extends keyof AudioPlayerEvents ? (...args: Parameters<AudioPlayerEvents[T]>) => any : T extends keyof ClientEvents ? (client: Client, ...args: ClientEvents[T]) => void : never;
+    readonly execute: T extends keyof CollectionAudioEvents ? CollectionAudioEvents[T] : T extends keyof AudioPlayerEvents ? (...args: Parameters<AudioPlayerEvents[T]>) => any : T extends keyof ClientEvents ? (client: Client, ...args: ClientEvents[T]) => void : never;
   }
 
   /**
@@ -126,7 +132,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    data: SlashBuilder["json"];
+    readonly data: SlashBuilder["json"];
 
     /**
      * @description Команду может использовать только разработчик
@@ -134,7 +140,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    owner?: boolean;
+    readonly owner?: boolean;
 
     /**
      * @description Права для использования той или иной команды
@@ -142,7 +148,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    rules?: InteractRules[]
+    readonly rules?: InteractRules[]
 
     /**
      * @description Выполнение команды
@@ -150,7 +156,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    execute: (options: { message: Interact; args?: string[]; type: string}) => void;
+    readonly execute: (options: { message: Interact; args?: string[]; type: string}) => void;
   }
 }
 
@@ -168,7 +174,12 @@ export namespace Constructor {
    * @public
    */
   export abstract class Collection<K, T = string> {
-    private readonly data = new Map<T, K>();
+    /**
+     * @description База Map для взаимодействия с объектами через идентификатор
+     * @readonly
+     * @private
+     */
+    private readonly map = new Map<T, K>();
 
     /**
      * @description Получаем объект из ID
@@ -176,7 +187,7 @@ export namespace Constructor {
      * @public
      */
     public get = (ID: T) => {
-      return this.data.get(ID);
+      return this.map.get(ID);
     };
 
     /**
@@ -189,12 +200,14 @@ export namespace Constructor {
     public set = (ID: T, value: K, promise?: (item: K) => void) => {
       const item = this.get(ID);
 
+      // Если нет объекта, то добавляем его
       if (!item) {
         if (promise) promise(value);
-        this.data.set(ID, value);
+        this.map.set(ID, value);
         return value;
       }
 
+      // Выдаем объект
       return item;
     };
 
@@ -203,7 +216,7 @@ export namespace Constructor {
      * @param fn - функция фильтрации
      */
     public match = (fn: (item: K) => boolean) => {
-      for (const [_, value] of this.data) {
+      for (const [_, value] of this.map) {
         const check = fn(value);
 
         // Если найдено совпадение
@@ -219,14 +232,15 @@ export namespace Constructor {
      * @public
      */
     public remove = (ID: T) => {
-      const item: any = this.data.get(ID);
+      const item: any = this.map.get(ID);
 
+      // Если найден объект, то удаляем все сопутствующее, если это возможно
       if (item) {
         if ("disconnect" in item) item?.disconnect();
         if ("cleanup" in item) item?.cleanup();
         if ("destroy" in item) item?.destroy();
 
-        this.data.delete(ID);
+        this.map.delete(ID);
       }
     };
 
@@ -235,7 +249,7 @@ export namespace Constructor {
      * @public
      */
     public get random(): K {
-      const keys = Array.from(this.data.keys());
+      const keys = Array.from(this.map.keys());
       const key = keys[Math.floor(Math.random() * keys.length)];
 
       return this.get(key);
@@ -246,7 +260,7 @@ export namespace Constructor {
      * @public
      */
     public get size() {
-      return this.data.size;
+      return this.map.size;
     };
   }
 
@@ -276,19 +290,43 @@ export namespace Constructor {
    * @public
    */
   export abstract class Cycle<T = unknown> {
+    /**
+     * @description Данные для работы цикла
+     * @readonly
+     * @private
+     */
     private readonly data = {
+      /**
+       * @description База с объектами
+       */
       array: [] as T[],
+
+      /**
+       * @description Время через которое надо будет выполнить функцию
+       */
       time: 0
     };
 
+    /**
+     * @description Параметры для работы цикла
+     * @readonly
+     * @public
+     */
     public readonly _config: TimeCycleConfig<T> = {
       name: "timeCycle",
       execute: null,
       filter: null,
       duration: 10e3,
-      custom: { push: null }
+      custom: {
+        push: null
+      }
     };
 
+    /**
+     * @description Создаем класс и добавляем параметры
+     * @param options - Параметры для работы класса
+     * @protected
+     */
     protected constructor(options: TimeCycleConfig<T>) {
       Object.assign(this._config, options);
     };
@@ -333,7 +371,7 @@ export namespace Constructor {
     };
 
     /**
-     * @description Выполняем this._execute
+     * @description Здесь будет выполнен прогон объектов для выполнения execute
      * @readonly
      * @private
      */
@@ -395,26 +433,56 @@ export namespace Constructor {
    * @private
    */
   interface TimeCycleConfig<T> {
-    // Название цикла
-    name: string;
+    /**
+     * @description Имя цикла, для удобства отладки
+     * @readonly
+     * @public
+     */
+    readonly name: string,
 
-    // Функция выполнения
-    execute: (item: T) => void | Promise<boolean>;
+    /**
+     * @description Функция для выполнения
+     * @readonly
+     * @public
+     */
+    readonly execute: (item: T) => void | Promise<boolean>,
 
-    // Функция фильтрации
-    filter: (item: T) => boolean;
+    /**
+     * @description Как фильтровать объекты, вдруг объект еще не готов
+     * @readonly
+     * @public
+     */
+    readonly filter: (item: T) => boolean,
 
-    // Время через которое надо запустить цикл
-    duration: number | "promise";
+    /**
+     * @description Время прогона цикла, через n времени будет запущен цикл по новой
+     * @readonly
+     * @public
+     */
+    readonly duration: number | "promise",
 
-    // Модификации цикла, не обязательно
-    custom?: {
-      // Изменить логику добавления
-      push?: (item: T) => void;
+    /**
+     * @description Кастомные функции, необходимы для модификации или правильного удаления
+     * @readonly
+     * @public
+     */
+    readonly custom?: {
+      /**
+       * @description Изменить логику добавления
+       * @param item - объект
+       * @readonly
+       * @public
+       */
+      readonly push?: (item: T) => void;
 
-      // Изменить логику удаления
-      remove?: (item: T) => void;
-    };
+      /**
+       * @description Изменить логику удаления
+       * @param item - объект
+       * @readonly
+       * @public
+       */
+      readonly remove?: (item: T) => void;
+    }
   }
 }
 
@@ -436,16 +504,22 @@ export namespace API {
   export abstract class item<T extends callbacks> {
     /**
      * @description Имя запроса на платформу
+     * @readonly
+     * @public
      */
     public readonly name: T;
 
     /**
      * @description Фильтр поиска при использовании поиска по типу
+     * @readonly
+     * @public
      */
     public readonly filter?: RegExp;
 
     /**
      * @description Выполняем запрос
+     * @readonly
+     * @public
      */
     public readonly callback?: (url: string, options: T extends "track" ? {audio?: boolean} : {limit?: number}) => callback<T>;
 
@@ -466,7 +540,13 @@ export namespace API {
    * @public
    */
   export class response {
+    /**
+     * @description Класс который дает доступ к запросам платформы
+     * @readonly
+     * @private
+     */
     private readonly _api: request;
+
     /**
      * @description Выдаем название
      * @return API.platform

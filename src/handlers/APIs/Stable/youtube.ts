@@ -48,11 +48,11 @@ class sAPI extends Constructor.Assign<API.request> {
                                 let artist = null;
 
                                 return new Promise<Track.playlist>(async (resolve, reject) => {
-                                    //Если ID плейлиста не удалось извлечь из ссылки
+                                    // Если ID плейлиста не удалось извлечь из ссылки
                                     if (!ID) return reject(Error("[APIs]: Не удалось получить ID плейлиста!"));
 
                                     try {
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const details = await sAPI.API(`https://www.youtube.com/${ID}`);
 
                                         if (details instanceof Error) return reject(details);
@@ -63,7 +63,7 @@ class sAPI extends Constructor.Assign<API.request> {
                                             .content["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]
                                             .splice(0, limit).map(({playlistVideoRenderer}) => sAPI.track(playlistVideoRenderer));
 
-                                        //Если нет автора плейлиста, то это альбом автора
+                                        // Если нет автора плейлиста, то это альбом автора
                                         if (sidebar.length > 1) {
                                             const authorData = details["sidebar"]["playlistSidebarRenderer"].items[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
                                             artist = await sAPI.getChannel({ id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"], name: authorData.title["runs"][0].text });
@@ -145,7 +145,7 @@ class sAPI extends Constructor.Assign<API.request> {
                                         if (url.match(/@/)) ID = `@${url.split("@")[1].split("/")[0]}`;
                                         else ID = `channel/${url.split("channel/")[1]}`;
 
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const details = await sAPI.API(`https://www.youtube.com/${ID}/videos`);
 
                                         if (details instanceof Error) return reject(details);
@@ -155,7 +155,7 @@ class sAPI extends Constructor.Assign<API.request> {
                                         const contents = (tabs[1] ?? tabs[2])["tabRenderer"]?.content?.["richGridRenderer"]?.["contents"]
                                             ?.filter((video: any) => video?.["richItemRenderer"]?.content?.["videoRenderer"])?.splice(0, limit);
 
-                                        //Модифицируем видео
+                                        // Модифицируем видео
                                         const videos = contents.map(({richItemRenderer}: any) => {
                                             const video = richItemRenderer?.content?.["videoRenderer"];
 
@@ -184,10 +184,10 @@ class sAPI extends Constructor.Assign<API.request> {
                             callback: (url: string, {limit}): Promise<Track[] | Error> => {
                                 return new Promise<Track[] | Error>(async (resolve, reject) => {
                                     try {
-                                        //Создаем запрос
+                                        // Создаем запрос
                                         const details = await sAPI.API(`https://www.youtube.com/results?search_query=${url.split(" ").join("+")}`);
 
-                                        //Если при получении данных возникла ошибка
+                                        // Если при получении данных возникла ошибка
                                         if (details instanceof Error) return reject(details);
 
                                         let vanilla_videos = details["contents"]?.["twoColumnSearchResultsRenderer"]?.["primaryContents"]?.["sectionListRenderer"]?.["contents"][0]?.["itemSectionRenderer"]?.["contents"];
@@ -254,10 +254,10 @@ class sAPI extends Constructor.Assign<API.request> {
                     }),
                     headers: { 'content-type': 'application/json' }
                 }).toJson.then((api) => {
-                    //Если возникает ошибка при получении страницы
+                    // Если возникает ошибка при получении страницы
                     if (api instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
 
-                    //Если есть статус, то проверяем
+                    // Если есть статус, то проверяем
                     if (api["playabilityStatus"]?.status) {
                         if (api["playabilityStatus"]?.status === "LOGIN_REQUIRED") return resolve(Error(`[APIs]: Данное видео невозможно включить из-за проблем с авторизацией!`));
                         else if (api["playabilityStatus"]?.status !== "OK") return resolve(Error(`[APIs]: Не удалось получить данные! Status: ${api["playabilityStatus"]?.status}`));
@@ -272,13 +272,13 @@ class sAPI extends Constructor.Assign<API.request> {
             new httpsClient(ID, {useragent: true,
                 headers: { "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7", "accept-encoding": "gzip, deflate, br" }
             }).toString.then((api) => {
-                //Если возникает ошибка при получении страницы
+                // Если возникает ошибка при получении страницы
                 if (api instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
 
-                //Ищем данные на странице
+                // Ищем данные на странице
                 const data = this.extractInitialDataResponse(api);
 
-                //Если возникает ошибка при поиске на странице
+                // Если возникает ошибка при поиске на странице
                 if (data instanceof Error) return resolve(data);
 
                 const html5Player = /<script\s+src="([^"]+)"(?:\s+type="text\/javascript")?\s+name="player_ias\/base"\s*>|"jsUrl":"([^"]+)"/.exec(api);
@@ -400,10 +400,7 @@ class sAPI extends Constructor.Assign<API.request> {
                 },
                 time: { total: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0 },
                 image: track.thumbnail["thumbnails"].pop(),
-                audio: {
-                    type: "url",
-                    url: track?.format?.url || undefined,
-                }
+                audio: track?.format?.url || undefined
             });
         } catch (err) {
             return new Track({
@@ -418,10 +415,7 @@ class sAPI extends Constructor.Assign<API.request> {
                     total: track["lengthSeconds"] ?? 0
                 },
                 image: track.thumbnail["thumbnails"].pop(),
-                audio: {
-                    type: "url",
-                    url: track?.format?.url || undefined
-                }
+                audio: track?.format?.url || undefined
             })
         }
     };

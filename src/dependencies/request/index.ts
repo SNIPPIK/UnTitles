@@ -63,8 +63,10 @@ abstract class Request {
      * @private
      */
     private get protocol() {
-        const protocol = this.data.protocol?.split(":")[0];
-        return protocol === "https" ? httpsRequest : httpRequest;
+        const protocol = this.data.protocol;
+
+        if (protocol.startsWith("https")) return httpsRequest;
+        return httpRequest;
     };
 
     /**

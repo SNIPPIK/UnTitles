@@ -283,7 +283,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                     color: Colors.White,
                     thumbnail: queue.tracks.track.image,
                     author: {
-                        name: `${locale._(msg.locale, "player.button.lyrics.title")} - ${queue.tracks.track.titleReplaced}`,
+                        name: `${locale._(msg.locale, "player.button.lyrics.title")} ${queue.tracks.track.title}`,
                         iconURL: db.emojis.diskImage
                     },
                     description: `\`\`\`css\n${locale._(msg.locale, "player.button.lyrics.description")}\n\`\`\``,

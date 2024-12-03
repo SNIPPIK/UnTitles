@@ -293,7 +293,7 @@ export class Track {
      * @private
      */
     private readonly _track: Track.data & { user?: Track.user; duration?: { split: string; total: number; }} = {
-        id: null, title: null, url: null, image: null, artist: null, duration: null, time: null, audio: { url: null, type: "url" }
+        id: null, title: null, url: null, image: null, artist: null, duration: null, time: null, audio: null
     };
 
     /**
@@ -394,13 +394,13 @@ export class Track {
      * @description Получаем ссылку на исходный файл
      * @public
      */
-    public get link() { return this._track.audio.url; };
+    public get link() { return this._track.audio; };
 
     /**
      * @description Добавление ссылки на трек
      * @param url - Ссылка или путь
      */
-    public set link(url: string) { this._track.audio.url = url; };
+    public set link(url: string) { this._track.audio = url; };
 
     /**
      * @description Проверяем ссылку на доступность и выдаем ее если ссылка имеет код !==200, то обновляем
@@ -544,10 +544,7 @@ export namespace Track {
         /**
          * @description Данные об исходном файле, он же сам трек
          */
-        audio?: {
-            type: "file" | "url";
-            url: string;
-        }
+        audio?: string;
     }
 
     /**
