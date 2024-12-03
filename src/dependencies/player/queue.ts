@@ -198,11 +198,9 @@ export class Queue {
         if (this.tracks.size > 1) {
             Object.assign(first[0], { disabled: false });
             Object.assign(first[3], { disabled: false, style: 3 });
-            Object.assign(two[1], { disabled: false });
         } else {
             Object.assign(first[0], { disabled: true });
             Object.assign(first[3], { disabled: true });
-            Object.assign(two[1], { disabled: true });
         }
 
         // Если нет включенных фильтров
