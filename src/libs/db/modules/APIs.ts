@@ -17,22 +17,26 @@ export class Database_APIs {
     protected readonly _platforms = {
         /**
          * @description Поддерживаемые платформы
+         * @protected
          */
         supported: [] as API.request[],
 
         /**
          * @description Платформы с отсутствующими данными для авторизации
+         * @protected
          */
         authorization: [] as API.platform[],
 
         /**
          * @description Платформы с возможностью получить аудио
          * По-умолчанию запрос идет к track
+         * @protected
          */
         audio: [] as API.platform[],
 
         /**
          * @description Заблокированные платформы, только через owner.list
+         * @protected
          */
         block: [] as API.platform[]
     };
@@ -44,21 +48,25 @@ export class Database_APIs {
     protected readonly _limits = {
         /**
          * @description Кол-во получаемых элементов трека при получении плейлиста
+         * @protected
          */
         playlist: parseInt(env.get("APIs.limit.playlist")),
 
         /**
          * @description Кол-во получаемых элементов трека при получении альбома
+         * @protected
          */
         album: parseInt(env.get("APIs.limit.album")),
 
         /**
          * @description Кол-во получаемых элементов трека при поиске
+         * @protected
          */
         search: parseInt(env.get("APIs.limit.search")),
 
         /**
          * @description Кол-во получаемых элементов трека при запросе треков автора
+         * @protected
          */
         author: parseInt(env.get("APIs.limit.author"))
     };
@@ -87,9 +95,10 @@ export class Database_APIs {
     };
 
     /**
-     * @author SNIPPIK
      * @description Ищем аудио если платформа может самостоятельно выдать аудио
      * @param track - трек у которого нет аудио
+     * @readonly
+     * @public
      */
     public readonly fetchAllow = (track: Track): Promise<string | Error> => {
         return new Promise(async (resolve) => {
@@ -116,6 +125,8 @@ export class Database_APIs {
     /**
      * @description Получаем ссылку на трек если прошлая уже не актуальна
      * @param track - трек у которого нет аудио
+     * @readonly
+     * @public
      */
     public readonly fetch = (track: Track): Promise<string | Error> => {
         return new Promise(async (resolve) => {

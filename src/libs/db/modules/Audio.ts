@@ -16,18 +16,21 @@ import {env} from "@env";
 export class Database_Audio {
     /**
      * @description Хранилище очередей
+     * @readonly
      * @private
      */
     private readonly _queue = new AudioQueues();
 
     /**
      * @description Хранилище циклов для работы музыки
+     * @readonly
      * @private
      */
     private readonly _cycles = new AudioCycles();
 
     /**
      * @description Здесь хранятся модификаторы аудио
+     * @readonly
      * @private
      */
     private readonly _options = {
@@ -65,9 +68,14 @@ export class Database_Audio {
 class AudioQueues extends Constructor.Collection<Queue> {
     /**
      * @description Ивенты привязанные к плееру и очереди
+     * @readonly
      * @private
      */
     private readonly emitter = new class extends TypedEmitter<CollectionAudioEvents & AudioPlayerEvents> {
+        /**
+         * @description Имена событий плеера, с авто поиском
+         * @private
+         */
         private _playerEvents: (keyof AudioPlayerEvents)[] = null;
 
         /**
@@ -155,7 +163,7 @@ class AudioCycles {
                 name: "Message",
                 duration: 30e3,
                 filter: (message) => !!message.editable,
-                execute: (message): void => {
+                execute: (message) => {
                     const {guild} = message;
                     const queue = db.audio.queue.get(guild.id);
 

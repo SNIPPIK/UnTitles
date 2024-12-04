@@ -145,12 +145,6 @@
     "en-US": "Enabled filters:"
   },
 
-
-  "player.button.lyrics.title": {
-    "ru": "Lyrics:",
-    "en-US": "Lyrics:"
-  },
-
   "player.button.lyrics.description": {
     "ru": "Извините но данная функция еще в разработке!",
     "en-US": "Sorry this in WIP"

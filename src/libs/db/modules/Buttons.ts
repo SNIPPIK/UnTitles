@@ -276,14 +276,16 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
          */
         this.set("lyrics", (msg) => {
             const queue = msg.queue;
+            const track = queue.tracks.track;
 
             // Отправляем сообщение с текстом песни
             new msg.builder().addEmbeds([
                 {
                     color: Colors.White,
-                    thumbnail: queue.tracks.track.image,
+                    thumbnail: track.image,
                     author: {
-                        name: `${locale._(msg.locale, "player.button.lyrics.title")} ${queue.tracks.track.title}`,
+                        name: track.title,
+                        url: track.url,
                         iconURL: db.emojis.diskImage
                     },
                     description: `\`\`\`css\n${locale._(msg.locale, "player.button.lyrics.description")}\n\`\`\``,

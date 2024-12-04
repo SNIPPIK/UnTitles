@@ -12,6 +12,7 @@ import {db} from "@lib/db";
 export class AudioFilters {
     /**
      * @description Включенные фильтры
+     * @readonly
      * @private
      */
     private readonly enables: AudioFilter[] = [];
@@ -96,24 +97,45 @@ export class ExtraFilters {
  * @public
  */
 export interface AudioFilter {
-    //Имена
-    name: string;
+    /**
+     * @description Имя фильтра
+     * @readonly
+     */
+    readonly name: string;
 
-    // Перевод описания фильтров
-    locale: LocalizationMap;
+    /**
+     * @description Имена переводов
+     * @readonly
+     */
+    readonly locale: LocalizationMap;
 
-    //Имена несовместимых фильтров
-    unsupported: string[];
+    /**
+     * @description Имена несовместимых фильтров
+     * @readonly
+     */
+    readonly unsupported: string[];
 
-    //Сам фильтр
-    filter: string;
+    /**
+     * @description Параметр фильтра для ffmpeg
+     * @readonly
+     */
+    readonly filter: string;
 
-    //Аргументы
-    args: false | [number, number];
+    /**
+     * @description Аргументы для фильтра
+     * @readonly
+     */
+    readonly args: false | [number, number];
 
-    //Аргумент пользователя
+    /**
+     * @description Аргументы указанные пользователем
+     * @readonly
+     */
     user_arg?: any;
 
-    //Меняется ли скорость
-    speed?: string | number;
+    /**
+     * @description Модификатор скорости
+     * @readonly
+     */
+    readonly speed?: string | number;
 }
