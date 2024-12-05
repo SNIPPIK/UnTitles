@@ -234,19 +234,21 @@ export class httpsClient extends Request {
 
 /**
  * @author SNIPPIK
- * @description WebSocket для node.js
+ * @description WebSocket для взаимодействия с discord, node.js не предоставляет свой
  * @class WebSocket
  * @public
  */
 export class WebSocket extends TypedEmitter<WebSocketEvents> {
     /**
      * @description Класс сокета для подключения к серверам discord
+     * @readonly
      * @private
      */
-    private readonly socket: WS;
+    private readonly socket: WS = null;
 
     /**
      * @description Данные для проверки жизни
+     * @readonly
      * @private
      */
     private readonly KeepAlive = {
@@ -312,6 +314,8 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
     /**
      * @description Используется для перехвата сообщения от сервера
      * @param event - Данные для перехвата
+     * @readonly
+     * @private
      */
     private readonly onmessage = (event: WebSocketEvent) => {
         if (typeof event.data !== "string") return;

@@ -11,6 +11,7 @@ import {TypedEmitter} from "tiny-typed-emitter";
 export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     /**
      * @description Конфигурация голосового подключения
+     * @readonly
      * @private
      */
     private readonly _config: VoiceConfig;
@@ -23,6 +24,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
     /**
      * @description Пакеты для работы с голосовым подключением
+     * @readonly
      * @private
      */
     private readonly _packets = {
@@ -98,6 +100,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         this.state.networking.speaking = enabled;
     };
 
+    /**
+     * @description Создаем класс для управления голосовым подключением
+     * @param config - Данные для подключения
+     * @param options - Параметры для сервера
+     */
     public constructor(config: VoiceConfig, options: CreateVoiceConnectionOptions) {
         super();
         this._config = config;
@@ -132,7 +139,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         if (!server || !state || this.state.status === VoiceConnectionStatus.Destroyed || !server.endpoint) return;
 
         // Создаем Socket подключение к discord
-        this.state = { ...this.state, status: VoiceConnectionStatus.Connecting, networking: new VoiceSocket({
+        this.state = { ...this.state,
+            status: VoiceConnectionStatus.Connecting,
+            networking: new VoiceSocket({
                 endpoint: server.endpoint,
                 serverId: server.guild_id,
                 token: server.token,
@@ -150,12 +159,12 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @param buffer - Пакет Opus для воспроизведения
      * @public
      */
-    public playOpusPacket = (buffer: Buffer) => {
+    public packet = (buffer: Buffer) => {
         // Если голосовое подключение еще не готово
         if (this.state.status !== VoiceConnectionStatus.Ready) return;
 
         // Отправляем пакет
-        this.state.networking.playAudioPacket = buffer;
+        this.state.networking.cryptoPacket = buffer;
     };
 
     /**
@@ -243,6 +252,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * голосовое соединение подаст Discord сигнал о том, что оно хотело бы вернуться к каналу. При этом автоматически будет предпринята попытка
      * восстановить соединение. Это можно было бы рассматривать как переход из состояния готовности в состояние сигнализации.
      * @param code - Код закрытия
+     * @readonly
      * @private
      */
     private readonly onSocketClose = (code: number) => {
@@ -272,6 +282,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Вызывается при изменении состояния сетевого экземпляра. Используется для определения состояния голосового соединения.
      * @param oldState - Предыдущее состояние
      * @param newState - Новое состояние
+     * @readonly
      * @private
      */
     private readonly onSocketStateChange = (oldState: VoiceSocketState, newState: VoiceSocketState) => {
@@ -285,6 +296,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     /**
      * @description Распространяет ошибки из базового сетевого экземпляра.
      * @param error - Распространяемая ошибка
+     * @readonly
      * @private
      */
     private readonly onSocketError = (error: Error) => {
@@ -295,6 +307,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Регистрирует пакет `VOICE_SERVER_UPDATE` для голосового соединения. Это приведет к повторному подключению с использованием
      * новых данных, предоставленных в пакете.
      * @param packet - Полученный пакет `VOICE_SERVER_UPDATE`
+     * @readonly
      * @private
      */
     private readonly addServerPacket = (packet: GatewayVoiceServerUpdateDispatchData) => {
@@ -312,6 +325,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Регистрирует пакет `VOICE_STATE_UPDATE` для голосового соединения. Самое главное, он сохраняет идентификатор
      * канала, к которому подключен клиент.
      * @param packet - Полученный пакет `VOICE_STATE_UPDATE`
+     * @readonly
      * @private
      */
     private readonly addStatePacket = (packet: GatewayVoiceStateUpdateDispatchData) => {

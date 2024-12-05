@@ -410,7 +410,7 @@ class PlayerVoice {
 
         // Отправляем пакет в голосовой канал
         try {
-            if (packet) this.connection.playOpusPacket(packet);
+            if (packet) this.connection.packet(packet);
         } catch (err) {
             // Если возникает ошибка, то сообщаем о ней
             console.log(err);

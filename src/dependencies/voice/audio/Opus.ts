@@ -57,12 +57,14 @@ const OGG = {
 export class OpusEncoder extends Transform {
     /**
      * @description Расшифровщик если он найдет
+     * @readonly
      * @private
      */
     private readonly encoder: any = null;
 
     /**
      * @description Временные данные, используются в this.encoder
+     * @readonly
      * @private
      */
     private readonly _temp = {
@@ -78,6 +80,7 @@ export class OpusEncoder extends Transform {
      * @description Название библиотеки и тип аудио для ffmpeg
      * @return {name: string, ffmpeg: string}
      * @public
+     * @static
      */
     public static get lib(): {name: string, ffmpeg: string} {
         if (loaded_lib?.name) return { name: loaded_lib.name, ffmpeg: "s16le" };
@@ -96,6 +99,7 @@ export class OpusEncoder extends Transform {
     /**
      * @description Запуск класса расшифровки в opus
      * @param options
+     * @constructor
      * @public
      */
     public constructor(options: TransformOptions = {autoDestroy: true, objectMode: true}) {
@@ -111,9 +115,10 @@ export class OpusEncoder extends Transform {
 
     /**
      * @description Декодирование фрагмента в opus
+     * @readonly
      * @private
      */
-    private packet = (chunk: Buffer) => {
+    private readonly packet = (chunk: Buffer) => {
         // Если есть подключенный кодировщик, то используем его
         if (this.encoder) return this.encoder.encode(chunk, 960);
 

@@ -41,7 +41,7 @@ const socketStatus = [
                 const udp = new VoiceUDPSocket({ip, port});
                 udp.on("error", socket["GettingError"]);
                 udp.once("close", socket["UDPClose"]);
-                udp.getIPDiscovery(ssrc).then((localConfig) => {
+                udp.discovery(ssrc).then((localConfig) => {
                     if (socket.state.code !== VoiceSocketStatusCode.upUDP) return;
                     socket.state.ws.packet = {
                         op: VoiceOpcodes.SelectProtocol,
@@ -200,7 +200,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      *
      * @public
      */
-    public set playAudioPacket(opusPacket: Buffer) {
+    public set cryptoPacket(opusPacket: Buffer) {
         const state = this.state;
 
         // Если код не соответствует с отправкой
@@ -239,6 +239,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
     /**
      * @description Создает новый веб-сокет для голосового шлюза Discord.
      * @param endpoint - Конечная точка, к которой нужно подключиться
+     * @readonly
      * @private
      */
     private readonly createWebSocket = (endpoint: string) => {
@@ -249,6 +250,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
     /**
      * @description Вызывается при открытии WebSocket. В зависимости от состояния, в котором находится экземпляр,
      * он либо идентифицируется с новым сеансом, либо попытается возобновить существующий сеанс.
+     * @readonly
      * @private
      */
     private readonly WebSocketOpen = () => {
@@ -276,8 +278,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * экземпляр либо попытается возобновить работу, либо перейдет в закрытое состояние и выдаст событие "close"
      * с кодом закрытия, позволяя пользователю решить, хочет ли он повторно подключиться.
      * @param code - Код закрытия
-     * @private
      * @readonly
+     * @private
      */
     private readonly WebSocketClose = ({ code }: {code: number}) => {
         const state = this.state;
@@ -300,6 +302,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
     /**
      * @description Вызывается при получении пакета от WebSocket
      * @param packet - Полученный пакет
+     * @readonly
      * @private
      */
     private readonly WebSocketPacket = (packet: {d: any, op: VoiceOpcodes}): void => {
@@ -315,8 +318,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
     /**
      * @description Распространяет ошибки из дочернего голосового веб-сокета и голосового UDP-сокета.
      * @param error - Ошибка, которая была выдана дочерним элементом
-     * @private
      * @readonly
+     * @private
      */
     private readonly GettingError = (error: Error): void => {
         this.emit("error", error);
@@ -324,8 +327,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
 
     /**
      * @description Вызывается, когда UDP-сокет сам закрылся, если он перестал получать ответы от Discord.
-     * @private
      * @readonly
+     * @private
      */
     private readonly UDPClose = (): void => {
         const state = this.state;

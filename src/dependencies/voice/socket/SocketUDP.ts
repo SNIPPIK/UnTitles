@@ -65,7 +65,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @param ssrc -
      * @public
      */
-    public getIPDiscovery = (ssrc: number): Promise<VoiceUDPSocket["remote"]> => {
+    public readonly discovery = (ssrc: number): Promise<VoiceUDPSocket["remote"]> => {
         const discoveryBuffer = Buffer.alloc(74);
         discoveryBuffer.writeUInt16BE(1, 0);
         discoveryBuffer.writeUInt16BE(70, 2);
@@ -75,22 +75,30 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         // Передаем данные об IP-адресе и порте
         return new Promise((resolve, reject) => {
             this.socket
-                .once("close", () => {
+
+                // Если при подключении была получена ошибка
+                .once("error", () => {
+                    this.destroy();
                     return reject(new Error("It is not possible to open the UDP port on your IP\n - Check your firewall!"))
                 })
-                .once("message", (msg) => {
-                    if (msg.readUInt16BE(0) !== 2) return resolve(null);
+
+                // Если получен ответ от сервера
+                .once("message", (message) => {
+                    if (message.readUInt16BE(0) !== 2) return resolve(null);
 
                     try {
-                        const packet = Buffer.from(msg);
+                        const packet = Buffer.from(message);
                         const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
 
-                        // Если нет IPv4
+                        // Если провайдер не предоставляет или нет пути IPV4
                         if (!isIPv4(ip)) return reject(new Error("Not found IPv4 address"));
 
-                        return resolve({ip, port: packet.readUInt16BE(packet.length - 2)});
+                        return resolve({
+                            ip,
+                            port: packet.readUInt16BE(packet.length - 2)
+                        });
                     } catch {
-                        return resolve(null);
+                       return resolve(null);
                     }
                 });
         });

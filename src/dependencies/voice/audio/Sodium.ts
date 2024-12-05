@@ -81,6 +81,8 @@ export class Encryption {
      * @description Шифрует пакет Opus, используя формат, согласованный экземпляром и Discord.
      * @param packet - Пакет Opus для шифрования
      * @param connectionData - Текущие данные подключения экземпляра
+     * @public
+     * @static
      */
     public static packet = (packet: Buffer, connectionData: ConnectionData) => {
         const rtp_packet = Buffer.alloc(12);
@@ -101,7 +103,9 @@ export class Encryption {
      * @description Шифрует пакет Opus, используя формат, согласованный экземпляром и Discord.
      * @param packet - Пакет Opus для шифрования
      * @param connectionData - Текущие данные подключения экземпляра
-     * @param additionalData
+     * @param additionalData - Доп данные для отправки
+     * @private
+     * @static
      */
     private static crypto = (packet: Buffer, connectionData: ConnectionData, additionalData: Buffer) => {
         const { secretKey, encryptionMode } = connectionData;
@@ -150,6 +154,8 @@ export class Encryption {
     /**
      * @description Выбирает режим шифрования из списка заданных параметров. Выбирает наиболее предпочтительный вариант.
      * @param options - Доступные варианты шифрования
+     * @public
+     * @static
      */
     public static mode(options: string[]): string {
         const option = options.find((option) => SUPPORTED_ENCRYPTION_MODES.includes(option));
@@ -161,6 +167,8 @@ export class Encryption {
     /**
      * @description Возвращает случайное число, находящееся в диапазоне n бит.
      * @param numberOfBits - Количество бит
+     * @public
+     * @static
      */
     public static randomNBit(numberOfBits: number) {
         return Math.floor(Math.random() * 2 ** numberOfBits);

@@ -44,6 +44,11 @@ export class ShardManager extends ShardingManager {
  * @public
  */
 export class Client extends DS_Client {
+    /**
+     * @description Обращение клиента через webhook для отправки ошибок в канал
+     * @readonly
+     * @private
+     */
     private readonly webhook = env.get("webhook.id") && env.get("webhook.token") ?
         new WebhookClient({id: env.get("webhook.id"), token: env.get("webhook.token")}) : null;
 
@@ -61,10 +66,10 @@ export class Client extends DS_Client {
 
             // Права бота
             intents: [
-                IntentsBitField.Flags["GuildEmojisAndStickers"],
-                IntentsBitField.Flags["GuildIntegrations"],
-                IntentsBitField.Flags["GuildVoiceStates"],
-                IntentsBitField.Flags["Guilds"]
+                IntentsBitField.Flags.GuildEmojisAndStickers,
+                IntentsBitField.Flags.GuildIntegrations,
+                IntentsBitField.Flags.GuildVoiceStates,
+                IntentsBitField.Flags.Guilds
             ],
 
             // Данные которые обязательно надо кешировать
