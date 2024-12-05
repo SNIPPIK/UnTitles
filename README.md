@@ -12,19 +12,16 @@
 
 
 
-> [!CAUTION]
-> Необходимо установить [`Sodium`](src/dependencies/voice/audio/Sodium.ts), на выбор есть `sodium-native`, `libsodium-wrappers`
-
-
-
 > [!IMPORTANT]
 > Конвертация происходит в чистый opus, есть поддержка библиотек, так-же присутствует [`нативная`](src/dependencies/voice/audio/Opus.ts) конвертация\
-> Поддерживает следующие библиотеки opusscript, mediaplex, @evan/opus
+> Поддерживает следующие библиотеки `opusscript`, `mediaplex`, `@evan/opus`\
+> Голосовая составляющая была позаимствована из `@discordjs/voice` с модификациями и удалением ненужного мусора
 
 
 
-> [!IMPORTANT]
-> Голосовая составляющая была позаимствована из discordjs/voice с модификациями и удалением ненужного мусора
+> [!CAUTION]
+> Возможно сменить [`Sodium`](src/dependencies/voice/audio/Sodium.ts), на выбор есть `sodium-native`, `libsodium-wrappers`\
+> Необходимо установить ffmpeg
 
 
 
