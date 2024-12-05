@@ -20,6 +20,7 @@ const cache = env.get("cache");
 export class Queue {
     /**
      * @description Кнопки для сообщения
+     * @readonly
      * @private
      */
     private readonly _components = [
@@ -57,6 +58,7 @@ export class Queue {
 
     /**
      * @description Данные временно хранящиеся в очереди
+     * @readonly
      * @private
      */
     private readonly _data = {
@@ -169,7 +171,7 @@ export class Queue {
         const two = this._components[1].components;
 
         // Кнопка перетасовки очереди
-        if (this.shuffle) Object.assign(first[0], {style: 1});
+        if (this.shuffle) Object.assign(first[0], {style: 3});
         else Object.assign(first[0], {style: 2});
 
         // Делаем проверку на кнопку ПАУЗА/ПРОДОЛЖИТЬ
@@ -177,8 +179,8 @@ export class Queue {
         else Object.assign(first[2], {emoji: {id: db.emojis.button.pause}});
 
         // Кнопка повтора
-        if (this.repeat === "song") Object.assign(first[4], { emoji: {id: db.emojis.button.loop_one}, style: 1 });
-        else if (this.repeat === "songs") Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 1 });
+        if (this.repeat === "song") Object.assign(first[4], { emoji: {id: db.emojis.button.loop_one}, style: 3 });
+        else if (this.repeat === "songs") Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 3 });
         else Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 2 });
 
         // Если это первый трек в списке, то не позволяем пользователям возвращать трек
@@ -257,9 +259,10 @@ export class Queue {
 
     /**
      * @description Очищаем очередь
+     * @readonly
      * @public
      */
-    public cleanup = () => {
+    public readonly cleanup = () => {
         db.audio.cycles.players.remove(this.player);
         if (this.player) this.player.cleanup();
 
@@ -276,18 +279,52 @@ export class Queue {
 export class Track {
     /**
      * @description Здесь хранятся данные с какой платформы был взят трек
+     * @readonly
      * @private
      */
-    private readonly _api: { platform: API.platform; color: number; } = { platform: null, color: null};
+    private readonly _api: {
+        /**
+         * @description Имя платформы с которой был взят трек
+         * @readonly
+         * @private
+         */
+        platform: API.platform;
+
+        /**
+         * @description Цвет платформы
+         * @readonly
+         * @private
+         */
+        color: number;
+    } = {
+        platform: null,
+        color: null
+    };
 
     /**
      * @description Здесь хранятся данные времени трека
+     * @readonly
      * @private
      */
-    private readonly _duration: { split: string; total: number; } = null;
+    private readonly _duration: {
+        /**
+         * @description Время визуальное 00:00
+         * @readonly
+         * @private
+         */
+        split: string;
+
+        /**
+         * @description Время в секундах
+         * @readonly
+         * @private
+         */
+        total: number;
+    } = null;
 
     /**
      * @description Сами данные трека
+     * @readonly
      * @private
      */
     private readonly _track: Track.data & { user?: Track.user; duration?: { split: string; total: number; }} = {
@@ -501,18 +538,21 @@ export namespace Track {
     export interface data {
         /**
          * @description Уникальный id трека
+         * @readonly
          */
-        id: string
+        readonly id: string
 
         /**
          * @description Название трека
+         * @readonly
          */
-        title: string;
+        readonly title: string;
 
         /**
          * @description Ссылка на трек, именно на трек
+         * @readonly
          */
-        url: string;
+        readonly url: string;
 
         /**
          * @description Данные об авторе трека
@@ -522,7 +562,12 @@ export namespace Track {
         /**
          * @description База с картинками трека и автора
          */
-        image: { url: string };
+        image: {
+            /**
+             * @description Ссылка на картинку трека
+             */
+            url: string
+        };
 
         /**
          * @description Данные о времени трека
@@ -550,10 +595,36 @@ export namespace Track {
      * @interface playlist
      */
     export interface playlist {
-        url: string;
-        title: string;
+        /**
+         * @description Ссылка на плейлист
+         * @readonly
+         */
+        readonly url: string;
+
+        /**
+         * @description Название плейлиста
+         * @readonly
+         */
+        readonly title: string;
+
+        /**
+         * @description Что в себе содержит плейлист
+         */
         items: Track[];
-        image: { url: string; };
+
+        /**
+         * @description Картинка автора плейлиста
+         */
+        image: {
+            /**
+             * @description Ссылка на картинку плейлиста
+             */
+            url: string;
+        };
+
+        /**
+         * @description Данные об авторе плейлиста
+         */
         artist?: artist;
     }
 
@@ -564,15 +635,25 @@ export namespace Track {
     export interface artist {
         /**
          * @description Ник/имя автора трека
+         * @readonly
          */
-        title: string;
+        readonly title: string;
 
         /**
          * @description Ссылка на автора трека
+         * @readonly
          */
-        url: string;
+        readonly url: string;
 
-        image?: {url: string}
+        /**
+         * @description Картинка артиста трека
+         */
+        image?: {
+            /**
+             * @description Ссылка на картинку артиста
+             */
+            url: string
+        };
     }
 
     /**
@@ -582,17 +663,20 @@ export namespace Track {
     export interface user {
         /**
          * @description ID пользователя
+         * @readonly
          */
-        id: string;
+        readonly id: string;
 
         /**
          * @description Имя/ник пользователя
+         * @readonly
          */
-        username: string;
+        readonly username: string;
 
         /**
          * @description Ссылка на аватар пользователя
+         * @readonly
          */
-        avatar: string | null;
+        readonly avatar: string | null;
     }
 }

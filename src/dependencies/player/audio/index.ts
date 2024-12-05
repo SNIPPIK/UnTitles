@@ -12,6 +12,7 @@ import {env} from "@env";
 export class AudioResource {
     /**
      * @description Временное хранилище для потоков
+     * @readonly
      * @private
      */
     private readonly _streams: (Process | OpusEncoder)[] = [
@@ -23,6 +24,7 @@ export class AudioResource {
 
     /**
      * @description Данные для запуска процесса буферизации
+     * @readonly
      * @private
      */
     private readonly chunks = {
