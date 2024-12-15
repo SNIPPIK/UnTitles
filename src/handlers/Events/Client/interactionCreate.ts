@@ -24,13 +24,14 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
             name: Events.InteractionCreate,
             type: "client",
             execute: (_, message) => {
-                // Игнорируем ботов
-                if ((message.user || message?.member?.user).bot) return;
+                // Какие действия надо просто игнорировать
+                if (
+                    // Игнорируем ботов
+                    (message.user || message?.member?.user).bot ||
 
-                // Системные кнопки которые не отслеживаются здесь!
-                if ("customId" in message) {
-                    if (message.customId === "back" || message.customId === "next" || message.customId === "cancel") return;
-                }
+                    // Системные кнопки которые не отслеживаются здесь!
+                    "customId" in message && (message.customId === "back" || message.customId === "next" || message.customId === "cancel")
+                ) return;
 
                 const interact = new Interact(message);
                 const user = temple_db.get(message.user.id);
@@ -54,12 +55,12 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     temple_db.set(message.user.id, Date.now() + 5e3);
                 }
 
-                // Если пользователя уже в списке
+                // Если пользователь уже в списке
                 else {
                     // Если время еще не прошло говорим пользователю об этом
                     if (user >= Date.now()) {
                         interact.fastBuilder = {
-                            description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0)]),
+                            description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0), 5]),
                             color: Colors.Yellow
                         }
                         return;

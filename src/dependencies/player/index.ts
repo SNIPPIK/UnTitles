@@ -290,7 +290,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         const old = this.tracks.position;
 
         // Меняем позицию трека в очереди
-        if (this.audio.current.duration < this.tracks.track.time.total + 10) {
+        if (this.audio.current.duration < this.tracks.track.time.total + db.audio.options.optimization) {
             this.tracks.swapPosition = position;
             this.play();
 

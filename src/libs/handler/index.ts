@@ -1,11 +1,11 @@
 import {Interact, InteractRules} from "@lib/discord/utils/Interact";
-import { SlashBuilder } from "@lib/discord/utils/SlashBuilder";
+import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {CollectionAudioEvents} from "@lib/db/modules/Audio";
 import {AudioPlayerEvents} from "@lib/player";
-import { ClientEvents } from "discord.js";
+import {ClientEvents} from "discord.js";
 import {Track} from "@lib/player/queue";
-import { Client } from "@lib/discord";
-import { readdirSync } from "node:fs";
+import {Client} from "@lib/discord";
+import {readdirSync} from "node:fs";
 import {db} from "@lib/db";
 
 /**
@@ -581,27 +581,17 @@ export namespace API {
      * @public
      */
     public get<T extends API.callbacks>(type: string | T): item<T> {
-      const requests = this._api.requests;
-
-      // Если указана ссылка
-      if (type.startsWith("http")) {
-        // Ищем класс поиска в платформе
-        for (const item of requests) {
+      return this._api.requests.find((item): item<any> | null => {
+        // Если указана ссылка
+        if (type.startsWith("http")) {
           if (item.name === type || item.filter && !!type.match(item.filter)) return item as item<T>;
+          return null;
         }
 
+        // Скорее всего надо произвести поиск
+        if (item.name === "search" || item.name === type) return item as item<T>;
         return null;
-      }
-
-      // Скорее всего надо произвести поиск
-      else {
-        // Ищем класс поиска в платформе
-        for (const item of requests) {
-          if (item.name === "search" || item.name === type) return item as item<T>;
-        }
-
-        return null;
-      }
+      }) as item<any> | null;
     };
 
     /**
@@ -610,28 +600,14 @@ export namespace API {
      * @public
      */
     public constructor(argument: API.platform | string) {
-      const temp = db.api.platforms.supported;
+      // Ищем платформу
+      this._api = db.api.platforms.supported.find((item) => {
+        // Если была указана ссылка
+        if (argument.startsWith("http")) return !!argument.match(item.filter) || item.name === "DISCORD";
 
-      //Если была указана ссылка
-      if (argument.startsWith("http")) {
-        const platform = temp.find((info) => !!argument.match(info.filter));
-
-        //Если не найдена платформа тогда используем DISCORD
-        if (!platform) { this._api = temp.find((info) => info.name === "DISCORD"); return; }
-        this._api = platform; return;
-      }
-
-      //Если был указан текст
-      try {
-        const platform = temp.find((info) => info.name === argument);
-
-        //Не найдена платформа тогда используем YOUTUBE
-        if (!platform) { this._api = temp.find((info) => info.name === "YOUTUBE"); return; }
-
-        this._api = platform;
-      } catch { //Если произошла ошибка значит используем YOUTUBE
-        this._api = temp.find((info) => info.name === "YOUTUBE");
-      }
+        // Если был указан текст
+        return item.name === argument || item.name === "YOUTUBE";
+      });
     };
   }
 

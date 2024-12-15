@@ -306,13 +306,10 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @private
      */
     private readonly WebSocketPacket = (packet: {d: any, op: VoiceOpcodes}): void => {
-        for (const status of socketStatus) {
-            // Если найден подходящий статус
-            if (status.name === packet.op) {
-                // Если есть возможность выполнить функцию
-                if (status && status.callback) status.callback(this, packet);
-            }
-        }
+        const status = socketStatus.find((status) => status.name === packet.op);
+
+        // Если есть возможность выполнить функцию
+        if (status && status.callback) status.callback(this, packet);
     };
 
     /**

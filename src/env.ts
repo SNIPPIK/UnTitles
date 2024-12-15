@@ -25,8 +25,10 @@ class Environment {
   public readonly get = (name: keyof DotenvPopulateInput): any => {
     const env = this.dotenv.parsed[name];
 
+    // Если нет параметра в файле .env
     if (!env) throw new Error(`[ENV]: Not found ${name} in .env`);
 
+    // Проверяем параметр для конвертации
     return env === "true" ? true : env === "false" ? false : env;
   };
 
@@ -38,22 +40,22 @@ class Environment {
    * @public
    */
   public readonly set = (key: string, value: string): void => {
-    //Открываем файл env в array
+    // Открываем файл env в array
     const envFile = readFileSync(".env", "utf8").split(os.EOL);
 
-    //Ищем имя
+    // Ищем имя
     const target = envFile.indexOf(
       envFile.find((line) => line.match(new RegExp(key))),
     );
 
-    //Обновляем данные
+    // Обновляем данные
     envFile.splice(target, 1, `${key}="${value}"`);
 
     try {
-      //Сохраняем файл
+      // Сохраняем файл
       writeFileSync(".env", envFile.join(os.EOL));
 
-      //Обновляем env
+      // Обновляем env
       setImmediate(() => require("dotenv").config());
     } catch (e) {
       throw `[ENV]: Fail save >${key}< to .env`;
@@ -86,7 +88,7 @@ export const env = new Environment();
  * Использовать с умом, если попадут не те данные то могут быть ошибки
  */
 const prototypes: { type: any, name: string, value: any}[] = [
-  //Array
+  // Array
   {
     type: Array.prototype, name: "ArraySort",
     value: function (number = 5, callback: (value: number, index: number) => void, joined = "\"\\n\\n\"") {
@@ -102,7 +104,7 @@ const prototypes: { type: any, name: string, value: any}[] = [
     }
   },
 
-  //String
+  // String
   {
     type: String.prototype, name: "duration",
     value: function () {
@@ -111,7 +113,7 @@ const prototypes: { type: any, name: string, value: any}[] = [
     }
   },
 
-  //Number
+  // Number
   {
     type: Number.prototype, name: "duration",
     value: function () {

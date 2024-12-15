@@ -9,7 +9,10 @@ import {env} from "@env";
  * @name ShardManager
  * @description Загрузка менеджера осколков
  */
-if (process["argv"].includes("--ShardManager")) new ShardManager(__filename);
+if (process["argv"].includes("--ShardManager")) {
+    Logger.log("LOG", `[ShardManager] is started`);
+    new ShardManager(__filename);
+}
 
 /**
  * @name "shard"
@@ -17,6 +20,7 @@ if (process["argv"].includes("--ShardManager")) new ShardManager(__filename);
  */
 else {
     const client = new Client();
+    Logger.log("LOG", `[Shard ${client.ID}] is started`);
 
     /**
      * @description Подключаемся к api discord

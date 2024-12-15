@@ -35,7 +35,8 @@ export class Database_Audio {
      */
     private readonly _options = {
         volume: parseInt(env.get("audio.volume")),
-        fade: parseInt(env.get("audio.fade"))
+        fade: parseInt(env.get("audio.fade")),
+        optimization: parseInt(env.get("duration.optimization"))
     };
 
     /**

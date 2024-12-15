@@ -232,11 +232,14 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
      */
     {
         name: "handlers/APIs",
-        callback: (_, item: API.request) => {
+        callback: (client, item: API.request) => {
             if (!item.auth) db.api.platforms.authorization.push(item.name);
             if (!item.audio) db.api.platforms.audio.push(item.name);
 
             db.api.platforms.supported.push(item);
+
+            // Сообщаем что было загружено
+            if (client.ID === 0) Logger.log("DEBUG", `[APIs] loaded ${item.name}`);
         }
     },
     /**
@@ -244,7 +247,7 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
      */
     {
         name: "handlers/Commands",
-        callback: (_, item: Handler.Command) => {
+        callback: (client, item: Handler.Command) => {
             if (item.data.options) {
                 for (const option of item.data.options) {
                     if ("options" in option) db.commands.subCommands += option.options.length;
@@ -252,6 +255,9 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
                 db.commands.subCommands += item.data.options.length;
             }
             db.commands.push(item);
+
+            // Сообщаем что было загружено
+            if (client.ID === 0) Logger.log("DEBUG", `[Commands] loaded ${item.data.name}`);
         }
     },
     /**
@@ -262,6 +268,9 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
         callback: (client, item: Handler.Event<any>) => {
             if (item.type === "client") client.on(item.name as any, (...args) => item.execute(client, ...args));
             else db.audio.queue.events.on(item.name as any, (...args: any) => item.execute(...args));
+
+            // Сообщаем что было загружено
+            if (client.ID === 0) Logger.log("DEBUG", `[Events] loaded ${item.name}`);
         }
     }
 ];
