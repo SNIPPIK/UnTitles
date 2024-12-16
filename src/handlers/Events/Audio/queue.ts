@@ -1,7 +1,7 @@
-import {ActionRowBuilder, Colors, StringSelectMenuBuilder} from "discord.js";
 import {Constructor, Handler} from "@handler";
 import {Track} from "@lib/player/queue";
 import {locale} from "@lib/locale";
+import {Colors} from "discord.js";
 import {db} from "@lib/db";
 
 /**
@@ -101,33 +101,60 @@ class message_search extends Constructor.Assign<Handler.Event<"message/search">>
         super({
             name: "message/search",
             type: "player",
-            execute: (tracks, _, message) => {
+            execute: (tracks, platform, message) => {
                 // Если не нашлись треки
                 if (tracks?.length < 1 || !tracks) {
-                    new message.builder().addEmbeds([
-                        {
-                            description: locale._(message.locale, "player.search.fail"),
-                            color: Colors.DarkRed
-                        }
-                    ]).setTime(7e3).send = message;
+                    message.fastBuilder = {
+                        description: locale._(message.locale, "player.search.fail"),
+                        color: Colors.DarkRed
+                    };
                     return;
                 }
 
-                // Отправляем список найденных треков
-                new message.builder().addEmbeds([{description: locale._(message.locale, "player.search")}]).setTime(30e3).addComponents([
-                    new ActionRowBuilder()
-                        .addComponents(new StringSelectMenuBuilder()
-                            .setCustomId("search-menu")
-                            .setOptions(...tracks.map((track) => {
-                                    return {
-                                        label: `${track.title}`,
-                                        description: `${track.artist.title} | ${track.time.split}`,
-                                        value: track.url
-                                    }
-                                }), {label: locale._(message.locale, "cancel"), value: "stop"}
-                            )
-                        )
-                ]).send = message;
+                const track = tracks[0];
+
+                // Создаем сообщение о поиске
+                new message.builder()
+                    .setMenu({type: "selector", pages: tracks, page: 0})
+                    .addEmbeds([
+                        {
+                            color: Colors.Green,
+                            author: {
+                                name: locale._(message.locale, "player.search"),
+                                iconURL: db.emojis.diskImage
+                            },
+                            description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤${track.artist.title}\n💽${track.title.substring(0, 45)}\n\n🕐${track.time.split}\n\`\`\``,
+                            image: { url: track.image?.url || db.emojis.diskImage },
+                            footer: {
+                                text: locale._(message.locale, "player.search.list", [tracks.length, 1, tracks.length])
+                            },
+                            timestamp: new Date()
+                        }
+                    ])
+                    .setTime(120e3).setCallback((msg, pages, page, embed, item: Track) => {
+                        // Если был выбран объект
+                        if (item) {
+                            db.audio.queue.events.emit("request/api", message, [platform, item.url]);
+                            return;
+                        }
+
+                        const track = pages[page];
+
+                        // Если надо изменить сообщение
+                        msg.edit({
+                            embeds: [ //@ts-ignore
+                                {
+                                    ...embed[0],
+                                    description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤${track.artist.title}\n💽${track.title.substring(0, 45)}\n\n🕐${track.time.split}\n\`\`\``,
+                                    image: { url: pages[page].image.url || db.emojis.diskImage },
+                                    footer: {
+                                        text: locale._(message.locale, "player.search.list", [tracks.length, page+1, tracks.length])
+                                    },
+                                }
+                            ]
+                        });
+                    }
+                ).send = message;
             }
         });
     };
@@ -146,7 +173,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
             name: "message/playing",
             type: "player",
             execute: (queue, message) => {
-                const {color, artist, image, title, url, time, platform} = queue.tracks.track;
+                const {color, artist, image, title, url} = queue.tracks.track;
                 const embed = new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image,

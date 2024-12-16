@@ -262,8 +262,13 @@
   },
 
   "player.search": {
-    "ru": "Все что удалось найти!",
-    "en-US": "Founded tracks!"
+    "ru": "Вот что мне удалось найти!",
+    "en-US": "This is what I managed to find!"
+  },
+
+  "player.search.list": {
+    "ru": "Найдено: {ARGUMENT} | Сейчас: {ARGUMENT} из {ARGUMENT}",
+    "en-US": "Founded: {ARGUMENT} | Current: {ARGUMENT} of {ARGUMENT}"
   },
 
   "player.search.fail": {

@@ -184,7 +184,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
             const page = parseInt((queue.tracks.position / 5).toFixed(0));
             const pages = queue.tracks.arraySort(5);
 
-            return new msg.builder().addEmbeds([
+            new msg.builder().addEmbeds([
                 {
                     color: Colors.Green,
                     author: {
@@ -207,7 +207,7 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
                     },
                     timestamp: new Date()
                 }
-            ]).setPage(page).setPages(pages).setTime(60e3).setCallback((message, pages: string[], page: number, embed) => {
+            ]).setMenu({type: "table", pages, page}).setTime(60e3).setCallback((message, pages: string[], page: number, embed) => {
                 return message.edit({
                     embeds: [ //@ts-ignore
                         {

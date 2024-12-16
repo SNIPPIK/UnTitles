@@ -584,7 +584,7 @@ export namespace API {
       return this._api.requests.find((item): item<any> | null => {
         // Если указана ссылка
         if (type.startsWith("http")) {
-          if (item.name === type || item.filter && !!type.match(item.filter)) return item as item<T>;
+          if (item.name === type || item.filter && !!item.filter.exec(type)) return item as item<T>;
           return null;
         }
 
@@ -603,7 +603,7 @@ export namespace API {
       // Ищем платформу
       this._api = db.api.platforms.supported.find((item) => {
         // Если была указана ссылка
-        if (argument.startsWith("http")) return !!argument.match(item.filter) || item.name === "DISCORD";
+        if (argument.startsWith("http")) return !!item.filter.exec(argument) || item.name === "DISCORD";
 
         // Если был указан текст
         return item.name === argument || item.name === "YOUTUBE";

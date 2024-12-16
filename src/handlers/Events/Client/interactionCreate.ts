@@ -30,7 +30,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     (message.user || message?.member?.user).bot ||
 
                     // Системные кнопки которые не отслеживаются здесь!
-                    "customId" in message && (message.customId === "back" || message.customId === "next" || message.customId === "cancel")
+                    "customId" in message && (`${message.customId}`.startsWith("menu_"))
                 ) return;
 
                 const interact = new Interact(message);
@@ -93,19 +93,6 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                         args: interact.options?._hoistedOptions?.map((f) => `${f.value}`),
                         type: interact.options._subcommand
                     });
-
-                    // Завершаем действие
-                    return;
-                }
-
-                // Если происходит взаимодействие с меню
-                else if (message.isStringSelectMenu()) {
-
-                    if (message.customId === "search-menu") {
-                        db.audio.queue.events.emit("request/api", interact, [message.values[0], message.values[0]]);
-                        message.message.delete().catch(() => {});
-                        return;
-                    }
 
                     // Завершаем действие
                     return;

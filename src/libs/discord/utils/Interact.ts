@@ -251,8 +251,10 @@ export class Interact {
   public set delete(time: number) {
     //Удаляем сообщение через time время
     setTimeout(() => {
-      if (this.replied && "deleteReply" in this._temp) (this._temp as any).deleteReply();
-      else (this._temp as any).delete();
+      try {
+        if (this.replied && "deleteReply" in this._temp) (this._temp as any).deleteReply().catch(() => null);
+        else (this._temp as any).delete().catch(() => null);
+      } catch {/* Ohh discord.js */}
     }, time || 15e3);
   };
 
@@ -297,7 +299,7 @@ export class Interact {
  * @description создаем продуманное сообщение
  * @class MessageBuilder
  */
-class MessageBuilder {
+class MessageBuilder implements MessageBuilder {
   /**
    * @description Временная база данных с embed json data в array
    * @public
@@ -311,13 +313,32 @@ class MessageBuilder {
   public readonly components: (ComponentData | ActionRowBuilder)[] = [];
 
   /**
+   * @description Параметры для создания меню
+   * @private
+   */
+  private readonly _menu = {
+    pages: [] as any[],
+    type: null as "table" | "selector",
+    page: 0
+  };
+
+  /**
+   * @description Функция позволяющая бесконечно выполнять обновление сообщения
+   * @public
+   */
+  private callback: (message: Message, pages: any[], page: number, embed: MessageBuilder["embeds"], selected?: any) => void;
+
+  /**
+   * @description Функция которая будет выполнена после отправления сообщения
+   * @public
+   */
+  private promise: (msg: Interact) => void;
+
+  /**
    * @description Время жизни сообщения по умолчанию
    * @public
    */
   public time: number = 15e3;
-
-  public page: number = 1;
-  public pages: string[] = [];
 
   /**
    * @description Отправляем сообщение в текстовый канал
@@ -326,33 +347,21 @@ class MessageBuilder {
   public set send(interaction: Interact) {
     interaction.send({embeds: this.embeds, components: this.components})
         .then((message) => {
-          //Если получить возврат не удалось, то ничего не делаем
+          // Если получить возврат не удалось, то ничего не делаем
           if (!message) return;
 
           const msg = new Interact(message);
 
-          //Удаляем сообщение через время если это возможно
+          // Удаляем сообщение через время если это возможно
           if (this.time !== 0) msg.delete = this.time;
 
-          //Если меню, то не надо удалять
-          if (this.pages && this.pages.length > 1) this.createMenuTable(message);
+          // Создаем меню если есть параметры для него
+          if (this._menu.pages.length > 0) this.constructor_menu(message);
 
-          //Если надо выполнить действия после
+          // Если надо выполнить действия после
           if (this.promise) this.promise(msg);
         });
   };
-
-  /**
-   * @description Функция позволяющая бесконечно выполнять обновление сообщения
-   * @public
-   */
-  public callback: (message: Message, pages: string[], page: number, embed: MessageBuilder["embeds"]) => void;
-
-  /**
-   * @description Функция которая будет выполнена после отправления сообщения
-   * @public
-   */
-  public promise: (msg: Interact) => void;
 
   /**
    * @description Добавляем embeds в базу для дальнейшей отправки
@@ -409,44 +418,47 @@ class MessageBuilder {
   };
 
   /**
-   * @description Добавляем pages в базу для дальнейшей обработки
-   * @param list - Список данных для обновления
+   * @description Параметры для создания меню
+   * @param options - Сами параметры
    */
-  public setPages = (list: string[]) => {
-    this.pages = list;
+  public setMenu = (options: MessageBuilder["_menu"]) => {
+    // Добавляем кнопки для просмотра
+    if (options.type === "table") {
+      this.components.push(
+          {
+            type: 1, components: [// @ts-ignore
+              {type: 2, emoji: {name: "⬅"}, custom_id: "menu_back", style: 2},   // @ts-ignore
+              {type: 2, emoji: {name: "➡"}, custom_id: "menu_next", style: 2},   // @ts-ignore
+              {type: 2, emoji: {name: "🗑️"}, custom_id: "menu_cancel", style: 4}
+            ]
+          }
+      )
+    }
 
-    // Добавляем кнопки
-    if (this.pages && this.pages.length > 1) this.components.push(
-        {
-          type: 1, components: [// @ts-ignore
-            {type: 2, emoji: {name: "⬅"}, custom_id: "back", style: 2},// @ts-ignore
-            {type: 2, emoji: {name: "➡"}, custom_id: "next", style: 2},// @ts-ignore
-            {type: 2, emoji: {name: "🗑️"}, custom_id: "cancel", style: 4}
-          ]
-        }
-    )
+    // Добавляем кнопки для выбора
+    else {
+      this.components.push(
+          {
+            type: 1, components: [// @ts-ignore
+              {type: 2, emoji: {name: "⬅"}, custom_id: "menu_back", style: 2},    // @ts-ignore
+              {type: 2, emoji: {name: "✔️"}, custom_id: "menu_select", style: 3}, // @ts-ignore
+              {type: 2, emoji: {name: "➡"}, custom_id: "menu_next", style: 2},    // @ts-ignore
+              {type: 2, emoji: {name: "🗑️"}, custom_id: "menu_cancel", style: 4}
+            ]
+          }
+      )
+    }
 
+    Object.assign(this._menu, options);
     return this;
   };
 
   /**
-   * @description Задаем страницу по умолчанию, с нее будет начат отсчет
-   * @param page - Номер страницы
+   * @description Создаем интерактивное меню
+   * @param msg      - Сообщение от сообщения
    */
-  public setPage = (page: number) => {
-    this.page = page;
-
-    return this;
-  };
-
-  /**
-   * @description Создаем меню с объектами
-   * @param msg - Сообщение пользователя
-   * @return void
-   */
-  private createMenuTable = (msg: Message) => {
-    const pages = this.pages;
-    let page = this.page;
+  private constructor_menu = (msg: Message) => {
+    let {pages, page, type} = this._menu;
 
     // Создаем сборщик
     const collector = msg.createMessageComponentCollector({
@@ -459,20 +471,33 @@ class MessageBuilder {
       // Игнорируем ошибки
       try { i.deferReply(); i.deleteReply(); } catch {}
 
-      // Если нельзя поменять страницу
-      if (page === pages.length || page < 0) return;
+      // Правит ситуацию когда пользователь включает не тот трек который надо
+      const temple_page = page + 1;
+
+      // Делаем стрелки более функциональными
+      if (temple_page === pages.length) page = 0;
+      else if (temple_page < 0) page = pages.length;
 
       // Кнопка переключения на предыдущую страницу
-      if (i.customId === "back") page--;
+      if (i.customId === "menu_back") page--;
+
       // Кнопка переключения на следующую страницу
-      else if (i.customId === "next") page++;
-      // Кнопка отмены и удаления сообщения
-      else if (i.customId === "cancel") {
+      else if (i.customId === "menu_next") page++;
+
+      // Добавляем выбранный трек
+      else if (i.customId === "menu_select") {
+        this.callback(msg, pages, page, this.embeds, pages[page]);
         msg.delete();
         return;
       }
 
-      return this.callback(msg as any, pages, page, this.embeds);
+      // Кнопка отмены
+      else if (i.customId === "menu_cancel") {
+        msg.delete();
+        return;
+      }
+
+      return this.callback(msg, pages, page, this.embeds);
     });
   };
 }

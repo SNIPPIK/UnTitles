@@ -242,7 +242,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @readonly
      * @private
      */
-    private readonly createWebSocket = (endpoint: string) => {
+    private readonly createWebSocket = (endpoint: string): WebSocket => {
         return new WebSocket(`wss://${endpoint}?v=4`).on("error", this.GettingError).once("open", this.WebSocketOpen)
             .on("packet", this.WebSocketPacket).once("close", this.WebSocketClose);
     };
