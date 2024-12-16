@@ -40,12 +40,14 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
                     return;
                 }
 
+                /*
                 // Отправляем сообщение о том что запрос производится
                 message.fastBuilder = {
                     title: `${platform.platform}.${api.name}`,
                     description: locale._(message.locale, "api.platform.request", [env.get("loading.emoji")]),
                     color: platform.color
                 };
+                 */
 
                 // Если ответ не был получен от сервера
                 const timeout = setTimeout(() => {

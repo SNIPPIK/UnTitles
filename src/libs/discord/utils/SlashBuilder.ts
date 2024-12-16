@@ -48,7 +48,19 @@ export class SlashBuilder {
      * @description 18+ доступ
      * @private
      */
-    private nsfw: boolean = false
+    private nsfw: boolean = false;
+
+    /**
+     * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
+     * @public
+     */
+    private integration_types: number[] = [0];
+
+    /**
+     * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
+     * @private
+     */
+    private contexts: number[] = [0];
 
     /**
      * @description Доп параметры для работы slashCommand
@@ -71,9 +83,32 @@ export class SlashBuilder {
             default_member_permissions: this.default_member_permissions,
             dm_permission: this.dm_permission,
 
+            integration_types: this.integration_types,
+            contexts: this.contexts,
+
             options: this.options,
             nsfw: this.nsfw
         };
+    };
+
+    /**
+     * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
+     * @param types - Типы от 0 до 1, [0,1]
+     * @public
+     */
+    public setIntegration_types = (types: number[]) => {
+        this.integration_types = types;
+        return this;
+    };
+
+    /**
+     * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
+     * @param types - Типы от 0 до 2, [0,1,2]
+     * @public
+     */
+    public setContexts = (types: number[]) => {
+        this.contexts = types;
+        return this;
     };
 
     /**

@@ -83,7 +83,7 @@ class message_push extends Constructor.Assign<Handler.Event<"message/push">> {
                             }
                         ]
                     }
-                ]).setTime(20e3).send = message;
+                ]).setTime(20e3).setHide(true).send = message;
             }
         });
     };
@@ -116,6 +116,7 @@ class message_search extends Constructor.Assign<Handler.Event<"message/search">>
                 // Создаем сообщение о поиске
                 new message.builder()
                     .setMenu({type: "selector", pages: tracks, page: 0})
+                    .setHide(true)
                     .addEmbeds([
                         {
                             color: Colors.Green,
@@ -151,7 +152,7 @@ class message_search extends Constructor.Assign<Handler.Event<"message/search">>
                                         text: locale._(message.locale, "player.search.list", [tracks.length, page+1, tracks.length])
                                     },
                                 }
-                            ]
+                            ], ephemeral: true
                         });
                     }
                 ).send = message;

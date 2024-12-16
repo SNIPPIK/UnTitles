@@ -270,7 +270,7 @@ export class Interact {
    * @description Отправляем сообщение со соответствием параметров
    * @param options - Данные для отправки сообщения
    */
-  public send = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[]}): Promise<Message> => {
+  public send = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], ephemeral?: boolean}): Promise<Message> => {
     try {
       if (this.replied) {
         this._replied = false;
@@ -287,7 +287,7 @@ export class Interact {
    * @description Редактируем сообщение
    * @param options - Данные для замены сообщения
    */
-  public edit = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[]}) => {
+  public edit = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], ephemeral?: boolean}) => {
     if ("edit" in this._temp) return this._temp.edit(options as any);
     return null;
   };
@@ -311,6 +311,12 @@ class MessageBuilder implements MessageBuilder {
    * @public
    */
   public readonly components: (ComponentData | ActionRowBuilder)[] = [];
+
+  /**
+   * @description Скрывать ли сообщение от глаз других пользователей
+   * @private
+   */
+  private ephemeral: boolean = false;
 
   /**
    * @description Параметры для создания меню
@@ -345,7 +351,7 @@ class MessageBuilder implements MessageBuilder {
    * @param interaction
    */
   public set send(interaction: Interact) {
-    interaction.send({embeds: this.embeds, components: this.components})
+    interaction.send({embeds: this.embeds, components: this.components, ephemeral: this.ephemeral})
         .then((message) => {
           // Если получить возврат не удалось, то ничего не делаем
           if (!message) return;
@@ -361,6 +367,15 @@ class MessageBuilder implements MessageBuilder {
           // Если надо выполнить действия после
           if (this.promise) this.promise(msg);
         });
+  };
+
+  /**
+   * @description Спрятать ли это сообщение от чужих глаз
+   * @param bool - Тип
+   */
+  public setHide = (bool: boolean) => {
+    this.ephemeral = bool;
+    return this;
   };
 
   /**
@@ -487,13 +502,13 @@ class MessageBuilder implements MessageBuilder {
       // Добавляем выбранный трек
       else if (i.customId === "menu_select") {
         this.callback(msg, pages, page, this.embeds, pages[page]);
-        msg.delete();
+        try { msg.delete(); } catch { return; }
         return;
       }
 
       // Кнопка отмены
       else if (i.customId === "menu_cancel") {
-        msg.delete();
+        try { msg.delete(); } catch { return; }
         return;
       }
 

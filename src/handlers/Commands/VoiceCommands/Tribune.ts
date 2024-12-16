@@ -63,7 +63,8 @@ class VoiceCommand extends Constructor.Assign<Handler.Command> {
                             }
                         ]
                     }
-                ]).json,
+                ])
+                .json,
             rules: ["voice", "another_voice"],
             execute: async ({message, args, type}) => {
                 const me = message.guild.members?.me;
