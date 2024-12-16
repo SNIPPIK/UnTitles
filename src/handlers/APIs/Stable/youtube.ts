@@ -219,7 +219,6 @@ class sAPI extends Constructor.Assign<API.request> {
             if (AIza) {
                 if (!this.AIzaKey) this.AIzaKey = this.generateAIzaKey;
                 new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${this.AIzaKey}&prettyPrint=false`, {
-                    useragent: true,
                     method: "POST",
                     body: JSON.stringify({
                         "context": {
@@ -259,7 +258,16 @@ class sAPI extends Constructor.Assign<API.request> {
 
                     // Если есть статус, то проверяем
                     if (api["playabilityStatus"]?.status) {
+                        // Если без аккаунта не получается получить данные
                         if (api["playabilityStatus"]?.status === "LOGIN_REQUIRED") return resolve(Error(`[APIs]: Данное видео невозможно включить из-за проблем с авторизацией!`));
+
+                        // Если произошла ошибка при получении данных
+                        else if (api["playabilityStatus"]?.status === "ERROR") {
+                            this.AIzaKey = null;
+                            return resolve(Error(`[APIs]: Не удалось получить данные! Reason: ${api["playabilityStatus"]?.reason}`));
+                        }
+
+                        // Если статус не является хорошим
                         else if (api["playabilityStatus"]?.status !== "OK") return resolve(Error(`[APIs]: Не удалось получить данные! Status: ${api["playabilityStatus"]?.status}`));
                     }
 
@@ -269,8 +277,12 @@ class sAPI extends Constructor.Assign<API.request> {
             }
 
             // Если не надо использовать ключ, то делаем используем систему поиска данных по странице
-            new httpsClient(ID, {useragent: true,
-                headers: { "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7", "accept-encoding": "gzip, deflate, br" }
+            new httpsClient(ID, {
+                useragent: true,
+                headers: {
+                    "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "accept-encoding": "gzip, deflate, br"
+                }
             }).toString.then((api) => {
                 // Если возникает ошибка при получении страницы
                 if (api instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
@@ -296,7 +308,7 @@ class sAPI extends Constructor.Assign<API.request> {
      */
     protected static get generateAIzaKey() {
         const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-        let result = 'AIzaSy', position = 0;
+        let result = "AIzaSy", position = 0;
 
         // Постепенно генерим ключи
         while (position <= 33) {
