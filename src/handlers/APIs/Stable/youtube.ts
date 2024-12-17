@@ -217,7 +217,16 @@ class sAPI extends Constructor.Assign<API.request> {
         return new Promise((resolve) => {
             // Если надо использовать ключ доступа
             if (AIza) {
-                if (!this.AIzaKey) this.AIzaKey = this.generateAIzaKey;
+                // Если по умолчанию нет ключа доступа
+                if (!this.AIzaKey) {
+                    const key = this.generateAIzaKey;
+
+                    // Сохраняем ключ, если он будет не рабочим он будет сгенерирован заново
+                    env.set("token.youtube", key);
+                    this.AIzaKey = key;
+                }
+
+                // Создаем запрос на сервер
                 new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${this.AIzaKey}&prettyPrint=false`, {
                     method: "POST",
                     body: JSON.stringify({

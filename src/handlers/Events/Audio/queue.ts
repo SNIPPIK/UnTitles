@@ -83,7 +83,7 @@ class message_push extends Constructor.Assign<Handler.Event<"message/push">> {
                             }
                         ]
                     }
-                ]).setTime(20e3).setHide(true).send = message;
+                ]).setTime(20e3).send = message;
             }
         });
     };
