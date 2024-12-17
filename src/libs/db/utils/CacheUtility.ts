@@ -1,6 +1,6 @@
 import {createWriteStream, existsSync, mkdirSync, rename} from "node:fs";
 import {httpsClient} from "@lib/request";
-import {Track} from "@lib/player/queue";
+import {Track} from "@lib/player/track";
 import {Constructor} from "@handler";
 import path from "node:path";
 import {env} from "@env";

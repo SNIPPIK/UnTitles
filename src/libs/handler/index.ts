@@ -3,7 +3,7 @@ import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {CollectionAudioEvents} from "@lib/db/modules/Audio";
 import {AudioPlayerEvents} from "@lib/player";
 import {ClientEvents} from "discord.js";
-import {Track} from "@lib/player/queue";
+import {Track} from "@lib/player/track";
 import {Client} from "@lib/discord";
 import {readdirSync} from "node:fs";
 import {db} from "@lib/db";

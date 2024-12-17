@@ -1,6 +1,6 @@
 import {API, Constructor} from "@handler";
 import {httpsClient} from "@lib/request";
-import {Track} from "@lib/player/queue";
+import {Track} from "@lib/player/track";
 import {db} from "@lib/db";
 import {env} from "@env";
 

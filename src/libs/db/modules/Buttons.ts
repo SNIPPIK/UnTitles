@@ -278,20 +278,23 @@ export class Database_Buttons extends Constructor.Collection<button, SupportButt
             const queue = msg.queue;
             const track = queue.tracks.track;
 
-            // Отправляем сообщение с текстом песни
-            new msg.builder().addEmbeds([
-                {
-                    color: Colors.White,
-                    thumbnail: track.image,
-                    author: {
-                        name: track.title,
-                        url: track.url,
-                        iconURL: db.emojis.diskImage
-                    },
-                    description: `\`\`\`css\n${locale._(msg.locale, "player.button.lyrics.description")}\n\`\`\``,
-                    timestamp: new Date()
-                }
-            ]).setTime(20e3).send = msg;
+            // Получаем текст песни
+            track.lyrics.then((item) => {
+                // Отправляем сообщение с текстом песни
+                new msg.builder().addEmbeds([
+                    {
+                        color: Colors.White,
+                        thumbnail: track.image,
+                        author: {
+                            name: track.title,
+                            url: track.url,
+                            iconURL: db.emojis.diskImage
+                        },
+                        description: `\`\`\`css\n${item !== undefined ? item : locale._(msg.locale, "player.button.lyrics.fail")}\n\`\`\``,
+                        timestamp: new Date()
+                    }
+                ]).setTime(20e3).send = msg;
+            });
         });
 
         /**

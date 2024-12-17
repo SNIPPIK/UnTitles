@@ -1,7 +1,8 @@
 import {ExtraPlayer, AudioPlayerEvents} from "@lib/player";
 import {Interact} from "@lib/discord/utils/Interact";
 import {TypedEmitter} from "tiny-typed-emitter";
-import {Queue, Track} from "@lib/player/queue";
+import {Track} from "@lib/player/track";
+import {Queue} from "@lib/player/queue";
 import {Attachment} from "discord.js";
 import {Constructor} from "@handler";
 import {db} from "@lib/db";

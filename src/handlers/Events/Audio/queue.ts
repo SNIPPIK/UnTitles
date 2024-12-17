@@ -1,5 +1,5 @@
 import {Constructor, Handler} from "@handler";
-import {Track} from "@lib/player/queue";
+import {Track} from "@lib/player/track";
 import {locale} from "@lib/locale";
 import {Colors} from "discord.js";
 import {db} from "@lib/db";
@@ -116,7 +116,6 @@ class message_search extends Constructor.Assign<Handler.Event<"message/search">>
                 // Создаем сообщение о поиске
                 new message.builder()
                     .setMenu({type: "selector", pages: tracks, page: 0})
-                    .setHide(true)
                     .addEmbeds([
                         {
                             color: Colors.Green,
@@ -124,7 +123,7 @@ class message_search extends Constructor.Assign<Handler.Event<"message/search">>
                                 name: locale._(message.locale, "player.search"),
                                 iconURL: db.emojis.diskImage
                             },
-                            description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤${track.artist.title}\n💽${track.title.substring(0, 45)}\n\n🕐${track.time.split}\n\`\`\``,
+                            description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.title.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
                             image: { url: track.image?.url || db.emojis.diskImage },
                             footer: {
                                 text: locale._(message.locale, "player.search.list", [tracks.length, 1, tracks.length])
@@ -146,7 +145,7 @@ class message_search extends Constructor.Assign<Handler.Event<"message/search">>
                             embeds: [ //@ts-ignore
                                 {
                                     ...embed[0],
-                                    description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤${track.artist.title}\n💽${track.title.substring(0, 45)}\n\n🕐${track.time.split}\n\`\`\``,
+                                    description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.title.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
                                     image: { url: pages[page].image.url || db.emojis.diskImage },
                                     footer: {
                                         text: locale._(message.locale, "player.search.list", [tracks.length, page+1, tracks.length])

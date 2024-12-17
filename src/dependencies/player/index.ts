@@ -2,7 +2,7 @@ import {AudioFilters} from "@lib/db/utils/AudioFilters";
 import {TypedEmitter} from "tiny-typed-emitter";
 import {AudioResource} from "@lib/player/audio";
 import {VoiceConnection} from "@lib/voice";
-import {Track} from "@lib/player/queue";
+import {Track} from "@lib/player/track";
 import {Logger} from "@lib/logger";
 import {db} from "@lib/db";
 

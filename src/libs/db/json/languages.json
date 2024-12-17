@@ -145,9 +145,9 @@
     "en-US": "Enabled filters:"
   },
 
-  "player.button.lyrics.description": {
-    "ru": "Извините но данная функция еще в разработке!",
-    "en-US": "Sorry this in WIP"
+  "player.button.lyrics.fail": {
+    "ru": "Текст песни не был найден!",
+    "en-US": "The song lyrics were not found!"
   },
 
 

@@ -1,5 +1,5 @@
+import {Track} from "@lib/player/track";
 import {API} from "@lib/handler";
-import {Track} from "@lib/player/queue";
 import {env} from "@env";
 
 /**

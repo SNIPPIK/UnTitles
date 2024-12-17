@@ -1,5 +1,5 @@
 import {API, Constructor} from "@handler";
-import {Track} from "@lib/player/queue";
+import {Track} from "@lib/player/track";
 
 /**
  * @author SNIPPIK
