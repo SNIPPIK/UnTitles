@@ -173,7 +173,6 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
             execute: ({message, args, type}) => {
                 const {guild} = message;
                 const queue = db.audio.queue.get(guild.id);
-                const seek: number = queue.player.audio.current?.duration ?? 0;
                 const player = queue.player;
 
                 // Если статус плеера не позволяет пропустить поток
@@ -199,7 +198,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
 
                     // Если можно выключить фильтр или фильтры сейчас
                     if (player.audio.current.duration < player.tracks.track.time.total + db.audio.options.optimization) {
-                        queue.player.play(seek);
+                        queue.player.play(queue.player.audio.current?.duration);
 
                         // Сообщаем о выключении фильтров
                         message.fastBuilder = {
@@ -219,6 +218,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                     return;
                 }
 
+                const seek: number = queue.player.audio.current?.duration ?? 0;
                 const name = args[args.length - 2 || args?.length - 1] ?? args[0];
                 const arg = args.length > 1 ? Number(args[args?.length - 1]) : null;
                 const Filter = filters.find((item) => item.name === name) as AudioFilter;
