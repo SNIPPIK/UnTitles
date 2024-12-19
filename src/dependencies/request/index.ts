@@ -112,8 +112,15 @@ abstract class Request {
             });
         }
 
+        // Если user-agent есть готовый
+        if (typeof options?.useragent === "string") {
+            Object.assign(this.data.headers, {
+                "User-Agent": options.useragent,
+            });
+        }
+
         // Надо ли генерировать user-agent
-        if (options?.useragent) {
+        else if (options?.useragent) {
             const OS = [ "(X11; Linux x86_64)", "(Windows NT 10.0; Win64; x64)" ];
             const version = `${(128).random(96)}.0.${(6250).random(1280)}.${(250).random(59)}`;
 
@@ -147,7 +154,7 @@ interface RequestData extends RequestOptions {
     body?: string;
 
     //Добавлять рандомный user-agent
-    useragent?: boolean;
+    useragent?: boolean | string;
 }
 
 /**
