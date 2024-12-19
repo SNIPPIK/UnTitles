@@ -88,7 +88,7 @@ class sAPI extends Constructor.Assign<API.request> {
                     public constructor() {
                         super({
                             name: "track",
-                            filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/gi,
+                            filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
                             callback: (url: string, { audio}) => {
                                 const ID = this.filter.exec(url)?.at(0) ?? this.filter.exec(url)[0];
 
@@ -227,7 +227,7 @@ class sAPI extends Constructor.Assign<API.request> {
                 }
 
                 // Создаем запрос на сервер
-                new httpsClient(`https://www.youtube.com/youtubei/v1/player?key${this.AIzaKey}&prettyPrint=false`, {
+                new httpsClient(`https://www.youtube.com/youtubei/v1/player?key=${this.AIzaKey}`, {
                     method: "POST",
                     body: JSON.stringify({
                         "context": {
@@ -235,7 +235,7 @@ class sAPI extends Constructor.Assign<API.request> {
                                 "hl": 'en',
                                 "timeZone": 'UTC',
                                 "clientName": 'IOS',
-                                "clientVersion": `${(19).random(17)}.36.4`, //17.36.4
+                                "clientVersion": `19.36.4`,
                             },
                             "user": {
                                 "lockedSafetyMode": false
@@ -260,7 +260,7 @@ class sAPI extends Constructor.Assign<API.request> {
                         "racyCheckOk": false,
                         "contentCheckOk": false
                     }),
-                    headers: { 'content-type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' }
                 }).toJson.then((api) => {
                     // Если возникает ошибка при получении страницы
                     if (api instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
