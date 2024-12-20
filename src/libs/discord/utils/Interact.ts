@@ -398,7 +398,7 @@ class MessageBuilder implements MessageBuilder {
 
   /**
    * @description Добавляем время удаления сообщения
-   * @param time - Время в миллисекундах
+   * @param time - Время в миллисекундах, если указать 0 то сообщение не будет удалено
    */
   public setTime = (time: number) => {
     this.time = time;

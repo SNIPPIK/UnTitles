@@ -362,16 +362,14 @@ class sAPI extends Constructor.Assign<API.request> {
      */
     protected static extractFormat = (data: any) => {
         return new Promise((resolve) => {
-            // Проверяем все форматы аудио и видео
-            for (const format of (data["adaptiveFormats"])) {
-                if (!format.url) continue;
-
+            return resolve(data["adaptiveFormats"].sort((format: any, format2: any): void => {
                 // Если это аудио, то проверяем его
-                else if (format.mimeType.match(/opus|audio/) && !format.mimeType.match(/ec-3/)) {
-                    if (!format.url.startsWith("https")) format.url = format.url.split("https://")[1];
-                    return resolve(format);
+                if (format.mimeType.match(/opus|audio/) && !format.mimeType.match(/ec-3/)) {
+                    // Выбираем лучший битрейт
+                    return resolve(format.bitrate > format2.bitrate ? format : format2);
                 }
-            }
+                return resolve(null);
+            }));
         });
     };
 

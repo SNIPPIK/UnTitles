@@ -179,13 +179,6 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                         color, thumbnail: image,
                         author: {name: artist.title, url: artist.url, iconURL: db.emojis.diskImage},
                         fields: [
-
-                            // Текущий трек
-                            {
-                                name: locale._(queue.message.locale, "player.current.playing"),
-                                value: `\`\`\`${title}\`\`\`` + locale._(queue.message.locale, "player.current.link", [url])
-                            },
-
                             //Следующий трек или треки
                             queue.tracks.size > 1 ? (() => {
                                 const tracks = queue.tracks.next().map((track, index) => {
@@ -198,6 +191,12 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                                 };
                                 return {name: locale._(queue.message.locale, "player.next.playing"), value: tracks.join("\n")};
                             })() : null,
+
+                            // Текущий трек
+                            {
+                                name: locale._(queue.message.locale, "player.current.playing"),
+                                value: `\`\`\`${title}\`\`\`` + locale._(queue.message.locale, "player.current.link", [url])
+                            },
 
                             // Прогресс бар
                             {
