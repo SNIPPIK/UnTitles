@@ -14,10 +14,10 @@ type SupportButtons = "shuffle" | "last" | "resume_pause" | "skip" | "repeat" | 
 /**
  * @author SNIPPIK
  * @description Класс хранящий в себе все кнопки для бота
- * @class Database_Buttons
+ * @class dbl_buttons
  * @public
  */
-export class Database_Buttons extends Constructor.Collection<button, SupportButtons> {
+export class dbl_buttons extends Constructor.Collection<button, SupportButtons> {
     public constructor() {
         super();
 

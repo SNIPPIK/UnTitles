@@ -11,10 +11,10 @@ import {env} from "@env";
 /**
  * @author SNIPPIK
  * @description Коллекция для взаимодействия с modules
- * @class Database_Audio
+ * @class dbl_audio
  * @public
  */
-export class Database_Audio {
+export class dbl_audio {
     /**
      * @description Хранилище очередей
      * @readonly

@@ -5,10 +5,10 @@ import {env} from "@env";
 /**
  * @author SNIPPIK
  * @description Коллекция для взаимодействия с APIs
- * @class Database_APIs
+ * @class dbl_apis
  * @public
  */
-export class Database_APIs {
+export class dbl_apis {
     /**
      * @description База с платформами
      * @protected

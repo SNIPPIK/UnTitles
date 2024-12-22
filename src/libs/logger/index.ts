@@ -28,7 +28,7 @@ const db = {
 
 /**
  * @author SNIPPIK
- * @description Простенький logger
+ * @description Простенький logger, не надо использовать new, все функции в нем статичны
  * @class Logger
  * @public
  */

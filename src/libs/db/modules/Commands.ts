@@ -1,3 +1,6 @@
+import {SlashComponent} from "@lib/discord/utils/SlashBuilder";
+import filters from "@lib/db/json/filters.json";
+import {AudioFilter} from "@lib/player";
 import {Handler} from "@lib/handler";
 import {Client} from "@lib/discord";
 import {Logger} from "@lib/logger";
@@ -5,10 +8,10 @@ import {Logger} from "@lib/logger";
 /**
  * @author SNIPPIK
  * @description Класс хранящий в себе управление командами
- * @class Database_Commands
+ * @class dbl_commands
  * @public
  */
-export class Database_Commands<T extends Handler.Command> extends Array<T> {
+export class dbl_commands<T extends Handler.Command> extends Array<T> {
     /**
      * @description Доп команды, бывают команды, которые могут содержать несколько доп команд
      * @public
@@ -53,6 +56,42 @@ export class Database_Commands<T extends Handler.Command> extends Array<T> {
      * @public
      */
     public get public() { return this.filter((command) => !command.owner); };
+
+    /**
+     * @description Создаем список фильтров для дискорд
+     * @public
+     */
+    public get filters_options() {
+        const temples: SlashComponent["choices"] = [];
+
+        // Если фильтров слишком много
+        if (filters.length > 25) return temples;
+
+        // Перебираем фильтр
+        for (const filter of filters as AudioFilter[]) {
+            const default_locale = Object.keys(filter.locale)[0];
+
+            // Проверяем кол-во символов на допустимость discord (100 шт.)
+            for (const [key, value] of Object.entries(filter.locale)) {
+                if (value.startsWith("[")) continue;
+
+                // Добавляем диапазон аргументов
+                if (filter.args) filter.locale[key] = `<${filter.args[0]}-${filter.args[1]}> - ${filter.locale[key]}`;
+
+                // Удаляем лишний размер описания
+                filter.locale[key] = value.length > 75 ? `[${filter.name}] - ${filter.locale[key].substring(0, 75)}...` : `[${filter.name}] - ${filter.locale[key]}`;
+            }
+
+            // Создаем список для показа фильтров в командах
+            temples.push({
+                name: filter.locale[default_locale],
+                nameLocalizations: filter.locale,
+                value: filter.name
+            });
+        }
+
+        return temples;
+    };
 
     /**
      * @description Загружаем команды для бота в Discord

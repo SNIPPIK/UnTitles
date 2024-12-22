@@ -1,10 +1,334 @@
-import {AudioFilters} from "@lib/db/utils/AudioFilters";
+import type {LocalizationMap} from "discord-api-types/v10";
 import {TypedEmitter} from "tiny-typed-emitter";
 import {AudioResource} from "@lib/player/audio";
 import {VoiceConnection} from "@lib/voice";
 import {Track} from "@lib/player/track";
 import {Logger} from "@lib/logger";
 import {db} from "@lib/db";
+
+/**
+ * @author SNIPPIK
+ * @description Класс для управления включенным потоком, хранит в себе все данные потока
+ * @class PlayerStream
+ * @protected
+ */
+class PlayerStream {
+    /**
+     * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
+     * @private
+     */
+    private _stream: AudioResource = null;
+
+    /**
+     * @description Текущий стрим
+     * @return AudioResource
+     * @public
+     */
+    public get current() { return this._stream; };
+
+    /**
+     * @description Подключаем новый поток
+     * @param stream
+     */
+    public set current(stream) {
+        // Если есть текущий поток
+        if (this.current) {
+            this.current?.stream?.emit("close");
+            this.current.destroy();
+            this._stream = null;
+        }
+
+        // Подключаем новый поток
+        this._stream = stream;
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Класс для управления голосовыми подключениями, хранит в себе все данные голосового подключения
+ * @class PlayerVoice
+ * @protected
+ */
+class PlayerVoice {
+    /**
+     * @description Текущее голосовое подключение к каналу на сервере
+     * @private
+     */
+    private _voice: VoiceConnection = null;
+
+    /**
+     * @description Производим подключение к голосовому каналу
+     * @public
+     */
+    public set connection(connection: VoiceConnection) {
+        if (connection?.config) {
+            // Если боту нельзя говорить, то смысл продолжать
+            if (connection.config.selfMute) return;
+
+            // Если повторное подключение к тому же голосовому каналу
+            else if (this._voice && connection.config.channelId === this._voice.config.channelId) {
+                connection.configureSocket();
+            }
+        }
+
+        this._voice = connection;
+    };
+
+    /**
+     * @description Получение голосового подключения
+     * @return VoiceConnection
+     * @public
+     */
+    public get connection() { return this._voice; };
+
+    /**
+     * @description Отправляем пакет в голосовой канал
+     * @public
+     */
+    public set send(packet: Buffer) {
+        if (!packet) return;
+
+        // Отправляем пакет в голосовой канал
+        try {
+            if (packet) this.connection.packet(packet);
+        } catch (err) {
+            // Если возникает ошибка, то сообщаем о ней
+            console.log(err);
+        }
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Все треки для проигрывания в плеере, хранит в себе все данные треков
+ * @class PlayerTracks
+ * @protected
+ */
+class PlayerTracks {
+    /**
+     * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
+     * @readonly
+     * @private
+     */
+    private readonly _tracks: Track[] = [];
+
+    /**
+     * @description Текущая позиция в списке
+     * @private
+     */
+    private _position = 0;
+
+    /**
+     * @description На сколько сделать пропуск треков
+     * @param number - Позиция трека
+     * @public
+     */
+    public set swapPosition(number: number) { this._position = number; };
+
+    /**
+     * @description Текущая позиция трека в очереди
+     * @return number
+     * @public
+     */
+    public get position() { return this._position; };
+
+
+    /**
+     * @description Кол-во треков в очереди с учетом текущей позиции
+     * @return number
+     * @public
+     */
+    public get size() { return this._tracks.length - this.position; };
+
+    /**
+     * @description Кол-во треков в очереди
+     * @return number
+     * @public
+     */
+    public get total() { return this._tracks.length; };
+
+    /**
+     * @description Общее время треков
+     * @public
+     */
+    public get time() {
+        const tracks = this._tracks.slice(this._position);
+        const total = tracks.reduce((total: number, item: {time: { total: number }}) => total + (item.time.total || 0), 0);
+
+        return total.duration();
+    };
+
+
+    /**
+     * @description Получаем текущий трек
+     * @return Song
+     * @public
+     */
+    public get track() { return this._tracks[this._position]; };
+
+
+    /**
+     * @description Получаем последние n треков, не включает текущий
+     * @param size - Кол-во треков
+     * @public
+     */
+    public last = (size: number = 5) => {
+        return this._tracks.slice(this._position - 1 - size, this._position - 1 - size);
+    };
+
+    /**
+     * @description Получаем следующие n треков, не включает текущий
+     * @param size - Кол-во треков
+     * @public
+     */
+    public next = (size: number = 5) => {
+        return this._tracks.slice(this._position + 1, this._position + size);
+    };
+
+    /**
+     * @description Сортируем все треки в Array<Array, Array>
+     * @param size - Кол-во треков в одном списке
+     */
+    public arraySort = (size: number = 5) => {
+        let number = 0;
+
+        // Создаем Array
+        return this._tracks.ArraySort(size, (track) => {
+            number++;
+            return `\`${number}\` - ${track.titleReplaced}`;
+        }, "\n");
+    };
+
+
+    /**
+     * @description Перетасовка треков без нарушения текущий позиции
+     * @public
+     */
+    public shuffle = () => {
+        const i = this.size.random(1);
+
+        // Меняем трек текущий позиции на случайный
+        [this._tracks[this._position], this._tracks[i]] = [this._tracks[i], this._tracks[this._position]];
+    };
+
+
+    /**
+     * @description Добавляем трек в очередь
+     * @param track - Сам трек
+     */
+    public push = (track: Track) => { this._tracks.push(track); };
+
+    /**
+     * @description Получаем прошлый трек или текущий в зависимости от позиции
+     * @param position - позиция трека, номер в очереди
+     */
+    public get = (position: number) => { return this._tracks[position]; };
+
+    /**
+     * @description Удаляем из очереди неугодный трек
+     * @param position - позиция трека, номер в очереди
+     */
+    public remove = (position: number) => {
+        // Удаляем из очереди
+        this._tracks.splice(position, 1);
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Обработчик прогресс бара трека
+ * @class PlayerProgress
+ * @protected
+ */
+class PlayerProgress {
+    /**
+     * @description Размер прогресс бара
+     * @readonly
+     * @private
+     */
+    private readonly size: number = null;
+
+    /**
+     * @description Эмодзи в качестве дизайнерского решения
+     * @readonly
+     * @static
+     * @private
+     */
+    private static emoji: typeof db.emojis.progress = null;
+
+    /**
+     * @description Создаем класс для отображения прогресс бара
+     * @param size - Размер
+     */
+    public constructor(size: number = 12) {
+        if (!PlayerProgress.emoji) PlayerProgress.emoji = db.emojis.progress;
+        this.size = size;
+    };
+
+    /**
+     * @description Получаем готовый прогресс бар
+     */
+    public readonly bar = (options: {duration: {current: number; total: number}, platform: string}) => {
+        const emoji = PlayerProgress.emoji;
+        const button = emoji["bottom_" + options.platform.toLowerCase()] || emoji.bottom;
+        const {current, total} = options.duration;
+        const size = this.size;
+
+        const number = Math.round(size * (isNaN(current) ? 0 : current / total));
+        let txt = current > 0 ? `${emoji.upped.left}` : `${emoji.empty.left}`;
+
+        //Середина дорожки + точка
+        if (current === 0) txt += `${emoji.upped.center.repeat(number)}${emoji.empty.center.repeat((size + 1) - number)}`;
+        else if (current >= total) txt += `${emoji.upped.center.repeat(size)}`;
+        else txt += `${emoji.upped.center.repeat(number)}${button}${emoji.empty.center.repeat(size - number)}`;
+
+        return txt + (current >= total ? `${emoji.upped.right}` : `${emoji.empty.right}`);
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Управление фильтрами, хранит и конвертирует в string для FFmpeg
+ * @class PlayerAudioFilters
+ * @public
+ */
+class PlayerAudioFilters {
+    /**
+     * @description Включенные фильтры
+     * @readonly
+     * @private
+     */
+    private readonly enables: AudioFilter[] = [];
+
+    /**
+     * @description Получаем список включенных фильтров
+     * @public
+     */
+    public get enable() { return this.enables; };
+
+    /**
+     * @description Сжимаем фильтры для работы ffmpeg
+     */
+    public get compress() {
+        const realFilters: string[] = [`volume=${db.audio.options.volume / 100}`, `afade=t=in:st=0:d=${db.audio.options.fade}`];
+        let chunk = 0;
+
+        // Берем данные из всех фильтров
+        for (const filter of this.enable) {
+            const filterString = filter.args ? `${filter.filter}${filter.user_arg ?? ""}` : filter.filter;
+            realFilters.push(filterString);
+
+            // Если есть модификация скорости, то изменяем размер пакета
+            if (filter.speed) {
+                if (typeof filter.speed === "number") chunk += Number(filter.speed);
+                else chunk += Number(this.enable.slice(this.enable.indexOf(filter) + 1));
+            }
+        }
+
+        return { filters: realFilters.join(","), chunk };
+    };
+}
+
 
 /**
  * @author SNIPPIK
@@ -41,7 +365,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Хранилище аудио фильтров
      * @private
      */
-    private readonly _filters: AudioFilters = new AudioFilters();
+    private readonly _filters: PlayerAudioFilters = new PlayerAudioFilters();
 
     /**
      * @description Управление голосовыми состояниями
@@ -53,7 +377,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Управление потоковым вещанием
      * @private
      */
-    private readonly _audio: PlayerStreamSubSystem = new PlayerStreamSubSystem();
+    private readonly _audio: PlayerStream = new PlayerStream();
 
     /**
      * @description Делаем voice параметр публичным для использования вне класса
@@ -328,282 +652,52 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
 
 /**
  * @author SNIPPIK
- * @description Класс для управления включенным потоком, хранит в себе все данные потока
- * @class PlayerStreamSubSystem
- * @protected
+ * @description Как выглядит фильтр
+ * @interface AudioFilter
+ * @public
  */
-class PlayerStreamSubSystem {
+export interface AudioFilter {
     /**
-     * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
-     * @private
-     */
-    private _stream: AudioResource = null;
-
-    /**
-     * @description Текущий стрим
-     * @return AudioResource
-     * @public
-     */
-    public get current() { return this._stream; };
-
-    /**
-     * @description Подключаем новый поток
-     * @param stream
-     */
-    public set current(stream) {
-        // Если есть текущий поток
-        if (this.current) {
-            this.current?.stream?.emit("close");
-            this.current.destroy();
-            this._stream = null;
-        }
-
-        // Подключаем новый поток
-        this._stream = stream;
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Класс для управления голосовыми подключениями, хранит в себе все данные голосового подключения
- * @class PlayerVoice
- * @protected
- */
-class PlayerVoice {
-    /**
-     * @description Текущее голосовое подключение к каналу на сервере
-     * @private
-     */
-    private _voice: VoiceConnection = null;
-
-    /**
-     * @description Производим подключение к голосовому каналу
-     * @public
-     */
-    public set connection(connection: VoiceConnection) {
-        if (connection?.config) {
-            // Если боту нельзя говорить, то смысл продолжать
-            if (connection.config.selfMute) return;
-
-            // Если повторное подключение к тому же голосовому каналу
-            else if (this._voice && connection.config.channelId === this._voice.config.channelId) {
-                connection.configureSocket();
-            }
-        }
-
-        this._voice = connection;
-    };
-
-    /**
-     * @description Получение голосового подключения
-     * @return VoiceConnection
-     * @public
-     */
-    public get connection() { return this._voice; };
-
-    /**
-     * @description Отправляем пакет в голосовой канал
-     * @public
-     */
-    public set send(packet: Buffer) {
-        if (!packet) return;
-
-        // Отправляем пакет в голосовой канал
-        try {
-            if (packet) this.connection.packet(packet);
-        } catch (err) {
-            // Если возникает ошибка, то сообщаем о ней
-            console.log(err);
-        }
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Все треки для проигрывания в плеере, хранит в себе все данные треков
- * @class PlayerTracks
- * @protected
- */
-class PlayerTracks {
-    /**
-     * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
+     * @description Имя фильтра
      * @readonly
-     * @private
      */
-    private readonly _tracks: Track[] = [];
+    readonly name: string;
 
     /**
-     * @description Текущая позиция в списке
-     * @private
-     */
-    private _position = 0;
-
-    /**
-     * @description На сколько сделать пропуск треков
-     * @param number - Позиция трека
-     * @public
-     */
-    public set swapPosition(number: number) { this._position = number; };
-
-    /**
-     * @description Текущая позиция трека в очереди
-     * @return number
-     * @public
-     */
-    public get position() { return this._position; };
-
-
-    /**
-     * @description Кол-во треков в очереди с учетом текущей позиции
-     * @return number
-     * @public
-     */
-    public get size() { return this._tracks.length - this.position; };
-
-    /**
-     * @description Кол-во треков в очереди
-     * @return number
-     * @public
-     */
-    public get total() { return this._tracks.length; };
-
-    /**
-     * @description Общее время треков
-     * @public
-     */
-    public get time() {
-        const tracks = this._tracks.slice(this._position);
-        const total = tracks.reduce((total: number, item: {time: { total: number }}) => total + (item.time.total || 0), 0);
-
-        return total.duration();
-    };
-
-
-    /**
-     * @description Получаем текущий трек
-     * @return Song
-     * @public
-     */
-    public get track() { return this._tracks[this._position]; };
-
-
-    /**
-     * @description Получаем последние n треков, не включает текущий
-     * @param size - Кол-во треков
-     * @public
-     */
-    public last = (size: number = 5) => {
-        return this._tracks.slice(this._position - 1 - size, this._position - 1 - size);
-    };
-
-    /**
-     * @description Получаем следующие n треков, не включает текущий
-     * @param size - Кол-во треков
-     * @public
-     */
-    public next = (size: number = 5) => {
-        return this._tracks.slice(this._position + 1, this._position + size);
-    };
-
-    /**
-     * @description Сортируем все треки в Array<Array, Array>
-     * @param size - Кол-во треков в одном списке
-     */
-    public arraySort = (size: number = 5) => {
-        let number = 0;
-
-        // Создаем Array
-        return this._tracks.ArraySort(size, (track) => {
-            number++;
-            return `\`${number}\` - ${track.titleReplaced}`;
-        }, "\n");
-    };
-
-
-    /**
-     * @description Перетасовка треков без нарушения текущий позиции
-     * @public
-     */
-    public shuffle = () => {
-        const i = this.size.random(1);
-
-        // Меняем трек текущий позиции на случайный
-        [this._tracks[this._position], this._tracks[i]] = [this._tracks[i], this._tracks[this._position]];
-    };
-
-
-    /**
-     * @description Добавляем трек в очередь
-     * @param track - Сам трек
-     */
-    public push = (track: Track) => { this._tracks.push(track); };
-
-    /**
-     * @description Получаем прошлый трек или текущий в зависимости от позиции
-     * @param position - позиция трека, номер в очереди
-     */
-    public get = (position: number) => { return this._tracks[position]; };
-
-    /**
-     * @description Удаляем из очереди неугодный трек
-     * @param position - позиция трека, номер в очереди
-     */
-    public remove = (position: number) => {
-        // Удаляем из очереди
-        this._tracks.splice(position, 1);
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Обработчик прогресс бара трека
- * @class PlayerProgress
- * @protected
- */
-class PlayerProgress {
-    /**
-     * @description Размер прогресс бара
+     * @description Имена переводов
      * @readonly
-     * @private
      */
-    private readonly size: number = null;
+    readonly locale: LocalizationMap;
 
     /**
-     * @description Эмодзи в качестве дизайнерского решения
+     * @description Имена несовместимых фильтров
      * @readonly
-     * @static
-     * @private
      */
-    private static emoji: typeof db.emojis.progress = null;
+    readonly unsupported: string[];
 
     /**
-     * @description Создаем класс для отображения прогресс бара
-     * @param size - Размер
+     * @description Параметр фильтра для ffmpeg
+     * @readonly
      */
-    public constructor(size: number = 12) {
-        if (!PlayerProgress.emoji) PlayerProgress.emoji = db.emojis.progress;
-        this.size = size;
-    };
+    readonly filter: string;
 
     /**
-     * @description Получаем готовый прогресс бар
+     * @description Аргументы для фильтра
+     * @readonly
      */
-    public readonly bar = (options: {duration: {current: number; total: number}, platform: string}) => {
-        const emoji = PlayerProgress.emoji;
-        const button = emoji["bottom_" + options.platform.toLowerCase()] || emoji.bottom;
-        const {current, total} = options.duration;
-        const size = this.size;
+    readonly args: false | [number, number];
 
-        const number = Math.round(size * (isNaN(current) ? 0 : current / total));
-        let txt = current > 0 ? `${emoji.upped.left}` : `${emoji.empty.left}`;
+    /**
+     * @description Аргументы указанные пользователем
+     * @readonly
+     */
+    user_arg?: any;
 
-        //Середина дорожки + точка
-        if (current === 0) txt += `${emoji.upped.center.repeat(number)}${emoji.empty.center.repeat((size + 1) - number)}`;
-        else if (current >= total) txt += `${emoji.upped.center.repeat(size)}`;
-        else txt += `${emoji.upped.center.repeat(number)}${button}${emoji.empty.center.repeat(size - number)}`;
-
-        return txt + (current >= total ? `${emoji.upped.right}` : `${emoji.empty.right}`);
-    };
+    /**
+     * @description Модификатор скорости
+     * @readonly
+     */
+    readonly speed?: string | number;
 }
 
 /**

@@ -3,6 +3,8 @@
 - Основано на [`discord.js`](https://discord.js.org) - `v14`
 - Если очень хочется поддержать монеткой [`DonationAlerts`](https://www.donationalerts.com/r/snippik)
 
+
+
 > [!TIP]
 > Сделано с душой, не забывайте указывать авторство от этого зависит разработка!!!\
 > Если найдете ошибку, пожалуйста создайте запрос в [`issues`](https://github.com/SNIPPIK/UnTitles/issues) и объясните или заснимите как получить ошибку.\
@@ -24,8 +26,6 @@
 > Возможно сменить [`Sodium`](src/dependencies/voice/audio/Sodium.ts), на выбор есть `sodium-native`, `libsodium-wrappers`\
 > Не забываем про `.env` файл, есть заготовка в виде `.env.example`\
 > Необходимо установить ffmpeg
-
-
 
 
 

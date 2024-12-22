@@ -4,10 +4,10 @@ import {Constructor} from "@lib/handler";
 /**
  * @author SNIPPIK
  * @description Коллекция для взаимодействия с modules
- * @class Database_Voice
+ * @class dbl_voice
  * @public
  */
-export class Database_Voice extends Constructor.Collection<VoiceConnection> {
+export class dbl_voice extends Constructor.Collection<VoiceConnection> {
     /**
      * @description Подключение к голосовому каналу
      * @param config - Данные для подключения

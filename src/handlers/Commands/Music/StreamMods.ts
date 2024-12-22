@@ -1,8 +1,8 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
-import {AudioFilter} from "@lib/db/utils/AudioFilters";
 import filters from "@lib/db/json/filters.json";
 import {Constructor, Handler} from "@handler";
+import {AudioFilter} from "@lib/player";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 
@@ -126,7 +126,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                                 },
                                 type: ApplicationCommandOptionType["String"],
                                 required: true,
-                                choices: db.filters.discord_command
+                                choices: db.commands.filters_options
                             },
                             {
                                 names: {
@@ -163,7 +163,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                                 },
                                 type: ApplicationCommandOptionType["String"],
                                 required: true,
-                                choices: db.filters.discord_command
+                                choices: db.commands.filters_options
                             }
                         ]
                     },

@@ -121,7 +121,10 @@ class sAPI extends Constructor.Assign<API.request> {
                                         db.cache.set(track);
 
                                         return resolve(track);
-                                    } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
+                                    } catch (e) {
+                                        console.log(e)
+                                        return reject(Error(`[APIs]: ${e}`))
+                                    }
                                 });
                             }
                         });
@@ -362,13 +365,11 @@ class sAPI extends Constructor.Assign<API.request> {
      */
     protected static extractFormat = (data: any) => {
         return new Promise((resolve) => {
-            return resolve(data["adaptiveFormats"].sort((format: any, format2: any): void => {
+            return resolve(data["adaptiveFormats"].find((format: any): void => {
                 // Если это аудио, то проверяем его
                 if (format.mimeType.match(/opus|audio/) && !format.mimeType.match(/ec-3/)) {
-                    // Выбираем лучший битрейт
-                    return resolve(format.bitrate > format2.bitrate ? format : format2);
+                    return resolve(format);
                 }
-                return resolve(null);
             }));
         });
     };
