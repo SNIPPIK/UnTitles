@@ -13,7 +13,7 @@ import {db} from "@lib/db";
 class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            data: new SlashBuilder()
+            builder: new SlashBuilder()
                 .setName({
                     "en-US": "skip",
                     "ru": "пропуск"
@@ -35,8 +35,7 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                             "ru": "Номер трека!"
                         }
                     }
-                ])
-                .json,
+                ]),
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
                 const number = args.length > 0 ? parseInt(args.pop()) : 1;
@@ -89,7 +88,7 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
 class BackTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            data: new SlashBuilder()
+            builder: new SlashBuilder()
                 .setName({
                     "en-US": "back",
                     "ru": "назад"
@@ -111,8 +110,7 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
                         required: true,
                         type: ApplicationCommandOptionType["Number"]
                     }
-                ])
-                .json,
+                ]),
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
                 const queue = db.audio.queue.get(message.guild.id);
@@ -157,7 +155,7 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
 class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            data: new SlashBuilder()
+            builder: new SlashBuilder()
                 .setName({
                     "en-US": "remove",
                     "ru": "удалить"
@@ -179,8 +177,7 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                             "ru": "Номер трека!"
                         }
                     }
-                ])
-                .json,
+                ]),
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
                 const queue = db.audio.queue.get(message.guild.id);

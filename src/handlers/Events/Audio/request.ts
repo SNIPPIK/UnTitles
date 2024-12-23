@@ -55,7 +55,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
                 }, 10e3);
 
                 // Получаем данные в системе API
-                api.callback(argument[1] as string, { limit: db.api.limits[api.name], audio: true }).then((item) => {
+                api.callback(argument[1] as string, { limit: db.api.limits[api.name] }).then((item) => {
                     clearTimeout(timeout);
 
                     // Если нет данных или была получена ошибка

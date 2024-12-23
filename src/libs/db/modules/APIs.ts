@@ -1,5 +1,5 @@
+import {API, Handler} from "@lib/handler";
 import {Track} from "@lib/player/track";
-import {API} from "@lib/handler";
 import {env} from "@env";
 
 /**
@@ -19,7 +19,7 @@ export class dbl_apis {
          * @description Поддерживаемые платформы
          * @protected
          */
-        supported: [] as API.request[],
+        supported: [] as Handler.APIRequest[],
 
         /**
          * @description Платформы с отсутствующими данными для авторизации
@@ -109,7 +109,7 @@ export class dbl_apis {
 
             // Если исходник уже не актуален, то получаем новый
             try {
-                const song = await api.callback(track.url, {audio: true});
+                const song = await api.callback(track.url);
 
                 // Если не удалось получить новый исходник
                 if (song instanceof Error) return resolve(song);
@@ -138,7 +138,7 @@ export class dbl_apis {
                 if (tracks instanceof Error || tracks.length === 0) return resolve(null);
 
                 // Если он был найден, то получаем исходник трека
-                const song = await platform.get("track").callback(tracks?.at(0)?.url, {audio: true});
+                const song = await platform.get("track").callback(tracks?.at(0)?.url);
                 if (song instanceof Error || !song.link) return resolve(null);
 
                 // Отдаем исходник трека

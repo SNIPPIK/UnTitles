@@ -13,7 +13,7 @@ import {db} from "@lib/db";
 class Command_Voice extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            data: new SlashBuilder()
+            builder: new SlashBuilder()
                 .setName({
                     "en-US": "voice",
                     "ru": "голос"
@@ -45,7 +45,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                         },
                         type: ApplicationCommandOptionType.Subcommand
                     }
-                ]).json,
+                ]),
             rules: ["voice", "another_voice"],
             execute: async ({message, type}) => {
                 const VoiceChannel: VoiceChannel | StageChannel = message.voice.channel;

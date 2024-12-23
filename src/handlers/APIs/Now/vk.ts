@@ -1,4 +1,4 @@
-import {API, Constructor} from "@handler";
+import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/track";
 import {db} from "@lib/db";
@@ -10,7 +10,7 @@ import {env} from "@env";
  * @class sAPI
  * @public
  */
-class sAPI extends Constructor.Assign<API.request> {
+class sAPI extends Constructor.Assign<Handler.APIRequest> {
     /**
      * @description Данные для создания запросов
      * @protected
@@ -49,75 +49,67 @@ class sAPI extends Constructor.Assign<API.request> {
                  * @description Запрос данных о треке
                  * @type track
                  */
-                new class extends API.item<"track"> {
-                    public constructor() {
-                        super({
-                            name: "track",
-                            filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi,
-                            callback: (url) => {
-                                const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi.exec(url).pop();
+                {
+                    name: "track",
+                    filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi,
+                    callback: (url) => {
+                        const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi.exec(url).pop();
 
-                                return new Promise<Track>(async (resolve, reject) => {
-                                    //Если ID трека не удалось извлечь из ссылки
-                                    if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
+                        return new Promise<Track>(async (resolve, reject) => {
+                            //Если ID трека не удалось извлечь из ссылки
+                            if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
 
-                                    // Интеграция с утилитой кеширования
-                                    const cache = db.cache.get(ID);
+                            // Интеграция с утилитой кеширования
+                            const cache = db.cache.get(ID);
 
-                                    // Если найден трек или похожий объект
-                                    if (cache) return resolve(cache);
+                            // Если найден трек или похожий объект
+                            if (cache) return resolve(cache);
 
-                                    try {
-                                        // Создаем запрос
-                                        const api = await sAPI.API("audio", "getById", `&audios=${ID}`);
+                            try {
+                                // Создаем запрос
+                                const api = await sAPI.API("audio", "getById", `&audios=${ID}`);
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
 
-                                        const track = sAPI.track(api.response.pop(), url);
+                                const track = sAPI.track(api.response.pop(), url);
 
-                                        // Если нет ссылки на трек
-                                        if (!track.link) return reject(Error("[APIs]: Невозможно получить файл аудио!"));
+                                // Если нет ссылки на трек
+                                if (!track.link) return reject(Error("[APIs]: Невозможно получить файл аудио!"));
 
-                                        // Сохраняем кеш в системе
-                                        db.cache.set(track);
+                                // Сохраняем кеш в системе
+                                db.cache.set(track);
 
-                                        return resolve(track);
-                                    } catch (e) {
-                                        return reject(Error(`[APIs]: ${e}`))
-                                    }
-                                });
+                                return resolve(track);
+                            } catch (e) {
+                                return reject(Error(`[APIs]: ${e}`))
                             }
                         });
-                    };
+                    }
                 },
 
                 /**
                  * @description Запрос данных по поиску
                  * @type search
                  */
-                new class extends API.item<"search"> {
-                    public constructor() {
-                        super({
-                            name: "search",
-                            callback: (url, {limit}) => {
-                                return new Promise<Track[]>(async (resolve, reject) => {
-                                    try {
-                                        // Создаем запрос
-                                        const api = await sAPI.API("audio", "search", `&q=${url}`);
+                {
+                    name: "search",
+                    callback: (url, {limit}) => {
+                        return new Promise<Track[]>(async (resolve, reject) => {
+                            try {
+                                // Создаем запрос
+                                const api = await sAPI.API("audio", "search", `&q=${url}`);
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
-                                        const tracks = (api.response.items.splice(0, limit)).map((track: any) => sAPI.track(track));
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
+                                const tracks = (api.response.items.splice(0, limit)).map((track: any) => sAPI.track(track));
 
-                                        return resolve(tracks);
-                                    } catch (e) {
-                                        return reject(Error(`[APIs]: ${e}`))
-                                    }
-                                });
+                                return resolve(tracks);
+                            } catch (e) {
+                                return reject(Error(`[APIs]: ${e}`))
                             }
                         });
-                    };
+                    }
                 }
             ]
         });

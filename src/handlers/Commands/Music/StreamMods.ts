@@ -15,7 +15,7 @@ import {db} from "@lib/db";
 class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            data: new SlashBuilder()
+            builder: new SlashBuilder()
                 .setName({
                     "en-US": "seek",
                     "ru": "переход"
@@ -37,8 +37,7 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                         },
                         required: true,
                     }
-                ])
-                .json,
+                ]),
             rules: ["queue", "voice", "another_voice"],
             execute: ({message, args}) => {
                 const {guild} = message;
@@ -83,7 +82,7 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
 class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            data: new SlashBuilder()
+            builder: new SlashBuilder()
                 .setName({
                     "en-US": "filter",
                     "ru": "фильтр"
@@ -167,8 +166,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                             }
                         ]
                     },
-                ])
-                .json,
+                ]),
             rules: ["queue", "voice", "another_voice"],
             execute: ({message, args, type}) => {
                 const {guild} = message;

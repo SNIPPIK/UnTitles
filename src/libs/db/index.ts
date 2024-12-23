@@ -4,9 +4,9 @@ import {dbl_buttons} from "@lib/db/modules/Buttons";
 import {dbl_audio} from "@lib/db/modules/Audio";
 import {dbl_voice} from "@lib/db/modules/Voice";
 import {dbl_apis} from "@lib/db/modules/APIs";
-import {API, Handler} from "@handler";
 import {Client} from "@lib/discord";
 import {Logger} from "@lib/logger";
+import {Handler} from "@handler";
 import {env} from "@env";
 
 /**
@@ -20,7 +20,7 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
      */
     {
         name: "handlers/APIs",
-        callback: (client, item: API.request) => {
+        callback: (client, item: Handler.APIRequest) => {
             if (!item.auth) db.api.platforms.authorization.push(item.name);
             if (!item.audio) db.api.platforms.audio.push(item.name);
 
@@ -36,16 +36,24 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
     {
         name: "handlers/Commands",
         callback: (client, item: Handler.Command) => {
-            if (item.data.options) {
-                for (const option of item.data.options) {
+            // Расшифровываем команды
+            const command = item.builder.json;
+
+            // Если есть доп команды, то плюсуем их к общим
+            if (command.options) {
+                for (const option of command.options) {
                     if ("options" in option) db.commands.subCommands += option.options.length;
                 }
-                db.commands.subCommands += item.data.options.length;
+
+                // Добавляем кол-во команд в базу
+                db.commands.subCommands += command.options.length;
             }
-            db.commands.push(item);
+
+            // Загружаем команду в базу данных
+            db.commands.push({...item, builder: command});
 
             // Сообщаем что было загружено
-            if (client.ID === 0) Logger.log("DEBUG", `[Commands] loaded ${item.data.name}`);
+            if (client.ID === 0) Logger.log("DEBUG", `[Commands] loaded ${command.name}`);
         }
     },
     /**

@@ -12,7 +12,7 @@ import {locale} from "@lib/locale";
 class VoiceCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            data: new SlashBuilder()
+            builder: new SlashBuilder()
                 .setName({
                     "en-US": "tribune",
                     "ru": "трибуна"
@@ -63,8 +63,7 @@ class VoiceCommand extends Constructor.Assign<Handler.Command> {
                             }
                         ]
                     }
-                ])
-                .json,
+                ]),
             rules: ["voice", "another_voice"],
             execute: async ({message, args, type}) => {
                 const me = message.guild.members?.me;

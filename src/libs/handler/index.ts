@@ -125,14 +125,14 @@ export namespace Handler {
    * @interface Command
    * @public
    */
-  export interface Command {
+  export interface Command<T = ""> {
     /**
      * @description Данные команды для отправки на сервера discord
      * @default Необходим ввод данных
      * @readonly
      * @public
      */
-    readonly data: SlashBuilder["json"];
+    readonly builder: T extends "get" ? SlashBuilder["json"] : SlashBuilder;
 
     /**
      * @description Команду может использовать только разработчик
@@ -157,6 +157,95 @@ export namespace Handler {
      * @public
      */
     readonly execute: (options: { message: Interact; args?: string[]; type: string}) => void;
+  }
+
+  /**
+   * @author SNIPPIK
+   * @description Создаем класс запроса для взаимодействия с APIs
+   * @interface APITem
+   * @abstract
+   * @public
+   */
+  export interface APITem<T extends API.callbacks> {
+    /**
+     * @description Имя запроса на платформу
+     * @readonly
+     * @public
+     */
+    readonly name: T;
+
+    /**
+     * @description Фильтр поиска при использовании поиска по типу
+     * @readonly
+     * @public
+     */
+    readonly filter?: RegExp;
+
+    /**
+     * @description Выполняем запрос
+     * @readonly
+     * @public
+     */
+    readonly callback?: (url: string, options?: T extends "track" ? null : {limit?: number}) =>
+        Promise<(T extends "track" ? Track : T extends "playlist" | "album" ? Track.playlist : T extends "search" | "author" ? Track[] : never) | Error>
+  }
+
+  /**
+   * @author SNIPPIK
+   * @description Создаем класс для итоговой платформы для взаимодействия с APIs
+   * @interface APIRequest
+   * @abstract
+   * @public
+   */
+  export interface APIRequest {
+    /**
+     * @description Имя платформы
+     * @readonly
+     * @public
+     */
+    readonly name: API.platform;
+
+    /**
+     * @description Ссылка для работы фильтра
+     * @readonly
+     * @public
+     */
+    readonly url: string;
+
+    /**
+     * @description Доступ к аудио
+     * @readonly
+     * @public
+     */
+    readonly audio: boolean;
+
+    /**
+     * @description Доступ с авторизацией
+     * @readonly
+     * @public
+     */
+    readonly auth: boolean;
+
+    /**
+     * @description Фильтр ссылки для работы определения
+     * @readonly
+     * @public
+     */
+    readonly filter: RegExp;
+
+    /**
+     * @description Цвет платформы
+     * @readonly
+     * @public
+     */
+    readonly color: number;
+
+    /**
+     * @description Запросы платформы
+     * @readonly
+     * @public
+     */
+    readonly requests: APITem<API.callbacks>[];
   }
 }
 
@@ -496,45 +585,6 @@ export namespace Constructor {
 export namespace API {
   /**
    * @author SNIPPIK
-   * @description Создаем класс запроса для взаимодействия с APIs
-   * @class item
-   * @abstract
-   * @public
-   */
-  export abstract class item<T extends callbacks> {
-    /**
-     * @description Имя запроса на платформу
-     * @readonly
-     * @public
-     */
-    public readonly name: T;
-
-    /**
-     * @description Фильтр поиска при использовании поиска по типу
-     * @readonly
-     * @public
-     */
-    public readonly filter?: RegExp;
-
-    /**
-     * @description Выполняем запрос
-     * @readonly
-     * @public
-     */
-    public readonly callback?: (url: string, options: T extends "track" ? {audio?: boolean} : {limit?: number}) => callback<T>;
-
-    /**
-     * @description Создаем класс
-     * @param options
-     * @protected
-     */
-    protected constructor(options: item<T>) {
-      Object.assign(this, options);
-    };
-  }
-
-  /**
-   * @author SNIPPIK
    * @description Получаем ответ от локальной базы APIs
    * @class response
    * @public
@@ -545,7 +595,7 @@ export namespace API {
      * @readonly
      * @private
      */
-    private readonly _api: request;
+    private readonly _api: Handler.APIRequest;
 
     /**
      * @description Выдаем название
@@ -580,18 +630,18 @@ export namespace API {
      * @param type {get} Тип запроса
      * @public
      */
-    public get<T extends API.callbacks>(type: string | T): item<T> {
-      return this._api.requests.find((item): item<any> | null => {
+    public get<T extends API.callbacks>(type: string | T): Handler.APITem<T> {
+      return this._api.requests.find((item): Handler.APITem<T> | null => {
         // Если указана ссылка
         if (type.startsWith("http")) {
-          if (item.name === type || item.filter && !!item.filter.exec(type) || item.filter && !!type.match(item.filter)) return item as item<T>;
+          if (item.name === type || item.filter && !!item.filter.exec(type) || item.filter && !!type.match(item.filter)) return item as Handler.APITem<T>;
           return null;
         }
 
         // Скорее всего надо произвести поиск
-        if (item.name === "search" || item.name === type) return item as item<T>;
+        if (item.name === "search" || item.name === type) return item as Handler.APITem<T>;
         return null;
-      }) as item<any> | null;
+      }) as Handler.APITem<T> | null;
     };
 
     /**
@@ -609,64 +659,6 @@ export namespace API {
         return item.name === argument || item.name === "YOUTUBE";
       });
     };
-  }
-
-  /**
-   * @author SNIPPIK
-   * @description Создаем класс для итоговой платформы для взаимодействия с APIs
-   * @interface request
-   * @abstract
-   * @public
-   */
-  export interface request {
-    /**
-     * @description Имя платформы
-     * @readonly
-     * @public
-     */
-    readonly name: platform;
-
-    /**
-     * @description Ссылка для работы фильтра
-     * @readonly
-     * @public
-     */
-    readonly url: string;
-
-    /**
-     * @description Доступ к аудио
-     * @readonly
-     * @public
-     */
-    readonly audio: boolean;
-
-    /**
-     * @description Доступ с авторизацией
-     * @readonly
-     * @public
-     */
-    readonly auth: boolean;
-
-    /**
-     * @description Фильтр ссылки для работы определения
-     * @readonly
-     * @public
-     */
-    readonly filter: RegExp;
-
-    /**
-     * @description Цвет платформы
-     * @readonly
-     * @public
-     */
-    readonly color: number;
-
-    /**
-     * @description Запросы платформы
-     * @readonly
-     * @public
-     */
-    readonly requests: item<callbacks>[];
   }
 
   /**

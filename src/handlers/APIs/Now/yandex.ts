@@ -1,4 +1,4 @@
-import {API, Constructor} from "@handler";
+import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/track";
 import crypto from "node:crypto";
@@ -11,7 +11,7 @@ import {env} from "@env";
  * @class sAPI
  * @public
  */
-class sAPI extends Constructor.Assign<API.request> {
+class sAPI extends Constructor.Assign<Handler.APIRequest> {
     /**
      * @description Данные для создания запросов
      * @protected
@@ -50,195 +50,171 @@ class sAPI extends Constructor.Assign<API.request> {
                  * @description Запрос данных о треке
                  * @type track
                  */
-                new class extends API.item<"track"> {
-                    public constructor() {
-                        super({
-                            name: "track",
-                            filter: /track\/[0-9]+/gi,
-                            callback: (url, {audio}) => {
-                                const ID = /track\/[0-9]+/gi.exec(url)?.pop()?.split("track")?.pop();
+                {
+                    name: "track",
+                    filter: /track\/[0-9]+/gi,
+                    callback: (url) => {
+                        const ID = /track\/[0-9]+/gi.exec(url)?.pop()?.split("track")?.pop();
 
-                                return new Promise<Track>(async (resolve, reject) => {
-                                    // Если ID трека не удалось извлечь из ссылки
-                                    if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
+                        return new Promise<Track>(async (resolve, reject) => {
+                            // Если ID трека не удалось извлечь из ссылки
+                            if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
 
-                                    // Интеграция с утилитой кеширования
-                                    const cache = db.cache.get(ID);
+                            // Интеграция с утилитой кеширования
+                            const cache = db.cache.get(ID);
 
-                                    // Если найден трек или похожий объект
-                                    if (cache) return resolve(cache);
+                            // Если найден трек или похожий объект
+                            if (cache) return resolve(cache);
 
-                                    try {
-                                        // Делаем запрос
-                                        const api = await sAPI.API(`tracks/${ID}`);
+                            try {
+                                // Делаем запрос
+                                const api = await sAPI.API(`tracks/${ID}`);
 
-                                        // Обрабатываем ошибки
-                                        if (api instanceof Error) return reject(api);
-                                        else if (!api[0]) return reject(Error("[APIs]: Не удалось получить данные о треке!"));
+                                // Обрабатываем ошибки
+                                if (api instanceof Error) return reject(api);
+                                else if (!api[0]) return reject(Error("[APIs]: Не удалось получить данные о треке!"));
 
-                                        const track = sAPI.track(api[0]);
+                                const track = sAPI.track(api[0]);
+                                const link = await sAPI.getAudio(ID);
 
-                                        // Надо ли получать аудио
-                                        if (audio) {
-                                            const link = await sAPI.getAudio(ID);
+                                if (link instanceof Error) return reject(api);
+                                track.link = link;
 
-                                            if (link instanceof Error) return reject(api);
-                                            track.link = link;
-                                        }
+                                // Сохраняем кеш в системе
+                                db.cache.set(track);
 
-                                        // Сохраняем кеш в системе
-                                        db.cache.set(track);
-
-                                        return resolve(track);
-                                    } catch (e) {
-                                        console.log(e);
-                                        return reject(Error(`[APIs]: ${e}`))
-                                    }
-                                });
+                                return resolve(track);
+                            } catch (e) {
+                                console.log(e);
+                                return reject(Error(`[APIs]: ${e}`))
                             }
                         });
-                    };
+                    }
                 },
 
                 /**
                  * @description Запрос данных об альбоме
                  * @type album
                  */
-                new class extends API.item<"album"> {
-                    public constructor() {
-                        super({
-                            name: "album",
-                            filter: /(album)\/[0-9]+/gi,
-                            callback: (url, {limit}) => {
-                                const ID = /[0-9]+/gi.exec(url)?.pop()?.split("album")?.pop();
+                {
+                    name: "album",
+                    filter: /(album)\/[0-9]+/gi,
+                    callback: (url, {limit}) => {
+                        const ID = /[0-9]+/gi.exec(url)?.pop()?.split("album")?.pop();
 
-                                return new Promise<Track.playlist>(async (resolve, reject) => {
-                                    // Если ID альбома не удалось извлечь из ссылки
-                                    if (!ID) return reject(Error("[APIs]: Не удалось получить ID альбома!"));
+                        return new Promise<Track.playlist>(async (resolve, reject) => {
+                            // Если ID альбома не удалось извлечь из ссылки
+                            if (!ID) return reject(Error("[APIs]: Не удалось получить ID альбома!"));
 
-                                    try {
-                                        // Создаем запрос
-                                        const api = await sAPI.API(`albums/${ID}/with-tracks`);
+                            try {
+                                // Создаем запрос
+                                const api = await sAPI.API(`albums/${ID}/with-tracks`);
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
-                                        else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return reject(Error("[APIs]: Я не нахожу треков в этом альбоме!"));
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
+                                else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return reject(Error("[APIs]: Я не нахожу треков в этом альбоме!"));
 
-                                        const AlbumImage = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
-                                        const tracks: Track.data[] = api["volumes"]?.pop().splice(0, limit);
-                                        const songs = tracks.map(sAPI.track);
+                                const AlbumImage = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
+                                const tracks: Track.data[] = api["volumes"]?.pop().splice(0, limit);
+                                const songs = tracks.map(sAPI.track);
 
-                                        return resolve({url, title: api.title, image: AlbumImage, items: songs});
-                                    } catch (e) {
-                                        return reject(Error(`[APIs]: ${e}`))
-                                    }
-                                });
+                                return resolve({url, title: api.title, image: AlbumImage, items: songs});
+                            } catch (e) {
+                                return reject(Error(`[APIs]: ${e}`))
                             }
                         });
-                    };
+                    }
                 },
 
                 /**
                  * @description Запрос данных об плейлисте
                  * @type playlist
                  */
-                new class extends API.item<"playlist"> {
-                    public constructor() {
-                        super({
-                            name: "playlist",
-                            filter: /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/gi,
-                            callback: (url, {limit}) => {
-                                const ID = this.filter.exec(url);
+                {
+                    name: "playlist",
+                    filter: /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/gi,
+                    callback: (url, {limit}) => {
+                        const ID = /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/gi.exec(url);
 
-                                return new Promise<Track.playlist>(async (resolve, reject) => {
-                                    if (!ID[1]) return reject(Error("[APIs]: Не найден ID пользователя!"));
-                                    else if (!ID[2]) return reject(Error("[APIs]: Не найден ID плейлиста!"));
+                        return new Promise<Track.playlist>(async (resolve, reject) => {
+                            if (!ID[1]) return reject(Error("[APIs]: Не найден ID пользователя!"));
+                            else if (!ID[2]) return reject(Error("[APIs]: Не найден ID плейлиста!"));
 
-                                    try {
-                                        // Создаем запрос
-                                        const api = await sAPI.API(ID.at(0));
+                            try {
+                                // Создаем запрос
+                                const api = await sAPI.API(ID.at(0));
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
-                                        else if (api?.tracks?.length === 0) return reject(Error("[APIs]: Я не нахожу треков в этом плейлисте!"));
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
+                                else if (api?.tracks?.length === 0) return reject(Error("[APIs]: Я не нахожу треков в этом плейлисте!"));
 
-                                        const image = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
-                                        const tracks: any[] = api.tracks?.splice(0, limit);
-                                        const songs = tracks.map(({track}) => sAPI.track(track));
+                                const image = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
+                                const tracks: any[] = api.tracks?.splice(0, limit);
+                                const songs = tracks.map(({track}) => sAPI.track(track));
 
-                                        return resolve({
-                                            url, title: api.title, image: image, items: songs,
-                                            artist: {
-                                                title: api.owner.name,
-                                                url: `https://music.yandex.ru/users/${ID[1]}`
-                                            }
-                                        });
-                                    } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
+                                return resolve({
+                                    url, title: api.title, image: image, items: songs,
+                                    artist: {
+                                        title: api.owner.name,
+                                        url: `https://music.yandex.ru/users/${ID[1]}`
+                                    }
                                 });
-                            }
+                            } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                         });
-                    };
+                    }
                 },
 
                 /**
                  * @description Запрос данных треков артиста
                  * @type author
                  */
-                new class extends API.item<"author"> {
-                    public constructor() {
-                        super({
-                            name: "author",
-                            filter: /(artist)\/[0-9]+/gi,
-                            callback: (url, {limit}) => {
-                                const ID = this.filter.exec(url)?.pop()?.split("artist")?.pop();
+                {
+                    name: "author",
+                    filter: /(artist)\/[0-9]+/gi,
+                    callback: (url, {limit}) => {
+                        const ID = /(artist)\/[0-9]+/gi.exec(url)?.pop()?.split("artist")?.pop();
 
-                                return new Promise<Track[]>(async (resolve, reject) => {
-                                    // Если ID автора не удалось извлечь из ссылки
-                                    if (!ID) return reject(Error("[APIs]: Не удалось получить ID автора!"));
+                        return new Promise<Track[]>(async (resolve, reject) => {
+                            // Если ID автора не удалось извлечь из ссылки
+                            if (!ID) return reject(Error("[APIs]: Не удалось получить ID автора!"));
 
-                                    try {
-                                        // Создаем запрос
-                                        const api = await sAPI.API(`artists/${ID}/tracks`);
+                            try {
+                                // Создаем запрос
+                                const api = await sAPI.API(`artists/${ID}/tracks`);
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
-                                        const tracks = api.tracks.splice(0, limit).map(sAPI.track);
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
+                                const tracks = api.tracks.splice(0, limit).map(sAPI.track);
 
-                                        return resolve(tracks);
-                                    } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
-                                });
-                            }
+                                return resolve(tracks);
+                            } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                         });
-                    };
+                    }
                 },
 
                 /**
                  * @description Запрос данных по поиску
                  * @type search
                  */
-                new class extends API.item<"search"> {
-                    public constructor() {
-                        super({
-                            name: "search",
-                            callback: (url , {limit}) => {
-                                return new Promise<Track[]>(async (resolve, reject) => {
-                                    try {
-                                        // Создаем запрос
-                                        const api = await sAPI.API(`search?type=all&text=${url.split(" ").join("%20")}&page=0&nococrrect=false`);
+                {
+                    name: "search",
+                    callback: (url , {limit}) => {
+                        return new Promise<Track[]>(async (resolve, reject) => {
+                            try {
+                                // Создаем запрос
+                                const api = await sAPI.API(`search?type=all&text=${url.split(" ").join("%20")}&page=0&nococrrect=false`);
 
-                                        // Обрабатываем ошибки
-                                        if (api instanceof Error) return reject(api);
-                                        else if (!api.tracks) return reject(Error(`[APIs]: На Yandex music нет такого трека!`));
+                                // Обрабатываем ошибки
+                                if (api instanceof Error) return reject(api);
+                                else if (!api.tracks) return reject(Error(`[APIs]: На Yandex music нет такого трека!`));
 
-                                        const tracks = api.tracks["results"].splice(0, limit).map(sAPI.track);
-                                        return resolve(tracks);
-                                    } catch (e) {
-                                        return reject(Error(`[APIs]: ${e}`))
-                                    }
-                                });
+                                const tracks = api.tracks["results"].splice(0, limit).map(sAPI.track);
+                                return resolve(tracks);
+                            } catch (e) {
+                                return reject(Error(`[APIs]: ${e}`))
                             }
                         });
-                    };
+                    }
                 }
             ]
         });

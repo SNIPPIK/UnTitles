@@ -13,7 +13,7 @@ import {db} from "@lib/db";
 class PlayCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            data: new SlashBuilder()
+            builder: new SlashBuilder()
                 .setName({
                     "en-US": "play",
                     "ru": "играть"
@@ -91,8 +91,7 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                             }
                         ]
                     }
-                ])
-                .json,
+                ]),
             rules: ["voice", "another_voice"],
             execute: ({message, args, type}) => {
                 // Если пользователь прикрепил файл

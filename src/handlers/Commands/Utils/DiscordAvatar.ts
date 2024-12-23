@@ -12,7 +12,7 @@ import {locale} from "@lib/locale";
 class AvatarCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            data: new SlashBuilder()
+            builder: new SlashBuilder()
                 .setName({
                     "en-US": "avatar",
                     "ru": "аватар"
@@ -34,8 +34,7 @@ class AvatarCommand extends Constructor.Assign<Handler.Command> {
                         type: ApplicationCommandOptionType["User"],
                         required: true
                     }
-                ])
-                .json,
+                ]),
             execute: ({message, args}) => {
                 const user = message.guild.members.cache.get(args[0]).user;
 

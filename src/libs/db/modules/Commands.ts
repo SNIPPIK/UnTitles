@@ -11,7 +11,7 @@ import {Logger} from "@lib/logger";
  * @class dbl_commands
  * @public
  */
-export class dbl_commands<T extends Handler.Command> extends Array<T> {
+export class dbl_commands<T extends Handler.Command<"get">> extends Array<T> {
     /**
      * @description Доп команды, бывают команды, которые могут содержать несколько доп команд
      * @public
@@ -28,14 +28,14 @@ export class dbl_commands<T extends Handler.Command> extends Array<T> {
         for (const cmd of this) {
 
             // Если указанное имя совпало с именем команды
-            if (cmd.data.name === names) return cmd;
+            if (cmd.builder.name === names) return cmd;
 
             // Проверяем имена если это список
             else if (names instanceof Array) {
                 // Проверяем все указанные имена команды
                 for (const name of names) {
                     // Если нашлась подходящая
-                    if (cmd.data.name === name || cmd.data.name === name) return cmd;
+                    if (cmd.builder.name === name || cmd.builder.name === name) return cmd;
                 }
             }
         }
@@ -103,7 +103,7 @@ export class dbl_commands<T extends Handler.Command> extends Array<T> {
         return new Promise<true>((resolve) => {
 
             // Загрузка глобальных команд
-            client.application.commands.set(this.map((command) => command.data) as any)
+            client.application.commands.set(this.map((command) => command.builder) as any)
                 .then(() => Logger.log("DEBUG", `[Shard ${client.ID}] [SlashCommands | ${this.public.length}] has load public commands`))
                 .catch(console.error);
 

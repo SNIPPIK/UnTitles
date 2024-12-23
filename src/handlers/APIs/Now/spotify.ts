@@ -1,4 +1,4 @@
-import {API, Constructor} from "@handler";
+import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/track";
 import {db} from "@lib/db";
@@ -10,7 +10,7 @@ import {env} from "@env";
  * @class sAPI
  * @public
  */
-class sAPI extends Constructor.Assign<API.request> {
+class sAPI extends Constructor.Assign<Handler.APIRequest> {
     /**
      * @description Данные для создания запросов
      * @protected
@@ -64,163 +64,143 @@ class sAPI extends Constructor.Assign<API.request> {
                  * @description Запрос данных о треке
                  * @type track
                  */
-                new class extends API.item<"track"> {
-                    public constructor() {
-                        super({
-                            name: "track",
-                            filter: /track\/[0-9z]+/i,
-                            callback: (url: string) => {
-                                const ID = /track\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("track\/")?.pop();
+                {
+                    name: "track",
+                    filter: /track\/[0-9z]+/i,
+                    callback: (url: string) => {
+                        const ID = /track\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("track\/")?.pop();
 
-                                return new Promise<Track>(async (resolve, reject) => {
-                                    //Если ID трека не удалось извлечь из ссылки
-                                    if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
+                        return new Promise<Track>(async (resolve, reject) => {
+                            //Если ID трека не удалось извлечь из ссылки
+                            if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
 
-                                    // Интеграция с утилитой кеширования
-                                    const cache = db.cache.get(ID);
+                            // Интеграция с утилитой кеширования
+                            const cache = db.cache.get(ID);
 
-                                    // Если найден трек или похожий объект
-                                    if (cache) return resolve(cache);
+                            // Если найден трек или похожий объект
+                            if (cache) return resolve(cache);
 
-                                    try {
-                                        // Создаем запрос
-                                        const api = await sAPI.API(`tracks/${ID}`);
+                            try {
+                                // Создаем запрос
+                                const api = await sAPI.API(`tracks/${ID}`);
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
-                                        const track = sAPI.track(api);
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
+                                const track = sAPI.track(api);
 
-                                        db.cache.set(track);
+                                db.cache.set(track);
 
-                                        return resolve(track);
-                                    } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
-                                });
-                            }
+                                return resolve(track);
+                            } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                         });
-                    };
+                    }
                 },
 
                 /**
                  * @description Запрос данных об альбоме
                  * @type album
                  */
-                new class extends API.item<"album"> {
-                    public constructor() {
-                        super({
-                            name: "album",
-                            filter: /album\/[0-9z]+/i,
-                            callback: (url, {limit}) => {
-                                const ID = /album\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("album\/")?.pop();
+                {
+                    name: "album",
+                    filter: /album\/[0-9z]+/i,
+                    callback: (url, {limit}) => {
+                        const ID = /album\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("album\/")?.pop();
 
-                                return new Promise<Track.playlist>(async (resolve, reject) => {
-                                    // Если ID альбома не удалось извлечь из ссылки
-                                    if (!ID) return reject(Error("[APIs]: Не найден ID альбома!"));
+                        return new Promise<Track.playlist>(async (resolve, reject) => {
+                            // Если ID альбома не удалось извлечь из ссылки
+                            if (!ID) return reject(Error("[APIs]: Не найден ID альбома!"));
 
-                                    try {
-                                        // Создаем запрос
-                                        const api: Error | any = await sAPI.API(`albums/${ID}?offset=0&limit=${limit}`);
+                            try {
+                                // Создаем запрос
+                                const api: Error | any = await sAPI.API(`albums/${ID}?offset=0&limit=${limit}`);
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
 
-                                        const tracks = api.tracks.items.map(sAPI.track)
+                                const tracks = api.tracks.items.map(sAPI.track)
 
-                                        return resolve({ url, title: api.name, image: api.images[0], items: tracks, artist: api?.["artists"][0] });
-                                    } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
-                                });
-                            }
+                                return resolve({ url, title: api.name, image: api.images[0], items: tracks, artist: api?.["artists"][0] });
+                            } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                         });
-                    };
+                    }
                 },
 
                 /**
                  * @description Запрос данных об плейлисте
                  * @type playlist
                  */
-                new class extends API.item<"playlist"> {
-                    public constructor() {
-                        super({
-                            name: "playlist",
-                            filter: /playlist\/[0-9z]+/i,
-                            callback: (url, {limit}) => {
-                                const ID = /playlist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("playlist\/")?.pop();
+                {
+                    name: "playlist",
+                    filter: /playlist\/[0-9z]+/i,
+                    callback: (url, {limit}) => {
+                        const ID = /playlist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("playlist\/")?.pop();
 
-                                return new Promise<Track.playlist>(async (resolve, reject) => {
-                                    // Если ID плейлиста не удалось извлечь из ссылки
-                                    if (!ID) return reject(Error("[APIs]: Не найден ID плейлиста!"));
+                        return new Promise<Track.playlist>(async (resolve, reject) => {
+                            // Если ID плейлиста не удалось извлечь из ссылки
+                            if (!ID) return reject(Error("[APIs]: Не найден ID плейлиста!"));
 
-                                    try {
-                                        // Создаем запрос
-                                        const api: Error | any = await sAPI.API(`playlists/${ID}?offset=0&limit=${limit}`);
+                            try {
+                                // Создаем запрос
+                                const api: Error | any = await sAPI.API(`playlists/${ID}?offset=0&limit=${limit}`);
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
-                                        const tracks = api.tracks.items.map(({ track }) => sAPI.track(track));
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
+                                const tracks = api.tracks.items.map(({ track }) => sAPI.track(track));
 
-                                        return resolve({ url, title: api.name, image: api.images[0], items: tracks });
-                                    } catch (e) {
-                                        return reject(Error(`[APIs]: ${e}`))
-                                    }
-                                });
+                                return resolve({ url, title: api.name, image: api.images[0], items: tracks });
+                            } catch (e) {
+                                return reject(Error(`[APIs]: ${e}`))
                             }
                         });
-                    };
+                    }
                 },
 
                 /**
                  * @description Запрос данных треков артиста
                  * @type author
                  */
-                new class extends API.item<"author"> {
-                    public constructor() {
-                        super({
-                            name: "author",
-                            filter: /artist\/[0-9z]+/i,
-                            callback: (url, {limit}) => {
-                                const ID = /artist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("artist\/")?.pop();
+                {
+                    name: "author",
+                    filter: /artist\/[0-9z]+/i,
+                    callback: (url, {limit}) => {
+                        const ID = /artist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("artist\/")?.pop();
 
-                                return new Promise<Track[]>(async (resolve, reject) => {
-                                    // Если ID автора не удалось извлечь из ссылки
-                                    if (!ID) return reject(Error("[APIs]: Не найден ID автора!"));
+                        return new Promise<Track[]>(async (resolve, reject) => {
+                            // Если ID автора не удалось извлечь из ссылки
+                            if (!ID) return reject(Error("[APIs]: Не найден ID автора!"));
 
-                                    try {
-                                        // Создаем запрос
-                                        const api = await sAPI.API(`artists/${ID}/top-tracks?market=ES&limit=${limit}`);
+                            try {
+                                // Создаем запрос
+                                const api = await sAPI.API(`artists/${ID}/top-tracks?market=ES&limit=${limit}`);
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
 
-                                        return resolve((api.tracks?.items ?? api.tracks).map(sAPI.track));
-                                    } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
-                                });
-                            }
+                                return resolve((api.tracks?.items ?? api.tracks).map(sAPI.track));
+                            } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                         });
-                    };
+                    }
                 },
 
                 /**
                  * @description Запрос данных по поиску
                  * @type search
                  */
-                new class extends API.item<"search"> {
-                    public constructor() {
-                        super({
-                            name: "search",
-                            callback: (url, {limit}) => {
-                                return new Promise<Track[]>(async (resolve, reject) => {
-                                    try {
-                                        // Создаем запрос
-                                        const api: Error | any = await sAPI.API(`search?q=${url}&type=track&limit=${limit}`);
+                {
+                    name: "search",
+                    callback: (url, {limit}) => {
+                        return new Promise<Track[]>(async (resolve, reject) => {
+                            try {
+                                // Создаем запрос
+                                const api: Error | any = await sAPI.API(`search?q=${url}&type=track&limit=${limit}`);
 
-                                        // Если запрос выдал ошибку то
-                                        if (api instanceof Error) return reject(api);
+                                // Если запрос выдал ошибку то
+                                if (api instanceof Error) return reject(api);
 
-                                        return resolve(api.tracks.items.map(sAPI.track));
-                                    } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
-                                });
-                            }
+                                return resolve(api.tracks.items.map(sAPI.track));
+                            } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                         });
-                    };
+                    }
                 }
             ]
         });
