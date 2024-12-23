@@ -24,9 +24,7 @@ export class dbl_commands<T extends Handler.Command<"get">> extends Array<T> {
      * @public
      */
     public get = (names: string | string[]): T => {
-        // Перебираем весь список команд, этот метод быстрее чем filter или find на 2 ms
         for (const cmd of this) {
-
             // Если указанное имя совпало с именем команды
             if (cmd.builder.name === names) return cmd;
 

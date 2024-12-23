@@ -41,7 +41,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                 {
                     name: "playlist",
                     filter: /playlist\?list=[a-zA-Z0-9-_]+/gi,
-                    callback: (url: string, {limit}) => {
+                    execute: (url: string, {limit}) => {
                         const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/gi).pop();
                         let artist = null;
 
@@ -83,7 +83,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                 {
                     name: "track",
                     filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
-                    callback: (url: string) => {
+                    execute: (url: string) => {
                         const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
 
                         return new Promise<Track>(async (resolve, reject) => {
@@ -126,7 +126,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                 {
                     name: "author",
                     filter: /\/(channel)?(@)/gi,
-                    callback: (url: string, {limit}) => {
+                    execute: (url: string, {limit}) => {
                         return new Promise<Track[]>(async (resolve, reject) => {
                             try {
                                 let ID: string;
@@ -166,7 +166,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                  */
                 {
                     name: "search",
-                    callback: (url: string, {limit}): Promise<Track[] | Error> => {
+                    execute: (url: string, {limit}): Promise<Track[] | Error> => {
                         return new Promise<Track[] | Error>(async (resolve, reject) => {
                             try {
                                 // Создаем запрос

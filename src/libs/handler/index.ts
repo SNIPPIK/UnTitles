@@ -186,7 +186,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    readonly callback?: (url: string, options?: T extends "track" ? null : {limit?: number}) =>
+    readonly execute: (url: string, options?: T extends "track" ? null : {limit?: number}) =>
         Promise<(T extends "track" ? Track : T extends "playlist" | "album" ? Track.playlist : T extends "search" | "author" ? Track[] : never) | Error>
   }
 
@@ -674,11 +674,4 @@ export namespace API {
    * @public
    */
   export type callbacks = "track" | "playlist" | "search" | "album" | "author";
-
-  /**
-   * @description Функция запроса
-   * @type callback<callbacks>
-   * @public
-   */
-  export type callback<T> = Promise<(T extends "track" ? Track : T extends "playlist" | "album" ? Track.playlist : T extends "search" | "author" ? Track[] : never) | Error>
 }

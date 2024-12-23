@@ -52,7 +52,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                 {
                     name: "track",
                     filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi,
-                    callback: (url) => {
+                    execute: (url) => {
                         const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi.exec(url).pop();
 
                         return new Promise<Track>(async (resolve, reject) => {
@@ -94,7 +94,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                  */
                 {
                     name: "search",
-                    callback: (url, {limit}) => {
+                    execute: (url, {limit}) => {
                         return new Promise<Track[]>(async (resolve, reject) => {
                             try {
                                 // Создаем запрос

@@ -109,7 +109,7 @@ export class dbl_apis {
 
             // Если исходник уже не актуален, то получаем новый
             try {
-                const song = await api.callback(track.url);
+                const song = await api.execute(track.url);
 
                 // Если не удалось получить новый исходник
                 if (song instanceof Error) return resolve(song);
@@ -134,11 +134,11 @@ export class dbl_apis {
 
             try {
                 // Ищем подходящий трек
-                const tracks = await platform.get("search").callback(`${track.artist.title} - ${track.title}`, {limit: 5});
+                const tracks = await platform.get("search").execute(`${track.artist.title} - ${track.title}`, {limit: 5});
                 if (tracks instanceof Error || tracks.length === 0) return resolve(null);
 
                 // Если он был найден, то получаем исходник трека
-                const song = await platform.get("track").callback(tracks?.at(0)?.url);
+                const song = await platform.get("track").execute(tracks?.at(0)?.url);
                 if (song instanceof Error || !song.link) return resolve(null);
 
                 // Отдаем исходник трека

@@ -25,16 +25,16 @@ export class locale {
     /**
      * @description Перевод на другие языки, перевод берется из базы
      * @param language - Тип locale для перевода
-     * @param context - Имя перевода
+     * @param locale - Имя перевода
      * @param args - Аргументы будут подставлены автоматически вместо "{ARGUMENT}" в порядке очереди
      */
-    public static _ = (language: languages, context: locale_text, args?: any[]) => {
-        let translate = locales[context][language] as string;
+    public static _ = (language: languages, locale: locale_text, args?: any[]) => {
+        let translate = locales[locale][language] as string;
 
         // Если нет такой строки
         if (!translate) {
             // По умолчанию будет выведен английский язык
-            translate = locales[context]["en-US"];
+            translate = locales[locale]["en-US"];
         }
 
         // Если есть аргументы

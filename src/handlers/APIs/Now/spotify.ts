@@ -67,7 +67,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                 {
                     name: "track",
                     filter: /track\/[0-9z]+/i,
-                    callback: (url: string) => {
+                    execute: (url: string) => {
                         const ID = /track\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("track\/")?.pop();
 
                         return new Promise<Track>(async (resolve, reject) => {
@@ -103,7 +103,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                 {
                     name: "album",
                     filter: /album\/[0-9z]+/i,
-                    callback: (url, {limit}) => {
+                    execute: (url, {limit}) => {
                         const ID = /album\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("album\/")?.pop();
 
                         return new Promise<Track.playlist>(async (resolve, reject) => {
@@ -132,7 +132,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                 {
                     name: "playlist",
                     filter: /playlist\/[0-9z]+/i,
-                    callback: (url, {limit}) => {
+                    execute: (url, {limit}) => {
                         const ID = /playlist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("playlist\/")?.pop();
 
                         return new Promise<Track.playlist>(async (resolve, reject) => {
@@ -162,7 +162,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                 {
                     name: "author",
                     filter: /artist\/[0-9z]+/i,
-                    callback: (url, {limit}) => {
+                    execute: (url, {limit}) => {
                         const ID = /artist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("artist\/")?.pop();
 
                         return new Promise<Track[]>(async (resolve, reject) => {
@@ -188,7 +188,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                  */
                 {
                     name: "search",
-                    callback: (url, {limit}) => {
+                    execute: (url, {limit}) => {
                         return new Promise<Track[]>(async (resolve, reject) => {
                             try {
                                 // Создаем запрос

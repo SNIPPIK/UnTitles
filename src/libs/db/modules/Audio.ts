@@ -136,6 +136,11 @@ class AudioCycles {
      * @private
      */
     private readonly _audioPlayers = new class extends Constructor.Cycle<ExtraPlayer> {
+        /**
+         * @description Запускаем работу цикла
+         * @constructor
+         * @public
+         */
         public constructor() {
             super({
                 name: "AudioPlayer",
@@ -160,6 +165,11 @@ class AudioCycles {
      * @private
      */
     private readonly _messages = new class extends Constructor.Cycle<Interact> {
+        /**
+         * @description Запускаем работу цикла
+         * @constructor
+         * @public
+         */
         public constructor() {
             super({
                 name: "Message",
@@ -176,9 +186,7 @@ class AudioCycles {
                     db.audio.queue.events.emit("message/playing", queue, message);
                 },
                 custom: {
-                    remove: (item) => {
-                        item.delete = 200;
-                    },
+                    remove: (item) => { item.delete = 200; },
                     push: (item) => {
                         const old = this.array.find(msg => msg.guild.id === item.guild.id);
 

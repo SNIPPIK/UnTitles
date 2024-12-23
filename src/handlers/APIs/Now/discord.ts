@@ -31,7 +31,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
                 {
                     name: "track",
                     filter: /attachments|ephemeral-attachments/,
-                    callback: (attachment: any) => {
+                    execute: (attachment: any) => {
                         return new Promise<Track>((resolve) => {
                             const track = new Track({
                                 id: null,

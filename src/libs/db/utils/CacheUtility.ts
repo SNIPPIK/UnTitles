@@ -73,6 +73,11 @@ class CacheAudio extends Constructor.Cycle<Track> {
      */
     private readonly cache = env.get("cache.dir");
 
+    /**
+     * @description Запускаем работу цикла
+     * @constructor
+     * @public
+     */
     public constructor() {
         super({
             name: "AudioFile",

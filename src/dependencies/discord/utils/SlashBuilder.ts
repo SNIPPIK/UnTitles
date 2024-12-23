@@ -181,45 +181,45 @@ export interface SlashComponent {
     /**
      * @description Имена команды на разных языках
      */
-    names: ApplicationCommandOption['nameLocalizations'];
+    readonly names: ApplicationCommandOption['nameLocalizations'];
 
     /**
      * @description Описание команды на разных языках
      */
-    descriptions: ApplicationCommandOption["descriptionLocalizations"];
+    readonly descriptions: ApplicationCommandOption["descriptionLocalizations"];
 
     /**
      * @description Тип вводимых данных
      */
-    type: ApplicationCommandOption["type"];
+    readonly type: ApplicationCommandOption["type"];
 
     /**
      * @description Ввод данных обязателен
      */
-    required?: boolean;
+    readonly required?: boolean;
 
     /**
      * @description Доп команды к команде или к подкоманде. Внимание нельзя нарушать структуру discord а то команды не будут приняты
      */
-    options?: SlashComponent[];
+    readonly options?: SlashComponent[];
 
     /**
      * @description Список действий на выбор пользователей
      */
-    choices?: {
+    readonly choices?: {
         /**
          * @description Имя действия
          */
-        name: string;
+        readonly name: string;
 
         /**
          * @description Тип возврата данных, нужен для кода разработчика
          */
-        value: string;
+        readonly value: string;
 
         /**
          * @description Перевод имен действий на разные языки
          */
-        nameLocalizations?: LocalizationMap;
+        readonly nameLocalizations?: LocalizationMap;
     }[]
 }
