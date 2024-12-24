@@ -162,15 +162,19 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     }
 
                     // Если права не соответствуют правде
-                    else if (command.rules) {
-                        // Проверяем всю базу
-                        for (const key of command.rules) {
-                            const intent = intends[key];
+                    else if (command.rules && command.rules?.length > 0) {
+                        const rule = intends.find((item) => {
+                            // Если будет найдено совпадение
+                            if (command.rules.includes(item.name)) {
+                                // Если нет этого необходимости проверки запроса, то пропускаем
+                                return item.callback(interact);
+                            }
 
-                            // Если нет этого необходимости проверки запроса, то пропускаем
-                            if (!intent.callback(interact)) continue;
-                            else return;
-                        }
+                            return true;
+                        });
+
+                        // Если нет доступа, то отклоняем
+                        if (!rule) return;
                     }
 
                     // Выполняем команду

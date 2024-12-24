@@ -366,7 +366,7 @@ class MessageBuilder {
    * @param msg      - Сообщение от сообщения
    */
   private constructor_menu = (msg: Message) => {
-    let {pages, page, type} = this._menu;
+    let {pages, page} = this._menu;
 
     // Создаем сборщик
     const collector = msg.createMessageComponentCollector({

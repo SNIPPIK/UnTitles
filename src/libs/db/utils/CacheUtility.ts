@@ -29,7 +29,7 @@ export class CacheUtility {
      * @readonly
      * @private
      */
-    private readonly _audio = new CacheAudio();
+    private readonly _audio: CacheAudio = new CacheAudio();
 
     /**
      * @description Выдаем класс для кеширования аудио
@@ -71,7 +71,7 @@ class CacheAudio extends Constructor.Cycle<Track> {
      * @author SNIPPIK
      * @description Путь до директории с кешированными данными
      */
-    private readonly cache = env.get("cache.dir");
+    private readonly cache: string = env.get("cache.dir");
 
     /**
      * @description Запускаем работу цикла

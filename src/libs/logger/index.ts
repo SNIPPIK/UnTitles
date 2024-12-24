@@ -36,7 +36,7 @@ export class Logger {
     /**
      * @description Отправляем лог в консоль
      */
-    public static log = (status: "DEBUG" | "WARN" | "ERROR" | "LOG", text: string): void => {
+    public static log = (status: keyof typeof db.status, text: string): void => {
         // Игнорируем debug сообщения
         if (status === "DEBUG") return;
 

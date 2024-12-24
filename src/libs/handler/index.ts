@@ -161,37 +161,6 @@ export namespace Handler {
 
   /**
    * @author SNIPPIK
-   * @description Создаем класс запроса для взаимодействия с APIs
-   * @interface APITem
-   * @abstract
-   * @public
-   */
-  export interface APITem<T extends API.callbacks> {
-    /**
-     * @description Имя запроса на платформу
-     * @readonly
-     * @public
-     */
-    readonly name: T;
-
-    /**
-     * @description Фильтр поиска при использовании поиска по типу
-     * @readonly
-     * @public
-     */
-    readonly filter?: RegExp;
-
-    /**
-     * @description Выполняем запрос
-     * @readonly
-     * @public
-     */
-    readonly execute: (url: string, options?: T extends "track" ? null : {limit?: number}) =>
-        Promise<(T extends "track" ? Track : T extends "playlist" | "album" ? Track.playlist : T extends "search" | "author" ? Track[] : never) | Error>
-  }
-
-  /**
-   * @author SNIPPIK
    * @description Создаем класс для итоговой платформы для взаимодействия с APIs
    * @interface APIRequest
    * @abstract
@@ -245,7 +214,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    readonly requests: APITem<API.callbacks>[];
+    readonly requests: (APIs.track | APIs.playlist | APIs.album | APIs.author | APIs.search)[];
   }
 }
 
@@ -304,7 +273,7 @@ export namespace Constructor {
      * @description Фильтруем данные по принципу подбора
      * @param fn - функция фильтрации
      */
-    public match = (fn: (item: K) => boolean) => {
+    /*public match = (fn: (item: K) => boolean) => {
       for (const [_, value] of this.map) {
         const check = fn(value);
 
@@ -313,7 +282,7 @@ export namespace Constructor {
       }
 
       return null;
-    };
+    };*/
 
     /**
      * @description Удаляем элемент из списка
@@ -584,6 +553,20 @@ export namespace Constructor {
  */
 export namespace API {
   /**
+   * @description Доступные платформы по умолчанию
+   * @type platform
+   * @public
+   */
+  export type platform = "YOUTUBE" | "SPOTIFY" | "VK" | "DISCORD" | "YANDEX";
+
+  /**
+   * @description Доступные запросы для платформ
+   * @type api_types
+   * @public
+   */
+  export type api_types = (APIs.track | APIs.playlist | APIs.album | APIs.author | APIs.search)["name"];
+
+  /**
    * @author SNIPPIK
    * @description Получаем ответ от локальной базы APIs
    * @class response
@@ -595,7 +578,7 @@ export namespace API {
      * @readonly
      * @private
      */
-    private readonly _api: Handler.APIRequest;
+    private readonly _api: Handler.APIRequest = null;
 
     /**
      * @description Выдаем название
@@ -630,18 +613,18 @@ export namespace API {
      * @param type {get} Тип запроса
      * @public
      */
-    public get<T extends API.callbacks>(type: string | T): Handler.APITem<T> {
-      return this._api.requests.find((item): Handler.APITem<T> | null => {
+    public get<T extends API.api_types>(type: T | string): T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "author" ? APIs.author : APIs.search {
+      return this._api.requests.find((item) => {
+        // Скорее всего надо произвести поиск
+        if (item.name === "search" || item.name === type) return item;
+
         // Если указана ссылка
         if (type.startsWith("http")) {
-          if (item.name === type || item.filter && !!item.filter.exec(type) || item.filter && !!type.match(item.filter)) return item as Handler.APITem<T>;
+          if (item.name === type || item.filter && !!item.filter.exec(type) || item.filter && !!type.match(item.filter)) return item;
           return null;
         }
-
-        // Скорее всего надо произвести поиск
-        if (item.name === "search" || item.name === type) return item as Handler.APITem<T>;
         return null;
-      }) as Handler.APITem<T> | null;
+      }) as any;
     };
 
     /**
@@ -660,18 +643,61 @@ export namespace API {
       });
     };
   }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Доступные запросы для платформ
+ * @namespace APIs
+ * @public
+ */
+namespace APIs {
+  /**
+   * @description Что из себя должен представлять запрос данные трека
+   * @interface track
+   */
+  export interface track {
+    name: "track";
+    filter: RegExp;
+    execute: (url: string) => Promise<Track | Error>
+  }
 
   /**
-   * @description Доступные платформы
-   * @type platform
-   * @public
+   * @description Что из себя должен представлять запрос данные плейлиста
+   * @interface playlist
    */
-  export type platform = "YOUTUBE" | "SPOTIFY" | "VK" | "DISCORD" | "YANDEX";
+  export interface playlist {
+    name: "playlist";
+    filter: RegExp;
+    execute: (url: string, options: {limit: number}) => Promise<Track.playlist | Error>
+  }
 
   /**
-   * @description Доступные запросы
-   * @type callbacks
-   * @public
+   * @description Что из себя должен представлять запрос данные альбома
+   * @interface album
    */
-  export type callbacks = "track" | "playlist" | "search" | "album" | "author";
+  export interface album {
+    name: "album";
+    filter: RegExp;
+    execute: (url: string, options: {limit: number}) => Promise<Track.playlist | Error>
+  }
+
+  /**
+   * @description Что из себя должен представлять запрос данные треков автора
+   * @interface author
+   */
+  export interface author {
+    name: "author"
+    filter: RegExp;
+    execute: (url: string, options: {limit: number}) => Promise<Track[] | Error>
+  }
+
+  /**
+   * @description Что из себя должен представлять поиск треков
+   * @interface search
+   */
+  export interface search {
+    name: "search"
+    execute: (text: string, options: {limit: number}) => Promise<Track[] | Error>
+  }
 }
