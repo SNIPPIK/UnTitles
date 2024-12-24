@@ -37,6 +37,9 @@ export class Logger {
      * @description Отправляем лог в консоль
      */
     public static log = (status: "DEBUG" | "WARN" | "ERROR" | "LOG", text: string): void => {
+        // Игнорируем debug сообщения
+        if (status === "DEBUG") return;
+
         text = text.replace(/\[/g, "\x1b[100m \x1b[30m").replace(/]/g, " \x1b[0m");
 
         const extStatus = db.status[status];

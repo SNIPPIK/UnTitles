@@ -3,6 +3,7 @@ import {locale} from "@lib/locale";
 import {Colors} from "discord.js";
 import {db} from "@lib/db";
 import {env} from "@env";
+import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -97,7 +98,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
                     // Запускаем проигрывание треков
                     return db.audio.queue.create(message, item);
                 }).catch((err: Error) => { // Отправляем сообщение об ошибке
-                    console.log(err);
+                    Logger.log("DEBUG", `request/api - ${err}`);
                     clearTimeout(timeout);
                     db.audio.queue.events.emit("request/error", message, `**${platform.platform}.${api.name}**\n\n**❯** **${err.message}**`, true);
                 });

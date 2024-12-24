@@ -147,13 +147,13 @@ interface RequestData extends RequestOptions {
     // Метод запроса
     method?: "POST" | "GET" | "HEAD" | "PATCH";
 
-    //Headers запроса
+    // Headers запроса
     headers?: RequestOptions["headers"];
 
-    //Если мы хотим что-то отправить серверу
+    // Если мы хотим что-то отправить серверу
     body?: string;
 
-    //Добавлять рандомный user-agent
+    // Добавлять user-agent, рандомный или указанный
     useragent?: boolean | string;
 }
 
