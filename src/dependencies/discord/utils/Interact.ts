@@ -1,115 +1,8 @@
-import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User, Colors} from "discord.js"
+import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User} from "discord.js"
 import type { ComponentData, EmbedData, GuildMember} from "discord.js"
 import { BaseInteraction, Message, Attachment} from "discord.js";
 import type {LocalizationMap} from "discord-api-types/v10";
-import {locale} from "@lib/locale";
 import {db} from "@lib/db";
-
-/**
- * @author SNIPPIK
- * @description Функции правил проверки, возвращает true или false
- * @true - Разрешено
- * @false - Запрещено
- */
-const intends: {[key: string]: (message: Interact) => boolean } = {
-  "voice": (message) => {
-    const VoiceChannel = message.voice.channel;
-
-    // Если нет голосового подключения
-    if (!VoiceChannel) {
-      message.fastBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow };
-      return false;
-    }
-
-    return true;
-  },
-  "queue": (message) => {
-    // Если нет очереди
-    if (!message.queue) {
-      message.fastBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow };
-      return false;
-    }
-
-    return true;
-  },
-  "another_voice": (message) => {
-    const queue = message.queue;
-    const VoiceChannel = (message.member as GuildMember)?.voice?.channel;
-
-    // Если музыка играет в другом голосовом канале
-    if (message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
-
-      // Если включена музыка на сервере
-      if (queue) {
-
-        // Если есть голосовое подключение
-        if (queue.voice && queue.voice.channel) {
-
-          // Если в гс есть другие пользователи
-          if (queue.voice.channel?.members?.size > 1) {
-            message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
-            return false;
-          }
-
-          // Если нет пользователей, то подключаемся к другому пользователю
-          else {
-            queue.voice = message.voice;
-            queue.message = message;
-            message.fastBuilder = { description: locale._(message.locale, "voice.new", [message.voice.channel]), color: Colors.Yellow };
-            return true;
-          }
-        }
-      }
-
-      // Если нет очереди, но есть голосовое подключение
-      else {
-        const connection = db.voice.get(message.guild.id);
-
-        // Отключаемся от голосового канала
-        if (connection) connection.disconnect();
-      }
-    }
-
-    return true;
-  }
-};
-
-/**
- * @author SNIPPIK
- * @description Поддерживаемые правила проверки
- */
-export type InteractRules = "voice" | "queue" | "another_voice";
-
-/**
- * @author SNIPPIK
- * @description Класс для проверки, используется в командах
- * @class InteractRule
- * @public
- */
-export class InteractRule {
-  /**
-   * @description Проверяем команды на наличие
-   * @param array
-   * @param message
-   */
-  public static check = (array: InteractRules[], message: Interact) => {
-    if (!array || array?.length === 0) return false;
-
-    let onError = true;
-
-    // Проверяем всю базу
-    for (const key of array) {
-      const intent = intends[key];
-
-      //Если нет этого необходимости проверки запроса, то пропускаем
-      if (!intent) continue;
-      else onError = intent(message);
-    }
-
-    return onError;
-  };
-}
-
 
 /**
  * @author SNIPPIK
@@ -299,7 +192,7 @@ export class Interact {
  * @description создаем продуманное сообщение
  * @class MessageBuilder
  */
-class MessageBuilder implements MessageBuilder {
+class MessageBuilder {
   /**
    * @description Временная база данных с embed json data в array
    * @public

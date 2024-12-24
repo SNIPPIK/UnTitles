@@ -135,17 +135,14 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
             if (loop === "off") {
                 queue.repeat = "songs";
 
-                msg.fastBuilder = {
-                    description: locale._(msg.locale, "player.button.repeat.songs"),
-                    color: Colors.Green
-                };
+                msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.songs"), color: Colors.Green };
                 return;
             }
 
             // Включение повтора трека
             else if (loop === "songs") {
                 queue.repeat = "song";
-                msg.fastBuilder = {description: locale._(msg.locale, "player.button.repeat.song"), color: Colors.Green};
+                msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.song"), color: Colors.Green };
                 return;
             }
 

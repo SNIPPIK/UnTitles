@@ -1,5 +1,6 @@
-import {Interact, InteractRule} from "@lib/discord/utils/Interact";
+import {Interact} from "@lib/discord/utils/Interact";
 import {Constructor, Handler} from "@handler";
+import type { GuildMember} from "discord.js"
 import {Colors, Events} from "discord.js";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
@@ -13,6 +14,84 @@ const temple_db = new Map<string, number>;
 
 /**
  * @author SNIPPIK
+ * @description Функции правил проверки, возвращает true или false
+ * @true - Разрешено
+ * @false - Запрещено
+ */
+const intends: { name: Handler.Command["rules"][number], callback: (message: Interact) => boolean }[] = [
+    {
+        name: "voice",
+        callback: (message) => {
+            const VoiceChannel = message.voice.channel;
+
+            // Если нет голосового подключения
+            if (!VoiceChannel) {
+                message.fastBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow };
+                return false;
+            }
+
+            return true;
+        }
+    },
+    {
+        name: "queue",
+        callback: (message) => {
+            // Если нет очереди
+            if (!message.queue) {
+                message.fastBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow };
+                return false;
+            }
+
+            return true;
+        }
+    },
+    {
+        name: "another_voice",
+        callback: (message) => {
+            const queue = message.queue;
+            const VoiceChannel = (message.member as GuildMember)?.voice?.channel;
+
+            // Если музыка играет в другом голосовом канале
+            if (message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
+
+                // Если включена музыка на сервере
+                if (queue) {
+
+                    // Если есть голосовое подключение
+                    if (queue.voice && queue.voice.channel) {
+
+                        // Если в гс есть другие пользователи
+                        if (queue.voice.channel?.members?.size > 1) {
+                            message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
+                            return false;
+                        }
+
+                        // Если нет пользователей, то подключаемся к другому пользователю
+                        else {
+                            queue.voice = message.voice;
+                            queue.message = message;
+                            message.fastBuilder = { description: locale._(message.locale, "voice.new", [message.voice.channel]), color: Colors.Yellow };
+                            return true;
+                        }
+                    }
+                }
+
+                // Если нет очереди, но есть голосовое подключение
+                else {
+                    const connection = db.voice.get(message.guild.id);
+
+                    // Отключаемся от голосового канала
+                    if (connection) connection.disconnect();
+                }
+            }
+
+            return true;
+        }
+    }
+];
+
+/**
+ * @author SNIPPIK
  * @description Класс для взаимодействия бота с slash commands, buttons
  * @class InteractionCreate
  * @event Events.InteractionCreate
@@ -23,7 +102,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
         super({
             name: Events.InteractionCreate,
             type: "client",
-            execute: (_, message) => {
+            execute: (_, message): void => {
                 // Какие действия надо просто игнорировать
                 if (
                     // Игнорируем ботов
@@ -84,7 +163,14 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
                     // Если права не соответствуют правде
                     else if (command.rules) {
-                        if (!InteractRule.check(command.rules, interact)) return;
+                        // Проверяем всю базу
+                        for (const key of command.rules) {
+                            const intent = intends[key];
+
+                            // Если нет этого необходимости проверки запроса, то пропускаем
+                            if (!intent.callback(interact)) continue;
+                            else return;
+                        }
                     }
 
                     // Выполняем команду
@@ -127,4 +213,4 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({Interaction});
+export default Object.values({ Interaction });

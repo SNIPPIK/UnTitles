@@ -1,6 +1,6 @@
-import {Interact, InteractRules} from "@lib/discord/utils/Interact";
 import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {CollectionAudioEvents} from "@lib/db/modules/Audio";
+import {Interact} from "@lib/discord/utils/Interact";
 import {AudioPlayerEvents} from "@lib/player";
 import {ClientEvents} from "discord.js";
 import {Track} from "@lib/player/track";
@@ -148,7 +148,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    readonly rules?: InteractRules[]
+    readonly rules?: ("voice" | "queue" | "another_voice")[]
 
     /**
      * @description Выполнение команды
