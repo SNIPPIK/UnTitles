@@ -388,7 +388,7 @@ class sAPI extends Constructor.Assign<Handler.APIRequest> {
      * @description Подготавливаем трек к отправке
      * @param track {any} Видео
      */
-    protected static track(track: any): any {
+    protected static track = (track: any) => {
         try {
             return new Track({
                 id: track["videoId"],
