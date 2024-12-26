@@ -1,9 +1,9 @@
-import {Constructor, Handler, API} from "@handler";
+import {Constructor, Handler} from "@handler";
+import {Logger} from "@lib/logger";
 import {locale} from "@lib/locale";
 import {Colors} from "discord.js";
 import {db} from "@lib/db";
 import {env} from "@env";
-import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -18,7 +18,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
             name: "request/api",
             type: "player",
             execute: (message, argument) => {
-                const platform = new API.response(argument[0] as string);
+                const platform = db.api.request(argument[0] as string);
 
                 // Если платформа заблокирована
                 if (platform.block) {

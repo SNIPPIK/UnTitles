@@ -1,5 +1,5 @@
 import {httpsClient} from "@lib/request";
-import {API} from "@handler";
+import {Handler} from "@handler";
 import {db} from "@lib/db";
 import {env} from "@env";
 
@@ -27,7 +27,7 @@ export class Track {
          * @readonly
          * @private
          */
-        platform: API.platform;
+        platform: Handler.API["name"];
 
         /**
          * @description Цвет платформы

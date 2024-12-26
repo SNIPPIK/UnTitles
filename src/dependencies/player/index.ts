@@ -1,6 +1,6 @@
 import type {LocalizationMap} from "discord-api-types/v10";
 import {TypedEmitter} from "tiny-typed-emitter";
-import {AudioResource} from "@lib/player/audio";
+import {AudioResource} from "@lib/voice/audio";
 import {VoiceConnection} from "@lib/voice";
 import {Track} from "@lib/player/track";
 import {Logger} from "@lib/logger";

@@ -2,11 +2,10 @@ import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
 import {CollectionAudioEvents} from "@lib/db/modules/Audio";
 import {Interact} from "@lib/discord/utils/Interact";
 import {AudioPlayerEvents} from "@lib/player";
+import {APIs} from "@lib/db/modules/APIs";
 import {ClientEvents} from "discord.js";
-import {Track} from "@lib/player/track";
 import {Client} from "@lib/discord";
 import {readdirSync} from "node:fs";
-import {db} from "@lib/db";
 
 /**
  * @author SNIPPIK
@@ -162,17 +161,17 @@ export namespace Handler {
   /**
    * @author SNIPPIK
    * @description Создаем класс для итоговой платформы для взаимодействия с APIs
-   * @interface APIRequest
+   * @interface API
    * @abstract
    * @public
    */
-  export interface APIRequest {
+  export interface API {
     /**
      * @description Имя платформы
      * @readonly
      * @public
      */
-    readonly name: API.platform;
+    readonly name: "YOUTUBE" | "SPOTIFY" | "VK" | "DISCORD" | "YANDEX";
 
     /**
      * @description Ссылка для работы фильтра
@@ -220,7 +219,7 @@ export namespace Handler {
 
 /**
  * @author SNIPPIK
- * @description Вспомогательные классы
+ * @description Классы упрощающие некоторые моменты, так-же содержит класс для запросов
  * @namespace Constructor
  * @public
  */
@@ -484,220 +483,62 @@ export namespace Constructor {
       setTimeout(this._stepCycle, this.data.time - Date.now());
     };
   }
-
-  /**
-   * @author SNIPPIK
-   * @description Интерфейс для опций TimeCycle
-   * @private
-   */
-  interface TimeCycleConfig<T> {
-    /**
-     * @description Имя цикла, для удобства отладки
-     * @readonly
-     * @public
-     */
-    readonly name: string,
-
-    /**
-     * @description Функция для выполнения
-     * @readonly
-     * @public
-     */
-    readonly execute: (item: T) => void | Promise<boolean>,
-
-    /**
-     * @description Как фильтровать объекты, вдруг объект еще не готов
-     * @readonly
-     * @public
-     */
-    readonly filter: (item: T) => boolean,
-
-    /**
-     * @description Время прогона цикла, через n времени будет запущен цикл по новой
-     * @readonly
-     * @public
-     */
-    readonly duration: number | "promise",
-
-    /**
-     * @description Кастомные функции, необходимы для модификации или правильного удаления
-     * @readonly
-     * @public
-     */
-    readonly custom?: {
-      /**
-       * @description Изменить логику добавления
-       * @param item - объект
-       * @readonly
-       * @public
-       */
-      readonly push?: (item: T) => void;
-
-      /**
-       * @description Изменить логику удаления
-       * @param item - объект
-       * @readonly
-       * @public
-       */
-      readonly remove?: (item: T) => void;
-    }
-  }
-}
-
-
-/**
- * @author SNIPPIK
- * @description Классы для взаимодействия с API
- * @namespace API
- * @public
- */
-export namespace API {
-  /**
-   * @description Доступные платформы по умолчанию
-   * @type platform
-   * @public
-   */
-  export type platform = "YOUTUBE" | "SPOTIFY" | "VK" | "DISCORD" | "YANDEX";
-
-  /**
-   * @description Доступные запросы для платформ
-   * @type api_types
-   * @public
-   */
-  export type api_types = (APIs.track | APIs.playlist | APIs.album | APIs.author | APIs.search)["name"];
-
-  /**
-   * @author SNIPPIK
-   * @description Получаем ответ от локальной базы APIs
-   * @class response
-   * @public
-   */
-  export class response {
-    /**
-     * @description Класс который дает доступ к запросам платформы
-     * @readonly
-     * @private
-     */
-    private readonly _api: Handler.APIRequest = null;
-
-    /**
-     * @description Выдаем название
-     * @return API.platform
-     * @public
-     */
-    public get platform() { return this._api.name; };
-
-    /**
-     * @description Выдаем bool, Недоступна ли платформа
-     * @return boolean
-     * @public
-     */
-    public get block() { return db.api.platforms.block.includes(this.platform); };
-
-    /**
-     * @description Выдаем bool, есть ли доступ к платформе
-     * @return boolean
-     * @public
-     */
-    public get auth() { return db.api.platforms.authorization.includes(this.platform); };
-
-    /**
-     * @description Выдаем int, цвет платформы
-     * @return number
-     * @public
-     */
-    public get color() { return this._api.color; };
-
-    /**
-     * @description Получаем функцию в зависимости от типа платформы и запроса
-     * @param type {get} Тип запроса
-     * @public
-     */
-    public get<T extends API.api_types>(type: T | string): T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "author" ? APIs.author : APIs.search {
-      return this._api.requests.find((item) => {
-        // Скорее всего надо произвести поиск
-        if (item.name === "search" || item.name === type) return item;
-
-        // Если указана ссылка
-        if (type.startsWith("http")) {
-          if (item.name === type || item.filter && !!item.filter.exec(type) || item.filter && !!type.match(item.filter)) return item;
-          return null;
-        }
-        return null;
-      }) as any;
-    };
-
-    /**
-     * @description Ищем платформу из доступных
-     * @param argument {API.platform} Имя платформы
-     * @public
-     */
-    public constructor(argument: API.platform | string) {
-      // Ищем платформу
-      this._api = db.api.platforms.supported.find((item) => {
-        // Если была указана ссылка
-        if (argument.startsWith("http")) return !!item.filter.exec(argument) || !!argument.match(item.filter) || item.name === "DISCORD";
-
-        // Если был указан текст
-        return item.name === argument || item.name === "YOUTUBE";
-      });
-    };
-  }
 }
 
 /**
  * @author SNIPPIK
- * @description Доступные запросы для платформ
- * @namespace APIs
- * @public
+ * @description Интерфейс для опций TimeCycle
+ * @private
  */
-namespace APIs {
+interface TimeCycleConfig<T> {
   /**
-   * @description Что из себя должен представлять запрос данные трека
-   * @interface track
+   * @description Имя цикла, для удобства отладки
+   * @readonly
+   * @public
    */
-  export interface track {
-    name: "track";
-    filter: RegExp;
-    execute: (url: string) => Promise<Track | Error>
-  }
+  readonly name: string,
 
   /**
-   * @description Что из себя должен представлять запрос данные плейлиста
-   * @interface playlist
+   * @description Функция для выполнения
+   * @readonly
+   * @public
    */
-  export interface playlist {
-    name: "playlist";
-    filter: RegExp;
-    execute: (url: string, options: {limit: number}) => Promise<Track.playlist | Error>
-  }
+  readonly execute: (item: T) => void | Promise<boolean>,
 
   /**
-   * @description Что из себя должен представлять запрос данные альбома
-   * @interface album
+   * @description Как фильтровать объекты, вдруг объект еще не готов
+   * @readonly
+   * @public
    */
-  export interface album {
-    name: "album";
-    filter: RegExp;
-    execute: (url: string, options: {limit: number}) => Promise<Track.playlist | Error>
-  }
+  readonly filter: (item: T) => boolean,
 
   /**
-   * @description Что из себя должен представлять запрос данные треков автора
-   * @interface author
+   * @description Время прогона цикла, через n времени будет запущен цикл по новой
+   * @readonly
+   * @public
    */
-  export interface author {
-    name: "author"
-    filter: RegExp;
-    execute: (url: string, options: {limit: number}) => Promise<Track[] | Error>
-  }
+  readonly duration: number | "promise",
 
   /**
-   * @description Что из себя должен представлять поиск треков
-   * @interface search
+   * @description Кастомные функции, необходимы для модификации или правильного удаления
+   * @readonly
+   * @public
    */
-  export interface search {
-    name: "search"
-    execute: (text: string, options: {limit: number}) => Promise<Track[] | Error>
+  readonly custom?: {
+    /**
+     * @description Изменить логику добавления
+     * @param item - объект
+     * @readonly
+     * @public
+     */
+    readonly push?: (item: T) => void;
+
+    /**
+     * @description Изменить логику удаления
+     * @param item - объект
+     * @readonly
+     * @public
+     */
+    readonly remove?: (item: T) => void;
   }
 }

@@ -20,7 +20,7 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
      */
     {
         name: "handlers/APIs",
-        callback: (client, item: Handler.APIRequest) => {
+        callback: (client, item: Handler.API) => {
             if (!item.auth) db.api.platforms.authorization.push(item.name);
             if (!item.audio) db.api.platforms.audio.push(item.name);
 

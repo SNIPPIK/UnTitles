@@ -7,7 +7,7 @@ import {Track} from "@lib/player/track";
  * @class sAPI
  * @public
  */
-class sAPI extends Constructor.Assign<Handler.APIRequest> {
+class sAPI extends Constructor.Assign<Handler.API> {
     /**
      * @description Создаем экземпляр запросов
      * @constructor sAPI

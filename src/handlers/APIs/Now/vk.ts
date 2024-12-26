@@ -10,7 +10,7 @@ import {env} from "@env";
  * @class sAPI
  * @public
  */
-class sAPI extends Constructor.Assign<Handler.APIRequest> {
+class sAPI extends Constructor.Assign<Handler.API> {
     /**
      * @description Данные для создания запросов
      * @protected
