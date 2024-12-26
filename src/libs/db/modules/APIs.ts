@@ -96,7 +96,7 @@ export class dbl_apis {
     };
 
     /**
-     * @description Создание класс для взаимодействия с платформой
+     * @description Создание класса для взаимодействия с платформой
      * @return APIRequest
      * @public
      */
