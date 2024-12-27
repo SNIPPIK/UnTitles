@@ -16,7 +16,7 @@ if (process["argv"].includes("--ShardManager")) {
 
 /**
  * @name "shard"
- * @description Загрузка клиента или осколка
+ * @description Загрузка осколка
  */
 else {
     const client = new Client();
