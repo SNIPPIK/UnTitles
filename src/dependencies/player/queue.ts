@@ -179,8 +179,9 @@ export class Queue {
         else Object.assign(first[1], { disabled: true });
         
 
+
         // Ограничиваем кнопку очередь
-        if (this.tracks.size > 5) {
+        if (this.tracks.size > 1) {
             Object.assign(two[0], { disabled: false });
         } else {
             Object.assign(two[0], { disabled: true });

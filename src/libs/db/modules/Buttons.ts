@@ -194,7 +194,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
                     fields: [
                         {
                             name: locale._(msg.locale, "player.current.playing"),
-                            value: `\`${queue.tracks.position + 1}\` - ${queue.tracks.track.titleReplaced}`
+                            value: `\`\`${queue.tracks.position + 1}\`\` - ${queue.tracks.track.titleReplaced}`
                         },
                         pages.length > 0 ? {name: locale._(msg.locale, "queue"), value: pages[page]} : null
                     ],

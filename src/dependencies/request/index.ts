@@ -51,9 +51,9 @@ abstract class Request {
              * @description Ивент если превышено время ожидания подключения
              * @public
              */
-            request.once("timeout", () => {
-                throw new Error(`[APIs]: Connection Timeout Exceeded ${this.data.hostname}:443`);
-            });
+            //request.once("timeout", () => {
+            //    throw new Error(`[APIs]: Connection Timeout Exceeded ${this.data.hostname}:443`);
+            //});
 
             /**
              * @description Ивент если подключение было сорвано

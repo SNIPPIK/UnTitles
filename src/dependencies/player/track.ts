@@ -117,8 +117,8 @@ export class Track {
         // Удаляем лишнее скобки
         const title = `[${this.title.replace(/[()\[\]"]/g, "").substring(0, 45)}](${this.url})`;
 
-        if (this.platform === "YOUTUBE") return `\`\`[${this.time.split}]\`\` ${title}`;
-        return `\`\`[${this.time.split}]\`\` [${this.artist.title}](${this.artist.url}) - ${title}`;
+        if (this.platform === "YOUTUBE") return `\`\`${this.time.split}\`\` ${title}`;
+        return `\`\`${this.time.split}\`\` [${this.artist.title}](${this.artist.url}) - ${title}`;
     };
 
     /**

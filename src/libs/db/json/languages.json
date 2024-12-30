@@ -232,18 +232,8 @@
   },
 
   "player.current.link": {
-    "ru": "**__[link to track]({ARGUMENT})__**",
-    "en-US": "**__[link to track]({ARGUMENT})__**"
-  },
-
-  "player.next.playing": {
-    "ru": "Следующее:",
-    "en-US": "Next:"
-  },
-
-  "player.next.playing.alt": {
-    "ru": "Следующее - [{ARGUMENT}]",
-    "en-US": "Next - [{ARGUMENT}]"
+    "ru": "**[ссылка на трек]({ARGUMENT})**",
+    "en-US": "**[link to track]({ARGUMENT})**"
   },
 
   "player.current.error": {

@@ -173,36 +173,29 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
             name: "message/playing",
             type: "player",
             execute: (queue, message) => {
-                const {color, artist, image, title, url} = queue.tracks.track;
+                const {color, artist, image, title, user} = queue.tracks.track;
                 const embed = new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image,
                         author: {name: artist.title, url: artist.url, iconURL: db.emojis.diskImage},
                         fields: [
-                            //Следующий трек или треки
-                            queue.tracks.size > 1 ? (() => {
-                                const tracks = queue.tracks.next().map((track, index) => {
-                                    return `\`${index + 2}\` ${track.titleReplaced}`;
-                                });
-
-                                if (queue.tracks.size > 5) return {
-                                    name: locale._(queue.message.locale, "player.next.playing.alt", [queue.tracks.size]),
-                                    value: tracks.join("\n") + "\n\n"
-                                };
-                                return {name: locale._(queue.message.locale, "player.next.playing"), value: tracks.join("\n")};
-                            })() : null,
-
                             // Текущий трек
                             {
-                                name: locale._(queue.message.locale, "player.current.playing"),
-                                value: `\`\`\`${title}\`\`\`` + locale._(queue.message.locale, "player.current.link", [url])
+                                name: "", //locale._(queue.message.locale, "player.current.playing")
+                                value: `\`\`\`${title}\`\`\`` + queue.player.progress
                             },
 
-                            // Прогресс бар
-                            {
-                                name: "",
-                                value: queue.player.progress
-                            }
+                            // Следующий трек или треки
+                            queue.tracks.size > 1 ? (() => {
+                                const tracks = queue.tracks.next(2).map((track, index) => {
+                                    return `\`\`${index + 2}\`\` - ${track.titleReplaced}`;
+                                });
+
+                                return {
+                                    name: "",
+                                    value: tracks.join("\n")
+                                };
+                            })() : null
                         ]
                     }
                 ]).setPromise((msg) => {
