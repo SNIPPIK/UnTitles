@@ -74,7 +74,6 @@ else {
         Logger.log("ERROR", `\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n└ Stack:   ${err.stack}`);
     });
     process.on("unhandledRejection", (err: Error) => {
-        //if (`${err}`.match(/DiscordAPIError/)) return;
-        console.log(err);
+        console.error(err);
     });
 }

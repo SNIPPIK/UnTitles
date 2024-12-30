@@ -159,9 +159,9 @@ export class Encryption {
      */
     public static mode(options: string[]): string {
         const option = options.find((option) => SUPPORTED_ENCRYPTION_MODES.includes(option));
-        if (!option) throw new Error(`No compatible encryption modes. Available include: ${options.join(', ')}`);
 
-        return option;
+        if (option) return option;
+        throw new Error(`No compatible encryption modes. Available include: ${options.join(', ')}`);
     };
 
     /**

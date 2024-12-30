@@ -20,7 +20,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Текущее состояние голосового подключения
      * @private
      */
-    private _state: VoiceConnectionState;
+    private readonly _state: VoiceConnectionState;
 
     /**
      * @description Пакеты для работы с голосовым подключением
@@ -78,7 +78,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             oldState.adapter.destroy();
         }
 
-        this._state = newState;
+        Object.assign(this._state, newState);
 
         // Меняем текущий статус
         if (oldState.status !== newState.status) {

@@ -114,7 +114,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @description Текущий статус подключения
      * @private
      */
-    private _state: VoiceSocketState = {
+    private readonly _state: VoiceSocketState = {
         /**
          * @description Код подключения
          * @private
@@ -169,7 +169,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
         );
 
         this.emit("stateChange", this._state, newState);
-        this._state = newState;
+        Object.assign(this._state, newState);
     };
 
     /**

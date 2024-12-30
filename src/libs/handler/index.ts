@@ -6,6 +6,7 @@ import {APIs} from "@lib/db/modules/APIs";
 import {ClientEvents} from "discord.js";
 import {Client} from "@lib/discord";
 import {readdirSync} from "node:fs";
+import {Logger} from "@lib/logger";
 
 /**
  * @author SNIPPIK
@@ -34,28 +35,42 @@ export class Handler<T> {
   public constructor(directory: string) {
     // Загружаем каталог
     for (const dir of readdirSync(`src/${directory}`)) {
-      if (dir.endsWith(".ts") && !dir.endsWith(".js")) continue;
+      if (dir.endsWith(".ts") && !dir.endsWith(".js")) {
+        Logger.log("WARN", `[Handler] TypeError: File is not directory, need remove this file src/${directory}/${dir}`);
+        continue;
+      }
 
       // Загружаем 2 каталог
       for (const file of readdirSync(`src/${directory}/${dir}`)) {
-        if (!file.endsWith(".ts") && !file.endsWith(".js")) continue;
+        if (!file.endsWith(".ts") && !file.endsWith(".js")) {
+          Logger.log("WARN", `[Handler] TypeError: File is directory, need remove this directory src/${directory}/${dir}`);
+          continue
+        }
 
-        const imported = this.imports(`${directory}/${dir}/${file}`);
+        const imported = this.import_(`${directory}/${dir}/${file}`);
 
         if (!imported) continue;
 
-        // Если при загрузке была получена ошибка
-        if (imported instanceof Error) throw imported;
-
-        // Если полученные данные являются списком
-        else if (imported instanceof Array) {
-          for (const obj of imported) this._files.push(new obj(null));
-        }
-
-        // Если ничего выше описанного не было получено
-        else this._files.push(new (imported as any)(null));
+        // Загружаем файл
+        this.file(imported);
       }
     }
+  };
+  /**
+   * @description Функция загрузки файла
+   * @param imported
+   */
+  private readonly file = (imported: T | Error) => {
+    // Если при загрузке была получена ошибка
+    if (imported instanceof Error) throw imported;
+
+    // Если полученные данные являются списком
+    else if (imported instanceof Array) {
+      for (const obj of imported) this._files.push(new obj(null));
+    }
+
+    // Если ничего выше описанного не было получено
+    else this._files.push(new (imported as any)(null));
   };
 
   /**
@@ -63,13 +78,14 @@ export class Handler<T> {
    * @readonly
    * @private
    */
-  private readonly imports = (path: string): Error | T => {
+  private readonly import_ = (path: string): Error | T => {
     try {
       const file = require(`../../${path}`);
 
       // Удаляем кеш загрузки
       delete require.cache[require.resolve(path)];
 
+      // Если нет импортируемых объектов
       if (!file?.default) return null;
 
       return file.default;

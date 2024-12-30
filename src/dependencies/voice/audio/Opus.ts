@@ -324,7 +324,7 @@ class OpusEncoder extends Transform {
      * @readonly
      * @private
      */
-    private readonly _temp = {
+    private readonly db = {
         remaining: null as Buffer,
         buffer: null    as Buffer,
         bitstream: null as number,
@@ -349,8 +349,8 @@ class OpusEncoder extends Transform {
      * @private
      */
     private get argument() {
-        if (this.encoder) return this._temp.buffer.length >= bit * (this._temp.index + 1);
-        return this._temp.argument;
+        if (this.encoder) return this.db.buffer.length >= bit * (this.db.index + 1);
+        return this.db.argument;
     };
 
     /**
@@ -366,7 +366,7 @@ class OpusEncoder extends Transform {
         if (loaded_lib?.name) {
             //Подключаем opus library
             this.encoder = new loaded_lib.encoder(...loaded_lib.args);
-            this._temp.buffer = Buffer.alloc(0);
+            this.db.buffer = Buffer.alloc(0);
         }
     };
 
@@ -427,16 +427,16 @@ class OpusEncoder extends Transform {
             const header = segment.subarray(0, 8);
 
             // Если уже есть буфер данных
-            if (this._temp.buffer) {
+            if (this.db.buffer) {
                 if (header.equals(OGG.OPUS_TAGS)) this.emit("tags", segment);
-                else if (this._temp.bitstream === bitstream) this.push(segment);
+                else if (this.db.bitstream === bitstream) this.push(segment);
             }
 
             // Если заголовок подходит под тип ogg/opus head
             else if (header.equals(OGG.OPUS_HEAD)) {
                 this.emit("head", segment);
-                this._temp.buffer = segment;
-                this._temp.bitstream = bitstream;
+                this.db.buffer = segment;
+                this.db.bitstream = bitstream;
             }
 
             // Если ничего из выше перечисленного не подходит
@@ -453,18 +453,18 @@ class OpusEncoder extends Transform {
      * @public
      */
     public _transform = (chunk: Buffer, _: any, done: () => any) => {
-        let index = this._temp.index, packet = () => chunk;
+        let index = this.db.index, packet = () => chunk;
 
         // Если есть подключенная библиотека расшифровки opus, то используем ее
         if (this.encoder) {
-            this._temp.buffer = Buffer.concat([this._temp.buffer, chunk]);
-            packet = () => this._temp.buffer.subarray(index * bit, (index + 1) * bit);
-        } else setImmediate(() => this._temp.remaining = chunk);
+            this.db.buffer = Buffer.concat([this.db.buffer, chunk]);
+            packet = () => this.db.buffer.subarray(index * bit, (index + 1) * bit);
+        } else setImmediate(() => this.db.remaining = chunk);
 
         // Если есть прошлый фрагмент расшифровки
-        if (this._temp.remaining) {
-            chunk = Buffer.concat([this._temp.remaining, chunk]);
-            this._temp.remaining = null;
+        if (this.db.remaining) {
+            chunk = Buffer.concat([this.db.remaining, chunk]);
+            this.db.remaining = null;
         }
 
         // Начинаем чтение пакетов
@@ -481,7 +481,7 @@ class OpusEncoder extends Transform {
         }
 
         // Если номер пакета больше 1, то добавляем прошлый пакет в базу
-        if (index > 0) this._temp.buffer = this._temp.buffer.subarray(index * bit);
+        if (index > 0) this.db.buffer = this.db.buffer.subarray(index * bit);
 
         return done();
     };
@@ -501,7 +501,7 @@ class OpusEncoder extends Transform {
      */
     public _destroy = () => {
         if (typeof this.encoder?.delete === "function") this.encoder!.delete!();
-        for (let key of Object.keys(this._temp)) this._temp[key] = null;
+        for (let key of Object.keys(this.db)) this.db[key] = null;
 
         //@ts-expect-error
         this["encoder"] = null;
