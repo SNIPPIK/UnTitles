@@ -29,7 +29,6 @@ const support_libs: Methods.supported = {
             return cipherText;
         }
     }),
-
     "libsodium-wrappers": (lib) => ({
         close: lib.crypto_secretbox_easy,
         random: lib.randombytes_buf,

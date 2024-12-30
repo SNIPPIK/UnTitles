@@ -142,7 +142,7 @@ export class Interact {
    * @param time - Через сколько удалить сообщение
    */
   public set delete(time: number) {
-    //Удаляем сообщение через time время
+    // Удаляем сообщение через time время
     setTimeout(() => {
       try {
         if (this.replied && "deleteReply" in this._temp) (this._temp as any).deleteReply().catch(() => null);

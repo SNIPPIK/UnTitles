@@ -58,13 +58,12 @@ else {
                 }],
                 color: Colors.DarkRed,
             }],
-        }
+        };
 
         // Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
         if (err.message?.match(/Critical/)) {
             Logger.log("ERROR", `[CODE: <14>] Hooked critical error!`);
             process.exit(14);
-            //return;
         }
 
         // Если вдруг запущено несколько ботов

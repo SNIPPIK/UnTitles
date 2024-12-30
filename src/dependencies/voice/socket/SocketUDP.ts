@@ -15,7 +15,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @readonly
      * @private
      */
-    private readonly socket: Socket = createSocket("udp4");
+    private readonly socket: Socket = createSocket({ type: "udp4" });
 
     /**
      * @description Данные сервера к которому надо подключится
@@ -109,7 +109,11 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public destroy = () => {
-        if (this.socket) this.socket?.close();
+        try {
+            if (this.socket) this.socket?.close();
+        } catch (err) {
+            if (`${err}`.match("Not running")) return;
+        }
     };
 }
 

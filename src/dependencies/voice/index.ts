@@ -14,7 +14,12 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @readonly
      * @private
      */
-    private readonly _config: VoiceConfig;
+    private readonly _config: VoiceConfig = {
+        channelId: "0",
+        guildId: "0",
+        selfMute: false,
+        selfDeaf: true
+    };
 
     /**
      * @description Текущее состояние голосового подключения
@@ -107,7 +112,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      */
     public constructor(config: VoiceConfig, options: CreateVoiceConnectionOptions) {
         super();
-        this._config = config;
         this._state = {
             status: VoiceConnectionStatus.Signalling,
 
@@ -118,6 +122,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                 destroy: this.destroy
             })
         };
+
+        Object.assign(this._config, config);
     };
 
     /**

@@ -21,21 +21,19 @@ export class CacheUtility {
         /**
          * @description Кешированные треки
          */
-        tracks: new Map<string, Track>()
-    };
+        tracks: new Map<string, Track>(),
 
-    /**
-     * @description Класс кеширования аудио файлов
-     * @readonly
-     * @private
-     */
-    private readonly _audio: CacheAudio = new CacheAudio();
+        /**
+         * @description Класс кеширования аудио файлов
+         */
+        audio: new CacheAudio()
+    };
 
     /**
      * @description Выдаем класс для кеширования аудио
      * @public
      */
-    public get audio() { return this._audio; };
+    public get audio() { return this.data.audio; };
 
     /**
      * @description Сохраняем данные в класс
@@ -54,9 +52,7 @@ export class CacheUtility {
      * @description Выдаем данные из класса
      * @param ID
      */
-    public get = (ID: string) => {
-        return this.data.tracks.get(ID);
-    };
+    public get = (ID: string) => { return this.data.tracks.get(ID); };
 }
 
 /**

@@ -187,7 +187,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
 
                                 if (queue.tracks.size > 5) return {
                                     name: locale._(queue.message.locale, "player.next.playing.alt", [queue.tracks.size]),
-                                    value: tracks.join("\n")
+                                    value: tracks.join("\n") + "\n\n"
                                 };
                                 return {name: locale._(queue.message.locale, "player.next.playing"), value: tracks.join("\n")};
                             })() : null,

@@ -54,19 +54,19 @@ export class SlashBuilder {
      * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
      * @public
      */
-    private integration_types: number[] = [0];
+    private readonly integration_types: number[] = [0];
 
     /**
      * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
      * @private
      */
-    private contexts: number[] = [0];
+    private readonly contexts: number[] = [0];
 
     /**
      * @description Доп параметры для работы slashCommand
      * @private
      */
-    private options: ApplicationCommandOption[] = [];
+    private readonly options: ApplicationCommandOption[] = [];
 
     /**
      * @description Выдаем json данные для отправки на discord api
@@ -149,24 +149,24 @@ export class SlashBuilder {
         for (let obj of subcommands) {
 
             // Если надо подменить данные для работы с discord
-            const component = {
-                ...obj,
-                name: obj.names[Object.keys(obj.names)[0]],
-                nameLocalizations: obj.names,
-                description: obj.descriptions[Object.keys(obj.descriptions)[0]],
-                descriptionLocalizations: obj.descriptions,
-                options: obj.options ? obj.options.map((option) => {
-                    return {
-                        ...option,
-                        name: option.names[Object.keys(option.names)[0]],
-                        nameLocalizations: option.names,
-                        description: option.descriptions[Object.keys(option.descriptions)[0]],
-                        descriptionLocalizations: option.descriptions,
-                    };
-                }) : []
-            };
-
-            this.options.push(component as any);
+            this.options.push(
+                {
+                    ...obj,
+                    name: obj.names[Object.keys(obj.names)[0]],
+                    nameLocalizations: obj.names,
+                    description: obj.descriptions[Object.keys(obj.descriptions)[0]],
+                    descriptionLocalizations: obj.descriptions,
+                    options: obj.options ? obj.options.map((option) => {
+                        return {
+                            ...option,
+                            name: option.names[Object.keys(option.names)[0]],
+                            nameLocalizations: option.names,
+                            description: option.descriptions[Object.keys(option.descriptions)[0]],
+                            descriptionLocalizations: option.descriptions,
+                        };
+                    }) : []
+                } as any
+            );
         }
 
         return this;
