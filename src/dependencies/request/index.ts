@@ -7,44 +7,6 @@ import {TypedEmitter} from "tiny-typed-emitter";
 
 /**
  * @author SNIPPIK
- * @description Список ивент функций для ClientRequest
- * @private
- */
-const requests: { name: string, callback: (req: ClientRequest, url?: string) => any }[] = [
-    /**
-     * @description Ивент если превышено время ожидания подключения
-     * @public
-     */
-    {
-        name: "timeout",
-        callback: (_, url) => {
-            return new Error(`[APIs]: Connection Timeout Exceeded ${url}:443`);
-        }
-    },
-    /**
-     * @description Ивент если подключение было сорвано
-     * @public
-     */
-    {
-        name: "close",
-        callback: (request) => {
-            request.destroy();
-        }
-    },
-    /**
-     * @description Ивент если что-то пошло не так или была получена ошибка
-     * @public
-     */
-    {
-        name: "error",
-        callback: () => {
-            return;
-        }
-    }
-];
-
-/**
- * @author SNIPPIK
  * @description Класс создающий запрос
  * @class Request
  * @public
@@ -85,8 +47,21 @@ abstract class Request {
             // Если запрос POST, отправляем ответ на сервер
             if (this.data.method === "POST" && this.data.body) request.write(this.data.body);
 
-            // Подключаем ивенты для отслеживания состояния
-            for (const {name, callback} of requests) request.once(name, () => callback(request, this.data.hostname));
+            /**
+             * @description Ивент если превышено время ожидания подключения
+             * @public
+             */
+            request.once("timeout", () => {
+                throw new Error(`[APIs]: Connection Timeout Exceeded ${this.data.hostname}:443`);
+            });
+
+            /**
+             * @description Ивент если подключение было сорвано
+             * @public
+             */
+            request.once("close", () => {
+                request.destroy();
+            });
 
             request.end();
         });
