@@ -47,7 +47,7 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
                     }
                 ]),
             rules: ["voice", "another_voice"],
-            execute: async ({message, type}) => {
+            execute: ({message, type}) => {
                 const VoiceChannel: VoiceChannel | StageChannel = message.voice.channel;
                 const queue = message.queue;
                 const { guild } = message;

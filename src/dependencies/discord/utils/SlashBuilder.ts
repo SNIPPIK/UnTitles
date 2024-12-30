@@ -97,7 +97,7 @@ export class SlashBuilder {
      * @public
      */
     public setIntegration_types = (types: number[]) => {
-        this.integration_types = types;
+        Object.assign(this.integration_types, types);
         return this;
     };
 
@@ -107,7 +107,7 @@ export class SlashBuilder {
      * @public
      */
     public setContexts = (types: number[]) => {
-        this.contexts = types;
+        Object.assign(this.contexts, types);
         return this;
     };
 

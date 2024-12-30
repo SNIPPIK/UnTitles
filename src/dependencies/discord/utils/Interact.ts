@@ -54,7 +54,7 @@ export class Interact {
   public get locale(): keyof LocalizationMap {
     if ("locale" in this._temp) return this._temp.locale;
     else if ("guildLocale" in this._temp) return this._temp.guildLocale as any;
-    return "ru";
+    return "en-US";
   };
 
   /**

@@ -1,6 +1,6 @@
 import type {LocalizationMap} from "discord-api-types/v10";
+import {AudioResource} from "@lib/voice/audio/Opus";
 import {TypedEmitter} from "tiny-typed-emitter";
-import {AudioResource} from "@lib/voice/audio";
 import {VoiceConnection} from "@lib/voice";
 import {Track} from "@lib/player/track";
 import {Logger} from "@lib/logger";
@@ -353,7 +353,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Подключаем класс для отображения прогресс бара
      * @private
      */
-    private readonly _progress = new PlayerProgress(12);
+    private readonly _progress: PlayerProgress = new PlayerProgress(12);
 
     /**
      * @description Хранилище треков

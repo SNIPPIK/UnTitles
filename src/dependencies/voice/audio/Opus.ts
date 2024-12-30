@@ -1,5 +1,8 @@
+import {ChildProcessWithoutNullStreams, spawn, spawnSync} from "node:child_process";
 import {Transform, TransformOptions} from "node:stream";
 import {Buffer} from "node:buffer";
+import path from "node:path";
+import {env} from "@env";
 
 /**
  * @author SNIPPIK
@@ -21,31 +24,285 @@ const loaded_lib: Methods.current = {};
 
 /**
  * @author SNIPPIK
- * @description Превращаем имя переменной в буфер
- * @param name - Имя переменной
- * @private
+ * @description Типы для правильной работы typescript
  */
-const bufferCode = (name: string) => {
-    return Buffer.from([...`${name}`].map((x: string) => x.charCodeAt(0)));
-};
+namespace Methods {
+    /**
+     * @author SNIPPIK
+     * @description Поддерживаемый запрос к библиотеке
+     * @type supported
+     */
+    export type supported = {
+        [name: string]: (lib: any) => current
+    }
+
+    /**
+     * @author SNIPPIK
+     * @description Выдаваемы методы для работы opus encoder
+     */
+    export interface current {
+        //Имя библиотеки
+        name?: string;
+
+        //Аргументы для запуска
+        args?: any[];
+
+        //Класс для расшифровки
+        encoder?: any;
+    }
+}
+
 
 /**
  * @author SNIPPIK
- * @description Доступный формат для отправки opus пакетов
- * @private
+ * @description Конвертирует аудио в нужный формат
+ * @class AudioResource
+ * @public
  */
-const bit = 960 * 2 * 2;
+export class AudioResource {
+    /**
+     * @description Временное хранилище для потоков
+     * @readonly
+     * @private
+     */
+    private readonly _streams: (Process | OpusEncoder)[] = [
+        new OpusEncoder({
+            highWaterMark: 5 * 1000 * 1000,
+            readableObjectMode: true
+        })
+    ];
+
+    /**
+     * @description Данные для запуска процесса буферизации
+     * @readonly
+     * @private
+     */
+    private readonly chunks = {
+        // Кол-во пакетов
+        length:    0,
+
+        // Размер пакета
+        size:     20
+    };
+
+    /**
+     * @description Можно ли читать поток
+     * @private
+     */
+    private _readable = false;
+
+    /**
+     * @description Можно ли читать поток
+     * @default true - Всегда можно читать поток, если поток еще не был загружен то отправляем пустышки
+     * @return boolean
+     * @public
+     */
+    public get readable() { return this._readable; };
+
+    /**
+     * @description Выдаем фрагмент потока или пустышку
+     * @return Buffer
+     * @public
+     */
+    public get packet(): Buffer {
+        const packet = this.stream.read();
+
+        // Если есть аудио пакеты
+        if (packet) this.chunks.length++;
+
+        // Отправляем пакет
+        return packet;
+    };
+
+    /**
+     * @description Получаем время, время зависит от прослушанных пакетов
+     * @public
+     */
+    public get duration() {
+        const duration = ((this.chunks.length * this.chunks.size) / 1e3).toFixed(0);
+        return parseInt(duration);
+    };
+
+    /**
+     * @description Получаем OpusEncoder
+     * @return OpusEncoder
+     * @public
+     */
+    public get stream() { return this._streams.at(0) as OpusEncoder; };
+
+    /**
+     * @description Получаем Process
+     * @return Process
+     * @public
+     */
+    public get process() { return this._streams.at(1) as Process; };
+
+    /**
+     * @description Подключаем поток к ffmpeg
+     * @param options - Параметры для запуска
+     * @private
+     */
+    private set input(options: {input: NodeJS.ReadWriteStream | Process, event?: string, events: string[]}) {
+        // Подключаем ивенты к потоку
+        for (const event of options.events) {
+            if (options.event) options.input[options.event].once(event, this.destroy);
+            else options.input["once"](event, this.destroy);
+        }
+
+        // Добавляем процесс в класс для отслеживания
+        if (options.input instanceof Process) this._streams.push(options.input);
+        else {
+            options.input.once("readable", () => { this._readable = true; });
+            this.process.stdout.pipe(options.input);
+        }
+    };
+
+    /**
+     * @description Создаем класс и задаем параметры
+     * @param options - Настройки кодировщика
+     * @public
+     */
+    public constructor(options: {path: string, seek?: number; filters: string; chunk?: number}) {
+        if (options.chunk > 0) this.chunks.size = 20 * options.chunk;
+        if (options.seek > 0) this.chunks.length = (options.seek * 1e3) / this.chunks.size;
+
+        // Процесс
+        this.input = {
+            events: ["error"],
+            event: "stdout",
+            input: new Process([ "-vn",  "-loglevel", "panic",
+                // Если это ссылка, то просим ffmpeg переподключиться при сбросе соединения
+                ...(options.path.startsWith("http") ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
+                "-ss", `${options.seek ?? 0}`, "-i", options.path,
+
+                // Подключаем фильтры
+                ...(options.filters ? ["-af", options.filters] : []),
+
+                // Указываем формат аудио
+                "-f", `${OpusEncoder.lib.ffmpeg}`,
+                "pipe:1"
+            ])
+        };
+
+        // Расшифровщик
+        this.input = {
+            input: this.stream,
+            events: ["end", "close", "error", "drain"]
+        };
+    };
+
+    /**
+     * @description Удаляем ненужные данные
+     * @public
+     */
+    public destroy = () => {
+        // Удаляем поток после всех действий, даже если он будет включен заново он все равно будет удален
+        setImmediate(() => {
+            for (const stream of this._streams) {
+                if (stream instanceof Process) stream.destroy();
+                else {
+                    stream.emit("close");
+                    stream?.destroy();
+                    stream?.end();
+                }
+            }
+
+            this._streams.splice(0, this._streams.length);
+        });
+
+        Object.keys(this.chunks).forEach(key => this.chunks[key] = null);
+        this._readable = null;
+    };
+}
+
 
 /**
  * @author SNIPPIK
- * @description Заголовки для поиска в chuck
+ * @description Делаем проверку на наличие FFmpeg/avconv
+ */
+(() => {
+    const cache = env.get("cache.dir");
+    const names = [`${cache}/FFmpeg/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
+
+    // Проверяем имена, если есть FFmpeg/avconv
+    for (const name of [...names, "ffmpeg", "avconv"]) {
+        try {
+            const result = spawnSync(name, ['-h'], {windowsHide: true});
+            if (result.error) continue;
+            return env.set("ffmpeg.path", name);
+        } catch {}
+    }
+
+    // Выдаем ошибку если нет FFmpeg/avconv
+    throw Error("[Critical]: FFmpeg/avconv not found!");
+})();
+
+/**
+ * @author SNIPPIK
+ * @description Для уничтожения использовать <class>.emit("close")
+ * @class Process
  * @private
  */
-const OGG = {
-    "OGGs_HEAD": bufferCode("OggS"),
-    "OPUS_HEAD": bufferCode("OpusHead"),
-    "OPUS_TAGS": bufferCode("OpusTags")
-};
+class Process {
+    /**
+     * @description Процесс запущенный через spawn
+     * @private
+     */
+    private _process: ChildProcessWithoutNullStreams = null;
+
+    /**
+     * @description Получаем ChildProcessWithoutNullStreams
+     * @return ChildProcessWithoutNullStreams
+     * @public
+     */
+    public get process() { return this._process; }
+
+    /**
+     * @description Зарезервирован для вывода данных, как правило (хотя и не обязательно)
+     * @return internal.Readable
+     * @public
+     */
+    public get stdout() { return this?.process?.stdout; };
+
+    /**
+     * @description Задаем параметры и запускаем процесс
+     * @param args {string[]} Аргументы для запуска
+     * @param name {string} Имя процесса
+     */
+    public constructor(args: string[], name: string = env.get("ffmpeg.path")) {
+        this._process = spawn(name, args, {shell: false});
+        ["end", "close", "error", "disconnect", "exit"].forEach((event) => this.process.once(event, this.destroy));
+    };
+
+    /**
+     * @description Удаляем и отключаемся от процесса
+     * @private
+     */
+    public destroy = () => {
+        if (this._process && !this.process?.killed) this.process?.kill();
+        this._process = null;
+    };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Проверяем на наличие библиотек, если будет найдена библиотека то она будет использоваться
+ * @async
+ */
+(async () => {
+    const names = Object.keys(support_libs);
+
+    for (const name of names) {
+        try {
+            const library = require(name);
+            if (library?.ready) await library.ready;
+            Object.assign(loaded_lib, support_libs[name](library));
+            delete require.cache[require.resolve(name)];
+            return;
+        } catch {}
+    }
+})();
 
 /**
  * @author SNIPPIK
@@ -54,7 +311,7 @@ const OGG = {
  * @extends Transform
  * @public
  */
-export class OpusEncoder extends Transform {
+class OpusEncoder extends Transform {
     /**
      * @description Расшифровщик если он найдет
      * @readonly
@@ -195,7 +452,7 @@ export class OpusEncoder extends Transform {
      * @description При получении данных через pipe или write, модифицируем их для одобрения со стороны discord
      * @public
      */
-   public _transform = (chunk: Buffer, _: any, done: () => any) => {
+    public _transform = (chunk: Buffer, _: any, done: () => any) => {
         let index = this._temp.index, packet = () => chunk;
 
         // Если есть подключенная библиотека расшифровки opus, то используем ее
@@ -253,51 +510,28 @@ export class OpusEncoder extends Transform {
 
 /**
  * @author SNIPPIK
- * @description Типы для правильной работы typescript
+ * @description Превращаем имя переменной в буфер
+ * @param name - Имя переменной
+ * @private
  */
-namespace Methods {
-    /**
-     * @author SNIPPIK
-     * @description Поддерживаемый запрос к библиотеке
-     * @type supported
-     */
-    export type supported = {
-        [name: string]: (lib: any) => current
-    }
-
-    /**
-     * @author SNIPPIK
-     * @description Выдаваемы методы для работы opus encoder
-     */
-    export interface current {
-        //Имя библиотеки
-        name?: string;
-
-        //Аргументы для запуска
-        args?: any[];
-
-        //Класс для расшифровки
-        encoder?: any;
-    }
-}
-
-
+const bufferCode = (name: string) => {
+    return Buffer.from([...`${name}`].map((x: string) => x.charCodeAt(0)));
+};
 
 /**
  * @author SNIPPIK
- * @description Проверяем на наличие библиотек, если будет найдена библиотека то она будет использоваться
- * @async
+ * @description Доступный формат для отправки opus пакетов
+ * @private
  */
-(async () => {
-    const names = Object.keys(support_libs);
+const bit = 960 * 2 * 2;
 
-    for (const name of names) {
-        try {
-            const library = require(name);
-            if (library?.ready) await library.ready;
-            Object.assign(loaded_lib, support_libs[name](library));
-            delete require.cache[require.resolve(name)];
-            return;
-        } catch {}
-    }
-})();
+/**
+ * @author SNIPPIK
+ * @description Заголовки для поиска в chuck
+ * @private
+ */
+const OGG = {
+    "OGGs_HEAD": bufferCode("OggS"),
+    "OPUS_HEAD": bufferCode("OpusHead"),
+    "OPUS_TAGS": bufferCode("OpusTags")
+};

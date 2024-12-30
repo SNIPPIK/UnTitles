@@ -62,11 +62,8 @@ abstract class Request {
      * @description Получаем протокол ссылки
      * @private
      */
-    private get protocol() {
-        const protocol = this.data.protocol;
-
-        if (protocol.startsWith("https")) return httpsRequest;
-        return httpRequest;
+    private get protocol(): { (options: (RequestOptions | string | URL), callback?: (res: IncomingMessage) => void): ClientRequest } {
+        return this.data.protocol.startsWith("https") ? httpsRequest : httpRequest;
     };
 
     /**
