@@ -1,4 +1,4 @@
-import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
+import {SlashBuilder, SlashComponent} from "@lib/discord/utils/SlashBuilder";
 import {CollectionAudioEvents} from "@lib/db/modules/Audio";
 import {Interact} from "@lib/discord/utils/Interact";
 import {AudioPlayerEvents} from "@lib/player";
@@ -171,7 +171,23 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    readonly execute: (options: { message: Interact; args?: string[]; type: string}) => void;
+    readonly execute: (options: {
+      /**
+       * @description Сообщение пользователя для работы с discord
+       */
+      message: Interact;
+
+      /**
+       * @description Тип команды, необходимо для работы много ступенчатых команд
+       * @warning Необходимо правильно понимать логику загрузки команд для работы с этим параметром
+       */
+      type: Command["builder"]["options"][number]["name"];
+
+      /**
+       * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
+       */
+      args?: SlashComponent["choices"][number]["value"][];
+    }) => void;
   }
 
   /**

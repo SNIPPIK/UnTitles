@@ -397,11 +397,31 @@
   },
 
 
+  "command.api.block": {
+    "en-US": "{ARGUMENT} | Platform is blocked!",
+    "ru": "{ARGUMENT} | Платформа заблокирована!"
+  },
+
+  "command.api.block.retry": {
+    "en-US": "{ARGUMENT} | The platform is already blocked!",
+    "ru": "{ARGUMENT} | Платформа уже заблокирована!"
+  },
+
+  "command.api.unblock": {
+    "en-US": "{ARGUMENT} | The platform is unlocked!",
+    "ru": "{ARGUMENT} | Платформа разблокирована!"
+  },
+
+  "command.api.unblock.retry": {
+    "en-US": "{ARGUMENT} | The platform is not blocked!",
+    "ru": "{ARGUMENT} | Платформа не заблокирована!"
+  },
+
+
   "command.remove.track": {
     "ru": "Был удален из очереди трек\n\n**❯** **{ARGUMENT}**",
     "en-US": "A track has been removed from the queue\n\n**❯** **{ARGUMENT}**"
   },
-
 
 
   "command.filter.push.two": {

@@ -4,6 +4,8 @@ import {AudioFilter} from "@lib/player";
 import {Handler} from "@lib/handler";
 import {Client} from "@lib/discord";
 import {Logger} from "@lib/logger";
+import {locale} from "@lib/locale";
+import {env} from "@env";
 
 /**
  * @author SNIPPIK
@@ -67,8 +69,6 @@ export class dbl_commands<T extends Handler.Command<"get">> extends Array<T> {
 
         // Перебираем фильтр
         for (const filter of filters as AudioFilter[]) {
-            const default_locale = Object.keys(filter.locale)[0];
-
             // Проверяем кол-во символов на допустимость discord (100 шт.)
             for (const [key, value] of Object.entries(filter.locale)) {
                 if (value.startsWith("[")) continue;
@@ -82,7 +82,7 @@ export class dbl_commands<T extends Handler.Command<"get">> extends Array<T> {
 
             // Создаем список для показа фильтров в командах
             temples.push({
-                name: filter.locale[default_locale],
+                name: filter.locale[locale.language],
                 nameLocalizations: filter.locale,
                 value: filter.name
             });
@@ -98,11 +98,17 @@ export class dbl_commands<T extends Handler.Command<"get">> extends Array<T> {
      * @public
      */
     public register = (client: Client): Promise<boolean> => {
-        return new Promise<true>((resolve) => {
+        const guildID = env.get("owner.server"), guild = client.guilds.cache.get(guildID);
 
+        return new Promise<true>((resolve) => {
             // Загрузка глобальных команд
             client.application.commands.set(this.map((command) => command.builder) as any)
                 .then(() => Logger.log("DEBUG", `[Shard ${client.ID}] [SlashCommands | ${this.public.length}] has load public commands`))
+                .catch(console.error);
+
+            // Загрузка приватных команд
+            if (guild) guild.commands.set(this.owner.map((command) => command.builder) as any)
+                .then(() => Logger.log("DEBUG", `[Shard ${client.ID}] [SlashCommands | ${this.owner.length}] has load private commands`))
                 .catch(console.error);
 
             return resolve(true);
