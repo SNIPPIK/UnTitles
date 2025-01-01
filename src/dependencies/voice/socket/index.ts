@@ -37,12 +37,14 @@ const socketStatus = [
         callback: (socket: VoiceSocket, packet: {d: any, op: VoiceOpcodes}) => {
             if (socket.state.code === VoiceSocketStatusCode.identify) {
                 const {ip, port, ssrc, modes} = packet.d;
-
                 const udp = new VoiceUDPSocket({ip, port});
-                udp.on("error", socket["GettingError"]);
-                udp.once("close", socket["UDPClose"]);
+
+                // Получаем ip и порт сервера голосового подключения
                 udp.discovery(ssrc).then((localConfig) => {
                     if (socket.state.code !== VoiceSocketStatusCode.upUDP) return;
+
+                    // Отправляем пакет, о подключении к сокету
+                    socket.state = {...socket.state, code: VoiceSocketStatusCode.protocol};
                     socket.state.ws.packet = {
                         op: VoiceOpcodes.SelectProtocol,
                         d: {
@@ -54,8 +56,16 @@ const socketStatus = [
                             },
                         }
                     };
-                    socket.state = {...socket.state, code: VoiceSocketStatusCode.protocol};
-                }).catch((error: Error) => socket.emit("error", error));
+                }).catch((error: Error) => {
+                    // Если произошла ошибка при работе с сокетом
+                    if (`${error}`.match("Timeout")) return;
+
+                    // Если получена не отслеживаемая ошибка
+                    socket.emit("error", error);
+                });
+
+                udp.on("error", socket["GettingError"]);
+                udp.once("close", socket["UDPClose"]);
 
                 socket.state = {...socket.state, udp, code: VoiceSocketStatusCode.upUDP, connectionData: {ssrc} as any};
             }

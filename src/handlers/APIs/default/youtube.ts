@@ -1,6 +1,7 @@
 import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/track";
+import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 import {env} from "@env";
 
@@ -47,7 +48,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track.playlist>(async (resolve, reject) => {
                             // Если ID плейлиста не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не удалось получить ID плейлиста!"));
+                            if (!ID) return reject(locale.err("api.request.id.playlist"));
 
                             try {
                                 // Создаем запрос
@@ -88,7 +89,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track>(async (resolve, reject) => {
                             // Если ID видео не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не удалось получить ID трека!"));
+                            if (!ID) return reject(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
                             const cache = db.cache.get(ID);
@@ -111,10 +112,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
                                 db.cache.set(track);
 
                                 return resolve(track);
-                            } catch (e) {
-                                console.log(e)
-                                return reject(Error(`[APIs]: ${e}`))
-                            }
+                            } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
                         });
                     }
                 },
@@ -177,7 +175,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                                 let vanilla_videos = details["contents"]?.["twoColumnSearchResultsRenderer"]?.["primaryContents"]?.["sectionListRenderer"]?.["contents"][0]?.["itemSectionRenderer"]?.["contents"];
 
-                                if (vanilla_videos?.length === 0 || !vanilla_videos) return reject(Error(`[APIs]: Не удалось найти: ${url}`));
+                                if (vanilla_videos?.length === 0 || !vanilla_videos) return reject(Error(locale._("en-US", "api.request.fail")));
 
                                 let filtered_ = vanilla_videos?.filter((video: any) => video && video?.["videoRenderer"] && video?.["videoRenderer"]?.["videoId"])?.splice(0, limit);
                                 let videos: Track[] = filtered_.map(({ videoRenderer }: any) => sAPI.track(videoRenderer));
@@ -246,21 +244,21 @@ class sAPI extends Constructor.Assign<Handler.API> {
                     headers: { 'Content-Type': 'application/json' }
                 }).toJson.then((api) => {
                     // Если возникает ошибка при получении страницы
-                    if (api instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
+                    if (api instanceof Error) return resolve(locale.err( "api.request.fail"));
 
                     // Если есть статус, то проверяем
                     if (api["playabilityStatus"]?.status) {
                         // Если без аккаунта не получается получить данные
-                        if (api["playabilityStatus"]?.status === "LOGIN_REQUIRED") return resolve(Error(`[APIs]: Данное видео невозможно включить из-за проблем с авторизацией!`));
+                        if (api["playabilityStatus"]?.status === "LOGIN_REQUIRED") return resolve(locale.err("api.request.login"));
 
                         // Если произошла ошибка при получении данных
                         else if (api["playabilityStatus"]?.status === "ERROR") {
                             this.AIzaKey = null;
-                            return resolve(Error(`[APIs]: Не удалось получить данные! Reason: ${api["playabilityStatus"]?.reason}`));
+                            return resolve(locale.err("api.request.fail.msg", [api["playabilityStatus"]?.reason]));
                         }
 
                         // Если статус не является хорошим
-                        else if (api["playabilityStatus"]?.status !== "OK") return resolve(Error(`[APIs]: Не удалось получить данные! Status: ${api["playabilityStatus"]?.status}`));
+                        else if (api["playabilityStatus"]?.status !== "OK") return resolve(locale.err( "api.request.fail.msg", [api["playabilityStatus"]?.reason]));
                     }
 
                     return resolve(api);
@@ -277,7 +275,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
                 }
             }).toString.then((api) => {
                 // Если возникает ошибка при получении страницы
-                if (api instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
+                if (api instanceof Error) return resolve(locale.err( "api.request.fail"));
 
                 // Ищем данные на странице
                 const data = this.extractInitialDataResponse(api);
@@ -327,12 +325,12 @@ class sAPI extends Constructor.Assign<Handler.API> {
         const data = JSON.parse(input.substring(startIndex + startPattern.length, endIndex + 1));
 
         // Если при получении данных происходит что-то не так
-        if (!data) return Error("[APIs]: Not found video data!");
+        if (!data) return locale.err("api.request.fail");
 
         // Если есть статус, то проверяем
         if (data["playabilityStatus"]?.status) {
-            if (data["playabilityStatus"]?.status === "LOGIN_REQUIRED") return Error(`[APIs]: Sorry this video a 18+!`);
-            else if (data["playabilityStatus"]?.status !== "OK") return Error(`[APIs]: Fail getting data! Status: ${data["playabilityStatus"]?.status}`);
+            if (data["playabilityStatus"]?.status === "LOGIN_REQUIRED") return Error(locale._(locale.language, "api.request.login"));
+            else if (data["playabilityStatus"]?.status !== "OK") return Error(locale._(locale.language, "api.request.fail.msg", [data["playabilityStatus"]?.reason]));
         }
 
         // Выдаем данные

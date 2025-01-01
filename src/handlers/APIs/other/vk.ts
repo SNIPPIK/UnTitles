@@ -1,6 +1,7 @@
 import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/track";
+import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 import {env} from "@env";
 
@@ -57,7 +58,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track>(async (resolve, reject) => {
                             //Если ID трека не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
+                            if (!ID) return reject(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
                             const cache = db.cache.get(ID);
@@ -75,7 +76,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
                                 const track = sAPI.track(api.response.pop(), url);
 
                                 // Если нет ссылки на трек
-                                if (!track.link) return reject(Error("[APIs]: Невозможно получить файл аудио!"));
+                                if (!track.link) return reject(locale.err( "api.request.fail"));
 
                                 // Сохраняем кеш в системе
                                 db.cache.set(track);
@@ -126,8 +127,8 @@ class sAPI extends Constructor.Assign<Handler.API> {
             const url = `${this.authorization.api}/${method}.${type}` + `?access_token=${this.authorization.token}${options}&v=5.95`;
 
             new httpsClient(url).toJson.then((api: any) => {
-                if (!api || !api?.response) return resolve(Error("[APIs]: Невозможно найти данные!"));
-                else if (api?.["error_code"] || api?.error) return resolve(Error(`[APIs]: ${api?.["error_msg"]}`));
+                if (!api || !api?.response) return resolve(locale.err( "api.request.fail"));
+                else if (api?.["error_code"] || api?.error) return resolve(locale.err( "api.request.fail.msg", [api?.["error_msg"]]));
 
                 return resolve(api);
             }).catch((err) => resolve(Error(`[APIs]: ${err}`)));

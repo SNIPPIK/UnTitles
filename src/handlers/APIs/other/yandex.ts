@@ -4,6 +4,7 @@ import {Track} from "@lib/player/track";
 import crypto from "node:crypto";
 import {db} from "@lib/db";
 import {env} from "@env";
+import {locale} from "@lib/locale";
 
 /**
  * @author SNIPPIK
@@ -58,7 +59,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track>(async (resolve, reject) => {
                             // Если ID трека не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
+                            if (!ID) return reject(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
                             const cache = db.cache.get(ID);
@@ -72,7 +73,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                                 // Обрабатываем ошибки
                                 if (api instanceof Error) return reject(api);
-                                else if (!api[0]) return reject(Error("[APIs]: Не удалось получить данные о треке!"));
+                                else if (!api[0]) return reject(locale.err( "api.request.fail"));
 
                                 const track = sAPI.track(api[0]);
                                 const link = await sAPI.getAudio(ID);
@@ -104,7 +105,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track.playlist>(async (resolve, reject) => {
                             // Если ID альбома не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не удалось получить ID альбома!"));
+                            if (!ID) return reject(locale.err( "api.request.id.album"));
 
                             try {
                                 // Создаем запрос
@@ -112,7 +113,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return reject(api);
-                                else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return reject(Error("[APIs]: Я не нахожу треков в этом альбоме!"));
+                                else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return reject(locale.err("api.request.fail"));
 
                                 const AlbumImage = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
                                 const tracks: Track.data[] = api["volumes"]?.pop().splice(0, limit);
@@ -137,8 +138,8 @@ class sAPI extends Constructor.Assign<Handler.API> {
                         const ID = /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/gi.exec(url);
 
                         return new Promise<Track.playlist>(async (resolve, reject) => {
-                            if (!ID[1]) return reject(Error("[APIs]: Не найден ID пользователя!"));
-                            else if (!ID[2]) return reject(Error("[APIs]: Не найден ID плейлиста!"));
+                            if (!ID[1]) return reject(locale.err("api.request.id.author"));
+                            else if (!ID[2]) return reject(locale.err("api.request.id.playlist"));
 
                             try {
                                 // Создаем запрос
@@ -146,7 +147,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return reject(api);
-                                else if (api?.tracks?.length === 0) return reject(Error("[APIs]: Я не нахожу треков в этом плейлисте!"));
+                                else if (api?.tracks?.length === 0) return reject(locale.err("api.request.fail.msg", ["Not found tracks in playlist"]));
 
                                 const image = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
                                 const tracks: any[] = api.tracks?.splice(0, limit);
@@ -176,7 +177,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track[]>(async (resolve, reject) => {
                             // Если ID автора не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не удалось получить ID автора!"));
+                            if (!ID) return reject(locale.err("api.request.id.author"));
 
                             try {
                                 // Создаем запрос
@@ -206,7 +207,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                                 // Обрабатываем ошибки
                                 if (api instanceof Error) return reject(api);
-                                else if (!api.tracks) return reject(Error(`[APIs]: На Yandex music нет такого трека!`));
+                                else if (!api.tracks) return reject(locale.err("api.request.fail"));
 
                                 const tracks = api.tracks["results"].splice(0, limit).map(sAPI.track);
                                 return resolve(tracks);
@@ -230,9 +231,9 @@ class sAPI extends Constructor.Assign<Handler.API> {
             new httpsClient(`${this.authorization.api}/${method}`, {
                 headers: { "Authorization": "OAuth " + this.authorization.token }, method: "GET"
             }).toJson.then((req) => {
-                if (!req || req instanceof Error) return resolve(Error("[APIs]: Не удалось получить данные!"));
-                else if (req?.error?.name === "session-expired") return resolve(Error("[APIs]: Токен не действителен!"));
-                else if (req?.error?.name === "not-allowed") return resolve(Error("[APIs]: Токен не был допущен! Необходимо обновить!"));
+                if (!req || req instanceof Error) return resolve(locale.err("api.request.fail"));
+                else if (req?.error?.name === "session-expired") return resolve(locale.err("api.request.login.session-expired"));
+                else if (req?.error?.name === "not-allowed") return resolve(locale.err("api.request.login.not-allowed"));
 
                 if (req?.result) return resolve(req?.result);
                 return resolve(req);
@@ -249,13 +250,13 @@ class sAPI extends Constructor.Assign<Handler.API> {
             try {
                 const api = await this.API(`tracks/${ID}/download-info`);
 
-                if (!api) return resolve(Error("[APIs]: Невозможно получить исходный файл!"));
+                if (!api) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]));
                 else if (api instanceof Error) return resolve(api);
-                else if (api.length === 0) return resolve(Error("[APIs]: Не удалось найти исходный файл музыки!"));
+                else if (api.length === 0) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api.size as 0"]));
 
                 const url = api.find((data: any) => data.codec !== "aac");
 
-                if (!url) return resolve(Error("[APIs]: Не удалось найти исходный файл музыки!"));
+                if (!url) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio url"]));
 
                 new httpsClient(url["downloadInfoUrl"]).toXML.then((xml) => {
                     if (xml instanceof Error) return resolve(xml);

@@ -23,6 +23,13 @@ type locale_text = keyof typeof locales;
  */
 export class locale {
     /**
+     * @description Язык по-умолчанию, использовать только тот которые есть для всех языков
+     */
+    public static get language(): languages {
+        return "en-US";
+    };
+
+    /**
      * @description Перевод на другие языки, перевод берется из базы
      * @param language - Тип locale для перевода
      * @param locale - Имя перевода
@@ -34,7 +41,7 @@ export class locale {
         // Если нет такой строки
         if (!translate) {
             // По умолчанию будет выведен английский язык
-            translate = locales[locale]["en-US"];
+            translate = locales[locale][this.language];
         }
 
         // Если есть аргументы
@@ -45,5 +52,14 @@ export class locale {
         }
 
         return translate;
+    };
+
+    /**
+     * @description Перевод ошибки на язык по-умолчанию
+     * @param locale - Имя перевода
+     * @param args - Аргументы будут подставлены автоматически вместо "{ARGUMENT}" в порядке очереди
+     */
+    public static err = (locale: locale_text, args?: any[]) => {
+        return Error(this._(this.language, locale, args));
     };
 }

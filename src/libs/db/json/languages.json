@@ -283,17 +283,17 @@
 
   "api.platform.block": {
     "ru": "Блокировка API: эта платформа в настоящее время заблокирована разработчиком",
-    "en-US": "APIs block: This platform has currently been blocked by the developer"
+    "en-US": "API block: This platform has currently been blocked by the developer"
   },
 
   "api.platform.auth": {
-    "ru": "API auth: Проблема с данными авторизации, обратитесь к разработчику",
-    "en-US": "APIs auth: Problem with authorization data, contact the developer"
+    "ru": "Авторизация API: Проблема с данными авторизации, обратитесь к разработчику",
+    "en-US": "API authorization: Problem with authorization data, contact the developer"
   },
 
   "api.platform.support": {
     "ru": "Ошибка API: у меня нет поддержки для этого типа запроса",
-    "en-US": "APIs error: I don't have support for this type of request"
+    "en-US": "API error: I don't have support for this type of request"
   },
 
   "api.platform.request": {
@@ -309,6 +309,52 @@
   "api.platform.error": {
     "ru": "**Критическая ошибка:** {ARGUMENT}",
     "en-US": "**Critical Error:** {ARGUMENT}"
+  },
+
+
+  "api.request.login": {
+    "ru": "[Авторизация API]: Данное контент невозможно включить из-за проблем с авторизацией!",
+    "en-US": "[API authorization]: This content cannot be included due to authorization problems!"
+  },
+
+  "api.request.login.session-expired": {
+    "ru": "[Авторизация API]: Токен не действителен!",
+    "en-US": "[API authorization]: The token is not valid!"
+  },
+
+  "api.request.login.not-allowed": {
+    "ru": "[Авторизация API]: Токен не был допущен! Необходимо обновить!",
+    "en-US": "[API authorization]: The token was not accepted! Need to update!"
+  },
+
+  "api.request.fail": {
+    "ru": "[Ошибка API]: Не удалось получить данные!",
+    "en-US": "[API error]: Fail getting data!"
+  },
+
+  "api.request.fail.msg": {
+    "ru": "[Ошибка API]: Не удалось получить данные! Причина: {ARGUMENT}",
+    "en-US": "[API error]: Fail getting data! Reason: {ARGUMENT}"
+  },
+
+  "api.request.id.track": {
+    "ru": "[Ошибка API]: Не удалось получить ID трека!",
+    "en-US": "[API error]: Failed to get track ID!"
+  },
+
+  "api.request.id.playlist": {
+    "ru": "[Ошибка API]: Не удалось получить ID плейлиста!",
+    "en-US": "[API error]: Failed to get playlist ID!"
+  },
+
+  "api.request.id.album": {
+    "ru": "[Ошибка API]: Не удалось получить ID альбома!",
+    "en-US": "[API error]: Failed to get album ID!"
+  },
+
+  "api.request.id.author": {
+    "ru": "[Ошибка API]: Не удалось получить ID автора!",
+    "en-US": "[API error]: Failed to get author ID!"
   },
 
 

@@ -1,6 +1,7 @@
 import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
 import {Track} from "@lib/player/track";
+import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 import {env} from "@env";
 
@@ -72,7 +73,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track>(async (resolve, reject) => {
                             //Если ID трека не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не найден ID трека!"));
+                            if (!ID) return reject(locale.err("api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
                             const cache = db.cache.get(ID);
@@ -108,7 +109,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track.playlist>(async (resolve, reject) => {
                             // Если ID альбома не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не найден ID альбома!"));
+                            if (!ID) return reject(locale.err( "api.request.id.album"));
 
                             try {
                                 // Создаем запрос
@@ -137,7 +138,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track.playlist>(async (resolve, reject) => {
                             // Если ID плейлиста не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не найден ID плейлиста!"));
+                            if (!ID) return reject(locale.err( "api.request.id.playlist"));
 
                             try {
                                 // Создаем запрос
@@ -167,7 +168,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                         return new Promise<Track[]>(async (resolve, reject) => {
                             // Если ID автора не удалось извлечь из ссылки
-                            if (!ID) return reject(Error("[APIs]: Не найден ID автора!"));
+                            if (!ID) return reject(locale.err( "api.request.id.author"));
 
                             try {
                                 // Создаем запрос
@@ -240,9 +241,9 @@ class sAPI extends Constructor.Assign<Handler.API> {
                         "accept-encoding": "gzip, deflate, br"
                     }
                 }).toJson.then((api) => {
-                    if (!api) return resolve(Error("[APIs]: Не удалось получить данные!"));
+                    if (!api) return resolve(locale.err("api.request.fail"));
                     else if (api instanceof Error) resolve(api);
-                    else if (api.error) return resolve(Error(`[APIs]: ${api.error.message}`));
+                    else if (api.error) return resolve(locale.err( "api.request.fail.msg", [api.error.message]));
 
                     return resolve(api);
                 }).catch((err) => resolve(Error(`[APIs]: ${err}`)));
