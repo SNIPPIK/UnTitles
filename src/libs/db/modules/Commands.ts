@@ -48,14 +48,14 @@ export class dbl_commands<T extends Handler.Command<"get">> extends Array<T> {
      * @return Command[]
      * @public
      */
-    public get owner() { return this.filter((command) => command.owner); };
+    public get owner() { return this.filter((command) => command.owner === true); };
 
     /**
      * @description Команды доступные для всех
      * @return Command[]
      * @public
      */
-    public get public() { return this.filter((command) => !command.owner); };
+    public get public() { return this.filter((command) => command.owner !== true); };
 
     /**
      * @description Создаем список фильтров для дискорд

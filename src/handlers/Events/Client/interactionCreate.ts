@@ -161,6 +161,12 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                         return;
                     }
 
+                    // Если пользователь пытается использовать команду разработчика
+                    else if (command?.owner && !db.owner.ids.includes(interact.author.id)) {
+                        interact.fastBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
+                        return;
+                    }
+
                     // Если права не соответствуют правде
                     else if (command.rules && command.rules?.length > 0) {
                         const rule = intends.find((item) => {

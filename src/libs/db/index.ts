@@ -208,6 +208,15 @@ class Database {
     };
 
     /**
+     * @description Для работы с командами для разработчика
+     * @public
+     */
+    public readonly owner = {
+        ids: env.get("owner.list").split(",") as string[],
+        guildID: env.get("owner.server") as string
+    };
+
+    /**
      * @description База для управления музыкой
      * @public
      */

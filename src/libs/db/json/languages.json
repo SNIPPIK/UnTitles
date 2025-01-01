@@ -45,13 +45,18 @@
   },
 
   "cooldown.message": {
-    "ru": "{ARGUMENT} ты слишком часто отправляешь сообщение, охлади свой пыл!\nОсталось: <t:{ARGUMENT}> ({ARGUMENT}) секунд",
-    "en-US": "{ARGUMENT} you send messages too often, cool your ardor!\nRemaining: <t:{ARGUMENT}> ({ARGUMENT}) seconds"
+    "ru": "{ARGUMENT} Ты слишком часто отправляешь сообщение, охлади свой пыл!\nОсталось: <t:{ARGUMENT}> ({ARGUMENT}) секунд",
+    "en-US": "{ARGUMENT} You send messages too often, cool your ardor!\nRemaining: <t:{ARGUMENT}> ({ARGUMENT}) seconds"
   },
 
   "whitelist.message": {
-    "ru": "{ARGUMENT} ты не внесен в белый лист, так-что неа!",
+    "ru": "{ARGUMENT} Ты не внесен в белый лист, так-что неа!",
     "en-US": "{ARGUMENT} You're not on the white list, so nope!"
+  },
+
+  "owner.message": {
+    "ru": "{ARGUMENT} Ты не являешься разработчиком, так-что неа!",
+    "en-US": "{ARGUMENT} You are not a developer, so nope!"
   },
 
 
