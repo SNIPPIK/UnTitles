@@ -46,6 +46,7 @@ const intends: { name: Handler.Command["rules"][number], callback: (message: Int
         }
     },
     {
+        //TODO: Здесь есть над чем поработать, так же тут есть баг
         name: "another_voice",
         callback: (message) => {
             const queue = message.queue;
@@ -74,6 +75,9 @@ const intends: { name: Handler.Command["rules"][number], callback: (message: Int
                             return true;
                         }
                     }
+
+                    // Если есть очередь, но нет голосовых подключений
+                    else queue.cleanup();
                 }
 
                 // Если нет очереди, но есть голосовое подключение
