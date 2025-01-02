@@ -6,7 +6,7 @@ import locales from "@lib/db/json/languages.json";
  * @description Все доступные языки для помощи
  * @type languages
  */
-type languages = keyof LocalizationMap;
+export type languages = `${keyof LocalizationMap}`;
 
 /**
  * @author SNIPPIK
@@ -23,7 +23,7 @@ type locale_text = keyof typeof locales;
  */
 export class locale {
     /**
-     * @description Язык по-умолчанию, использовать только тот которые есть для всех языков
+     * @description Язык по-умолчанию, использовать только тот, где перевод на 100%
      */
     public static get language(): languages {
         return "en-US";

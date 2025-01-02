@@ -1,7 +1,7 @@
 import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User} from "discord.js"
 import type { ComponentData, EmbedData, GuildMember} from "discord.js"
-import { BaseInteraction, Message, Attachment} from "discord.js";
-import type {LocalizationMap} from "discord-api-types/v10";
+import { BaseInteraction, Message, Attachment, MessageFlags} from "discord.js";
+import {locale, languages} from "@lib/locale";
 import {db} from "@lib/db";
 
 /**
@@ -51,10 +51,10 @@ export class Interact {
    * @description Получение языка пользователя
    * @public
    */
-  public get locale(): keyof LocalizationMap {
+  public get locale(): languages {
     if ("locale" in this._temp) return this._temp.locale;
     else if ("guildLocale" in this._temp) return this._temp.guildLocale as any;
-    return "en-US";
+    return locale.language;
   };
 
   /**
@@ -163,16 +163,16 @@ export class Interact {
    * @description Отправляем сообщение со соответствием параметров
    * @param options - Данные для отправки сообщения
    */
-  public send = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], ephemeral?: boolean}): Promise<Message> => {
+  public send = (options: {content?: string, embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], flags?: MessageFlags}): Promise<Message> => {
     try {
       if (this.replied) {
         this._replied = false;
-        return this._temp["reply"]({...options, fetchReply: true});
+        return this._temp["reply"]({...options, withResponse: true});
       }
 
-      return this._temp.channel["send"]({...options, fetchReply: true});
+      return this._temp.channel["send"]({...options, withResponse: true});
     } catch {
-      return this._temp.channel["send"]({...options, fetchReply: true});
+      return this._temp.channel["send"]({...options, withResponse: true});
     }
   };
 
@@ -180,7 +180,7 @@ export class Interact {
    * @description Редактируем сообщение
    * @param options - Данные для замены сообщения
    */
-  public edit = (options: {embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], ephemeral?: boolean}) => {
+  public edit = (options: {content?: string, embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], flags?: MessageFlags}) => {
     if ("edit" in this._temp) return this._temp.edit(options as any);
     return null;
   };
@@ -209,7 +209,7 @@ class MessageBuilder {
    * @description Скрывать ли сообщение от глаз других пользователей
    * @private
    */
-  private ephemeral: boolean = false;
+  private flags: MessageFlags = null;
 
   /**
    * @description Параметры для создания меню
@@ -244,7 +244,7 @@ class MessageBuilder {
    * @param interaction
    */
   public set send(interaction: Interact) {
-    interaction.send({embeds: this.embeds, components: this.components, ephemeral: this.ephemeral})
+    interaction.send({embeds: this.embeds, components: this.components, flags: this.flags})
         .then((message) => {
           // Если получить возврат не удалось, то ничего не делаем
           if (!message) return;
@@ -267,7 +267,7 @@ class MessageBuilder {
    * @param bool - Тип
    */
   public setHide = (bool: boolean) => {
-    this.ephemeral = bool;
+    if (bool) this.flags = MessageFlags.Ephemeral;
     return this;
   };
 

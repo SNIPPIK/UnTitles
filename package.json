@@ -10,14 +10,14 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "discord.js": "^14.16.3",
+    "discord.js": "^14.17.2",
     "dotenv": "^16.4.7",
     "sodium-native": "^4.3.1",
     "tiny-typed-emitter": "^2.1.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
+    "@types/node": "^22.10.4",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.2"
   },

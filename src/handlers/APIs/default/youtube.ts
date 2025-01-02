@@ -175,7 +175,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                                 let vanilla_videos = details["contents"]?.["twoColumnSearchResultsRenderer"]?.["primaryContents"]?.["sectionListRenderer"]?.["contents"][0]?.["itemSectionRenderer"]?.["contents"];
 
-                                if (vanilla_videos?.length === 0 || !vanilla_videos) return reject(Error(locale._("en-US", "api.request.fail")));
+                                if (vanilla_videos?.length === 0 || !vanilla_videos) return reject(locale.err("api.request.fail"));
 
                                 let filtered_ = vanilla_videos?.filter((video: any) => video && video?.["videoRenderer"] && video?.["videoRenderer"]?.["videoId"])?.splice(0, limit);
                                 let videos: Track[] = filtered_.map(({ videoRenderer }: any) => sAPI.track(videoRenderer));
