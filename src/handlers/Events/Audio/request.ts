@@ -48,7 +48,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
                         description: locale._(message.locale, "api.platform.request", [env.get("loading.emoji")]),
                         color: platform.color
                     }
-                ]).setTime(0).setHide(true).send = message;
+                ]).setTime(5e3).send = message;
 
                 // Если ответ не был получен от сервера
                 const timeout = setTimeout(() => {

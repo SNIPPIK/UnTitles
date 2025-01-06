@@ -66,7 +66,7 @@ export class Client extends DS_Client {
 
             // Права бота
             intents: [
-                IntentsBitField.Flags.GuildEmojisAndStickers,
+                IntentsBitField.Flags.GuildExpressions,
                 IntentsBitField.Flags.GuildIntegrations,
                 IntentsBitField.Flags.GuildVoiceStates,
                 IntentsBitField.Flags.Guilds

@@ -5,6 +5,8 @@ import {locale} from "@lib/locale";
 import {db} from "@lib/db";
 import {env} from "@env";
 
+const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
 /**
  * @author SNIPPIK
  * @description Динамически загружаемый класс
@@ -297,17 +299,13 @@ class sAPI extends Constructor.Assign<Handler.API> {
      * @static
      */
     protected static get generateAIzaKey() {
-        const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-        let result = "AIzaSy", position = 0;
+        let key = "";
 
-        // Постепенно генерим ключи
-        while (position <= 33) {
-            position++;
-            result += characters.charAt(Math.floor(Math.random() * characters.length));
-        }
+        // Постепенно генерируем ключ
+        while (key.length <= 33) key += characters.charAt(Math.floor(Math.random() * characters.length));
 
         // Выдаем готовый ключ
-        return result;
+        return `AIzaSy${key}`
     };
 
     /**

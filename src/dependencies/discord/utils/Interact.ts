@@ -167,12 +167,12 @@ export class Interact {
     try {
       if (this.replied) {
         this._replied = false;
-        return this._temp["reply"]({...options, withResponse: true});
+        return this._temp["reply"]({...options, withResponse: true}).catch(() => null);
       }
 
-      return this._temp.channel["send"]({...options, withResponse: true});
+      return this._temp.channel["send"]({...options, withResponse: true}).catch(() => null);
     } catch {
-      return this._temp.channel["send"]({...options, withResponse: true});
+      return this._temp.channel["send"]({...options, withResponse: true}).catch(() => null);
     }
   };
 
@@ -181,7 +181,7 @@ export class Interact {
    * @param options - Данные для замены сообщения
    */
   public edit = (options: {content?: string, embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], flags?: MessageFlags}) => {
-    if ("edit" in this._temp) return this._temp.edit(options as any);
+    if ("edit" in this._temp) return this._temp.edit(options as any).catch(() => null);
     return null;
   };
 }
@@ -395,14 +395,12 @@ class MessageBuilder {
       // Добавляем выбранный трек
       else if (i.customId === "menu_select") {
         this.callback(msg, pages, page, this.embeds, pages[page]);
-        try { msg.delete(); } catch { return; }
-        return;
+        try { return msg.delete(); } catch { return; }
       }
 
       // Кнопка отмены
       else if (i.customId === "menu_cancel") {
-        try { msg.delete(); } catch { return; }
-        return;
+        try { return msg.delete(); } catch { return; }
       }
 
       return this.callback(msg, pages, page, this.embeds);
