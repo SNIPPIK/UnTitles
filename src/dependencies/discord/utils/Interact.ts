@@ -168,12 +168,12 @@ export class Interact {
     try {
       if (this.replied) {
         this._replied = false;
-        return this._temp["reply"]({...options, withResponse: true});
+        return this._temp["reply"]({...options, withResponse: true}).catch(() => null);
       }
 
-      return this._temp.channel["send"]({...options, withResponse: true});
+      return this._temp.channel["send"]({...options, withResponse: true}).catch(() => null);
     } catch {
-      return this._temp.channel["send"]({...options, withResponse: true});
+      return this._temp.channel["send"]({...options, withResponse: true}).catch(() => null);
     }
   };
 
@@ -182,7 +182,7 @@ export class Interact {
    * @param options - Данные для замены сообщения
    */
   public edit = (options: {content?: string, embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], flags?: MessageFlags}) => {
-    if ("edit" in this._temp) return this._temp.edit(options as any);
+    if ("edit" in this._temp) return this._temp.edit(options as any).catch(() => null);
     return null;
   };
 }
