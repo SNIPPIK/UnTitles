@@ -1,4 +1,4 @@
-import {Interact} from "@lib/discord/utils/Interact";
+import {Interact} from "@lib/discord/tools/Interact";
 import {Constructor} from "@handler";
 import {locale} from "@lib/locale";
 import {Colors} from "discord.js";
@@ -66,7 +66,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
             }
 
             // Меняем позицию трека в очереди
-            queue.player.stop_fade(queue.tracks.position - 1);
+            queue.player.stop(queue.tracks.position - 1, queue.shuffle);
 
             // Уведомляем пользователя о смене трека
             msg.fastBuilder = {
@@ -115,7 +115,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
             const queue = msg.queue;
 
             // Меняем позицию трека в очереди
-            queue.player.stop_fade(queue.tracks.position + 1);
+            queue.player.stop(queue.tracks.position + 1, queue.shuffle);
 
             // Уведомляем пользователя о пропущенном треке
             msg.fastBuilder = {

@@ -1,5 +1,5 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
+import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
 import filters from "@lib/db/json/filters.json";
 import {Constructor, Handler} from "@handler";
 import {AudioFilter} from "@lib/player";

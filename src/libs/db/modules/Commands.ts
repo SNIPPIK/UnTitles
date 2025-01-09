@@ -1,4 +1,4 @@
-import {SlashComponent} from "@lib/discord/utils/SlashBuilder";
+import {SlashComponent} from "@lib/discord/tools/SlashBuilder";
 import filters from "@lib/db/json/filters.json";
 import {AudioFilter} from "@lib/player";
 import {Handler} from "@lib/handler";

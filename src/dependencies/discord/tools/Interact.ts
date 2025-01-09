@@ -1,7 +1,8 @@
-import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User} from "discord.js"
 import { Interaction, Message, Attachment, MessageFlags, InteractionCallbackResponse } from "discord.js";
-import type { ComponentData, EmbedData, GuildMember, CacheType} from "discord.js"
+import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User} from "discord.js"
+import type { ComponentData, EmbedData, GuildMember, BaseInteraction} from "discord.js"
 import {locale, languages} from "@lib/locale";
+import {Logger} from "@lib/logger";
 import {db} from "@lib/db";
 
 /**
@@ -15,7 +16,7 @@ export class Interact {
    * @description Сообщение принятое с discord.js
    * @private
    */
-  private readonly _temp: Message | Interaction<CacheType>;
+  private readonly _temp: Message | BaseInteraction;
 
   /**
    * @description Не был получен ответ
@@ -157,23 +158,29 @@ export class Interact {
    * @description Загружаем данные для взаимодействия с классом
    * @param data - Message или BaseInteraction
    */
-  public constructor(data: Message | Interaction) {
-    this._temp = data;
+  public constructor(data: Message | Interaction | InteractionCallbackResponse) {
+    if (data instanceof InteractionCallbackResponse) this._temp = data.resource.message;
+    else this._temp = data;
   };
 
   /**
    * @description Отправляем сообщение со соответствием параметров
    * @param options - Данные для отправки сообщения
    */
-  public send = (options: {content?: string, embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], flags?: MessageFlags}): Promise<Message> => {
+  public send = (options: InteractSendOptions): Promise<InteractionCallbackResponse> => {
+    // Ловим ошибки
     try {
+      // Если можно дать ответ на сообщение
       if (this.replied) {
         this._replied = false;
         return this._temp["reply"]({...options, withResponse: true});
       }
 
+      // Если нельзя отправить ответ
       return this._temp.channel["send"]({...options, withResponse: true});
-    } catch {
+    } catch (err) {
+      // Если происходит ошибка
+      Logger.log("ERROR", err);
       return this._temp.channel["send"]({...options, withResponse: true});
     }
   };
@@ -182,12 +189,17 @@ export class Interact {
    * @description Редактируем сообщение
    * @param options - Данные для замены сообщения
    */
-  public edit = (options: {content?: string, embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], flags?: MessageFlags}) => {
-    if ("edit" in this._temp) return this._temp.edit(options as any);
-    return null;
+  public edit = (options: InteractSendOptions): Promise<InteractionCallbackResponse> => {
+    try {
+      if ("edit" in this._temp) return this._temp.edit(options as any) as any;
+      return null;
+    } catch (err) {
+      // Если происходит ошибка
+      Logger.log("ERROR", err);
+      return null;
+    }
   };
 }
-
 
 /**
  * @author SNIPPIK
@@ -247,7 +259,7 @@ class MessageBuilder {
    */
   public set send(interaction: Interact) {
     interaction.send({embeds: this.embeds, components: this.components, flags: this.flags})
-        .then((message) => {
+        .then((message: InteractionCallbackResponse) => {
           // Если получить возврат не удалось, то ничего не делаем
           if (!message) return;
 
@@ -257,7 +269,7 @@ class MessageBuilder {
           if (this.time !== 0) msg.delete = this.time;
 
           // Создаем меню если есть параметры для него
-          if (this._menu.pages.length > 0) this.constructor_menu(message);
+          if (this._menu.pages.length > 0) this.constructor_menu(message.resource.message);
 
           // Если надо выполнить действия после
           if (this.promise) this.promise(msg);
@@ -408,4 +420,33 @@ class MessageBuilder {
       return this.callback(msg, pages, page, this.embeds);
     });
   };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Параметры для отправки сообщения
+ */
+export interface InteractSendOptions {
+  components?: (ComponentData | ActionRowBuilder | InteractComponent)[];
+  embeds?: EmbedData[];
+  flags?: MessageFlags;
+  context?: string;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Компонент кнопки в json объекте
+ */
+export interface InteractComponent {
+  type: 1 | 2,
+  components: {
+    type: 1 | 2,
+    emoji?: {
+      id?: string,
+      name?: string
+    },
+    custom_id: string,
+    style: 1 | 2 | 3 | 4,
+    disable?: boolean }[],
 }

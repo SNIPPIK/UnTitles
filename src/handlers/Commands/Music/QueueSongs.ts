@@ -1,8 +1,9 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
+import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
 import {Constructor, Handler} from "@handler";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
+import queue from "@handlers/Events/Audio/queue";
 
 /**
  * @author SNIPPIK
@@ -39,7 +40,7 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
                 const number = args.length > 0 ? parseInt(args.pop()) : 1;
-                const {player, tracks} = db.audio.queue.get(message.guild.id);
+                const {player, tracks, shuffle} = db.audio.queue.get(message.guild.id);
 
                 // Если аргумент не является числом
                 if (isNaN(number)) {
@@ -64,14 +65,14 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                 // Если аргумент больше 1, то ищем трек
                 if (number > 1) {
                     // Меняем позицию трека в очереди
-                    player.stop_fade(tracks.position + number - 1);
+                    player.stop(tracks.position + number - 1, shuffle);
                     message.fastBuilder = { description: locale._(message.locale, "command.skip.arg.track", [number, `[${title}](${url})`]), color };
 
                     return;
                 }
 
                 // Пропускаем текущий трек
-                player.stop_fade(tracks.position + 1);
+                player.stop(tracks.position + 1, shuffle);
                 message.fastBuilder = { description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]), color };
                 return;
             }
@@ -114,7 +115,7 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
                 const queue = db.audio.queue.get(message.guild.id);
-                const {player, tracks} = queue;
+                const {player, tracks, shuffle} = queue;
                 const number = args.length > 0 ? parseInt(args.pop()) : 1;
 
                 // Если аргумент не является числом
@@ -138,7 +139,7 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
                 const {title, url, color} = tracks.get(number > 1 ? number : number - 1);
 
                 // Меняем позицию трека в очереди
-                queue.player.stop_fade(number);
+                queue.player.stop(number, shuffle);
                 message.fastBuilder = { description: locale._(message.locale, "command.position", [number, `[${title}](${url})`]), color };
                 return;
             }
@@ -206,7 +207,7 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                 // Удаляем трек указанный пользователем
                 if (number !== 1) queue.tracks.remove(number - 1);
                 else {
-                    queue.player.stop_fade(queue.tracks.position + 1);
+                    queue.player.stop(queue.tracks.position + 1, queue.shuffle);
                     queue.tracks.remove(number - 1);
                 }
 

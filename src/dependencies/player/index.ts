@@ -589,33 +589,33 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Останавливаем воспроизведение текущего трека
      * @public
      */
-    public stop = (): void => {
+    public stop = (position?: number, shuffle: boolean = false): void => {
+        // Работает по принципу stop, но с плавным переходом
+        if (position) {
+            const old = this.tracks.position;
+
+            // Меняем позицию трека в очереди
+            if (this.audio.current.duration < this.tracks.track.time.total + db.audio.options.optimization) {
+                if (!shuffle) this.tracks.swapPosition = position;
+                else this.tracks.swapPosition = this.tracks.total.random(1)
+                this.play();
+
+                // Если не получилось начать чтение следующего трека
+                this.audio.current.stream.once("error", () => {
+                    // Возвращаем прошлый номер трека
+                    this.tracks.swapPosition = old;
+                });
+            } else {
+                // Если надо вернуть прошлый трек, но времени уже нет!
+                if (this.tracks.position > position) this.tracks.swapPosition = position - 1;
+                if (this.status === "player/wait") return;
+                this.status = "player/wait";
+            }
+            return;
+        }
+
         if (this.status === "player/wait") return;
         this.status = "player/wait";
-    };
-
-    /**
-     * @description Работает по принципу stop, но с плавным переходом
-     * @param position - номер трека
-     */
-    public stop_fade = (position: number) => {
-        const old = this.tracks.position;
-
-        // Меняем позицию трека в очереди
-        if (this.audio.current.duration < this.tracks.track.time.total + db.audio.options.optimization) {
-            this.tracks.swapPosition = position;
-            this.play();
-
-            // Если не получилось начать чтение следующего трека
-            this.audio.current.stream.once("error", () => {
-                // Возвращаем прошлый номер трека
-                this.tracks.swapPosition = old;
-            });
-        } else {
-            // Если надо вернуть прошлый трек, но времени уже нет!
-            if (this.tracks.position > position) this.tracks.swapPosition = position - 1;
-            this.stop();
-        }
     };
 
     /**

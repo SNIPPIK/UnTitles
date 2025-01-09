@@ -187,7 +187,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
 
                             // Следующий трек или треки
                             queue.tracks.size > 1 ? (() => {
-                                const tracks = queue.tracks.array(-2).map((track, index) => {
+                                const tracks = (queue.tracks.array(-2) as Track[]).map((track, index) => {
                                     return `\`\`${index + 2}\`\` - ${track.titleReplaced}`;
                                 });
 
@@ -205,8 +205,8 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                 // Если надо обновить сообщение
                 if (message) {
                     //Обновляем сообщение
-                    message.edit({ embeds: embed.embeds, components: queue.components as any });
-                    return;
+                    message.edit({ embeds: embed.embeds, components: queue.components }).catch((err) => console.error(err));
+                    return
                 }
 
                 embed.setTime(0).addComponents(queue.components as any).send = queue.message;

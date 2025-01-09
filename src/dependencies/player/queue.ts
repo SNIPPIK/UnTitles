@@ -1,4 +1,4 @@
-import {Interact} from "@lib/discord/utils/Interact";
+import {Interact, InteractComponent} from "@lib/discord/tools/Interact";
 import {ExtraPlayer} from "@lib/player";
 import {db} from "@lib/db";
 
@@ -14,7 +14,7 @@ export class Queue {
      * @readonly
      * @private
      */
-    private readonly _components = [
+    private readonly _components: InteractComponent[] = [
 
         /**
          * @description Первый сет кнопок

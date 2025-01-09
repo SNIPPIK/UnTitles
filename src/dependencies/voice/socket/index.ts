@@ -16,14 +16,14 @@ const TIMESTAMP_INC = (48_000 / 100) * 2;
  * @description Статусы голосового подключения
  * @private
  */
-const socketStatus = [
+const socketStatus: {name: VoiceOpcodes, callback: (socket: VoiceSocket, packet?: {d: any, op: VoiceOpcodes}) => void}[] = [
     /**
      * @description Устанавливаем соединение
      * @private
      */
     {
         name: VoiceOpcodes.Hello,
-        callback: (socket: VoiceSocket, packet: {d: any, op: VoiceOpcodes}) => {
+        callback: (socket, packet) => {
             if (socket.state.code !== VoiceSocketStatusCode.close) socket.state.ws.keepAlive = packet.d.heartbeat_interval;
         }
     },
@@ -34,7 +34,7 @@ const socketStatus = [
      */
     {
         name: VoiceOpcodes.Ready,
-        callback: (socket: VoiceSocket, packet: {d: any, op: VoiceOpcodes}) => {
+        callback: (socket, packet) => {
             if (socket.state.code === VoiceSocketStatusCode.identify) {
                 const {ip, port, ssrc, modes} = packet.d;
                 const udp = new VoiceUDPSocket({ip, port});
@@ -78,7 +78,7 @@ const socketStatus = [
      */
     {
         name: VoiceOpcodes.SessionDescription,
-        callback: (socket: VoiceSocket, packet: {d: any, op: VoiceOpcodes}) => {
+        callback: (socket, packet) => {
             if (socket.state.code === VoiceSocketStatusCode.protocol) {
                 const { mode: encryptionMode, secret_key: secretKey } = packet.d;
                 socket.state = { ...socket.state, code: VoiceSocketStatusCode.ready,
@@ -104,7 +104,7 @@ const socketStatus = [
      */
     {
         name: VoiceOpcodes.Resumed,
-        callback: (socket: VoiceSocket) => {
+        callback: (socket) => {
             if (socket.state.code === VoiceSocketStatusCode.resume) {
                 socket.state = {...socket.state, code: VoiceSocketStatusCode.ready};
                 socket.state.connectionData.speaking = false;

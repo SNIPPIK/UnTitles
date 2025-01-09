@@ -1,5 +1,5 @@
 import {ExtraPlayer, AudioPlayerEvents} from "@lib/player";
-import {Interact} from "@lib/discord/utils/Interact";
+import {Interact} from "@lib/discord/tools/Interact";
 import {TypedEmitter} from "tiny-typed-emitter";
 import {Track} from "@lib/player/track";
 import {Queue} from "@lib/player/queue";
@@ -133,14 +133,10 @@ class AudioCycles {
     /**
      * @author SNIPPIK
      * @description Здесь происходит управление плеерами
+     * @readonly
      * @private
      */
     private readonly _audioPlayers = new class extends Constructor.Cycle<ExtraPlayer> {
-        /**
-         * @description Запускаем работу цикла
-         * @constructor
-         * @public
-         */
         public constructor() {
             super({
                 name: "AudioPlayer",
@@ -161,15 +157,11 @@ class AudioCycles {
 
     /**
      * @author SNIPPIK
-     * @description Здесь происходит управление сообщениями от плеера
+     * @description Здесь происходит управление сообщениями и их обновлениями
+     * @readonly
      * @private
      */
     private readonly _messages = new class extends Constructor.Cycle<Interact> {
-        /**
-         * @description Запускаем работу цикла
-         * @constructor
-         * @public
-         */
         public constructor() {
             super({
                 name: "Message",

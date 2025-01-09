@@ -42,15 +42,12 @@ else {
         process.exit(0);
     });
 
-    /**
-     * @description Ловим попытки сломать процесс
-     */
-    process.on("uncaughtException", (err: Error) => {
+    process.on("uncaughtException", (err, origin) => {
         // Отправляем данные об ошибке и отправляем через систему webhook
         client.sendWebhook = {
             username: client.user.username, avatarURL: client.user.avatarURL(),
             embeds: [{
-                title: "uncaughtException",
+                title: "Caught exception",
                 description: `\`\`\`${err.name} - ${err.message}\`\`\``,
                 fields: [{
                     name: "Stack:",
@@ -66,13 +63,26 @@ else {
             process.exit(14);
         }
 
-        // Если вдруг запущено несколько ботов
-        else if (err.name?.match(/acknowledged./)) return Logger.log("WARN", `[CODE: <50490>] Several bots are running!`);
+        //Выводим ошибку
+        Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
+    });
+
+    process.on("unhandledRejection", async (reason: string, promise) => {
+        // Отправляем данные об ошибке и отправляем через систему webhook
+        client.sendWebhook = {
+            username: client.user.username, avatarURL: client.user.avatarURL(),
+            embeds: [{
+                title: "Unhandled Rejection",
+                description: `\`\`\`${reason}\`\`\``,
+                fields: [{
+                    name: "Promise:",
+                    value: `\`\`\`${promise}\`\`\``
+                }],
+                color: Colors.DarkRed,
+            }],
+        };
 
         //Выводим ошибку
-        Logger.log("ERROR", `\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n└ Stack:   ${err.stack}`);
-    });
-    process.on("unhandledRejection", (err: Error) => {
-        console.error(err);
+        Logger.log("ERROR", `Unhandled Rejection\n┌ Reason:    ${reason}\n└ Promise:  ${await promise}\n`);
     });
 }

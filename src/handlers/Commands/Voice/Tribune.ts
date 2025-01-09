@@ -1,5 +1,5 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {SlashBuilder} from "@lib/discord/utils/SlashBuilder";
+import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
 import {Constructor, Handler} from "@handler";
 import {locale} from "@lib/locale";
 

@@ -1,4 +1,4 @@
-import {Interact} from "@lib/discord/utils/Interact";
+import {Interact} from "@lib/discord/tools/Interact";
 import {Constructor, Handler} from "@handler";
 import type { GuildMember} from "discord.js"
 import {Colors, Events} from "discord.js";
@@ -152,8 +152,6 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     // Удаляем пользователя из базы
                     temple_db.delete(message.user.id);
                 }
-
-
 
                 // Если пользователь использует команду
                 if (message.isCommand()) {

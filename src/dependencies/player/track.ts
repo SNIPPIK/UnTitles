@@ -210,8 +210,8 @@ export class Track {
                         if (status) break;
                         else this.link = null;
                     } catch (err) {
+                        // Если произошла ошибка при проверке статуса
                         console.log(err);
-
                         this.link = null;
                     }
                 }
@@ -231,7 +231,7 @@ export class Track {
             }
 
             // Если не удается найти ссылку через n попыток
-            if (!this.link) return resolve(Error(`[SONG]: Fail update link resource`));
+            if (!this.link) return resolve(Error(`[Track]: Fail update link resource`));
             else {
                 // Сохраняем аудио кеш
                 if (download) db.cache.audio.set(this);
@@ -253,7 +253,7 @@ export class Track {
             if (this._lyrics) return resolve(this._lyrics);
 
             new httpsClient(`https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.title.split(" ").join("+")}`, {
-                useragent: "UnTitles-Client, (Discord music) 0.1.0 version"
+                useragent: "UnTitles-Client, (Discord music) 0.1.1 version"
             }).toJson.then((item) => {
                 // Если получаем вместо данных ошибку
                 if (item instanceof Error) return resolve(item);

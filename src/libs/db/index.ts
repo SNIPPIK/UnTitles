@@ -1,4 +1,4 @@
-import {CacheUtility} from "@lib/db/utils/CacheUtility";
+import {CacheUtility} from "@lib/db/tools/CacheUtility";
 import {dbl_commands} from "@lib/db/modules/Commands";
 import {dbl_buttons} from "@lib/db/modules/Buttons";
 import {dbl_audio} from "@lib/db/modules/Audio";
