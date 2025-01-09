@@ -345,6 +345,17 @@ export namespace Constructor {
     };
 
     /**
+     * @description Получаем имена очередей
+     * @public
+     */
+    public get keys(): K[] {
+      const keys = [];
+
+      for (const [key, _] of this.map) keys.push(key);
+      return keys;
+    };
+
+    /**
      * @description Получаем кол-во объектов в списке
      * @public
      */

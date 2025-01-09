@@ -158,47 +158,35 @@ class PlayerTracks {
         return total.duration();
     };
 
-
     /**
      * @description Получаем текущий трек
-     * @return Song
+     * @return Track
      * @public
      */
     public get track() { return this._tracks[this._position]; };
 
 
     /**
-     * @description Получаем последние n треков, не включает текущий
-     * @param size - Кол-во треков
-     * @public
+     * @description Получаем <указанное> кол-во треков
+     * @param size - При -5 будут выданы выданные последние до текущего трека, при +5 будут выданы следующие треки
+     * @param sorting - При включении треки перейдут в string[]
      */
-    public last = (size: number = 5) => {
-        return this._tracks.slice(this._position - 1 - size, this._position - 1 - size);
-    };
+    public array = (size: number, sorting: boolean = false) => {
+        // Сортируем треки в строки
+        if (sorting) {
+            let number = 0;
 
-    /**
-     * @description Получаем следующие n треков, не включает текущий
-     * @param size - Кол-во треков
-     * @public
-     */
-    public next = (size: number = 5) => {
+            // Создаем Array
+            return this._tracks.ArraySort(size, (track) => {
+                number++;
+                return `\`${number}\` - ${track.titleReplaced}`;
+            }, "\n");
+        }
+
+        // Выдаем список треков
+        if (size < 0) return this._tracks.slice(this._position - 1 - size, this._position - 1 - size);
         return this._tracks.slice(this._position + 1, this._position + size);
     };
-
-    /**
-     * @description Сортируем все треки в Array<Array, Array>
-     * @param size - Кол-во треков в одном списке
-     */
-    public arraySort = (size: number = 5) => {
-        let number = 0;
-
-        // Создаем Array
-        return this._tracks.ArraySort(size, (track) => {
-            number++;
-            return `\`${number}\` - ${track.titleReplaced}`;
-        }, "\n");
-    };
-
 
     /**
      * @description Перетасовка треков без нарушения текущий позиции

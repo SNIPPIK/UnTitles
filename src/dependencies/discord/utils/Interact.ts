@@ -1,6 +1,6 @@
 import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User} from "discord.js"
 import { Interaction, Message, Attachment, MessageFlags, InteractionCallbackResponse } from "discord.js";
-import type { ComponentData, EmbedData, GuildMember} from "discord.js"
+import type { ComponentData, EmbedData, GuildMember, CacheType} from "discord.js"
 import {locale, languages} from "@lib/locale";
 import {db} from "@lib/db";
 
@@ -15,7 +15,7 @@ export class Interact {
    * @description Сообщение принятое с discord.js
    * @private
    */
-  private readonly _temp: Message | Interaction;
+  private readonly _temp: Message | Interaction<CacheType>;
 
   /**
    * @description Не был получен ответ
@@ -48,16 +48,6 @@ export class Interact {
   };
 
   /**
-   * @description Получение языка пользователя
-   * @public
-   */
-  public get locale(): languages {
-    if ("locale" in this._temp) return this._temp.locale;
-    else if ("guildLocale" in this._temp) return this._temp.guildLocale as any;
-    return locale.language;
-  };
-
-  /**
    * @description Получен ли ответ на сообщение
    * @public
    */
@@ -69,35 +59,6 @@ export class Interact {
    */
   public get options(): { _group?: string; _subcommand?: string; _hoistedOptions: CommandInteractionOption[]; getAttachment?: (name: string) => Attachment } {
     if ("options" in this._temp) return this._temp.options as any;
-    return null;
-  };
-
-  /**
-   * @description Получаем очередь сервера если она конечно есть!
-   * @public
-   */
-  public get queue() { return db.audio.queue.get(this.guild.id); };
-
-  /**
-   * @description Выдаем класс для сборки сообщений
-   * @public
-   */
-  public get builder() { return MessageBuilder; };
-
-  /**
-   * @description Отправляем быстрое сообщение
-   * @param embed - Embed data, для создания сообщения
-   */
-  public set fastBuilder(embed: EmbedData) {
-    new this.builder().addEmbeds([embed]).setTime(10e3).send = this;
-  };
-
-  /**
-   * @description Получаем команду из названия если нет названия команда не будет получена
-   * @public
-   */
-  public get command() {
-    if ("commandName" in this._temp) return db.commands.get([this._temp.commandName as string, this.options._group]);
     return null;
   };
 
@@ -136,7 +97,6 @@ export class Interact {
    */
   public get member() { return this._temp.member; };
 
-
   /**
    * @description Удаление сообщения через указанное время
    * @param time - Через сколько удалить сообщение
@@ -151,6 +111,47 @@ export class Interact {
       return;
     }, time || 15e3);
   };
+
+
+  /**
+   * @description Получаем очередь сервера если она конечно есть!
+   * @public
+   */
+  public get queue() { return db.audio.queue.get(this.guild.id); };
+
+  /**
+   * @description Выдаем класс для сборки сообщений
+   * @public
+   */
+  public get builder() { return MessageBuilder; };
+
+  /**
+   * @description Отправляем быстрое сообщение
+   * @param embed - Embed data, для создания сообщения
+   */
+  public set fastBuilder(embed: EmbedData) {
+    new this.builder().addEmbeds([embed]).setTime(10e3).send = this;
+  };
+
+  /**
+   * @description Получаем команду из названия если нет названия команда не будет получена
+   * @public
+   */
+  public get command() {
+    if ("commandName" in this._temp) return db.commands.get([this._temp.commandName as string, this.options._group]);
+    return null;
+  };
+
+  /**
+   * @description Получение языка пользователя
+   * @public
+   */
+  public get locale(): languages {
+    if ("locale" in this._temp) return this._temp.locale;
+    else if ("guildLocale" in this._temp) return this._temp.guildLocale as any;
+    return locale.language;
+  };
+
 
   /**
    * @description Загружаем данные для взаимодействия с классом
@@ -168,12 +169,12 @@ export class Interact {
     try {
       if (this.replied) {
         this._replied = false;
-        return this._temp["reply"]({...options, withResponse: true}).catch(() => null);
+        return this._temp["reply"]({...options, withResponse: true});
       }
 
-      return this._temp.channel["send"]({...options, withResponse: true}).catch(() => null);
+      return this._temp.channel["send"]({...options, withResponse: true});
     } catch {
-      return this._temp.channel["send"]({...options, withResponse: true}).catch(() => null);
+      return this._temp.channel["send"]({...options, withResponse: true});
     }
   };
 
@@ -182,7 +183,7 @@ export class Interact {
    * @param options - Данные для замены сообщения
    */
   public edit = (options: {content?: string, embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], flags?: MessageFlags}) => {
-    if ("edit" in this._temp) return this._temp.edit(options as any).catch(() => null);
+    if ("edit" in this._temp) return this._temp.edit(options as any);
     return null;
   };
 }

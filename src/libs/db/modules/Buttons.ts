@@ -179,7 +179,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
         this.set("queue", (msg: Interact) => {
             const queue = msg.queue;
             const page = parseInt((queue.tracks.position / 5).toFixed(0));
-            const pages = queue.tracks.arraySort(5);
+            const pages = queue.tracks.array(5, true) as string[];
 
             new msg.builder().addEmbeds([
                 {

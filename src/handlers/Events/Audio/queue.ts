@@ -77,7 +77,7 @@ class message_push extends Constructor.Assign<Handler.Event<"message/push">> {
                         fields: [
                             {
                                 name: locale._(message.locale, "player.queue.push"),
-                                value: obj instanceof Track ? `${obj.titleReplaced}` : `${obj.items.slice(0, 5).map((track, index) => {
+                                value: obj instanceof Track ? `\`\`\`${obj.title}\`\`\`` : `${obj.items.slice(0, 5).map((track, index) => {
                                     return `\`${index + 1}\` ${track.titleReplaced}`;
                                 }).join("\n")}${obj.items.length > 5 ? locale._(message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}`
                             }
@@ -187,7 +187,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
 
                             // Следующий трек или треки
                             queue.tracks.size > 1 ? (() => {
-                                const tracks = queue.tracks.next(2).map((track, index) => {
+                                const tracks = queue.tracks.array(-2).map((track, index) => {
                                     return `\`\`${index + 2}\`\` - ${track.titleReplaced}`;
                                 });
 
