@@ -1,6 +1,6 @@
 import {CommandInteractionOption, GuildTextBasedChannel, ActionRowBuilder, User} from "discord.js"
+import { Interaction, Message, Attachment, MessageFlags, InteractionCallbackResponse } from "discord.js";
 import type { ComponentData, EmbedData, GuildMember} from "discord.js"
-import { BaseInteraction, Message, Attachment, MessageFlags} from "discord.js";
 import {locale, languages} from "@lib/locale";
 import {db} from "@lib/db";
 
@@ -15,7 +15,7 @@ export class Interact {
    * @description Сообщение принятое с discord.js
    * @private
    */
-  private readonly _temp: Message | BaseInteraction;
+  private readonly _temp: Message | Interaction;
 
   /**
    * @description Не был получен ответ
@@ -144,10 +144,11 @@ export class Interact {
   public set delete(time: number) {
     // Удаляем сообщение через time время
     setTimeout(() => {
-      try {
-        if (this.replied && "deleteReply" in this._temp) (this._temp as any).deleteReply().catch(() => null);
-        else (this._temp as any).delete().catch(() => null);
-      } catch {/* Ohh discord.js */}
+      // Если получаем возврат
+      if (this._temp instanceof InteractionCallbackResponse) this._temp.resource.message.delete();
+      else if ("delete" in this._temp) this._temp.delete();
+      else if ("deleteReply" in this._temp) (this._temp as any).deleteReply();
+      return;
     }, time || 15e3);
   };
 
@@ -155,7 +156,7 @@ export class Interact {
    * @description Загружаем данные для взаимодействия с классом
    * @param data - Message или BaseInteraction
    */
-  public constructor(data: Message | BaseInteraction) {
+  public constructor(data: Message | Interaction) {
     this._temp = data;
   };
 
@@ -167,12 +168,12 @@ export class Interact {
     try {
       if (this.replied) {
         this._replied = false;
-        return this._temp["reply"]({...options, withResponse: true}).catch(() => null);
+        return this._temp["reply"]({...options, withResponse: true});
       }
 
-      return this._temp.channel["send"]({...options, withResponse: true}).catch(() => null);
+      return this._temp.channel["send"]({...options, withResponse: true});
     } catch {
-      return this._temp.channel["send"]({...options, withResponse: true}).catch(() => null);
+      return this._temp.channel["send"]({...options, withResponse: true});
     }
   };
 
@@ -181,7 +182,7 @@ export class Interact {
    * @param options - Данные для замены сообщения
    */
   public edit = (options: {content?: string, embeds?: EmbedData[], components?: (ComponentData | ActionRowBuilder)[], flags?: MessageFlags}) => {
-    if ("edit" in this._temp) return this._temp.edit(options as any).catch(() => null);
+    if ("edit" in this._temp) return this._temp.edit(options as any);
     return null;
   };
 }
