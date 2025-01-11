@@ -3,7 +3,6 @@ import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
 import {Constructor, Handler} from "@handler";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
-import queue from "@handlers/Events/Audio/queue";
 
 /**
  * @author SNIPPIK
@@ -37,7 +36,7 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                         }
                     }
                 ]),
-            rules: ["voice", "another_voice", "queue"],
+            rules: ["voice", "another_voice", "queue", "player-not-playing"],
             execute: ({message, args}) => {
                 const number = args.length > 0 ? parseInt(args.pop()) : 1;
                 const {player, tracks, shuffle} = db.audio.queue.get(message.guild.id);
@@ -45,12 +44,6 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                 // Если аргумент не является числом
                 if (isNaN(number)) {
                     message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.nan"), color: Colors.DarkRed };
-                    return;
-                }
-
-                // Если музыку нельзя пропустить из-за плеера
-                else if (!player.playing) {
-                    message.fastBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
                     return;
                 }
 

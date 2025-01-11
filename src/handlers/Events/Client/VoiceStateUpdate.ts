@@ -26,6 +26,7 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
         super({
             name: Events.VoiceStateUpdate,
             type: "client",
+            once: false,
             execute: (client, oldState, newState) => setImmediate(() => {
                 const guild = oldState.guild || newState.guild;
                 const voice = db.voice.get(guild.id);

@@ -15,22 +15,19 @@ if (process["argv"].includes("--ShardManager")) {
 }
 
 /**
- * @name "shard"
+ * @name Client
  * @description Загрузка осколка
  */
 else {
     const client = new Client();
-    Logger.log("LOG", `[Shard ${client.ID}] is started`);
+    Logger.log("LOG", `[Shard ${client.ID}] is loading`);
 
     /**
      * @description Подключаемся к api discord
      */
     client.login(env.get("token.discord")).then(() => {
         // Запускаем загрузку модулей после инициализации бота
-        client.once("ready", () => {
-            Logger.log("LOG", `[Shard ${client.ID}] is connected to websocket`);
-            db.initialize = client;
-        });
+        db.initialize = client;
     });
 
     /**

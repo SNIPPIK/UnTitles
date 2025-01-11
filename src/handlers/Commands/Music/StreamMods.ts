@@ -38,7 +38,7 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                         required: true,
                     }
                 ]),
-            rules: ["queue", "voice", "another_voice"],
+            rules: ["queue", "voice", "another_voice", "player-not-playing"],
             execute: ({message, args}) => {
                 const {guild} = message;
                 const queue = db.audio.queue.get(guild.id);
@@ -53,12 +53,6 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
                 //Если пользователь указал времени больше чем в треке
                 else if (duration > queue.tracks.track.time.total) {
                     message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.big") };
-                    return;
-                }
-
-                //Если музыку нельзя пропустить из-за плеера
-                else if (!queue.player.playing) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "player.playing.off") };
                     return;
                 }
 

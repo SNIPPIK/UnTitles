@@ -46,6 +46,18 @@ const intends: { name: Handler.Command["rules"][number], callback: (message: Int
         }
     },
     {
+        name: "player-not-playing",
+        callback: (message) => {
+            // Если музыку нельзя пропустить из-за плеера
+            if (!message.queue.player.playing) {
+                message.fastBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
+                return false;
+            }
+
+            return true;
+        }
+    },
+    {
         //TODO: Здесь есть над чем поработать, так же тут есть баг
         name: "another_voice",
         callback: (message) => {
@@ -106,6 +118,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
         super({
             name: Events.InteractionCreate,
             type: "client",
+            once: false,
             execute: (_, message): void => {
                 // Какие действия надо просто игнорировать
                 if (

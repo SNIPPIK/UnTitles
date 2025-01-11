@@ -126,6 +126,14 @@ export namespace Handler {
     readonly type: T extends keyof CollectionAudioEvents | keyof AudioPlayerEvents ? "player" : "client";
 
     /**
+     * @description Тип выполнения ивента
+     * @default null
+     * @readonly
+     * @public
+     */
+    readonly once: boolean;
+
+    /**
      * @description Функция, которая будет запущена при вызове ивента
      * @default null
      * @readonly
@@ -163,7 +171,7 @@ export namespace Handler {
      * @readonly
      * @public
      */
-    readonly rules?: ("voice" | "queue" | "another_voice")[]
+    readonly rules?: ("voice" | "queue" | "another_voice" | "player-not-playing")[]
 
     /**
      * @description Выполнение команды
@@ -301,21 +309,6 @@ export namespace Constructor {
     };
 
     /**
-     * @description Фильтруем данные по принципу подбора
-     * @param fn - функция фильтрации
-     */
-    /*public match = (fn: (item: K) => boolean) => {
-      for (const [_, value] of this.map) {
-        const check = fn(value);
-
-        // Если найдено совпадение
-        if (check) return check;
-      }
-
-      return null;
-    };*/
-
-    /**
      * @description Удаляем элемент из списка
      * @param ID - ID Сервера
      * @public
@@ -342,17 +335,6 @@ export namespace Constructor {
       const key = keys[Math.floor(Math.random() * keys.length)];
 
       return this.get(key);
-    };
-
-    /**
-     * @description Получаем имена очередей
-     * @public
-     */
-    public get keys(): K[] {
-      const keys = [];
-
-      for (const [key, _] of this.map) keys.push(key);
-      return keys;
     };
 
     /**

@@ -16,6 +16,7 @@ class message_error extends Constructor.Assign<Handler.Event<"message/error">> {
         super({
             name: "message/error",
             type: "player",
+            once: false,
             execute: (queue, error) => {
                 if (queue?.tracks || queue?.tracks!.track) return;
 
@@ -57,6 +58,7 @@ class message_push extends Constructor.Assign<Handler.Event<"message/push">> {
         super({
             name: "message/push",
             type: "player",
+            once: false,
             execute: (message, obj) => {
                 const {artist, image } = obj;
 
@@ -101,6 +103,7 @@ class message_search extends Constructor.Assign<Handler.Event<"message/search">>
         super({
             name: "message/search",
             type: "player",
+            once: false,
             execute: (tracks, platform, message) => {
                 // Если не нашлись треки
                 if (tracks?.length < 1 || !tracks) {
@@ -172,6 +175,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
         super({
             name: "message/playing",
             type: "player",
+            once: false,
             execute: (queue, message) => {
                 const {color, artist, image, title, user} = queue.tracks.track;
                 const embed = new queue.message.builder().addEmbeds([

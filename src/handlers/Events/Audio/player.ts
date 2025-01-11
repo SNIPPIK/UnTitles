@@ -13,6 +13,7 @@ class player_ended extends Constructor.Assign<Handler.Event<"player/ended">> {
         super({
             name: "player/ended",
             type: "player",
+            once: false,
             execute: (player,  seek) => {
                 const queue = db.audio.queue.get(player.id);
 
@@ -35,6 +36,7 @@ class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
         super({
             name: "player/wait",
             type: "player",
+            once: false,
             execute: (player) => {
                 const queue = db.audio.queue.get(player.id);
 
@@ -72,6 +74,7 @@ class player_error extends Constructor.Assign<Handler.Event<"player/error">> {
         super({
             name: "player/error",
             type: "player",
+            once: false,
             execute: (player, err, crash) => {
                 const queue = db.audio.queue.get(player.id);
 

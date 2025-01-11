@@ -16,19 +16,20 @@ export class ShardManager extends ShardingManager {
      */
     public constructor(path: string) {
         super(path, {
-            token: env.get("token.discord"), mode: "worker",
+            token: env.get("token.discord"),
+            mode: "process",
             totalShards: env.get("shard.total"),
             execArgv: ["-r", "tsconfig-paths/register"],
             respawn: true
         });
 
         // Сообщаем о запуске ShardManager
-        Logger.log("LOG", `[ShardManager/worker] running...`);
+        Logger.log("LOG", `[ShardManager/process] running...`);
 
         // Слушаем ивент для создания осколка
         this.on("shardCreate", (shard) => {
             shard.on("spawn", () => Logger.log("LOG",`[Shard ${shard.id}] added to manager`));
-            shard.on("ready", () => Logger.log("LOG",`[Shard ${shard.id}] is running`));
+            shard.on("ready", () => Logger.log("LOG",`[Shard ${shard.id}] is connected to websocket`));
             shard.on("death", () => Logger.log("LOG",`[Shard ${shard.id}] is killed`));
         });
 

@@ -62,8 +62,8 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
     {
         name: "handlers/Events",
         callback: (client, item: Handler.Event<any>) => {
-            if (item.type === "client") client.on(item.name as any, (...args) => item.execute(client, ...args));
-            else db.audio.queue.events.on(item.name as any, (...args: any) => item.execute(...args));
+            if (item.type === "client") client[item.once ? "once" : "on"](item.name as any, (...args) => item.execute(client, ...args));
+            else db.audio.queue.events[item.once ? "once" : "on"](item.name as any, (...args: any) => item.execute(...args));
 
             // Сообщаем что было загружено
             if (client.ID === 0) Logger.log("DEBUG", `[Events] loaded ${item.name}`);
@@ -266,8 +266,11 @@ class Database {
                 try {
                     Logger.log("LOG", `[Shard ${client.ID}] has initialize ${handler.name}`);
 
-                    for (const file of new Handler(handler.name).files)
+                    // Загружаем функции загрузки
+                    for (const file of new Handler(handler.name).files) {
+                        // Загружаем файл
                         handler.callback(client, file);
+                    }
                 } catch (err) {
                     throw err;
                 }

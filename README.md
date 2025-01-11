@@ -1,8 +1,7 @@
 # UnTitles
 - Авторы: [`SNIPPIK`](https://github.com/SNIPPIK), [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS)
 - Основано на [`discord.js`](https://discord.js.org) - `v14`
-- Если очень хочется поддержать монеткой [`DonationAlerts`](https://www.donationalerts.com/r/snippik)
-
+- Если хочется поддержать монеткой [`DonationAlerts`](https://www.donationalerts.com/r/snippik)
 
 
 > [!TIP]
@@ -23,14 +22,17 @@
 
 
 > [!CAUTION]
+> Здесь еще присутствует очень много ошибок, используйте код на свой страх и риск\
+> Многие функции находятся на стадии полировки
+
+
+
+> [!CAUTION]
 > Возможно сменить [`Sodium`](src/dependencies/voice/audio/Sodium.ts), на выбор есть `sodium-native`, `libsodium-wrappers`\
 > Не забываем про `.env` файл, есть заготовка в виде `.env.example`\
 > Необходимо установить ffmpeg
 
 
-> [!CAUTION]
-> Здесь еще присутствует кучи ошибок, используйте код на свой страх и риск\
-> Многие функции находятся на стадии полировки
 
 ## Todo list
 - Здесь будут время от времени как добавляться таски так и завершаться

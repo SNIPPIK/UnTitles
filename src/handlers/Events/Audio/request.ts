@@ -17,6 +17,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
         super({
             name: "request/api",
             type: "player",
+            once: false,
             execute: (message, argument) => {
                 const platform = db.api.request(argument[0] as string);
 
@@ -119,6 +120,7 @@ class request_error extends Constructor.Assign<Handler.Event<"request/error">> {
         super({
             name: "request/error",
             type: "player",
+            once: false,
             execute: (message, error) => {
                 new message.builder().addEmbeds([
                     {
