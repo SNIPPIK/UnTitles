@@ -388,10 +388,14 @@ class MessageBuilder {
       filter: (click) => click.user.id !== msg.client.user.id
     });
 
+    // TODO бывает убивает процесс, пока не пойму с чем именно это связано, возможно связанно с discord.js
     // Собираем кнопки на которые нажал пользователь
     collector.on("collect", (i) => {
-      // Игнорируем ошибки
-      try { i.deferReply(); i.deleteReply(); } catch {}
+      // Удаляем ответ, ведь его нет
+      try {
+        i.deferReply().catch(() => null);
+        i.deleteReply().catch(() => null);
+      } catch {}
 
       // Правит ситуацию когда пользователь включает не тот трек который надо
       const temple_page = page + 1;

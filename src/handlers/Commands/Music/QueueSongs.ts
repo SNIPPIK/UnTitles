@@ -39,7 +39,7 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
             rules: ["voice", "another_voice", "queue", "player-not-playing"],
             execute: ({message, args}) => {
                 const number = args.length > 0 ? parseInt(args.pop()) : 1;
-                const {player, tracks, shuffle} = db.audio.queue.get(message.guild.id);
+                const {player, tracks} = db.audio.queue.get(message.guild.id);
 
                 // Если аргумент не является числом
                 if (isNaN(number)) {
@@ -58,14 +58,14 @@ class SkipTracksCommand extends Constructor.Assign<Handler.Command> {
                 // Если аргумент больше 1, то ищем трек
                 if (number > 1) {
                     // Меняем позицию трека в очереди
-                    player.stop(tracks.position + number - 1, shuffle);
+                    player.stop(tracks.position + number - 1);
                     message.fastBuilder = { description: locale._(message.locale, "command.skip.arg.track", [number, `[${title}](${url})`]), color };
 
                     return;
                 }
 
                 // Пропускаем текущий трек
-                player.stop(tracks.position + 1, shuffle);
+                player.stop(tracks.position + 1);
                 message.fastBuilder = { description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]), color };
                 return;
             }
@@ -108,7 +108,7 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
             rules: ["voice", "another_voice", "queue"],
             execute: ({message, args}) => {
                 const queue = db.audio.queue.get(message.guild.id);
-                const {player, tracks, shuffle} = queue;
+                const {player, tracks} = queue;
                 const number = args.length > 0 ? parseInt(args.pop()) : 1;
 
                 // Если аргумент не является числом
@@ -132,7 +132,7 @@ class BackTrackCommand extends Constructor.Assign<Handler.Command> {
                 const {title, url, color} = tracks.get(number > 1 ? number : number - 1);
 
                 // Меняем позицию трека в очереди
-                queue.player.stop(number, shuffle);
+                queue.player.stop(number);
                 message.fastBuilder = { description: locale._(message.locale, "command.position", [number, `[${title}](${url})`]), color };
                 return;
             }
@@ -200,7 +200,7 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                 // Удаляем трек указанный пользователем
                 if (number !== 1) queue.tracks.remove(number - 1);
                 else {
-                    queue.player.stop(queue.tracks.position + 1, queue.shuffle);
+                    queue.player.stop(queue.tracks.position + 1);
                     queue.tracks.remove(number - 1);
                 }
 

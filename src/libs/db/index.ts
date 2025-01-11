@@ -208,6 +208,15 @@ class Database {
     };
 
     /**
+     * @description Для управления черным списком пользователей
+     * @public
+     */
+    public readonly blacklist = {
+        toggle: env.get("blacklist")              as boolean,
+        ids: env.check("blacklist.list") ? env.get("blacklist.list").split(",") as string[] : []
+    };
+
+    /**
      * @description Для работы с командами для разработчика
      * @public
      */

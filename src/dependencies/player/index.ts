@@ -106,53 +106,77 @@ class PlayerVoice {
  */
 class PlayerTracks {
     /**
-     * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
-     * @readonly
+     * @description База данных для работы с треками
      * @private
      */
-    private readonly _tracks: Track[] = [];
+    private readonly _tracks = {
+        /**
+         * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
+         * @readonly
+         * @private
+         */
+        _current:  [] as Track[],
 
-    /**
-     * @description Текущая позиция в списке
-     * @private
-     */
-    private _position = 0;
+        /**
+         * @description Хранилище треков в оригинальном порядке, необходимо для правильной работы shuffle
+         * @readonly
+         * @private
+         */
+        _original: [] as Track[],
+
+        /**
+         * @description Текущая позиция в списке
+         * @private
+         */
+        _position: 0,
+
+        /**
+         * @description Тип повтора
+         * @private
+         */
+        _repeat: "off" as "off" | "song" | "songs",
+
+        /**
+         * @description Смешивание треков
+         * @private
+         */
+        _shuffle: false as boolean
+    }
 
     /**
      * @description На сколько сделать пропуск треков
      * @param number - Позиция трека
      * @public
      */
-    public set swapPosition(number: number) { this._position = number; };
+    public set position(number: number) { this._tracks._position = number; };
 
     /**
      * @description Текущая позиция трека в очереди
      * @return number
      * @public
      */
-    public get position() { return this._position; };
-
+    public get position() { return this._tracks._position; };
 
     /**
      * @description Кол-во треков в очереди с учетом текущей позиции
      * @return number
      * @public
      */
-    public get size() { return this._tracks.length - this.position; };
+    public get size() { return this._tracks._current.length - this.position; };
 
     /**
      * @description Кол-во треков в очереди
      * @return number
      * @public
      */
-    public get total() { return this._tracks.length; };
+    public get total() { return this._tracks._current.length; };
 
     /**
      * @description Общее время треков
      * @public
      */
     public get time() {
-        const tracks = this._tracks.slice(this._position);
+        const tracks = this._tracks._current.slice(this._tracks._position);
         const total = tracks.reduce((total: number, item: {time: { total: number }}) => total + (item.time.total || 0), 0);
 
         return total.duration();
@@ -163,7 +187,65 @@ class PlayerTracks {
      * @return Track
      * @public
      */
-    public get track() { return this._tracks[this._position]; };
+    public get track() { return this._tracks._current[this._tracks._position]; };
+
+    /**
+     * @description Перетасовка треков, так-же есть поддержка полного восстановления
+     * @public
+     */
+    public set shuffle(bol: boolean) {
+        if (!this._tracks._shuffle) {
+            let currentIndex = this.size;
+
+            // Записываем треки до перетасовки
+            this._tracks._original.push(...this._tracks._current);
+
+            // Хотя еще остались элементы, которые нужно перетасовать...
+            while (currentIndex != 0) {
+                let randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+
+                // Текущий трек не трогаем
+                if (currentIndex !== this.position && randomIndex !== this.position) {
+                    // И замените его текущим элементом.
+                    [this._tracks._current[currentIndex], this._tracks._current[randomIndex]] = [this._tracks._current[randomIndex], this._tracks._current[currentIndex]];
+                }
+            }
+        }
+
+        // Восстанавливаем оригинальную очередь
+        else {
+            // Меняем треки в текущей очереди на оригинальные
+            this._tracks._current = this._tracks._original;
+
+            setTimeout(() => {
+                // Удаляем оригинальные треки, поскольку они теперь и основной ветке
+                this._tracks._original = [];
+            }, 2e3);
+        }
+
+        // Меняем переменную
+        this._tracks._shuffle = bol;
+    };
+
+    /**
+     * @description Получаем данные перетасовки
+     * @public
+     */
+    public get shuffle(): boolean { return this._tracks._shuffle; };
+
+    /**
+     * @description Сохраняем тип повтора
+     * @param loop - Тип повтора
+     * @public
+     */
+    public set repeat(loop: "off" | "song" | "songs") { this._tracks._repeat = loop; };
+
+    /**
+     * @description Получаем тип повтора
+     * @public
+     */
+    public get repeat() { return this._tracks._repeat; };
 
 
     /**
@@ -172,39 +254,35 @@ class PlayerTracks {
      * @param sorting - При включении треки перейдут в string[]
      */
     public array = (size: number, sorting: boolean = false) => {
+        const position = this._tracks._position;
+
         // Сортируем треки в строки
         if (sorting) {
             let number = 0;
 
             // Создаем Array
-            return this._tracks.ArraySort(size, (track) => {
+            return this._tracks._current.ArraySort(size, (track) => {
                 number++;
                 return `\`${number}\` - ${track.titleReplaced}`;
             }, "\n");
         }
 
         // Выдаем список треков
-        if (size < 0) return this._tracks.slice(this._position - 1 - size, this._position - 1 - size);
-        return this._tracks.slice(this._position + 1, this._position + size);
+        if (size < 0) return this._tracks._current.slice(position - 1 - size, position - 1 - size);
+        return this._tracks._current.slice(position + 1, position + size);
     };
-
-    /**
-     * @description Перетасовка треков без нарушения текущий позиции
-     * @public
-     */
-    public shuffle = () => {
-        const i = this.size.random(1);
-
-        // Меняем трек текущий позиции на случайный
-        [this._tracks[this._position], this._tracks[i]] = [this._tracks[i], this._tracks[this._position]];
-    };
-
 
     /**
      * @description Добавляем трек в очередь
      * @param track - Сам трек
      */
-    public push = (track: Track) => { this._tracks.push(track); };
+    public push = (track: Track) => {
+        // Если включена перетасовка, то добавляем треки в оригинальную очередь
+        if (this._tracks._shuffle) this._tracks._original.push(track);
+
+        // Добавляем трек в текущую очередь
+        this._tracks._current.push(track);
+    };
 
     /**
      * @description Получаем прошлый трек или текущий в зависимости от позиции
@@ -217,8 +295,29 @@ class PlayerTracks {
      * @param position - позиция трека, номер в очереди
      */
     public remove = (position: number) => {
+        // Если трек удаляем из виртуально очереди, то и из оригинальной
+        if (this._tracks._shuffle) {
+            const index = this._tracks._original.indexOf(this._tracks._current[position]);
+            if (index > -1) this._tracks._original.splice(index, 1);
+        }
+
         // Удаляем из очереди
-        this._tracks.splice(position, 1);
+        this._tracks._current.splice(position, 1);
+    };
+
+    /**
+     * @description Функция для переключения трека на следующий, сопоставление аргументов и прочее
+     * @public
+     */
+    public autoPosition = (): void => {
+        // Проверяем надо ли удалить из очереди трек
+        if (this.repeat === "off" || this.repeat === "songs") {
+            // Смена трек на следующий
+            this.position = this.position + 1;
+
+            // Если включен повтор и нет больше треков, значит включаем обратно все треки
+            if (this.repeat === "songs" && this.position >= this.total) this.position = 0;
+        }
     };
 }
 
@@ -589,25 +688,24 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Останавливаем воспроизведение текущего трека
      * @public
      */
-    public stop = (position?: number, shuffle: boolean = false): void => {
+    public stop = (position?: number): void => {
         // Работает по принципу stop, но с плавным переходом
         if (position) {
             const old = this.tracks.position;
 
             // Меняем позицию трека в очереди
             if (this.audio.current.duration < this.tracks.track.time.total + db.audio.options.optimization) {
-                if (!shuffle) this.tracks.swapPosition = position;
-                else this.tracks.swapPosition = this.tracks.total.random(1)
+                this.tracks.position = position;
                 this.play();
 
                 // Если не получилось начать чтение следующего трека
                 this.audio.current.stream.once("error", () => {
                     // Возвращаем прошлый номер трека
-                    this.tracks.swapPosition = old;
+                    this.tracks.position = old;
                 });
             } else {
                 // Если надо вернуть прошлый трек, но времени уже нет!
-                if (this.tracks.position > position) this.tracks.swapPosition = position - 1;
+                if (this.tracks.position > position) this.tracks.position = position - 1;
                 if (this.status === "player/wait") return;
                 this.status = "player/wait";
             }

@@ -39,11 +39,11 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
             }
 
             // Включение тасовки очереди
-            queue.shuffle = !queue.shuffle;
+            queue.tracks.shuffle = !queue.tracks.shuffle;
 
             // Отправляем сообщение о включении или выключении тасовки
             msg.fastBuilder = {
-                description: locale._(msg.locale, queue.shuffle ? "player.button.shuffle.on" : "player.button.shuffle.off"),
+                description: locale._(msg.locale, queue.tracks.shuffle ? "player.button.shuffle.on" : "player.button.shuffle.off"),
                 color: Colors.Green
             }
         });
@@ -66,7 +66,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
             }
 
             // Меняем позицию трека в очереди
-            queue.player.stop(queue.tracks.position - 1, queue.shuffle);
+            queue.player.stop(queue.tracks.position - 1);
 
             // Уведомляем пользователя о смене трека
             msg.fastBuilder = {
@@ -115,7 +115,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
             const queue = msg.queue;
 
             // Меняем позицию трека в очереди
-            queue.player.stop(queue.tracks.position + 1, queue.shuffle);
+            queue.player.stop(queue.tracks.position + 1);
 
             // Уведомляем пользователя о пропущенном треке
             msg.fastBuilder = {
@@ -129,11 +129,11 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
          * @button repeat
          */
         this.set("repeat", (msg) => {
-            const queue = msg.queue, loop = queue.repeat;
+            const queue = msg.queue, loop = queue.tracks.repeat;
 
             // Включение всех треков
             if (loop === "off") {
-                queue.repeat = "songs";
+                queue.tracks.repeat = "songs";
 
                 msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.songs"), color: Colors.Green };
                 return;
@@ -141,12 +141,12 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
 
             // Включение повтора трека
             else if (loop === "songs") {
-                queue.repeat = "song";
+                queue.tracks.repeat = "song";
                 msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.song"), color: Colors.Green };
                 return;
             }
 
-            queue.repeat = "off";
+            queue.tracks.repeat = "off";
             msg.fastBuilder = {
                 description: locale._(msg.locale, "player.button.repeat.off"),
                 color: Colors.Green

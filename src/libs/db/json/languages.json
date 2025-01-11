@@ -54,6 +54,11 @@
     "en-US": "{ARGUMENT} You're not on the white list, so nope!"
   },
 
+  "blacklist.message": {
+    "ru": "{ARGUMENT} Ты внесен в черный лист, так-что неа!",
+    "en-US": "{ARGUMENT} You're blacklisted, so nope!"
+  },
+
   "owner.message": {
     "ru": "{ARGUMENT} Ты не являешься разработчиком, так-что неа!",
     "en-US": "{ARGUMENT} You are not a developer, so nope!"
@@ -70,13 +75,13 @@
 
 
   "player.button.shuffle.on": {
-    "ru": "Перетасовка очереди включена",
-    "en-US": "Shuffle has enabled"
+    "ru": "Очередь была перетасована!",
+    "en-US": "The queue has been shuffled!"
   },
 
   "player.button.shuffle.off": {
-    "ru": "Перетасовка очереди выключена",
-    "en-US": "Shuffle has disabled"
+    "ru": "Возврат перетасованных треков к оригиналу!",
+    "en-US": "Return shuffled tracks to the original!"
   },
 
   "player.button.shuffle.fail": {

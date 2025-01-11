@@ -130,7 +130,6 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                 ) return;
 
                 const interact = new Interact(message);
-                const user = temple_db.get(message.user.id);
 
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
@@ -145,26 +144,46 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     }
                 }
 
-                // Если нет пользователя в системе ожидания
-                else if (!user) {
-                    // Добавляем пользователя в систему ожидания
-                    temple_db.set(message.user.id, Date.now() + 5e3);
-                }
-
-                // Если пользователь уже в списке
-                else {
-                    // Если время еще не прошло говорим пользователю об этом
-                    if (user >= Date.now()) {
+                // Если включен режим черного списка
+                else if (db.blacklist.toggle) {
+                    // Если нет пользователя в списке просто его игнорируем
+                    if (!db.blacklist.ids.includes(message.user.id)) {
                         interact.fastBuilder = {
-                            description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0), 5]),
+                            description: locale._(interact.locale, "blacklist.message", [interact.author]),
                             color: Colors.Yellow
                         }
+
                         return;
                     }
-
-                    // Удаляем пользователя из базы
-                    temple_db.delete(message.user.id);
                 }
+
+                // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
+                else if (!db.owner.ids.includes(message.user.id)) {
+                    const user = temple_db.get(message.user.id);
+
+                    // Если нет пользователя в системе ожидания
+                    if (!user) {
+                        // Добавляем пользователя в систему ожидания
+                        temple_db.set(message.user.id, Date.now() + 5e3);
+                    }
+
+                    // Если пользователь уже в списке
+                    else {
+                        // Если время еще не прошло говорим пользователю об этом
+                        if (user >= Date.now()) {
+                            interact.fastBuilder = {
+                                description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0), 5]),
+                                color: Colors.Yellow
+                            }
+                            return;
+                        }
+
+                        // Удаляем пользователя из базы
+                        temple_db.delete(message.user.id);
+                    }
+                }
+
+
 
                 // Если пользователь использует команду
                 if (message.isCommand()) {

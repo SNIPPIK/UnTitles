@@ -54,18 +54,6 @@ export class Queue {
      */
     private readonly _data = {
         /**
-         * @description Тип повтора
-         * @private
-         */
-        repeat:     "off" as "off" | "song" | "songs",
-
-        /**
-         * @description Смешивание треков
-         * @private
-         */
-        shuffle:    false as boolean,
-
-        /**
          * @description Сообщение пользователя
          * @private
          */
@@ -115,7 +103,6 @@ export class Queue {
     };
 
 
-
     /**
      * @description Получаем доступ к трекам
      * @public
@@ -124,33 +111,6 @@ export class Queue {
         if (!this._data.player) return null;
         return this._data.player.tracks;
     };
-
-    /**
-     * @description Получаем данные перетасовки
-     * @public
-     */
-    public get shuffle(): boolean { return this._data.shuffle; };
-
-    /**
-     * @description Сохраняем данные перетасовки
-     * @param bol - Параметр boolean
-     * @public
-     */
-    public set shuffle(bol) { this._data.shuffle = bol; };
-
-    /**
-     * @description Сохраняем тип повтора
-     * @param loop - Тип повтора
-     * @public
-     */
-    public set repeat(loop: "off" | "song" | "songs") { this._data.repeat = loop; };
-
-    /**
-     * @description Получаем тип повтора
-     * @public
-     */
-    public get repeat() { return this._data.repeat; };
-
 
 
     /**
@@ -162,7 +122,7 @@ export class Queue {
         const two = this._components[1].components;
 
         // Кнопка перетасовки очереди
-        if (this.shuffle) Object.assign(first[0], {style: 3});
+        if (this.tracks.shuffle) Object.assign(first[0], {style: 3});
         else Object.assign(first[0], {style: 2});
 
         // Делаем проверку на кнопку ПАУЗА/ПРОДОЛЖИТЬ
@@ -170,8 +130,8 @@ export class Queue {
         else Object.assign(first[2], {emoji: {id: db.emojis.button.pause}});
 
         // Кнопка повтора
-        if (this.repeat === "song") Object.assign(first[4], { emoji: {id: db.emojis.button.loop_one}, style: 3 });
-        else if (this.repeat === "songs") Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 3 });
+        if (this.tracks.repeat === "song") Object.assign(first[4], { emoji: {id: db.emojis.button.loop_one}, style: 3 });
+        else if (this.tracks.repeat === "songs") Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 3 });
         else Object.assign(first[4],{ emoji: {id: db.emojis.button.loop}, style: 2 });
 
         // Если это первый трек в списке, то не позволяем пользователям возвращать трек
