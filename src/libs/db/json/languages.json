@@ -406,6 +406,11 @@
     "en-US": "The current track was skipped\n\n**Will be played:**\n**❯** **{ARGUMENT}**"
   },
 
+  "command.go.track": {
+    "ru": "Был выполнен переход\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**",
+    "en-US": "The transition was completed\n\n**Will be played:**\n**❯** **{ARGUMENT}**"
+  },
+
 
   "command.api.block": {
     "en-US": "{ARGUMENT} | Platform is blocked!",
