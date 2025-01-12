@@ -10,8 +10,14 @@ import {env} from "@env";
  * @description Загрузка менеджера осколков
  */
 if (process["argv"].includes("--ShardManager")) {
-    Logger.log("LOG", `[ShardManager] is started`);
-    new ShardManager(__filename);
+    Logger.log("LOG", `[ShardManager] is starting...`);
+    new ShardManager(__filename, {
+        token: env.get("token.discord"),
+        mode: "process",
+        totalShards: env.get("shard.total"),
+        execArgv: ["-r", "tsconfig-paths/register"],
+        respawn: true
+    });
 }
 
 /**
@@ -20,7 +26,7 @@ if (process["argv"].includes("--ShardManager")) {
  */
 else {
     const client = new Client();
-    Logger.log("LOG", `[Shard ${client.ID}] is loading`);
+    Logger.log("LOG", `[Shard ${client.ID}] is loading...`);
 
     /**
      * @description Подключаемся к api discord
@@ -39,19 +45,24 @@ else {
         process.exit(0);
     });
 
+    /**
+     * @description Событие генерируется, когда не перехваченный JavaScript исключений возвращается в цикл событий
+     * @link https://nodejs.org/api/process.html#event-uncaughtexception
+     */
     process.on("uncaughtException", (err, origin) => {
         // Отправляем данные об ошибке и отправляем через систему webhook
         client.sendWebhook = {
             username: client.user.username, avatarURL: client.user.avatarURL(),
             embeds: [{
-                title: "Caught exception",
+                timestamp: Date(),
+                title: origin,
                 description: `\`\`\`${err.name} - ${err.message}\`\`\``,
                 fields: [{
                     name: "Stack:",
                     value: `\`\`\`${err.stack}\`\`\``
                 }],
                 color: Colors.DarkRed,
-            }],
+            }]
         };
 
         // Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
@@ -60,11 +71,15 @@ else {
             process.exit(14);
         }
 
-        //Выводим ошибку
+        // Выводим ошибку
         Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
     });
 
-    process.on("unhandledRejection", async (reason: string, promise) => {
+    /**
+     * @description Cобытие генерируется всякий раз, когда Promise отвергается и в ходе цикла событий к обещанию не прикрепляется обработчик ошибок
+     * @link https://nodejs.org/api/process.html#event-unhandledrejection
+     */
+    process.on("unhandledRejection", (reason: string, promise) => {
         // Отправляем данные об ошибке и отправляем через систему webhook
         client.sendWebhook = {
             username: client.user.username, avatarURL: client.user.avatarURL(),
@@ -79,7 +94,7 @@ else {
             }],
         };
 
-        //Выводим ошибку
-        Logger.log("ERROR", `Unhandled Rejection\n┌ Reason:    ${reason}\n└ Promise:  ${await promise}\n`);
+        // Выводим ошибку
+        Logger.log("ERROR", `Unhandled Rejection\n┌ Reason:    ${reason}\n└ Promise:  ${promise}\n`);
     });
 }
