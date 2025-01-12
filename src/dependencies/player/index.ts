@@ -288,7 +288,7 @@ class PlayerTracks {
      * @description Получаем прошлый трек или текущий в зависимости от позиции
      * @param position - позиция трека, номер в очереди
      */
-    public get = (position: number) => { return this._tracks[position]; };
+    public get = (position: number) => { return this._tracks._current[position]; };
 
     /**
      * @description Удаляем из очереди неугодный трек

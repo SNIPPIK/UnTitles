@@ -388,30 +388,28 @@ class MessageBuilder {
       filter: (click) => click.user.id !== msg.client.user.id
     });
 
-    // TODO бывает убивает процесс, пока не пойму с чем именно это связано, возможно связанно с discord.js
     // Собираем кнопки на которые нажал пользователь
     collector.on("collect", (i) => {
-      // Удаляем ответ, ведь его нет
-      try {
-        i.deferReply().catch(() => null);
-        i.deleteReply().catch(() => null);
-      } catch {}
-
-      // Правит ситуацию когда пользователь включает не тот трек который надо
-      const temple_page = page + 1;
-
-      // Делаем стрелки более функциональными
-      if (temple_page === pages.length) page = 0;
-      else if (temple_page < 0) page = pages.length;
+      // Кнопка переключения на предыдущую страницу
+      if (i.customId === "menu_back") {
+        // Делаем перелистывание на последнею страницу
+        if (page === 0) page = pages.length;
+        else if (pages.length === 1) return;
+        else page--;
+      }
 
       // Кнопка переключения на предыдущую страницу
-      if (i.customId === "menu_back") page--;
-
-      // Кнопка переключения на следующую страницу
-      else if (i.customId === "menu_next") page++;
+      else if (i.customId === "menu_next") {
+        // Делаем перелистывание на первую страницу
+        if (page === pages.length) page = 0;
+        else if (pages.length === 1) return;
+        else page++;
+      }
 
       // Добавляем выбранный трек
       else if (i.customId === "menu_select") {
+        if (pages.length === 1) return;
+
         this.callback(msg, pages, page, this.embeds, pages[page]);
         try { return msg.delete(); } catch { return; }
       }
