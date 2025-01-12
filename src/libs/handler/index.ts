@@ -458,6 +458,7 @@ export namespace Constructor {
      * @private
      */
     private readonly _stepCycle = (): void => {
+      // Если нет объектов
       if (this.data.array?.length === 0) {
         this.data.time = 0;
         return;
@@ -466,7 +467,7 @@ export namespace Constructor {
       // Если цикл запущен с режимом обещания
       if (this._config.duration === "promise") {
         // Высчитываем время для выполнения
-        this.data.time += 10e3;
+        this.data.time += 20e3;
       }
 
       // Если запущен стандартный цикл
@@ -475,36 +476,38 @@ export namespace Constructor {
         this.data.time += this._config.duration;
       }
 
-      for (let item of this.data.array) {
-        const filtered = this._config.filter(item);
+      // Запускаем цикл
+      for (let items = this.data.array.length; items > 0; items--) {
+        const item = this.data.array[items - 1];
+
+        // Если объект не готов
+        if (!this._config.filter(item)) continue;
 
         try {
-          if (filtered) {
-            // Если цикл запущен с режимом обещания
-            if (item instanceof Promise) {
-              (this._config.execute(item) as Promise<boolean>)
-                  // Если скачивание завершено
-                  .then((bool) => {
-                    if (!bool) this.remove(item);
-                  })
+          // Если цикл запущен с режимом обещания
+          if (item instanceof Promise) {
+            (this._config.execute(item) as Promise<boolean>)
+                // Если скачивание завершено
+                .then((bool) => {
+                  if (!bool) this.remove(item);
+                })
 
-                  // Если произошла ошибка при скачивании
-                  .catch((error) => {
-                    this.remove(item);
-                    console.log(error);
-                  });
-            }
-
-            // Если запущен стандартный цикл
-            else this._config.execute(item);
+                // Если произошла ошибка при скачивании
+                .catch((error) => {
+                  this.remove(item);
+                  console.log(error);
+                });
           }
+
+          // Если запущен стандартный цикл
+          else this._config.execute(item);
         } catch (error) {
           this.remove(item);
           console.log(error);
         }
       }
 
-      // Выполняем функцию через ~this._time ms
+      // Выполняем функцию через ~this.data.time ms
       setTimeout(this._stepCycle, this.data.time - Date.now());
     };
   }

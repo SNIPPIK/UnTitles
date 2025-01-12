@@ -1,4 +1,4 @@
-import { Client as DS_Client, IntentsBitField, Partials, ShardingManager, WebhookClient, ShardingManagerOptions} from "discord.js";
+import { Client as DS_Client, ShardingManager, WebhookClient, ShardingManagerOptions} from "discord.js";
 import type { WebhookMessageCreateOptions } from "discord.js";
 import {Logger} from "@lib/logger";
 import {env} from "@env";
@@ -47,37 +47,6 @@ export class Client extends DS_Client {
      */
     private readonly webhook = env.get("webhook.id") && env.get("webhook.token") ?
         new WebhookClient({id: env.get("webhook.id"), token: env.get("webhook.token")}) : null;
-
-    /**
-     * @description Создаем класс и задаем параметры боту
-     * @public
-     */
-    public constructor() {
-        super({
-            // Какие данные не надо кешировать (для экономии памяти)
-            allowedMentions: {
-                parse: ["roles", "users"],
-                repliedUser: true,
-            },
-
-            // Права бота
-            intents: [
-                IntentsBitField.Flags.GuildExpressions,
-                IntentsBitField.Flags.GuildIntegrations,
-                IntentsBitField.Flags.GuildVoiceStates,
-                IntentsBitField.Flags.Guilds
-            ],
-
-            // Данные которые обязательно надо кешировать
-            partials: [
-                Partials.Channel,
-                Partials.GuildMember,
-                Partials.Message,
-                Partials.Reaction,
-                Partials.User
-            ]
-        });
-    };
 
     /**
      * @description Получаем ID осколка

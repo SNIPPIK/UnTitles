@@ -1,7 +1,7 @@
+import {IntentsBitField, Partials, Colors} from "discord.js";
 import {Client, ShardManager} from "@lib/discord";
 import process from "node:process";
 import {Logger} from "@lib/logger";
-import {Colors} from "discord.js";
 import {db} from "@lib/db";
 import {env} from "@env";
 
@@ -25,7 +25,30 @@ if (process["argv"].includes("--ShardManager")) {
  * @description Загрузка осколка
  */
 else {
-    const client = new Client();
+    const client = new Client({
+        // Какие данные не надо кешировать (для экономии памяти)
+        allowedMentions: {
+            parse: ["roles", "users"],
+            repliedUser: true,
+        },
+
+        // Права бота
+        intents: [
+            IntentsBitField.Flags.GuildExpressions,
+            IntentsBitField.Flags.GuildIntegrations,
+            IntentsBitField.Flags.GuildVoiceStates,
+            IntentsBitField.Flags.Guilds
+        ],
+
+        // Данные которые обязательно надо кешировать
+        partials: [
+            Partials.Channel,
+            Partials.GuildMember,
+            Partials.Message,
+            Partials.Reaction,
+            Partials.User
+        ]
+    });
     Logger.log("LOG", `[Shard ${client.ID}] is loading...`);
 
     /**

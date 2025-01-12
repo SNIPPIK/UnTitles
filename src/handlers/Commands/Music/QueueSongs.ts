@@ -188,8 +188,8 @@ class RemoveTrackCommand extends Constructor.Assign<Handler.Command> {
                     "ru": "удалить"
                 })
                 .setDescription({
-                    "en-US": "Deleting a track from the queue, without the possibility of recovery! Past tracks count!",
-                    "ru": "Удаление трека из очереди, без возможности восстановить! Прошлые треки идут в счет!"
+                    "en-US": "Deleting a track from the queue, without the possibility of recovery!",
+                    "ru": "Удаление трека из очереди, без возможности восстановить!"
                 })
                 .addSubCommands([
                     {

@@ -192,7 +192,7 @@ export class Track {
 
         return new Promise(async (resolve) => {
             // Смотрим если ли кеш аудио
-            if (download) {
+            if (download && db.cache.audio) {
                 const status = db.cache.audio.status(this);
 
                 // Если есть кеш аудио, то выдаем его
@@ -223,7 +223,7 @@ export class Track {
                     // Если вместо ссылки получили ошибку
                     if (link instanceof Error || !link) {
                         if (refresh < 3) continue;
-                        else return resolve("Fail find other track, requested a max 3!");
+                        else return resolve(Error("Fail find other track, requested a max 3!"));
                     }
 
                     this.link = link;
@@ -231,10 +231,10 @@ export class Track {
             }
 
             // Если не удается найти ссылку через n попыток
-            if (!this.link) return resolve(Error(`[Track]: Fail update link resource`));
+            if (!this.link) return resolve(Error(`[Error]: Fail update link resource`));
             else {
                 // Сохраняем аудио кеш
-                if (download) db.cache.audio.set(this);
+                if (download && db.cache.audio) db.cache.audio.set(this);
             }
 
             // Отдаем ссылку на трек

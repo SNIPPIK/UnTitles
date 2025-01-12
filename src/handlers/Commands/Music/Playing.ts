@@ -94,23 +94,24 @@ class PlayCommand extends Constructor.Assign<Handler.Command> {
                 ]),
             rules: ["voice", "another_voice"],
             execute: ({message, args, type}) => {
-                // Если пользователь прикрепил файл
-                if (type === "file") {
-                    const attachment = message.options.getAttachment("input");
+                switch (type) {
+                    // Если пользователь прикрепил файл
+                    case "file": {
+                        const attachment = message.options.getAttachment("input");
 
-                    // Если пользователь подсунул фальшивку
-                    if (!attachment.contentType.match("audio")) {
-                        message.fastBuilder = { description: locale._(message.locale, "attachment.audio.fail"), color: Colors.Yellow };
+                        // Если пользователь подсунул фальшивку
+                        if (!attachment.contentType.match("audio")) {
+                            message.fastBuilder = { description: locale._(message.locale, "attachment.audio.fail"), color: Colors.Yellow };
+                            return;
+                        }
+
+                        db.audio.queue.events.emit("request/api", message, ["DISCORD", attachment]);
                         return;
                     }
 
-                    db.audio.queue.events.emit("request/api", message, ["DISCORD", attachment]);
-                    return;
+                    // Если пользователя пытается сделать запрос к API
+                    default: db.audio.queue.events.emit("request/api", message, args);
                 }
-
-                // Если пользователя пытается включить трек
-                db.audio.queue.events.emit("request/api", message, args);
-                return;
             }
         });
     };
