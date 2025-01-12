@@ -50,6 +50,8 @@ else {
      * @link https://nodejs.org/api/process.html#event-uncaughtexception
      */
     process.on("uncaughtException", (err, origin) => {
+        if (err.message.match(/read ECONNRESET/)) return;
+
         // Отправляем данные об ошибке и отправляем через систему webhook
         client.sendWebhook = {
             username: client.user.username, avatarURL: client.user.avatarURL(),

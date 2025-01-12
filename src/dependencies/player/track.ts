@@ -156,16 +156,16 @@ export class Track {
      * @param author - Автор запроса
      */
     public set user(author) {
-        const { username, id, avatar } = author;
+        const { displayName, id, avatar } = author;
 
         //Если нет автора трека, то автором станет сам пользователь
         if (!this.artist) this._track.artist = {
-            title: username, url: `https://discordapp.com/users/${id}`
+            title: displayName, url: `https://discordapp.com/users/${id}`
         };
 
         //Пользователь, который включил трек
         this._track.user = {
-            username, id,
+            displayName: displayName, id,
             avatar: `https://cdn.discordapp.com/avatars/${id}/${avatar}.webp`
         };
     };
@@ -296,6 +296,10 @@ export class Track {
         if (track.artist.title)
             track.artist.title = track.artist.title.replace(/ - Topic/, "")
 
+        // Удаляем мусорное (Lyrics Video)
+        if (track.title)
+            track.title = track.title.replace(/\(Lyrics Video\)/, "")
+
         // Добавляем данные
         Object.assign(this._track, track);
     };
@@ -323,7 +327,7 @@ export namespace Track {
          * @description Название трека
          * @readonly
          */
-        readonly title: string;
+        title: string;
 
         /**
          * @description Ссылка на трек, именно на трек
@@ -448,7 +452,7 @@ export namespace Track {
          * @description Имя/ник пользователя
          * @readonly
          */
-        readonly username: string;
+        readonly displayName: string;
 
         /**
          * @description Ссылка на аватар пользователя

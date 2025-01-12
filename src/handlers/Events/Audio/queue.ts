@@ -37,7 +37,7 @@ class message_error extends Constructor.Assign<Handler.Event<"message/error">> {
                         ],
                         author: {name: artist.title, url: artist.url, iconURL: db.emojis.diskImage},
                         footer: {
-                            text: `${user.username} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
+                            text: `${user.displayName} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
                             iconURL: user?.avatar
                         }
                     }
@@ -80,7 +80,7 @@ class message_push extends Constructor.Assign<Handler.Event<"message/push">> {
                         fields: [
                             {
                                 name: locale._(message.locale, "player.queue.push"),
-                                value: obj instanceof Track ? `\`\`\`${obj.title}\`\`\`` : `${obj.items.slice(0, 5).map((track, index) => {
+                                value: obj instanceof Track ? `\`\`\`[${obj.time.split}] - ${obj.title}\`\`\`` : `${obj.items.slice(0, 5).map((track, index) => {
                                     return `\`${index + 1}\` ${track.titleReplaced}`;
                                 }).join("\n")}${obj.items.length > 5 ? locale._(message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}`
                             }
@@ -183,6 +183,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                     {
                         color, thumbnail: image,
                         author: {name: artist.title, url: artist.url, iconURL: db.emojis.diskImage},
+                        footer: { text: `${user.displayName}`, iconURL: user.avatar },
                         fields: [
                             // Текущий трек
                             {

@@ -215,7 +215,7 @@ export class dbl_buttons extends Constructor.Collection<ButtonCallback, SupportB
                         pages.length > 0 ? {name: locale._(msg.locale, "queue"), value: pages[page]} : null
                     ],
                     footer: {
-                        text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time]),
+                        text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.displayName, page + 1, pages.length, queue.tracks.size, queue.tracks.time]),
                         iconURL: queue.tracks.track.user.avatar
                     },
                     timestamp: new Date()
