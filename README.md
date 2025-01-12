@@ -1,7 +1,8 @@
 # UnTitles
 - Авторы: [`SNIPPIK`](https://github.com/SNIPPIK), [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS)
-- Основано на [`discord.js`](https://discord.js.org) - `v14`
+- Работает на [`discord.js`](https://discord.js.org) - `v14`
 - Если хочется поддержать монеткой [`DonationAlerts`](https://www.donationalerts.com/r/snippik)
+
 
 
 > [!TIP]
@@ -17,7 +18,8 @@
 > [!IMPORTANT]
 > Конвертация происходит в opus, есть поддержка библиотек, так-же присутствует [`нативная`](src/dependencies/voice/audio/Opus.ts)\
 > Поддерживает следующие библиотеки `opusscript`, `mediaplex`, `@evan/opus`\
-> Голосовая составляющая была позаимствована из `@discordjs/voice` с модификациями и удалением ненужного мусора
+> Голосовая составляющая была позаимствована из `@discordjs/voice` с модификациями и удалением ненужного мусора\
+> (Для РФ) В связи с действиями РКН, голосовые пакеты будут с каким-то шансом пропадать только при обходе!!!
 
 
 

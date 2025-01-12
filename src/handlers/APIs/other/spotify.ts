@@ -227,8 +227,10 @@ class sAPI extends Constructor.Assign<Handler.API> {
                         method: "POST"
                     }).toJson;
 
+                    // Если при получении токена была получена ошибка
                     if (token instanceof Error) return resolve(token);
 
+                    // Вносим данные авторизации
                     this.authorization.time = Date.now() + token["expires_in"];
                     this.authorization.token = token["access_token"];
                 }
@@ -241,8 +243,9 @@ class sAPI extends Constructor.Assign<Handler.API> {
                         "accept-encoding": "gzip, deflate, br"
                     }
                 }).toJson.then((api) => {
+                    // Если на этапе получение данных получена одна из ошибок
                     if (!api) return resolve(locale.err("api.request.fail"));
-                    else if (api instanceof Error) resolve(api);
+                    else if (api instanceof Error) return resolve(api);
                     else if (api.error) return resolve(locale.err( "api.request.fail.msg", [api.error.message]));
 
                     return resolve(api);

@@ -211,7 +211,6 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                 // Создаем запрос на сервер
                 new httpsClient(`https://www.youtube.com/youtubei/v1/player?key=${this.AIzaKey}`, {
-                    method: "POST",
                     body: JSON.stringify({
                         "context": {
                             "client": {
@@ -243,7 +242,10 @@ class sAPI extends Constructor.Assign<Handler.API> {
                         "racyCheckOk": false,
                         "contentCheckOk": false
                     }),
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    method: "POST",
                 }).toJson.then((api) => {
                     // Если возникает ошибка при получении страницы
                     if (api instanceof Error) return resolve(locale.err( "api.request.fail"));

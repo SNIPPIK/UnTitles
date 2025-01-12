@@ -47,7 +47,7 @@
   },
 
   // Включить в сборку
-  "include": ["package.json", "tsconfig.json", "src" ],
+  "include": ["package.json", "tsconfig.json", "src"],
 
   //Исключить из сборки
   "exclude": ["node_modules"]

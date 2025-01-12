@@ -1,5 +1,5 @@
-import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
+import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
 import {Constructor, Handler} from "@handler";
 import {locale} from "@lib/locale";
 import {db} from "@lib/db";
@@ -92,6 +92,7 @@ class api extends Constructor.Assign<Handler.Command> {
                                 return;
                             }
 
+                            // Блокируем платформу
                             db.api.platforms.block.push(args[1] as Handler.API["name"]);
                             message.fastBuilder = {
                                 description: locale._(message.locale, "command.api.block", [message.author]),
@@ -107,6 +108,7 @@ class api extends Constructor.Assign<Handler.Command> {
                                 return;
                             }
 
+                            // Разблокируем платформу
                             const index = db.api.platforms.block.indexOf(args[1] as Handler.API["name"]);
                             db.api.platforms.block.splice(index - 1, 1);
                             message.fastBuilder = {

@@ -42,7 +42,8 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public set packet(packet: Buffer) {
-        this.socket.send(packet, this.remote.port, this.remote.ip);
+        // Если есть пакет
+        if (packet) this.socket.send(packet, this.remote.port, this.remote.ip);
     };
 
     /**
@@ -54,7 +55,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         super();
         Object.assign(this.remote, options);
 
-        // Добавляем ивенты
+        // Привязываем события
         for (let event of ["message", "error", "close"]) {
             this.socket.on(event, (...args) => this.emit(event as any, ...args));
         }
@@ -77,9 +78,11 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
             this.socket
 
                 // Если при подключении была получена ошибка
-                .once("error", () => {
+                .once("error", (err) => {
                     this.destroy();
-                    return reject(new Error("It is not possible to open the UDP port on your IP\n - Check your firewall!"))
+
+                    if (err) console.error(err);
+                    return reject(Error("It is not possible to open the UDP port on your IP\n - Check your firewall!"));
                 })
 
                 // Если получен ответ от сервера
@@ -91,7 +94,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
                         const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
 
                         // Если провайдер не предоставляет или нет пути IPV4
-                        if (!isIPv4(ip)) return reject(new Error("Not found IPv4 address"));
+                        if (!isIPv4(ip)) return reject(Error("Not found IPv4 address"));
 
                         return resolve({
                             ip,
@@ -118,11 +121,25 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 }
 
 /**
- * @description Ивенты для UDP
+ * @author SNIPPIK
+ * @description События для UDP
  * @class VoiceWebSocket
  */
 interface UDPSocketEvents {
+    /**
+     * @description Событие при котором сокет получает ответ от сервера
+     * @param message - Само сообщение
+     */
     "message": (message: Buffer) => void;
+
+    /**
+     * @description Событие при котором сокет получает ошибку
+     * @param error
+     */
     "error": (error: Error) => void;
+
+    /**
+     * @description Событие при котором сокет закрывается
+     */
     "close": () => void;
 }

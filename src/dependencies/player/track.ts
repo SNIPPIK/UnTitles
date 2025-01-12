@@ -68,7 +68,7 @@ export class Track {
     private _lyrics: string = null;
 
     /**
-     * @description Сами данные трека
+     * @description Сами данные трека полученный в результате API
      * @readonly
      * @private
      */
@@ -110,7 +110,7 @@ export class Track {
     };
 
     /**
-     * @description Получаем отредактированное название трека
+     * @description Получаем отредактированное название трека в формате time [author](author_url) - [title](track_url)
      * @public
      */
     public get titleReplaced() {
@@ -134,13 +134,13 @@ export class Track {
     public get artist() { return this._track.artist; };
 
     /**
-     * @description Получаем время трека
+     * @description Получаем данные времени трека
      * @public
      */
     public get time() { return this._duration; };
 
     /**
-     * @description Получаем картинки автора и трека
+     * @description Получаем картину трека
      * @public
      */
     public get image() { return this._track.image; };
@@ -253,7 +253,7 @@ export class Track {
             if (this._lyrics) return resolve(this._lyrics);
 
             new httpsClient(`https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.title.split(" ").join("+")}`, {
-                useragent: "UnTitles-Client, (Discord music) 0.1.1 version"
+                useragent: "UnTitles-Client, (Discord music) 0.1.1 version (github: github.com/SNIPPIK/UnTitles)"
             }).toJson.then((item) => {
                 // Если получаем вместо данных ошибку
                 if (item instanceof Error) return resolve(item);
@@ -292,7 +292,7 @@ export class Track {
         // Удаляем ненужные данные
         delete track.time;
 
-        // Удаляем мусорное Topic
+        // Удаляем мусорное "Topic"
         if (track.artist.title)
             track.artist.title = track.artist.title.replace(/ - Topic/, "")
 

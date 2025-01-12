@@ -92,7 +92,7 @@ export class dbl_apis {
      * @public
      */
     public get allow() {
-        return this._platforms.supported.filter((platform) => platform.name !== "DISCORD" && platform.auth);
+        return this.platforms.supported.filter((platform) => platform.name !== "DISCORD" && platform.auth);
     };
 
     /**
@@ -253,8 +253,13 @@ export namespace APIs {
      * @interface track
      */
     export interface track {
+        // Название типа запроса
         name: "track";
+
+        // Фильтр типа запроса
         filter: RegExp;
+
+        // Функция получения данных
         execute: (url: string) => Promise<Track | Error>
     }
 
@@ -263,8 +268,13 @@ export namespace APIs {
      * @interface playlist
      */
     export interface playlist {
+        // Название типа запроса
         name: "playlist";
+
+        // Фильтр типа запроса
         filter: RegExp;
+
+        // Функция получения данных
         execute: (url: string, options: {limit: number}) => Promise<Track.playlist | Error>
     }
 
@@ -273,8 +283,13 @@ export namespace APIs {
      * @interface album
      */
     export interface album {
+        // Название типа запроса
         name: "album";
+
+        // Фильтр типа запроса
         filter: RegExp;
+
+        // Функция получения данных
         execute: (url: string, options: {limit: number}) => Promise<Track.playlist | Error>
     }
 
@@ -283,8 +298,13 @@ export namespace APIs {
      * @interface author
      */
     export interface author {
+        // Название типа запроса
         name: "author"
+
+        // Фильтр типа запроса
         filter: RegExp;
+
+        // Функция получения данных
         execute: (url: string, options: {limit: number}) => Promise<Track[] | Error>
     }
 
@@ -293,7 +313,10 @@ export namespace APIs {
      * @interface search
      */
     export interface search {
+        // Название типа запроса
         name: "search"
+
+        // Функция получения данных
         execute: (text: string, options: {limit: number}) => Promise<Track[] | Error>
     }
 }

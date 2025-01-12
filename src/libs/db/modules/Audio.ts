@@ -69,7 +69,7 @@ export class dbl_audio {
  */
 class AudioQueues extends Constructor.Collection<Queue> {
     /**
-     * @description Ивенты привязанные к плееру и очереди
+     * @description События привязанные к плееру и очереди
      * @readonly
      * @private
      */
@@ -81,7 +81,7 @@ class AudioQueues extends Constructor.Collection<Queue> {
         private _playerEvents: (keyof AudioPlayerEvents)[] = null;
 
         /**
-         * @description Ивенты плеера
+         * @description События плеера
          * @return (keyof AudioPlayerEvents)[]
          */
         public get player() {
@@ -93,7 +93,7 @@ class AudioQueues extends Constructor.Collection<Queue> {
     }
 
     /**
-     * @description Получаем ивенты для плеера
+     * @description Получаем события для плеера
      * @return CollectionAudioEvents
      * @public
      */
@@ -205,28 +205,50 @@ class AudioCycles {
 
 /**
  * @author SNIPPIK
- * @description Ивенты коллекции
+ * @description События коллекции
  * @interface CollectionAudioEvents
  */
 export interface CollectionAudioEvents {
-    // Сообщение о добавленном треке или плейлисте, альбоме
+    /**
+     * @description Событие при котором коллекция будет отправлять информацию о добавленном треке или плейлисте, альбоме
+     * @param message - Сообщение с сервера
+     * @param items   - Трек или плейлист, альбом
+     */
     "message/push": (message: Interact, items: Track | Track.playlist) => void;
 
-    // Сообщение о текущем треке
+    /**
+     * @description Событие при котором коллекция будет отправлять сообщение о текущем треке
+     * @param queue     - Очередь сервера
+     * @param message   - Сообщение с сервера
+     */
     "message/playing": (queue: Queue, message?: Interact) => void;
 
-    // Сообщение об ошибке
+    /**
+     * @description Событие при котором коллекция будет отправлять сообщение об ошибке
+     * @param queue     - Очередь сервера
+     * @param error     - Ошибка в формате string или в типе Error
+     */
     "message/error": (queue: Queue, error?: string | Error) => void;
 
-    // Сообщение о поиске и выборе трека
+    /**
+     * @description Событие при котором коллекция будет отправлять сообщение об найденных треках
+     * @param tracks     - Найденные треки
+     * @param platform   - Имя платформы
+     * @param message    - Сообщение с сервера
+     */
     "message/search": (tracks: Track[], platform: string, message: Interact) => void;
 
-    // Сообщение о последнем треке
-    "message/last": (track: Track, message: Interact) => void;
-
-    // Добавляем и создаем очередь
+    /**
+     * @description Событие при котором коллекция будет искать трек в системе API
+     * @param message    - Сообщение с сервера
+     * @param argument   - Что надо будет найти, первый аргумент должен быть имя платформы
+     */
     "request/api": (message: Interact, argument: (string | Attachment)[]) => void;
 
-    // Если во время добавления трека или плейлиста произошла ошибка
-    "request/error": (message: Interact, error: string, replied?: boolean, color?: "DarkRed" | "Yellow") => void;
+    /**
+     * @description Событие при котором коллекция будет отправлять ошибки в системе API
+     * @param message    - Сообщение с сервера
+     * @param error      - Ошибка в формате string
+     */
+    "request/error": (message: Interact, error: string) => void;
 }

@@ -127,6 +127,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
             const url = `${this.authorization.api}/${method}.${type}` + `?access_token=${this.authorization.token}${options}&v=5.95`;
 
             new httpsClient(url).toJson.then((api: any) => {
+                // Если на этапе получение данных получена одна из ошибок
                 if (!api || !api?.response) return resolve(locale.err( "api.request.fail"));
                 else if (api?.["error_code"] || api?.error) return resolve(locale.err( "api.request.fail.msg", [api?.["error_msg"]]));
 

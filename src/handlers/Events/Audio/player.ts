@@ -17,6 +17,7 @@ class player_ended extends Constructor.Assign<Handler.Event<"player/ended">> {
             execute: (player,  seek) => {
                 const queue = db.audio.queue.get(player.id);
 
+                // Если это модификация трека, фильтры к примеру, то не даем отправить сообщение
                 if (seek !== 0) return;
                 db.audio.queue.events.emit("message/playing", queue);
             }
@@ -68,7 +69,7 @@ class player_error extends Constructor.Assign<Handler.Event<"player/error">> {
                 const queue = db.audio.queue.get(player.id);
 
                 // Если нет плеера, то нет смысла продолжать
-                if (!queue || !queue.player) return;
+                if (!queue || !player) return;
 
                 // Если возникла критическая ошибка
                 if (crash) db.audio.queue.remove(player.id);

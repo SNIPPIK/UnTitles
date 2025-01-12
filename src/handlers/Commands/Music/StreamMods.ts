@@ -161,32 +161,22 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         ]
                     },
                 ]),
-            rules: ["queue", "voice", "another_voice"],
+            rules: ["queue", "voice", "another_voice", "player-not-playing"],
             execute: ({message, args, type}) => {
                 const {guild} = message;
                 const queue = db.audio.queue.get(guild.id);
                 const player = queue.player;
 
-                // Если статус плеера не позволяет пропустить поток
-                if (!queue.player.playing) {
-                    message.fastBuilder = {
-                        description: locale._(message.locale, "player.playing.off"),
-                        color: Colors.Yellow
-                    };
-
-                    return;
-                }
-
                 // Выключаем все фильтры
-                else if (type === "off") {
+                if (type === "off") {
                     // Если нет фильтров
-                    if (queue.player.filters.enable.length === 0) {
+                    if (queue.player.filters.enabled.length === 0) {
                         message.fastBuilder = { description: locale._(message.locale, "command.filter.off.null") };
                         return;
                     }
 
                     // Удаляем фильтры
-                    queue.player.filters.enable.splice(0, queue.player.filters.enable.length);
+                    queue.player.filters.enabled.splice(0, queue.player.filters.enabled.length);
 
                     // Если можно выключить фильтр или фильтры сейчас
                     if (player.audio.current.duration < player.tracks.track.time.total + db.audio.options.optimization) {
@@ -214,7 +204,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                 const name = args[args.length - 2 || args?.length - 1] ?? args[0];
                 const arg = args.length > 1 ? Number(args[args?.length - 1]) : null;
                 const Filter = filters.find((item) => item.name === name) as AudioFilter;
-                const findFilter = queue.player.filters.enable.find((fl) => fl.name === Filter.name);
+                const findFilter = queue.player.filters.enabled.find((fl) => fl.name === Filter.name);
 
                 switch (type) {
                     // Добавляем фильтр
@@ -236,7 +226,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         }
 
                         // Делаем проверку на совместимость
-                        for (let i = 0; i < queue.player.filters.enable.length; i++) {
+                        for (let i = 0; i < queue.player.filters.enabled.length; i++) {
                             const filter = queue.player.filters[i];
 
                             // Если фильтры не совместимы
@@ -251,7 +241,7 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         }
 
                         // Добавляем фильтр
-                        queue.player.filters.enable.push(Filter);
+                        queue.player.filters.enabled.push(Filter);
 
                         // Если можно включить фильтр или фильтры сейчас
                         if (player.audio.current.duration < player.tracks.track.time.total + db.audio.options.optimization) {
@@ -287,8 +277,8 @@ class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
                         }
 
                         // Удаляем фильтр
-                        const index = queue.player.filters.enable.indexOf(findFilter);
-                        queue.player.filters.enable.splice(index, 1);
+                        const index = queue.player.filters.enabled.indexOf(findFilter);
+                        queue.player.filters.enabled.splice(index, 1);
 
                         // Если можно выключить фильтр или фильтры сейчас
                         if (player.audio.current.duration < player.tracks.track.time.total + db.audio.options.optimization) {

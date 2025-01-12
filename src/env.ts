@@ -157,7 +157,7 @@ for (const property of prototypes) {
 }
 
 /**
- * @description Декларируем их для typescript
+ * @description Декларируем для TS
  * @global
  */
 declare global {

@@ -108,8 +108,8 @@ export class Queue {
      * @public
      */
     public get tracks() {
-        if (!this._data.player) return null;
-        return this._data.player.tracks;
+        if (!this.player) return null;
+        return this.player.tracks;
     };
 
 
@@ -158,7 +158,7 @@ export class Queue {
         }
 
         // Если нет включенных фильтров
-        if (this.player.filters.enable.length === 0) Object.assign(two[3], { disabled: true });
+        if (this.player.filters.enabled.length === 0) Object.assign(two[3], { disabled: true });
         else Object.assign(two[3], { disabled: false });
 
         return this._components;

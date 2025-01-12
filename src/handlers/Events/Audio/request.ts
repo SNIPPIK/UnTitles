@@ -1,4 +1,5 @@
 import {Constructor, Handler} from "@handler";
+import {Track} from "@lib/player/track";
 import {Logger} from "@lib/logger";
 import {locale} from "@lib/locale";
 import {Colors} from "discord.js";
@@ -19,7 +20,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
             type: "player",
             once: false,
             execute: (message, argument) => {
-                const platform = db.api.request(argument[0] as string);
+                const platform = db.api.request(typeof argument[0] !== "string" ? argument[0].url : argument[0]);
 
                 // Если платформа заблокирована
                 if (platform.block) {
@@ -73,7 +74,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
                     }
 
                     // Добавляем данные о платформе для плейлиста
-                    if ("items" in item) item.items.map((track) => {
+                    if ("items" in item) item.items.map((track: Track) => {
                         // Добавляем данные о платформе
                         track.api = {
                             platform: platform.platform,
@@ -85,7 +86,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
                     else if ("time" in item) {
                         // Если был получен трек являющийся потоковым
                         if (item.time.total === 0) {
-                            db.audio.queue.events.emit("request/error", message, locale._(message.locale, "track.live", [platform.platform, api.name]), true);
+                            db.audio.queue.events.emit("request/error", message, locale._(message.locale, "track.live", [platform.platform, api.name]));
                             return;
                         }
 
@@ -101,7 +102,7 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
                 }).catch((err: Error) => { // Отправляем сообщение об ошибке
                     Logger.log("DEBUG", `request/api - ${err}`);
                     clearTimeout(timeout);
-                    db.audio.queue.events.emit("request/error", message, `**${platform.platform}.${api.name}**\n\n**❯** **${err.message}**`, true);
+                    db.audio.queue.events.emit("request/error", message, `**${platform.platform}.${api.name}**\n\n**❯** **${err.message}**`);
                 });
             }
         });

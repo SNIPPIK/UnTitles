@@ -49,18 +49,14 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
             rules: ["voice", "another_voice"],
             execute: ({message, type}) => {
                 const VoiceChannel: VoiceChannel | StageChannel = message.voice.channel;
-                const queue = message.queue;
                 const { guild } = message;
+                const voiceConnection = db.voice.get(guild.id);
+                const queue = message.queue;
 
                 switch (type) {
 
                     // Переконфигурация голосового канала
                     case "re-configure": {
-                        const voiceConnection = db.voice.get(guild.id);
-
-                        // Если бот не подключен к голосовому каналу
-                        if (!voiceConnection) return;
-
                         // Меняем регион голосового подключения
                         VoiceChannel.setRTCRegion(null, 'Auto select channel region')
                             .then(() => {
@@ -87,16 +83,11 @@ class Command_Voice extends Constructor.Assign<Handler.Command> {
 
                     // Отключение от голосового канала
                     case "leave": {
-                        const voiceConnection = db.voice.get(guild.id);
-
-                        // Если бот не подключен к голосовому каналу
-                        if (!voiceConnection) return;
-
                         // Если есть очередь, то удаляем ее!
                         if (queue) queue.cleanup();
 
+                        // Отключаемся от голосового канала
                         voiceConnection.disconnect();
-
                         new message.builder().addEmbeds([
                             {
                                 color: Colors.Green,

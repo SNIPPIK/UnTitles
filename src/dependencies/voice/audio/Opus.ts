@@ -24,34 +24,31 @@ const loaded_lib: Methods.current = {};
 
 /**
  * @author SNIPPIK
- * @description Типы для правильной работы typescript
+ * @description Превращаем имя переменной в буфер
+ * @param name - Имя переменной
+ * @private
  */
-namespace Methods {
-    /**
-     * @author SNIPPIK
-     * @description Поддерживаемый запрос к библиотеке
-     * @type supported
-     */
-    export type supported = {
-        [name: string]: (lib: any) => current
-    }
+const bufferCode = (name: string) => {
+    return Buffer.from([...`${name}`].map((x: string) => x.charCodeAt(0)));
+};
 
-    /**
-     * @author SNIPPIK
-     * @description Выдаваемы методы для работы opus encoder
-     */
-    export interface current {
-        //Имя библиотеки
-        name?: string;
+/**
+ * @author SNIPPIK
+ * @description Доступный формат для отправки opus пакетов
+ * @private
+ */
+const bit = 960 * 2 * 2;
 
-        //Аргументы для запуска
-        args?: any[];
-
-        //Класс для расшифровки
-        encoder?: any;
-    }
-}
-
+/**
+ * @author SNIPPIK
+ * @description Заголовки для поиска в chuck
+ * @private
+ */
+const OGG = {
+    "OGGs_HEAD": bufferCode("OggS"),
+    "OPUS_HEAD": bufferCode("OpusHead"),
+    "OPUS_TAGS": bufferCode("OpusTags")
+};
 
 /**
  * @author SNIPPIK
@@ -143,7 +140,7 @@ export class AudioResource {
      * @private
      */
     private set input(options: {input: NodeJS.ReadWriteStream | Process, event?: string, events: string[]}) {
-        // Подключаем ивенты к потоку
+        // Подключаем события к потоку
         for (const event of options.events) {
             if (options.event) options.input[options.event].once(event, this.destroy);
             else options.input["once"](event, this.destroy);
@@ -508,30 +505,33 @@ class OpusEncoder extends Transform {
     };
 }
 
-/**
- * @author SNIPPIK
- * @description Превращаем имя переменной в буфер
- * @param name - Имя переменной
- * @private
- */
-const bufferCode = (name: string) => {
-    return Buffer.from([...`${name}`].map((x: string) => x.charCodeAt(0)));
-};
 
 /**
  * @author SNIPPIK
- * @description Доступный формат для отправки opus пакетов
- * @private
+ * @description Типы для правильной работы typescript
  */
-const bit = 960 * 2 * 2;
+namespace Methods {
+    /**
+     * @author SNIPPIK
+     * @description Поддерживаемый запрос к библиотеке
+     * @type supported
+     */
+    export type supported = {
+        [name: string]: (lib: any) => current
+    }
 
-/**
- * @author SNIPPIK
- * @description Заголовки для поиска в chuck
- * @private
- */
-const OGG = {
-    "OGGs_HEAD": bufferCode("OggS"),
-    "OPUS_HEAD": bufferCode("OpusHead"),
-    "OPUS_TAGS": bufferCode("OpusTags")
-};
+    /**
+     * @author SNIPPIK
+     * @description Выдаваемы методы для работы opus encoder
+     */
+    export interface current {
+        //Имя библиотеки
+        name?: string;
+
+        //Аргументы для запуска
+        args?: any[];
+
+        //Класс для расшифровки
+        encoder?: any;
+    }
+}

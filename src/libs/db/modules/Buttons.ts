@@ -13,11 +13,18 @@ type SupportButtons = "shuffle" | "last" | "resume_pause" | "skip" | "repeat" | 
 
 /**
  * @author SNIPPIK
+ * @description Что хранит в себе объект кнопки
+ * @interface ButtonCallback
+ */
+type ButtonCallback = (msg: Interact) => void;
+
+/**
+ * @author SNIPPIK
  * @description Класс хранящий в себе все кнопки для бота
  * @class dbl_buttons
  * @public
  */
-export class dbl_buttons extends Constructor.Collection<button, SupportButtons> {
+export class dbl_buttons extends Constructor.Collection<ButtonCallback, SupportButtons> {
     public constructor() {
         super();
 
@@ -34,7 +41,6 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
                     description: locale._(msg.locale, "player.button.shuffle.fail"),
                     color: Colors.Yellow
                 };
-
                 return;
             }
 
@@ -61,7 +67,6 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
                     description: locale._(msg.locale, "player.button.last.fail"),
                     color: Colors.Yellow
                 };
-
                 return;
             }
 
@@ -105,6 +110,8 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
                     color: Colors.Green
                 }
             }
+
+            return;
         });
 
         /**
@@ -121,7 +128,8 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
             msg.fastBuilder = {
                 description: locale._(msg.locale, "player.button.skip"),
                 color: Colors.Green
-            }
+            };
+            return;
         });
 
         /**
@@ -135,14 +143,20 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
             if (loop === "off") {
                 queue.tracks.repeat = "songs";
 
-                msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.songs"), color: Colors.Green };
+                msg.fastBuilder = {
+                    description: locale._(msg.locale, "player.button.repeat.songs"),
+                    color: Colors.Green
+                };
                 return;
             }
 
             // Включение повтора трека
             else if (loop === "songs") {
                 queue.tracks.repeat = "song";
-                msg.fastBuilder = { description: locale._(msg.locale, "player.button.repeat.song"), color: Colors.Green };
+                msg.fastBuilder = {
+                    description: locale._(msg.locale, "player.button.repeat.song"),
+                    color: Colors.Green
+                };
                 return;
             }
 
@@ -150,7 +164,8 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
             msg.fastBuilder = {
                 description: locale._(msg.locale, "player.button.repeat.off"),
                 color: Colors.Green
-            }
+            };
+            return;
         });
 
 
@@ -169,6 +184,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
                 description: locale._(msg.locale, "player.button.replay", [queue.tracks.track.title]),
                 color: Colors.Green
             };
+            return;
         });
 
 
@@ -224,6 +240,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
                     ]
                 });
             }).send = msg;
+            return;
         });
 
 
@@ -233,11 +250,14 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
          */
         this.set("filters_menu", (msg) => {
             const queue = msg.queue;
-            const filters = queue.player.filters.enable;
+            const filters = queue.player.filters.enabled;
 
             // Если нет фильтров
             if (filters.length === 0) {
-                msg.fastBuilder = {description: locale._(msg.locale, "player.button.filter.zero"), color: Colors.White};
+                msg.fastBuilder = {
+                    description: locale._(msg.locale, "player.button.filter.zero"),
+                    color: Colors.White
+                };
                 return;
             }
 
@@ -264,6 +284,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
                     timestamp: new Date()
                 }
             ]).send = msg;
+            return;
         });
 
 
@@ -292,6 +313,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
                     }
                 ]).setTime(20e3).send = msg;
             });
+            return;
         });
 
         /**
@@ -309,13 +331,7 @@ export class dbl_buttons extends Constructor.Collection<button, SupportButtons> 
                 description: locale._(msg.locale, "player.button.stop"),
                 color: Colors.Green
             };
+            return;
         });
     };
 }
-
-/**
- * @author SNIPPIK
- * @description Что хранит в себе объект кнопки
- * @interface button
- */
-type button = (msg: Interact) => void

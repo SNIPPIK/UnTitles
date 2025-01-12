@@ -48,7 +48,7 @@ abstract class Request {
             if (this.data.method === "POST" && this.data.body) request.write(this.data.body);
 
             /**
-             * @description Ивент если превышено время ожидания подключения
+             * @description Событие если превышено время ожидания подключения
              * @public
              */
             //request.once("timeout", () => {
@@ -56,7 +56,7 @@ abstract class Request {
             //});
 
             /**
-             * @description Ивент если подключение было сорвано
+             * @description Событие если подключение было сорвано
              * @public
              */
             request.once("close", () => {
@@ -326,7 +326,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
 }
 
 /**
- * @description Ивенты для VoiceWebSocket
+ * @description События для VoiceWebSocket
  * @interface WebSocketEvents
  * @class VoiceWebSocket
  */

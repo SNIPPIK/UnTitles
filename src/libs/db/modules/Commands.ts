@@ -18,7 +18,7 @@ export class dbl_commands<T extends Handler.Command<"get">> extends Array<T> {
      * @description Доп команды, бывают команды, которые могут содержать несколько доп команд
      * @public
      */
-    public subCommands = 0;
+    public subCommands: number = 0;
 
     /**
      * @description Ищем в array подходящий тип

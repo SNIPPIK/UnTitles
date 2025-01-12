@@ -382,7 +382,7 @@ export enum VoiceSocketStatusCode {
 
 
 /**
- * @description Ивенты для VoiceSocket
+ * @description События для VoiceSocket
  * @interface VoiceSocketEvents
  */
 interface VoiceSocketEvents {

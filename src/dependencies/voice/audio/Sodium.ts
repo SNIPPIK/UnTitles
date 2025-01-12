@@ -46,7 +46,7 @@ const support_libs: Methods.supported = {
  * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
  * @private
  */
-const loaded_lib: Methods._new = {};
+const loaded_lib: Methods.current = {};
 
 /**
  * @author SNIPPIK
@@ -156,7 +156,7 @@ export class Encryption {
      * @public
      * @static
      */
-    public static mode(options: string[]): string {
+    public static mode = (options: string[]): string => {
         const option = options.find((option) => SUPPORTED_ENCRYPTION_MODES.includes(option));
 
         if (option) return option;
@@ -169,9 +169,7 @@ export class Encryption {
      * @public
      * @static
      */
-    public static randomNBit(numberOfBits: number) {
-        return Math.floor(Math.random() * 2 ** numberOfBits);
-    };
+    public static randomNBit = (numberOfBits: number) => Math.floor(Math.random() * 2 ** numberOfBits);
 }
 
 /**
@@ -186,14 +184,14 @@ namespace Methods {
      * @type supported
      */
     export type supported = {
-        [name: string]: (lib: any) => _new
+        [name: string]: (lib: any) => current
     }
 
     /**
      * @description Новый тип шифровки пакетов
-     * @interface _new
+     * @interface current
      */
-    export interface _new {
+    export interface current {
         crypto_aead_xchacha20poly1305_ietf_decrypt?(cipherText: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike | Uint8Array): Buffer;
         crypto_aead_xchacha20poly1305_ietf_encrypt?(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike | Uint8Array): Buffer;
         close?(opusPacket: Buffer, nonce: Buffer, secretKey: Uint8Array): Buffer;

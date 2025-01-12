@@ -23,6 +23,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
     /**
      * @description Текущее состояние голосового подключения
+     * @readonly
      * @private
      */
     private readonly _state: VoiceConnectionState;
@@ -138,7 +139,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * Соединение перейдет в состояние подключения, когда это будет вызвано.
      * @public
      */
-    public configureSocket = () => {
+    public configureSocket = (): void => {
         const { server, state } = this._packets;
 
         // Если нет некоторых данных, то прекращаем выполнение
@@ -165,7 +166,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @param buffer - Пакет Opus для воспроизведения
      * @public
      */
-    public packet = (buffer: Buffer) => {
+    public packet = (buffer: Buffer): void => {
         // Если голосовое подключение еще не готово
         if (this.state.status !== VoiceConnectionStatus.Ready) return;
 
@@ -194,7 +195,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @returns ``true`, если соединение было успешно отключено
      * @public
      */
-    public disconnect = () => {
+    public disconnect = (): boolean => {
         if (this.state.status === VoiceConnectionStatus.Destroyed || this.state.status === VoiceConnectionStatus.Signalling) return false;
 
         this._config.channelId = null;
@@ -224,7 +225,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @returns ``true`, если соединение было успешно установлено
      * @public
      */
-    public rejoin = (joinConfig?: VoiceConfig) => {
+    public rejoin = (joinConfig?: VoiceConfig): boolean => {
         const state = this.state;
 
         // Если статус не дает переподключиться
@@ -261,7 +262,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @readonly
      * @private
      */
-    private readonly onSocketClose = (code: number) => {
+    private readonly onSocketClose = (code: number): void => {
         const state = this.state;
 
         // Если голосовое подключение уже уничтожено
@@ -291,7 +292,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @readonly
      * @private
      */
-    private readonly onSocketStateChange = (oldState: VoiceSocketState, newState: VoiceSocketState) => {
+    private readonly onSocketStateChange = (oldState: VoiceSocketState, newState: VoiceSocketState): void => {
         const state = this.state;
 
         if (oldState.code === newState.code || state.status !== VoiceConnectionStatus.Connecting && state.status !== VoiceConnectionStatus.Ready) return;
@@ -305,7 +306,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @readonly
      * @private
      */
-    private readonly onSocketError = (error: Error) => {
+    private readonly onSocketError = (error: Error): void => {
         this.emit("error", error);
     };
 
@@ -316,7 +317,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @readonly
      * @private
      */
-    private readonly addServerPacket = (packet: GatewayVoiceServerUpdateDispatchData) => {
+    private readonly addServerPacket = (packet: GatewayVoiceServerUpdateDispatchData): void => {
         const state = this.state;
 
         this._packets.server = packet;
@@ -334,7 +335,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @readonly
      * @private
      */
-    private readonly addStatePacket = (packet: GatewayVoiceStateUpdateDispatchData) => {
+    private readonly addStatePacket = (packet: GatewayVoiceStateUpdateDispatchData): void => {
         this._packets.state = packet;
         Object.assign(this._config, packet);
     };
@@ -346,7 +347,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @param adapterAvailable - Можно ли использовать адаптер
      * @public
      */
-    public destroy = (adapterAvailable = false) => {
+    public destroy = (adapterAvailable = false): void => {
         const state = this.state;
 
         if (state.status === VoiceConnectionStatus.Destroyed) throw new Error("Cannot destroy VoiceConnection - it has already been destroyed");
@@ -358,7 +359,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
 /**
  * @class VoiceConnection
- * @description Ивенты для VoiceConnection
+ * @description События для VoiceConnection
  */
 interface VoiceConnectionEvents {
     "connecting": (oldState: VoiceConnectionState, newState: VoiceConnectionState & { status: Event }) => this | void;

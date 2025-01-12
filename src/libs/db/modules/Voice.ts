@@ -19,13 +19,13 @@ export class dbl_voice extends Constructor.Collection<VoiceConnection> {
 
         //Если нет голосового подключения, то создаем и сохраняем в базу
         if (!connection) {
-            connection = new VoiceConnection(config as any, {adapterCreator});
+            connection = new VoiceConnection(config, {adapterCreator});
             this.set(config.guildId, connection);
         }
 
         //Если есть голосовое подключение, то подключаемся заново
         if (connection && connection.state.status !== VoiceConnectionStatus.Destroyed) {
-            if (connection.state.status === VoiceConnectionStatus.Disconnected) connection.rejoin(config as any);
+            if (connection.state.status === VoiceConnectionStatus.Disconnected) connection.rejoin(config);
             else if (!connection.state.adapter.sendPayload(connection.payload(config))) connection.state = { ...connection.state, status: "disconnected" as any, reason: 1 };
         }
 

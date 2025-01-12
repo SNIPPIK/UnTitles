@@ -1,7 +1,4 @@
 .idea
 build
 node_modules
-proxy/target
-srcEXP
-.env
 package-lock.json

@@ -57,7 +57,7 @@ const loaders: {name: string, callback: (client: Client, item: any) => void}[] =
         }
     },
     /**
-     * @description Загрузчик handlers/Events, загружает ивенты для управления событиями бота
+     * @description Загрузчик handlers/Events, загружает события для управления событиями бота
      */
     {
         name: "handlers/Events",

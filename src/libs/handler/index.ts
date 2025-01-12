@@ -110,7 +110,7 @@ export namespace Handler {
    */
   export interface Event<T extends keyof ClientEvents | keyof CollectionAudioEvents | keyof AudioPlayerEvents> {
     /**
-     * @description Название ивента
+     * @description Название событие
      * @default null
      * @readonly
      * @public
@@ -118,7 +118,7 @@ export namespace Handler {
     readonly name: T extends keyof CollectionAudioEvents ? keyof CollectionAudioEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
 
     /**
-     * @description Тип ивента
+     * @description Тип события
      * @default null
      * @readonly
      * @public
@@ -126,7 +126,7 @@ export namespace Handler {
     readonly type: T extends keyof CollectionAudioEvents | keyof AudioPlayerEvents ? "player" : "client";
 
     /**
-     * @description Тип выполнения ивента
+     * @description Тип выполнения события
      * @default null
      * @readonly
      * @public
@@ -134,12 +134,12 @@ export namespace Handler {
     readonly once: boolean;
 
     /**
-     * @description Функция, которая будет запущена при вызове ивента
+     * @description Функция, которая будет запущена при вызове события
      * @default null
      * @readonly
      * @public
      */
-    readonly execute: T extends keyof CollectionAudioEvents ? CollectionAudioEvents[T] : T extends keyof AudioPlayerEvents ? (...args: Parameters<AudioPlayerEvents[T]>) => any : T extends keyof ClientEvents ? (client: Client, ...args: ClientEvents[T]) => void : never;
+    readonly execute: T extends keyof CollectionAudioEvents ? CollectionAudioEvents[T] : T extends keyof AudioPlayerEvents ? (...args: Parameters<AudioPlayerEvents[T]>) => void : T extends keyof ClientEvents ? (client: Client, ...args: ClientEvents[T]) => void : never;
   }
 
   /**

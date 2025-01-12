@@ -17,14 +17,14 @@ class PlayerStream {
      * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
      * @private
      */
-    private _stream: AudioResource = null;
+    private _audio: AudioResource = null;
 
     /**
      * @description Текущий стрим
      * @return AudioResource
      * @public
      */
-    public get current() { return this._stream; };
+    public get current() { return this._audio; };
 
     /**
      * @description Подключаем новый поток
@@ -35,11 +35,11 @@ class PlayerStream {
         if (this.current) {
             this.current?.stream?.emit("close");
             this.current.destroy();
-            this._stream = null;
+            this._audio = null;
         }
 
         // Подключаем новый поток
-        this._stream = stream;
+        this._audio = stream;
     };
 }
 
@@ -54,7 +54,7 @@ class PlayerVoice {
      * @description Текущее голосовое подключение к каналу на сервере
      * @private
      */
-    private _voice: VoiceConnection = null;
+    private _connection: VoiceConnection = null;
 
     /**
      * @description Производим подключение к голосовому каналу
@@ -66,12 +66,12 @@ class PlayerVoice {
             if (connection.config.selfMute) return;
 
             // Если повторное подключение к тому же голосовому каналу
-            else if (this._voice && connection.config.channelId === this._voice.config.channelId) {
+            else if (this._connection && connection.config.channelId === this._connection.config.channelId) {
                 connection.configureSocket();
             }
         }
 
-        this._voice = connection;
+        this._connection = connection;
     };
 
     /**
@@ -79,7 +79,7 @@ class PlayerVoice {
      * @return VoiceConnection
      * @public
      */
-    public get connection() { return this._voice; };
+    public get connection() { return this._connection; };
 
     /**
      * @description Отправляем пакет в голосовой канал
@@ -158,26 +158,12 @@ class PlayerTracks {
     public get position() { return this._tracks._position; };
 
     /**
-     * @description Кол-во треков в очереди с учетом текущей позиции
-     * @return number
-     * @public
-     */
-    public get size() { return this._tracks._current.length - this.position; };
-
-    /**
-     * @description Кол-во треков в очереди
-     * @return number
-     * @public
-     */
-    public get total() { return this._tracks._current.length; };
-
-    /**
      * @description Общее время треков
      * @public
      */
     public get time() {
-        const tracks = this._tracks._current.slice(this._tracks._position);
-        const total = tracks.reduce((total: number, item: {time: { total: number }}) => total + (item.time.total || 0), 0);
+        const tracks = this._tracks._current.slice(this.position);
+        const total = tracks.reduce((total: number, item) => total + (item.time.total || 0), 0);
 
         return total.duration();
     };
@@ -187,7 +173,7 @@ class PlayerTracks {
      * @return Track
      * @public
      */
-    public get track() { return this._tracks._current[this._tracks._position]; };
+    public get track() { return this._tracks._current[this.position]; };
 
     /**
      * @description Перетасовка треков, так-же есть поддержка полного восстановления
@@ -236,16 +222,30 @@ class PlayerTracks {
 
     /**
      * @description Сохраняем тип повтора
-     * @param loop - Тип повтора
+     * @param type - Тип повтора
      * @public
      */
-    public set repeat(loop: "off" | "song" | "songs") { this._tracks._repeat = loop; };
+    public set repeat(type: "off" | "song" | "songs") { this._tracks._repeat = type; };
 
     /**
      * @description Получаем тип повтора
      * @public
      */
     public get repeat() { return this._tracks._repeat; };
+
+    /**
+     * @description Кол-во треков в очереди с учетом текущей позиции
+     * @return number
+     * @public
+     */
+    public get size() { return this._tracks._current.length - this.position; };
+
+    /**
+     * @description Общее кол-во треков в очереди
+     * @return number
+     * @public
+     */
+    public get total() { return this._tracks._current.length; };
 
 
     /**
@@ -276,7 +276,7 @@ class PlayerTracks {
      * @description Добавляем трек в очередь
      * @param track - Сам трек
      */
-    public push = (track: Track) => {
+    public push = (track: Track): void => {
         // Если включена перетасовка, то добавляем треки в оригинальную очередь
         if (this._tracks._shuffle) this._tracks._original.push(track);
 
@@ -294,7 +294,7 @@ class PlayerTracks {
      * @description Удаляем из очереди неугодный трек
      * @param position - позиция трека, номер в очереди
      */
-    public remove = (position: number) => {
+    public remove = (position: number): void => {
         // Если трек удаляем из виртуально очереди, то и из оригинальной
         if (this._tracks._shuffle) {
             const index = this._tracks._original.indexOf(this._tracks._current[position]);
@@ -310,13 +310,15 @@ class PlayerTracks {
      * @public
      */
     public autoPosition = (): void => {
+        const repeat = this.repeat, position = this.position;
+
         // Проверяем надо ли удалить из очереди трек
-        if (this.repeat === "off" || this.repeat === "songs") {
+        if (repeat === "off" || repeat === "songs") {
             // Смена трек на следующий
-            this.position = this.position + 1;
+            this.position = position + 1;
 
             // Если включен повтор и нет больше треков, значит включаем обратно все треки
-            if (this.repeat === "songs" && this.position >= this.total) this.position = 0;
+            if (repeat === "songs" && position >= this.total) this.position = 0;
         }
     };
 }
@@ -354,8 +356,10 @@ class PlayerProgress {
 
     /**
      * @description Получаем готовый прогресс бар
+     * @readonly
+     * @public
      */
-    public readonly bar = (options: {duration: {current: number; total: number}, platform: string}) => {
+    public readonly bar = (options: {duration: {current: number; total: number}, platform: string}): string => {
         const emoji = PlayerProgress.emoji;
         const button = emoji["bottom_" + options.platform.toLowerCase()] || emoji.bottom;
         const {current, total} = options.duration;
@@ -385,13 +389,13 @@ class PlayerAudioFilters {
      * @readonly
      * @private
      */
-    private readonly enables: AudioFilter[] = [];
+    private readonly _filters: AudioFilter[] = [];
 
     /**
      * @description Получаем список включенных фильтров
      * @public
      */
-    public get enable() { return this.enables; };
+    public get enabled() { return this._filters; };
 
     /**
      * @description Сжимаем фильтры для работы ffmpeg
@@ -401,14 +405,14 @@ class PlayerAudioFilters {
         let chunk = 0;
 
         // Берем данные из всех фильтров
-        for (const filter of this.enable) {
+        for (const filter of this.enabled) {
             const filterString = filter.args ? `${filter.filter}${filter.user_arg ?? ""}` : filter.filter;
             realFilters.push(filterString);
 
             // Если есть модификация скорости, то изменяем размер пакета
             if (filter.speed) {
                 if (typeof filter.speed === "number") chunk += Number(filter.speed);
-                else chunk += Number(this.enable.slice(this.enable.indexOf(filter) + 1));
+                else chunk += Number(this.enabled.slice(this.enabled.indexOf(filter) + 1));
             }
         }
 
@@ -432,36 +436,42 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
 
     /**
      * @description Плеер привязан к queue, и это его идентификатор
+     * @readonly
      * @public
      */
     public readonly id: string = null;
 
     /**
      * @description Подключаем класс для отображения прогресс бара
+     * @readonly
      * @private
      */
     private readonly _progress: PlayerProgress = new PlayerProgress(12);
 
     /**
      * @description Хранилище треков
+     * @readonly
      * @private
      */
     private readonly _tracks: PlayerTracks = new PlayerTracks();
 
     /**
      * @description Хранилище аудио фильтров
+     * @readonly
      * @private
      */
     private readonly _filters: PlayerAudioFilters = new PlayerAudioFilters();
 
     /**
      * @description Управление голосовыми состояниями
+     * @readonly
      * @private
      */
     private readonly _voice: PlayerVoice = new PlayerVoice();
 
     /**
      * @description Управление потоковым вещанием
+     * @readonly
      * @private
      */
     private readonly _audio: PlayerStream = new PlayerStream();
@@ -516,7 +526,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
             // Если начато воспроизведение, то даем возможность говорить боту
             if (status === "player/playing") this.voice.connection.speak = true;
 
-            // Запускаем ивент
+            // Запускаем событие
             this.emit(status, this);
         }
 
@@ -565,7 +575,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         super();
         this.id = guild;
 
-        // Загружаем ивенты плеера
+        // Загружаем события плеера
         for (const event of db.audio.queue.events.player)
             this.on(event, (...args: any[]) => db.audio.queue.events.emit(event as any, ...args));
 
@@ -641,7 +651,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
                         }, 25e3);
                     }
 
-                    // Подключаем ивенты для отслеживания работы потока (временные)
+                    // Подключаем события для отслеживания работы потока (временные)
                     stream.stream
                         // Если возникнет ошибка во время загрузки потока
                         .once("error", () => {
@@ -693,7 +703,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (position) {
             const old = this.tracks.position;
 
-            // Меняем позицию трека в очереди
+            // Меняем позицию трека в очереди с учетом времени
             if (this.audio.current.duration < this.tracks.track.time.total + db.audio.options.optimization) {
                 this.tracks.position = position;
                 this.play();
@@ -720,7 +730,7 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Удаляем ненужные данные
      * @public
      */
-    public cleanup = () => {
+    public cleanup = (): void => {
         this.removeAllListeners();
         // Выключаем плеер если сейчас играет трек
         this.stop();
@@ -788,22 +798,40 @@ export interface AudioFilter {
 
 /**
  * @author SNIPPIK
- * @description Ивенты плеера
+ * @description События плеера
  * @interface AudioPlayerEvents
  */
 export interface AudioPlayerEvents {
-    //Плеер начал играть новый трек
+    /**
+     * @description Событие при котором плеер начинает завершение текущего трека
+     * @param player - Текущий плеер
+     * @param seek   - Время пропуска если оно есть
+     */
     "player/ended": (player: ExtraPlayer, seek: number) => void;
 
-    //Плеер закончил играть трек
+    /**
+     * @description Событие при котором плеер ожидает новый трек
+     * @param player - Текущий плеер
+     */
     "player/wait": (player: ExtraPlayer) => void;
 
-    //Плеер встал на паузу
+    /**
+     * @description Событие при котором плеер встает на паузу и ожидает дальнейших действий
+     * @param player - Текущий плеер
+     */
     "player/pause": (player: ExtraPlayer) => void;
 
-    //Плеер играет
+    /**
+     * @description Событие при котором плеер начинает проигрывание
+     * @param player - Текущий плеер
+     */
     "player/playing": (player: ExtraPlayer) => void;
 
-    //Плеер получил ошибку
+    /**
+     * @description Событие при котором плеер получает ошибку
+     * @param player - Текущий плеер
+     * @param err    - Ошибка в формате string
+     * @param critical - Если ошибка критична, то плеер будет уничтожен
+     */
     "player/error": (player: ExtraPlayer, err: string, critical?: boolean) => void;
 }

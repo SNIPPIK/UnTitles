@@ -23,7 +23,7 @@ type locale_text = keyof typeof locales;
  */
 export class locale {
     /**
-     * @description Язык по-умолчанию, использовать только тот, где перевод на 100%
+     * @description Язык по-умолчанию, использовать только тот, где есть перевод на 100%
      */
     public static get language(): languages {
         return "en-US";
@@ -40,7 +40,7 @@ export class locale {
 
         // Если нет такой строки
         if (!translate) {
-            // По умолчанию будет выведен английский язык
+            // По умолчанию будет выведен указанный язык
             translate = locales[locale][this.language];
         }
 

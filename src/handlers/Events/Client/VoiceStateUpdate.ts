@@ -16,7 +16,7 @@ const timeout = 15;
 
 /**
  * @author SNIPPIK
- * @description Класс ивента VoiceStateUpdate
+ * @description Класс события VoiceStateUpdate
  * @class VoiceStateUpdate
  * @event Events.VoiceStateUpdate
  * @public

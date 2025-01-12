@@ -69,11 +69,16 @@ class VoiceCommand extends Constructor.Assign<Handler.Command> {
                 const me = message.guild.members?.me;
 
                 switch (type) {
+                    // Состояние
                     case "stage": {
                         try {
+                            // Если бота просят подключится
                             if (args[0] === "join") await me.voice.setSuppressed(true);
+
+                            // Если бота просят сделать запрос
                             else await me.voice.setRequestToSpeak(true);
                         } catch (err) {
+                            // Если не удалось подключиться или сделать запрос
                             message.fastBuilder = {
                                 description: args[0] === "join" ? locale._(message.locale, "voice.join.fail") : locale._(message.locale, "voice.join.request.fail"),
                                 color: Colors.DarkRed
@@ -81,6 +86,7 @@ class VoiceCommand extends Constructor.Assign<Handler.Command> {
                             return;
                         }
 
+                        // Если удалось подключиться или сделать запрос
                         message.fastBuilder = {
                             description: args[0] === "join" ? locale._(message.locale, "voice.join") : locale._(message.locale, "voice.join.request"),
                             color: Colors.Green

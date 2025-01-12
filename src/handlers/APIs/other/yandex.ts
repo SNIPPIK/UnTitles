@@ -229,8 +229,12 @@ class sAPI extends Constructor.Assign<Handler.API> {
     protected static API = (method: string): Promise<any> => {
         return new Promise<any | Error>((resolve) => {
             new httpsClient(`${this.authorization.api}/${method}`, {
-                headers: { "Authorization": "OAuth " + this.authorization.token }, method: "GET"
+                headers: {
+                    "Authorization": "OAuth " + this.authorization.token
+                },
+                method: "GET",
             }).toJson.then((req) => {
+                // Если на этапе получение данных получена одна из ошибок
                 if (!req || req instanceof Error) return resolve(locale.err("api.request.fail"));
                 else if (req?.error?.name === "session-expired") return resolve(locale.err("api.request.login.session-expired"));
                 else if (req?.error?.name === "not-allowed") return resolve(locale.err("api.request.login.not-allowed"));
@@ -250,14 +254,17 @@ class sAPI extends Constructor.Assign<Handler.API> {
             try {
                 const api = await this.API(`tracks/${ID}/download-info`);
 
+                // Если на этапе получение данных получена одна из ошибок
                 if (!api) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]));
                 else if (api instanceof Error) return resolve(api);
                 else if (api.length === 0) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api.size as 0"]));
 
                 const url = api.find((data: any) => data.codec !== "aac");
 
+                // Если нет ссылки на xml
                 if (!url) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio url"]));
 
+                // Расшифровываем xml страницу на фрагменты
                 new httpsClient(url["downloadInfoUrl"]).toXML.then((xml) => {
                     if (xml instanceof Error) return resolve(xml);
 
