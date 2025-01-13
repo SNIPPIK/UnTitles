@@ -196,7 +196,7 @@ export class Track {
                 const status = db.cache.audio.status(this);
 
                 // Если есть кеш аудио, то выдаем его
-                if (status.status === "final") return resolve(status.path);
+                if (status.status === "ended") return resolve(status.path);
             }
 
             // Проверяем ссылку на работоспособность, если 3 раза будет неудача ссылка будет удалена
@@ -223,7 +223,7 @@ export class Track {
                     // Если вместо ссылки получили ошибку
                     if (link instanceof Error || !link) {
                         if (refresh < 3) continue;
-                        else return resolve(Error("Fail find other track, requested a max 3!"));
+                        return resolve(Error("Fail find other track, requested a max 3!"));
                     }
 
                     this.link = link;
@@ -231,7 +231,7 @@ export class Track {
             }
 
             // Если не удается найти ссылку через n попыток
-            if (!this.link) return resolve(Error(`[Error]: Fail update link resource`));
+            if (!this.link) return resolve(Error(`Fail update link resource`));
             else {
                 // Сохраняем аудио кеш
                 if (download && db.cache.audio) db.cache.audio.set(this);

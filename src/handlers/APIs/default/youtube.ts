@@ -86,7 +86,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
                 {
                     name: "track",
                     filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
-                    execute: (url: string) => {
+                    execute: (url: string, options) => {
                         const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
 
                         return new Promise<Track>(async (resolve, reject) => {
@@ -97,7 +97,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
                             const cache = db.cache.get(ID);
 
                             // Если найден трек или похожий объект
-                            if (cache) return resolve(cache);
+                            if (cache && !options?.audio) return resolve(cache);
 
                             try {
                                 // Создаем запрос

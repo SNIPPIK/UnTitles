@@ -19,7 +19,7 @@ class message_error extends Constructor.Assign<Handler.Event<"message/error">> {
             once: false,
             execute: (queue, error) => {
                 // Если нет треков или трека?!
-                if (queue?.tracks || queue?.tracks!.track) return;
+                if (!queue?.tracks || !queue?.tracks!.track) return;
 
                 const {color, artist, image, title, user} = queue.tracks.track;
                 new queue.message.builder().addEmbeds([

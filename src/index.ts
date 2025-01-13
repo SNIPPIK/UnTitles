@@ -102,7 +102,7 @@ else {
     });
 
     /**
-     * @description Cобытие генерируется всякий раз, когда Promise отвергается и в ходе цикла событий к обещанию не прикрепляется обработчик ошибок
+     * @description Событие генерируется всякий раз, когда Promise отвергается и в ходе цикла событий к обещанию не прикрепляется обработчик ошибок
      * @link https://nodejs.org/api/process.html#event-unhandledrejection
      */
     process.on("unhandledRejection", (reason: string, promise) => {

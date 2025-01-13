@@ -65,7 +65,7 @@ export class Client extends DS_Client {
      */
     public set sendWebhook(options: WebhookMessageCreateOptions) {
         if (this.webhook) this.webhook.send(options).catch(() => {
-            Logger.log("WARN", "Fail to send webhook data for discord channel!");
+            Logger.log("WARN", "Fail to send webhook data in discord channel!");
         });
     };
 }

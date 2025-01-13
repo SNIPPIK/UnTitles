@@ -240,7 +240,7 @@ export class AudioResource {
  * @class Process
  * @private
  */
-class Process {
+export class Process {
     /**
      * @description Процесс запущенный через spawn
      * @private

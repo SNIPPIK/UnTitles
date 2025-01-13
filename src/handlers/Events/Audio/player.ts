@@ -65,17 +65,13 @@ class player_error extends Constructor.Assign<Handler.Event<"player/error">> {
             name: "player/error",
             type: "player",
             once: false,
-            execute: (player, err, crash) => {
+            execute: (player, err, skip) => {
                 const queue = db.audio.queue.get(player.id);
 
-                // Если нет плеера, то нет смысла продолжать
-                if (!queue || !player) return;
-
-                // Если возникла критическая ошибка
-                if (crash) db.audio.queue.remove(player.id);
-                else {
-                    // Заставляем плеер пропустить этот трек
-                    if (player.tracks.size > 0) player.status = "player/ended";
+                // Заставляем плеер пропустить этот трек
+                if (skip) {
+                    if (player.tracks.size === 1) setTimeout(() => db.audio.queue.remove(player.id), 300);
+                    else player.tracks.remove(skip.position);
                 }
 
                 // Выводим сообщение об ошибке

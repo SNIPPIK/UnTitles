@@ -129,7 +129,7 @@ export class dbl_apis {
 
             // Если исходник уже не актуален, то получаем новый
             try {
-                const song = await api.execute(track.url);
+                const song = await api.execute(track.url, {audio: true});
 
                 // Если не удалось получить новый исходник
                 if (song instanceof Error) return resolve(song);
@@ -158,7 +158,7 @@ export class dbl_apis {
                 if (tracks instanceof Error || tracks.length === 0) return resolve(null);
 
                 // Если он был найден, то получаем исходник трека
-                const song = await platform.get("track").execute(tracks?.at(0)?.url);
+                const song = await platform.get("track").execute(tracks?.at(0)?.url, {audio: true});
                 if (song instanceof Error || !song.link) return resolve(null);
 
                 // Отдаем исходник трека
@@ -260,7 +260,7 @@ export namespace APIs {
         filter: RegExp;
 
         // Функция получения данных
-        execute: (url: string) => Promise<Track | Error>
+        execute: (url: string, options: {audio: boolean}) => Promise<Track | Error>
     }
 
     /**

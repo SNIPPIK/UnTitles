@@ -54,7 +54,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
                 {
                     name: "track",
                     filter: /track\/[0-9]+/gi,
-                    execute: (url) => {
+                    execute: (url, options) => {
                         const ID = /track\/[0-9]+/gi.exec(url)?.pop()?.split("track")?.pop();
 
                         return new Promise<Track>(async (resolve, reject) => {
@@ -65,7 +65,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
                             const cache = db.cache.get(ID);
 
                             // Если найден трек или похожий объект
-                            if (cache) return resolve(cache);
+                            if (cache && options?.audio) return resolve(cache);
 
                             try {
                                 // Делаем запрос

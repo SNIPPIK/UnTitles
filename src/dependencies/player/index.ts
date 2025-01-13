@@ -599,33 +599,21 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Получаем асинхронные данные в синхронном потоке
         track?.resource
-            // Если возникла ошибка
-            .catch((err) => {
-                    // Сообщаем об ошибке
-                    Logger.log("ERROR", `[Player]: ${err}`);
-
-                    // Если сейчас не играет трек, то предпринимаем решение
-                    if (this.status === "player/wait") this.emit("player/error", this, `${err}`, false);
-                }
-            )
-
             // Если удалось получить исходный файл трека
             .then((path) => {
                     // Если нет исходника
                     if (!path) {
-                        if (this.status === "player/wait") {
-                            this.emit("player/error", this, `Not found link audio!`, false);
-                        }
-
+                        // Если сейчас не играет трек
+                        if (!this.playing) this.emit("player/error", this, `Not found link audio!`, { skip: true, position: this.tracks.total - 1});
+                        else this.emit("player/error", this, `Not found link audio!`, { skip: true, position: this.tracks.total - 1});
                         return;
                     }
 
                     // Если получена ошибка вместо исходника
                     else if (path instanceof Error) {
-                        if (this.status === "player/wait") {
-                            this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, false);
-                        }
-
+                        // Если сейчас не играет трек
+                        if (!this.playing) this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, { skip: true, position: this.tracks.total - 1});
+                        else this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, { skip: true, position: this.tracks.total - 1});
                         return;
                     }
 
@@ -644,7 +632,8 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
                     // Если поток нельзя читать, возможно что он еще грузится
                     else if (this.status === "player/wait") {
                         timeout = setTimeout(() => {
-                            this.emit("player/error", this, "Timeout the stream has been exceeded!", false);
+                            if (!this.playing) this.emit("player/error", this, "Timeout the stream has been exceeded!", { skip: true, position: this.tracks.total - 1});
+                            else this.emit("player/error", this, "Timeout the stream has been exceeded!", { skip: true, position: this.tracks.total - 1});
 
                             // Уничтожаем поток
                             stream.destroy();
@@ -667,6 +656,17 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
                             this.audio.current = stream;
                             this.status = "player/playing"
                         })
+                }
+            )
+
+            // Если возникла ошибка
+            .catch((err) => {
+                    // Сообщаем об ошибке
+                    Logger.log("ERROR", `[Player]: ${err}`);
+
+                    // Если сейчас не играет трек, то предпринимаем решение
+                    if (!this.playing) this.emit("player/error", this, `${err}`, { skip: true, position: this.tracks.total - 1});
+                    else this.emit("player/error", this, `${err}`, { skip: true, position: this.tracks.total - 1});
                 }
             )
 
@@ -831,7 +831,8 @@ export interface AudioPlayerEvents {
      * @description Событие при котором плеер получает ошибку
      * @param player - Текущий плеер
      * @param err    - Ошибка в формате string
-     * @param critical - Если ошибка критична, то плеер будет уничтожен
+     * @param skip   - Если надо пропустить трек
+     * @param position - Позиция трека в очереди
      */
-    "player/error": (player: ExtraPlayer, err: string, critical?: boolean) => void;
+    "player/error": (player: ExtraPlayer, err: string, track?: {skip: boolean, position: number}) => void;
 }

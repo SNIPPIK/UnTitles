@@ -215,8 +215,9 @@ export class Queue {
      * @public
      */
     public readonly cleanup = () => {
-        db.audio.cycles.players.remove(this.player);
+        // Удаляем плеер
         if (this.player) this.player.cleanup();
+        db.audio.cycles.players.remove(this.player);
 
         for (let key of Object.keys(this._data)) this._data[key] = null;
     };

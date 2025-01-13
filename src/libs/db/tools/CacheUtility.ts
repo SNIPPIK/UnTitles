@@ -1,8 +1,8 @@
-import {createWriteStream, existsSync, mkdirSync, rename, stat, unlink, writeFile, readFileSync} from "node:fs";
-import {httpsClient} from "@lib/request";
+import {Process} from "@lib/voice/audio/Opus";
 import {Track} from "@lib/player/track";
 import {Constructor} from "@handler";
 import path from "node:path";
+import fs from "node:fs";
 import {env} from "@env";
 
 /**
@@ -18,7 +18,7 @@ export class CacheUtility {
      * @readonly
      * @private
      */
-    private readonly cache: string = env.get("cache.dir");
+    private readonly cache: string = path.resolve(env.get("cache.dir"));
 
     /**
      * @author SNIPPIK
@@ -71,16 +71,16 @@ export class CacheUtility {
         }
 
         // Если нет директории Data
-        if (!existsSync(`${this.cache}/Data`)) {
+        if (!fs.existsSync(`${this.cache}/Data`)) {
             let dirs = `${this.cache}/Data`.split("/");
-            mkdirSync(dirs.join("/"), {recursive: true});
+            fs.mkdir(dirs.join("/"), {recursive: true}, () => {});
         }
 
         // Сохраняем данные в файл
-        if (!existsSync(`${this.cache}/Data/[${track.id}].json`)) {
-            createWriteStream(`${this.cache}/Data/[${track.id}].json`);
+        if (!fs.existsSync(`${this.cache}/Data/[${track.id}].json`)) {
+            fs.createWriteStream(`${this.cache}/Data/[${track.id}].json`);
 
-            writeFile(`${this.cache}/Data/[${track.id}].json`, JSON.stringify({
+            fs.writeFile(`${this.cache}/Data/[${track.id}].json`, JSON.stringify({
                 ...track["_track"],
                 time: { total: `${track["_duration"]["total"]}` },
                 // Не записываем в кеш аудио, он будет в кеше
@@ -104,12 +104,12 @@ export class CacheUtility {
         }
 
         // Если есть трек в кеше
-        if (existsSync(`${this.cache}/Data/[${ID}].json`)) {
+        if (fs.existsSync(`${this.cache}/Data/[${ID}].json`)) {
             // Если трек кеширован в файл
-            const json = JSON.parse(readFileSync(`${this.cache}/Data/[${ID}].json`, 'utf8'));
+            const json = JSON.parse(fs.readFileSync(`${this.cache}/Data/[${ID}].json`, 'utf8'));
 
             // Если трек был найден среди файлов
-            if (json) return new Track(json._track);
+            if (json) return new Track(json);
         }
         return null;
     };
@@ -124,8 +124,9 @@ export class CacheUtility {
  */
 class CacheAudio extends Constructor.Cycle<Track> {
     /**
-     * @author SNIPPIK
      * @description Путь до директории с кешированными данными
+     * @readonly
+     * @private
      */
     private readonly cache_dir: string = null;
 
@@ -142,69 +143,45 @@ class CacheAudio extends Constructor.Cycle<Track> {
                 const names = this.status(item);
 
                 //Если уже скачено или не подходит для скачивания то, пропускаем
-                if (names.status === "final" || item.time.total > 600) {
+                if (names.status === "ended" || item.time.total > 600) {
                     this.remove(item);
                     return false;
 
                     //Если нет директории то, создаем ее
-                } else if (!existsSync(names.path)) {
+                } else if (!fs.existsSync(names.path)) {
                     let dirs = names.path.split("/");
 
                     if (!names.path.endsWith("/")) dirs.splice(dirs.length - 1);
-                    mkdirSync(dirs.join("/"), {recursive: true});
+                    fs.mkdirSync(dirs.join("/"), {recursive: true});
                 }
                 return true;
             },
             execute: (track) => {
                 return new Promise<boolean>((resolve) => {
-                    new httpsClient(track.link).request.then((req) => {
-                        if (req instanceof Error) return resolve(false);
-                        else if ("pipe" in req) {
-                            const status = this.status(track);
-                            const file = createWriteStream(status.path)
-                                // Если произошла ошибка при создании файла
-                                .once("error", () => {
-                                    return resolve(false);
-                                })
+                    const status = this.status(track);
 
-                                // Производим запись в файл
-                                .once("ready", () => {
-                                    req.pipe(file);
-                                })
+                    // Создаем ffmpeg для скачивания трека
+                    const ffmpeg = new Process([
+                        "-vn",  "-loglevel", "panic",
+                        "-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+                        "-i", track.link,
+                        "-f", `opus`,
+                        `${status.path}.opus`
+                    ]);
 
-                                // Если запись была завершена
-                                .once("finish", () => {
-                                    const name = this.status(track).path.split(".raw")[0];
-
-                                    // Заканчиваем запись на файл
-                                    if (!file.destroyed) {
-                                        file.destroy();
-                                        file.end();
-                                    }
-
-                                    // Удаляем подключение
-                                    if (!req.destroyed) req.destroy();
-
-                                    // Проверяем размер файла
-                                    stat(`${name}.raw`, (_, file) => {
-                                        // Если вес файла менее 100 байт, то его надо удалить
-                                        if (file && file.size < 100) {
-                                            unlink(`${name}.raw`, () => {});
-                                            return resolve(false);
-                                        }
-
-                                        // Файл успешно скачан и готов
-                                        rename(status.path, `${name}.opus`, () => null);
-                                        return resolve(true);
-                                    });
-                                });
-                        }
-
+                    // Если была получена ошибка
+                    ffmpeg.stdout.once("error", () => {
                         return resolve(false);
+                    });
+
+                    // Если запись была завершена
+                    ffmpeg.stdout.once("close", () => {
+                        return resolve(true);
                     });
                 });
             }
         });
+
         this.cache_dir = cache_dir;
     };
 
@@ -212,14 +189,13 @@ class CacheAudio extends Constructor.Cycle<Track> {
      * @description Получаем статус скачивания и путь до файла
      * @param track
      */
-    public status = (track: Track): { status: "not" | "final" | "download", path: string } => {
-        try {
-            const dir = `${path.resolve(`${this.cache_dir}/Audio/[${track.id}]`)}`;
-            const isOpus = existsSync(`${dir}.opus`), isRaw = existsSync(`${dir}.raw`);
+    public status = (track: Track): { status: "not-ended" | "ended" | "download", path: string } => {
+        const file = `${this.cache_dir}/Audio/[${track.id}]`;
 
-            return {status: isOpus ? "final" : isRaw ? "download" : "not", path: dir + (isOpus ? `.opus` : `.raw`)}
-        } catch {
-            return {status: "not", path: null};
-        }
+        // Если файл был найден в виде opus
+        if (fs.existsSync(`${file}.opus`)) return { status: "ended", path: `${file}.opus`};
+
+        // Выдаем что ничего нет
+        return { status: "not-ended", path: file };
     };
 }
