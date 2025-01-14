@@ -134,7 +134,7 @@ class PlayerTracks {
          * @description Тип повтора
          * @private
          */
-        _repeat: "songs" as "off" | "song" | "songs",
+        _repeat: "off" as "off" | "song" | "songs",
 
         /**
          * @description Смешивание треков
