@@ -79,8 +79,6 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
                 // Если при подключении была получена ошибка
                 .once("error", (err) => {
-                    this.destroy();
-
                     if (err) console.error(err);
                     return reject(Error("It is not possible to open the UDP port on your IP\n - Check your firewall!"));
                 })

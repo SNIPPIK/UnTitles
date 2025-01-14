@@ -134,21 +134,36 @@ class PlayerTracks {
          * @description Тип повтора
          * @private
          */
-        _repeat: "off" as "off" | "song" | "songs",
+        _repeat: "songs" as "off" | "song" | "songs",
 
         /**
          * @description Смешивание треков
          * @private
          */
         _shuffle: false as boolean
-    }
+    };
 
     /**
      * @description На сколько сделать пропуск треков
      * @param number - Позиция трека
      * @public
      */
-    public set position(number: number) { this._tracks._position = number; };
+    public set position(number: number) {
+        // Переключаем позицию на первый трек
+        if (number >= this._tracks._current.length) {
+            this._tracks._position = 0;
+            return;
+        }
+
+        // Переключаем с первой на последнею
+        else if (number < 0) {
+            this._tracks._position = this._tracks._current.length - 1;
+            return;
+        }
+
+        // Меняем позицию
+        this._tracks._position = number;
+    };
 
     /**
      * @description Текущая позиция трека в очереди
@@ -303,23 +318,6 @@ class PlayerTracks {
 
         // Удаляем из очереди
         this._tracks._current.splice(position, 1);
-    };
-
-    /**
-     * @description Функция для переключения трека на следующий, сопоставление аргументов и прочее
-     * @public
-     */
-    public autoPosition = (): void => {
-        const repeat = this.repeat, position = this.position;
-
-        // Проверяем надо ли удалить из очереди трек
-        if (repeat === "off" || repeat === "songs") {
-            // Смена трек на следующий
-            this.position = position + 1;
-
-            // Если включен повтор и нет больше треков, значит включаем обратно все треки
-            if (repeat === "songs" && position >= this.total) this.position = 0;
-        }
     };
 }
 
@@ -727,22 +725,36 @@ export class ExtraPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
-     * @description Удаляем ненужные данные
-     * @public
+     * @description Эта функция частично удаляет плеер и некоторые сопутствующие данные
+     * @readonly
+     * @protected
      */
-    public cleanup = (): void => {
-        this.removeAllListeners();
-        // Выключаем плеер если сейчас играет трек
-        this.stop();
+    public readonly cleanup = (): void => {
+        Logger.log("DEBUG", `[AudioPlayer: ${this.id}] has cleanup`);
+
+        // Отключаем от цикла плеер
+        db.audio.cycles.players.remove(this);
 
         // Удаляем текущий поток, поскольку он больше не нужен
-        setImmediate(() => {
-            // Вырубаем поток, если он есть
-            if (this.audio.current) {
-                this.audio.current.stream.emit("close");
-                this.audio.current.destroy();
-            }
-        });
+        if (this.audio.current) {
+            if (this.audio.current.stream) this.audio.current.stream.emit("close");
+            this.audio.current.destroy();
+        }
+    };
+
+    /**
+     * @description Эта функция полностью удаляет плеер и все сопутствующие данные
+     * @readonly
+     * @protected
+     */
+    protected readonly destroy = () => {
+        Logger.log("DEBUG", `[AudioPlayer: ${this.id}] has destroyed`);
+
+        // Отключаем все ивенты от плеера
+        this.removeAllListeners();
+
+        // Удаляем все параметры
+        for (let key of Object.keys(this)) this[key] = null;
     };
 }
 

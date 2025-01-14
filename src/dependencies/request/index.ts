@@ -244,7 +244,11 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
 
         // Если есть время для проверки жизни
         if (ms > 0) this.KeepAlive.interval = setInterval(() => {
-            if (this.KeepAlive.send !== 0 && this.KeepAlive.miss >= 3) this.destroy(0);
+            if (this.KeepAlive.send !== 0 && this.KeepAlive.miss >= 3) {
+                // Пропущено слишком - отключаемся
+                this.socket.close();
+                this.keepAlive = -1;
+            }
 
             // Задаем время и прочие параметры для правильной работы
             this.KeepAlive.send = Date.now();
@@ -299,16 +303,17 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
     private readonly onmessage = (event: WebSocketEvent) => {
         if (typeof event.data !== "string") return;
 
+        let packet: any;
         try {
-            const packet = JSON.parse(event.data);
-
-            // Если надо обновить интервал жизни
-            if (packet.op === VoiceOpcodes.HeartbeatAck) this.KeepAlive.miss = 0;
-
-            this.emit("packet", packet);
+            packet = JSON.parse(event.data);
         } catch (error) {
             this.emit("error", error as Error);
         }
+
+        // Если надо обновить интервал жизни
+        if (packet.op === VoiceOpcodes.HeartbeatAck) this.KeepAlive.miss = 0;
+
+        this.emit('packet', packet);
     };
 
     /**

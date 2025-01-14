@@ -253,7 +253,7 @@ export class Track {
             if (this._lyrics) return resolve(this._lyrics);
 
             new httpsClient(`https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.title.split(" ").join("+")}`, {
-                useragent: "UnTitles-Client, (Discord music) 0.1.1 version (github: github.com/SNIPPIK/UnTitles)"
+                useragent: "UnTitles-Client, (Discord music) 0.2.0 version (github: github.com/SNIPPIK/UnTitles)"
             }).toJson.then((item) => {
                 // Если получаем вместо данных ошибку
                 if (item instanceof Error) return resolve(item);

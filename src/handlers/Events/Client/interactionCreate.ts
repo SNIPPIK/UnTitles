@@ -65,15 +65,12 @@ const intends: { name: Handler.Command["rules"][number], callback: (message: Int
 
             // Если музыка играет в другом голосовом канале
             if (message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
-
                 // Если включена музыка на сервере
                 if (queue) {
-
                     // Если есть голосовое подключение
                     if (queue.voice && queue.voice.channel) {
-
                         // Если в гс есть другие пользователи
-                        if (queue.voice.channel?.members?.size > 1) {
+                        if (message.me.voice.channel.members.filter((user) => !user.user.bot).size > 0) {
                             message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
                             return false;
                         }
@@ -82,7 +79,11 @@ const intends: { name: Handler.Command["rules"][number], callback: (message: Int
                         else {
                             queue.voice = message.voice;
                             queue.message = message;
-                            message.fastBuilder = { description: locale._(message.locale, "voice.new", [message.voice.channel]), color: Colors.Yellow };
+
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "voice.new", [message.voice.channel]),
+                                color: Colors.Yellow
+                            };
                             return true;
                         }
                     }
@@ -202,18 +203,19 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
 
                     // Если права не соответствуют правде
                     else if (command.rules && command.rules?.length > 0) {
-                        const rule = intends.find((item) => {
-                            // Если будет найдено совпадение
-                            if (command.rules.includes(item.name)) {
-                                // Если нет этого необходимости проверки запроса, то пропускаем
-                                return item.callback(interact);
-                            }
+                        let isContinue = true;
 
-                            return true;
-                        });
+                        for (const rule of intends) {
+                            // Если будет найдено совпадение
+                            if (command.rules.includes(rule.name)) {
+                                // Если нет этого необходимости проверки запроса, то пропускаем
+                                if (isContinue) isContinue = rule.callback(interact);
+                                else break;
+                            }
+                        }
 
                         // Если нет доступа, то отклоняем
-                        if (!rule) return;
+                        if (!isContinue) return;
                     }
 
                     // Выполняем команду

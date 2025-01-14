@@ -61,15 +61,6 @@ export class dbl_buttons extends Constructor.Collection<ButtonCallback, SupportB
         this.set("last", (msg) => {
             const queue = msg.queue;
 
-            // Если играет 1 трек
-            if (queue.tracks.position === 0) {
-                msg.fastBuilder = {
-                    description: locale._(msg.locale, "player.button.last.fail"),
-                    color: Colors.Yellow
-                };
-                return;
-            }
-
             // Меняем позицию трека в очереди
             queue.player.stop(queue.tracks.position - 1);
 
@@ -325,7 +316,6 @@ export class dbl_buttons extends Constructor.Collection<ButtonCallback, SupportB
 
             // Если есть очередь, то удаляем ее
             if (queue) queue.cleanup();
-            db.voice.remove(msg.guild.id);
 
             msg.fastBuilder = {
                 description: locale._(msg.locale, "player.button.stop"),

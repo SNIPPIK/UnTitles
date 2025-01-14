@@ -90,13 +90,8 @@
   },
 
   "player.button.last": {
-    "ru": "Прошлый трек был вернут!",
-    "en-US": "Return old track!"
-  },
-
-  "player.button.last.fail": {
-    "ru": "Играет только 1 трек, прошлых треков нет!",
-    "en-US": "Playing only 1 track, not old tracks!"
+    "ru": "Переход к прошлому треку!",
+    "en-US": "Go to the previous track!"
   },
 
   "player.button.resume": {
@@ -110,8 +105,8 @@
   },
 
   "player.button.skip": {
-    "ru": "Пропускаем текущий трек!",
-    "en-US": "Skip current track!"
+    "ru": "Переход к следующему треку!",
+    "en-US": "Skip to next track!"
   },
 
   "player.button.repeat.songs": {
@@ -217,8 +212,8 @@
   },
 
   "voice.new": {
-    "ru": "В том голосовом канале никого нет, я пере подключился сюда {ARGUMENT}!",
-    "en-US": "There is no one in that voice channel, I reconnected here {ARGUMENT}!"
+    "ru": "В том голосовом канале никого нет, провожу подключение сюда {ARGUMENT}!",
+    "en-US": "There is no one in that voice channel, I’m connecting here {ARGUMENT}!"
   },
 
 

@@ -78,8 +78,10 @@ export class CacheUtility {
 
         // Сохраняем данные в файл
         if (!fs.existsSync(`${this.cache}/Data/[${track.id}].json`)) {
-            fs.createWriteStream(`${this.cache}/Data/[${track.id}].json`);
+            // Создаем файл
+            fs.createWriteStream(`${this.cache}/Data/[${track.id}].json`).destroy();
 
+            // Записываем данные в файл
             fs.writeFile(`${this.cache}/Data/[${track.id}].json`, JSON.stringify({
                 ...track["_track"],
                 time: { total: `${track["_duration"]["total"]}` },

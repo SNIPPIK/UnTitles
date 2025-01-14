@@ -183,7 +183,7 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                     {
                         color, thumbnail: image,
                         author: {name: artist.title, url: artist.url, iconURL: db.emojis.diskImage},
-                        footer: { text: `${user.displayName}`, iconURL: user.avatar },
+                        footer: { text: `${user.displayName} | 🎵 ${queue.player.tracks.position + 1} - ${queue.player.tracks.total} 🎶`, iconURL: user.avatar },
                         fields: [
                             // Текущий трек
                             {
@@ -211,11 +211,11 @@ class message_playing extends Constructor.Assign<Handler.Event<"message/playing"
                 // Если надо обновить сообщение
                 if (message) {
                     //Обновляем сообщение
-                    message.edit({ embeds: embed.embeds, components: queue.components }).catch((err) => console.error(err));
+                    message.edit({ embeds: embed.embeds, components: queue.components }).catch(() => null);
                     return
                 }
 
-                embed.setTime(0).addComponents(queue.components as any).send = queue.message;
+                embed.setTime(0).addComponents(queue.components).send = queue.message;
             }
         });
     };

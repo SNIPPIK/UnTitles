@@ -1,5 +1,5 @@
-import {Events, VoiceChannel} from "discord.js";
 import {Constructor, Handler} from "@handler";
+import {Events} from "discord.js";
 import {db} from "@lib/db";
 
 /**
@@ -27,11 +27,12 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
             name: Events.VoiceStateUpdate,
             type: "client",
             once: false,
-            execute: (client, oldState, newState) => setImmediate(() => {
+            execute: (_, oldState, newState) => setImmediate(() => {
                 const guild = oldState.guild || newState.guild;
                 const voice = db.voice.get(guild.id);
                 const queue = db.audio.queue.get(guild.id);
                 const temp = temple_db.get(guild.id);
+
 
                 // Если нет гс, то не продолжаем
                 if (!voice && !queue) return;
@@ -43,7 +44,7 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
                 else {
                     // Если есть очередь на сервере и голосовое подключение
                     if (queue) {
-                        const members = queue.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
+                        const members = oldState.guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
 
                         // Если есть пользователи
                         if (members > 0) {
@@ -72,11 +73,11 @@ class VoiceStateUpdate extends Constructor.Assign<Handler.Event<Events.VoiceStat
 
                     // Если нет очереди, но есть голосовое подключение
                     else {
-                        const members = (client.channels.cache.get(voice.config.channelId) as VoiceChannel)?.members?.filter(member => !member.user.bot).size;
+                        const members = oldState.guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size;
 
                         // Если есть пользователи
                         if (members > 0) return;
-                        else voice.disconnect();
+                        else db.voice.remove(guild.id);
                     }
                 }
             })

@@ -199,15 +199,17 @@ export class AudioResource {
                 if (stream instanceof Process) stream.destroy();
                 else {
                     stream.emit("close");
-                    stream?.destroy();
-                    stream?.end();
+                    stream.destroy();
+                    stream.end();
                 }
             }
 
             this._streams.splice(0, this._streams.length);
+
+            // Удаляем все параметры
+            for (let key of Object.keys(this)) this[key] = null;
         });
 
-        Object.keys(this.chunks).forEach(key => this.chunks[key] = null);
         this._readable = null;
     };
 }

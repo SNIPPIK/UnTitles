@@ -39,14 +39,35 @@ class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
             type: "player",
             once: false,
             execute: (player) => {
-                // Если нет треков в очереди
-                if (!player?.tracks?.track || !player) return db.audio.queue.remove(player.id);
+                const queue = db.audio.queue.get(player.id);
+                const repeat = player.tracks.repeat;
+                const position = player.tracks.position;
 
-                // Авто переключение трека
-                player.tracks.autoPosition();
+                // Если включен повтор трека сменить позицию нельзя
+                if (repeat === "song") player.tracks.position = position;
+
+                // Если включен повтор треков
+                else if (repeat === "songs") {
+                    // Переключаем позицию на первый трек
+                    if (position >= player.tracks.total) player.tracks.position = 0;
+
+                    // Переключаем с первой на последнею
+                    else if (position < 0) player.tracks.position = player.tracks.total - 1;
+
+                    // Меняем позицию трека в списке
+                    player.tracks.position = player.tracks.position + 1;
+                }
+
+                // Если повтор выключен
+                else {
+                    // Если уже максимальная позиция
+                    if (player.tracks.position + 1 === player.tracks.total) return queue.cleanup();
+
+                    player.tracks.position = player.tracks.position + 1;
+                }
 
                 // Получаем ссылки на трек и проигрываем ее
-                setTimeout(() => player.play(), 2e3);
+                setTimeout(player.play, 2e3);
             }
         });
     };
@@ -70,7 +91,7 @@ class player_error extends Constructor.Assign<Handler.Event<"player/error">> {
 
                 // Заставляем плеер пропустить этот трек
                 if (skip) {
-                    if (player.tracks.size === 1) setTimeout(() => db.audio.queue.remove(player.id), 300);
+                    if (player.tracks.size === 1) queue.cleanup();
                     else player.tracks.remove(skip.position);
                 }
 

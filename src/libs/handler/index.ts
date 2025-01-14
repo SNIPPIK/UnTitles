@@ -453,6 +453,17 @@ export namespace Constructor {
     };
 
     /**
+     * @description Ищем есть ли объект в базе
+     * @param item - Объект T
+     */
+    public match = (item: T) => {
+      if (this.array.length === 0) return false;
+
+      // Ищем есть и в базе этот объект
+      return this.array.indexOf(item) !== -1;
+    };
+
+    /**
      * @description Здесь будет выполнен прогон объектов для выполнения execute
      * @readonly
      * @private
@@ -507,8 +518,13 @@ export namespace Constructor {
         }
       }
 
-      // Выполняем функцию через ~this.data.time ms
-      setTimeout(this._stepCycle, this.data.time - Date.now());
+      let time = this.data.time - Date.now();
+
+      // Если время меньше 1 ms
+      if (time < 1) time = 20;
+
+      // Выполняем функцию через ~time ms
+      setTimeout(this._stepCycle, time);
     };
   }
 }

@@ -1,6 +1,7 @@
 import { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData, GatewayOpcodes } from "discord-api-types/v10";
 import {stateDestroyer, VoiceSocket, VoiceSocketState, VoiceSocketStatusCode} from "./socket";
 import {TypedEmitter} from "tiny-typed-emitter";
+import {Logger} from "@lib/logger";
 
 /**
  * @class VoiceConnection
@@ -348,11 +349,14 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public destroy = (adapterAvailable = false): void => {
+        Logger.log("DEBUG", `[VoiceConnection] has destroyed`);
+
         const state = this.state;
 
-        if (state.status === VoiceConnectionStatus.Destroyed) throw new Error("Cannot destroy VoiceConnection - it has already been destroyed");
+        if (state.status === VoiceConnectionStatus.Destroyed) return;
         if (adapterAvailable) state.adapter.sendPayload(this.payload(this.config));
 
+        if ("networking" in state) state.networking.destroy();
         this.state = { status: VoiceConnectionStatus.Destroyed };
     };
 }

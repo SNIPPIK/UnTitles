@@ -47,5 +47,6 @@ export class Logger {
 
         // Отправляем лог
         console.log(`\x1b[35m${threadId}\x1b[0m [${time}] |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}`);
+        return;
     };
 }

@@ -37,7 +37,7 @@ export class Interact {
    * @description Главный класс бота
    * @public
    */
-  public get me() { return this._temp.client; }
+  public get me() { return this._temp.guild.members.me; }
 
   /**
    * @description Проверяем возможно ли редактирование сообщения
@@ -106,9 +106,9 @@ export class Interact {
     // Удаляем сообщение через time время
     setTimeout(() => {
       // Если получаем возврат
-      if (this._temp instanceof InteractionCallbackResponse) this._temp.resource.message.delete();
-      else if ("delete" in this._temp) this._temp.delete();
-      else if ("deleteReply" in this._temp) (this._temp as any).deleteReply();
+      if (this._temp instanceof InteractionCallbackResponse) this._temp.resource.message.delete().catch(() => null);
+      else if ("delete" in this._temp) this._temp.delete().catch(() => null);
+      else if ("deleteReply" in this._temp) (this._temp as any).deleteReply().catch(() => null);
       return;
     }, time || 15e3);
   };
@@ -316,7 +316,7 @@ class MessageBuilder {
    * @description Добавляем components в базу для дальнейшей отправки
    * @param data - Компоненты под сообщением
    */
-  public addComponents = (data: MessageBuilder["components"]) => {
+  public addComponents = (data: InteractSendOptions["components"]) => {
     Object.assign(this.components, data);
     return this;
   };

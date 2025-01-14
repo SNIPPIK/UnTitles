@@ -109,6 +109,19 @@ class AudioQueues extends Constructor.Collection<Queue> {
 
         // Проверяем есть ли очередь в списке, если нет то создаем
         if (!queue) queue = new Queue(message);
+        else {
+            // Значит что плеера нет в циклах
+            if (db.audio.cycles.players.match(queue.player)) {
+                // Если это новый текстовый канал
+                if (queue.message.channel.id !== message.channel.id) queue.message = message;
+
+                // Добавляем плеер в базу цикла для отправки пакетов
+                db.audio.cycles.players.set(queue.player);
+
+                // Запускаем проигрывание заново
+                setImmediate(queue.player.play);
+            }
+        }
 
         // Отправляем сообщение о том что было добавлено
         if ("items" in item || item instanceof Track && queue.tracks.total > 0) {
