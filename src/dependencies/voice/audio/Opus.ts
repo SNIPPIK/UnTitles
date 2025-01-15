@@ -125,14 +125,22 @@ export class AudioResource {
      * @return OpusEncoder
      * @public
      */
-    public get stream() { return this._streams.at(0) as OpusEncoder; };
+    public get stream() {
+        if (!this._streams) return null;
+
+        return this._streams.at(0) as OpusEncoder;
+    };
 
     /**
      * @description Получаем Process
      * @return Process
      * @public
      */
-    public get process() { return this._streams.at(1) as Process; };
+    public get process() {
+        if (!this._streams) return null;
+
+        return this._streams.at(1) as Process;
+    };
 
     /**
      * @description Подключаем поток к ffmpeg
