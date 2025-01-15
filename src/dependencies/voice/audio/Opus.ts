@@ -195,16 +195,18 @@ export class AudioResource {
     public destroy = () => {
         // Удаляем поток после всех действий, даже если он будет включен заново он все равно будет удален
         setImmediate(() => {
-            for (const stream of this._streams) {
-                if (stream instanceof Process) stream.destroy();
-                else {
-                    stream.emit("close");
-                    stream.destroy();
-                    stream.end();
+            if (this._streams && this._streams?.length) {
+                for (const stream of this._streams) {
+                    if (stream instanceof Process) stream.destroy();
+                    else {
+                        stream.emit("close");
+                        stream.destroy();
+                        stream.end();
+                    }
                 }
-            }
 
-            this._streams.splice(0, this._streams.length);
+                this._streams.splice(0, this._streams.length);
+            }
 
             // Удаляем все параметры
             for (let key of Object.keys(this)) this[key] = null;
