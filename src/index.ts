@@ -73,8 +73,8 @@ else {
      * @link https://nodejs.org/api/process.html#event-uncaughtexception
      */
     process.on("uncaughtException", (err, origin) => {
-        if (err.message.match(/read ECONNRESET/)) return;
-        else if (err.message.match(/Unknown interaction/)) return Logger.log("WARN", `[Hocked Error Discord Library]: Unknown interaction`);
+        if (err.message.match(/read ECONNRESET/)) return Logger.log("WARN", `[ECONNRESET] WebSocket ECONNRESET`);
+        else if (err.message.match(/Unknown interaction/)) return Logger.log("WARN", `[Hocked Error Discord Library] Unknown interaction`);
 
         // Отправляем данные об ошибке и отправляем через систему webhook
         client.sendWebhook = {
