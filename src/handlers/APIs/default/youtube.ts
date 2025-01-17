@@ -253,13 +253,13 @@ class sAPI extends Constructor.Assign<Handler.API> {
                     // Если есть статус, то проверяем
                     if (api["playabilityStatus"]?.status) {
                         // Если без аккаунта не получается получить данные
-                        if (api["playabilityStatus"]?.status === "LOGIN_REQUIRED") return resolve(locale.err("api.request.login"));
+                        if (api["playabilityStatus"]?.status === "LOGIN_REQUIRED") {
+                            this.AIzaKey = null;
+                            return resolve(locale.err("api.request.login"));
+                        }
 
                         // Если произошла ошибка при получении данных
-                        else if (api["playabilityStatus"]?.status === "ERROR") {
-                            this.AIzaKey = null;
-                            return resolve(locale.err("api.request.fail.msg", [api["playabilityStatus"]?.reason]));
-                        }
+                        else if (api["playabilityStatus"]?.status === "ERROR") return resolve(locale.err("api.request.fail.msg", [api["playabilityStatus"]?.reason]));
 
                         // Если статус не является хорошим
                         else if (api["playabilityStatus"]?.status !== "OK") return resolve(locale.err( "api.request.fail.msg", [api["playabilityStatus"]?.reason]));
