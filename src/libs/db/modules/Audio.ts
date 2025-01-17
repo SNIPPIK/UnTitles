@@ -111,7 +111,7 @@ class AudioQueues extends Constructor.Collection<Queue> {
         if (!queue) queue = new Queue(message);
         else {
             // Значит что плеера нет в циклах
-            if (db.audio.cycles.players.match(queue.player)) {
+            if (!db.audio.cycles.players.match(queue.player)) {
                 // Если это новый текстовый канал
                 if (queue.message.channel.id !== message.channel.id) queue.message = message;
 
