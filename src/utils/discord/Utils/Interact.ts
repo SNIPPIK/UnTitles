@@ -1,6 +1,6 @@
-import type { EmbedData, GuildMember, CommandInteraction, MessageComponentInteraction, ModalSubmitInteraction} from "discord.js"
+import type { EmbedData, GuildMember} from "discord.js"
 import {CommandInteractionOption, GuildTextBasedChannel, User} from "discord.js"
-import { Message, Attachment, InteractionCallbackResponse } from "discord.js";
+import { Attachment, InteractionCallbackResponse } from "discord.js";
 import {EmbedBuilder, MessageSendOptions, ds_input} from "@util/discord";
 import {locale, languages} from "@service/locale";
 import {Logger} from "@service/logger";
@@ -132,7 +132,7 @@ export class Interact {
    * @param embed - Embed data, для создания сообщения
    */
   public set fastBuilder(embed: EmbedData) {
-    new this.builder().addEmbeds([embed]).setTime(10e3).send = this._temp as any;
+    new this.builder().addEmbeds([embed]).setTime(10e3).send = this;
   };
 
   /**
@@ -159,7 +159,7 @@ export class Interact {
    * @description Загружаем данные для взаимодействия с классом
    * @param data - Message или BaseInteraction
    */
-  public constructor(data: Message | CommandInteraction | MessageComponentInteraction | ModalSubmitInteraction) {
+  public constructor(data: ds_input) {
     if (data instanceof InteractionCallbackResponse) this._temp = data.resource.message;
     else this._temp = data;
   };

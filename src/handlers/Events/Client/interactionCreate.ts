@@ -129,7 +129,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     "customId" in message && (`${message.customId}`.startsWith("menu_"))
                 ) return;
 
-                const interact = new Interact(message as any);
+                const interact = new Interact(message);
 
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
@@ -182,7 +182,6 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                         temple_db.delete(message.user.id);
                     }
                 }
-
 
 
                 // Если пользователь использует команду
@@ -240,14 +239,14 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     // Если есть очередь и пользователь не подключен к тому же голосовому каналу
                     else if (!queue || interact.voice.channel?.id !== queue.voice.channel.id) return;
 
-                    // Если была найдена кнопка
-                    else if (button) button(interact);
+                    // Если была не найдена кнопка
+                    else if (!button) {
+                        interact.fastBuilder = { description: locale._(interact.locale, "button.fail"), color: Colors.DarkRed };
+                        return;
+                    }
 
-                    // Если кнопка была не найдена
-                    else interact.fastBuilder = { description: locale._(interact.locale, "button.fail"), color: Colors.DarkRed };
-
-                    // Завершаем действие
-                    return;
+                    // Если кнопка была найдена
+                    button(interact);
                 }
             }
         });
