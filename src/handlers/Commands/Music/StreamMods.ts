@@ -1,10 +1,10 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
-import filters from "@lib/db/json/filters.json";
+import {SlashBuilder} from "@util/decorators/SlashCommand";
+import filters from "@service/db/json/filters.json";
 import {Constructor, Handler} from "@handler";
 import {AudioFilter} from "@lib/player";
-import {locale} from "@lib/locale";
-import {db} from "@lib/db";
+import {locale} from "@service/locale";
+import {db} from "@service/db";
 
 /**
  * @author SNIPPIK
@@ -12,32 +12,34 @@ import {db} from "@lib/db";
  * @class SeekTrackCommand
  * @public
  */
+@SlashBuilder({
+    names: {
+        "en-US": "seek",
+        "ru": "переход"
+    },
+    descriptions: {
+        "en-US": "Jump to a specific track time!",
+        "ru": "Переход к конкретному времени трека!"
+    },
+    dm_permission: false,
+    options: [
+        {
+            type: ApplicationCommandOptionType["String"],
+            names: {
+                "en-US": "time",
+                "ru": "время"
+            },
+            descriptions: {
+                "en-US": "It is necessary to specify what time to arrive. Example - 00:00",
+                "ru": "Необходимо указать к какому времени прейти. Пример - 00:00"
+            },
+            required: true,
+        }
+    ]
+})
 class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            builder: new SlashBuilder()
-                .setName({
-                    "en-US": "seek",
-                    "ru": "переход"
-                })
-                .setDescription({
-                    "en-US": "Jump to a specific track time!",
-                    "ru": "Переход к конкретному времени трека!"
-                })
-                .addSubCommands([
-                    {
-                        type: ApplicationCommandOptionType["String"],
-                        names: {
-                            "en-US": "time",
-                            "ru": "время"
-                        },
-                        descriptions: {
-                            "en-US": "It is necessary to specify what time to arrive. Example - 00:00",
-                            "ru": "Необходимо указать к какому времени прейти. Пример - 00:00"
-                        },
-                        required: true,
-                    }
-                ]),
             rules: ["queue", "voice", "another_voice", "player-not-playing"],
             execute: ({message, args}) => {
                 const {guild} = message;
@@ -73,94 +75,96 @@ class SeekTrackCommand extends Constructor.Assign<Handler.Command> {
  * @class AudioFiltersCommand
  * @public
  */
+@SlashBuilder({
+    names: {
+        "en-US": "filter",
+        "ru": "фильтр"
+    },
+    descriptions: {
+        "en-US": "Setting filters",
+        "ru": "Управление фильтрами аудио!"
+    },
+    dm_permission: false,
+    options: [
+        {
+            names: {
+                "en-US": "off",
+                "ru": "выкл"
+            },
+            descriptions: {
+                "en-US": "Disable all filters!",
+                "ru": "Отключение всех фильтров!"
+            },
+            type: ApplicationCommandOptionType.Subcommand
+        },
+        {
+            names: {
+                "en-US": "push",
+                "ru": "добавить"
+            },
+            descriptions: {
+                "en-US": "Adding filters!",
+                "ru": "Добавление фильтров!"
+            },
+            type: ApplicationCommandOptionType.Subcommand,
+            options: [
+                {
+                    names: {
+                        "en-US": "filters",
+                        "ru": "фильтры"
+                    },
+                    descriptions: {
+                        "en-US": "You need to select a filter! [names] - <allowable range> - description",
+                        "ru": "Необходимо выбрать фильтр! [названия] - <допустимый диапазон> - описание"
+                    },
+                    type: ApplicationCommandOptionType["String"],
+                    required: true,
+                    choices: db.commands.filters_options
+                },
+                {
+                    names: {
+                        "en-US": "argument",
+                        "ru": "аргумент"
+                    },
+                    descriptions: {
+                        "en-US": "An argument for the filter, if necessary!",
+                        "ru": "Аргумент для фильтра, если он необходим!"
+                    },
+                    type: ApplicationCommandOptionType["String"]
+                }
+            ]
+        },
+        {
+            names: {
+                "en-US": "disable",
+                "ru": "отключить"
+            },
+            descriptions: {
+                "en-US": "Disabled filters!",
+                "ru": "Отключение фильтров!"
+            },
+            type: ApplicationCommandOptionType.Subcommand,
+            options: [
+                {
+                    names: {
+                        "en-US": "filters",
+                        "ru": "фильтры"
+                    },
+                    descriptions: {
+                        "en-US": "You need to select a filter! [names] - <not required> - description",
+                        "ru": "Необходимо выбрать фильтр! [названия] - <не требуется> - описание"
+                    },
+                    type: ApplicationCommandOptionType["String"],
+                    required: true,
+                    choices: db.commands.filters_options
+                }
+            ]
+        },
+    ]
+})
 class AudioFiltersCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            builder: new SlashBuilder()
-                .setName({
-                    "en-US": "filter",
-                    "ru": "фильтр"
-                })
-                .setDescription({
-                    "en-US": "Setting filters",
-                    "ru": "Управление фильтрами аудио!"
-                })
-                .addSubCommands([
-                    {
-                        names: {
-                            "en-US": "off",
-                            "ru": "выкл"
-                        },
-                        descriptions: {
-                            "en-US": "Disable all filters!",
-                            "ru": "Отключение всех фильтров!"
-                        },
-                        type: ApplicationCommandOptionType.Subcommand
-                    },
-                    {
-                        names: {
-                            "en-US": "push",
-                            "ru": "добавить"
-                        },
-                        descriptions: {
-                            "en-US": "Adding filters!",
-                            "ru": "Добавление фильтров!"
-                        },
-                        type: ApplicationCommandOptionType.Subcommand,
-                        options: [
-                            {
-                                names: {
-                                    "en-US": "filters",
-                                    "ru": "фильтры"
-                                },
-                                descriptions: {
-                                    "en-US": "You need to select a filter! [names] - <allowable range> - description",
-                                    "ru": "Необходимо выбрать фильтр! [названия] - <допустимый диапазон> - описание"
-                                },
-                                type: ApplicationCommandOptionType["String"],
-                                required: true,
-                                choices: db.commands.filters_options
-                            },
-                            {
-                                names: {
-                                    "en-US": "argument",
-                                    "ru": "аргумент"
-                                },
-                                descriptions: {
-                                    "en-US": "An argument for the filter, if necessary!",
-                                    "ru": "Аргумент для фильтра, если он необходим!"
-                                },
-                                type: ApplicationCommandOptionType["String"]
-                            }
-                        ]
-                    },
-                    {
-                        names: {
-                            "en-US": "disable",
-                            "ru": "отключить"
-                        },
-                        descriptions: {
-                          "en-US": "Disabled filters!",
-                            "ru": "Отключение фильтров!"
-                        },
-                        type: ApplicationCommandOptionType.Subcommand,
-                        options: [
-                            {
-                                names: {
-                                    "en-US": "filters",
-                                    "ru": "фильтры"
-                                },
-                                descriptions: {
-                                    "en-US": "You need to select a filter! [names] - <not required> - description",
-                                    "ru": "Необходимо выбрать фильтр! [названия] - <не требуется> - описание"
-                                },
-                                type: ApplicationCommandOptionType["String"],
-                                required: true,
-                                choices: db.commands.filters_options
-                            }
-                        ]
-                    },
-                ]),
             rules: ["queue", "voice", "another_voice", "player-not-playing"],
             execute: ({message, args, type}) => {
                 const {guild} = message;

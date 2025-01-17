@@ -1,5 +1,5 @@
 import {Constructor, Handler} from "@handler";
-import {Track} from "@lib/player/track";
+import {Track} from "@lib/player";
 
 /**
  * @author SNIPPIK

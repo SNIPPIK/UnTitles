@@ -1,8 +1,8 @@
 import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
-import {Track} from "@lib/player/track";
-import {locale} from "@lib/locale";
-import {db} from "@lib/db";
+import {Track} from "@lib/player";
+import {locale} from "@service/locale";
+import {db} from "@service/db";
 import {env} from "@env";
 
 /**

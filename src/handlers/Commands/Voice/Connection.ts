@@ -1,8 +1,8 @@
 import {ApplicationCommandOptionType, Colors, StageChannel, VoiceChannel} from "discord.js";
-import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
+import {SlashBuilder} from "@util/decorators/SlashCommand";
 import {Constructor, Handler} from "@handler";
-import {locale} from "@lib/locale";
-import {db} from "@lib/db";
+import {locale} from "@service/locale";
+import {db} from "@service/db";
 
 /**
  * @author SNIPPIK
@@ -10,42 +10,44 @@ import {db} from "@lib/db";
  * @class Command_Voice
  * @public
  */
+@SlashBuilder({
+    names: {
+        "en-US": "voice",
+        "ru": "голос"
+    },
+    descriptions: {
+        "en-US": "Interaction with voice connections",
+        "ru": "Взаимодействие с голосовыми подключениями"
+    },
+    options: [
+        {
+            names: {
+                "en-US": "leave",
+                "ru": "отключение"
+            },
+            descriptions: {
+                "en-US": "Disconnecting from the voice channel!",
+                "ru": "Отключение от голосового канала!"
+            },
+            type: ApplicationCommandOptionType.Subcommand
+        },
+        {
+            names: {
+                "en-US": "re-configure",
+                "ru": "переконфигурация"
+            },
+            descriptions: {
+                "en-US": "Reconnect to the voice channel!",
+                "ru": "Переподключение к голосовому каналу!"
+            },
+            type: ApplicationCommandOptionType.Subcommand
+        }
+    ],
+    dm_permission: false
+})
 class Command_Voice extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            builder: new SlashBuilder()
-                .setName({
-                    "en-US": "voice",
-                    "ru": "голос"
-                })
-                .setDescription({
-                    "en-US": "Interaction with voice connections",
-                    "ru": "Взаимодействие с голосовыми подключениями"
-                })
-                .addSubCommands([
-                    {
-                        names: {
-                            "en-US": "leave",
-                            "ru": "отключение"
-                        },
-                        descriptions: {
-                            "en-US": "Disconnecting from the voice channel!",
-                            "ru": "Отключение от голосового канала!"
-                        },
-                        type: ApplicationCommandOptionType.Subcommand
-                    },
-                    {
-                        names: {
-                            "en-US": "re-configure",
-                            "ru": "переконфигурация"
-                        },
-                        descriptions: {
-                            "en-US": "Reconnect to the voice channel!",
-                            "ru": "Переподключение к голосовому каналу!"
-                        },
-                        type: ApplicationCommandOptionType.Subcommand
-                    }
-                ]),
             rules: ["voice", "another_voice"],
             execute: ({message, type}) => {
                 const VoiceChannel: VoiceChannel | StageChannel = message.voice.channel;

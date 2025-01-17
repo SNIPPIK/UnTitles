@@ -1,8 +1,8 @@
 import {Constructor, Handler} from "@handler";
-import {Track} from "@lib/player/track";
-import {locale} from "@lib/locale";
+import {locale} from "@service/locale";
+import {Track} from "@lib/player";
 import {Colors} from "discord.js";
-import {db} from "@lib/db";
+import {db} from "@service/db";
 
 /**
  * @author SNIPPIK
@@ -155,7 +155,7 @@ class message_search extends Constructor.Assign<Handler.Event<"message/search">>
                                         text: locale._(message.locale, "player.search.list", [tracks.length, page+1, tracks.length])
                                     },
                                 }
-                            ], ephemeral: true
+                            ]
                         });
                     }
                 ).send = message;

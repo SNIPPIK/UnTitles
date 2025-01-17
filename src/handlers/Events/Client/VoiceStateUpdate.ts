@@ -1,6 +1,6 @@
 import {Constructor, Handler} from "@handler";
 import {Events} from "discord.js";
-import {db} from "@lib/db";
+import {db} from "@service/db";
 
 /**
  * @author SNIPPIK

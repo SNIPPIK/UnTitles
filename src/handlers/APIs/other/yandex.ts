@@ -1,10 +1,10 @@
 import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
-import {Track} from "@lib/player/track";
+import {locale} from "@service/locale";
+import {Track} from "@lib/player";
 import crypto from "node:crypto";
-import {db} from "@lib/db";
+import {db} from "@service/db";
 import {env} from "@env";
-import {locale} from "@lib/locale";
 
 /**
  * @author SNIPPIK
@@ -273,7 +273,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
 
                     return resolve(`https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`);
                 }).catch((e) => resolve(Error(e)));
-            } catch (e) { return resolve(Error(e)); }
+            } catch (e) { return resolve(Error(e as string)); }
         });
     };
 

@@ -1,7 +1,7 @@
-import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
+import {SlashBuilder} from "@util/decorators/SlashCommand";
 import {ApplicationCommandOptionType} from "discord.js";
 import {Constructor, Handler} from "@handler";
-import {locale} from "@lib/locale";
+import {locale} from "@service/locale";
 
 /**
  * @author SNIPPIK
@@ -9,32 +9,34 @@ import {locale} from "@lib/locale";
  * @class AvatarCommand
  * @public
  */
+@SlashBuilder({
+    names: {
+        "en-US": "avatar",
+        "ru": "аватар"
+    },
+    descriptions: {
+        "en-US": "If you want to look at the user's avatar, I'm at your service!",
+        "ru": "Если хочется глянуть аватар пользователя я к вашим услугам!"
+    },
+    dm_permission: false,
+    options: [
+        {
+            names: {
+                "en-US": "user",
+                "ru": "пользователь"
+            },
+            descriptions: {
+                "en-US": "Specify the user!",
+                "ru": "Укажи пользователя!"
+            },
+            type: ApplicationCommandOptionType["User"],
+            required: true
+        }
+    ]
+})
 class AvatarCommand extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            builder: new SlashBuilder()
-                .setName({
-                    "en-US": "avatar",
-                    "ru": "аватар"
-                })
-                .setDescription({
-                    "en-US": "If you want to look at the user's avatar, I'm at your service!",
-                    "ru": "Если хочется глянуть аватар пользователя я к вашим услугам!"
-                })
-                .addSubCommands([
-                    {
-                        names: {
-                            "en-US": "user",
-                            "ru": "пользователь"
-                        },
-                        descriptions: {
-                            "en-US": "Specify the user!",
-                            "ru": "Укажи пользователя!"
-                        },
-                        type: ApplicationCommandOptionType["User"],
-                        required: true
-                    }
-                ]),
             execute: ({message, args}) => {
                 const user = message.guild.members.cache.get(args[0]).user;
 

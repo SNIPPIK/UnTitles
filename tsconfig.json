@@ -14,7 +14,6 @@
     "resolveJsonModule": true, // Игнорировать импорт ".json" файлы
 
     "declaration": false, // Создать ".d.ts" файлы
-    "skipLibCheck": true, // Не проверять типы
     "listFiles": false, // Печатать имена файлов
     "listEmittedFiles": true, // Печатать список всех выходных файлов
     "removeComments": false, // Удалить все комментарии
@@ -32,14 +31,27 @@
     "noImplicitAny": false, // Запрет на "any"
     "noUnusedParameters": true, // Вызов ошибки, когда параметр функции не читается
 
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
     // Сокращения
     "paths": {
       // Библиотеки
-      "@lib/*": ["./libs/*", "./dependencies/*"],
+      "@lib/*": ["./deps/*"],
 
       // Загрузчик
       "@handlers/*": ["./handlers/*"],
-      "@handler": ["./libs/handler/index"],
+      "@handler": ["./handlers/index"],
+
+      // Сервисы
+      "@service/*": ["./services/*"],
+
+      "@util/*": ["./utils/*"],
 
       // Дополнительные функции
       "@env": ["./env"]

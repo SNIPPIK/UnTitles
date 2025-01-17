@@ -1,83 +1,84 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {SlashBuilder} from "@lib/discord/tools/SlashBuilder";
 import {Constructor, Handler} from "@handler";
-import {locale} from "@lib/locale";
-import {db} from "@lib/db";
+import {locale} from "@service/locale";
+import {db} from "@service/db";
+import {SlashBuilder} from "@util/decorators/SlashCommand";
 
+@SlashBuilder({
+    names: {
+        "en-US": "api",
+        "ru": "api"
+    },
+    descriptions: {
+        "en-US": "Managing API work inside the bot!",
+        "ru": "Управление работой api внутри бота!"
+    },
+    dm_permission: false,
+    options: [
+        {
+            names: {
+                "en-US": "access",
+                "ru": "доступ"
+            },
+            descriptions: {
+                "en-US": "Actions with the platform!",
+                "ru": "Управление доступом к платформам!"
+            },
+            type: ApplicationCommandOptionType.Subcommand,
+            options: [
+                {
+                    names: {
+                        "en-US": "choice",
+                        "ru": "выбор"
+                    },
+                    descriptions: {
+                        "en-US": "You must choose an action! What will we do with the platform?",
+                        "ru": "Необходимо выбрать действие! Что будем делать с платформой?"
+                    },
+                    required: true,
+                    type: ApplicationCommandOptionType["String"],
+                    choices: [
+                        {
+                            name: "block - Block access",
+                            nameLocalizations: {
+                                "ru": "block - Заблокировать доступ"
+                            },
+                            value: "block"
+                        },
+                        {
+                            name: "unblock - Unlock access",
+                            nameLocalizations: {
+                                "ru": "unblock - Разблокировать доступ"
+                            },
+                            value: "unblock"
+                        }
+                    ]
+                },
+                {
+                    names: {
+                        "en-US": "platform",
+                        "ru": "платформа"
+                    },
+                    descriptions: {
+                        "en-US": "Actions with the platform!",
+                        "ru": "Необходимо выбрать платформу!"
+                    },
+                    required: true,
+                    type: ApplicationCommandOptionType["String"],
+                    choices: db.api.allow.map((platform) => {
+                        return {
+                            name: `[${platform.requests.length}] - ${platform.name} | ${platform.url}`,
+                            value: platform.name
+                        }
+                    }),
+                }
+            ]
+        }
+    ]
+})
 class api extends Constructor.Assign<Handler.Command> {
     public constructor() {
         super({
-            builder: new SlashBuilder()
-                .setName({
-                    "en-US": "api",
-                    "ru": "api"
-                })
-                .setDescription({
-                    "en-US": "Managing API work inside the bot!",
-                    "ru": "Управление работой api внутри бота!"
-                })
-                .setDMPermission(false)
-                .addSubCommands([
-                    {
-                        names: {
-                            "en-US": "access",
-                            "ru": "доступ"
-                        },
-                        descriptions: {
-                            "en-US": "Actions with the platform!",
-                            "ru": "Управление доступом к платформам!"
-                        },
-                        type: ApplicationCommandOptionType.Subcommand,
-                        options: [
-                            {
-                                names: {
-                                    "en-US": "choice",
-                                    "ru": "выбор"
-                                },
-                                descriptions: {
-                                    "en-US": "You must choose an action! What will we do with the platform?",
-                                    "ru": "Необходимо выбрать действие! Что будем делать с платформой?"
-                                },
-                                required: true,
-                                type: ApplicationCommandOptionType["String"],
-                                choices: [
-                                    {
-                                        name: "block - Block access",
-                                        nameLocalizations: {
-                                            "ru": "block - Заблокировать доступ"
-                                        },
-                                        value: "block"
-                                    },
-                                    {
-                                        name: "unblock - Unlock access",
-                                        nameLocalizations: {
-                                            "ru": "unblock - Разблокировать доступ"
-                                        },
-                                        value: "unblock"
-                                    }
-                                ]
-                            },
-                            {
-                                names: {
-                                    "en-US": "platform",
-                                    "ru": "платформа"
-                                },
-                                descriptions: {
-                                    "en-US": "Actions with the platform!",
-                                    "ru": "Необходимо выбрать платформу!"
-                                },
-                                required: true,
-                                type: ApplicationCommandOptionType["String"],
-                                choices: db.api.allow.map((platform) => {
-                                    return {
-                                        name: `[${platform.requests.length}] - ${platform.name} | ${platform.url}`,
-                                        value: platform.name
-                                    }
-                                }),
-                            }
-                        ]
-                    }
-                ]),
             owner: true,
             execute: ({message, args, type}) => {
                 switch (type) {

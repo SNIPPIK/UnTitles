@@ -1,9 +1,9 @@
-import {Interact} from "@lib/discord/tools/Interact";
+import {Interact} from "@util/discord";
 import {Constructor, Handler} from "@handler";
 import type { GuildMember} from "discord.js"
 import {Colors, Events} from "discord.js";
-import {locale} from "@lib/locale";
-import {db} from "@lib/db";
+import {locale} from "@service/locale";
+import {db} from "@service/db";
 
 /**
  * @author SNIPPIK
@@ -129,7 +129,7 @@ class Interaction extends Constructor.Assign<Handler.Event<Events.InteractionCre
                     "customId" in message && (`${message.customId}`.startsWith("menu_"))
                 ) return;
 
-                const interact = new Interact(message);
+                const interact = new Interact(message as any);
 
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {

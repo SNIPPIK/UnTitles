@@ -1,5 +1,5 @@
 import {Constructor, Handler} from "@handler";
-import {db} from "@lib/db";
+import {db} from "@service/db";
 
 /**
  * @author SNIPPIK

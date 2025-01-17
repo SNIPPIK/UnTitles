@@ -1,8 +1,8 @@
 import {IntentsBitField, Partials, Colors} from "discord.js";
-import {Client, ShardManager} from "@lib/discord";
+import {Client, ShardManager} from "@util/discord";
+import {Logger} from "@service/logger";
 import process from "node:process";
-import {Logger} from "@lib/logger";
-import {db} from "@lib/db";
+import {db} from "@service/db";
 import {env} from "@env";
 
 /**

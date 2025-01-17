@@ -1,9 +1,9 @@
 import {Constructor, Handler} from "@handler";
-import {Track} from "@lib/player/track";
-import {Logger} from "@lib/logger";
-import {locale} from "@lib/locale";
+import {Track} from "@lib/player";
+import {Logger} from "@service/logger";
+import {locale} from "@service/locale";
 import {Colors} from "discord.js";
-import {db} from "@lib/db";
+import {db} from "@service/db";
 import {env} from "@env";
 
 /**

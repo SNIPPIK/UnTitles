@@ -1,8 +1,8 @@
 import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
-import {Track} from "@lib/player/track";
-import {locale} from "@lib/locale";
-import {db} from "@lib/db";
+import {Track} from "@lib/player";
+import {locale} from "@service/locale";
+import {db} from "@service/db";
 import {env} from "@env";
 
 const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -217,7 +217,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
                                 "hl": 'en',
                                 "timeZone": 'UTC',
                                 "clientName": 'IOS',
-                                "clientVersion": `19.36.4`,
+                                "clientVersion": `${(19).random(17)}.36.4`,
                             },
                             "user": {
                                 "lockedSafetyMode": false
@@ -233,14 +233,14 @@ class sAPI extends Constructor.Assign<Handler.API> {
                             "contentPlaybackContext": {
                                 "vis": 0,
                                 "splay": false,
-                                "autoCaptionsDefaultOn": false,
+                                "autoCaptionsDefaultOn": true,
                                 "autonavState": "STATE_NONE",
                                 "html5Preference": "HTML5_PREF_WANTS",
                                 "lactMilliseconds": "-1"
                             }
                         },
-                        "racyCheckOk": false,
-                        "contentCheckOk": false
+                        "racyCheckOk": true,
+                        "contentCheckOk": true
                     }),
                     headers: {
                         'Content-Type': 'application/json'
