@@ -1,5 +1,5 @@
 import {IntentsBitField, Partials, Colors} from "discord.js";
-import {Client, ShardManager} from "@util/discord";
+import {Client, ShardManager} from "@service/discord";
 import {Logger} from "@service/logger";
 import process from "node:process";
 import {db} from "@service/db";
@@ -99,28 +99,5 @@ else {
 
         // Выводим ошибку
         Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
-    });
-
-    /**
-     * @description Событие генерируется всякий раз, когда Promise отвергается и в ходе цикла событий к обещанию не прикрепляется обработчик ошибок
-     * @link https://nodejs.org/api/process.html#event-unhandledrejection
-     */
-    process.on("unhandledRejection", (reason: string, promise) => {
-        // Отправляем данные об ошибке и отправляем через систему webhook
-        client.sendWebhook = {
-            username: client.user.username, avatarURL: client.user.avatarURL(),
-            embeds: [{
-                title: "Unhandled Rejection",
-                description: `\`\`\`${reason}\`\`\``,
-                fields: [{
-                    name: "Promise:",
-                    value: `\`\`\`${promise}\`\`\``
-                }],
-                color: Colors.DarkRed,
-            }],
-        };
-
-        // Выводим ошибку
-        Logger.log("ERROR", `Unhandled Rejection\n┌ Reason:    ${reason}\n└ Promise:  ${promise}\n`);
     });
 }

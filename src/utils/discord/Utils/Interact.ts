@@ -1,7 +1,7 @@
-import type { EmbedData, GuildMember} from "discord.js"
+import {EmbedBuilder, MessageSendOptions, ds_input, MessageUtils} from "@util/discord";
 import {CommandInteractionOption, GuildTextBasedChannel, User} from "discord.js"
-import { Attachment, InteractionCallbackResponse } from "discord.js";
-import {EmbedBuilder, MessageSendOptions, ds_input} from "@util/discord";
+import {Attachment, InteractionCallbackResponse} from "discord.js";
+import type {EmbedData, GuildMember, Message} from "discord.js"
 import {locale, languages} from "@service/locale";
 import {Logger} from "@service/logger";
 import {db} from "@service/db";
@@ -17,7 +17,7 @@ export class Interact {
    * @description Сообщение принятое с discord.js
    * @private
    */
-  private readonly _temp: ds_input;
+  private readonly _temp: ds_input = null;
 
   /**
    * @description Не был получен ответ
@@ -38,7 +38,9 @@ export class Interact {
    * @description Главный класс бота
    * @public
    */
-  public get me() { return this._temp.guild.members.me; }
+  public get me() {
+    return this._temp.guild.members.me;
+  };
 
   /**
    * @description Проверяем возможно ли редактирование сообщения
@@ -53,7 +55,9 @@ export class Interact {
    * @description Получен ли ответ на сообщение
    * @public
    */
-  public get replied() { return this._replied; };
+  public get replied() {
+    return this._replied;
+  };
 
   /**
    * @description Получаем опции взаимодействия пользователя с ботом
@@ -70,19 +74,25 @@ export class Interact {
    * @description Данные о текущем сервере
    * @public
    */
-  public get guild() { return this._temp.guild; };
+  public get guild() {
+    return this._temp.guild;
+  };
 
   /**
    * @description Данные о текущем канале, данные параметр привязан к серверу
    * @public
    */
-  public get channel() { return this._temp.channel as GuildTextBasedChannel; };
+  public get channel() {
+    return this._temp.channel as GuildTextBasedChannel;
+  };
 
   /**
    * @description Данные о текущем голосовом состоянии, данные параметр привязан к серверу
    * @public
    */
-  public get voice() { return (this._temp.member as GuildMember).voice; };
+  public get voice() {
+    return (this._temp.member as GuildMember).voice;
+  };
 
   /**
    * @description Данные о текущем пользователе или авторе сообщения
@@ -97,21 +107,16 @@ export class Interact {
    * @description Данные о текущем пользователе сервера
    * @public
    */
-  public get member() { return this._temp.member; };
+  public get member() {
+    return this._temp.member;
+  };
 
   /**
    * @description Удаление сообщения через указанное время
    * @param time - Через сколько удалить сообщение
    */
   public set delete(time: number) {
-    // Удаляем сообщение через time время
-    setTimeout(() => {
-      // Если получаем возврат
-      if (this._temp instanceof InteractionCallbackResponse) this._temp.resource.message.delete().catch(() => null);
-      else if ("delete" in this._temp) this._temp.delete().catch(() => null);
-      else if ("deleteReply" in this._temp) (this._temp as any).deleteReply().catch(() => null);
-      return;
-    }, time || 15e3);
+    MessageUtils.delete(this._temp as any, time);
   };
 
 
@@ -119,13 +124,17 @@ export class Interact {
    * @description Получаем очередь сервера если она конечно есть!
    * @public
    */
-  public get queue() { return db.audio.queue.get(this.guild.id); };
+  public get queue() {
+    return db.audio.queue.get(this.guild.id);
+  };
 
   /**
    * @description Выдаем класс для сборки сообщений
    * @public
    */
-  public get builder() { return EmbedBuilder; };
+  public get builder() {
+    return EmbedBuilder;
+  };
 
   /**
    * @description Отправляем быстрое сообщение
@@ -168,7 +177,7 @@ export class Interact {
    * @description Отправляем сообщение со соответствием параметров
    * @param options - Данные для отправки сообщения
    */
-  public send = (options: MessageSendOptions): Promise<InteractionCallbackResponse> => {
+  public send = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
     // Ловим ошибки
     try {
       // Если можно дать ответ на сообщение
@@ -190,7 +199,7 @@ export class Interact {
    * @description Редактируем сообщение
    * @param options - Данные для замены сообщения
    */
-  public edit = (options: MessageSendOptions): Promise<InteractionCallbackResponse> => {
+  public edit = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
     try {
       if ("edit" in this._temp) return this._temp.edit(options as any) as any;
       return null;

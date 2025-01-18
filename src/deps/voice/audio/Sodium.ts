@@ -1,4 +1,4 @@
-import {ConnectionData} from "../socket";
+import {ConnectionData} from "@lib/voice";
 import {Buffer} from "node:buffer";
 import crypto from "node:crypto";
 

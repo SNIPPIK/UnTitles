@@ -116,6 +116,8 @@ export class AudioResource {
      * @public
      */
     public get duration() {
+        if (!this.chunks?.length || !this.chunks?.size) return 0;
+
         const duration = ((this.chunks.length * this.chunks.size) / 1e3).toFixed(0);
         return parseInt(duration);
     };

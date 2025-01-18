@@ -1,7 +1,7 @@
 import {Constructor, Handler} from "@handler";
 import {httpsClient} from "@lib/request";
-import {Track} from "@lib/player";
 import {locale} from "@service/locale";
+import {Track} from "@lib/player";
 import {db} from "@service/db";
 import {env} from "@env";
 
@@ -210,41 +210,16 @@ class sAPI extends Constructor.Assign<Handler.API> {
                 }
 
                 // Создаем запрос на сервер
-                new httpsClient(`https://www.youtube.com/youtubei/v1/player?key=${this.AIzaKey}`, {
+                new httpsClient(`https://www.youtube.com/youtubei/v1/player?key=${this.AIzaKey}&prettyPrint=false`, {
                     body: JSON.stringify({
+                        "videoId": ID,
                         "context": {
                             "client": {
-                                "hl": 'en',
-                                "timeZone": 'UTC',
-                                "clientName": 'IOS',
-                                "clientVersion": `${(19).random(17)}.36.4`,
-                            },
-                            "user": {
-                                "lockedSafetyMode": false
-                            },
-                            "request": {
-                                "useSsl": true,
-                                "internalExperimentFlags": [],
-                                "consistencyTokenJars": []
+                                "clientName": "IOS",
+                                "clientVersion": "19.42.1"
                             }
-                        },
-                        "videoId": ID,
-                        "playbackContext": {
-                            "contentPlaybackContext": {
-                                "vis": 0,
-                                "splay": false,
-                                "autoCaptionsDefaultOn": true,
-                                "autonavState": "STATE_NONE",
-                                "html5Preference": "HTML5_PREF_WANTS",
-                                "lactMilliseconds": "-1"
-                            }
-                        },
-                        "racyCheckOk": true,
-                        "contentCheckOk": true
+                        }
                     }),
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
                     method: "POST",
                 }).toJson.then((api) => {
                     // Если возникает ошибка при получении страницы
@@ -342,7 +317,7 @@ class sAPI extends Constructor.Assign<Handler.API> {
      * @param data {any} <videoData>.streamingData
      */
     protected static extractFormat = (data: any) => {
-        return new Promise((resolve) => {
+        return new Promise(async (resolve) => {
             return resolve(data["adaptiveFormats"].find((format: any): void => {
                 // Если это аудио, то проверяем его
                 if (format.mimeType.match(/opus|audio/) && !format.mimeType.match(/ec-3/)) {

@@ -1,9 +1,9 @@
 import {SlashComponent} from "@util/decorators/SlashCommand";
 import filters from "@service//db/json/filters.json";
+import {Client} from "@service/discord";
 import {AudioFilter} from "@lib/player";
 import {Logger} from "@service/logger";
 import {locale} from "@service/locale";
-import {Client} from "@util/discord";
 import {Handler} from "@handler";
 import {env} from "@env";
 

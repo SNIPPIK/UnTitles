@@ -1,6 +1,6 @@
 import {dbl_apis, dbl_buttons, dbl_voice, dbl_commands, dbl_audio, CacheUtility} from "./services";
+import {Client} from "@service/discord";
 import {Logger} from "@service/logger";
-import {Client} from "@util/discord";
 import {Handler} from "@handler";
 import {env} from "@env";
 

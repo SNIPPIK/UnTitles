@@ -28,7 +28,7 @@ export class PlayerAudio {
         // Если есть текущий поток
         if (this.current) {
             this.current?.stream?.emit("close");
-            this.current.destroy();
+            this.current?.destroy();
             this._audio = null;
         }
 

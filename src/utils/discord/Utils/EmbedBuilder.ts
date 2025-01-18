@@ -1,7 +1,6 @@
-import {ActionRowBuilder, InteractionCallbackResponse} from "discord.js"
-import type { ComponentData, EmbedData} from "discord.js"
-import { Message, MessageFlags } from "discord.js";
-import { Interact} from "@util/discord";
+import type {ComponentData, EmbedData, Message, ActionRowBuilder} from "discord.js"
+import {MessageFlags, InteractionCallbackResponse} from "discord.js";
+import {Interact, MessageUtils} from "@util/discord";
 
 /**
  * @author SNIPPIK
@@ -47,7 +46,7 @@ export class EmbedBuilder<T extends Interact> {
      * @description Функция которая будет выполнена после отправления сообщения
      * @public
      */
-    private promise: (msg: T) => void;
+    private promise: (msg: Interact) => void;
 
     /**
      * @description Время жизни сообщения по умолчанию
@@ -62,57 +61,32 @@ export class EmbedBuilder<T extends Interact> {
     public set send(interaction: T) {
         const options = {embeds: this.embeds, components: this.components, flags: this.flags};
 
-        interaction.send({embeds: this.embeds, components: this.components, flags: this.flags})
-            .then((message: InteractionCallbackResponse) => {
-                // Если получить возврат не удалось, то ничего не делаем
-                if (!message) return;
+        interaction.send(options).then((message) => {
+            // Если получить возврат не удалось, то ничего не делаем
+            if (!message) return;
 
-                const msg = new Interact(message as any);
-
+            // Если был получен ответ
+            if (message instanceof InteractionCallbackResponse) {
                 // Удаляем сообщение через время если это возможно
-                if (this.time !== 0) msg.delete = this.time;
+                if (this.time !== 0) MessageUtils.delete(message, this.time)
 
                 // Создаем меню если есть параметры для него
                 if (this._menu.pages.length > 0) this.constructor_menu(message.resource.message);
 
                 // Если надо выполнить действия после
-                if (this.promise) this.promise(msg as any);
-            });
+                if (this.promise) this.promise(new Interact(message as any));
+                return;
+            }
 
-        /*
-        if (interaction instanceof Message) {
-            MessageUtils.send(interaction.channel, options)
-                .then(async (message) => {
-                    // Если получить возврат не удалось, то ничего не делаем
-                    if (!message) return;
+            // Удаляем сообщение через время если это возможно
+            if (this.time !== 0) MessageUtils.delete(message, this.time)
 
-                    // Удаляем сообщение через время если это возможно
-                    if (this.time !== 0) await MessageUtils.delete(message, this.time);
+            // Создаем меню если есть параметры для него
+            if (this._menu.pages.length > 0) this.constructor_menu(message);
 
-                    // Создаем меню если есть параметры для него
-                    if (this._menu.pages.length > 0) this.constructor_menu(message);
-
-                    // Если надо выполнить действия после
-                    if (this.promise) this.promise(message as any);
-                });
-        }
-
-        else {
-            InteractionUtils.send(interaction as any, options)
-                .then(async (message) => {
-                    // Если получить возврат не удалось, то ничего не делаем
-                    if (!message) return;
-
-                    // Удаляем сообщение через время если это возможно
-                    if (this.time !== 0) await MessageUtils.delete(message.resource.message, this.time);
-
-                    // Создаем меню если есть параметры для него
-                    if (this._menu.pages.length > 0) this.constructor_menu(message.resource.message);
-
-                    // Если надо выполнить действия после
-                    if (this.promise) this.promise(message.resource.message as any);
-                })
-        }*/
+            // Если надо выполнить действия после
+            if (this.promise) this.promise(new Interact(message));
+        });
     };
 
     /**
