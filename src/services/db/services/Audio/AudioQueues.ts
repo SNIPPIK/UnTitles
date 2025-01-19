@@ -61,8 +61,14 @@ export class AudioQueues extends Constructor.Collection<Queue> {
                 // Добавляем плеер в базу цикла для отправки пакетов
                 db.audio.cycles.players.set(queue.player);
 
-                // Запускаем проигрывание заново
-                setImmediate(queue.player.play);
+                // Если плеер не запустится сам
+                setImmediate(() => {
+                    // Запускаем проигрывание заново
+                    if (!queue.player.audio.current.stream) {
+                        queue.player.tracks.position = queue.player.tracks.position + 1;
+                        queue.player.play();
+                    }
+                });
             }
         }
 

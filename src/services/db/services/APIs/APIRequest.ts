@@ -51,14 +51,16 @@ export class APIRequest {
      */
     public get<T extends (APIs.track | APIs.playlist | APIs.album | APIs.author | APIs.search)["name"]>(type: T | string) {
         return this._api.requests.find((item) => {
-            // Скорее всего надо произвести поиск
-            if (item.name === "search" || item.name === type) return item;
-
             // Если указана ссылка
             if (type.startsWith("http")) {
-                if (item.name === type || item.filter && !!item.filter.exec(type) || item.filter && !!type.match(item.filter)) return item;
+                if (item.name === "search") return null;
+                else if (item.name === type || item.filter && !!item.filter.exec(type) || item.filter && !!type.match(item.filter)) return item;
                 return null;
             }
+
+            // Скорее всего надо произвести поиск
+            else if (item.name === "search" || item.name === type) return item;
+
             return null;
         }) as T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "author" ? APIs.author : APIs.search;
     };

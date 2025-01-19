@@ -1,7 +1,7 @@
-import {Interact} from "@util/discord";
 import {Constructor, Handler} from "@handler";
 import type { GuildMember} from "discord.js"
 import {Colors, Events} from "discord.js";
+import {Interact} from "@util/discord";
 import {locale} from "@service/locale";
 import {db} from "@service/db";
 

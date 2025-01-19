@@ -1,8 +1,8 @@
 import {Constructor, Handler} from "@handler";
-import {Track} from "@lib/player";
 import {Logger} from "@service/logger";
 import {locale} from "@service/locale";
 import {Colors} from "discord.js";
+import {Track} from "@lib/player";
 import {db} from "@service/db";
 import {env} from "@env";
 
@@ -58,52 +58,61 @@ class request_api extends Constructor.Assign<Handler.Event<"request/api">> {
                 }, 10e3);
 
                 // Получаем данные в системе API
-                api.execute(argument[1] as string, { limit: db.api.limits[api.name], audio: false }).then((item): void => {
-                    clearTimeout(timeout);
+                api.execute(argument[1] as string, { limit: db.api.limits[api.name], audio: false })
 
-                    // Если нет данных или была получена ошибка
-                    if (item instanceof Error) {
-                        db.audio.queue.events.emit("request/error", message, locale._(message.locale, "api.platform.error", [item]));
-                        return;
-                    }
-
-                    // Если был указан поиск
-                    else if (item instanceof Array) {
-                        db.audio.queue.events.emit("message/search", item, platform.platform, message);
-                        return;
-                    }
-
-                    // Добавляем данные о платформе для плейлиста
-                    if ("items" in item) item.items.map((track: Track) => {
-                        // Добавляем данные о платформе
-                        track.api = {
-                            platform: platform.platform,
-                            color: platform.color
-                        };
-                    });
-
-                    // Добавляем данные о платформе для трека
-                    else if ("time" in item) {
-                        // Если был получен трек являющийся потоковым
-                        if (item.time.total === 0) {
-                            db.audio.queue.events.emit("request/error", message, locale._(message.locale, "track.live", [platform.platform, api.name]));
+                    // Получаем данные
+                    .then((item): void => {
+                        // Если нет данных или была получена ошибка
+                        if (item instanceof Error) {
+                            db.audio.queue.events.emit("request/error", message, locale._(message.locale, "api.platform.error", [item]));
                             return;
                         }
 
-                        // Добавляем данные о платформе
-                        item.api = {
-                            platform: platform.platform,
-                            color: platform.color
-                        };
-                    }
+                        // Если был указан поиск
+                        else if (item instanceof Array) {
+                            db.audio.queue.events.emit("message/search", item, platform.platform, message);
+                            return;
+                        }
 
-                    // Запускаем проигрывание треков
-                    return db.audio.queue.create(message, item);
-                }).catch((err: Error) => { // Отправляем сообщение об ошибке
-                    Logger.log("DEBUG", `request/api - ${err}`);
-                    clearTimeout(timeout);
-                    db.audio.queue.events.emit("request/error", message, `**${platform.platform}.${api.name}**\n\n**❯** **${err.message}**`);
-                });
+                        // Добавляем данные о платформе для плейлиста
+                        if ("items" in item) item.items.map((track: Track) => {
+                            // Добавляем данные о платформе
+                            track.api = {
+                                platform: platform.platform,
+                                color: platform.color
+                            };
+                        });
+
+                        // Добавляем данные о платформе для трека
+                        else if ("time" in item) {
+                            // Если был получен трек являющийся потоковым
+                            if (item.time.total === 0) {
+                                db.audio.queue.events.emit("request/error", message, locale._(message.locale, "track.live", [platform.platform, api.name]));
+                                return;
+                            }
+
+                            // Добавляем данные о платформе
+                            item.api = {
+                                platform: platform.platform,
+                                color: platform.color
+                            };
+                        }
+
+                        // Запускаем проигрывание треков
+                        return db.audio.queue.create(message, item);
+                    })
+
+                    // Обрабатываем ошибки
+                    .catch((err: Error) => { // Отправляем сообщение об ошибке
+                        Logger.log("DEBUG", `request/api - ${err}`);
+                        db.audio.queue.events.emit("request/error", message, `**${platform.platform}.${api.name}**\n\n**❯** **${err.message}**`);
+                    })
+
+                    // Действие в конце
+                    .finally(() => {
+                        // Удаляем timeout
+                        clearTimeout(timeout);
+                    });
             }
         });
     };

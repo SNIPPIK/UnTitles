@@ -38,7 +38,7 @@ export class Logger {
      */
     public static log = (status: keyof typeof db.status, text: string): void => {
         // Игнорируем debug сообщения
-        if (status === "DEBUG") return;
+        //if (status === "DEBUG") return;
 
         text = text.replace(/\[/g, "\x1b[100m \x1b[30m").replace(/]/g, " \x1b[0m");
 

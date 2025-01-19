@@ -82,10 +82,10 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @return boolean
      * @public
      */
-    public get playing() {
+    public get playing(): boolean {
         if (this.status === "player/wait" || !this.voice.connection) return false;
 
-        //Если больше не читается, переходим в состояние wait.
+        // Если больше не читается, переходим в состояние wait.
         if (!this.audio.current?.readable) {
             this.audio.current?.stream?.emit("end");
             this.status = "player/wait";
@@ -328,8 +328,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Удаляем текущий поток, поскольку он больше не нужен
         if (this.audio.current) {
-            if (this.audio.current.stream) this.audio.current.stream.emit("close");
-            this.audio.current.destroy();
+            if (this.audio.current?.destroy) this.audio.current.destroy();
         }
     };
 

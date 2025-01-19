@@ -67,7 +67,7 @@ class player_wait extends Constructor.Assign<Handler.Event<"player/wait">> {
                 }
 
                 // Получаем ссылки на трек и проигрываем ее
-                setTimeout(player.play, 2e3);
+                setImmediate(player.play);
             }
         });
     };
