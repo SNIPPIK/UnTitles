@@ -1,5 +1,5 @@
 import type {LocalizationMap} from "discord-api-types/v10";
-import locales from "../db/json/languages.json";
+import locales from "./languages.json";
 
 /**
  * @author SNIPPIK

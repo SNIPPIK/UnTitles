@@ -1,37 +1,140 @@
-import {IntentsBitField, Partials, Colors} from "discord.js";
-import {Client, ShardManager} from "@service/discord";
-import {Logger} from "@service/logger";
-import process from "node:process";
-import {db} from "@service/db";
-import {env} from "@env";
+import {Client, ShardingManager, IntentsBitField, Partials, Options} from "discord.js";
+import {CacheUtility, db_buttons, db_voice, Queues} from "@handler/queues";
+import {API_requester} from "@handler/apis";
+import {Commands} from "@handler/commands";
+import {Events} from "@handler/events";
+import {Logger} from "@utils";
+import {env} from "@handler";
+import {global} from "@type";
+
+// Включение
+Logger.log("LOG", `[ZEN|UDB] has starting`);
 
 /**
- * @name ShardManager
- * @description Загрузка менеджера осколков
+ * @author SNIPPIK
+ * @description Локальная база данных бота
+ * @class Database
+ * @public
  */
-if (process["argv"].includes("--ShardManager")) {
-    Logger.log("LOG", `[ShardManager] is starting...`);
-    new ShardManager(__filename, {
-        token: env.get("token.discord"),
-        mode: "process",
-        totalShards: env.get("shard.total"),
-        execArgv: ["-r", "tsconfig-paths/register"],
-        respawn: true
-    });
+class Database {
+    /**
+     * @description Загружаем класс для хранения запросов на платформы
+     * @readonly
+     * @private
+     */
+    public readonly api = new API_requester();
+
+    /**
+     * @description Загружаем класс для хранения событий
+     * @readonly
+     * @private
+     */
+    public readonly events = new Events();
+
+    /**
+     * @description Загружаем класс для хранения очередей, плееров, циклов
+     * @private
+     */
+    public readonly queues = new Queues();
+
+    /**
+     * @description Загружаем класс для хранения голосовых подключений
+     * @private
+     */
+    public readonly voice = new db_voice();
+
+    /**
+     * @description Класс кеширования
+     * @private
+     */
+    public readonly cache = new CacheUtility();
+
+    /**
+     * @description Загружаем класс для хранения кнопок бота
+     * @private
+     */
+    public readonly buttons = new db_buttons();
+
+    /**
+     * @description Загружаем класс для хранения команд
+     * @readonly
+     * @private
+     */
+    public readonly commands = new Commands();
+
+    /**
+     * @description Для управления белым списком пользователей
+     * @public
+     */
+    public readonly whitelist = {
+        toggle: env.get("whitelist")              as boolean,
+        ids: env.check("whitelist.list") ? env.get("whitelist.list").split(",") as string[] : []
+    };
+
+    /**
+     * @description Для управления черным списком пользователей
+     * @public
+     */
+    public readonly blacklist = {
+        toggle: env.get("blacklist")              as boolean,
+        ids: env.check("blacklist.list") ? env.get("blacklist.list").split(",") as string[] : []
+    };
+
+    /**
+     * @description Для работы с командами для разработчика
+     * @public
+     */
+    public readonly owner = {
+        ids: env.get("owner.list").split(",") as string[],
+        guildID: env.get("owner.server") as string
+    };
 }
 
 /**
- * @name Client
- * @description Загрузка осколка
+ * @author SNIPPIK
+ * @description Экспортируем базу данных глобально
+ * @public
+ */
+export var db: Database = null;
+
+
+/**
+ * @author SNIPPIK
+ * @description Если требуется запустить менеджер осколков
+ */
+if (process["argv"].includes("--ShardManager")) {
+    Logger.log("WARN", `[ZEN|UDB] has running ShardManager...`);
+
+    // Создаем менеджер осколков
+    const manager = new ShardingManager(__filename, {
+        execArgv: ["-r", "tsconfig-paths/register"],
+        token: env.get("token.discord"),
+        mode: "process",
+        respawn: true,
+        silent: false
+    });
+
+    // Слушаем событие для создания осколка
+    manager.on("shardCreate", (shard) => {
+        shard.on("spawn", () => Logger.log("WARN",`[ZEN|UDB/${shard.id}] added to manager`));
+        shard.on("ready", () => Logger.log("WARN",`[ZEN|UDB/${shard.id}] is connected to websocket`));
+        shard.on("death", () => Logger.log("WARN",`[ZEN|UDB/${shard.id}] is killed`));
+    });
+
+    // Создаем дубликат
+    manager.spawn({ amount: "auto", delay: -1 }).catch((err: Error) => Logger.log("ERROR",`[ShardManager] ${err}`));
+}
+
+/**
+ * @author SNIPPIK
+ * @description Если требуется запустить осколок
  */
 else {
-    const client = new Client({
-        // Какие данные не надо кешировать (для экономии памяти)
-        allowedMentions: {
-            parse: ["roles", "users"],
-            repliedUser: true,
-        },
+    Logger.log("DEBUG", `[ZEN|UDB] adding utilities${global}`);
+    Logger.log("WARN", `[ZEN|UDB] has running shard`);
 
+    // Создаем класс осколка
+    const client = new Client({
         // Права бота
         intents: [
             IntentsBitField.Flags.GuildExpressions,
@@ -47,57 +150,43 @@ else {
             Partials.Message,
             Partials.Reaction,
             Partials.User
-        ]
+        ],
+
+        // Задаем параметры кеша
+        makeCache: Options.cacheWithLimits({
+            ...Options.DefaultMakeCacheSettings,
+            GuildBanManager: 0,
+            GuildForumThreadManager: 0,
+            AutoModerationRuleManager: 0,
+            DMMessageManager: 0,
+            GuildScheduledEventManager: 0,
+            GuildMessageManager: 0,
+            GuildInviteManager: 0,
+            GuildEmojiManager: 0,
+            GuildStickerManager: 0,
+            GuildMemberManager: {
+                maxSize: 10,
+                keepOverLimit: member => member.id === client.user.id
+            }
+        })
     });
-    Logger.log("LOG", `[Shard ${client.ID}] is loading...`);
+    const id = client.shard?.ids[0] ?? 0;
 
-    /**
-     * @description Подключаемся к api discord
-     */
-    client.login(env.get("token.discord")).then(() => {
-        // Запускаем загрузку модулей после инициализации бота
-        db.initialize = client;
-    });
+    db = new Database();
+    Logger.log("LOG", `[ZEN|UDB/${id}] has initialize db`);
 
-    /**
-     * @description Удаляем копию клиента если процесс был закрыт
-     */
-    for (const event of ["exit"]) process.once(event, () => {
-        Logger.log("DEBUG", "[Process] is killed!");
-        client.destroy().catch((err) => Logger.log("ERROR", err));
-        process.exit(0);
-    });
+    // Подключаем осколок к discord
+    client.login(env.get("token.discord")).finally(() => {
+        // Загружаем платформы
+        db.api.register();
+        Logger.log("DEBUG", `[ZEN|UDB/${id} | ${db.api.platforms.supported.length}/${db.api.platforms.authorization.length}] has load apis`);
 
-    /**
-     * @description Событие генерируется, когда не перехваченный JavaScript исключений возвращается в цикл событий
-     * @link https://nodejs.org/api/process.html#event-uncaughtexception
-     */
-    process.on("uncaughtException", (err, origin) => {
-        if (err.message.match(/read ECONNRESET/)) return Logger.log("WARN", `[ECONNRESET] WebSocket ECONNRESET`);
-        else if (err.message.match(/Unknown interaction/)) return Logger.log("WARN", `[Hocked Error Discord Library] Unknown interaction`);
+        // Загружаем события
+        db.events.register(client);
+        Logger.log("DEBUG", `[ZEN|UDB/${id} | ${db.events.events.length}] has load events`);
 
-        // Отправляем данные об ошибке и отправляем через систему webhook
-        client.sendWebhook = {
-            username: client.user.username, avatarURL: client.user.avatarURL(),
-            embeds: [{
-                timestamp: Date(),
-                title: origin,
-                description: `\`\`\`${err.name} - ${err.message}\`\`\``,
-                fields: [{
-                    name: "Stack:",
-                    value: `\`\`\`${err.stack}\`\`\``
-                }],
-                color: Colors.DarkRed,
-            }]
-        };
-
-        // Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
-        if (err.message?.match(/Critical/)) {
-            Logger.log("ERROR", `[CODE: <14>] Hooked critical error!`);
-            process.exit(14);
-        }
-
-        // Выводим ошибку
-        Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
+        // Загружаем команды
+        db.commands.register(client);
+        Logger.log("DEBUG", `[ZEN|UDB/${id} | ${db.commands.public.length}] has load commands`);
     });
 }
