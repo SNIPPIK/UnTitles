@@ -41,35 +41,46 @@ class sAPI extends Assign<API> {
                         const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/gi).pop();
                         let artist = null;
 
-                        return new Promise<Track.playlist>(async (resolve, reject) => {
+                        return new Promise<Track.playlist | Error>(async (resolve) => {
                             // Если ID плейлиста не удалось извлечь из ссылки
-                            if (!ID) return reject(locale.err("api.request.id.playlist"));
+                            if (!ID) return resolve(locale.err("api.request.id.playlist"));
 
                             try {
                                 // Создаем запрос
-                                const details = await sAPI.API(`https://www.youtube.com/${ID}`);
+                                const api = await sAPI.API(`https://www.youtube.com/${ID}`);
 
-                                if (details instanceof Error) return reject(details);
+                                // Если при запросе была получена ошибка
+                                if (api instanceof Error) return resolve(api);
 
-                                const sidebar: any[] = details["sidebar"]["playlistSidebarRenderer"]["items"];
-                                const microformat: any = details["microformat"]["microformatDataRenderer"];
-                                const items: Track[] = details["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]
-                                    .content["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]
-                                    .splice(0, limit).map(({playlistVideoRenderer}) => sAPI.track(playlistVideoRenderer));
+                                // Данные о плейлисте
+                                const playlist = api["microformat"]["microformatDataRenderer"];
 
-                                // Если нет автора плейлиста, то это альбом автора
-                                if (sidebar.length > 1) {
-                                    const authorData = details["sidebar"]["playlistSidebarRenderer"].items[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
+                                // Необработанные видео
+                                const videos: any[] = api["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]
+                                    .content["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"];
+
+                                // Все доступные видео в плейлисте
+                                const items = videos.splice(0, limit).map(({playlistVideoRenderer}) => sAPI.track(playlistVideoRenderer));
+
+                                // Раздел с данными автора
+                                const author = api["sidebar"]["playlistSidebarRenderer"]["items"];
+
+                                // Если авторов в плейлисте больше 1
+                                if (author.length > 1) {
+                                    const authorData = author[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
+
+                                    // Получаем истинные данные об авторе плейлиста
                                     artist = await sAPI.getChannel({ id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"], name: authorData.title["runs"][0].text });
-                                } else artist = items.at(-1).artist;
+                                }
 
                                 return resolve({
-                                    url, title: microformat.title, items, artist,
-                                    image: microformat.thumbnail["thumbnails"].pop()
+                                    url, items,
+                                    title: playlist.title,
+                                    image: playlist.thumbnail["thumbnails"].pop(),
+                                    artist: artist ?? items.at(-1).artist
                                 });
                             } catch (e) {
-                                console.log(e);
-                                return reject(Error(`[APIs]: ${e}`));
+                                return resolve(new Error(`[APIs]: ${e}`));
                             }
                         });
                     }
@@ -85,9 +96,9 @@ class sAPI extends Assign<API> {
                     execute: (url: string, options) => {
                         const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
 
-                        return new Promise<Track>(async (resolve, reject) => {
+                        return new Promise<Track | Error>(async (resolve) => {
                             // Если ID видео не удалось извлечь из ссылки
-                            if (!ID) return reject(locale.err( "api.request.id.track"));
+                            if (!ID) return resolve(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
                             const cache = db.cache.get(ID);
@@ -100,8 +111,9 @@ class sAPI extends Assign<API> {
                                 const result = await sAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
 
                                 /// Если при получении данных возникла ошибка
-                                if (result instanceof Error) return reject(result);
+                                if (result instanceof Error) return resolve(result);
                                 
+                                // Расшифровываем аудио формат
                                 const format = await sAPI.extractFormat(result["streamingData"], result.html);
                                 result["videoDetails"]["format"] = {url: format["url"]};
                                 const track = sAPI.track(result["videoDetails"]);
@@ -111,8 +123,7 @@ class sAPI extends Assign<API> {
 
                                 return resolve(track);
                             } catch (e) {
-                                console.log(e);
-                                return reject(Error(`[APIs]: ${e}`))
+                                return resolve(new Error(`[APIs]: ${e}`))
                             }
                         });
                     }
@@ -126,17 +137,18 @@ class sAPI extends Assign<API> {
                     name: "author",
                     filter: /\/(channel)?(@)/gi,
                     execute: (url: string, {limit}) => {
-                        return new Promise<Track[]>(async (resolve, reject) => {
+                        return new Promise<Track[] | Error>(async (resolve) => {
                             try {
                                 let ID: string;
 
+                                // Получаем истинное id канала
                                 if (url.match(/@/)) ID = `@${url.split("@")[1].split("/")[0]}`;
                                 else ID = `channel/${url.split("channel/")[1]}`;
 
                                 // Создаем запрос
                                 const details = await sAPI.API(`https://www.youtube.com/${ID}/videos`);
 
-                                if (details instanceof Error) return reject(details);
+                                if (details instanceof Error) return resolve(details);
 
                                 const author = details["microformat"]["microformatDataRenderer"];
                                 const tabs: any[] = details?.["contents"]?.["twoColumnBrowseResultsRenderer"]?.["tabs"];
@@ -155,8 +167,7 @@ class sAPI extends Assign<API> {
 
                                 return resolve(videos);
                             } catch (e) {
-                                console.log(e);
-                                return reject(Error(`[APIs]: ${e}`))
+                                return resolve(new Error(`[APIs]: ${e}`))
                             }
                         });
                     }
@@ -169,25 +180,26 @@ class sAPI extends Assign<API> {
                 {
                     name: "search",
                     execute: (url: string, {limit}): Promise<Track[] | Error> => {
-                        return new Promise<Track[] | Error>(async (resolve, reject) => {
+                        return new Promise<Track[] | Error>(async (resolve) => {
                             try {
                                 // Создаем запрос
                                 const details = await sAPI.API(`https://www.youtube.com/results?search_query=${url.split(" ").join("+")}`);
 
                                 // Если при получении данных возникла ошибка
-                                if (details instanceof Error) return reject(details);
+                                if (details instanceof Error) return resolve(details);
 
-                                let vanilla_videos = details["contents"]?.["twoColumnSearchResultsRenderer"]?.["primaryContents"]?.["sectionListRenderer"]?.["contents"][0]?.["itemSectionRenderer"]?.["contents"];
+                                // Найденные видео
+                                const vanilla_videos = details["contents"]?.["twoColumnSearchResultsRenderer"]?.["primaryContents"]?.["sectionListRenderer"]?.["contents"][0]?.["itemSectionRenderer"]?.["contents"];
 
-                                if (vanilla_videos?.length === 0 || !vanilla_videos) return reject(locale.err("api.request.fail"));
+                                // Проверяем на наличие видео
+                                if (vanilla_videos?.length === 0 || !vanilla_videos) return resolve(locale.err("api.request.fail"));
 
                                 let filtered_ = vanilla_videos?.filter((video: any) => video && video?.["videoRenderer"] && video?.["videoRenderer"]?.["videoId"])?.splice(0, limit);
                                 let videos: Track[] = filtered_.map(({ videoRenderer }: any) => sAPI.track(videoRenderer));
 
                                 return resolve(videos);
                             } catch (e) {
-                                console.log(e);
-                                return reject(Error(`[APIs]: ${e}`))
+                                return resolve(new Error(`[APIs]: ${e}`))
                             }
                         });
                     }

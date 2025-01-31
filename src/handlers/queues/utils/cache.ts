@@ -12,21 +12,23 @@ import fs from "node:fs";
  * @public
  */
 export class CacheUtility {
-    /**
-     * @author SNIPPIK
-     * @description Путь до директории с кешированными данными
-     * @readonly
-     * @private
-     */
-    private readonly cache: string = path.resolve(env.get("cache.dir"));
+    private readonly _options = {
+        /**
+         * @description Путь до директории с кешированными данными
+         * @private
+         */
+        dirname: path.resolve(env.get("cache.dir")),
 
-    /**
-     * @author SNIPPIK
-     * @description Можно ли сохранять файлы
-     * @readonly
-     * @private
-     */
-    private readonly cache_file: string = env.get("cache.file");
+        /**
+         * @description Можно ли сохранять файлы
+         */
+        inFile: env.get("cache.file"),
+
+        /**
+         * @description Включена ли система кеширования
+         */
+        isOn: env.get("cache")
+    }
 
     /**
      * @description База данных треков
@@ -42,7 +44,7 @@ export class CacheUtility {
         /**
          * @description Класс кеширования аудио файлов
          */
-        audio: this.cache_file ? new CacheAudio(this.cache) : null
+        audio: this._options.inFile ? new CacheAudio(this._options.dirname) : null
     };
 
     /**
@@ -50,9 +52,27 @@ export class CacheUtility {
      * @public
      */
     public get audio(): null | CacheAudio {
-        if (!this.cache_file) return null;
+        if (!this._options.inFile) return null;
         return this.data.audio;
     };
+
+    /**
+     * @description Путь до директории кеширования
+     * @public
+     */
+    public get dirname() { return this._options.dirname; };
+
+    /**
+     * @description Можно ли сохранять кеш в файл
+     * @public
+     */
+    public get inFile() { return this._options.inFile; };
+
+    /**
+     * @description Включена ли система кеширования
+     * @public
+     */
+    public get isOn() { return this._options.isOn; };
 
     /**
      * @description Сохраняем данные в класс
@@ -60,7 +80,7 @@ export class CacheUtility {
      */
     public set = (track: Track) => {
         // Если включен режим без кеширования в файл
-        if (!this.cache_file) {
+        if (!this.inFile) {
             const song = this.data.tracks.get(track.id);
 
             // Если уже сохранен трек
@@ -72,19 +92,19 @@ export class CacheUtility {
 
         setImmediate(() => {
             // Если нет директории Data
-            if (!fs.existsSync(`${this.cache}/Data`)) {
-                let dirs = `${this.cache}/Data`.split("/");
+            if (!fs.existsSync(`${this.dirname}/Data`)) {
+                let dirs = `${this.dirname}/Data`.split("/");
                 fs.mkdir(dirs.join("/"), {recursive: true}, () => {
                 });
             }
 
             // Сохраняем данные в файл
-            if (!fs.existsSync(`${this.cache}/Data/[${track.id}].json`)) {
+            if (!fs.existsSync(`${this.dirname}/Data/[${track.id}].json`)) {
                 // Создаем файл
-                fs.createWriteStream(`${this.cache}/Data/[${track.id}].json`).destroy();
+                fs.createWriteStream(`${this.dirname}/Data/[${track.id}].json`).destroy();
 
                 // Записываем данные в файл
-                fs.writeFile(`${this.cache}/Data/[${track.id}].json`, JSON.stringify({
+                fs.writeFile(`${this.dirname}/Data/[${track.id}].json`, JSON.stringify({
                     ...track["_track"],
                     time: {total: `${track["_duration"]["total"]}`},
                     // Не записываем в кеш аудио, он будет в кеше
@@ -100,7 +120,7 @@ export class CacheUtility {
      */
     public get = (ID: string): Track | null => {
         // Если включен режим без кеширования в файл
-        if (!this.cache_file) {
+        if (!this.inFile) {
             const track = this.data.tracks.get(ID);
 
             // Если трек кеширован в память, то выдаем данные
@@ -109,9 +129,9 @@ export class CacheUtility {
         }
 
         // Если есть трек в кеше
-        if (fs.existsSync(`${this.cache}/Data/[${ID}].json`)) {
+        if (fs.existsSync(`${this.dirname}/Data/[${ID}].json`)) {
             // Если трек кеширован в файл
-            const json = JSON.parse(fs.readFileSync(`${this.cache}/Data/[${ID}].json`, 'utf8'));
+            const json = JSON.parse(fs.readFileSync(`${this.dirname}/Data/[${ID}].json`, 'utf8'));
 
             // Если трек был найден среди файлов
             if (json) return new Track(json);

@@ -57,9 +57,9 @@ class sAPI extends Assign<API> {
                     execute: (url, options) => {
                         const ID = /track\/[0-9]+/gi.exec(url)?.pop()?.split("track")?.pop();
 
-                        return new Promise<Track>(async (resolve, reject) => {
+                        return new Promise<Track | Error>(async (resolve) => {
                             // Если ID трека не удалось извлечь из ссылки
-                            if (!ID) return reject(locale.err( "api.request.id.track"));
+                            if (!ID) return resolve(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
                             const cache = db.cache.get(ID);
@@ -72,13 +72,14 @@ class sAPI extends Assign<API> {
                                 const api = await sAPI.API(`tracks/${ID}`);
 
                                 // Обрабатываем ошибки
-                                if (api instanceof Error) return reject(api);
-                                else if (!api[0]) return reject(locale.err( "api.request.fail"));
+                                if (api instanceof Error) return resolve(api);
+                                else if (!api[0]) return resolve(locale.err( "api.request.fail"));
 
                                 const track = sAPI.track(api[0]);
                                 const link = await sAPI.getAudio(ID);
 
-                                if (link instanceof Error) return reject(api);
+                                // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл
+                                if (link instanceof Error) return resolve(link);
                                 track.link = link;
 
                                 // Сохраняем кеш в системе
@@ -86,8 +87,7 @@ class sAPI extends Assign<API> {
 
                                 return resolve(track);
                             } catch (e) {
-                                console.log(e);
-                                return reject(Error(`[APIs]: ${e}`))
+                                return resolve(new Error(`[APIs]: ${e}`))
                             }
                         });
                     }
@@ -103,17 +103,17 @@ class sAPI extends Assign<API> {
                     execute: (url, {limit}) => {
                         const ID = /[0-9]+/gi.exec(url)?.pop()?.split("album")?.pop();
 
-                        return new Promise<Track.playlist>(async (resolve, reject) => {
+                        return new Promise<Track.playlist | Error>(async (resolve) => {
                             // Если ID альбома не удалось извлечь из ссылки
-                            if (!ID) return reject(locale.err( "api.request.id.album"));
+                            if (!ID) return resolve(locale.err( "api.request.id.album"));
 
                             try {
                                 // Создаем запрос
                                 const api = await sAPI.API(`albums/${ID}/with-tracks`);
 
                                 // Если запрос выдал ошибку то
-                                if (api instanceof Error) return reject(api);
-                                else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return reject(locale.err("api.request.fail"));
+                                if (api instanceof Error) return resolve(api);
+                                else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return resolve(locale.err("api.request.fail"));
 
                                 const AlbumImage = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
                                 const tracks: Track.data[] = api["volumes"]?.pop().splice(0, limit);
@@ -121,7 +121,7 @@ class sAPI extends Assign<API> {
 
                                 return resolve({url, title: api.title, image: AlbumImage, items: songs});
                             } catch (e) {
-                                return reject(Error(`[APIs]: ${e}`))
+                                return resolve(Error(`[APIs]: ${e}`))
                             }
                         });
                     }
@@ -137,17 +137,17 @@ class sAPI extends Assign<API> {
                     execute: (url, {limit}) => {
                         const ID = /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/gi.exec(url);
 
-                        return new Promise<Track.playlist>(async (resolve, reject) => {
-                            if (!ID[1]) return reject(locale.err("api.request.id.author"));
-                            else if (!ID[2]) return reject(locale.err("api.request.id.playlist"));
+                        return new Promise<Track.playlist | Error>(async (resolve) => {
+                            if (!ID[1]) return resolve(locale.err("api.request.id.author"));
+                            else if (!ID[2]) return resolve(locale.err("api.request.id.playlist"));
 
                             try {
                                 // Создаем запрос
                                 const api = await sAPI.API(ID.at(0));
 
                                 // Если запрос выдал ошибку то
-                                if (api instanceof Error) return reject(api);
-                                else if (api?.tracks?.length === 0) return reject(locale.err("api.request.fail.msg", ["Not found tracks in playlist"]));
+                                if (api instanceof Error) return resolve(api);
+                                else if (api?.tracks?.length === 0) return resolve(locale.err("api.request.fail.msg", ["Not found tracks in playlist"]));
 
                                 const image = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
                                 const tracks: any[] = api.tracks?.splice(0, limit);
@@ -160,7 +160,9 @@ class sAPI extends Assign<API> {
                                         url: `https://music.yandex.ru/users/${ID[1]}`
                                     }
                                 });
-                            } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
+                            } catch (e) {
+                                return resolve(Error(`[APIs]: ${e}`))
+                            }
                         });
                     }
                 },
@@ -175,20 +177,22 @@ class sAPI extends Assign<API> {
                     execute: (url, {limit}) => {
                         const ID = /(artist)\/[0-9]+/gi.exec(url)?.pop()?.split("artist")?.pop();
 
-                        return new Promise<Track[]>(async (resolve, reject) => {
+                        return new Promise<Track[] | Error>(async (resolve) => {
                             // Если ID автора не удалось извлечь из ссылки
-                            if (!ID) return reject(locale.err("api.request.id.author"));
+                            if (!ID) return resolve(locale.err("api.request.id.author"));
 
                             try {
                                 // Создаем запрос
                                 const api = await sAPI.API(`artists/${ID}/tracks`);
 
                                 // Если запрос выдал ошибку то
-                                if (api instanceof Error) return reject(api);
+                                if (api instanceof Error) return resolve(api);
                                 const tracks = api.tracks.splice(0, limit).map(sAPI.track);
 
                                 return resolve(tracks);
-                            } catch (e) { return reject(Error(`[APIs]: ${e}`)) }
+                            } catch (e) {
+                                return resolve(new Error(`[APIs]: ${e}`))
+                            }
                         });
                     }
                 },
@@ -200,19 +204,19 @@ class sAPI extends Assign<API> {
                 {
                     name: "search",
                     execute: (url , {limit}) => {
-                        return new Promise<Track[]>(async (resolve, reject) => {
+                        return new Promise<Track[] | Error>(async (resolve) => {
                             try {
                                 // Создаем запрос
                                 const api = await sAPI.API(`search?type=all&text=${url.split(" ").join("%20")}&page=0&nococrrect=false`);
 
                                 // Обрабатываем ошибки
-                                if (api instanceof Error) return reject(api);
-                                else if (!api.tracks) return reject(locale.err("api.request.fail"));
+                                if (api instanceof Error) return resolve(api);
+                                else if (!api.tracks) return resolve(locale.err("api.request.fail"));
 
                                 const tracks = api.tracks["results"].splice(0, limit).map(sAPI.track);
                                 return resolve(tracks);
                             } catch (e) {
-                                return reject(Error(`[APIs]: ${e}`))
+                                return resolve(new Error(`[APIs]: ${e}`))
                             }
                         });
                     }

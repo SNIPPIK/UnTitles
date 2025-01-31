@@ -33,24 +33,28 @@ class Database {
 
     /**
      * @description Загружаем класс для хранения очередей, плееров, циклов
+     * @readonly
      * @private
      */
     public readonly queues = new Queues();
 
     /**
      * @description Загружаем класс для хранения голосовых подключений
+     * @readonly
      * @private
      */
     public readonly voice = new db_voice();
 
     /**
      * @description Класс кеширования
+     * @readonly
      * @private
      */
     public readonly cache = new CacheUtility();
 
     /**
      * @description Загружаем класс для хранения кнопок бота
+     * @readonly
      * @private
      */
     public readonly buttons = new db_buttons();
@@ -64,6 +68,7 @@ class Database {
 
     /**
      * @description Для управления белым списком пользователей
+     * @readonly
      * @public
      */
     public readonly whitelist = {
@@ -73,6 +78,7 @@ class Database {
 
     /**
      * @description Для управления черным списком пользователей
+     * @readonly
      * @public
      */
     public readonly blacklist = {
@@ -82,11 +88,22 @@ class Database {
 
     /**
      * @description Для работы с командами для разработчика
+     * @readonly
      * @public
      */
     public readonly owner = {
         ids: env.get("owner.list").split(",") as string[],
         guildID: env.get("owner.server") as string
+    };
+
+    /**
+     * @description Для отображения в embed сообщениях
+     * @readonly
+     * @public
+     */
+    public readonly images = {
+        disk: env.get("image.currentPlay"),
+        no_image: env.get("image.not"),
     };
 }
 

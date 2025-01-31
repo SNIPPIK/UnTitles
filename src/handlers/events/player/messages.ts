@@ -4,7 +4,6 @@ import {Event} from "@handler/events";
 import {Colors} from "discord.js";
 import {Assign} from "@utils";
 import {db} from "@app";
-import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -69,7 +68,7 @@ class message_push extends Assign<Event<"message/push">> {
                 new message.builder().addEmbeds([
                     {
                         color: obj["color"] ?? Colors.Blue,
-                        thumbnail: typeof image === "string" ? {url: image} : image ?? null,
+                        thumbnail: typeof image === "string" ? {url: image} : image ?? db.images.no_image,
                         footer: {
                             text: `${message.author.username}`,
                             iconURL: message.author.avatarURL()
@@ -77,7 +76,7 @@ class message_push extends Assign<Event<"message/push">> {
                         author: {
                             name: artist?.title,
                             url: artist?.url,
-                            iconURL: obj.artist.image.url
+                            iconURL: db.images.disk
                         },
                         fields: [
                             {

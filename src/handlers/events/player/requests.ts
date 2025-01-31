@@ -64,6 +64,7 @@ class request_api extends Assign<Event<"request/api">> {
                     .then((item): void => {
                         // Если нет данных или была получена ошибка
                         if (item instanceof Error) {
+                            Logger.log("ERROR", `request/api - ${item}`);
                             db.events.emitter.emit("request/error", message, locale._(message.locale, "api.platform.error", [item]));
                             return;
                         }
@@ -104,7 +105,7 @@ class request_api extends Assign<Event<"request/api">> {
 
                     // Обрабатываем ошибки
                     .catch((err: Error) => { // Отправляем сообщение об ошибке
-                        Logger.log("DEBUG", `request/api - ${err}`);
+                        Logger.log("ERROR", `request/api - ${err}`);
                         db.events.emitter.emit("request/error", message, `**${platform.platform}.${api.name}**\n\n**❯** **${err.message}**`);
                     })
 

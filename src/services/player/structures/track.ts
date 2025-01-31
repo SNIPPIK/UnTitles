@@ -1,12 +1,5 @@
 import {httpsClient, API} from "@handler/apis";
-import {env} from "@handler";
 import {db} from "@app";
-
-/**
- * @author SNIPPIK
- * @description Проверяем включено ли кеширование аудио
- */
-const cache = env.get("cache"), noImage = env.get("image.not"),diskImage = env.get("image.currentPlay")
 
 /**
  * @author SNIPPIK
@@ -136,7 +129,7 @@ export class Track {
             url: this._track.artist.url,
             title: this._track.artist.title,
             image: {
-                url: diskImage
+                url: db.images.disk
             }
         };
     };
@@ -152,7 +145,7 @@ export class Track {
      */
     public get image() {
         // Если нет картинки
-        if (!this._track.image || !this._track.image.url) return { url: noImage };
+        if (!this._track.image || !this._track.image.url) return { url: db.images.no_image };
         return this._track.image;
     };
 
@@ -199,7 +192,7 @@ export class Track {
      * @public
      */
     public get resource(): Promise<string | Error> {
-        const download = cache && this.platform !== "DISCORD";
+        const download = db.cache.isOn && this.platform !== "DISCORD";
 
         return new Promise(async (resolve) => {
             // Смотрим если ли кеш аудио
