@@ -239,10 +239,10 @@ export class MessageUtils {
      * @description Создание одной кнопки в одной функции
      * @param name - Название параметра в env
      * @param style - Тип стиля
-     * @param disable - Кнопка доступна для нажатия
+     * @param disabled - Кнопка доступна для нажатия
      */
-    public static createButton_env(name: string, style: MessageComponent["style"] = 2, disable: boolean): MessageComponent {
-        return { type: 2, emoji: MessageUtils.checkIDComponent(name), custom_id: name.split("button.")[1], style, disable }
+    public static createButton_env(name: string, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
+        return { type: 2, emoji: MessageUtils.checkIDComponent(name), custom_id: name.split("button.")[1], style, disabled }
     };
 
     /**
@@ -251,10 +251,10 @@ export class MessageUtils {
      * @param emoji - Название параметра в env
      * @param id - Уникальный индикатор кнопки
      * @param style - Тип стиля
-     * @param disable - Кнопка доступна для нажатия
+     * @param disabled - Кнопка доступна для нажатия
      */
-    public static createButton(emoji: MessageComponent["emoji"], id: string, style: MessageComponent["style"] = 2, disable: boolean): MessageComponent {
-        return { type: 2, emoji, custom_id: id, style, disable }
+    public static createButton(emoji: MessageComponent["emoji"], id: string, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
+        return { type: 2, emoji, custom_id: id, style, disabled }
     };
 
     /**

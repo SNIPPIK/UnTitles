@@ -56,7 +56,7 @@ const components: MessageComponents[] = [
             MessageUtils.createButton_env("button.queue", 2, true),
 
             // Кнопка текста песни
-            MessageUtils.createButton_env("button.lyrics", 2, true),
+            MessageUtils.createButton_env("button.lyrics", 2, false),
 
             // Кнопка стоп
             MessageUtils.createButton_env("button.stop", 4, false),
@@ -147,29 +147,29 @@ export class Queue {
 
         if (this.tracks.total > 1) {
             // Кнопка очереди
-            Object.assign(two[0], { disable: false });
+            Object.assign(two[0], { disabled: false });
 
             // Кнопка перетасовки очереди
-            Object.assign(first[0], { disable: false });
+            Object.assign(first[0], { disabled: false });
 
             // Кнопка назад
-            Object.assign(first[1], { disable: false, style: 3 });
+            Object.assign(first[1], { disabled: false, style: 3 });
 
             // Кнопка вперед
-            Object.assign(first[3], { disable: false, style: 3 });
+            Object.assign(first[3], { disabled: false, style: 3 });
         }
         else {
             // Кнопка очереди
-            Object.assign(two[0], { disable: true });
+            Object.assign(two[0], { disabled: true });
 
             // Кнопка перетасовки очереди
-            Object.assign(first[0], { disable: true });
+            Object.assign(first[0], { disabled: true });
 
             // Кнопка назад
-            Object.assign(first[1], { disable: true, style: 2 });
+            Object.assign(first[1], { disabled: true, style: 2 });
 
             // Кнопка вперед
-            Object.assign(first[3], { disable: true, style: 2 });
+            Object.assign(first[3], { disabled: true, style: 2 });
         }
 
         // Кнопка повтора
@@ -186,8 +186,8 @@ export class Queue {
         else Object.assign(first[0], {style: 2});
 
         // Кнопка фильтров
-        if (this.player.filters.enabled.length === 0) Object.assign(two[3], { disable: true });
-        else Object.assign(two[3], { disable: false });
+        if (this.player.filters.enabled.length === 0) Object.assign(two[3], { disabled: true });
+        else Object.assign(two[3], { disabled: false });
 
         return components;
     };

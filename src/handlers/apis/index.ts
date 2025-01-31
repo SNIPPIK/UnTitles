@@ -88,6 +88,7 @@ export class API_requester extends handler<API> {
 
     /**
      * @description Загружаем класс вместе с дочерним
+     * @public
      */
     public constructor() {
         super("src/handlers/apis");
@@ -95,6 +96,7 @@ export class API_requester extends handler<API> {
 
     /**
      * @description Функция загрузки api запросов
+     * @public
      */
     public register = () => {
         this.load();
@@ -142,7 +144,7 @@ export class API_requester extends handler<API> {
         return new Promise(async (resolve) => {
 
             // Если платформа может сама выдавать данные о треке
-            if (!this.platforms.authorization.includes(track.platform) && this.platforms.audio.includes(track.platform)) {
+            if (!this.platforms.authorization.includes(track.platform) && !this.platforms.audio.includes(track.platform)) {
                 const api = this.request(track.platform).get("track");
 
                 // Если нет такого запроса
@@ -162,6 +164,7 @@ export class API_requester extends handler<API> {
                 }
             }
 
+            // Ищем платформу где будем искать данные трека
             const platform = this.request(this.platforms.supported.find((plt) => plt.requests.length >= 2 && plt.audio).name);
 
             try {
@@ -225,6 +228,15 @@ export class APIRequest {
     public get color() { return this._api.color; };
 
     /**
+     * @description Ищем платформу из доступных
+     * @param argument {API.platform} Имя платформы
+     * @public
+     */
+    public constructor(argument: API) {
+        this._api = argument;
+    };
+
+    /**
      * @description Получаем функцию в зависимости от типа платформы и запроса
      * @param type {get} Тип запроса
      * @public
@@ -243,15 +255,6 @@ export class APIRequest {
 
             return null;
         }) as T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "author" ? APIs.author : APIs.search;
-    };
-
-    /**
-     * @description Ищем платформу из доступных
-     * @param argument {API.platform} Имя платформы
-     * @public
-     */
-    public constructor(argument: API) {
-        this._api = argument;
     };
 }
 

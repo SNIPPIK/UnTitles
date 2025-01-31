@@ -34,7 +34,7 @@ export interface MessageComponents {
         };
         custom_id: string;
         style: 1 | 2 | 3 | 4;
-        disable?: boolean;
+        disabled?: boolean;
     }[]
 }
 
