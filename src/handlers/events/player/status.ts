@@ -1,3 +1,4 @@
+import {RepeatType} from "@service/player";
 import {Event} from "@handler/events";
 import {Assign} from "@utils";
 import {db} from "@app";
@@ -21,7 +22,7 @@ class player_wait extends Assign<Event<"player/wait">> {
                 const current = player.tracks.position;
 
                 // Если включен повтор трека сменить позицию нельзя
-                if (repeat === "song") player.tracks.position = current;
+                if (repeat === RepeatType.Song) player.tracks.position = current;
 
                 // Если включен повтор треков или его вовсе нет
                 else {
@@ -29,7 +30,7 @@ class player_wait extends Assign<Event<"player/wait">> {
                     player.tracks.position = player.tracks.position + 1;
 
                     // Если повтор выключен
-                    if (repeat === "off") {
+                    if (repeat === RepeatType.None) {
                         // Если очередь началась заново
                         if (current + 1 === player.tracks.total && player.tracks.position === 0) return queue.cleanup();
                     }

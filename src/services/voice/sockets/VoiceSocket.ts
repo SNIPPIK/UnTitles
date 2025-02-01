@@ -2,6 +2,7 @@ import {Encryption, VoiceUDPSocket} from "@service/voice";
 import {VoiceOpcodes} from "discord-api-types/voice/v4";
 import {WebSocket} from "@handler/apis";
 import {TypedEmitter} from "@utils";
+import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -135,34 +136,41 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @public
      */
     public set state(newState) {
-        // Уничтожаем WebSocket
-        stateDestroyer(
-            Reflect.get(this._state, "ws") as WebSocket,
-            Reflect.get(newState, "ws") as WebSocket,
-            (oldS) => {
-                oldS
-                    .off("error", this.GettingError)
-                    .off("open", this.WebSocketOpen)
-                    .off("packet", this.WebSocketPacket)
-                    .off("close", this.WebSocketClose)
-                    .destroy()
-            }
-        );
+        try {
+            // Уничтожаем WebSocket
+            stateDestroyer(
+                Reflect.get(this._state, "ws") as WebSocket,
+                Reflect.get(newState, "ws") as WebSocket,
+                (oldS) => {
+                    oldS
+                        .off("error", this.GettingError)
+                        .off("open", this.WebSocketOpen)
+                        .off("packet", this.WebSocketPacket)
+                        .off("close", this.WebSocketClose)
+                        .destroy()
+                }
+            );
 
-        // Уничтожаем UDP подключение
-        stateDestroyer(
-            Reflect.get(this._state, "udp") as VoiceUDPSocket,
-            Reflect.get(newState, "udp") as VoiceUDPSocket,
-            (oldS) => {
-                oldS
-                    .off("error", this.GettingError)
-                    .off("close", this.UDPClose)
-                    .destroy();
-            }
-        );
+            // Уничтожаем UDP подключение
+            stateDestroyer(
+                Reflect.get(this._state, "udp") as VoiceUDPSocket,
+                Reflect.get(newState, "udp") as VoiceUDPSocket,
+                (oldS) => {
+                    oldS
+                        .off("error", this.GettingError)
+                        .off("close", this.UDPClose)
+                        .destroy();
+                }
+            );
 
-        this.emit("stateChange", this._state, newState);
-        Object.assign(this._state, newState);
+            this.emit("stateChange", this._state, newState);
+            Object.assign(this._state, newState);
+        } catch (err) {
+            // Если было произведено экстренное удаление подключения
+            if (`${err}`.match("Reflect.get called on non-object")) return;
+
+            console.error(err);
+        }
     };
 
     /**

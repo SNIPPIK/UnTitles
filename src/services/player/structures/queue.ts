@@ -1,6 +1,6 @@
+import {AudioPlayer, RepeatType} from "@service/player";
 import {Logger, Interact, MessageUtils} from "@utils";
 import {MessageComponents} from "@type/discord";
-import {AudioPlayer} from "@service/player";
 import {db} from "@app";
 
 /**
@@ -173,8 +173,8 @@ export class Queue {
         }
 
         // Кнопка повтора
-        if (this.tracks.repeat === "song") Object.assign(first[4], { emoji: button.loop_one, style: 3 });
-        else if (this.tracks.repeat === "songs") Object.assign(first[4],{ emoji: button.loop, style: 3 });
+        if (this.tracks.repeat === RepeatType.Song) Object.assign(first[4], { emoji: button.loop_one, style: 3 });
+        else if (this.tracks.repeat === RepeatType.Songs) Object.assign(first[4],{ emoji: button.loop, style: 3 });
         else Object.assign(first[4],{ emoji: button.loop, style: 2 });
 
         // Делаем проверку на кнопку ПАУЗА/ПРОДОЛЖИТЬ

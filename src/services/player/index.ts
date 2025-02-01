@@ -97,3 +97,4 @@ export * from "./structures/track";
 export * from "./structures/queue";
 export * from "./structures/player";
 export * from "./modules/filters";
+export * from "./modules/tracks";

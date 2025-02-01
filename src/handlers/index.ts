@@ -122,7 +122,7 @@ class Environment {
 
     /**
      * @description Получаем значение
-     * @param name {string} Имя
+     * @param name - Имя параметра в env
      * @readonly
      * @public
      */
@@ -131,6 +131,20 @@ class Environment {
 
         // Если нет параметра в файле .env
         if (!env) throw new Error(`[ENV]: Not found ${name} in .env`);
+
+        // Проверяем параметр для конвертации
+        return env === "true" ? true : env === "false" ? false : env;
+    };
+
+    /**
+     * @description Получаем данные более безопасно
+     * @param name - Имя параметра в env
+     * @param def - Этот параметр будет возращен если ничего нет
+     */
+    public readonly safe_get = (name: keyof DotenvPopulateInput, def: any): any => {
+        const env = this._env.parsed[name];
+
+        if (!env) return def;
 
         // Проверяем параметр для конвертации
         return env === "true" ? true : env === "false" ? false : env;

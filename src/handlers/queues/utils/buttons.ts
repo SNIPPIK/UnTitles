@@ -1,3 +1,4 @@
+import {RepeatType} from "@service/player";
 import {Collection, Logger} from "@utils";
 import {locale} from "@service/locale";
 import {Colors} from "discord.js";
@@ -62,7 +63,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             const oldState = queue.player.tracks.repeat;
 
             // TODO надо придумать как это сделать без костылей
-            queue.player.tracks.repeat = "songs";
+            queue.player.tracks.repeat = RepeatType.Songs;
 
             // Меняем позицию трека в очереди
             queue.player.stop(queue.tracks.position - 1);
@@ -138,8 +139,8 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             const queue = msg.queue, loop = queue.tracks.repeat;
 
             // Включение всех треков
-            if (loop === "off") {
-                queue.tracks.repeat = "songs";
+            if (loop === RepeatType.None) {
+                queue.tracks.repeat = RepeatType.Songs;
 
                 msg.fastBuilder = {
                     description: locale._(msg.locale, "player.button.repeat.songs"),
@@ -149,8 +150,8 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             }
 
             // Включение повтора трека
-            else if (loop === "songs") {
-                queue.tracks.repeat = "song";
+            else if (loop === RepeatType.Songs) {
+                queue.tracks.repeat = RepeatType.Song;
                 msg.fastBuilder = {
                     description: locale._(msg.locale, "player.button.repeat.song"),
                     color: Colors.Green
@@ -158,7 +159,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
                 return;
             }
 
-            queue.tracks.repeat = "off";
+            queue.tracks.repeat = RepeatType.None;
             msg.fastBuilder = {
                 description: locale._(msg.locale, "player.button.repeat.off"),
                 color: Colors.Green

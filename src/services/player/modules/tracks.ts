@@ -2,12 +2,6 @@ import {Track} from "@service/player";
 
 /**
  * @author SNIPPIK
- * @description Типы повтора
- */
-type TracksRepeat = "off" | "song" | "songs";
-
-/**
- * @author SNIPPIK
  * @description Все треки для проигрывания в плеере, хранит в себе все данные треков
  * @class PlayerTracks
  * @protected
@@ -43,7 +37,7 @@ export class PlayerTracks {
          * @description Тип повтора
          * @private
          */
-        _repeat: "off" as TracksRepeat,
+        _repeat: RepeatType.None as RepeatType,
 
         /**
          * @description Смешивание треков
@@ -239,4 +233,26 @@ export class PlayerTracks {
     public indexOf = (track: Track) => {
         return  this._tracks._current.indexOf(track);
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Типы повторов
+ * @enum RepeatType
+ */
+export enum RepeatType {
+    /**
+     * @description Повтор выключен
+     */
+    None = 0,
+
+    /**
+     * @description Повтор одного трека
+     */
+    Song = 1,
+
+    /**
+     * @description Повтор всех треков
+     */
+    Songs = 2,
 }

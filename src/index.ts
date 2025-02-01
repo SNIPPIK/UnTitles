@@ -72,8 +72,8 @@ class Database {
      * @public
      */
     public readonly whitelist = {
-        toggle: env.get("whitelist")              as boolean,
-        ids: env.check("whitelist.list") ? env.get("whitelist.list").split(",") as string[] : []
+        toggle: env.get("whitelist")                         as boolean,
+        ids: env.safe_get("whitelist.list", "").split(",")   as string[]
     };
 
     /**
@@ -82,8 +82,8 @@ class Database {
      * @public
      */
     public readonly blacklist = {
-        toggle: env.get("blacklist")              as boolean,
-        ids: env.check("blacklist.list") ? env.get("blacklist.list").split(",") as string[] : []
+        toggle: env.get("blacklist")                         as boolean,
+        ids: env.safe_get("blacklist.list", "").split(",")   as string[]
     };
 
     /**
@@ -92,8 +92,8 @@ class Database {
      * @public
      */
     public readonly owner = {
-        ids: env.get("owner.list").split(",") as string[],
-        guildID: env.get("owner.server") as string
+        ids: env.get("owner.list").split(",")                as string[],
+        guildID: env.get("owner.server")                     as string
     };
 
     /**
