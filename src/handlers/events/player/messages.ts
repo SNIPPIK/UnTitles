@@ -68,7 +68,7 @@ class message_push extends Assign<Event<"message/push">> {
                 new message.builder().addEmbeds([
                     {
                         color: obj["color"] ?? Colors.Blue,
-                        thumbnail: typeof image === "string" ? {url: image} : image ?? db.images.no_image,
+                        thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
                         footer: {
                             text: `${message.author.username}`,
                             iconURL: message.author.avatarURL()

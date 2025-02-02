@@ -61,8 +61,8 @@ class Command_Voice extends Assign<Command> {
         super({
             rules: ["voice", "another_voice"],
             execute: ({message, type}) => {
-                const VoiceChannel = message.voice.channel;
                 const { guild } = message;
+                const VoiceChannel = message.voice.channel;
                 const voiceConnection = db.voice.get(guild.id);
                 const queue = message.queue;
 

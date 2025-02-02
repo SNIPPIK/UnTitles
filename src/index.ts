@@ -14,7 +14,6 @@ Logger.log("LOG", `[ZEN|UDB] has starting`);
  * @author SNIPPIK
  * @description Локальная база данных бота
  * @class Database
- * @public
  */
 class Database {
     /**
@@ -71,9 +70,9 @@ class Database {
      * @readonly
      * @public
      */
-    public readonly whitelist = {
-        toggle: env.get("whitelist")                         as boolean,
-        ids: env.safe_get("whitelist.list", "").split(",")   as string[]
+    public readonly whitelist: {toggle: boolean; ids: string[]} = {
+        toggle: env.get("whitelist"),
+        ids: env.safe_get("whitelist.list", "").split(",")
     };
 
     /**
@@ -81,9 +80,9 @@ class Database {
      * @readonly
      * @public
      */
-    public readonly blacklist = {
-        toggle: env.get("blacklist")                         as boolean,
-        ids: env.safe_get("blacklist.list", "").split(",")   as string[]
+    public readonly blacklist: {toggle: boolean; ids: string[]} = {
+        toggle: env.get("blacklist"),
+        ids: env.safe_get("blacklist.list", "").split(",")
     };
 
     /**
@@ -91,9 +90,9 @@ class Database {
      * @readonly
      * @public
      */
-    public readonly owner = {
-        ids: env.get("owner.list").split(",")                as string[],
-        guildID: env.get("owner.server")                     as string
+    public readonly owner: {ids: string[]; guildID: string} = {
+        ids: env.get("owner.list").split(","),
+        guildID: env.get("owner.server")
     };
 
     /**
@@ -101,16 +100,16 @@ class Database {
      * @readonly
      * @public
      */
-    public readonly images = {
+    public readonly images: {disk: string; no_image: string; loading: string} = {
         disk: env.get("image.currentPlay"),
         no_image: env.get("image.not"),
+        loading: env.get("loading.emoji")
     };
 }
 
 /**
  * @author SNIPPIK
  * @description Экспортируем базу данных глобально
- * @public
  */
 export var db: Database = null;
 

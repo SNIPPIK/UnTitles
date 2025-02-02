@@ -127,7 +127,6 @@ export class Commands extends handler<Command> {
  * @author SNIPPIK
  * @description Интерфейс для команд
  * @interface Command
- * @public
  */
 export interface Command {
     /**
@@ -301,6 +300,7 @@ interface SlashCommandOptions {
 /**
  * @author SNIPPIK
  * @description Оригинальный элемент выбора
+ * @interface DiscordSlashChoice
  */
 interface DiscordSlashChoice {
     /**
@@ -322,6 +322,7 @@ interface DiscordSlashChoice {
 /**
  * @author SNIPPIK
  * @description Упрощающий элемент создания компонентов для команд
+ * @interface SlashComponent
  */
 export interface SlashComponent {
     /**

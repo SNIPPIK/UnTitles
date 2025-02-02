@@ -29,16 +29,16 @@ const components: MessageComponents[] = [
         type: 1,
         components: [
             // Кнопка перетасовки
-            MessageUtils.createButton_env("button.shuffle", 2, true),
+            MessageUtils.createButton_env("shuffle", 2, true),
 
             // Кнопка назад
-            MessageUtils.createButton_env("button.back", 2, true),
+            MessageUtils.createButton_env("back", 2, true),
 
             // Кнопка паузы/продолжить
             MessageUtils.createButton(button.pause, "resume_pause", 2, false),
 
             // Кнопка пропуска/вперед
-            MessageUtils.createButton_env("button.skip", 2, false),
+            MessageUtils.createButton_env("skip", 2, false),
 
             // Кнопка повтора
             MessageUtils.createButton(button.loop, "repeat", 2, false)
@@ -53,19 +53,19 @@ const components: MessageComponents[] = [
         type: 1,
         components: [
             // Кнопка очереди
-            MessageUtils.createButton_env("button.queue", 2, true),
+            MessageUtils.createButton_env("queue", 2, true),
 
             // Кнопка текста песни
-            MessageUtils.createButton_env("button.lyrics", 2, false),
+            MessageUtils.createButton_env("lyrics", 2, false),
 
             // Кнопка стоп
-            MessageUtils.createButton_env("button.stop", 4, false),
+            MessageUtils.createButton_env("stop", 4, false),
 
             // Кнопка текущих фильтров
-            MessageUtils.createButton_env("button.filters", 2, true),
+            MessageUtils.createButton_env("filters", 2, true),
 
             // Кнопка повтора текущего трека
-            MessageUtils.createButton_env("button.replay", 2, false)
+            MessageUtils.createButton_env("replay", 2, false)
         ]
     }
 ];

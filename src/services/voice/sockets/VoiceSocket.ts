@@ -359,7 +359,11 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
  * @param callback - Функция по удалению
  */
 export function stateDestroyer<O extends WebSocket | VoiceUDPSocket | VoiceSocket>(oldS: O, newS: O, callback: (oldS: O, newS: O) => void) {
-    if (oldS && oldS !== newS) callback(oldS, newS);
+    try {
+        if (oldS && oldS !== newS) callback(oldS, newS);
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 /**

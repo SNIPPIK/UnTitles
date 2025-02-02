@@ -104,8 +104,7 @@ class AudioFiltersCommand extends Assign<Command> {
         super({
             rules: ["queue", "voice", "another_voice", "player-not-playing"],
             execute: ({message, args, type}) => {
-                const {guild} = message;
-                const queue = db.queues.get(guild.id);
+                const queue = message.queue;
                 const player = queue.player;
 
                 // Выключаем все фильтры

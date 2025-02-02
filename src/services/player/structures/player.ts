@@ -1,10 +1,9 @@
-import {AudioPlayerEvents, PlayerTracks} from "@service/player";
+import {AudioPlayerEvents, PlayerTracks, PlayerAudioFilters} from "@service/player";
 import {AudioResource} from "@service/voice";
 import {Logger, TypedEmitter} from "@utils";
 import {db} from "@app";
 
 // Local modules
-import {PlayerAudioFilters} from "@service/player";
 import {PlayerProgress} from "../modules/progress";
 import {PlayerVoice} from "../modules/voice";
 import {PlayerAudio} from "../modules/audio";

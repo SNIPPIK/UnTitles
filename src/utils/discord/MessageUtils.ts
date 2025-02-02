@@ -3,6 +3,7 @@ import {MessageSendOptions, ds_input, MessageComponent} from "@type/discord";
 import {Attachment, InteractionCallbackResponse} from "discord.js";
 import type {EmbedData, GuildMember, Message} from "discord.js"
 import {locale, languages} from "@service/locale";
+import {SupportButtons} from "@handler/queues";
 import {Logger, EmbedBuilder} from "@utils";
 import {env} from "@handler";
 import {db} from "@app";
@@ -241,8 +242,8 @@ export class MessageUtils {
      * @param style - Тип стиля
      * @param disabled - Кнопка доступна для нажатия
      */
-    public static createButton_env(name: string, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
-        return { type: 2, emoji: MessageUtils.checkIDComponent(name), custom_id: name.split("button.")[1], style, disabled }
+    public static createButton_env(name: SupportButtons, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
+        return { type: 2, emoji: MessageUtils.checkIDComponent(`button.${name}`), custom_id: name, style, disabled }
     };
 
     /**
@@ -253,7 +254,7 @@ export class MessageUtils {
      * @param style - Тип стиля
      * @param disabled - Кнопка доступна для нажатия
      */
-    public static createButton(emoji: MessageComponent["emoji"], id: string, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
+    public static createButton(emoji: MessageComponent["emoji"], id: SupportButtons, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
         return { type: 2, emoji, custom_id: id, style, disabled }
     };
 

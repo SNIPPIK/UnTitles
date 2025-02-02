@@ -2,7 +2,6 @@ import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {Command, SlashCommand} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
-import {db} from "@app";
 
 /**
  * @author SNIPPIK
@@ -40,7 +39,7 @@ class RemoveTrackCommand extends Assign<Command> {
         super({
             rules: ["voice", "another_voice", "queue", "player-not-playing"],
             execute: ({message, args}) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = message.queue;
                 const number = args.length > 0 ? parseInt(args.pop()) : 1;
 
                 // Если аргумент не является числом

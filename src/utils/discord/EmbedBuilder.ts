@@ -173,9 +173,9 @@ export class EmbedBuilder<T extends Interact> {
             this.components.push(
                 {
                     type: 1, components: [
-                        {type: 2, emoji: {name: "⬅"}, custom_id: "menu_back", style: 2},
-                        {type: 2, emoji: {name: "➡"}, custom_id: "menu_next", style: 2},
-                        {type: 2, emoji: {name: "🗑️"}, custom_id: "menu_cancel", style: 4}
+                        MessageUtils.createButton({name: "⬅"},  "menu_back", 2, false),
+                        MessageUtils.createButton({name: "➡"},  "menu_next", 2, false),
+                        MessageUtils.createButton({name: "🗑️"}, "menu_cancel", 4, false)
                     ]
                 }
             )
@@ -186,10 +186,10 @@ export class EmbedBuilder<T extends Interact> {
             this.components.push(
                 {
                     type: 1, components: [
-                        {type: 2, emoji: {name: "⬅"}, custom_id: "menu_back", style: 2},
-                        {type: 2, emoji: {name: "✔️"}, custom_id: "menu_select", style: 3},
-                        {type: 2, emoji: {name: "➡"}, custom_id: "menu_next", style: 2},
-                        {type: 2, emoji: {name: "🗑️"}, custom_id: "menu_cancel", style: 4}
+                        MessageUtils.createButton({name: "⬅"},  "menu_back", 2, false),
+                        MessageUtils.createButton({name: "✔️"}, "menu_select", 3, false),
+                        MessageUtils.createButton({name: "➡"},  "menu_next", 2, false),
+                        MessageUtils.createButton({name: "🗑️"}, "menu_cancel", 4, false)
                     ]
                 }
             )

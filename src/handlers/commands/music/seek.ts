@@ -2,7 +2,6 @@ import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {Command, SlashCommand} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
-import {db} from "@app";
 
 /**
  * @author SNIPPIK
@@ -40,8 +39,7 @@ class SeekTrackCommand extends Assign<Command> {
         super({
             rules: ["queue", "voice", "another_voice", "player-not-playing"],
             execute: ({message, args}) => {
-                const {guild} = message;
-                const queue = db.queues.get(guild.id);
+                const queue = message.queue;
                 const duration = args[0]?.duration();
 
                 //Если пользователь написал что-то не так

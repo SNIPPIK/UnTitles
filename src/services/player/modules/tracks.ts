@@ -82,8 +82,7 @@ export class PlayerTracks {
      * @public
      */
     public get time() {
-        const tracks = this._tracks._current.slice(this.position);
-        const total = tracks.reduce((total: number, item) => total + (item.time.total || 0), 0);
+        const total = this._tracks._current.reduce((total: number, item) => total + (item.time.total || 0), 0);
 
         return total.duration();
     };

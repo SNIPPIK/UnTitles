@@ -7,9 +7,10 @@ import {Interact} from "@utils";
 /**
  * @author SNIPPIK
  * @description Доступные кнопки
- * @type SupportButtons
+ * @enum SupportButtons
  */
-type SupportButtons = "shuffle" | "back" | "resume_pause" | "skip" | "repeat" | "replay" | "queue" | "filters" | "lyrics" | "stop";
+export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters" | MenuButtons;
+type MenuButtons = "menu_back" | "menu_select" | "menu_cancel" | "menu_next";
 
 /**
  * @author SNIPPIK
@@ -214,26 +215,27 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
                         pages.length > 0 ? {name: locale._(msg.locale, "queue"), value: pages[page]} : null
                     ],
                     footer: {
-                        text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.displayName, page + 1, pages.length, queue.tracks.size, queue.tracks.time]),
+                        text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.displayName, page + 1, pages.length, queue.tracks.total, queue.tracks.time]),
                         iconURL: queue.tracks.track.user.avatar
                     },
                     timestamp: new Date()
                 }
-            ]).setMenu({type: "table", pages, page}).setTime(60e3).setCallback((message, pages: string[], page: number, embed) => {
+            ]).setMenu({type: "table", pages, page}).setTime(60e3).setCallback((message, pages: string[], page: number) => {
                 return message.edit({
                     embeds: [ //@ts-ignore
                         {
-                            ...embed[0],
+                            ...message.embeds[0],
+                            color: Colors.Green,
                             fields: [
-                                embed[0].fields[0],
+                                message.embeds[0].fields[0],
                                 {
                                     name: locale._(msg.locale, "queue"),
                                     value: pages[page]
                                 }
                             ],
                             footer: {
-                                ...embed[0].footer,
-                                text: locale._(msg.locale, "player.button.queue.footer", [msg.author.username, page + 1, pages.length, queue.tracks.size, queue.tracks.time])
+                                ...message.embeds[0].footer,
+                                text: locale._(msg.locale, "player.button.queue.footer", [msg.author.username, page + 1, pages.length, queue.tracks.total, queue.tracks.time])
                             }
                         }
                     ]

@@ -130,4 +130,4 @@ class apis extends Assign<Command> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({api: apis});
+export default Object.values({ apis });

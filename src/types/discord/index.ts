@@ -1,8 +1,10 @@
 import {Message, BaseInteraction, ComponentData, ActionRowBuilder, EmbedData, MessageFlags} from "discord.js";
+import {SupportButtons} from "@handler/queues";
 
 /**
  * @author SNIPPIK
  * @description Поддерживаемый тип сообщения
+ * @type ds_input
  */
 export type ds_input = Message | BaseInteraction; //| CommandInteraction | MessageComponentInteraction | ModalSubmitInteraction;
 
@@ -32,7 +34,7 @@ export interface MessageComponents {
             id?:   string;
             name?: string;
         };
-        custom_id: string;
+        custom_id: SupportButtons;
         style: 1 | 2 | 3 | 4;
         disabled?: boolean;
     }[]
