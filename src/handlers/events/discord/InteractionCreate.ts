@@ -135,7 +135,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
-                    if (!db.whitelist.ids.includes(message.user.id)) {
+                    if (db.whitelist.ids.length > 0 && !db.whitelist.ids.includes(message.user.id)) {
                         interact.fastBuilder = {
                             description: locale._(interact.locale, "whitelist.message", [interact.author]),
                             color: Colors.Yellow
@@ -148,7 +148,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 // Если включен режим черного списка
                 else if (db.blacklist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
-                    if (!db.blacklist.ids.includes(message.user.id)) {
+                    if (db.blacklist.ids.length > 0 && !db.blacklist.ids.includes(message.user.id)) {
                         interact.fastBuilder = {
                             description: locale._(interact.locale, "blacklist.message", [interact.author]),
                             color: Colors.Yellow

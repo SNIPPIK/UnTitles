@@ -108,6 +108,12 @@ export abstract class handler<T = unknown> {
 
 /**
  * @author SNIPPIK
+ * @description Тип выходящего параметра env.get
+ */
+type EnvironmentExit<T> = T extends boolean ? T : T extends string ? T : never;
+
+/**
+ * @author SNIPPIK
  * @description Взаимодействуем с environment variables
  * @class Environment
  * @public
@@ -123,31 +129,28 @@ class Environment {
     /**
      * @description Получаем значение
      * @param name - Имя параметра в env
-     * @readonly
+     * @param safe - Этот параметр будет возращен если ничего нет
      * @public
      */
-    public readonly get = (name: keyof DotenvPopulateInput): any => {
+    public get<T = string>(name: keyof DotenvPopulateInput, safe?: EnvironmentExit<T>): EnvironmentExit<T> {
         const env = this._env.parsed[name];
 
         // Если нет параметра в файле .env
-        if (!env) throw new Error(`[ENV]: Not found ${name} in .env`);
+        if (!env) {
+            if (safe !== undefined) return safe;
 
-        // Проверяем параметр для конвертации
-        return env === "true" ? true : env === "false" ? false : env;
-    };
+            // Если нет <safe> параметра
+            throw new Error(`[ENV]: Not found ${name} in .env`);
+        }
 
-    /**
-     * @description Получаем данные более безопасно
-     * @param name - Имя параметра в env
-     * @param def - Этот параметр будет возращен если ничего нет
-     */
-    public readonly safe_get = (name: keyof DotenvPopulateInput, def: any): any => {
-        const env = this._env.parsed[name];
+        // Если параметр имеет правду
+        if (["on", "true"].includes(env)) return true as EnvironmentExit<T>;
 
-        if (!env) return def;
+        // Если параметр имеет ложь
+        else if (["off", "false"].includes(env)) return false as EnvironmentExit<T>;
 
-        // Проверяем параметр для конвертации
-        return env === "true" ? true : env === "false" ? false : env;
+        // Если параметр имеет что-то другое
+        return env as EnvironmentExit<T>;
     };
 
     /**

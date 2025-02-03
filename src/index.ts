@@ -71,8 +71,8 @@ class Database {
      * @public
      */
     public readonly whitelist: {toggle: boolean; ids: string[]} = {
-        toggle: env.get("whitelist"),
-        ids: env.safe_get("whitelist.list", "").split(",")
+        toggle: env.get<boolean>("whitelist"),
+        ids: env.get("whitelist.list", "").split(",")
     };
 
     /**
@@ -81,8 +81,8 @@ class Database {
      * @public
      */
     public readonly blacklist: {toggle: boolean; ids: string[]} = {
-        toggle: env.get("blacklist"),
-        ids: env.safe_get("blacklist.list", "").split(",")
+        toggle: env.get<boolean>("blacklist"),
+        ids: env.get("blacklist.list", "").split(",")
     };
 
     /**
