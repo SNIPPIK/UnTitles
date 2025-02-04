@@ -176,6 +176,6 @@ class SkipUtilityCommand extends Assign<Command> {
 
 /**
  * @export default
- * @description Делаем классы глобальными
+ * @description Не даем классам или объектам быть доступными везде в проекте
  */
 export default Object.values({SkipUtilityCommand});

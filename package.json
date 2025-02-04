@@ -6,12 +6,11 @@
   "preferGlobal": true,
   "engineStrict": true,
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=23.0.0"
   },
   "dependencies": {
     "discord.js": "^14.17.3",
     "dotenv": "^16.4.7",
-    "sodium-native": "^4.3.1",
     "tiny-typed-emitter": "^2.1.0",
     "ws": "^8.18.0"
   },

@@ -16,7 +16,7 @@ export class Commands extends handler<Command> {
      * @public
      */
     public get filters_choices() {
-        const temples: SlashComponent["choices"] = [];
+        const temples: SlashCommand.Component["choices"] = [];
 
         // Если фильтров слишком много
         if (filters.length > 25) return temples;
@@ -125,6 +125,139 @@ export class Commands extends handler<Command> {
 
 /**
  * @author SNIPPIK
+ * @description Декоратор slash команды
+ * @constructor
+ * @decorator
+ */
+export function SlashCommand(options: SlashCommand.Options) {
+    const name_key = Object.keys(options.names)[0] as Locale
+    const name = options.names[name_key];
+    const name_localizations = options.names;
+
+    const description_key = Object.keys(options.descriptions)[0] as Locale;
+    const description = options.descriptions[description_key];
+    const description_localizations = options.descriptions;
+
+    const SubOptions: SlashCommand.Component[] = [];
+
+    // Создаем компонент команды для discord
+    for (let obj of options.options) {
+        // Если надо подменить данные для работы с discord
+        SubOptions.push(
+            {
+                ...obj,
+                name: obj.names[Object.keys(obj.names)[0] as Locale],
+                nameLocalizations: obj.names,
+                description: obj.descriptions[Object.keys(obj.descriptions)[0] as Locale],
+                descriptionLocalizations: obj.descriptions,
+                options: obj.options ? obj.options.map((option) => {
+                    return {
+                        ...option,
+                        name: option.names[Object.keys(option.names)[0] as Locale],
+                        nameLocalizations: option.names,
+                        description: option.descriptions[Object.keys(option.descriptions)[0] as Locale],
+                        descriptionLocalizations: option.descriptions,
+                    };
+                }) : undefined
+            } as any
+        );
+    }
+
+    // Загружаем данные в класс
+    return function (target: Function) {
+        target.prototype.name = name;
+        target.prototype["name_localizations"] = name_localizations;
+        target.prototype.description = description;
+        target.prototype["description_localizations"] = description_localizations;
+        target.prototype["default_member_permissions"] = null;
+        target.prototype.dm_permission = options?.dm_permission ?? null;
+        target.prototype["integration_types"] = [0];
+        target.prototype["contexts"] = [0];
+        target.prototype.options = SubOptions;
+        target.prototype["nsfw"] = false;
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Интерфейсы slash-command
+ */
+export namespace SlashCommand {
+    /**
+     * @author SNIPPIK
+     * @description Параметры декоратора
+     * @interface Options
+     */
+    export interface Options {
+        names: LocalizationMap;
+        descriptions: LocalizationMap;
+        options: Component[];
+
+        dm_permission?: boolean;
+    }
+
+    /**
+     * @author SNIPPIK
+     * @description Оригинальный элемент выбора
+     * @interface Choice
+     */
+    export interface Choice {
+        /**
+         * @description Имя действия
+         */
+        readonly name: string;
+
+        /**
+         * @description Тип возврата данных, нужен для кода разработчика
+         */
+        readonly value: string;
+
+        /**
+         * @description Перевод имен действий на разные языки
+         */
+        readonly nameLocalizations?: LocalizationMap;
+    }
+
+    /**
+     * @author SNIPPIK
+     * @description Упрощающий элемент создания компонентов для команд
+     * @interface Component
+     */
+    export interface Component {
+        /**
+         * @description Имена команды на разных языках
+         */
+        readonly names: ApplicationCommandOption['nameLocalizations'];
+
+        /**
+         * @description Описание команды на разных языках
+         */
+        readonly descriptions: ApplicationCommandOption["descriptionLocalizations"];
+
+        /**
+         * @description Тип вводимых данных
+         */
+        readonly type: ApplicationCommandOption["type"];
+
+        /**
+         * @description Ввод данных обязателен
+         */
+        readonly required?: boolean;
+
+        /**
+         * @description Доп команды к команде или к подкоманде. Внимание нельзя нарушать структуру discord а то команды не будут приняты
+         */
+        readonly options?: Component[];
+
+        /**
+         * @description Список действий на выбор пользователей
+         */
+        choices?: Choice[];
+    }
+}
+
+/**
+ * @author SNIPPIK
  * @description Интерфейс для команд
  * @interface Command
  */
@@ -226,132 +359,6 @@ export interface Command {
         /**
          * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
          */
-        args?: SlashComponent["choices"][number]["value"][];
+        args?: SlashCommand.Component["choices"][number]["value"][];
     }) => void;
-}
-
-/**
- * @author SNIPPIK
- * @description Декоратор slash команды
- * @constructor
- */
-export function SlashCommand(options: SlashCommandOptions) {
-    const name_key = Object.keys(options.names)[0] as Locale
-    const name = options.names[name_key];
-    const name_localizations = options.names;
-
-    const description_key = Object.keys(options.descriptions)[0] as Locale;
-    const description = options.descriptions[description_key];
-    const description_localizations = options.descriptions;
-
-    const SubOptions: SlashComponent[] = [];
-
-    // Создаем компонент команды для discord
-    for (let obj of options.options) {
-        // Если надо подменить данные для работы с discord
-        SubOptions.push(
-            {
-                ...obj,
-                name: obj.names[Object.keys(obj.names)[0] as Locale],
-                nameLocalizations: obj.names,
-                description: obj.descriptions[Object.keys(obj.descriptions)[0] as Locale],
-                descriptionLocalizations: obj.descriptions,
-                options: obj.options ? obj.options.map((option) => {
-                    return {
-                        ...option,
-                        name: option.names[Object.keys(option.names)[0] as Locale],
-                        nameLocalizations: option.names,
-                        description: option.descriptions[Object.keys(option.descriptions)[0] as Locale],
-                        descriptionLocalizations: option.descriptions,
-                    };
-                }) : undefined
-            } as any
-        );
-    }
-
-    // Загружаем данные в класс
-    return function (target: Function) {
-        target.prototype.name = name;
-        target.prototype["name_localizations"] = name_localizations;
-        target.prototype.description = description;
-        target.prototype["description_localizations"] = description_localizations;
-        target.prototype["default_member_permissions"] = null;
-        target.prototype.dm_permission = options?.dm_permission ?? null;
-        target.prototype["integration_types"] = [0];
-        target.prototype["contexts"] = [0];
-        target.prototype.options = SubOptions;
-        target.prototype["nsfw"] = false;
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Параметры декоратора
- * @interface SlashCommandOptions
- */
-interface SlashCommandOptions {
-    names: LocalizationMap;
-    descriptions: LocalizationMap;
-    options: SlashComponent[];
-
-    dm_permission?: boolean;
-}
-
-/**
- * @author SNIPPIK
- * @description Оригинальный элемент выбора
- * @interface DiscordSlashChoice
- */
-interface DiscordSlashChoice {
-    /**
-     * @description Имя действия
-     */
-    readonly name: string;
-
-    /**
-     * @description Тип возврата данных, нужен для кода разработчика
-     */
-    readonly value: string;
-
-    /**
-     * @description Перевод имен действий на разные языки
-     */
-    readonly nameLocalizations?: LocalizationMap;
-}
-
-/**
- * @author SNIPPIK
- * @description Упрощающий элемент создания компонентов для команд
- * @interface SlashComponent
- */
-export interface SlashComponent {
-    /**
-     * @description Имена команды на разных языках
-     */
-    readonly names: ApplicationCommandOption['nameLocalizations'];
-
-    /**
-     * @description Описание команды на разных языках
-     */
-    readonly descriptions: ApplicationCommandOption["descriptionLocalizations"];
-
-    /**
-     * @description Тип вводимых данных
-     */
-    readonly type: ApplicationCommandOption["type"];
-
-    /**
-     * @description Ввод данных обязателен
-     */
-    readonly required?: boolean;
-
-    /**
-     * @description Доп команды к команде или к подкоманде. Внимание нельзя нарушать структуру discord а то команды не будут приняты
-     */
-    readonly options?: SlashComponent[];
-
-    /**
-     * @description Список действий на выбор пользователей
-     */
-    choices?: (DiscordSlashChoice)[];
 }

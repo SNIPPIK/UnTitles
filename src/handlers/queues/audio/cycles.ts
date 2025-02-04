@@ -7,7 +7,6 @@ import {db} from "@app";
  * @author SNIPPIK
  * @description Циклы для работы аудио, лучше не трогать без понимания как все это работает
  * @class Cycles
- * @private
  */
 export class AudioCycles {
     /**

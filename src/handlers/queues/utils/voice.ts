@@ -14,7 +14,7 @@ export class db_voice extends Collection<VoiceConnection> {
      * @param adapterCreator - Для отправки пакетов
      * @public
      */
-    public join = (config: VoiceConfig, adapterCreator: DiscordGatewayAdapterCreator): VoiceConnection => {
+    public join = (config: VoiceConfig, adapterCreator: DiscordGatewayAdapterCreator) => {
         let connection = this.get(config.guildId);
 
         // Если есть голосовое подключение при подключении

@@ -88,6 +88,17 @@ import {db} from "@app";
                     required: true
                 }
             ]
+        },
+        {
+            type: ApplicationCommandOptionType.Subcommand,
+            names: {
+                "en-US": "replay",
+                "ru": "заново"
+            },
+            descriptions: {
+                "en-US": "Restart queue!!! Necessary for re-enabling if playback has been completed!",
+                "ru": "Перезапуск очереди!!! Необходимо для повторного включения если проигрывание было завершено!"
+            },
         }
     ]
 })
@@ -111,6 +122,23 @@ class PlayCommand extends Assign<Command> {
                         return;
                     }
 
+                    // Если надо перезапустить проигрывание
+                    case "replay": {
+                        const queue = message.queue;
+
+                        // Если нет очереди, то и нечего перезапускать
+                        if (!queue) {
+                            message.fastBuilder = { description: locale._(message.locale, "command.play.replay.queue", [message.author]), color: Colors.Yellow };
+                            return;
+                        }
+
+                        // Перезапускаем очередь
+                        db.queues.create(message);
+
+                        message.fastBuilder = { description: locale._(message.locale, "command.play.replay", [message.author]), color: Colors.Green };
+                        return;
+                    }
+
                     // Если пользователя пытается сделать запрос к API
                     default: db.events.emitter.emit("request/api", message, args);
                 }
@@ -121,6 +149,6 @@ class PlayCommand extends Assign<Command> {
 
 /**
  * @export default
- * @description Делаем классы глобальными
+ * @description Не даем классам или объектам быть доступными везде в проекте
  */
 export default Object.values({PlayCommand});

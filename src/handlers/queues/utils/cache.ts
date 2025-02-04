@@ -12,6 +12,11 @@ import fs from "node:fs";
  * @public
  */
 export class CacheUtility {
+    /**
+     * @description Параметры утилиты кеширования
+     * @readonly
+     * @private
+     */
     private readonly _options = {
         /**
          * @description Путь до директории с кешированными данными
@@ -28,7 +33,7 @@ export class CacheUtility {
          * @description Включена ли система кеширования
          */
         isOn: env.get("cache")
-    }
+    };
 
     /**
      * @description База данных треков

@@ -52,7 +52,7 @@ const socketStatus: {name: VoiceOpcodes, callback: (socket: VoiceSocket, packet?
                             data: {
                                 address: localConfig.ip,
                                 port: localConfig.port,
-                                mode: Encryption.mode(modes),
+                                mode: Encryption.mode,
                             },
                         }
                     };
@@ -89,7 +89,7 @@ const socketStatus: {name: VoiceOpcodes, callback: (socket: VoiceSocket, packet?
                         sequence: Encryption.randomNBit(16),
                         timestamp: Encryption.randomNBit(32),
                         nonce: 0,
-                        nonceBuffer: Buffer.alloc(24),
+                        nonceBuffer: Buffer.alloc(12),
                         speaking: false,
                         packetsPlayed: 0,
                     }

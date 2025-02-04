@@ -516,5 +516,15 @@
   "command.filter.off.after": {
     "ru": "Все фильтры будут выключены сейчас!",
     "en-US": "All filters will be turned off now!"
+  },
+
+
+  "command.play.replay.queue": {
+    "ru": "{ARGUMENT} | Я не могу перезапустить воспроизведение треков, очереди нет!",
+    "en-US": "{ARGUMENT} | I can't restart playing tracks, there is no queue!"
+  },
+  "command.play.replay": {
+    "ru": "{ARGUMENT} | Перезапуск воспроизведенных треков!",
+    "en-US": "{ARGUMENT} | Restarting played tracks!"
   }
 }

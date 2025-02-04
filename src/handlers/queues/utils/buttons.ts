@@ -7,9 +7,15 @@ import {Interact} from "@utils";
 /**
  * @author SNIPPIK
  * @description Доступные кнопки
- * @enum SupportButtons
+ * @type SupportButtons
  */
 export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters" | MenuButtons;
+
+/**
+ * @author SNIPPIK
+ * @description Имена кнопок в меню взаимодействия
+ * @type MenuButtons
+ */
 type MenuButtons = "menu_back" | "menu_select" | "menu_cancel" | "menu_next";
 
 /**
@@ -23,7 +29,6 @@ type ButtonCallback = (msg: Interact) => void;
  * @author SNIPPIK
  * @description Класс хранящий в себе все кнопки для бота
  * @class dbl_buttons
- * @public
  */
 export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
     public constructor() {

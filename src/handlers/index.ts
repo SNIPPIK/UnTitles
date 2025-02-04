@@ -108,6 +108,67 @@ export abstract class handler<T = unknown> {
 
 /**
  * @author SNIPPIK
+ * @description Упрощение проверки загрузки библиотек
+ * @class LoaderLibs
+ * @abstract
+ * @public
+ */
+export abstract class LoaderLibs<T = unknown> {
+    /**
+     * @description Данные для загрузки библиотеки
+     * @private
+     */
+    protected readonly self: { libs: lib_exec<T>; current: T; };
+
+    /**
+     * @description Выдаем найденную библиотеку
+     * @public
+     */
+    public get lib() { return this.self.current; };
+
+    /**
+     * @description Имена библиотек
+     * @public
+     */
+    public get names() { return Object.keys(this.self.libs); };
+
+    /**
+     * @description Проверка библиотек на наличие в системе
+     * @protected
+     */
+    protected check = async () => {
+        // Удаляем мусорные данные
+        setImmediate(() => { this.self.libs = null; });
+
+        for (const name of this.names) {
+            try {
+                const library = require(name);
+
+                // Если библиотеке надо сообщить о подготовке
+                if (library?.ready) await library.ready;
+
+                // Записываем библиотеку в базу для работы с библиотекой
+                Object.assign(this.self.current, this.self.libs[name](library));
+                delete require.cache[require.resolve(name)];
+                return true;
+            } catch {}
+        }
+
+        return false;
+    };
+}
+
+/**
+ * @description Поддерживаемый запрос к библиотеке
+ * @type supported
+ */
+export type lib_exec<T> = {
+    [name: string]: (lib: any) => T
+}
+
+
+/**
+ * @author SNIPPIK
  * @description Тип выходящего параметра env.get
  */
 type EnvironmentExit<T> = T extends boolean ? T : T extends string ? T : never;
