@@ -189,10 +189,30 @@ export namespace SlashCommand {
      * @interface Options
      */
     export interface Options {
+        /**
+         * @description Имена команды на разных языках
+         * @example Первое именование будет выставлено для других языков как по-умолчанию
+         * @public
+         */
         names: LocalizationMap;
+
+        /**
+         * @description Описание команды на розных языках
+         * @example Первое именование будет выставлено для других языков как по-умолчанию
+         * @public
+         */
         descriptions: LocalizationMap;
+
+        /**
+         * @description Параметры команды
+         * @public
+         */
         options: Component[];
 
+        /**
+         * @description Можно ли использовать эту команду в личных чатах
+         * @public
+         */
         dm_permission?: boolean;
     }
 
@@ -205,17 +225,17 @@ export namespace SlashCommand {
         /**
          * @description Имя действия
          */
-        readonly name: string;
+        name: string;
 
         /**
          * @description Тип возврата данных, нужен для кода разработчика
          */
-        readonly value: string;
+        value: string;
 
         /**
          * @description Перевод имен действий на разные языки
          */
-        readonly nameLocalizations?: LocalizationMap;
+        nameLocalizations?: LocalizationMap;
     }
 
     /**
@@ -226,31 +246,39 @@ export namespace SlashCommand {
     export interface Component {
         /**
          * @description Имена команды на разных языках
+         * @example Первое именование будет выставлено для других языков как по-умолчанию
+         * @public
          */
-        readonly names: ApplicationCommandOption['nameLocalizations'];
+        names: ApplicationCommandOption['nameLocalizations'];
 
         /**
          * @description Описание команды на разных языках
+         * @example Первое именование будет выставлено для других языков как по-умолчанию
+         * @public
          */
-        readonly descriptions: ApplicationCommandOption["descriptionLocalizations"];
+        descriptions: ApplicationCommandOption["descriptionLocalizations"];
 
         /**
          * @description Тип вводимых данных
+         * @public
          */
-        readonly type: ApplicationCommandOption["type"];
+        type: ApplicationCommandOption["type"];
 
         /**
          * @description Ввод данных обязателен
+         * @public
          */
-        readonly required?: boolean;
+        required?: boolean;
 
         /**
          * @description Доп команды к команде или к подкоманде. Внимание нельзя нарушать структуру discord а то команды не будут приняты
+         * @public
          */
-        readonly options?: Component[];
+        options?: Component[];
 
         /**
          * @description Список действий на выбор пользователей
+         * @public
          */
         choices?: Choice[];
     }

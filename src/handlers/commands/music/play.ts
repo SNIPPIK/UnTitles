@@ -16,8 +16,8 @@ import {db} from "@app";
         "ru": "играть"
     },
     descriptions: {
-        "en-US": "Play music of your choice!",
-        "ru": "Включайте музыку по вашему выбору!"
+        "en-US": "Turning on music, or searching for music!",
+        "ru": "Включение музыки, или поиск музыки!"
     },
     dm_permission: false,
     options: [

@@ -36,7 +36,7 @@ const socketStatus: {name: VoiceOpcodes, callback: (socket: VoiceSocket, packet?
         name: VoiceOpcodes.Ready,
         callback: (socket, packet) => {
             if (socket.state.code === VoiceSocketStatusCode.identify) {
-                const {ip, port, ssrc, modes} = packet.d;
+                const {ip, port, ssrc} = packet.d;
                 const udp = new VoiceUDPSocket({ip, port});
 
                 // Получаем ip и порт сервера голосового подключения

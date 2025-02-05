@@ -15,8 +15,8 @@ import {Assign} from "@utils";
         "ru": "аватар"
     },
     descriptions: {
-        "en-US": "If you want to look at the user's avatar, I'm at your service!",
-        "ru": "Если хочется глянуть аватар пользователя я к вашим услугам!"
+        "en-US": "If you need to take a closer look at the user's avatar!",
+        "ru": "Если надо глянуть аватар пользователя поближе!"
     },
     dm_permission: false,
     options: [

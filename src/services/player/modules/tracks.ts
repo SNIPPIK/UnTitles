@@ -75,16 +75,16 @@ export class PlayerTracks {
      * @return number
      * @public
      */
-    public get position() { return this._tracks._position; };
+    public get position() {
+        return this._tracks._position;
+    };
 
     /**
      * @description Общее время треков
      * @public
      */
     public get time() {
-        const total = this._tracks._current.reduce((total: number, item) => total + (item.time.total || 0), 0);
-
-        return total.duration();
+        return this._tracks._current.reduce((total: number, item) => total + (item.time.total || 0), 0).duration();
     };
 
     /**
@@ -138,35 +138,72 @@ export class PlayerTracks {
      * @description Получаем данные перетасовки
      * @public
      */
-    public get shuffle(): boolean { return this._tracks._shuffle; };
+    public get shuffle(): boolean {
+        return this._tracks._shuffle;
+    };
 
     /**
      * @description Сохраняем тип повтора
      * @param type - Тип повтора
      * @public
      */
-    public set repeat(type) { this._tracks._repeat = type; };
+    public set repeat(type) {
+        this._tracks._repeat = type;
+    };
 
     /**
      * @description Получаем тип повтора
      * @public
      */
-    public get repeat() { return this._tracks._repeat; };
+    public get repeat() {
+        return this._tracks._repeat;
+    };
 
     /**
      * @description Кол-во треков в очереди с учетом текущей позиции
      * @return number
      * @public
      */
-    public get size() { return this._tracks._current.length - this.position; };
+    public get size() {
+        return this._tracks._current.length - this.position;
+    };
 
     /**
      * @description Общее кол-во треков в очереди
      * @return number
      * @public
      */
-    public get total() { return this._tracks._current.length; };
+    public get total() {
+        return this._tracks._current.length;
+    };
 
+
+    /**
+     * @description Добавляем трек в очередь
+     * @param track - Сам трек
+     */
+    public push = (track: Track): void => {
+        // Если включена перетасовка, то добавляем треки в оригинальную очередь
+        if (this._tracks._shuffle) this._tracks._original.push(track);
+
+        // Добавляем трек в текущую очередь
+        this._tracks._current.push(track);
+    };
+
+    /**
+     * @description Удаляем из очереди неугодный трек
+     * @param position - позиция трека, номер в очереди
+     */
+    public remove = (position: number): void => {
+        // Если трек удаляем из виртуально очереди, то и из оригинальной
+        if (this._tracks._shuffle) {
+            const index = this._tracks._original.indexOf(this._tracks._current[position]);
+            if (index > -1) this._tracks._original.splice(index, 1);
+        }
+
+        // Удаляем из очереди
+        this._tracks._current.splice(position, 1);
+    };
 
     /**
      * @description Получаем <указанное> кол-во треков
@@ -193,36 +230,11 @@ export class PlayerTracks {
     };
 
     /**
-     * @description Добавляем трек в очередь
-     * @param track - Сам трек
-     */
-    public push = (track: Track): void => {
-        // Если включена перетасовка, то добавляем треки в оригинальную очередь
-        if (this._tracks._shuffle) this._tracks._original.push(track);
-
-        // Добавляем трек в текущую очередь
-        this._tracks._current.push(track);
-    };
-
-    /**
      * @description Получаем прошлый трек или текущий в зависимости от позиции
      * @param position - позиция трека, номер в очереди
      */
-    public get = (position: number) => { return this._tracks._current[position]; };
-
-    /**
-     * @description Удаляем из очереди неугодный трек
-     * @param position - позиция трека, номер в очереди
-     */
-    public remove = (position: number): void => {
-        // Если трек удаляем из виртуально очереди, то и из оригинальной
-        if (this._tracks._shuffle) {
-            const index = this._tracks._original.indexOf(this._tracks._current[position]);
-            if (index > -1) this._tracks._original.splice(index, 1);
-        }
-
-        // Удаляем из очереди
-        this._tracks._current.splice(position, 1);
+    public get = (position: number ) => {
+        return this._tracks._current[position];
     };
 
     /**
@@ -230,7 +242,7 @@ export class PlayerTracks {
      * @param track - Искомый трек
      */
     public indexOf = (track: Track) => {
-        return  this._tracks._current.indexOf(track);
+        return this._tracks._current.indexOf(track);
     };
 }
 
@@ -253,5 +265,5 @@ export enum RepeatType {
     /**
      * @description Повтор всех треков
      */
-    Songs = 2,
+    Songs = 2
 }

@@ -31,11 +31,9 @@ export class Encryption {
      * @static
      */
     public static packet = (packet: Buffer, connectionData: ConnectionData) => {
-        const rtp_packet = Buffer.alloc(12);
-        rtp_packet[0] = 0x80;
-        rtp_packet[1] = 0x78;
-
         const { sequence, timestamp, ssrc } = connectionData;
+        const rtp_packet = Buffer.alloc(12);
+        [rtp_packet[0], rtp_packet[1]] = [0x80, 0x78];
 
         rtp_packet.writeUIntBE(sequence, 2, 2);
         rtp_packet.writeUIntBE(timestamp, 4, 4);
@@ -54,13 +52,12 @@ export class Encryption {
      * @static
      */
     private static crypto = (packet: Buffer, connectionData: ConnectionData, additionalData: Buffer) => {
-        // Оба поддерживаемых метода шифрования требуют, чтобы одноразовое число было инкрементным целым числом.
         connectionData.nonce++;
+
         if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
         connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
 
-        const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer, {autoDestroy: true});
-        cipher.setAAD(additionalData);
+        const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer, {autoDestroy: true}).setAAD(additionalData);
         return [Buffer.concat([cipher.update(packet), cipher.final(), cipher.getAuthTag()]), connectionData.nonceBuffer.subarray(0, 4)];
     };
 

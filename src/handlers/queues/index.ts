@@ -29,9 +29,9 @@ export class Queues extends Collection<Queue> {
     };
 
     /**
-     * @description Проверяем надо ли создать очередь и добавляем треки в нее
+     * @description Ультимативная функция, позволяет как добавлять треки так и создавать очередь или переподключить очередь к системе
      * @param message - Сообщение пользователя
-     * @param item    - Добавляемый объект
+     * @param item    - Добавляемый объект (необязательно)
      * @public
      */
     public create = (message: Interact, item?: Track.playlist | Track) => {
@@ -41,7 +41,27 @@ export class Queues extends Collection<Queue> {
         if (!queue) queue = new Queue(message);
         else {
             // Значит что плеера нет в циклах
-            if (!this.cycles.players.match(queue.player)) this._reconstructQueue(queue, message);
+            if (!this.cycles.players.match(queue.player)) {
+                const voice = db.voice.get(message.guild.id);
+
+                // Если нет голосового подключения
+                if (!voice) queue.voice = message.voice;
+
+                // Если это новый текстовый канал
+                if (queue.message.channel.id !== message.channel.id) queue.message = message;
+
+                // Добавляем плеер в базу цикла для отправки пакетов
+                this.cycles.players.set(queue.player);
+
+                // Если плеер не запустится сам
+                setImmediate(() => {
+                    // Меняем позиции на самую последнюю
+                    queue.player.tracks.position = item instanceof Track ? queue.player.tracks.total - 1 : queue.player.tracks.total - item.items.length;
+
+                    // Запускаем проигрывание
+                    setTimeout(queue.player.play, 1e3);
+                });
+            }
         }
 
         // Если надо перезапустить очередь
@@ -57,34 +77,6 @@ export class Queues extends Collection<Queue> {
                 queue.tracks.push(track);
             }
         }
-    };
-
-    /**
-     * @description Что надо делать когда очередь, но нет проигрывания плеера
-     * @param queue   - Очередь сервера
-     * @param message - Сообщение пользователя
-     * @private
-     */
-    private _reconstructQueue = (queue: Queue, message: Interact) => {
-        const voice = db.voice.get(message.guild.id);
-
-        // Если нет голосового подключения
-        if (!voice) queue.voice = message.voice;
-
-        // Если это новый текстовый канал
-        if (queue.message.channel.id !== message.channel.id) queue.message = message;
-
-        // Добавляем плеер в базу цикла для отправки пакетов
-        this.cycles.players.set(queue.player);
-
-        // Если плеер не запустится сам
-        setImmediate(() => {
-            // Меняем позиции на самую последнюю
-            queue.player.tracks.position = queue.player.tracks.total - 1;
-
-            // Запускаем проигрывание
-            setTimeout(queue.player.play, 1e3);
-        });
     };
 }
 

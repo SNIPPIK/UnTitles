@@ -12,7 +12,7 @@ import {db} from "@app";
     },
     descriptions: {
         "en-US": "Managing API work inside the bot!",
-        "ru": "Управление работой api внутри бота!"
+        "ru": "Управление системой APIs внутри бота!"
     },
     dm_permission: false,
     options: [

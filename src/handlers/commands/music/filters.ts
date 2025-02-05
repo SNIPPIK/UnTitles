@@ -18,7 +18,7 @@ import {db} from "@app";
         "ru": "фильтр"
     },
     descriptions: {
-        "en-US": "Setting filters",
+        "en-US": "Setting audio filters",
         "ru": "Управление фильтрами аудио!"
     },
     dm_permission: false,
