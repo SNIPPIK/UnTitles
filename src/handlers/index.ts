@@ -1,4 +1,4 @@
-import {config, DotenvPopulateInput} from "dotenv";
+import * as process from "node:process";
 import * as path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -108,67 +108,6 @@ export abstract class handler<T = unknown> {
 
 /**
  * @author SNIPPIK
- * @description Упрощение проверки загрузки библиотек
- * @class LoaderLibs
- * @abstract
- * @public
- */
-export abstract class LoaderLibs<T = unknown> {
-    /**
-     * @description Данные для загрузки библиотеки
-     * @private
-     */
-    protected readonly self: { libs: lib_exec<T>; current: T; };
-
-    /**
-     * @description Выдаем найденную библиотеку
-     * @public
-     */
-    public get lib() { return this.self.current; };
-
-    /**
-     * @description Имена библиотек
-     * @public
-     */
-    public get names() { return Object.keys(this.self.libs); };
-
-    /**
-     * @description Проверка библиотек на наличие в системе
-     * @protected
-     */
-    protected check = async () => {
-        // Удаляем мусорные данные
-        setImmediate(() => { this.self.libs = null; });
-
-        for (const name of this.names) {
-            try {
-                const library = require(name);
-
-                // Если библиотеке надо сообщить о подготовке
-                if (library?.ready) await library.ready;
-
-                // Записываем библиотеку в базу для работы с библиотекой
-                Object.assign(this.self.current, this.self.libs[name](library));
-                delete require.cache[require.resolve(name)];
-                return true;
-            } catch {}
-        }
-
-        return false;
-    };
-}
-
-/**
- * @description Поддерживаемый запрос к библиотеке
- * @type supported
- */
-export type lib_exec<T> = {
-    [name: string]: (lib: any) => T
-}
-
-
-/**
- * @author SNIPPIK
  * @description Тип выходящего параметра env.get
  */
 type EnvironmentExit<T> = T extends boolean ? T : T extends string ? T : never;
@@ -181,11 +120,16 @@ type EnvironmentExit<T> = T extends boolean ? T : T extends string ? T : never;
  */
 class Environment {
     /**
-     * @description Загружаем .env файл
-     * @readonly
-     * @private
+     * @description Загружаем env файл в процесс
+     * @public
      */
-    private readonly _env = config();
+    public constructor() {
+        try {
+            process.loadEnvFile(".env");
+        } catch (error) {
+            throw new Error("[env] has not found .env file in current directory");
+        }
+    };
 
     /**
      * @description Получаем значение
@@ -193,8 +137,8 @@ class Environment {
      * @param safe - Этот параметр будет возращен если ничего нет
      * @public
      */
-    public get<T = string>(name: keyof DotenvPopulateInput, safe?: EnvironmentExit<T>): EnvironmentExit<T> {
-        const env = this._env.parsed[name];
+    public get<T = string>(name: string, safe?: EnvironmentExit<T>): EnvironmentExit<T> {
+        const env = process.env[name];
 
         // Если нет параметра в файле .env
         if (!env) {
@@ -238,7 +182,7 @@ class Environment {
             fs.writeFileSync(".env", envFile.join(os.EOL));
 
             // Обновляем env
-            setImmediate(() => require("dotenv").config());
+            setImmediate(() => process.loadEnvFile(".env"));
         } catch (e) {
             throw `[ENV]: Fail save >${key}< to .env`;
         }
@@ -251,7 +195,7 @@ class Environment {
      * @public
      */
     public readonly check = (name: string) => {
-        const env = this._env.parsed[name];
+        const env = process.env[name];
 
         return !(!env || env === "undefined");
     };

@@ -97,18 +97,56 @@ export class Queue {
     };
 
     /**
+     * @description Выдаем сообщение
+     * @return Client.message
+     * @public
+     */
+    public get message() {
+        // Если сообщение с сервера уже не доступно
+        if (!this._data.message) return null;
+        return this._data.message;
+    };
+
+    /**
+     * @description Выдаем сервер к которому привязана очередь
+     * @return Guild
+     * @public
+     */
+    public get guild() {
+        if (!this.message) return null;
+        return this.message.guild;
+    };
+
+    /**
+     * @description Записываем сообщение в базу для дальнейшего использования
+     * @param message - Сохраняемое сообщение
+     * @public
+     */
+    public set message(message: Interact) {
+        this._data.message = message;
+    };
+
+    /**
      * @description Выдаем плеер привязанный к очереди
      * @return AudioPlayer
      * @public
      */
-    public get player() { return this._data.player; };
+    public get player() {
+        // Если плеер уже не доступен
+        if (!this._data.player) return null;
+        return this._data.player;
+    };
 
     /**
      * @description Выдаем голосовой канал
      * @return VoiceChannel
      * @public
      */
-    public get voice() { return this._data.message.voice; };
+    public get voice() {
+        // Если сообщение с сервера уже не доступно
+        if (!this.message) return null;
+        return this.message.voice;
+    };
 
     /**
      * @description Записываем голосовой канал в базу для дальнейшего использования
@@ -116,6 +154,9 @@ export class Queue {
      * @public
      */
     public set voice(voice: Interact["voice"]) {
+        // Если плеер уже не доступен
+        if (!this.player) return;
+
         // Задаем новое голосовое подключение
         this.player.voice.connection = db.voice.join({
             selfDeaf: true,
@@ -132,6 +173,7 @@ export class Queue {
      * @public
      */
     public get tracks() {
+        // Если плеер уже не доступен
         if (!this.player) return null;
         return this.player.tracks;
     };
@@ -191,27 +233,6 @@ export class Queue {
 
         return components;
     };
-
-    /**
-     * @description Выдаем сообщение
-     * @return Client.message
-     * @public
-     */
-    public get message() { return this._data.message; };
-
-    /**
-     * @description Выдаем сервер к которому привязана очередь
-     * @return Guild
-     * @public
-     */
-    public get guild() { return this.message.guild; };
-
-    /**
-     * @description Записываем сообщение в базу для дальнейшего использования
-     * @param message - Сохраняемое сообщение
-     * @public
-     */
-    public set message(message: Interact) { this._data.message = message; };
 
     /**
      * @description Создаем очередь для дальнейшей работы, все подключение находятся здесь

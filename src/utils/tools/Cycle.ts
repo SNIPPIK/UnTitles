@@ -13,17 +13,17 @@ export abstract class Cycle<T = unknown> {
      * @readonly
      * @private
      */
-    private readonly _data = {
+    private readonly _data: {
         /**
          * @description База с объектами
          */
-        array: [] as T[],
+        array: T[];
 
         /**
          * @description Время через которое надо будет выполнить функцию
          */
-        time: 0
-    };
+        time: number;
+    } = null;
 
     /**
      * @description Параметры для работы цикла
@@ -44,6 +44,7 @@ export abstract class Cycle<T = unknown> {
      * @protected
      */
     protected constructor(options: TimeCycleConfig<T>) {
+        this._data = { array: [], time: 0 };
         this._config = {
             name: "timeCycle",
             execute: null,

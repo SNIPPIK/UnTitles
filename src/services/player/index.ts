@@ -46,9 +46,9 @@ export interface AudioPlayerEvents {
 /**
  * @author SNIPPIK
  * @description События глобальной системы очередей
- * @interface CollectionAudioEvents
+ * @interface QueuesEvents
  */
-export interface CollectionAudioEvents {
+export interface QueuesEvents {
     /**
      * @description Событие при котором коллекция будет отправлять информацию о добавленном треке или плейлисте, альбоме
      * @param message - Сообщение с сервера

@@ -20,7 +20,7 @@ export class Track {
      * @readonly
      * @private
      */
-    private readonly _duration: {
+    private _duration: {
         /**
          * @description Время визуальное 00:00
          * @readonly
@@ -73,32 +73,18 @@ export class Track {
      * @description Выдаем id трека
      * @public
      */
-    public get id() { return this._track.id; };
-
-    /**
-     * @description Получаем платформу у которого был взят трек
-     * @public
-     */
-    public get platform() { return this._api.platform; };
-
-    /**
-     * @description Добавление данных платформы
-     * @public
-     */
-    public set api(api: Track["_api"]) { this._api = api; };
-
-    /**
-     * @description Получаем цвет трека
-     * @public
-     */
-    public get color() { return this._api.color; };
+    public get id() {
+        // Если нет id трека
+        if (!this._track?.id) return undefined;
+        return this._track.id;
+    };
 
     /**
      * @description Получаем название трека
      * @public
      */
     public get title() {
-        if (!this._track.title) return "null";
+        if (!this._track?.title) return "null";
         return this._track.title;
     };
 
@@ -118,7 +104,9 @@ export class Track {
      * @description Получаем ссылку на трек
      * @public
      */
-    public get url() { return this._track.url; };
+    public get url() {
+        return this._track.url;
+    };
 
     /**
      * @description Получаем данные автора трека
@@ -133,11 +121,34 @@ export class Track {
             }
         };
     };
+
     /**
      * @description Получаем данные времени трека
      * @public
      */
-    public get time() { return this._duration; };
+    public get time() {
+        return this._duration;
+    };
+
+    /**
+     * @description Проверяем время и подгоняем к необходимым типам
+     * @param time - Данные о времени трека
+     * @protected
+     */
+    protected set time(time) {
+        // Если время в числовом формате
+        if (typeof time.total === "number") {
+            this._duration = { split: (time.total as number).duration(), total: time.total };
+        }
+        // Если что-то другое
+        else {
+            const total = parseInt(time.total);
+
+            // Время трека
+            if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };
+            else this._duration = { split: total.duration(), total };
+        }
+    };
 
     /**
      * @description Получаем превью трека
@@ -150,10 +161,29 @@ export class Track {
     };
 
     /**
+     * @description Получаем ссылку на исходный файл
+     * @public
+     */
+    public get link() {
+        return this._track.audio;
+    };
+
+    /**
+     * @description Добавление ссылки на трек
+     * @param url - Ссылка или путь
+     */
+    public set link(url: string) {
+        this._track.audio = url;
+    };
+
+
+    /**
      * @description Получаем пользователя который включил трек
      * @public
      */
-    public get user() { return this._user; };
+    public get user() {
+        return this._user;
+    };
 
     /**
      * @description Добавляем запросчика трека
@@ -174,17 +204,31 @@ export class Track {
         };
     };
 
-    /**
-     * @description Получаем ссылку на исходный файл
-     * @public
-     */
-    public get link() { return this._track.audio; };
 
     /**
-     * @description Добавление ссылки на трек
-     * @param url - Ссылка или путь
+     * @description Получаем платформу у которого был взят трек
+     * @public
      */
-    public set link(url: string) { this._track.audio = url; };
+    public get platform() {
+        return this._api.platform;
+    };
+
+    /**
+     * @description Добавление данных платформы
+     * @public
+     */
+    public set api(api: Track["_api"]) {
+        this._api = api;
+    };
+
+    /**
+     * @description Получаем цвет трека
+     * @public
+     */
+    public get color() {
+        return this._api.color;
+    };
+
 
     /**
      * @description Проверяем ссылку на доступность и выдаем ее если ссылка имеет код !==200, то обновляем
@@ -279,19 +323,10 @@ export class Track {
      * @param track - Данные трека с учетом <Song.track>
      */
     public constructor(track: Track.data) {
-        // Если время в числовом формате
-        if (typeof track.time.total === "number") {
-            this._duration = { split: (track.time.total as number).duration(), total: track.time.total };
-        }
-
-        // Если что-то другое
-        else {
-            const total = parseInt(track.time.total);
-
-            // Время трека
-            if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };
-            else this._duration = { split: total.duration(), total };
-        }
+        this.time = {
+            split: track.time.split,
+            total: track.time.total as any
+        };
 
         // Удаляем мусорные названия из текста
         track.artist.title = track.artist.title.replace(/ - Topic/gi, "");

@@ -10,6 +10,65 @@ import {db} from "@app";
 
 /**
  * @author SNIPPIK
+ * @description Функции для БЕЗОПАСНОЙ работы с discord.js
+ * @class MessageUtils
+ */
+export class MessageUtils {
+    /**
+     * @description Функция безопасного удаления сообщения
+     * @param msg
+     * @param time
+     */
+    public static delete(msg: InteractionCallbackResponse | Message, time: number =  10e3) {
+        setTimeout(() => {
+            if (msg instanceof InteractionCallbackResponse) {
+                msg.resource.message.delete().catch(() => null);
+                return;
+            }
+
+            msg.delete().catch(() => null);
+        }, time);
+    };
+
+    /**
+     * @author SNIPPIK
+     * @description Создание одной кнопки в одной функции
+     * @param name - Название параметра в env
+     * @param style - Тип стиля
+     * @param disabled - Кнопка доступна для нажатия
+     */
+    public static createButton_env(name: SupportButtons, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
+        return { type: 2, emoji: MessageUtils.checkIDComponent(`button.${name}`), custom_id: name, style, disabled }
+    };
+
+    /**
+     * @author SNIPPIK
+     * @description Создание одной кнопки в одной функции
+     * @param emoji - Название параметра в env
+     * @param id - Уникальный индикатор кнопки
+     * @param style - Тип стиля
+     * @param disabled - Кнопка доступна для нажатия
+     */
+    public static createButton(emoji: MessageComponent["emoji"], id: SupportButtons, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
+        return { type: 2, emoji, custom_id: id, style, disabled }
+    };
+
+    /**
+     * @author SNIPPIK
+     * @description Делаем проверку id
+     * @param name - Название параметра в env
+     */
+    public static checkIDComponent(name: string): MessageComponent["emoji"] {
+        const id = env.get(name);
+        const int = parseInt(id);
+
+        if (isNaN(int)) return {id: `${id}`};
+        return {id: `${id}`};
+    };
+}
+
+/**
+ * @author SNIPPIK
  * @description Взаимодействие с discord message
  * @class Interact
  * @public
@@ -210,64 +269,5 @@ export class Interact {
             Logger.log("ERROR", err as string);
             return null;
         }
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Функции для БЕЗОПАСНОЙ работы с discord.js
- * @class MessageUtils
- */
-export class MessageUtils {
-    /**
-     * @description Функция безопасного удаления сообщения
-     * @param msg
-     * @param time
-     */
-    public static delete(msg: InteractionCallbackResponse | Message, time: number =  10e3) {
-        setTimeout(() => {
-            if (msg instanceof InteractionCallbackResponse) {
-                msg.resource.message.delete().catch(() => null);
-                return;
-            }
-
-            msg.delete().catch(() => null);
-        }, time);
-    };
-
-    /**
-     * @author SNIPPIK
-     * @description Создание одной кнопки в одной функции
-     * @param name - Название параметра в env
-     * @param style - Тип стиля
-     * @param disabled - Кнопка доступна для нажатия
-     */
-    public static createButton_env(name: SupportButtons, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
-        return { type: 2, emoji: MessageUtils.checkIDComponent(`button.${name}`), custom_id: name, style, disabled }
-    };
-
-    /**
-     * @author SNIPPIK
-     * @description Создание одной кнопки в одной функции
-     * @param emoji - Название параметра в env
-     * @param id - Уникальный индикатор кнопки
-     * @param style - Тип стиля
-     * @param disabled - Кнопка доступна для нажатия
-     */
-    public static createButton(emoji: MessageComponent["emoji"], id: SupportButtons, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
-        return { type: 2, emoji, custom_id: id, style, disabled }
-    };
-
-    /**
-     * @author SNIPPIK
-     * @description Делаем проверку id
-     * @param name - Название параметра в env
-     */
-    public static checkIDComponent(name: string): MessageComponent["emoji"] {
-        const id = env.get(name);
-        const int = parseInt(id);
-
-        if (isNaN(int)) return {id: `${id}`};
-        else return {id: `${id}`};
     };
 }

@@ -1,4 +1,4 @@
-import {AudioPlayerEvents, CollectionAudioEvents} from "@service/player";
+import {AudioPlayerEvents, QueuesEvents} from "@service/player";
 import {ClientEvents, Client} from "discord.js";
 import {TypedEmitter} from "@utils";
 import {handler} from "@handler";
@@ -14,7 +14,7 @@ export class Events extends handler<Event<any>> {
      * @readonly
      * @private
      */
-    public readonly emitter = new class extends TypedEmitter<CollectionAudioEvents & AudioPlayerEvents> {
+    public readonly emitter = new class extends TypedEmitter<QueuesEvents & AudioPlayerEvents> {
         /**
          * @description Имена событий плеера, с авто поиском
          * @private
@@ -78,14 +78,14 @@ export class Events extends handler<Event<any>> {
  * @class Event
  * @public
  */
-export abstract class Event<T extends keyof ClientEvents | keyof CollectionAudioEvents | keyof AudioPlayerEvents> {
+export abstract class Event<T extends keyof ClientEvents | keyof QueuesEvents | keyof AudioPlayerEvents> {
     /**
      * @description Название событие
      * @default null
      * @readonly
      * @public
      */
-    readonly name: T extends keyof CollectionAudioEvents ? keyof CollectionAudioEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
+    readonly name: T extends keyof QueuesEvents ? keyof QueuesEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
 
     /**
      * @description Тип события
@@ -93,7 +93,7 @@ export abstract class Event<T extends keyof ClientEvents | keyof CollectionAudio
      * @readonly
      * @public
      */
-    readonly type: T extends keyof CollectionAudioEvents | keyof AudioPlayerEvents ? "player" : "client";
+    readonly type: T extends keyof QueuesEvents | keyof AudioPlayerEvents ? "player" : "client";
 
     /**
      * @description Тип выполнения события
@@ -109,5 +109,5 @@ export abstract class Event<T extends keyof ClientEvents | keyof CollectionAudio
      * @readonly
      * @public
      */
-    readonly execute: T extends keyof CollectionAudioEvents ? CollectionAudioEvents[T] : T extends keyof AudioPlayerEvents ? (...args: Parameters<AudioPlayerEvents[T]>) => void : T extends keyof ClientEvents ? (client: Client, ...args: ClientEvents[T]) => void : never;
+    readonly execute: T extends keyof QueuesEvents ? QueuesEvents[T] : T extends keyof AudioPlayerEvents ? (...args: Parameters<AudioPlayerEvents[T]>) => void : T extends keyof ClientEvents ? (client: Client, ...args: ClientEvents[T]) => void : never;
 }

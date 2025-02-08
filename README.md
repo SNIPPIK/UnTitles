@@ -3,7 +3,7 @@
 - Работает на [`discord.js`](https://discord.js.org) - `v14`
 - Если хочется поддержать монеткой [`DonationAlerts`](https://www.donationalerts.com/r/snippik)
 - Есть идеи прошу в [`discussions`](https://github.com/SNIPPIK/UnTitles/discussions) | [`Discord`](https://discord.gg/qMf2Sv3)
-- По-умолчанию бот поддерживает Russian, English. Свой язык можно добавить [тут](src/services/locale/languages.json)
+- По-умолчанию бот поддерживает Russian, English. Свой язык можно добавить [`тут`](src/services/locale/languages.json) и в [`commands`](src/handlers/commands)
 
 
 > [!TIP]

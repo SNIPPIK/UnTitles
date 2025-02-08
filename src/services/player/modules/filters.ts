@@ -19,7 +19,9 @@ export class PlayerAudioFilters {
      * @description Получаем список включенных фильтров
      * @public
      */
-    public get enabled() { return this._filters; };
+    public get enabled() {
+        return this._filters;
+    };
 
     /**
      * @description Сжимаем фильтры для работы ffmpeg

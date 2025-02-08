@@ -17,7 +17,9 @@ export abstract class Collection<K, T = string> {
      * @param ID - ID объекта
      * @public
      */
-    public get = (ID: T) => { return this.map.get(ID); };
+    public get = (ID: T) => {
+        return this.map.get(ID);
+    };
 
     /**
      * @description Добавляем объект в список
@@ -75,5 +77,7 @@ export abstract class Collection<K, T = string> {
      * @description Получаем кол-во объектов в списке
      * @public
      */
-    public get size() { return this.map.size; };
+    public get size() {
+        return this.map.size;
+    };
 }

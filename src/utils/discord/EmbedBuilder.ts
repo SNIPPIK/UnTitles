@@ -10,18 +10,18 @@ import {Interact, MessageUtils} from "@utils";
  */
 export class EmbedBuilder<T extends Interact> {
     /**
-     * @description Временная база данных с embed json data в array
-     * @readonly
-     * @public
-     */
-    public readonly embeds: Array<EmbedData> = [];
-
-    /**
      * @description Временная база данных с ComponentData или классом ActionRowBuilder в array
      * @readonly
      * @public
      */
     public readonly components: Array<MessageComponents> = [];
+
+    /**
+     * @description Временная база данных с embed json data в array
+     * @readonly
+     * @public
+     */
+    public readonly embeds: Array<EmbedData> = [];
 
     /**
      * @description Параметры для создания меню
@@ -48,18 +48,6 @@ export class EmbedBuilder<T extends Interact> {
         type: null,
         page: 0
     };
-
-    /**
-     * @description Функция позволяющая бесконечно выполнять обновление сообщения
-     * @public
-     */
-    private callback: (message: Message, pages: any[], page: number, embed: EmbedData, selected?: any) => void;
-
-    /**
-     * @description Функция которая будет выполнена после отправления сообщения
-     * @public
-     */
-    private promise: (msg: Interact) => void;
 
     /**
      * @description Время жизни сообщения по умолчанию
@@ -100,8 +88,25 @@ export class EmbedBuilder<T extends Interact> {
 
             // Если надо выполнить действия после
             if (this.promise) this.promise(new Interact(message));
+        }).finally(() => {
+            setTimeout(() => {
+                // Удаляем все параметры
+                for (let key of Object.keys(this)) this[key] = null;
+            }, this.time);
         });
     };
+
+    /**
+     * @description Функция позволяющая бесконечно выполнять обновление сообщения
+     * @public
+     */
+    private callback: (message: Message, pages: any[], page: number, embed: EmbedData, selected?: any) => void;
+
+    /**
+     * @description Функция которая будет выполнена после отправления сообщения
+     * @public
+     */
+    private promise: (msg: Interact) => void;
 
     /**
      * @description Добавляем embeds в базу для дальнейшей отправки

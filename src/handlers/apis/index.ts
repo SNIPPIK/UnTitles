@@ -416,7 +416,7 @@ abstract class Request {
      * @protected
      * @readonly
      */
-    protected readonly data: RequestData = { headers: {} };
+    protected data: RequestData = { headers: {} };
 
     /**
      * @description Получаем протокол ссылки
@@ -431,7 +431,7 @@ abstract class Request {
      * @public
      */
     public get request(): Promise<IncomingMessage | Error> {
-        return new Promise((resolve) => {
+        return new Promise<IncomingMessage | Error>((resolve) => {
             const request = this.protocol(this.data, (res) => {
                 // Если надо сделать редирект на другой ресурс
                 if ((res.statusCode >= 300 && res.statusCode < 400) && res.headers?.location) {
@@ -454,7 +454,11 @@ abstract class Request {
             });
 
             request.end();
-        });
+        })
+            // Удаляем данные после завершения ответа
+            .finally(() => {
+                this.data = null;
+            });
     };
 
     /**
@@ -501,26 +505,6 @@ abstract class Request {
 
 /**
  * @author SNIPPIK
- * @description Данные для произведения запроса
- * @interface RequestData
- * @private
- */
-interface RequestData extends RequestOptions {
-    // Метод запроса
-    method?: "POST" | "GET" | "HEAD" | "PATCH";
-
-    // Headers запроса
-    headers?: RequestOptions["headers"];
-
-    // Если мы хотим что-то отправить серверу
-    body?: string;
-
-    // Добавлять user-agent, рандомный или указанный
-    useragent?: boolean | string;
-}
-
-/**
- * @author SNIPPIK
  * @description Создаем http или https запрос
  * @class httpsClient
  * @public
@@ -531,29 +515,35 @@ export class httpsClient extends Request {
      * @public
      */
     public get toString(): Promise<string | Error> {
+        let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage, data = "";
+
         return new Promise<string | Error>((resolve) => {
             this.request.then((res) => {
                 if (res instanceof Error) return resolve(res);
 
                 const encoding = res.headers["content-encoding"];
-                let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage = res, data = "";
 
                 // Делаем выбор расшифровщика UFT-8
                 if (encoding === "br") decoder = res.pipe(createBrotliDecompress());
                 else if (encoding === "gzip") decoder = res.pipe(createGunzip());
                 else if (encoding === "deflate") decoder = res.pipe(createDeflate());
+                else decoder = res;
 
                 // Запускаем расшифровку
                 decoder.setEncoding("utf-8")
                     .on("data", (c) => data += c)
                     .once("end", () => {
-                        setImmediate(() => { data = null });
                         return resolve(data);
                     });
             }).catch((err) => {
                 return resolve(err);
             });
-        });
+        })
+            // Удаляем данные после завершения ответа
+            .finally(() => setImmediate(() => {
+                decoder = null;
+                data = null;
+            }));
     };
 
     /**
@@ -730,4 +720,24 @@ interface WebSocketEvents {
     "open": (event: Event) => void;
     "close": (event: CloseEvent) => void;
     "packet": (packet: any) => void;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные для произведения запроса
+ * @interface RequestData
+ * @private
+ */
+interface RequestData extends RequestOptions {
+    // Метод запроса
+    method?: "POST" | "GET" | "HEAD" | "PATCH";
+
+    // Headers запроса
+    headers?: RequestOptions["headers"];
+
+    // Если мы хотим что-то отправить серверу
+    body?: string;
+
+    // Добавлять user-agent, рандомный или указанный
+    useragent?: boolean | string;
 }

@@ -152,8 +152,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public get filters() { return this._filters; };
 
-
-
     /**
      * @description Задаем параметры плеера перед началом работы
      * @param guild - ID сервера для аутентификации плеера
@@ -176,6 +174,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public play = (seek: number = 0) => {
+        let timeout: NodeJS.Timeout = null;
         const track = this._tracks?.track;
 
         // Если больше нет треков
@@ -202,7 +201,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                     // Создаем класс для управления потоком
                     const stream = new AudioResource({path, seek, ...this._filters.compress});
-                    let timeout: NodeJS.Timeout = null;
 
                     // Если стрим можно прочитать
                     if (stream.readable) {

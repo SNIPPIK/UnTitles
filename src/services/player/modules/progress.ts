@@ -76,7 +76,7 @@ export class PlayerProgress {
      * @readonly
      * @public
      */
-    public readonly bar = (options: {duration: {current: number; total: number}, platform: string}): string => {
+    public bar = (options: {duration: {current: number; total: number}, platform: string}): string => {
         const button = emoji["bottom_" + options.platform.toLowerCase()] || emoji.bottom;
         const {current, total} = options.duration;
         const size = this.size;

@@ -28,6 +28,7 @@ type ButtonCallback = (msg: Interact) => void;
 /**
  * @author SNIPPIK
  * @description Класс хранящий в себе все кнопки для бота
+ * @extends Collection
  * @class dbl_buttons
  */
 export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
