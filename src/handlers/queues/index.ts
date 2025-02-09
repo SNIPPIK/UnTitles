@@ -55,8 +55,11 @@ export class Queues extends Collection<Queue> {
 
                 // Если плеер не запустится сам
                 setImmediate(() => {
+                    // Меняем позиции на 0
+                    if (!item) queue.player.tracks.position = 0;
+
                     // Меняем позиции на самую последнюю
-                    queue.player.tracks.position = item instanceof Track ? queue.player.tracks.total - 1 : queue.player.tracks.total - item.items.length;
+                    else queue.player.tracks.position = item instanceof Track ? queue.player.tracks.total - 1 : queue.player.tracks.total - item.items.length;
 
                     // Запускаем проигрывание
                     setTimeout(queue.player.play, 1e3);
