@@ -2,7 +2,6 @@ import {Encryption, VoiceUDPSocket} from "@service/voice";
 import {VoiceOpcodes} from "discord-api-types/voice/v4";
 import {WebSocket} from "@handler/apis";
 import {TypedEmitter} from "@utils";
-import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -16,7 +15,7 @@ const TIMESTAMP_INC = (48_000 / 100) * 2;
  * @description Статусы голосового подключения
  * @private
  */
-const socketStatus: {name: VoiceOpcodes, callback: (socket: VoiceSocket, packet?: {d: any, op: VoiceOpcodes}) => void}[] = [
+const socketStatus: {name: VoiceOpcodes, callback: (socket: VoiceSocket, packet?: {d: json, op: VoiceOpcodes}) => void}[] = [
     /**
      * @description Устанавливаем соединение
      * @private
@@ -80,16 +79,16 @@ const socketStatus: {name: VoiceOpcodes, callback: (socket: VoiceSocket, packet?
         name: VoiceOpcodes.SessionDescription,
         callback: (socket, packet) => {
             if (socket.state.code === VoiceSocketStatusCode.protocol) {
-                const { mode: encryptionMode, secret_key: secretKey } = packet.d;
+                const { mode: encryptionMode, secret_key } = packet.d;
                 socket.state = { ...socket.state, code: VoiceSocketStatusCode.ready,
                     connectionData: {
                         ...socket.state.connectionData,
                         encryptionMode,
-                        secretKey: new Uint8Array(secretKey),
+                        secretKey: new Uint8Array(secret_key),
                         sequence: Encryption.randomNBit(16),
                         timestamp: Encryption.randomNBit(32),
                         nonce: 0,
-                        nonceBuffer: Buffer.alloc(12),
+                        nonceBuffer: Encryption.nonce,
                         speaking: false,
                         packetsPlayed: 0,
                     }

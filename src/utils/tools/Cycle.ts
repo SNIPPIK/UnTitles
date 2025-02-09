@@ -1,5 +1,3 @@
-import * as console from "node:console";
-
 /**
  * @author SNIPPIK
  * @description База с циклами для дальнейшей работы этот класс надо подключить к другому

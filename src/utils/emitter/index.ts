@@ -1,4 +1,4 @@
-import { TypedEmitter as EventEmitter } from 'tiny-typed-emitter';
+import { TypedEmitter as EventEmitter } from "tiny-typed-emitter";
 
 /**
  * @author SNIPPIK

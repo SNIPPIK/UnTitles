@@ -17,14 +17,25 @@ const MAX_NONCE_SIZE = 2 ** 32 - 1;
  */
 export class Encryption {
     /**
-     * @description Выбирает режим шифрования из списка заданных параметров. Выбирает наиболее предпочтительный вариант.
+     * @description Задаем единственный актуальный вариант шифрования
      * @public
      * @static
      */
-    public static get mode() { return "aead_aes256_gcm_rtpsize"; };
+    public static get mode(): EncryptionModes {
+        return "aead_aes256_gcm_rtpsize";
+    };
 
     /**
-     * @description Шифрует пакет Opus, используя формат, согласованный экземпляром и Discord.
+     * @description Buffer для режима шифрования, нужен для правильно расстановки пакетов
+     * @public
+     * @static
+     */
+    public static get nonce() {
+        return Buffer.alloc(12);
+    };
+
+    /**
+     * @description Задаем структуру пакета
      * @param packet - Пакет Opus для шифрования
      * @param connectionData - Текущие данные подключения экземпляра
      * @public
@@ -32,40 +43,71 @@ export class Encryption {
      */
     public static packet = (packet: Buffer, connectionData: ConnectionData) => {
         const { sequence, timestamp, ssrc } = connectionData;
-        const rtp_packet = Buffer.alloc(12);
+        const rtp_packet = this.nonce;
+        // Version + Flags, Payload Type
         [rtp_packet[0], rtp_packet[1]] = [0x80, 0x78];
 
+        // Последовательность
         rtp_packet.writeUIntBE(sequence, 2, 2);
+
+        // Временная метка
         rtp_packet.writeUIntBE(timestamp, 4, 4);
+
+        // SSRC
         rtp_packet.writeUIntBE(ssrc, 8, 4);
 
-        rtp_packet.copy(Buffer.alloc(24), 0, 0, 12);
-        return Buffer.concat([rtp_packet, ...this.crypto(packet, connectionData, rtp_packet)]);
+        // Зашифрованный звук
+        rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
+        return this.crypto(packet, connectionData, rtp_packet);
     };
 
     /**
-     * @description Шифрует пакет Opus, используя формат, согласованный экземпляром и Discord.
+     * @description Подготавливаем пакет к отправке, выставляем правильную очередность
      * @param packet - Пакет Opus для шифрования
      * @param connectionData - Текущие данные подключения экземпляра
-     * @param additionalData - Доп данные для отправки
+     * @param rtp_packet - Доп данные для отправки
      * @private
      * @static
      */
-    private static crypto = (packet: Buffer, connectionData: ConnectionData, additionalData: Buffer) => {
+    private static crypto = (packet: Buffer, connectionData: ConnectionData, rtp_packet: Buffer) => {
         connectionData.nonce++;
 
         if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
         connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
 
-        const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer, {autoDestroy: true}).setAAD(additionalData);
-        return [Buffer.concat([cipher.update(packet), cipher.final(), cipher.getAuthTag()]), connectionData.nonceBuffer.subarray(0, 4)];
+        const nonceBuffer = connectionData.nonceBuffer.subarray(0, 4);
+
+        // Шифровка aead_aes256_gcm (rtpsize)
+        if (connectionData.encryptionMode.startsWith("aead_aes256_gcm")) {
+            const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer, {autoDestroy: true});
+            cipher.setAAD(rtp_packet);
+            return Buffer.concat([rtp_packet, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
+        }
+
+        /*
+        // Шифровка aead_xchacha20_poly1305 (rtpsize) | Пока не работает
+        else if (connectionData.encryptionMode.startsWith("aead_xchacha20_poly1305")) {
+            const cipher = crypto.createCipheriv("chacha20-poly1305", connectionData.secretKey, connectionData.nonceBuffer, {autoDestroy: true, authTagLength: 16});
+            return Buffer.concat([rtp_packet, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
+        }
+
+         */
+
+        // Если нет больше вариантов шифровки
+        throw new Error(`[Sodium] ${this.mode} is not supported`);
     };
 
     /**
-     * @description Возвращает случайное число, находящееся в диапазоне n бит.
+     * @description Возвращает случайное число, находящееся в диапазоне n бит
      * @param numberOfBits - Количество бит
      * @public
      * @static
      */
     public static randomNBit = (numberOfBits: number) => Math.floor(Math.random() * 2 ** numberOfBits);
 }
+
+/**
+ * @author SNIPPIK
+ * @description Все актуальные типы шифровки discord
+ */
+type EncryptionModes = "aead_aes256_gcm_rtpsize" | "aead_aes256_gcm" | "aead_xchacha20_poly1305_rtpsize";

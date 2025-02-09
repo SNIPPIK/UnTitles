@@ -28,7 +28,7 @@ export class AudioResource {
      * @private
      */
     private readonly chunks = {
-        // Кол-во проигранных пакетов
+        // Кол-во отправленных пакетов
         length:    0,
 
         // Размер пакета
@@ -105,8 +105,8 @@ export class AudioResource {
     private set input(options: AudioResourceInput) {
         // Подключаем события к потоку
         for (const event of options.events) {
-            if (options.event) (options.input as any)[options.event].once(event, this.destroy);
-            else (options.input as any)["once"](event, this.destroy);
+            if (options.event) (options.input)[options.event]["once"](event, this.destroy);
+            else (options.input)["once"](event, this.destroy);
         }
 
         // Добавляем процесс в класс для отслеживания
@@ -177,7 +177,7 @@ export class AudioResource {
             for (let key of Object.keys(this)) this[key] = null;
             this._readable = null;
 
-            Logger.log("DEBUG", "[AudioResource] has destroyed");
+            Logger.log("DEBUG", `[AudioResource] has destroyed`);
         });
     };
 }

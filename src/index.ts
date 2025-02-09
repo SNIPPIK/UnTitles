@@ -1,4 +1,4 @@
-import {Client, ShardingManager, IntentsBitField, Partials, Options} from "discord.js";
+import {Client, ShardingManager, IntentsBitField, Partials, Options, Colors} from "discord.js";
 import {CacheUtility, db_buttons, db_voice, Queues} from "@handler/queues";
 import {API_requester} from "@handler/apis";
 import {Commands} from "@handler/commands";
@@ -204,5 +204,30 @@ else {
         // Загружаем команды
         db.commands.register(client);
         Logger.log("DEBUG", `[ZEN|UDB/${id} | ${db.commands.public.length}] has load commands`);
+    });
+
+    process.on("uncaughtException", (err, origin) => {
+        // Отправляем данные об ошибке и отправляем через систему webhook
+        client.sendWebhook = {
+            username: client.user.username, avatarURL: client.user.avatarURL(),
+            embeds: [{
+                title: "Caught exception",
+                description: `\`\`\`${err.name} - ${err.message}\`\`\``,
+                fields: [{
+                    name: "Stack:",
+                    value: `\`\`\`${err.stack}\`\`\``
+                }],
+                color: Colors.DarkRed,
+            }],
+        };
+
+        // Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
+        if (err.message?.match(/Critical/)) {
+            Logger.log("ERROR", `[CODE: <14>] Hooked critical error!`);
+            process.exit(14);
+        }
+
+        //Выводим ошибку
+        Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
     });
 }

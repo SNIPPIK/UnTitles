@@ -49,6 +49,8 @@ export class Process {
         // Удаляем данные в следующем цикле
         setImmediate(() => {
             if (this._process) {
+                Logger.log("DEBUG", `[Process/${this._process.pid}] has destroyed`);
+
                 this._process.stdout.destroy();
                 this._process.stdout.read();
 
@@ -57,8 +59,6 @@ export class Process {
 
                 this._process.stdin.destroy();
                 this._process.kill('SIGKILL');
-
-                Logger.log("DEBUG", "[Process] has destroyed");
             }
 
             this._process = null;
