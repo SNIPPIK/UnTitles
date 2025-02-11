@@ -1,4 +1,4 @@
-import {Client, ShardingManager, IntentsBitField, Partials, Options, Colors} from "discord.js";
+import {Client, ShardingManager, IntentsBitField, Partials, Options, Colors, WebhookClient} from "discord.js";
 import {CacheUtility, db_buttons, db_voice, Queues} from "@handler/queues";
 import {API_requester} from "@handler/apis";
 import {Commands} from "@handler/commands";
@@ -149,6 +149,12 @@ else {
     Logger.log("DEBUG", `[ZEN|UDB] adding utilities${global}`);
     Logger.log("WARN", `[ZEN|UDB] has running shard`);
 
+    // Создаем webhook клиент
+    const webhook = new WebhookClient({
+        id: env.get<string>("webhook.id", null),
+        token: env.get<string>("webhook.token", null),
+    });
+
     // Создаем класс осколка
     const client = new Client({
         // Права бота
@@ -204,11 +210,25 @@ else {
         // Загружаем команды
         db.commands.register(client);
         Logger.log("DEBUG", `[ZEN|UDB/${id} | ${db.commands.public.length}] has load commands`);
+
+        // Сообщаем о полной готовности бота
+        webhook.send({
+            username: "Toolkit", avatarURL: db.images.no_image,
+            embeds: [{
+                title: `${client.user.username} has running`,
+                description: `🪪: ${id}\n🛡:  ${client.guilds.cache.size}`,
+                thumbnail: {url: client.user.avatarURL()},
+                color: Colors.White,
+            }],
+        }).catch(() => {
+            Logger.log("WARN", "[Webhook] Fail send message");
+        });
     });
 
+    // Отлавливаем все ошибки внутри процесса
     process.on("uncaughtException", (err, origin) => {
         // Отправляем данные об ошибке и отправляем через систему webhook
-        client.sendWebhook = {
+        webhook.send({
             username: client.user.username, avatarURL: client.user.avatarURL(),
             embeds: [{
                 title: "Caught exception",
@@ -219,11 +239,13 @@ else {
                 }],
                 color: Colors.DarkRed,
             }],
-        };
+        }).catch(() => {
+            Logger.log("WARN", "[Webhook] Fail send message");
+        });
 
         // Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
         if (err.message?.match(/Critical/)) {
-            Logger.log("ERROR", `[CODE: <14>] Hooked critical error!`);
+            Logger.log("ERROR", "[CODE: 14] Hooked critical error!");
             process.exit(14);
         }
 

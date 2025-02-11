@@ -184,7 +184,10 @@ class message_playing extends Assign<Event<"message/playing">> {
                     {
                         color, thumbnail: image,
                         author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
-                        footer: { text: `${user.displayName} | 🎵 ${queue.player.tracks.position + 1} - ${queue.player.tracks.total} 🎶`, iconURL: user.avatar },
+                        footer: {
+                            text: `${user.displayName} ${queue.tracks.total > 1 ? `| 🎵 ${queue.player.tracks.position + 1} - ${queue.player.tracks.total} 🎶` : ""}`,
+                            iconURL: user.avatar
+                        },
                         fields: [
                             // Текущий трек
                             {
