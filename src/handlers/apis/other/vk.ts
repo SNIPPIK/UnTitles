@@ -27,7 +27,7 @@ class sAPI extends Assign<API> {
          * @description Токен для авторизации
          * @protected
          */
-        token: env.check("token.vk") ? env.get("token.vk") : null
+        token: env.get("token.vk", null)
     };
 
     /**
@@ -39,7 +39,7 @@ class sAPI extends Assign<API> {
         super({
             name: "VK",
             audio: true,
-            auth: env.check("token.vk"),
+            auth: !!sAPI.authorization.token,
 
             color: 30719,
             filter: /^(https?:\/\/)?(vk\.com)\/.+$/gi,

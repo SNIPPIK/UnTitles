@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import {Assign} from "@utils";
 import {env} from "@handler";
 import {db} from "@app";
+import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -28,7 +29,7 @@ class sAPI extends Assign<API> {
          * @description Токен для авторизации
          * @protected
          */
-        token: env.check("token.yandex") ? env.get("token.yandex") : null
+        token: env.get<string>("token.yandex", null)
     };
 
     /**
@@ -40,7 +41,7 @@ class sAPI extends Assign<API> {
         super({
             name: "YANDEX",
             audio: true,
-            auth: env.check("token.yandex"),
+            auth: !!sAPI.authorization.token,
 
             color: 16705372,
             filter: /^(https?:\/\/)?(music\.)?(yandex\.ru)\/.+$/gi,

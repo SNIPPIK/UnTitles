@@ -111,7 +111,9 @@ class AudioFiltersCommand extends Assign<Command> {
                 if (type === "off") {
                     // Если нет фильтров
                     if (queue.player.filters.enabled.length === 0) {
-                        message.fastBuilder = { description: locale._(message.locale, "command.filter.off.null") };
+                        message.fastBuilder = {
+                            description: locale._(message.locale, "command.filter.off.null")
+                        };
                         return;
                     }
 
@@ -124,7 +126,7 @@ class AudioFiltersCommand extends Assign<Command> {
 
                         // Сообщаем о выключении фильтров
                         message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.off.before"),
+                            description: locale._(message.locale, "command.filter.off.after"),
                             color: Colors.Green, timestamp: new Date()
                         };
                     }
@@ -133,7 +135,7 @@ class AudioFiltersCommand extends Assign<Command> {
                     else {
                         // Сообщаем о выключении фильтров
                         message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.off.after"),
+                            description: locale._(message.locale, "command.filter.off.before"),
                             color: Colors.Green, timestamp: new Date()
                         };
                     }

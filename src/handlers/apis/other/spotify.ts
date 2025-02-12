@@ -30,7 +30,7 @@ class sAPI extends Assign<API> {
          * @description Данные для авторизации
          * @protected
          */
-        auth: env.check("token.spotify") ? env.get("token.spotify"): null,
+        auth: env.get("token.spotify", null),
 
         /**
          * @description Токен авторизации
@@ -54,7 +54,7 @@ class sAPI extends Assign<API> {
         super({
             name: "SPOTIFY",
             audio: false,
-            auth: env.check("token.spotify"),
+            auth: !!sAPI.authorization.token,
 
             color: 1420288,
             filter: /^(https?:\/\/)?(open\.)?(m\.)?(spotify\.com|spotify\.?ru)\/.+$/gi,
