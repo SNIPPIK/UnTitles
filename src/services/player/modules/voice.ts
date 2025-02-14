@@ -36,7 +36,9 @@ export class PlayerVoice {
      * @return VoiceConnection
      * @public
      */
-    public get connection() { return this._connection; };
+    public get connection() {
+        return this._connection;
+    };
 
     /**
      * @description Отправляем пакет в голосовой канал

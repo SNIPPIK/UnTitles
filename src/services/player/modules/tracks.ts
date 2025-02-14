@@ -92,7 +92,9 @@ export class PlayerTracks {
      * @return Track
      * @public
      */
-    public get track() { return this._tracks._current[this.position]; };
+    public get track() {
+        return this._tracks._current[this.position];
+    };
 
     /**
      * @description Перетасовка треков, так-же есть поддержка полного восстановления

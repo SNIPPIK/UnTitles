@@ -186,7 +186,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
 
                 // Если пользователь использует команду
-                if (message.isCommand()) {
+                if (message.isChatInputCommand()) {
                     const command = interact.command;
 
                     // Если нет команды

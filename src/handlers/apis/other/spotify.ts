@@ -259,7 +259,9 @@ class sAPI extends Assign<API> {
                     else if (api.error) return resolve(locale.err( "api.request.fail.msg", [api.error.message]));
 
                     return resolve(api);
-                }).catch((err) => resolve(Error(`[APIs]: ${err}`)));
+                }).catch((err) => {
+                    return resolve(Error(`[APIs]: ${err}`));
+                });
             }
         });
     };

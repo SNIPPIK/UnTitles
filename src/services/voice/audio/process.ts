@@ -51,13 +51,18 @@ export class Process {
             if (this._process) {
                 Logger.log("DEBUG", `[Process/${this._process.pid}] has destroyed`);
 
-                this._process.stdout.destroy();
-                this._process.stdout.read();
+                for (const std of [this._process.stdout, this._process.stderr, this._process.stdin]) {
+                    std.removeAllListeners();
+                    std.destroy();
 
-                this._process.stderr.destroy();
-                this._process.stderr.read();
+                    if ("read" in std) {
+                        // Отключаем от всех подключений
+                        std.unpipe();
 
-                this._process.stdin.destroy();
+                        // Чистим поток от остатков пакетов
+                        while (std.read()) {}
+                    }
+                }
                 this._process.kill('SIGKILL');
             }
 

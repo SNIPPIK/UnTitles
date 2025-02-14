@@ -36,11 +36,8 @@ class AudioPlayers extends Cycle<AudioPlayer> {
         super({
             name: "AudioPlayer",
             duration: 20,
-            filter: (item) => item.playing && !!item.voice.connection,
+            filter: (item) => item.playing,
             execute: (player) => {
-                // Параметры при которых нельзя продолжить выполнение
-                if (player.voice.connection?.state?.status !== "ready" || player?.status === "player/pause") return;
-
                 const packet = player.audio.current.packet;
 
                 // Отправляем пакет

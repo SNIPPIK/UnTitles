@@ -81,12 +81,6 @@ export class Interact {
     private readonly _temp: ds_input = null;
 
     /**
-     * @description Не был получен ответ
-     * @private
-     */
-    private _replied: boolean = true;
-
-    /**
      * @description Уникальный номер кнопки
      * @public
      */
@@ -110,14 +104,6 @@ export class Interact {
     public get editable() {
         if ("editable" in this._temp) return this._temp.editable;
         return false;
-    };
-
-    /**
-     * @description Получен ли ответ на сообщение
-     * @public
-     */
-    public get replied() {
-        return this._replied;
     };
 
     /**
@@ -239,20 +225,23 @@ export class Interact {
      * @param options - Данные для отправки сообщения
      */
     public send = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
-        // Ловим ошибки
         try {
+            // Если бот уже ответил на сообщение
+            if (this._temp["replied"] && !this._temp["deferred"]) {
+                return this._temp["followUp"](Object.assign({withResponse: true}, options));
+            }
+
             // Если можно дать ответ на сообщение
-            if (this.replied) {
-                this._replied = false;
-                return this._temp["reply"]({...options, withResponse: true});
+            else if (this._temp["replied"] !== undefined || this._temp["deferred"] !== undefined) {
+                if (!this._temp["replied"]) return this._temp["reply"](Object.assign({withResponse: true}, options));
             }
 
             // Если нельзя отправить ответ
-            return this._temp.channel["send"]({...options, withResponse: true});
+            return this._temp.channel["send"](Object.assign({withResponse: true}, options));
         } catch (err) {
             // Если происходит ошибка
-            Logger.log("ERROR", err as string);
-            return this._temp.channel["send"]({...options, withResponse: true});
+            Logger.log("ERROR", `${err}`);
+            return this._temp.channel["send"](Object.assign({withResponse: true}, options));
         }
     };
 
@@ -262,11 +251,14 @@ export class Interact {
      */
     public edit = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
         try {
-            if ("edit" in this._temp) return this._temp.edit(options as any) as any;
-            return null;
+            // Редактируем ответ
+            if (this._temp["deferred"]) return this._temp["editReply"](options);
+
+            // Редактируем обычное сообщение
+            return this._temp["edit"](options);
         } catch (err) {
             // Если происходит ошибка
-            Logger.log("ERROR", err as string);
+            Logger.log("ERROR", `${err}`);
             return null;
         }
     };

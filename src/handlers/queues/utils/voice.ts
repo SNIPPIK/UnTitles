@@ -1,4 +1,4 @@
-import {DiscordGatewayAdapterCreator, VoiceConfig, VoiceConnection, VoiceConnectionStatus} from "@service/voice";
+import {DiscordGatewayAdapter, VoiceConnection, VoiceConnectionStatus} from "@service/voice";
 import {Collection} from "@utils";
 
 /**
@@ -14,7 +14,7 @@ export class db_voice extends Collection<VoiceConnection> {
      * @param adapterCreator - Для отправки пакетов
      * @public
      */
-    public join = (config: VoiceConfig, adapterCreator: DiscordGatewayAdapterCreator) => {
+    public join = (config: VoiceConnection["config"], adapterCreator: DiscordGatewayAdapter.Creator) => {
         let connection = this.get(config.guildId);
 
         // Если есть голосовое подключение при подключении
@@ -26,7 +26,7 @@ export class db_voice extends Collection<VoiceConnection> {
 
         // Если нет голосового подключения, то создаем и сохраняем в базу
         if (!connection) {
-            connection = new VoiceConnection(config, {adapterCreator});
+            connection = new VoiceConnection(config, adapterCreator);
             this.set(config.guildId, connection);
         }
 

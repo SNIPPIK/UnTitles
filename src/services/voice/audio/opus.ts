@@ -42,16 +42,6 @@ export class OpusEncoder extends PassThrough {
     };
 
     /**
-     * @description Название библиотеки и тип аудио для ffmpeg
-     * @return {name: string, ffmpeg: string}
-     * @public
-     * @static
-     */
-    public static get lib(): {name: string, ffmpeg: string} {
-        return { name: "Native/Opus", ffmpeg: "opus" };
-    };
-
-    /**
      * @description Декодирование фрагмента в opus
      * @readonly
      * @private
@@ -137,8 +127,8 @@ export class OpusEncoder extends PassThrough {
             this.db.remaining = null;
         }
 
-        // Начинаем чтение пакетов
-        while (true) {
+        // Получаем пакеты из
+        while (!!chunk) {
             const packet = this.packet(chunk);
             if (packet) chunk = packet;
             else break;
@@ -163,7 +153,6 @@ export class OpusEncoder extends PassThrough {
     public _destroy = () => {
         // Отключаем все ивенты
         this.removeAllListeners();
-
         for (let key of Object.keys(this.db)) this.db[key] = null;
     };
 }

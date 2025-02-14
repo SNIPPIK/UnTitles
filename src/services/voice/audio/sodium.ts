@@ -11,6 +11,13 @@ const MAX_NONCE_SIZE = 2 ** 32 - 1;
 
 /**
  * @author SNIPPIK
+ * @description Время до следующей проверки жизни
+ * @private
+ */
+export const TIMESTAMP_INC = (48_000 / 100) * 2;
+
+/**
+ * @author SNIPPIK
  * @description Выдаваемы методы для использования sodium
  * @class Encryption
  * @public
@@ -32,6 +39,20 @@ export class Encryption {
      */
     public static get nonce() {
         return Buffer.alloc(12);
+    };
+
+    /**
+     * @description Буффер для создания UDP соединения
+     * @public
+     * @static
+     */
+    public static discoveryBuffer = (ssrc: number) => {
+        const packet = Buffer.alloc(74);
+        packet.writeUInt16BE(1, 0);
+        packet.writeUInt16BE(70, 2);
+        packet.writeUInt32BE(ssrc, 4);
+
+        return packet;
     };
 
     /**

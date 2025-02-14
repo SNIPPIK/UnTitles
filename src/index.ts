@@ -210,19 +210,11 @@ else {
         // Загружаем команды
         db.commands.register(client);
         Logger.log("DEBUG", `[ZEN|UDB/${id} | ${db.commands.public.length}] has load commands`);
+    });
 
-        // Сообщаем о полной готовности бота
-        webhook.send({
-            username: "Toolkit", avatarURL: db.images.no_image,
-            embeds: [{
-                title: `${client.user.username} has running`,
-                description: `🪪: ${id}\n🛡:  ${client.guilds.cache.size}`,
-                thumbnail: {url: client.user.avatarURL()},
-                color: Colors.White,
-            }],
-        }).catch(() => {
-            Logger.log("WARN", "[Webhook] Fail send message");
-        });
+    // Сообщаем если достигнут лимит запросов
+    client.rest.on("rateLimited", (d) => {
+        Logger.log("WARN", `[ZEN|UDB/${id}] ${d.limit} | ${d.timeToReset}`);
     });
 
     // Отлавливаем все ошибки внутри процесса
@@ -240,7 +232,7 @@ else {
                 color: Colors.DarkRed,
             }],
         }).catch(() => {
-            Logger.log("WARN", "[Webhook] Fail send message");
+            Logger.log("ERROR", "[Webhook] Fail send message");
         });
 
         // Если получена критическая ошибка, из-за которой будет нарушено выполнение кода

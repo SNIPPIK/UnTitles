@@ -5,7 +5,6 @@ import crypto from "node:crypto";
 import {Assign} from "@utils";
 import {env} from "@handler";
 import {db} from "@app";
-import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -144,7 +143,7 @@ class sAPI extends Assign<API> {
 
                             try {
                                 // Создаем запрос
-                                const api = await sAPI.API(ID.at(0));
+                                const api = await sAPI.API(ID[0]);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
@@ -247,7 +246,9 @@ class sAPI extends Assign<API> {
 
                 if (req?.result) return resolve(req?.result);
                 return resolve(req);
-            }).catch((err) => resolve(Error(`[APIs]: ${err}`)));
+            }).catch((err) => {
+                return resolve(Error(`[APIs]: ${err}`));
+            });
         });
     };
 
@@ -280,8 +281,12 @@ class sAPI extends Assign<API> {
                     const sign = crypto.createHash("md5").update("XGRlBW9FXlekgbPrRHuSiA" + path.slice(1) + xml[4]).digest("hex");
 
                     return resolve(`https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`);
-                }).catch((e) => resolve(Error(e)));
-            } catch (e) { return resolve(Error(e as string)); }
+                }).catch((e) => {
+                    return resolve(Error(e));
+                });
+            } catch (e) {
+                return resolve(Error(e as string));
+            }
         });
     };
 

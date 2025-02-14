@@ -139,7 +139,7 @@ export class AudioResource {
                 ...(options.filters ? ["-af", options.filters] : []),
 
                 // Указываем формат аудио
-                "-f", `${OpusEncoder.lib.ffmpeg}`,
+                "-f", "opus",
                 "pipe:1"
             ])
         };
@@ -160,23 +160,22 @@ export class AudioResource {
         setImmediate(() => {
             // Чистим все потоки от мусора
             for (const stream of this._streams) {
-                // Если поток является FFmpeg
-                if (stream instanceof Process) {
-                    if (stream.stdout) stream.stdout.unpipe(this.stream);
-                    stream.destroy();
-                }
 
                 // Если поток является OpusEncoder
-                else {
+                if (stream instanceof OpusEncoder) {
+                    stream.removeAllListeners();
                     stream.destroy();
-                    stream.read();
+
+                    // Чистим поток от остатков пакетов
+                    while (stream.read()) {}
+
                     stream.end();
                 }
+
+                else stream.destroy();
             }
             // Удаляем все параметры
             for (let key of Object.keys(this)) this[key] = null;
-            this._readable = null;
-
             Logger.log("DEBUG", `[AudioResource] has destroyed`);
         });
     };

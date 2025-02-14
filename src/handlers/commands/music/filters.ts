@@ -104,72 +104,76 @@ class AudioFiltersCommand extends Assign<Command> {
         super({
             rules: ["queue", "voice", "another_voice", "player-not-playing"],
             execute: ({message, args, type}) => {
-                const queue = message.queue;
-                const player = queue.player;
+                const player = message.queue.player;
 
-                // Выключаем все фильтры
-                if (type === "off") {
-                    // Если нет фильтров
-                    if (queue.player.filters.enabled.length === 0) {
-                        message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.off.null")
-                        };
+                const seek: number = player.audio.current?.duration ?? 0;
+                const name = args && args?.length > 0 ? args[0] : null;
+                const argument = args && args?.length > 1 ? Number(args[1]) : null;
+
+                const Filter = filters.find((item) => item.name === name) as AudioFilter;
+                const findFilter = Filter && player.filters.enabled.length > 0 ? player.filters.enabled.find((fl) => fl.name === Filter.name) : false;
+
+                switch (type) {
+                    // Если пользователь хочет выключить все аудио фильтры
+                    case "off": {
+                        // Если нет включенных фильтров
+                        if (player.filters.enabled.length === 0) {
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.filter.off.null")
+                            };
+                            return;
+                        }
+
+                        // Если можно выключить фильтр или фильтры сейчас
+                        if (player.audio.current.duration < player.tracks.track.time.total + db.queues.options.optimization) {
+                            player.play(player.audio.current?.duration);
+
+                            // Сообщаем о выключении фильтров
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.filter.off.after"),
+                                color: Colors.Green, timestamp: new Date()
+                            };
+                        }
+
+                        // Если нельзя выключить фильтр или фильтры сейчас
+                        else {
+                            // Сообщаем о выключении фильтров
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.filter.off.before"),
+                                color: Colors.Green, timestamp: new Date()
+                            };
+                        }
+
+                        // Удаляем фильтры
+                        player.filters.enabled.splice(0, player.filters.enabled.length);
                         return;
                     }
 
-                    // Удаляем фильтры
-                    queue.player.filters.enabled.splice(0, queue.player.filters.enabled.length);
-
-                    // Если можно выключить фильтр или фильтры сейчас
-                    if (player.audio.current.duration < player.tracks.track.time.total + db.queues.options.optimization) {
-                        queue.player.play(queue.player.audio.current?.duration);
-
-                        // Сообщаем о выключении фильтров
-                        message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.off.after"),
-                            color: Colors.Green, timestamp: new Date()
-                        };
-                    }
-
-                    // Если нельзя выключить фильтр или фильтры сейчас
-                    else {
-                        // Сообщаем о выключении фильтров
-                        message.fastBuilder = {
-                            description: locale._(message.locale, "command.filter.off.before"),
-                            color: Colors.Green, timestamp: new Date()
-                        };
-                    }
-                    return;
-                }
-
-                const seek: number = queue.player.audio.current?.duration ?? 0;
-                const name = args[args.length - 2 || args?.length - 1] ?? args[0];
-                const arg = args.length > 1 ? Number(args[args?.length - 1]) : null;
-                const Filter = filters.find((item) => item.name === name) as AudioFilter;
-                const findFilter = queue.player.filters.enabled.find((fl) => fl.name === Filter.name);
-
-                switch (type) {
-                    // Добавляем фильтр
+                    // Если пользователь добавляет аудио фильтр
                     case "push": {
                         // Пользователь пытается включить включенный фильтр
                         if (findFilter) {
-                            message.fastBuilder = { description: locale._(message.locale, "command.filter.push.two") };
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.filter.push.two")
+                            };
                             return;
                         }
 
                         // Делаем проверку на аргументы
                         else if (Filter.args) {
                             // Если аргументы подходят
-                            if (arg && arg >= Filter.args[0] && arg <= Filter.args[1]) Filter.user_arg = arg;
+                            if (argument && argument >= Filter.args[0] && argument <= Filter.args[1]) Filter.user_arg = argument;
                             else {
-                                message.fastBuilder = { description: locale._(message.locale, "command.filter.push.argument", Filter.args) };
+                                message.fastBuilder = {
+                                    description: locale._(message.locale, "command.filter.push.argument", Filter.args)
+                                };
                                 return;
                             }
                         }
 
                         // Делаем проверку на совместимость
-                        for (let i = 0; i < queue.player.filters.enabled.length; i++) {
-                            const filter = queue.player.filters[i];
+                        for (let i = 0; i < player.filters.enabled.length; i++) {
+                            const filter = player.filters[i];
 
                             // Если фильтры не совместимы
                             if (filter && Filter.unsupported.includes(filter?.name)) {
@@ -183,11 +187,11 @@ class AudioFiltersCommand extends Assign<Command> {
                         }
 
                         // Добавляем фильтр
-                        queue.player.filters.enabled.push(Filter);
+                        player.filters.enabled.push(Filter);
 
                         // Если можно включить фильтр или фильтры сейчас
                         if (player.audio.current.duration < player.tracks.track.time.total + db.queues.options.optimization) {
-                            queue.player.play(seek);
+                            player.play(seek);
 
                             // Сообщаем о включении фильтров
                             message.fastBuilder = {
@@ -219,12 +223,12 @@ class AudioFiltersCommand extends Assign<Command> {
                         }
 
                         // Удаляем фильтр
-                        const index = queue.player.filters.enabled.indexOf(findFilter);
-                        queue.player.filters.enabled.splice(index, 1);
+                        const index = player.filters.enabled.indexOf(findFilter as AudioFilter);
+                        player.filters.enabled.splice(index, 1);
 
                         // Если можно выключить фильтр или фильтры сейчас
                         if (player.audio.current.duration < player.tracks.track.time.total + db.queues.options.optimization) {
-                            queue.player.play(seek);
+                            player.play(seek);
 
                             // Сообщаем о включении фильтров
                             message.fastBuilder = {

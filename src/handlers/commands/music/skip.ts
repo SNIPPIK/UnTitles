@@ -107,7 +107,10 @@ class SkipUtilityCommand extends Assign<Command> {
 
                 // Если аргумент не является числом
                 if (isNaN(number)) {
-                    message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.nan"), color: Colors.DarkRed };
+                    message.fastBuilder = {
+                        description: locale._(message.locale, "command.seek.duration.nan"),
+                        color: Colors.DarkRed
+                    };
                     return;
                 }
 
@@ -116,7 +119,10 @@ class SkipUtilityCommand extends Assign<Command> {
                     case "back": {
                         // Если пользователь укажет больше чем есть в очереди или меньше
                         if (number > tracks.size || number < 1) {
-                            message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.seek.duration.big"),
+                                color: Colors.DarkRed
+                            };
                             return;
                         }
 
@@ -124,7 +130,10 @@ class SkipUtilityCommand extends Assign<Command> {
 
                         // Меняем позицию трека в очереди
                         player.stop(number - 1);
-                        message.fastBuilder = { description: locale._(message.locale, "command.position", [number, `[${title}](${url})`]), color };
+                        message.fastBuilder = {
+                            description: locale._(message.locale, "command.position", [number, `[${title}](${url})`]),
+                            color
+                        };
                         return;
                     }
 
@@ -132,7 +141,10 @@ class SkipUtilityCommand extends Assign<Command> {
                     case "to": {
                         // Если пользователь укажет больше чем есть в очереди или меньше
                         if (number > tracks.total || number < 1) {
-                            message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.seek.duration.big"),
+                                color: Colors.DarkRed
+                            };
                             return;
                         }
 
@@ -140,7 +152,10 @@ class SkipUtilityCommand extends Assign<Command> {
 
                         // Пропускаем текущий трек
                         player.stop(number - 1);
-                        message.fastBuilder = { description: locale._(message.locale, "command.go.track", [`[${title}](${url})`]), color };
+                        message.fastBuilder = {
+                            description: locale._(message.locale, "command.go.track", [`[${title}](${url})`]),
+                            color
+                        };
                         return;
                     }
 
@@ -148,7 +163,10 @@ class SkipUtilityCommand extends Assign<Command> {
                     case "next": {
                         // Если пользователь укажет больше чем есть в очереди или меньше
                         if (number > tracks.size || number < 1) {
-                            message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.seek.duration.big"),
+                                color: Colors.DarkRed
+                            };
                             return;
                         }
 
@@ -158,14 +176,19 @@ class SkipUtilityCommand extends Assign<Command> {
                         if (number > 1) {
                             // Меняем позицию трека в очереди
                             player.stop(tracks.position + number - 1);
-                            message.fastBuilder = { description: locale._(message.locale, "command.skip.arg.track", [number, `[${title}](${url})`]), color };
-
+                            message.fastBuilder = {
+                                description: locale._(message.locale, "command.skip.arg.track", [number, `[${title}](${url})`]),
+                                color
+                            };
                             return;
                         }
 
                         // Пропускаем текущий трек
                         player.stop(tracks.position + 1);
-                        message.fastBuilder = { description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]), color };
+                        message.fastBuilder = {
+                            description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]),
+                            color
+                        };
                         return;
                     }
                 }

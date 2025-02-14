@@ -67,13 +67,17 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Делаем voice параметр публичным для использования вне класса
      * @public
      */
-    public get voice() { return this._voice; };
+    public get voice() {
+        return this._voice;
+    };
 
     /**
      * @description Делаем stream параметр публичным для использования вне класса
      * @public
      */
-    public get audio() { return this._audio; };
+    public get audio() {
+        return this._audio;
+    };
 
     /**
      * @description Проверяем играет ли плеер
@@ -81,11 +85,15 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public get playing() {
-        if (this.status === "player/wait" || !this.voice.connection) return false;
+        // Если текущий статус не позволяет проигрывать музыку
+        if (this.status === "player/wait" || this?.status === "player/pause") return false;
 
-        // Если больше не читается, переходим в состояние wait.
-        if (!this.audio.current?.readable) {
-            this.audio.current?.stream?.emit("end");
+        // Если голосовое состояние не позволяет отправлять пакеты
+        else if (!this.voice.connection || this.voice.connection?.state?.status !== "ready") return false;
+
+        // Если поток не читается, переходим в состояние ожидания
+        else if (!this.audio.current?.readable) {
+            this.audio.current = null;
             this.status = "player/wait";
             return false;
         }
@@ -100,7 +108,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @return AudioPlayerStatus
      * @public
      */
-    public get status() { return this._status; };
+    public get status() {
+        return this._status;
+    };
 
     /**
      * @description Смена статуса плеера, если не знаешь что делаешь, то лучше не трогай!
@@ -144,13 +154,17 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Делаем tracks параметр публичным для использования вне класса
      * @public
      */
-    public get tracks() { return this._tracks; };
+    public get tracks() {
+        return this._tracks;
+    };
 
     /**
      * @description Делаем filters параметр публичным для использования вне класса
      * @public
      */
-    public get filters() { return this._filters; };
+    public get filters() {
+        return this._filters;
+    };
 
     /**
      * @description Задаем параметры плеера перед началом работы
@@ -187,67 +201,74 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         track?.resource
             // Если удалось получить исходный файл трека
             .then((path) => {
-                    // Если нет исходника
-                    if (!path) {
-                        this.emit("player/error", this, `Not found link audio!`, { skip: true, position: this.tracks.indexOf(track)});
-                        return;
-                    }
+                // Если нет исходника
+                if (!path) {
+                    this.emit("player/error", this, `Not found link audio!`, {
+                        skip: true,
+                        position: this.tracks.indexOf(track)
+                    });
+                    return;
+                }
 
-                    // Если получена ошибка вместо исходника
-                    else if (path instanceof Error) {
-                        this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, { skip: true, position: this.tracks.indexOf(track)});
-                        return;
-                    }
+                // Если получена ошибка вместо исходника
+                else if (path instanceof Error) {
+                    this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, {
+                        skip: true,
+                        position: this.tracks.indexOf(track)
+                    });
+                    return;
+                }
 
-                    // Создаем класс для управления потоком
-                    const stream = new AudioResource({path, seek, ...this._filters.compress});
+                // Создаем класс для управления потоком
+                const stream = new AudioResource(Object.assign({path, seek}, this._filters.compress));
 
-                    // Если стрим можно прочитать
-                    if (stream.readable) {
+                // Если стрим можно прочитать
+                if (stream.readable) {
+                    this.audio.current = stream;
+                    this.status = "player/playing"
+
+                    return;
+                }
+
+                // Если поток нельзя читать, возможно что он еще грузится
+                else if (this.status === "player/wait") {
+                    timeout = setTimeout(() => {
+                        this.emit("player/error", this, "Timeout the stream has been exceeded!", {
+                            skip: true,
+                            position: this.tracks.indexOf(track)
+                        });
+
+                        // Уничтожаем поток
+                        stream.destroy();
+                    }, 25e3);
+                }
+
+                // Подключаем события для отслеживания работы потока (временные)
+                stream.stream
+                    // Если возникнет ошибка во время загрузки потока
+                    .once("error", () => {
+                        clearTimeout(timeout);
+
+                        // Уничтожаем поток
+                        stream.destroy();
+                    })
+                    // Если уже можно читать поток
+                    .once("readable", () => {
+                        clearTimeout(timeout);
+
                         this.audio.current = stream;
                         this.status = "player/playing"
-
-                        return;
-                    }
-
-                    // Если поток нельзя читать, возможно что он еще грузится
-                    else if (this.status === "player/wait") {
-                        timeout = setTimeout(() => {
-                            this.emit("player/error", this, "Timeout the stream has been exceeded!", { skip: true, position: this.tracks.indexOf(track)});
-
-                            // Уничтожаем поток
-                            stream.destroy();
-                        }, 25e3);
-                    }
-
-                    // Подключаем события для отслеживания работы потока (временные)
-                    stream.stream
-                        // Если возникнет ошибка во время загрузки потока
-                        .once("error", () => {
-                            clearTimeout(timeout);
-
-                            // Уничтожаем поток
-                            stream.destroy();
-                        })
-                        // Если уже можно читать поток
-                        .once("readable", () => {
-                            clearTimeout(timeout);
-
-                            this.audio.current = stream;
-                            this.status = "player/playing"
-                        })
-                }
-            )
+                    })
+            })
 
             // Если возникла ошибка
             .catch((err) => {
-                    // Сообщаем об ошибке
-                    Logger.log("ERROR", `[Player] ${err}`);
+                // Сообщаем об ошибке
+                Logger.log("ERROR", `[Player] ${err}`);
 
-                    // Предпринимаем решение
-                    this.emit("player/error", this, `${err}`, { skip: true, position: this.tracks.indexOf(track)});
-                }
-            )
+                // Предпринимаем решение
+                this.emit("player/error", this, `${err}`, {skip: true, position: this.tracks.indexOf(track)});
+            })
 
             // Создаем сообщение после всех действий
             .finally(() => {
@@ -286,18 +307,10 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public stop = (position?: number) => {
         // Работает с плавным переходом
         if (position) {
-            const old = this.tracks.position;
-
             // Меняем позицию трека в очереди с учетом времени
             if (this.audio.current.duration < this.tracks.track.time.total + db.queues.options.optimization) {
                 this.tracks.position = position;
                 this.play();
-
-                // Если не получилось начать чтение следующего трека
-                this.audio.current.stream.once("error", () => {
-                    // Возвращаем прошлый номер трека
-                    this.tracks.position = old;
-                });
                 return;
             } else {
                 // Если надо вернуть прошлый трек, но времени уже нет!
@@ -315,13 +328,13 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @protected
      */
     public readonly cleanup = (): void => {
-        Logger.log("DEBUG", `[AudioPlayer: ${this.id}] has cleanup`);
+        Logger.log("DEBUG", `[AudioPlayer/${this.id}] has cleanup`);
 
         // Отключаем от цикла плеер
         db.queues.cycles.players.remove(this);
 
         // Удаляем текущий поток, поскольку он больше не нужен
-        if (this.audio.current && this.audio.current.destroy) this.audio.current.destroy();
+        this.audio.current = null;
     };
 
     /**
@@ -329,8 +342,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @readonly
      * @protected
      */
-    protected readonly destroy = () => {
-        Logger.log("DEBUG", `[AudioPlayer: ${this.id}] has destroyed`);
+    public readonly destroy = () => {
+        Logger.log("DEBUG", `[AudioPlayer/${this.id}] has destroyed`);
 
         // Отключаем все ивенты от плеера
         this.removeAllListeners();

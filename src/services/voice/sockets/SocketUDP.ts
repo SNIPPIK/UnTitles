@@ -1,4 +1,5 @@
 import {createSocket, Socket} from "node:dgram";
+import {Encryption} from "@service/voice";
 import {TypedEmitter} from "@utils";
 import {Buffer} from "node:buffer";
 import {isIPv4} from "node:net";
@@ -66,12 +67,8 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @param ssrc -
      * @public
      */
-    public readonly discovery = (ssrc: number): Promise<VoiceUDPSocket["remote"]> => {
-        const discoveryBuffer = Buffer.alloc(74);
-        discoveryBuffer.writeUInt16BE(1, 0);
-        discoveryBuffer.writeUInt16BE(70, 2);
-        discoveryBuffer.writeUInt32BE(ssrc, 4);
-        this.packet = discoveryBuffer;
+    public discovery = (ssrc: number): Promise<VoiceUDPSocket["remote"]> => {
+        this.packet = Encryption.discoveryBuffer(ssrc);
 
         // Передаем данные об IP-адресе и порте
         return new Promise((resolve, reject) => {

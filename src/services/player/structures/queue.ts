@@ -195,10 +195,10 @@ export class Queue {
             Object.assign(first[0], { disabled: false });
 
             // Кнопка назад
-            Object.assign(first[1], { disabled: false, style: 3 });
+            Object.assign(first[1], { disabled: false, style: 1 });
 
             // Кнопка вперед
-            Object.assign(first[3], { disabled: false, style: 3 });
+            Object.assign(first[3], { disabled: false, style: 1 });
         }
         else {
             // Кнопка очереди
@@ -220,12 +220,12 @@ export class Queue {
         else Object.assign(first[4],{ emoji: button.loop, style: 2 });
 
         // Делаем проверку на кнопку ПАУЗА/ПРОДОЛЖИТЬ
-        if (this.player.status === "player/pause") Object.assign(first[2], {emoji: button.resume});
-        else Object.assign(first[2], {emoji: button.pause});
+        if (this.player.status === "player/pause") Object.assign(first[2], { emoji: button.resume });
+        else Object.assign(first[2], { emoji: button.pause });
 
         // Кнопка перетасовки очереди
-        if (this.tracks.shuffle) Object.assign(first[0], {style: 3});
-        else Object.assign(first[0], {style: 2});
+        if (this.tracks.shuffle) Object.assign(first[0], { style: 3 });
+        else Object.assign(first[0], { style: 2 });
 
         // Кнопка фильтров
         if (this.player.filters.enabled.length === 0) Object.assign(two[3], { disabled: true });
@@ -252,7 +252,7 @@ export class Queue {
         // Добавляем очередь в список очередей
         db.queues.set(ID, this);
 
-        // В конце функции выполнить запуск проигрывания
+        // В конце функции выполнить запуск проигрывания (полезно если треков в плеере еще нет)
         setImmediate(this.player.play);
     };
 
@@ -262,7 +262,7 @@ export class Queue {
      * @public
      */
     public readonly cleanup = () => {
-        Logger.log("DEBUG", `[Queue: ${this.guild.id}] has cleanup`);
+        Logger.log("DEBUG", `[Queue/${this.guild.id}] has cleanup`);
 
         // Останавливаем плеер
         if (this.player) this.player.cleanup();
@@ -274,10 +274,10 @@ export class Queue {
      * @readonly
      */
     protected readonly destroy = () => {
-        Logger.log("DEBUG", `[Queue: ${this.guild.id}] has destroyed`);
+        Logger.log("DEBUG", `[Queue/${this.guild.id}] has destroyed`);
 
         // Удаляем плеер
-        if (this.player) this.player["destroy"]();
+        if (this.player) this.player.destroy();
 
         // Удаляем все параметры
         for (let key of Object.keys(this._data)) this._data[key] = null;

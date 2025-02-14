@@ -44,13 +44,19 @@ class SeekTrackCommand extends Assign<Command> {
 
                 //Если пользователь написал что-то не так
                 if (isNaN(duration)) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.nan") };
+                    message.fastBuilder = {
+                        color: Colors.DarkRed,
+                        description: locale._(message.locale, "command.seek.duration.nan")
+                    };
                     return;
                 }
 
                 //Если пользователь указал времени больше чем в треке
                 else if (duration > queue.tracks.track.time.total) {
-                    message.fastBuilder = { color: Colors.DarkRed, description: locale._(message.locale, "command.seek.duration.big") };
+                    message.fastBuilder = {
+                        color: Colors.DarkRed,
+                        description: locale._(message.locale, "command.seek.duration.big")
+                    };
                     return;
                 }
 
@@ -58,7 +64,10 @@ class SeekTrackCommand extends Assign<Command> {
                 queue.player.play(duration);
 
                 //Отправляем сообщение о пропуске времени
-                message.fastBuilder = { color: Colors.Green, description: locale._(message.locale, "command.seek", [duration]) };
+                message.fastBuilder = {
+                    color: Colors.Green,
+                    description: locale._(message.locale, "command.seek", [duration])
+                };
             }
         });
     };

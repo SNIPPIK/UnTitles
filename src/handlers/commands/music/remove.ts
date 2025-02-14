@@ -44,13 +44,19 @@ class RemoveTrackCommand extends Assign<Command> {
 
                 // Если аргумент не является числом
                 if (isNaN(number)) {
-                    message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.nan"), color: Colors.DarkRed };
+                    message.fastBuilder = {
+                        description: locale._(message.locale, "command.seek.duration.nan"),
+                        color: Colors.DarkRed
+                    };
                     return;
                 }
 
                 // Если аргумент больше кол-ва треков
                 else if (number > queue.tracks.size || number < 1) {
-                    message.fastBuilder = { description: locale._(message.locale, "command.seek.duration.big"), color: Colors.DarkRed };
+                    message.fastBuilder = {
+                        description: locale._(message.locale, "command.seek.duration.big"),
+                        color: Colors.DarkRed
+                    };
                     return;
                 }
 
@@ -63,7 +69,10 @@ class RemoveTrackCommand extends Assign<Command> {
                     queue.tracks.remove(number - 1);
                 }
 
-                message.fastBuilder = { description: locale._(message.locale, "command.remove.track", [`[${title}](${url})`]), color };
+                message.fastBuilder = {
+                    description: locale._(message.locale, "command.remove.track", [`[${title}](${url})`]),
+                    color
+                };
                 return;
             }
         });

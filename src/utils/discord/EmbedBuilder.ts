@@ -1,7 +1,7 @@
 import {MessageComponents, MessageSendOptions} from "@type/discord";
 import {InteractionCallbackResponse} from "discord.js";
+import {Interact, Logger, MessageUtils} from "@utils";
 import type {EmbedData, Message} from "discord.js"
-import {Interact, MessageUtils} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -67,28 +67,17 @@ export class EmbedBuilder<T extends Interact> {
             // Если получить возврат не удалось, то ничего не делаем
             if (!message) return;
 
-            // Если был получен ответ
-            if (message instanceof InteractionCallbackResponse) {
-                // Удаляем сообщение через время если это возможно
-                if (this.time !== 0) MessageUtils.delete(message, this.time)
-
-                // Создаем меню если есть параметры для него
-                if (this._menu.pages.length > 0) this.constructor_menu(message.resource.message);
-
-                // Если надо выполнить действия после
-                if (this.promise) this.promise(new Interact(message as any));
-                return;
-            }
-
             // Удаляем сообщение через время если это возможно
-            if (this.time !== 0) MessageUtils.delete(message, this.time)
+            if (this.time !== 0) MessageUtils.delete(message, this.time);
 
             // Создаем меню если есть параметры для него
-            if (this._menu.pages.length > 0) this.constructor_menu(message);
+            if (this._menu.pages.length > 0) this.constructor_menu(message instanceof InteractionCallbackResponse ? message.resource.message : message);
 
             // Если надо выполнить действия после
-            if (this.promise) this.promise(new Interact(message));
-        }).finally(() => {
+            if (this.promise) this.promise(new Interact(message as any));
+        })
+            .catch((err) => Logger.log("ERROR", `[DiscordAPI] ${err.message}`))
+            .finally(() => {
             setTimeout(() => {
                 // Удаляем все параметры
                 for (let key of Object.keys(this)) this[key] = null;

@@ -3,7 +3,7 @@ import {stateDestroyer, VoiceSocket, VoiceSocketState, VoiceSocketStatusCode} fr
 import {Logger, TypedEmitter} from "@utils";
 
 /**
- * @class VoiceConnection
+ * @author SNIPPIK
  * @description Подключение к голосовому серверу Гильдии может использоваться для воспроизведения аудио в голосовых каналах.
  * @class VoiceConnection
  * @public
@@ -14,11 +14,16 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @readonly
      * @private
      */
-    private readonly _config: VoiceConfig = {
-        channelId: "0",
-        guildId: "0",
-        selfMute: false,
-        selfDeaf: true
+    private readonly _config: {
+        channelId: string | null;
+        guildId: string;
+        selfDeaf: boolean;
+        selfMute: boolean;
+    } = {
+        channelId: null,
+        guildId: null,
+        selfMute: null,
+        selfDeaf: null
     };
 
     /**
@@ -26,7 +31,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @readonly
      * @private
      */
-    private readonly _state: VoiceConnectionState;
+    private readonly _state: ConnectionState.State = null;
 
     /**
      * @description Пакеты для работы с голосовым подключением
@@ -51,31 +56,40 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Текущий VoiceConfig
      * @public
      */
-    public get config() { return this._config; }
+    public get config() {
+        return this._config;
+    };
 
     /**
      * @description Текущее состояние голосового соединения.
      * @public
      */
-    public get state() { return this._state; }
+    public get state() {
+        return this._state;
+    };
 
     /**
      * @description Обновляет состояние голосового соединения, выполняя операции очистки там, где это необходимо.
      * @public
      */
-    public set state(newState: VoiceConnectionState) {
+    public set state(newState: ConnectionState.State) {
         const oldState = this._state;
 
-        //Уничтожаем VoiceSocket
+        // Уничтожаем прошлый VoiceSocket
         stateDestroyer<VoiceSocket>(
             Reflect.get(oldState, "networking") as VoiceSocket,
             Reflect.get(newState, "networking") as VoiceSocket,
             (old) => {
-                old
-                    .off("error", this.onSocketError)
-                    .off("close", this.onSocketClose)
-                    .off("stateChange", this.onSocketStateChange)
-                    .destroy();
+                try {
+                    old
+                        .off("error", this.onSocketError)
+                        .off("close", this.onSocketClose)
+                        .off("stateChange", this.onSocketStateChange)
+                        .destroy();
+                } catch {
+                    // Возможно что VoiceSocket уже уничтожен
+                    old.destroy();
+                }
             }
         );
 
@@ -109,15 +123,15 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     /**
      * @description Создаем класс для управления голосовым подключением
      * @param config - Данные для подключения
-     * @param options - Параметры для сервера
+     * @param adapterCreator - Параметры для сервера
      */
-    public constructor(config: VoiceConfig, options: CreateVoiceConnectionOptions) {
+    public constructor(config: VoiceConnection["config"], adapterCreator: DiscordGatewayAdapter.Creator) {
         super();
         this._state = {
             status: VoiceConnectionStatus.Signalling,
 
             // Создаем адаптер
-            adapter: options.adapterCreator({
+            adapter: adapterCreator({
                 onVoiceServerUpdate: this.addServerPacket,
                 onVoiceStateUpdate: this.addStatePacket,
                 destroy: this.destroy
@@ -178,7 +192,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Отправка данных на Discord
      * @param config - Данные для подключения
      */
-    public payload = (config: VoiceConfig) => {
+    public payload = (config: VoiceConnection["config"]) => {
         return {
             op: GatewayOpcodes.VoiceStateUpdate,
             d: {
@@ -225,7 +239,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @returns ``true`, если соединение было успешно установлено
      * @public
      */
-    public rejoin = (joinConfig?: VoiceConfig): boolean => {
+    public rejoin = (joinConfig?: VoiceConnection["config"]): boolean => {
         const state = this.state;
 
         // Если статус не дает переподключиться
@@ -259,10 +273,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * голосовое соединение подаст Discord сигнал о том, что оно хотело бы вернуться к каналу. При этом автоматически будет предпринята попытка
      * восстановить соединение. Это можно было бы рассматривать как переход из состояния готовности в состояние сигнализации.
      * @param code - Код закрытия
-     * @readonly
      * @private
      */
-    private readonly onSocketClose = (code: number): void => {
+    private onSocketClose = (code: number): void => {
         const state = this.state;
 
         // Если голосовое подключение уже уничтожено
@@ -289,10 +302,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Вызывается при изменении состояния сетевого экземпляра. Используется для определения состояния голосового соединения.
      * @param oldState - Предыдущее состояние
      * @param newState - Новое состояние
-     * @readonly
      * @private
      */
-    private readonly onSocketStateChange = (oldState: VoiceSocketState, newState: VoiceSocketState): void => {
+    private onSocketStateChange = (oldState: VoiceSocketState.States, newState: VoiceSocketState.States): void => {
         const state = this.state;
 
         if (oldState.code === newState.code || state.status !== VoiceConnectionStatus.Connecting && state.status !== VoiceConnectionStatus.Ready) return;
@@ -303,10 +315,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     /**
      * @description Распространяет ошибки из базового сетевого экземпляра.
      * @param error - Распространяемая ошибка
-     * @readonly
      * @private
      */
-    private readonly onSocketError = (error: Error): void => {
+    private onSocketError = (error: Error): void => {
         this.emit("error", error);
     };
 
@@ -314,10 +325,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Регистрирует пакет `VOICE_SERVER_UPDATE` для голосового соединения. Это приведет к повторному подключению с использованием
      * новых данных, предоставленных в пакете.
      * @param packet - Полученный пакет `VOICE_SERVER_UPDATE`
-     * @readonly
      * @private
      */
-    private readonly addServerPacket = (packet: GatewayVoiceServerUpdateDispatchData): void => {
+    private addServerPacket = (packet: GatewayVoiceServerUpdateDispatchData): void => {
         const state = this.state;
 
         this._packets.server = packet;
@@ -332,10 +342,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Регистрирует пакет `VOICE_STATE_UPDATE` для голосового соединения. Самое главное, он сохраняет идентификатор
      * канала, к которому подключен клиент.
      * @param packet - Полученный пакет `VOICE_STATE_UPDATE`
-     * @readonly
      * @private
      */
-    private readonly addStatePacket = (packet: GatewayVoiceStateUpdateDispatchData): void => {
+    private addStatePacket = (packet: GatewayVoiceStateUpdateDispatchData): void => {
         this._packets.state = packet;
         Object.assign(this._config, packet);
     };
@@ -362,22 +371,24 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 }
 
 /**
- * @class VoiceConnection
+ * @author SNIPPIK
  * @description События для VoiceConnection
+ * @interface VoiceConnection
  */
 interface VoiceConnectionEvents {
-    "connecting": (oldState: VoiceConnectionState, newState: VoiceConnectionState & { status: Event }) => this | void;
-    "destroyed": (oldState: VoiceConnectionState, newState: VoiceConnectionState & { status: Event }) => this | void;
-    "disconnected": (oldState: VoiceConnectionState, newState: VoiceConnectionState & { status: Event }) => this | void;
-    "ready": (oldState: VoiceConnectionState, newState: VoiceConnectionState & { status: Event }) => this | void;
-    "signalling": (oldState: VoiceConnectionState, newState: VoiceConnectionState & { status: Event }) => this | void;
+    "stateChange": (oldState: ConnectionState.State, newState: ConnectionState.State) => this;
+    "connecting": (oldState: ConnectionState.State, newState: ConnectionState.State & { status: Event }) => this | void;
+    "destroyed": (oldState: ConnectionState.State, newState: ConnectionState.State & { status: Event }) => this | void;
+    "disconnected": (oldState: ConnectionState.State, newState: ConnectionState.State & { status: Event }) => this | void;
+    "ready": (oldState: ConnectionState.State, newState: ConnectionState.State & { status: Event }) => this | void;
+    "signalling": (oldState: ConnectionState.State, newState: ConnectionState.State & { status: Event }) => this | void;
 
     "error": (error: Error) => this;
     "debug": (message: string) => this;
-    "stateChange": (oldState: VoiceConnectionState, newState: VoiceConnectionState) => this;
 }
 
 /**
+ * @author SNIPPIK
  * @description Различные коды состояния, которые может содержать голосовое соединение в любой момент времени.
  */
 export enum VoiceConnectionStatus {
@@ -408,15 +419,7 @@ export enum VoiceConnectionStatus {
 }
 
 /**
- * Состояние, в котором будет находиться голосовое соединение, когда оно ожидает получения пакетов VOICE_SERVER_UPDATE и
- * VOICE_STATE_UPDATE от Discord, предоставляемых адаптером.
- */
-interface VoiceConnectionSignallingState {
-    adapter: DiscordGatewayAdapterImplementerMethods;
-    status: VoiceConnectionStatus.Signalling;
-}
-
-/**
+ * @author SNIPPIK
  * @description Причины, по которым голосовое соединение может находиться в отключенном состоянии.
  */
 enum VoiceConnectionDisconnectReason {
@@ -442,131 +445,128 @@ enum VoiceConnectionDisconnectReason {
 }
 
 /**
- * @description Различные состояния, в которых может находиться голосовое соединение.
+ * @author SNIPPIK
+ * @description Все состояния голосового подключения
+ * @namespace ConnectionState
  */
-type VoiceConnectionState = | VoiceStateConnecting | VoiceStateDestroyed | VoiceConnectionDisconnectedOtherState | VoiceConnectionDisconnectedWebSocketState | VoiceStateReady | VoiceConnectionSignallingState;
-
-/**
- * @description Состояние, в котором будет находиться голосовое соединение, когда оно не подключено к голосовому серверу Discord и не
- * пытается подключиться. Вы можете вручную попытаться повторно подключиться, используя голосовое соединение#reconnect.
- */
-interface VoiceConnectionDisconnectedBaseState {
-    adapter: DiscordGatewayAdapterImplementerMethods;
-    status: VoiceConnectionStatus.Disconnected;
-}
-
-/**
- * @description Состояние, в котором будет находиться голосовое соединение, когда оно не подключено к голосовому серверу Discord и не
- * пытается подключиться. Вы можете вручную попытаться повторно подключиться, используя голосовое соединение#reconnect.
- */
-interface VoiceConnectionDisconnectedOtherState extends VoiceConnectionDisconnectedBaseState {
-    reason: Exclude<VoiceConnectionDisconnectReason, VoiceConnectionDisconnectReason.WebSocketClose>;
-}
-
-/**
- * @description Состояние, в котором будет находиться голосовое соединение, когда его подключение к WebSocket было закрыто.
- * Вы можете вручную попытаться повторно подключиться, используя голосовое соединение#reconnect.
- */
-interface VoiceConnectionDisconnectedWebSocketState extends VoiceConnectionDisconnectedBaseState {
-    closeCode: number;
-    reason: VoiceConnectionDisconnectReason.WebSocketClose;
-}
-
-/**
- * @description The state that a VoiceConnection will be in when it is establishing a connection to a Discord
- * voice server.
- */
-interface VoiceStateConnecting {
-    adapter: DiscordGatewayAdapterImplementerMethods;
-    networking: VoiceSocket;
-    status: VoiceConnectionStatus.Connecting;
-}
-
-/**
- * @description Состояние, в котором будет находиться голосовое соединение при активном подключении к
- * голосовому серверу Discord.
- */
-interface VoiceStateReady {
-    adapter: DiscordGatewayAdapterImplementerMethods;
-    networking: VoiceSocket;
-    status: VoiceConnectionStatus.Ready;
-}
-
-/**
- * @description Состояние, в котором будет находиться голосовое соединение, если оно было безвозвратно уничтожено
- * пользователем и не отслежено библиотекой. Его невозможно повторно подключить, вместо
- * этого необходимо установить новое голосовое соединение.
- */
-interface VoiceStateDestroyed {
-    status: VoiceConnectionStatus.Destroyed;
-}
-
-/**
- * @description Параметры, которые могут быть заданы при создании голосового соединения.
- */
-interface CreateVoiceConnectionOptions {
-    adapterCreator: DiscordGatewayAdapterCreator;
+namespace ConnectionState {
+    export type State = Connecting | Ready | Disconnected | Destroyed | Signalling | DisconnectedWebSocket;
 
     /**
-     * If true, debug messages will be enabled for the voice connection and its
-     * related components. Defaults to false.
+     * @description The state that a VoiceConnection will be in when it is establishing a connection to a Discord
+     * voice server.
      */
-    debug?: boolean | undefined;
+    interface Connecting {
+        adapter: DiscordGatewayAdapter.ImplementerMethods;
+        networking: VoiceSocket;
+        status: VoiceConnectionStatus.Connecting;
+    }
+
+    /**
+     * @description Состояние, в котором будет находиться голосовое соединение при активном подключении к
+     * голосовому серверу Discord.
+     */
+    interface Ready {
+        adapter: DiscordGatewayAdapter.ImplementerMethods;
+        networking: VoiceSocket;
+        status: VoiceConnectionStatus.Ready;
+    }
+
+    /**
+     * @description Состояние, в котором будет находиться голосовое соединение, если оно было безвозвратно уничтожено
+     * пользователем и не отслежено библиотекой. Его невозможно повторно подключить, вместо
+     * этого необходимо установить новое голосовое соединение.
+     */
+    interface Destroyed {
+        status: VoiceConnectionStatus.Destroyed;
+    }
+
+    /**
+     * Состояние, в котором будет находиться голосовое соединение, когда оно ожидает получения пакетов VOICE_SERVER_UPDATE и
+     * VOICE_STATE_UPDATE от Discord, предоставляемых адаптером.
+     */
+    interface Signalling {
+        adapter: DiscordGatewayAdapter.ImplementerMethods;
+        status: VoiceConnectionStatus.Signalling;
+    }
+
+    /**
+     * @description Состояние, в котором будет находиться голосовое соединение, когда оно не подключено к голосовому серверу Discord и не
+     * пытается подключиться. Вы можете вручную попытаться повторно подключиться, используя голосовое соединение#reconnect.
+     */
+    interface Disconnected extends Disconnected_Base {
+        reason: Exclude<VoiceConnectionDisconnectReason, VoiceConnectionDisconnectReason.WebSocketClose>;
+    }
+
+    /**
+     * @description Состояние, в котором будет находиться голосовое соединение, когда его подключение к WebSocket было закрыто.
+     * Вы можете вручную попытаться повторно подключиться, используя голосовое соединение#reconnect.
+     */
+    interface DisconnectedWebSocket extends Disconnected_Base {
+        closeCode: number;
+        reason: VoiceConnectionDisconnectReason.WebSocketClose;
+    }
+
+    /**
+     * @description Состояние, в котором будет находиться голосовое соединение, когда оно не подключено к голосовому серверу Discord и не
+     * пытается подключиться. Вы можете вручную попытаться повторно подключиться, используя голосовое соединение#reconnect.
+     */
+    interface Disconnected_Base {
+        adapter: DiscordGatewayAdapter.ImplementerMethods;
+        status: VoiceConnectionStatus.Disconnected;
+    }
 }
 
 /**
- * @description Конфиг для подключения к голосовому каналу
+ * @author SNIPPIK
+ * @description Параметры для создания адаптера
+ * @namespace DiscordGatewayAdapter
  */
-export interface VoiceConfig {
-    channelId: string | null;
-    guildId: string;
-    selfDeaf: boolean;
-    selfMute: boolean;
-}
+export namespace DiscordGatewayAdapter {
+    /**
+     * @description Шлюз Discord Адаптер, шлюза Discord.
+     */
+    export interface LibraryMethods {
+        /**
+         * Call this when the adapter can no longer be used (e.g. due to a disconnect from the main gateway)
+         */
+        destroy(): void;
+        /**
+         * Call this when you receive a VOICE_SERVER_UPDATE payload that is relevant to the adapter.
+         *
+         * @param data - The inner data of the VOICE_SERVER_UPDATE payload
+         */
+        onVoiceServerUpdate(data: GatewayVoiceServerUpdateDispatchData): void;
+        /**
+         * Call this when you receive a VOICE_STATE_UPDATE payload that is relevant to the adapter.
+         *
+         * @param data - The inner data of the VOICE_STATE_UPDATE payload
+         */
+        onVoiceStateUpdate(data: GatewayVoiceStateUpdateDispatchData): void;
+    }
 
-/**
- * @description Шлюз Discord Адаптер, шлюза Discord.
- */
-export interface DiscordGatewayAdapterLibraryMethods {
     /**
-     * Call this when the adapter can no longer be used (e.g. due to a disconnect from the main gateway)
+     * @description Методы, предоставляемые разработчиком адаптера Discord Gateway для DiscordGatewayAdapter.
      */
-    destroy(): void;
-    /**
-     * Call this when you receive a VOICE_SERVER_UPDATE payload that is relevant to the adapter.
-     *
-     * @param data - The inner data of the VOICE_SERVER_UPDATE payload
-     */
-    onVoiceServerUpdate(data: GatewayVoiceServerUpdateDispatchData): void;
-    /**
-     * Call this when you receive a VOICE_STATE_UPDATE payload that is relevant to the adapter.
-     *
-     * @param data - The inner data of the VOICE_STATE_UPDATE payload
-     */
-    onVoiceStateUpdate(data: GatewayVoiceStateUpdateDispatchData): void;
-}
+    export interface ImplementerMethods {
+        /**
+         * @description Это будет вызвано voice, когда адаптер можно будет безопасно уничтожить, поскольку он больше не будет использоваться.
+         */
+        destroy(): void;
+        /**
+         * @description Реализуйте этот метод таким образом, чтобы данная полезная нагрузка отправлялась на основное соединение Discord gateway.
+         *
+         * @param payload - Полезная нагрузка для отправки на основное соединение Discord gateway
+         * @returns `false`, если полезная нагрузка определенно не была отправлена - в этом случае голосовое соединение отключается
+         */
+        sendPayload(payload: any): boolean;
+    }
 
-/**
- * @description Методы, предоставляемые разработчиком адаптера Discord Gateway для DiscordGatewayAdapter.
- */
-export interface DiscordGatewayAdapterImplementerMethods {
     /**
-     * @description Это будет вызвано voice, когда адаптер можно будет безопасно уничтожить, поскольку он больше не будет использоваться.
+     * Функция, используемая для создания адаптеров. Она принимает параметр methods, содержащий функции, которые
+     * могут быть вызваны разработчиком при получении новых данных по его шлюзовому соединению. В свою очередь,
+     * разработчик вернет некоторые методы, которые может вызывать библиотека - например, для отправки сообщений на
+     * шлюз или для подачи сигнала о том, что адаптер может быть удален.
      */
-    destroy(): void;
-    /**
-     * @description Реализуйте этот метод таким образом, чтобы данная полезная нагрузка отправлялась на основное соединение Discord gateway.
-     *
-     * @param payload - Полезная нагрузка для отправки на основное соединение Discord gateway
-     * @returns `false`, если полезная нагрузка определенно не была отправлена - в этом случае голосовое соединение отключается
-     */
-    sendPayload(payload: any): boolean;
+    export type Creator = ( methods: LibraryMethods) => ImplementerMethods;
 }
-
-/**
- * Функция, используемая для создания адаптеров. Она принимает параметр methods, содержащий функции, которые
- * могут быть вызваны разработчиком при получении новых данных по его шлюзовому соединению. В свою очередь,
- * разработчик вернет некоторые методы, которые может вызывать библиотека - например, для отправки сообщений на
- * шлюз или для подачи сигнала о том, что адаптер может быть удален.
- */
-export type DiscordGatewayAdapterCreator = ( methods: DiscordGatewayAdapterLibraryMethods) => DiscordGatewayAdapterImplementerMethods;

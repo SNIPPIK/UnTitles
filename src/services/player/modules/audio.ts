@@ -18,20 +18,22 @@ export class PlayerAudio {
      * @return AudioResource
      * @public
      */
-    public get current() { return this._audio; };
+    public get current() {
+        return this._audio;
+    };
 
     /**
      * @description Подключаем новый поток
      * @param stream
      */
     public set current(stream) {
-        // Если уже есть поток
-        if (this.current) {
-            if (this.current?.stream) this.current.destroy();
-            this._audio = null;
+        // Если вносится не пустышка
+        if (stream) {
+            // Если есть активный поток
+            if (this.current && this.current?.stream) this.current.destroy();
         }
 
-        // Подключаем новый поток
+        // Перезаписываем текущий поток
         this._audio = stream;
     };
 }
