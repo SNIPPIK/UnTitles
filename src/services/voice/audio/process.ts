@@ -94,6 +94,7 @@ let ff_path = null;
             const result = spawnSync(name, ['-h'], {windowsHide: true});
             if (result.error) continue;
             ff_path = name;
+            return;
         } catch {}
     }
 
