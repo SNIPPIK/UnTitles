@@ -230,8 +230,8 @@ export class Interact {
         }
 
         // Если можно дать ответ на сообщение
-        else if ((this._temp["replied"] !== undefined || this._temp["deferred"] !== undefined) && !this._temp["replied"]) {
-            return this._temp["reply"](Object.assign({withResponse: true}, options));
+        else if (this._temp["replied"] !== undefined || this._temp["deferred"] !== undefined) {
+            if (!this._temp["replied"]) return this._temp["reply"](Object.assign({withResponse: true}, options));
         }
 
         // Если нельзя отправить ответ

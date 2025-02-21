@@ -1,7 +1,7 @@
 import {MessageComponents, MessageSendOptions} from "@type/discord";
 import {InteractionCallbackResponse} from "discord.js";
-import {Interact, Logger, MessageUtils} from "@utils";
-import type {EmbedData, Message} from "discord.js"
+import type {EmbedData, Message} from "discord.js";
+import {Interact, MessageUtils} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -64,7 +64,7 @@ export class EmbedBuilder {
         const options = {embeds: this.embeds, components: this.components};
 
         interaction.send(options)
-            .catch((err) => Logger.log("ERROR", `[DiscordAPI] ${err}`))
+            .catch(console.error)
             .then((message) => {
                 // Если получить возврат не удалось, то ничего не делаем
                 if (!message) return;
