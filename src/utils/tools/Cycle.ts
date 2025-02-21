@@ -34,7 +34,9 @@ export abstract class Cycle<T = unknown> {
      * @description Выдаем коллекцию
      * @public
      */
-    public get array() { return this._data.array; }
+    public get array() {
+        return this._data.array;
+    };
 
     /**
      * @description Создаем класс и добавляем параметры

@@ -1,5 +1,5 @@
 import type {LocalizationMap, Locale, Permissions} from "discord-api-types/v10";
-import {ApplicationCommandOption, Client} from "discord.js";
+import {ApplicationCommandOption, Client, Routes} from "discord.js";
 import filters from "@service/player/filters.json";
 import {AudioFilter} from "@service/player";
 import {Logger, Interact} from "@utils";
@@ -108,6 +108,24 @@ export class Commands extends handler<Command> {
         // Загрузка приватных команд
         if (guild) guild.commands.set(this.owner as any)
             .then(() => Logger.log("DEBUG", `[App/Commands | ${this.owner.length}] has load guild commands`))
+            .catch(console.error);
+    };
+
+    /**
+     * @description Удаление команды, полезно когда команда все еще есть в списке, но на деле ее нет
+     * @param client - Клиент
+     * @param guildID - ID сервера
+     * @param CommandID - ID Команды
+     */
+    public remove = (client: Client, guildID: string, CommandID: string) => {
+        // Удаление приватной команды
+        if (guildID) client.rest.delete(Routes.applicationGuildCommand(client.user.id, guildID, CommandID))
+            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed in guild ${guildID}`))
+            .catch(console.error);
+
+        // Удаление глобальной команды
+        else client.rest.delete(Routes.applicationCommand(client.user.id, CommandID))
+            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed`))
             .catch(console.error);
     };
 

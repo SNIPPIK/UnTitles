@@ -1,10 +1,10 @@
+import {MessageSendOptions, ds_interact, MessageComponent, interact} from "@type/discord";
 import {CommandInteractionOption, GuildTextBasedChannel, User} from "discord.js"
-import {MessageSendOptions, ds_input, MessageComponent} from "@type/discord";
 import {Attachment, InteractionCallbackResponse} from "discord.js";
 import type {EmbedData, GuildMember, Message} from "discord.js"
 import {locale, languages} from "@service/locale";
 import {SupportButtons} from "@handler/queues";
-import {Logger, EmbedBuilder} from "@utils";
+import {EmbedBuilder} from "@utils";
 import {env} from "@handler";
 import {db} from "@app";
 
@@ -19,14 +19,13 @@ export class MessageUtils {
      * @param msg
      * @param time
      */
-    public static delete(msg: InteractionCallbackResponse | Message, time: number =  10e3) {
+    public static delete(msg: InteractionCallbackResponse | Message | ds_interact, time: number =  10e3) {
         setTimeout(() => {
             if (msg instanceof InteractionCallbackResponse) {
                 msg.resource.message.delete().catch(() => null);
                 return;
             }
-
-            msg.delete().catch(() => null);
+            else if ("delete" in msg && typeof msg.delete === "function") msg.delete().catch(() => null);
         }, time);
     };
 
@@ -78,7 +77,7 @@ export class Interact {
      * @description Сообщение принятое с discord.js
      * @private
      */
-    private readonly _temp: ds_input = null;
+    private readonly _temp: interact = null;
 
     /**
      * @description Уникальный номер кнопки
@@ -147,7 +146,7 @@ export class Interact {
      */
     public get author(): User {
         if ("author" in this._temp) return this._temp.author;
-        return this._temp.member.user as any;
+        return this._temp.member.user as User;
     };
 
     /**
@@ -163,7 +162,7 @@ export class Interact {
      * @param time - Через сколько удалить сообщение
      */
     public set delete(time: number) {
-        MessageUtils.delete(this._temp as any, time);
+        MessageUtils.delete(this._temp, time);
     };
 
 
@@ -205,8 +204,8 @@ export class Interact {
      * @public
      */
     public get locale(): languages {
-        if ("locale" in this._temp) return this._temp.locale as any;
-        else if ("guildLocale" in this._temp) return this._temp.guildLocale as any;
+        if ("locale" in this._temp) return this._temp.locale as languages;
+        else if ("guildLocale" in this._temp) return this._temp.guildLocale as languages;
         return locale.language;
     };
 
@@ -215,7 +214,7 @@ export class Interact {
      * @description Загружаем данные для взаимодействия с классом
      * @param data - Message или BaseInteraction
      */
-    public constructor(data: ds_input) {
+    public constructor(data: ds_interact) {
         if (data instanceof InteractionCallbackResponse) this._temp = data.resource.message;
         else this._temp = data;
     };
@@ -225,24 +224,18 @@ export class Interact {
      * @param options - Данные для отправки сообщения
      */
     public send = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
-        try {
-            // Если бот уже ответил на сообщение
-            if (this._temp["replied"] && !this._temp["deferred"]) {
-                return this._temp["followUp"](Object.assign({withResponse: true}, options));
-            }
-
-            // Если можно дать ответ на сообщение
-            else if (this._temp["replied"] !== undefined || this._temp["deferred"] !== undefined) {
-                if (!this._temp["replied"]) return this._temp["reply"](Object.assign({withResponse: true}, options));
-            }
-
-            // Если нельзя отправить ответ
-            return this._temp.channel["send"](Object.assign({withResponse: true}, options));
-        } catch (err) {
-            // Если происходит ошибка
-            Logger.log("ERROR", `${err}`);
-            return this._temp.channel["send"](Object.assign({withResponse: true}, options));
+        // Если бот уже ответил на сообщение
+        if (this._temp["replied"] && !this._temp["deferred"]) {
+            return this._temp["followUp"](Object.assign({withResponse: true}, options));
         }
+
+        // Если можно дать ответ на сообщение
+        else if ((this._temp["replied"] !== undefined || this._temp["deferred"] !== undefined) && !this._temp["replied"]) {
+            return this._temp["reply"](Object.assign({withResponse: true}, options));
+        }
+
+        // Если нельзя отправить ответ
+        return this._temp.channel["send"](Object.assign({withResponse: true}, options));
     };
 
     /**
@@ -250,16 +243,10 @@ export class Interact {
      * @param options - Данные для замены сообщения
      */
     public edit = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
-        try {
-            // Редактируем ответ
-            if (this._temp["deferred"]) return this._temp["editReply"](options);
+        // Редактируем ответ
+        if (this._temp["deferred"]) return this._temp["editReply"](options);
 
-            // Редактируем обычное сообщение
-            return this._temp["edit"](options);
-        } catch (err) {
-            // Если происходит ошибка
-            Logger.log("ERROR", `${err}`);
-            return null;
-        }
+        // Редактируем обычное сообщение
+        return this._temp["edit"](options);
     };
 }

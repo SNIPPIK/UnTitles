@@ -224,11 +224,11 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
                         text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.displayName, page + 1, pages.length, queue.tracks.total, queue.tracks.time]),
                         iconURL: queue.tracks.track.user.avatar
                     },
-                    timestamp: new Date()
+                    timestamp: queue.timestamp
                 }
             ]).setMenu({type: "table", pages, page}).setTime(60e3).setCallback((message, pages: string[], page: number) => {
                 return message.edit({
-                    embeds: [ //@ts-ignore
+                    embeds: [
                         {
                             ...message.embeds[0],
                             color: Colors.Green,

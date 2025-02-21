@@ -1,12 +1,18 @@
-import {Message, BaseInteraction, ComponentData, ActionRowBuilder, EmbedData, MessageFlags} from "discord.js";
+import {Message, InteractionCallbackResponse,BaseInteraction, ComponentData, ActionRowBuilder, EmbedData, MessageFlags} from "discord.js";
 import {SupportButtons} from "@handler/queues";
 
 /**
  * @author SNIPPIK
  * @description Поддерживаемый тип сообщения
- * @type ds_input
+ * @type ds_interact
  */
-export type ds_input = Message | BaseInteraction; //| CommandInteraction | MessageComponentInteraction | ModalSubmitInteraction;
+export type ds_interact = Message | BaseInteraction | InteractionCallbackResponse; //| CommandInteraction | MessageComponentInteraction | ModalSubmitInteraction;
+
+/**
+ * @author SNIPPIK
+ * @description Внутренний тип сообщений
+ */
+export type interact = Message | BaseInteraction;
 
 /**
  * @author SNIPPIK

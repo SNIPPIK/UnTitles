@@ -37,7 +37,8 @@ class player_wait extends Assign<Event<"player/wait">> {
                 }
 
                 // Через время запускаем трек, что-бы не нарушать работу VoiceSocket
-                setTimeout(player.play, 400);
+                // Что будет если нарушить работу VoiceSocket, пинг >=1000
+                setTimeout(player.play, 2e3);
             }
         });
     };

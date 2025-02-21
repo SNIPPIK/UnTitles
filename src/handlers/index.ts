@@ -127,7 +127,7 @@ class Environment {
         try {
             process.loadEnvFile(".env");
         } catch (error) {
-            throw new Error("[env] has not found .env file in current directory");
+            throw new Error(`[ENV] has not found .env file in current directory ${__dirname}`);
         }
     };
 
@@ -145,7 +145,7 @@ class Environment {
             if (safe !== undefined) return safe;
 
             // Если нет <safe> параметра
-            throw new Error(`[ENV]: Not found ${name} in .env`);
+            throw new Error(`[ENV] Not found ${name} in .env`);
         }
 
         // Если параметр имеет правду
@@ -156,36 +156,6 @@ class Environment {
 
         // Если параметр имеет что-то другое
         return env as EnvironmentExit<T>;
-    };
-
-    /**
-     * @description Обновляем данные в env (не работает на некоторых хостингах)
-     * @param key {string} Имя
-     * @param value {string} значение
-     * @readonly
-     * @public
-     */
-    public readonly set = (key: string, value: string): void => {
-        // Открываем файл env в array
-        const envFile = fs.readFileSync(".env", "utf8").split(os.EOL);
-
-        // Ищем имя
-        const target = envFile.indexOf(
-            envFile.find((line) => line.match(new RegExp(key))),
-        );
-
-        // Обновляем данные
-        envFile.splice(target, 1, `${key}="${value}"`);
-
-        try {
-            // Сохраняем файл
-            fs.writeFileSync(".env", envFile.join(os.EOL));
-
-            // Обновляем env
-            setImmediate(() => process.loadEnvFile(".env"));
-        } catch (e) {
-            throw `[ENV]: Fail save >${key}< to .env`;
-        }
     };
 
     /**

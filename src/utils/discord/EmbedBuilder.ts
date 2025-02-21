@@ -8,7 +8,7 @@ import type {EmbedData, Message} from "discord.js"
  * @description создаем продуманное сообщение
  * @class EmbedBuilder
  */
-export class EmbedBuilder<T extends Interact> {
+export class EmbedBuilder {
     /**
      * @description Временная база данных с ComponentData или классом ActionRowBuilder в array
      * @readonly
@@ -60,29 +60,24 @@ export class EmbedBuilder<T extends Interact> {
      * @param interaction
      * @public
      */
-    public set send(interaction: T) {
+    public set send(interaction: Interact) {
         const options = {embeds: this.embeds, components: this.components};
 
-        interaction.send(options).then((message) => {
-            // Если получить возврат не удалось, то ничего не делаем
-            if (!message) return;
+        interaction.send(options)
+            .catch((err) => Logger.log("ERROR", `[DiscordAPI] ${err}`))
+            .then((message) => {
+                // Если получить возврат не удалось, то ничего не делаем
+                if (!message) return;
 
-            // Удаляем сообщение через время если это возможно
-            if (this.time !== 0) MessageUtils.delete(message, this.time);
+                // Удаляем сообщение через время если это возможно
+                if (this.time !== 0) MessageUtils.delete(message, this.time);
 
-            // Создаем меню если есть параметры для него
-            if (this._menu.pages.length > 0) this.constructor_menu(message instanceof InteractionCallbackResponse ? message.resource.message : message);
+                // Создаем меню если есть параметры для него
+                if (this._menu.pages.length > 0) this.constructor_menu(message instanceof InteractionCallbackResponse ? message.resource.message : message);
 
-            // Если надо выполнить действия после
-            if (this.promise) this.promise(new Interact(message as any));
-        })
-            .catch((err) => Logger.log("ERROR", `[DiscordAPI] ${err.message}`))
-            .finally(() => {
-            setTimeout(() => {
-                // Удаляем все параметры
-                for (let key of Object.keys(this)) this[key] = null;
-            }, this.time);
-        });
+                // Если надо выполнить действия после
+                if (this.promise) this.promise(new Interact(message as any));
+            });
     };
 
     /**
@@ -137,21 +132,21 @@ export class EmbedBuilder<T extends Interact> {
     };
 
     /**
-     * @description Добавляем функцию для управления данными после отправки
+     * @description Функция которая будет возвращена после отправки сообщения
      * @param func - Функция для выполнения после
      * @public
      */
-    public setPromise = (func: EmbedBuilder<T>["promise"]) => {
+    public setPromise = (func: EmbedBuilder["promise"]) => {
         this.promise = func;
         return this;
     };
 
     /**
-     * @description Добавляем функцию для управления данными после отправки, для menu
+     * @description Функция которая будет выполниться при вызове кнопки
      * @param func - Функция для выполнения после
      * @public
      */
-    public setCallback = (func: EmbedBuilder<T>["callback"]) => {
+    public setCallback = (func: EmbedBuilder["callback"]) => {
         this.callback = func;
         return this;
     };
@@ -161,7 +156,7 @@ export class EmbedBuilder<T extends Interact> {
      * @param options - Сами параметры
      * @public
      */
-    public setMenu = (options: EmbedBuilder<T>["_menu"]) => {
+    public setMenu = (options: EmbedBuilder["_menu"]) => {
         // Добавляем кнопки для просмотра
         if (options.type === "table") {
             this.components.push(

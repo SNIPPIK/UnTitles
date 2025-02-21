@@ -120,6 +120,7 @@ class message_search extends Assign<Event<"message/search">> {
 
                 // Создаем сообщение о поиске
                 new message.builder()
+                    .setTime(120e3)
                     .setMenu({type: "selector", pages: tracks, page: 0})
                     .addEmbeds([
                         {
@@ -136,7 +137,7 @@ class message_search extends Assign<Event<"message/search">> {
                             timestamp: new Date()
                         }
                     ])
-                    .setTime(120e3).setCallback((msg, pages, page, embed, item: Track) => {
+                    .setCallback((msg, pages: Track[], page, embed, item: Track) => {
                         // Если был выбран объект
                         if (item) {
                             db.events.emitter.emit("request/api", message, [platform, item.url]);
@@ -145,9 +146,9 @@ class message_search extends Assign<Event<"message/search">> {
 
                         const track = pages[page];
 
-                        // Если надо изменить сообщение
+                        // Изменяем сообщение
                         msg.edit({
-                            embeds: [ //@ts-ignore
+                            embeds: [
                                 {
                                     ...embed[0],
                                     description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.title.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
@@ -208,17 +209,22 @@ class message_playing extends Assign<Event<"message/playing">> {
                             })() : null
                         ]
                     }
-                ]).setPromise((msg) => {
-                    if (!db.queues.cycles.messages.array.includes(msg)) db.queues.cycles.messages.set(msg);
-                });
+                ]);
 
                 // Если надо обновить сообщение
                 if (message) {
-                    //Обновляем сообщение
+                    // Обновляем сообщение
                     message.edit({ embeds: embed.embeds, components: queue.components }).catch(() => null);
-                    return
+                    return;
                 }
 
+                // Для обновления сообщений
+                embed.setPromise((msg) => {
+                    // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
+                    if (!db.queues.cycles.messages.array.includes(msg)) db.queues.cycles.messages.set(msg);
+                });
+
+                // Создаем новое сообщение
                 embed.setTime(0).addComponents(queue.components).send = queue.message;
             }
         });

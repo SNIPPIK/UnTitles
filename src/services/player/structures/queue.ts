@@ -93,7 +93,13 @@ export class Queue {
          * @description Плеер для проигрывания музыки
          * @private
          */
-        player:     null as AudioPlayer
+        player:     null as AudioPlayer,
+
+        /**
+         * @description Время включения очереди или же проигрывания музыки
+         * @private
+         */
+        timestamp: new Date()
     };
 
     /**
@@ -123,6 +129,14 @@ export class Queue {
      * @public
      */
     public set message(message: Interact) {
+        // Если введено новое сообщение
+        if (message !== this.message) {
+            // Удаляем старое сообщение, если оно есть
+            if (this.message !== undefined) {
+                if (db.queues.cycles.messages.array.includes(this.message)) db.queues.cycles.messages.remove(this.message);
+            }
+        }
+
         this._data.message = message;
     };
 
@@ -165,6 +179,14 @@ export class Queue {
             guildId: this.guild.id,
             channelId: voice.channel.id
         }, this.guild.voiceAdapterCreator);
+    };
+
+    /**
+     * @description Время включения музыки текущей очереди
+     * @public
+     */
+    public get timestamp() {
+        return this._data.timestamp;
     };
 
 
@@ -254,6 +276,8 @@ export class Queue {
 
         // В конце функции выполнить запуск проигрывания (полезно если треков в плеере еще нет)
         setImmediate(this.player.play);
+
+        Logger.log("DEBUG", `[Queue/${ID}] has create`);
     };
 
     /**
@@ -275,6 +299,9 @@ export class Queue {
      */
     protected readonly destroy = () => {
         Logger.log("DEBUG", `[Queue/${this.guild.id}] has destroyed`);
+
+        // Удаляем сообщение
+        this.message = null;
 
         // Удаляем плеер
         if (this.player) this.player.destroy();

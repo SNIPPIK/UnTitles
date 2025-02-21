@@ -38,7 +38,10 @@ export class Process {
      */
     public constructor(args: string[], name: string = ff_path) {
         this._process = spawn(name, args);
-        ["end", "close", "error", "disconnect", "exit"].forEach((event) => this.process.once(event, this.destroy));
+
+        for (let event of ["end", "close", "error", "disconnect", "exit"]) {
+            this.process.once(event, this.destroy);
+        }
     };
 
     /**
@@ -83,18 +86,17 @@ let ff_path = null;
  */
 (() => {
     const cache = env.get("cache.dir");
-    const names = [`${cache}/FFmpeg/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
+    const names = [`${cache}/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 
     // Проверяем имена, если есть FFmpeg/avconv
-    for (const name of [...names, "ffmpeg", "avconv"]) {
+    for (const name of ["ffmpeg", "avconv", ...names]) {
         try {
             const result = spawnSync(name, ['-h'], {windowsHide: true});
             if (result.error) continue;
             ff_path = name;
-            return env.set("ffmpeg.path", name);
         } catch {}
     }
 
     // Выдаем ошибку если нет FFmpeg/avconv
-    throw Error("[Critical]: FFmpeg/avconv not found!");
+    throw Error("[Critical] FFmpeg/avconv not found!");
 })();

@@ -8,7 +8,7 @@ import {env} from "@handler";
 import {global} from "@type";
 
 // Включение
-Logger.log("LOG", `[ZEN|UDB] has starting`);
+Logger.log("LOG", `[Core] has starting`);
 
 /**
  * @author SNIPPIK
@@ -119,7 +119,7 @@ export var db: Database = null;
  * @description Если требуется запустить менеджер осколков
  */
 if (process["argv"].includes("--ShardManager")) {
-    Logger.log("WARN", `[ZEN|UDB] has running ShardManager...`);
+    Logger.log("WARN", `[Manager] has running ShardManager...`);
 
     // Создаем менеджер осколков
     const manager = new ShardingManager(__filename, {
@@ -132,13 +132,13 @@ if (process["argv"].includes("--ShardManager")) {
 
     // Слушаем событие для создания осколка
     manager.on("shardCreate", (shard) => {
-        shard.on("spawn", () => Logger.log("WARN",`[ZEN|UDB/${shard.id}] added to manager`));
-        shard.on("ready", () => Logger.log("WARN",`[ZEN|UDB/${shard.id}] is connected to websocket`));
-        shard.on("death", () => Logger.log("WARN",`[ZEN|UDB/${shard.id}] is killed`));
+        shard.on("spawn", () => Logger.log("WARN",`[Manager/${shard.id}] added to manager`));
+        shard.on("ready", () => Logger.log("WARN",`[Manager/${shard.id}] is connecting to websocket`));
+        shard.on("death", () => Logger.log("WARN",`[Manager/${shard.id}] is killed`));
     });
 
     // Создаем дубликат
-    manager.spawn({ amount: "auto", delay: -1 }).catch((err: Error) => Logger.log("ERROR",`[ShardManager] ${err}`));
+    manager.spawn({ amount: "auto", delay: -1 }).catch((err: Error) => Logger.log("ERROR",`[Manager] ${err}`));
 }
 
 /**
@@ -146,8 +146,8 @@ if (process["argv"].includes("--ShardManager")) {
  * @description Если требуется запустить осколок
  */
 else {
-    Logger.log("DEBUG", `[ZEN|UDB] adding utilities${global}`);
-    Logger.log("WARN", `[ZEN|UDB] has running shard`);
+    Logger.log("DEBUG", `[Core] adding utilities${global}`);
+    Logger.log("WARN", `[Core] has running shard`);
 
     // Создаем webhook клиент
     const webhook = new WebhookClient({
@@ -195,30 +195,40 @@ else {
     const id = client.shard?.ids[0] ?? 0;
 
     db = new Database();
-    Logger.log("LOG", `[ZEN|UDB/${id}] has initialize db`);
+    Logger.log("LOG", `[Core/${id}] has initialize db`);
 
     // Подключаем осколок к discord
-    client.login(env.get("token.discord")).finally(() => {
-        // Загружаем платформы
-        db.api.register();
-        Logger.log("DEBUG", `[ZEN|UDB/${id} | ${db.api.platforms.supported.length}/${db.api.platforms.authorization.length}] has load apis`);
+    client.login(env.get("token.discord"))
+        // Что делаем после того как бот подключится к discord api
+        .then(async () => {
+            Logger.log("WARN", `[Core/${id}] login successfully`);
+        })
 
-        // Загружаем события
-        db.events.register(client);
-        Logger.log("DEBUG", `[ZEN|UDB/${id} | ${db.events.events.length}] has load events`);
+        // Если при входе происходит ошибка
+        .catch(() => {
+            Logger.log("ERROR", `[Core/${id}] failed authorization in discord`);
+        })
 
-        // Загружаем команды
-        db.commands.register(client);
-        Logger.log("DEBUG", `[ZEN|UDB/${id} | ${db.commands.public.length}] has load commands`);
-    });
+        // Что делаем после подключения к discord api
+        .finally(async () => {
+            // Загружаем платформы
+            db.api.register();
+            Logger.log("DEBUG", `[Core/${id} | ${db.api.platforms.supported.length}/${db.api.platforms.authorization.length}] has load apis`);
 
-    // Сообщаем если достигнут лимит запросов
-    client.rest.on("rateLimited", (d) => {
-        Logger.log("WARN", `[ZEN|UDB/${id}] ${d.limit} | ${d.timeToReset}`);
-    });
+            // Загружаем события
+            db.events.register(client);
+            Logger.log("DEBUG", `[Core/${id} | ${db.events.events.length}] has load events`);
+
+            // Загружаем команды
+            db.commands.register(client);
+            Logger.log("DEBUG", `[Core/${id} | ${db.commands.public.length}] has load commands`);
+        });
 
     // Отлавливаем все ошибки внутри процесса
     process.on("uncaughtException", (err, origin) => {
+        //Выводим ошибку
+        Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
+
         // Отправляем данные об ошибке и отправляем через систему webhook
         webhook.send({
             username: client.user.username, avatarURL: client.user.avatarURL(),
@@ -234,14 +244,5 @@ else {
         }).catch(() => {
             Logger.log("ERROR", "[Webhook] Fail send message");
         });
-
-        // Если получена критическая ошибка, из-за которой будет нарушено выполнение кода
-        if (err.message?.match(/Critical/)) {
-            Logger.log("ERROR", "[CODE: 14] Hooked critical error!");
-            process.exit(14);
-        }
-
-        //Выводим ошибку
-        Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
     });
 }

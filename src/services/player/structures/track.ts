@@ -323,10 +323,7 @@ export class Track {
      * @param track - Данные трека с учетом <Song.track>
      */
     public constructor(track: Track.data) {
-        this.time = {
-            split: track.time.split,
-            total: track.time.total as any
-        };
+        this.time = track.time as any;
 
         // Удаляем мусорные названия из текста
         track.artist.title = track.artist.title.replace(/ - Topic/gi, "");

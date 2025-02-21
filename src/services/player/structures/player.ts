@@ -225,7 +225,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 // Если стрим можно прочитать
                 if (stream.readable) {
                     this.audio.current = stream;
-                    this.status = "player/playing"
+                    this.status = "player/playing";
 
                     return;
                 }
@@ -257,7 +257,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                         clearTimeout(timeout);
 
                         this.audio.current = stream;
-                        this.status = "player/playing"
+                        this.status = "player/playing";
                     })
             })
 

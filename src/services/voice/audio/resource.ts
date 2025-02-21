@@ -47,7 +47,9 @@ export class AudioResource {
      * @return boolean
      * @public
      */
-    public get readable() { return this._readable; };
+    public get readable() {
+        return this._readable;
+    };
 
     /**
      * @description Выдаем фрагмент потока или пустышку

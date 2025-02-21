@@ -120,7 +120,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             name: Events.InteractionCreate,
             type: "client",
             once: false,
-            execute: (_, message) => {
+            execute: (client, message) => {
                 // Какие действия надо просто игнорировать
                 if (
                     // Игнорируем ботов
@@ -191,6 +191,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
                     // Если нет команды
                     if (!command) {
+                        db.commands.remove(client, message.commandGuildId, message.commandId);
                         interact.fastBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
                         return;
                     }
