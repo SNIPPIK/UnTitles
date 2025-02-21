@@ -142,7 +142,7 @@ class Command_Voice extends Assign<Command> {
                             // Если получилось сменить регион
                             .finally(() => {
                                 //Перенастройка подключения
-                                voiceConnection.configureSocket();
+                                voiceConnection.configureSocket;
 
                                 message.fastBuilder = {
                                     color: Colors.Green,
@@ -158,7 +158,7 @@ class Command_Voice extends Assign<Command> {
                         if (queue) queue.cleanup();
 
                         // Отключаемся от голосового канала
-                        voiceConnection.disconnect();
+                        voiceConnection.disconnect;
 
                         message.fastBuilder = {
                             color: Colors.Green,

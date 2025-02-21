@@ -200,7 +200,7 @@ else {
     // Подключаем осколок к discord
     client.login(env.get("token.discord"))
         // Что делаем после того как бот подключится к discord api
-        .then(async () => {
+        .then(() => {
             Logger.log("WARN", `[Core/${id}] login successfully`);
         })
 
@@ -210,7 +210,7 @@ else {
         })
 
         // Что делаем после подключения к discord api
-        .finally(async () => {
+        .finally(() => {
             // Загружаем платформы
             db.api.register();
             Logger.log("DEBUG", `[Core/${id} | ${db.api.platforms.supported.length}/${db.api.platforms.authorization.length}] has load apis`);

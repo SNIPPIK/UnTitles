@@ -28,39 +28,30 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @public
      */
     public set state(newState) {
+        const oldState = this._state;
+
         try {
             // Уничтожаем прошлый WebSocket
-            stateDestroyer(
-                Reflect.get(this._state, "ws") as WebSocket,
-                Reflect.get(newState, "ws") as WebSocket,
-                (oldS) => {
-                    oldS
-                        .off("error", this.emitError)
-                        .off("open", this.openWebSocket)
-                        .off("packet", this.WebSocketPacket)
-                        .off("close", this.WebSocketClose)
-                        .destroy()
-                }
-            );
+            if (oldState && "ws" in oldState && oldState.ws !== newState["ws"]) {
+                oldState.ws
+                    .off("error", this.emitError)
+                    .off("open", this.openWebSocket)
+                    .off("packet", this.WebSocketPacket)
+                    .off("close", this.WebSocketClose)
+                    .destroy()
+            }
 
             // Уничтожаем прошлое UDP подключение
-            stateDestroyer(
-                Reflect.get(this._state, "udp") as VoiceUDPSocket,
-                Reflect.get(newState, "udp") as VoiceUDPSocket,
-                (oldS) => {
-                    oldS
-                        .off("error", this.emitError)
-                        .off("close", this.closeUDP)
-                        .destroy();
-                }
-            );
+            if (oldState && "udp" in oldState && oldState.udp !== newState["udp"]) {
+                oldState.udp
+                    .off("error", this.emitError)
+                    .off("close", this.closeUDP)
+                    .destroy();
+            }
 
-            this.emit("stateChange", this._state, newState);
+            this.emit("stateChange", oldState, newState);
             Object.assign(this._state, newState);
         } catch (err) {
-            // Если было произведено экстренное удаление подключения
-            if (`${err}`.match("Reflect.get called on non-object")) return;
-
             console.error(err);
         }
     };
@@ -330,21 +321,6 @@ interface VoiceSocketEvents {
     "stateChange": (oldState: VoiceSocketState.States, newState: VoiceSocketState.States) => void;
     "error": (error: Error) => void;
     "close": (code: number) => void;
-}
-
-/**
- * @author SNIPPIK
- * @description Уничтожаем не используемый WebSocket или SocketUDP
- * @param oldS - Прошлое состояние
- * @param newS - Новое состояние
- * @param callback - Функция по удалению
- */
-export function stateDestroyer<O extends WebSocket | VoiceUDPSocket | VoiceSocket>(oldS: O, newS: O, callback: (oldS: O, newS: O) => void) {
-    try {
-        if (oldS && oldS !== newS) callback(oldS, newS);
-    } catch (err) {
-        console.error(err);
-    }
 }
 
 /**

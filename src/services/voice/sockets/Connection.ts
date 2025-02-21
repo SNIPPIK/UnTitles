@@ -1,5 +1,5 @@
 import { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData, GatewayOpcodes } from "discord-api-types/v10";
-import {stateDestroyer, VoiceSocket, VoiceSocketState, VoiceSocketStatusCode} from "@service/voice";
+import {VoiceSocket, VoiceSocketState, VoiceSocketStatusCode} from "@service/voice";
 import {Logger, TypedEmitter} from "@utils";
 
 /**
@@ -19,12 +19,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         guildId: string;
         selfDeaf: boolean;
         selfMute: boolean;
-    } = {
-        channelId: null,
-        guildId: null,
-        selfMute: null,
-        selfDeaf: null
-    };
+    } = null;
 
     /**
      * @description Текущее состояние голосового подключения
@@ -76,34 +71,27 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         const oldState = this._state;
 
         // Уничтожаем прошлый VoiceSocket
-        stateDestroyer<VoiceSocket>(
-            Reflect.get(oldState, "networking") as VoiceSocket,
-            Reflect.get(newState, "networking") as VoiceSocket,
-            (old) => {
-                try {
-                    old
-                        .off("error", this.onSocketError)
-                        .off("close", this.onSocketClose)
-                        .off("stateChange", this.onSocketStateChange)
-                        .destroy();
-                } catch {
-                    // Возможно что VoiceSocket уже уничтожен
-                    old.destroy();
-                }
+        if (oldState && "networking" in oldState && oldState.networking !== newState["networking"]) {
+            try {
+                oldState.networking
+                    .off("error", this.onSocketError)
+                    .off("close", this.onSocketClose)
+                    .off("stateChange", this.onSocketStateChange)
+                    .destroy();
+            } catch {
+                // Возможно что VoiceSocket уже уничтожен
+                oldState.networking.destroy();
             }
-        );
+        }
 
         // Уничтожаем старый адаптер
         if (oldState.status !== VoiceConnectionStatus.Destroyed && newState.status === VoiceConnectionStatus.Destroyed) {
             oldState.adapter.destroy();
         }
 
-        Object.assign(this._state, newState);
-
         // Меняем текущий статус
-        if (oldState.status !== newState.status) {
-            this.emit(newState.status as any, oldState, newState);
-        }
+        if (oldState.status !== newState.status) this.emit(newState.status as any, oldState, newState);
+        Object.assign(this._state, newState);
     };
 
     /**
@@ -121,24 +109,32 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     };
 
     /**
-     * @description Создаем класс для управления голосовым подключением
-     * @param config - Данные для подключения
-     * @param adapterCreator - Параметры для сервера
+     * @description Отключает голосовое соединение, предоставляя возможность повторного подключения позже.
+     * @returns ``true`, если соединение было успешно отключено
+     * @public
      */
-    public constructor(config: VoiceConnection["config"], adapterCreator: DiscordGatewayAdapter.Creator) {
-        super();
-        this._state = {
-            status: VoiceConnectionStatus.Signalling,
+    public get disconnect (): boolean {
+        if (this.state.status === VoiceConnectionStatus.Destroyed || this.state.status === VoiceConnectionStatus.Signalling) return false;
 
-            // Создаем адаптер
-            adapter: adapterCreator({
-                onVoiceServerUpdate: this.addServerPacket,
-                onVoiceStateUpdate: this.addStatePacket,
-                destroy: this.destroy
-            })
+        this._config.channelId = null;
+
+        // Отправляем в discord сообщение об отключении бота
+        if (!this.state.adapter.sendPayload(this.payload(this.config))) {
+            this.state = {
+                reason: VoiceConnectionDisconnectReason.AdapterUnavailable,
+                status: VoiceConnectionStatus.Disconnected,
+                adapter: this.state.adapter
+            };
+            return false;
+        }
+
+        // Меняем статус на VoiceConnectionStatus.Disconnected
+        this.state = {
+            reason: VoiceConnectionDisconnectReason.Manual,
+            status: VoiceConnectionStatus.Disconnected,
+            adapter: this.state.adapter
         };
-
-        Object.assign(this._config, config);
+        return true;
     };
 
     /**
@@ -153,26 +149,27 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * Соединение перейдет в состояние подключения, когда это будет вызвано.
      * @public
      */
-    public configureSocket = (): void => {
+    public get configureSocket() {
         const { server, state } = this._packets;
 
         // Если нет некоторых данных, то прекращаем выполнение
-        if (!server || !state || this.state.status === VoiceConnectionStatus.Destroyed || !server.endpoint) return;
+        if (!server || !state || this.state.status === VoiceConnectionStatus.Destroyed || !server.endpoint) return false;
 
         // Создаем Socket подключение к discord
         this.state = { ...this.state,
             status: VoiceConnectionStatus.Connecting,
             networking: new VoiceSocket({
+                sessionId: state.session_id,
                 endpoint: server.endpoint,
                 serverId: server.guild_id,
-                token: server.token,
-                sessionId: state.session_id,
                 userId: state.user_id,
+                token: server.token
             })
                 .once("close", this.onSocketClose)
                 .on("stateChange", this.onSocketStateChange)
                 .on("error", this.onSocketError),
         };
+        return true;
     };
 
     /**
@@ -180,12 +177,59 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @param buffer - Пакет Opus для воспроизведения
      * @public
      */
-    public packet = (buffer: Buffer): void => {
+    public set packet(buffer: Buffer) {
         // Если голосовое подключение еще не готово
         if (this.state.status !== VoiceConnectionStatus.Ready) return;
 
         // Отправляем пакет
         this.state.networking.cryptoPacket = buffer;
+    };
+
+    /**
+     * @description Создаем класс для управления голосовым подключением
+     * @param config - Данные для подключения
+     * @param adapterCreator - Параметры для сервера
+     */
+    public constructor(config: VoiceConnection["config"], adapterCreator: DiscordGatewayAdapter.Creator) {
+        super();
+        this._state = {
+            status: VoiceConnectionStatus.Signalling,
+
+            // Создаем адаптер
+            adapter: adapterCreator({
+                /**
+                 * @description Регистрирует пакет `VOICE_SERVER_UPDATE` для голосового соединения. Это приведет к повторному подключению с использованием
+                 * новых данных, предоставленных в пакете.
+                 * @param packet - Полученный пакет `VOICE_SERVER_UPDATE`
+                 */
+                onVoiceServerUpdate: (packet: GatewayVoiceServerUpdateDispatchData): void => {
+                    const state = this.state;
+
+                    this._packets.server = packet;
+
+                    if (packet.endpoint) this.configureSocket;
+                    else if (state.status !== VoiceConnectionStatus.Destroyed) this.state = {
+                        ...state,
+                        reason: VoiceConnectionDisconnectReason.EndpointRemoved,
+                        status: VoiceConnectionStatus.Disconnected
+                    };
+                },
+
+                /**
+                 * @description Регистрирует пакет `VOICE_STATE_UPDATE` для голосового соединения. Самое главное, он сохраняет идентификатор
+                 * канала, к которому подключен клиент.
+                 * @param packet - Полученный пакет `VOICE_STATE_UPDATE`
+                 * @private
+                 */
+                onVoiceStateUpdate: (packet: GatewayVoiceStateUpdateDispatchData): void => {
+                    this._packets.state = packet;
+                    Object.assign(this._config, packet);
+                },
+                destroy: this.destroy
+            })
+        };
+
+        this._config = config;
     };
 
     /**
@@ -202,27 +246,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                 self_mute: config.selfMute
             }
         }
-    };
-
-    /**
-     * @description Отключает голосовое соединение, предоставляя возможность повторного подключения позже.
-     * @returns ``true`, если соединение было успешно отключено
-     * @public
-     */
-    public disconnect = (): boolean => {
-        if (this.state.status === VoiceConnectionStatus.Destroyed || this.state.status === VoiceConnectionStatus.Signalling) return false;
-
-        this._config.channelId = null;
-
-        // Отправляем в discord сообщение об отключении бота
-        if (!this.state.adapter.sendPayload(this.payload(this.config))) {
-            this.state = { adapter: this.state.adapter, status: VoiceConnectionStatus.Disconnected, reason: VoiceConnectionDisconnectReason.AdapterUnavailable };
-            return false;
-        }
-
-        // Меняем статус на VoiceConnectionStatus.Disconnected
-        this.state = { adapter: this.state.adapter, reason: VoiceConnectionDisconnectReason.Manual, status: VoiceConnectionStatus.Disconnected };
-        return true;
     };
 
     /**
@@ -308,6 +331,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         const state = this.state;
 
         if (oldState.code === newState.code || state.status !== VoiceConnectionStatus.Connecting && state.status !== VoiceConnectionStatus.Ready) return;
+
         if (newState.code === VoiceSocketStatusCode.ready) this.state = { ...state, status: VoiceConnectionStatus.Ready };
         else if (newState.code !== VoiceSocketStatusCode.close) this.state = { ...state, status: VoiceConnectionStatus.Connecting };
     };
@@ -319,34 +343,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      */
     private onSocketError = (error: Error): void => {
         this.emit("error", error);
-    };
-
-    /**
-     * @description Регистрирует пакет `VOICE_SERVER_UPDATE` для голосового соединения. Это приведет к повторному подключению с использованием
-     * новых данных, предоставленных в пакете.
-     * @param packet - Полученный пакет `VOICE_SERVER_UPDATE`
-     * @private
-     */
-    private addServerPacket = (packet: GatewayVoiceServerUpdateDispatchData): void => {
-        const state = this.state;
-
-        this._packets.server = packet;
-
-        if (packet.endpoint) this.configureSocket();
-        else if (state.status !== VoiceConnectionStatus.Destroyed) {
-            this.state = { ...state, status: VoiceConnectionStatus.Disconnected, reason: VoiceConnectionDisconnectReason.EndpointRemoved };
-        }
-    };
-
-    /**
-     * @description Регистрирует пакет `VOICE_STATE_UPDATE` для голосового соединения. Самое главное, он сохраняет идентификатор
-     * канала, к которому подключен клиент.
-     * @param packet - Полученный пакет `VOICE_STATE_UPDATE`
-     * @private
-     */
-    private addStatePacket = (packet: GatewayVoiceStateUpdateDispatchData): void => {
-        this._packets.state = packet;
-        Object.assign(this._config, packet);
     };
 
     /**

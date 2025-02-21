@@ -1,5 +1,6 @@
 import {httpsClient, API} from "@handler/apis";
 import {db} from "@app";
+import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -114,8 +115,8 @@ export class Track {
      */
     public get artist() {
         return {
-            url: this._track.artist.url,
-            title: this._track.artist.title,
+            url: this._track.artist?.url,
+            title: this._track.artist?.title,
             image: {
                 url: db.images.disk
             }
@@ -326,7 +327,7 @@ export class Track {
         this.time = track.time as any;
 
         // Удаляем мусорные названия из текста
-        track.artist.title = track.artist.title.replace(/ - Topic/gi, "");
+        if (track.artist) track.artist.title = track.artist?.title.replace(/ - Topic/gi, "");
         track.title = track.title.replace(/\(Lyrics Video\)/gi, "");
 
         // Удаляем ненужные данные

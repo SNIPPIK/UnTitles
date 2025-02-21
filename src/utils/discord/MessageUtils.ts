@@ -225,14 +225,14 @@ export class Interact {
      */
     public send = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
         // Если бот уже ответил на сообщение
-        if (this._temp["replied"] && !this._temp["deferred"]) {
-            return this._temp["followUp"](Object.assign({withResponse: true}, options));
-        }
+        //if (this._temp["replied"]) {
+        //    return this._temp["followUp"](Object.assign({}, options));
+        //}
 
         // Если можно дать ответ на сообщение
-        else if (this._temp["replied"] !== undefined || this._temp["deferred"] !== undefined) {
-            if (!this._temp["replied"]) return this._temp["reply"](Object.assign({withResponse: true}, options));
-        }
+        //else if (!this._temp["replied"]) {
+        //    return this._temp["reply"](Object.assign({withResponse: true}, options));
+        //}
 
         // Если нельзя отправить ответ
         return this._temp.channel["send"](Object.assign({withResponse: true}, options));
@@ -244,7 +244,7 @@ export class Interact {
      */
     public edit = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
         // Редактируем ответ
-        if (this._temp["deferred"]) return this._temp["editReply"](options);
+        //if (this._temp["replied"] || this._temp["deferred"]) return this._temp["editReply"](options);
 
         // Редактируем обычное сообщение
         return this._temp["edit"](options);

@@ -98,7 +98,7 @@ const intends: { name: Command["rules"][number], callback: (message: Interact) =
                     const connection = db.voice.get(message.guild.id);
 
                     // Отключаемся от голосового канала
-                    if (connection) connection.disconnect();
+                    if (connection) connection.disconnect;
                 }
             }
 

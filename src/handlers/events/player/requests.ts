@@ -38,7 +38,7 @@ class request_api extends Assign<Event<"request/api">> {
 
 
                 // Получаем данные в системе API
-                api.execute(this._parseArgument(argument, 1), { limit: db.api.limits[api.name], audio: false })
+                api.execute(argument[1] as any, { limit: db.api.limits[api.name], audio: false })
 
                     // Получаем данные
                     .then((item): void => {
@@ -54,7 +54,7 @@ class request_api extends Assign<Event<"request/api">> {
 
                     // Обрабатываем ошибки
                     .catch((err: Error) => { // Отправляем сообщение об ошибке
-                        Logger.log("ERROR", `request/api - ${err}`);
+                        console.error(err);
                         db.events.emitter.emit("request/error", message, `**${platform.platform}.${api.name}**\n**❯** **${err.message}**`);
                     })
 
