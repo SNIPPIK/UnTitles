@@ -159,9 +159,11 @@ else {
     const client = new Client({
         // Права бота
         intents: [
+            IntentsBitField.Flags.DirectMessages,
             IntentsBitField.Flags.GuildExpressions,
             IntentsBitField.Flags.GuildIntegrations,
             IntentsBitField.Flags.GuildVoiceStates,
+            IntentsBitField.Flags.GuildMessages,
             IntentsBitField.Flags.Guilds
         ],
 
@@ -181,8 +183,6 @@ else {
             GuildForumThreadManager: 0,
             AutoModerationRuleManager: 0,
             DMMessageManager: 0,
-            GuildScheduledEventManager: 0,
-            GuildMessageManager: 0,
             GuildInviteManager: 0,
             GuildEmojiManager: 0,
             GuildStickerManager: 0,

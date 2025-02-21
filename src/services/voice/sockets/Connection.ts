@@ -80,7 +80,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                     .destroy();
             } catch {
                 // Возможно что VoiceSocket уже уничтожен
-                oldState.networking.destroy();
             }
         }
 

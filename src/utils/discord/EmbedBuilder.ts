@@ -64,7 +64,17 @@ export class EmbedBuilder {
         const options = {embeds: this.embeds, components: this.components};
 
         interaction.send(options)
-            .catch(console.error)
+            .catch((err) => {
+                // Если происходит ошибка при отправке сообщений
+                if (`${err}`.match(/Unknown interaction|Interaction has already been acknowledged/)) {
+                    interaction["replied"] = false;
+
+                    this.send = interaction;
+                    return;
+                }
+
+                console.error(err);
+            })
             .then((message) => {
                 // Если получить возврат не удалось, то ничего не делаем
                 if (!message) return;
