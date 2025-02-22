@@ -173,7 +173,7 @@ class AudioFiltersCommand extends Assign<Command> {
 
                         // Делаем проверку на совместимость
                         for (let i = 0; i < player.filters.enabled.length; i++) {
-                            const filter = player.filters[i];
+                            const filter = player.filters.enabled[i];
 
                             // Если фильтры не совместимы
                             if (filter && Filter.unsupported.includes(filter?.name)) {
@@ -212,9 +212,9 @@ class AudioFiltersCommand extends Assign<Command> {
                     }
 
                     // Удаляем фильтр из включенных
-                    case "remove": {
+                    case "disable": {
                         // Пользователь пытается выключить выключенный фильтр
-                        if (findFilter) {
+                        if (!findFilter) {
                             message.fastBuilder = {
                                 description: locale._(message.locale, "command.filter.remove.two"),
                                 color: Colors.Yellow
