@@ -71,7 +71,7 @@ const intends: { name: Command["rules"][number], callback: (message: Interact) =
                     // Если есть голосовое подключение
                     if (queue.voice && queue.voice.channel) {
                         // Если в гс есть другие пользователи
-                        if (message.me.voice.channel.members.filter((user) => !user.user.bot).size > 0) {
+                        if (message.me.voice.channel && message.me.voice.channel.members.filter((user) => !user.user.bot).size > 0) {
                             message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
                             return false;
                         }

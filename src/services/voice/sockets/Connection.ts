@@ -360,6 +360,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         this.state = { status: VoiceConnectionStatus.Destroyed };
 
+        this.removeAllListeners();
+
         // DEBUG
         Logger.log("DEBUG", `[VoiceConnection] has destroyed`);
     };

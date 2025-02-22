@@ -10,7 +10,7 @@ export abstract class Collection<K, T = string> {
      * @readonly
      * @private
      */
-    private readonly map = new Map<T, K>();
+    private readonly _map = new Map<T, K>();
 
     /**
      * @description Получаем объект из ID
@@ -18,7 +18,7 @@ export abstract class Collection<K, T = string> {
      * @public
      */
     public get = (ID: T) => {
-        return this.map.get(ID);
+        return this._map.get(ID);
     };
 
     /**
@@ -34,7 +34,7 @@ export abstract class Collection<K, T = string> {
         // Если нет объекта, то добавляем его
         if (!item) {
             if (promise) promise(value);
-            this.map.set(ID, value);
+            this._map.set(ID, value);
             return value;
         }
 
@@ -48,26 +48,27 @@ export abstract class Collection<K, T = string> {
      * @public
      */
     public remove = (ID: T) => {
-        const item: any = this.map.get(ID);
+        const item = this._map.get(ID);
 
         // Если найден объект, то удаляем все сопутствующее, если это возможно
         if (item) {
-            if ("disconnect" in item) item?.disconnect();
-            if ("cleanup" in item) item?.cleanup();
-            if ("destroy" in item) item?.destroy();
+            // Если объект имеет функции удаления от они будут выполнены до удаления
+            for (const key of ["disconnect", "cleanup", "destroy"]) {
+                if (item[key] && typeof item[key] === "function") item[`${key}`]();
+            }
 
-            this.map.delete(ID);
+            this._map.delete(ID);
         }
 
         return;
     };
 
     /**
-     * @description Получаем случайный объект из класса MAP
+     * @description Получаем случайный объект из MAP
      * @public
      */
     public get random(): K {
-        const keys = Array.from(this.map.keys());
+        const keys = Array.from(this._map.keys());
         const key = keys[Math.floor(Math.random() * keys.length)];
 
         return this.get(key);
@@ -78,6 +79,6 @@ export abstract class Collection<K, T = string> {
      * @public
      */
     public get size() {
-        return this.map.size;
+        return this._map.size;
     };
 }

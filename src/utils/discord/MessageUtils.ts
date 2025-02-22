@@ -16,8 +16,8 @@ import {db} from "@app";
 export class MessageUtils {
     /**
      * @description Функция безопасного удаления сообщения
-     * @param msg
-     * @param time
+     * @param msg - Сообщение которое будет удалено
+     * @param time - Время через которое будет удалено сообщение
      */
     public static delete(msg: InteractionCallbackResponse | Message | ds_interact, time: number =  10e3) {
         setTimeout(() => {
@@ -32,24 +32,27 @@ export class MessageUtils {
     /**
      * @author SNIPPIK
      * @description Создание одной кнопки в одной функции
-     * @param name - Название параметра в env
-     * @param style - Тип стиля
-     * @param disabled - Кнопка доступна для нажатия
+     * @param options - Параметры для создания кнопки
      */
-    public static createButton_env(name: SupportButtons, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
-        return { type: 2, emoji: MessageUtils.checkIDComponent(`button.${name}`), custom_id: name, style, disabled }
-    };
+    public static createButton(options: creator_button | creator_button_env): MessageComponent {
+        let button: MessageComponent = {
+            type: 2,
+            style: options.style ?? 2,
+            disabled: options.disabled,
+            custom_id: null,
+        };
 
-    /**
-     * @author SNIPPIK
-     * @description Создание одной кнопки в одной функции
-     * @param emoji - Название параметра в env
-     * @param id - Уникальный индикатор кнопки
-     * @param style - Тип стиля
-     * @param disabled - Кнопка доступна для нажатия
-     */
-    public static createButton(emoji: MessageComponent["emoji"], id: SupportButtons, style: MessageComponent["style"] = 2, disabled: boolean): MessageComponent {
-        return { type: 2, emoji, custom_id: id, style, disabled }
+
+        // Если указан env
+        if ("env" in options) return {...button,
+            emoji: MessageUtils.checkIDComponent(`button.${options.env}`),
+            custom_id: options.env
+        }
+
+        return {...button,
+            emoji: options.emoji,
+            custom_id: options.id
+        }
     };
 
     /**
@@ -249,4 +252,26 @@ export class Interact {
         // Редактируем обычное сообщение
         return this._temp["edit"](options);
     };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Параметры для создания кнопки из env
+ */
+interface creator_button_env {
+    style?: MessageComponent["style"];
+    env: SupportButtons;
+    disabled?: boolean;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Параметры для создания кнопки
+ */
+interface creator_button {
+    style?: MessageComponent["style"];
+    emoji: MessageComponent["emoji"];
+    disabled?: boolean;
+    id: SupportButtons;
 }

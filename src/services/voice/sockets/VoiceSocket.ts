@@ -14,7 +14,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @description Текущий статус подключения
      * @private
      */
-    private readonly _state: VoiceSocketState.States = null;
+    private _state: VoiceSocketState.States = null;
     /**
      * @description Текущее состояние сетевого экземпляра
      * @public
@@ -48,12 +48,16 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                     .off("close", this.closeUDP)
                     .destroy();
             }
-
-            this.emit("stateChange", oldState, newState);
-            Object.assign(this._state, newState);
         } catch (err) {
             console.error(err);
         }
+
+        // Если происходит попытка вызова события из уничтоженного EventEmitter
+        try {
+            this.emit("stateChange", oldState, newState);
+        } catch {}
+
+        this._state = newState
     };
 
     /**
@@ -304,6 +308,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @public
      */
     public destroy = (): void => {
+        this.removeAllListeners();
+
         // Удаляем данные в следующем цикле
         setImmediate(() => {
             this.state = {code: VoiceSocketStatusCode.close};

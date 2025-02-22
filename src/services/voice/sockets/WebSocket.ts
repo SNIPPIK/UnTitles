@@ -122,6 +122,8 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
         } catch (error) {
             this.emit("error", error as Error);
         }
+
+        this.removeAllListeners();
     };
 }
 
