@@ -148,8 +148,13 @@ export class Commands extends handler<Command> {
  * @decorator
  */
 export function SlashCommand(options: SlashCommand.Options) {
+    // Если указан конкретный язык
+    let language = env.get("language.command");
+
+    if (!language || language === "null") language = null;
+
     const name_key = Object.keys(options.names)[0] as Locale
-    const name = options.names[name_key];
+    const name = options.names[language ? language : name_key];
     const name_localizations = options.names;
 
     const description_key = Object.keys(options.descriptions)[0] as Locale;
@@ -164,14 +169,14 @@ export function SlashCommand(options: SlashCommand.Options) {
         SubOptions.push(
             {
                 ...obj,
-                name: obj.names[Object.keys(obj.names)[0] as Locale],
+                name: obj.names[language ? language : Object.keys(obj.names)[0] as Locale],
                 nameLocalizations: obj.names,
                 description: obj.descriptions[Object.keys(obj.descriptions)[0] as Locale],
                 descriptionLocalizations: obj.descriptions,
                 options: obj.options ? obj.options.map((option) => {
                     return {
                         ...option,
-                        name: option.names[Object.keys(option.names)[0] as Locale],
+                        name: option.names[language ? language : Object.keys(option.names)[0] as Locale],
                         nameLocalizations: option.names,
                         description: option.descriptions[Object.keys(option.descriptions)[0] as Locale],
                         descriptionLocalizations: option.descriptions,
@@ -184,7 +189,7 @@ export function SlashCommand(options: SlashCommand.Options) {
     // Загружаем данные в класс
     return function (target: Function) {
         target.prototype.name = name;
-        target.prototype["name_localizations"] = name_localizations;
+        target.prototype["name_localizations"] = language ? null : name_localizations;
         target.prototype.description = description;
         target.prototype["description_localizations"] = description_localizations;
         target.prototype["default_member_permissions"] = null;
