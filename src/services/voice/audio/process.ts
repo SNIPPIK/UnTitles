@@ -22,14 +22,18 @@ export class Process {
      * @return ChildProcessWithoutNullStreams
      * @public
      */
-    public get process() { return this._process; }
+    public get process() {
+        return this._process;
+    };
 
     /**
      * @description Зарезервирован для вывода данных, как правило (хотя и не обязательно)
      * @return internal.Readable
      * @public
      */
-    public get stdout() { return this?.process?.stdout; };
+    public get stdout() {
+        return this?.process?.stdout;
+    };
 
     /**
      * @description Задаем параметры и запускаем процесс

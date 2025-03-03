@@ -1,50 +1,60 @@
-import {createSocket, Socket} from "node:dgram";
-import {Encryption} from "@service/voice";
+import {Encryption, UDPSocketEvents} from "@service/voice";
+import {createSocket} from "node:dgram";
 import {TypedEmitter} from "@utils";
-import {Buffer} from "node:buffer";
 import {isIPv4} from "node:net";
 
 /**
  * @author SNIPPIK
  * @description Создает udp подключение к api discord
- * @class VoiceUDPSocket
+ * @class SocketUDP
  * @public
  */
-export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
+export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
     /**
      * @description Socket UDP подключения
      * @readonly
      * @private
      */
-    private readonly socket: Socket = createSocket({ type: "udp4" });
+    private readonly socket = createSocket({ type: "udp4", reuseAddr: true });
 
     /**
      * @description Данные сервера к которому надо подключится
      * @readonly
      * @private
      */
-    private readonly remote = {
-        /**
-         * @description Прямой ip сервера
-         * @private
-         */
-        ip: null as string,
+    public readonly _connection: UDPConnection = null;
 
-        /**
-         * @description Порт сервера
-         * @private
-         */
-        port: 443
+    /**
+     * @description Отправка данных на сервер
+     * @param packet - Отправляемый пакет
+     */
+    public set packet(packet: Buffer) {
+        this.socket.send(packet, this._connection.port, this._connection.ip);
     };
 
     /**
-     * @description Отправляем буфер в Discord
-     * @param packet - Буфер для отправки
+     * @description Подключаемся к серверу через UDP подключение
      * @public
      */
-    public set packet(packet: Buffer) {
-        // Если есть пакет
-        if (packet) this.socket.send(packet, this.remote.port, this.remote.ip);
+    public set discovery(ssrc: number) {
+        this.packet = Encryption.discoveryBuffer(ssrc);
+
+        this.socket.once("message", async (message) => {
+            if (message.readUInt16BE(0) === 2) {
+                const packet = Buffer.from(message);
+                const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
+                const port = packet.readUInt16BE(packet.length - 2);
+
+                // Если провайдер не предоставляет или нет пути IPV4
+                if (!isIPv4(ip)) {
+                    this.emit("error", Error("Not found IPv4 address"));
+                    return;
+                }
+
+                this.emit("connected", { ip, port});
+                return;
+            }
+        });
     };
 
     /**
@@ -52,53 +62,18 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @param options - Данные для подключения
      * @public
      */
-    public constructor(options: VoiceUDPSocket["remote"]) {
+    public constructor(options: UDPConnection) {
         super();
-        this.remote = { ...this.remote, ...options };
+        this._connection = options;
 
-        // Привязываем события
-        for (let event of ["message", "error", "close"]) {
-            this.socket.on(event, (...args) => this.emit(event as any, ...args));
-        }
-    };
+        // Если подключение возвращает ошибки
+        this.socket.on("error", (err) => {
+            this.emit("error", err);
+        });
 
-    /**
-     * @description Получаем IP-адрес и порт
-     * @param ssrc -
-     * @public
-     */
-    public discovery = (ssrc: number): Promise<VoiceUDPSocket["remote"]> => {
-        this.packet = Encryption.discoveryBuffer(ssrc);
-
-        // Передаем данные об IP-адресе и порте
-        return new Promise((resolve, reject) => {
-            this.socket
-
-                // Если при подключении была получена ошибка
-                .once("error", (err) => {
-                    if (err) console.error(err);
-                    return reject(Error("It is not possible to open the UDP port on your IP\n - Check your firewall!"));
-                })
-
-                // Если получен ответ от сервера
-                .once("message", (message) => {
-                    if (message.readUInt16BE(0) !== 2) return resolve(null);
-
-                    try {
-                        const packet = Buffer.from(message);
-                        const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
-
-                        // Если провайдер не предоставляет или нет пути IPV4
-                        if (!isIPv4(ip)) return reject(Error("Not found IPv4 address"));
-
-                        return resolve({
-                            ip,
-                            port: packet.readUInt16BE(packet.length - 2)
-                        });
-                    } catch {
-                        return resolve(null);
-                    }
-                });
+        // Если подключение оборвалось
+        this.socket.once("close", () => {
+            this.emit("close");
         });
     };
 
@@ -107,6 +82,8 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public destroy = () => {
+        this.socket.removeAllListeners();
+
         try {
             if (this.socket) this.socket?.close();
         } catch (err) {
@@ -117,24 +94,19 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
 /**
  * @author SNIPPIK
- * @description События для UDP
- * @class VoiceWebSocket
+ * @description Параметры подключения UDP
+ * @interface UDPConnection
  */
-interface UDPSocketEvents {
+interface UDPConnection {
     /**
-     * @description Событие при котором сокет получает ответ от сервера
-     * @param message - Само сообщение
+     * @description Прямой ip сервера
+     * @private
      */
-    readonly "message": (message: Buffer) => void;
+    ip: string,
 
     /**
-     * @description Событие при котором сокет получает ошибку
-     * @param error
+     * @description Порт сервера
+     * @private
      */
-    readonly "error": (error: Error) => void;
-
-    /**
-     * @description Событие при котором сокет закрывается
-     */
-    readonly "close": () => void;
+    port: number
 }

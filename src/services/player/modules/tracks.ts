@@ -184,7 +184,7 @@ export class PlayerTracks {
      * @description Добавляем трек в очередь
      * @param track - Сам трек
      */
-    public push = (track: Track): void => {
+    public push = (track: Track) => {
         // Если включена перетасовка, то добавляем треки в оригинальную очередь
         if (this._tracks._shuffle) this._tracks._original.push(track);
 
@@ -196,7 +196,7 @@ export class PlayerTracks {
      * @description Удаляем из очереди неугодный трек
      * @param position - позиция трека, номер в очереди
      */
-    public remove = (position: number): void => {
+    public remove = (position: number) => {
         // Если трек удаляем из виртуально очереди, то и из оригинальной
         if (this._tracks._shuffle) {
             const index = this._tracks._original.indexOf(this._tracks._current[position]);

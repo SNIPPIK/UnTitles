@@ -111,13 +111,13 @@ class Command_Voice extends Assign<Command> {
                     // Подключение к голосовому каналу
                     case "join": {
                         // Если производится попытка подключится к тому же голосовому каналу
-                        if (voiceConnection && voiceConnection.config.channelId === VoiceChannel.id) return;
+                        if (voiceConnection && voiceConnection.config.channel_id === VoiceChannel.id) return;
 
                         // Если есть очередь сервера
                         if (queue) queue.voice = message.voice;
 
                         // Подключаемся к голосовому каналу без очереди
-                        else db.voice.join({ channelId: VoiceChannel.id, guildId: guild.id, selfDeaf: true, selfMute: true }, guild.voiceAdapterCreator);
+                        else db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, guild.voiceAdapterCreator);
 
                         // Отправляем сообщение о подключении к каналу
                         message.fastBuilder = {

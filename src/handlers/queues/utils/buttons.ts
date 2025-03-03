@@ -59,6 +59,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
                 description: locale._(msg.locale, queue.tracks.shuffle ? "player.button.shuffle.on" : "player.button.shuffle.off"),
                 color: Colors.Green
             };
+            return;
         });
 
         /**
@@ -78,12 +79,13 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             // TODO надо придумать как это сделать без костылей
             queue.player.tracks.repeat = oldState;
 
-
             // Уведомляем пользователя о смене трека
             msg.fastBuilder = {
                 description: locale._(msg.locale, "player.button.last"),
                 color: Colors.Yellow
             };
+
+            return;
         });
 
         /**

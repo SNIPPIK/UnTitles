@@ -5,7 +5,6 @@ import {Track} from "@service/player";
 import {Script} from "node:vm";
 import {Assign} from "@utils";
 import {db} from "@app";
-import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -112,10 +111,14 @@ class sAPI extends Assign<API> {
 
                                 /// Если при получении данных возникла ошибка
                                 if (result instanceof Error) return resolve(result);
-                                
+
                                 // Расшифровываем аудио формат
                                 const format = await sAPI.extractFormat(result["streamingData"], result.html);
-                                result["videoDetails"]["format"] = {url: format["url"]};
+
+                                // Если есть расшифровка ссылки видео
+                                if (format) result["videoDetails"]["format"] = {url: format["url"]};
+
+                                // Класс трека
                                 const track = sAPI.track(result["videoDetails"]);
 
                                 // Сохраняем кеш в системе
@@ -241,7 +244,9 @@ class sAPI extends Assign<API> {
                     // Путь плеера (необходим для расшифровки)
                     const html5Player = /<script\s+src="([^"]+)"(?:\s+type="text\/javascript")?\s+name="player_ias\/base"\s*>|"jsUrl":"([^"]+)"/.exec(api);
 
-                    return resolve({...data, html: `https://www.youtube.com${html5Player ? html5Player[1] || html5Player[2] : null}`});
+                    return resolve(Object.assign(data, {
+                        html: `https://www.youtube.com${html5Player ? html5Player[1] || html5Player[2] : null}`
+                    }));
                 })
 
                 // Если происходит ошибка
@@ -258,7 +263,12 @@ class sAPI extends Assign<API> {
      */
     protected static extractFormat = (data: json, html: string): Promise<YouTubeFormat> => {
         return new Promise(async (resolve) => {
-            const decoder = await Youtube_decoder.decipherFormats(data["formats"] ?? data["adaptiveFormats"], html);
+            if (!data["formats"]) return resolve(null);
+            const decoder = await Youtube_decoder.decipherFormats(data["formats"], html);
+
+            // Если произошла ошибка при расшифровке
+            if (decoder[0] instanceof Error) return resolve(decoder[0]);
+
             return resolve(decoder[0]);
         });
     };
@@ -302,9 +312,7 @@ class sAPI extends Assign<API> {
             new httpsClient(`https://www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`, {
                 headers: {
                     "x-youtube-client-name": "1",
-                    "x-youtube-client-version": "2.20201021.03.00",
-                    "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
-                    "accept-encoding": "gzip, deflate, br"
+                    "x-youtube-client-version": "2.20201021.03.00"
                 }
             }).toJson.then((channel) => {
                 if (channel instanceof Error) return resolve(null);
@@ -368,11 +376,12 @@ class sAPI extends Assign<API> {
  * @description Ищем имена в строке
  * @param regex - Как искать имена
  * @param body - Строка где будем искать
- * @param first - Выдача первого объекта
+ * @param id - Номер объекта
  */
-const mRegex = (regex: string | RegExp, body: string, first: boolean = true) => {
-    const reg =  body.match(new RegExp(regex, "s"));
-    return first ? reg[0] : reg[1];
+const mRegex = (regex: string | RegExp, body: string, id: number = 0) => {
+    const match = body.match(new RegExp(regex, "s"));
+    if (!match) return null;
+    return match[id];
 };
 
 /**
@@ -381,14 +390,14 @@ const mRegex = (regex: string | RegExp, body: string, first: boolean = true) => 
  * @param body - Станица youtube
  * @param regexps
  */
-const extractName = (body: string, regexps: string[]): string => {
-    let name: string = "";
+const extractName = (body: string, regexps: any): string => {
+    let name: string;
 
-    for (const regex of regexps) {
+    for (const [regex, id] of Object.entries(regexps)) {
         try {
-            name = mRegex(regex, body);
+            name = mRegex(regex, body, id as number);
             try {
-                name = mRegex(`${name.replace(/\$/g, "\\$")}=\\[([a-zA-Z0-9$\\[\\]]{2,})\\]`, body);
+                name = mRegex(`${name.replace(/\$/g, "\\$")}=\\[([a-zA-Z0-9$\\[\\]]{2,})\\]`, body, 1);
             } catch {
                 // Function name is not inside an array
             }
@@ -416,7 +425,7 @@ const extractors: { name: string, callback: (body: string) => string }[] = [
                 const resultFunc = `var ${DECIPHER_FUNC_NAME}=${decipherFunc};`;
                 const callerFunc = `${DECIPHER_FUNC_NAME}(${DECIPHER_ARGUMENT});`;
                 return helperObject + resultFunc + callerFunc;
-            } catch (e) {
+            } catch {
                 return null;
             }
         }
@@ -431,13 +440,13 @@ const extractors: { name: string, callback: (body: string) => string }[] = [
             try {
                 const decipherFuncName = extractName(body, DECIPHER_NAME_REGEXPS);
                 const funcPattern = `(${decipherFuncName.replace(/\$/g, '\\$')}=function\\([a-zA-Z0-9_]+\\)\\{.+?\\})`;
-                const decipherFunc = `var ${mRegex(funcPattern, body, false)};`;
-                const helperObjectName = mRegex(";([A-Za-z0-9_\\$]{2,})\\.\\w+\\(", decipherFunc, false);
+                const decipherFunc = `var ${mRegex(funcPattern, body, 1)};`;
+                const helperObjectName = mRegex(";([A-Za-z0-9_\\$]{2,})\\.\\w+\\(", decipherFunc, 1);
                 const helperPattern = `(var ${helperObjectName.replace(/\$/g, '\\$')}=\\{[\\s\\S]+?\\}\\};)`;
-                const helperObject = mRegex(helperPattern, body, false);
+                const helperObject = mRegex(helperPattern, body, 1);
                 const callerFunc = `${decipherFuncName}(${DECIPHER_ARGUMENT});`;
                 return helperObject + decipherFunc + callerFunc;
-            } catch (e) {
+            } catch {
                 return null;
             }
         }
@@ -447,14 +456,14 @@ const extractors: { name: string, callback: (body: string) => string }[] = [
      * @description Получаем данные n кода - для ускоренной загрузки с серверов
      */
     {
-        name: "extractNTransform",
+        name: "extractNTransformFunction",
         callback: (body) => {
             try {
                 const nFunc = mRegex(N_TRANSFORM_REGEXP, body);
                 const resultFunc = `var ${N_TRANSFORM_FUNC_NAME}=${nFunc}`;
                 const callerFunc = `${N_TRANSFORM_FUNC_NAME}(${N_ARGUMENT});`;
                 return resultFunc + callerFunc;
-            } catch (e) {
+            } catch {
                 return null;
             }
         }
@@ -469,10 +478,10 @@ const extractors: { name: string, callback: (body: string) => string }[] = [
             try {
                 const nFuncName = extractName(body, N_TRANSFORM_NAME_REGEXPS);
                 const funcPattern = `(${nFuncName.replace(/\$/g, "\\$")}=function\\([a-zA-Z0-9_]+\\)\\{.+?\\})`;
-                const nTransformFunc = `var ${mRegex(funcPattern, body, false)};`;
+                const nTransformFunc = `var ${mRegex(funcPattern, body, 1)};`;
                 const callerFunc = `${nFuncName}(${N_ARGUMENT});`;
                 return nTransformFunc + callerFunc;
-            } catch (e) {
+            } catch {
                 return null;
             }
         }
@@ -509,12 +518,16 @@ export class Youtube_decoder {
         const {decipher, nTransform} = script;
 
         const extractDecipher = (url: string): string => {
-            const args = querystring.parse(url);
-            if (!args.s || !decipher) return args.url as string;
+            try {
+                const args = querystring.parse(url);
+                if (!args.s || !decipher) return args.url as string;
 
-            const components = new URL(decodeURIComponent(args.url as string));
-            components.searchParams.set(args.sp as string ? args.sp as string : DECIPHER_ARGUMENT, decipher.runInNewContext({sig: decodeURIComponent(args.s as string)}));
-            return components.toString();
+                const components = new URL(decodeURIComponent(args.url as string));
+                components.searchParams.set(args.sp as string ? args.sp as string : DECIPHER_ARGUMENT, decipher.runInNewContext({sig: decodeURIComponent(args.s as string)}));
+                return components.toString();
+            } catch {
+                return null;
+            }
         };
         const extractNTransform = (url: string): string => {
             try {
@@ -523,12 +536,10 @@ export class Youtube_decoder {
                 if (!n || !nTransform) return url;
                 components.searchParams.set("n", nTransform.runInNewContext({ncode: n}));
                 return components.toString();
-            } catch (e) {
-                console.log(e);
+            } catch {
                 return null;
             }
         };
-
 
         const cipher = !format.url;
         const url = format.url || format.signatureCipher || format.cipher;
@@ -556,10 +567,16 @@ export class Youtube_decoder {
      * @param body - Страница плеера
      */
     private static extractNTransform = (body: string) => {
-        const nTransformFunc = this.extraction([extractors[2].callback, extractors[3].callback], body, (code: string) => //extractors[3].callback
-            code.replace(/if\(typeof \S+==="undefined"\)return \S+;/, ""));
-        if (!nTransformFunc) return null;
-        return nTransformFunc;
+        try {
+            const nTransformFunc = this.extraction([extractors[2].callback, extractors[3].callback], body, (code: string) =>
+                code.replace(/if\s*\(\s*typeof\s*[\w$]+\s*===?.*?\)\s*return\s+[\w$]+\s*;?/, "")
+            );
+
+            if (!nTransformFunc) return null;
+            return nTransformFunc;
+        } catch {
+            return null;
+        }
     };
 
     /**
@@ -590,7 +607,9 @@ export class Youtube_decoder {
 
                 // Выполняем виртуальный код
                 return new Script(postProcess ? postProcess(func) : func);
-            } catch (err) {}
+            } catch {
+                return null;
+            }
         }
 
         // Возвращаем null если не получилось выполнить скрипт
@@ -613,17 +632,18 @@ interface YouTubeFormat {
     bitrate?: number;
 }
 
-
-// NewPipeExtractor regexps
-const DECIPHER_NAME_REGEXPS = [
-    "\\bm=([a-zA-Z0-9$]{2,})\\(decodeURIComponent\\(h\\.s\\)\\)",
-    "\\bc&&\\(c=([a-zA-Z0-9$]{2,})\\(decodeURIComponent\\(c\\)\\)",
-    '(?:\\b|[^a-zA-Z0-9$])([a-zA-Z0-9$]{2,})\\s*=\\s*function\\(\\s*a\\s*\\)\\s*\\{\\s*a\\s*=\\s*a\\.split\\(\\s*""\\s*\\)',
-    '([\\w$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(""\\)\\s*;'
-];
-
 const DECIPHER_FUNC_NAME = "getDecipherFunc";
 const N_TRANSFORM_FUNC_NAME = "getNTransformFunc";
+
+const DECIPHER_NAME_REGEXPS = {
+    "\\b([a-zA-Z0-9_$]+)&&\\(\\1=([a-zA-Z0-9_$]{2,})\\(decodeURIComponent\\(\\1\\)\\)": 2,
+    '([a-zA-Z0-9_$]+)\\s*=\\s*function\\(\\s*([a-zA-Z0-9_$]+)\\s*\\)\\s*{\\s*\\2\\s*=\\s*\\2\\.split\\(\\s*""\\s*\\)\\s*;\\s*[^}]+;\\s*return\\s+\\2\\.join\\(\\s*""\\s*\\)': 1,
+    '/(?:\\b|[^a-zA-Z0-9_$])([a-zA-Z0-9_$]{2,})\\s*=\\s*function\\(\\s*a\\s*\\)\\s*{\\s*a\\s*=\\s*a\\.split\\(\\s*""\\s*\\)(?:;[a-zA-Z0-9_$]{2}\\.[a-zA-Z0-9_$]{2}\\(a,\\d+\\))?/': 1,
+    "\\bm=([a-zA-Z0-9$]{2,})\\(decodeURIComponent\\(h\\.s\\)\\)": 1,
+    "\\bc&&\\(c=([a-zA-Z0-9$]{2,})\\(decodeURIComponent\\(c\\)\\)": 1,
+    '(?:\\b|[^a-zA-Z0-9$])([a-zA-Z0-9$]{2,})\\s*=\\s*function\\(\\s*a\\s*\\)\\s*\\{\\s*a\\s*=\\s*a\\.split\\(\\s*""\\s*\\)': 1,
+    '([\\w$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(""\\)\\s*;': 1,
+};
 
 // LavaPlayer regexps
 const VARIABLE_PART = "[a-zA-Z_\\$][a-zA-Z_0-9]*";
@@ -636,6 +656,15 @@ const SLICE_PART = ":function\\(\\w,\\w\\)\\{return \\w\\.slice\\(\\w\\)\\}";
 const SPLICE_PART = ":function\\(\\w,\\w\\)\\{\\w\\.splice\\(0,\\w\\)\\}";
 const SWAP_PART =
     ":function\\(\\w,\\w\\)\\{var \\w=\\w\\[0\\];\\w\\[0\\]=\\w\\[\\w%\\w\\.length\\];\\w\\[\\w(?:%\\w.length|)\\]=\\w(?:;return \\w)?\\}";
+
+// LavaPlayer regexps
+const N_TRANSFORM_REGEXP =
+    "function\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
+    "var\\s*(\\w+)=(?:\\1\\.split\\(.*?\\)|String\\.prototype\\.split\\.call\\(\\1,.*?\\))," +
+    "\\s*(\\w+)=(\\[.*?]);\\s*\\3\\[\\d+]" +
+    "(.*?try)(\\{.*?})catch\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
+    '\\s*return"[\\w-]+([A-z0-9-]+)"\\s*\\+\\s*\\1\\s*}' +
+    '\\s*return\\s*(\\2\\.join\\(""\\)|Array\\.prototype\\.join\\.call\\(\\2,.*?\\))};';
 
 const DECIPHER_REGEXP =
     `function(?: ${VARIABLE_PART})?\\(([a-zA-Z])\\)\\{` +
@@ -651,24 +680,14 @@ const HELPER_REGEXP = `var (${VARIABLE_PART})=\\{((?:(?:${VARIABLE_PART_DEFINE}$
 const SCVR = "[a-zA-Z0-9$_]";
 const MCR = `${SCVR}+`;
 const AAR = "\\[(\\d+)]";
-const N_TRANSFORM_NAME_REGEXPS = [
-    // NewPipeExtractor regexps
-    `${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}\\(${MCR}\\),${MCR}=${MCR}\\.${MCR}\\[${MCR}]\\|\\|null\\).+\\|\\|(${MCR})\\(""\\)`,
-    `${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}\\(${MCR}\\),${MCR}=${MCR}\\.${MCR}\\[${MCR}]\\|\\|null\\)&&\\(${MCR}=(${MCR})${AAR}`,
-    `${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}=${MCR}\\.get\\(${MCR}\\)\\).+\\|\\|(${MCR})\\(""\\)`,
-    `${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}=${MCR}\\.get\\(${MCR}\\)\\)&&\\(${MCR}=(${MCR})\\[(\\d+)]`,
-    `\\(${SCVR}=String\\.fromCharCode\\(110\\),${SCVR}=${SCVR}\\.get\\(${SCVR}\\)\\)&&\\(${SCVR}=(${MCR})(?:${AAR})?\\(${SCVR}\\)`,
-    `\\.get\\("n"\\)\\)&&\\(${SCVR}=(${MCR})(?:${AAR})?\\(${SCVR}\\)`
-];
-
-// LavaPlayer regexps
-const N_TRANSFORM_REGEXP =
-    "function\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
-    "var\\s*(\\w+)=(?:\\1\\.split\\(.*?\\)|String\\.prototype\\.split\\.call\\(\\1,.*?\\))," +
-    "\\s*(\\w+)=(\\[.*?]);\\s*\\3\\[\\d+]" +
-    "(.*?try)(\\{.*?})catch\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
-    '\\s*return"[\\w-]+([A-z0-9-]+)"\\s*\\+\\s*\\1\\s*}' +
-    '\\s*return\\s*(\\2\\.join\\(""\\)|Array\\.prototype\\.join\\.call\\(\\2,.*?\\))};';
+const N_TRANSFORM_NAME_REGEXPS = {
+    [`${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}\\(${MCR}\\),${MCR}=${MCR}\\.${MCR}\\[${MCR}]\\|\\|null\\).+\\|\\|(${MCR})\\(""\\)`]: 1,
+    [`${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}\\(${MCR}\\),${MCR}=${MCR}\\.${MCR}\\[${MCR}]\\|\\|null\\)&&\\(${MCR}=(${MCR})${AAR}`]: 1,
+    [`${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}=${MCR}\\.get\\(${MCR}\\)\\).+\\|\\|(${MCR})\\(""\\)`]: 1,
+    [`${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}=${MCR}\\.get\\(${MCR}\\)\\)&&\\(${MCR}=(${MCR})\\[(\\d+)]`]: 1,
+    [`\\(${SCVR}=String\\.fromCharCode\\(110\\),${SCVR}=${SCVR}\\.get\\(${SCVR}\\)\\)&&\\(${SCVR}=(${MCR})(?:${AAR})?\\(${SCVR}\\)`]: 1,
+    [`\\.get\\("n"\\)\\)&&\\(${SCVR}=(${MCR})(?:${AAR})?\\(${SCVR}\\)`]: 1,
+};
 
 const DECIPHER_ARGUMENT = "sig";
 const N_ARGUMENT = "ncode";

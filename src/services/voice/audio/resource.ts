@@ -14,41 +14,34 @@ export class AudioResource {
      * @readonly
      * @private
      */
-    private readonly _streams: (Process | OpusEncoder)[] = [
-        new OpusEncoder({
-            highWaterMark: 5 * 1024 * 1024,
-            readableObjectMode: true,
-            autoDestroy: true
-        })
-    ];
+    private readonly _streams: (Process | OpusEncoder)[] = [];
 
     /**
-     * @description Данные для запуска процесса буферизации
+     * @description Параметры буфера потока
      * @readonly
      * @private
      */
-    private readonly chunks = {
-        // Кол-во отправленных пакетов
-        length:    0,
-
-        // Размер пакета
-        size:     20
+    private readonly _buffer: AudioResourceBuffer = {
+        chunks: [],
+        total: 0
     };
 
     /**
-     * @description Можно ли читать поток
-     * @private
-     */
-    private _readable = false;
-
-    /**
-     * @description Можно ли читать поток
-     * @default true - Всегда можно читать поток, если поток еще не был загружен то отправляем пустышки
-     * @return boolean
+     * @description Если чтение возможно
      * @public
      */
     public get readable() {
-        return this._readable;
+        return this._buffer.chunks.length > 0;
+    };
+
+    /**
+     * @description Получаем время проигрывания потока
+     * @public
+     */
+    public get duration() {
+        if (!this._buffer.chunks.length) return 0;
+
+        return ((this._buffer.total - this._buffer.chunks.length) * 20) / 1e3;
     };
 
     /**
@@ -57,24 +50,7 @@ export class AudioResource {
      * @public
      */
     public get packet(): Buffer {
-        const packet = this.stream.read();
-
-        // Если есть аудио пакеты
-        if (packet) this.chunks.length++;
-
-        // Отправляем пакет
-        return packet;
-    };
-
-    /**
-     * @description Получаем время, время зависит от прослушанных пакетов
-     * @public
-     */
-    public get duration() {
-        if (!this.chunks?.length || !this.chunks?.size) return 0;
-
-        const duration = ((this.chunks.length * this.chunks.size) / 1e3).toFixed(0);
-        return parseInt(duration);
+        return this._buffer.chunks.shift();
     };
 
     /**
@@ -105,37 +81,81 @@ export class AudioResource {
      * @private
      */
     private set input(options: AudioResourceInput) {
-        // Подключаем события к потоку
-        for (const event of options.events) {
-            if (options.event) (options.input)[options.event]["once"](event, this.destroy);
-            else (options.input)["once"](event, this.destroy);
+        // Добавляем процесс в класс для отслеживания
+        this._streams.push(options.input);
+
+        // Запускаем все события
+        for (const event of [...options.events.destroy, ...options.events.critical]) {
+            // Если ивент относится к критичным
+            if (options.events.critical.includes(event)) {
+                if (options.events.path) (options.input)[options.events.path]["once"](event, options.events.critical_callback);
+                else (options.input)["once"](event, () => options.events.critical_callback);
+            }
+
+            // Если ивент не относится к критичным
+            else {
+                if (options.events.path) (options.input)[options.events.path]["once"](event, options.events.destroy_callback);
+                else (options.input)["once"](event, () => options.events.destroy_callback);
+            }
         }
 
-        // Добавляем процесс в класс для отслеживания
-        if (options.input instanceof Process) this._streams.push(options.input);
+        // Если вводимый поток является расшифровщиком
+        if (options.input instanceof Process) this.process.stdout.pipe(this.stream);
         else {
-            options.input.once("readable", () => { this._readable = true; });
-            this.process.stdout.pipe(options.input);
+            this.stream.on("data", async (data) => {
+                if (data) {
+                    this._buffer.chunks.push(data);
+                    this._buffer.total++;
+                }
+            });
         }
     };
 
     /**
      * @description Создаем класс и задаем параметры
+     * @param path - Путь до файла или ссылка
      * @param options - Настройки кодировщика
      * @public
+     *
+     * @example <path> or <url>
      */
-    public constructor(options: {path: string, seek?: number; filters: string; chunk?: number}) {
-        if (options.chunk > 0) this.chunks.size = 20 * options.chunk;
-        if (options.seek > 0) this.chunks.length = (options.seek * 1e3) / this.chunks.size;
+    public constructor(path: string, options: {seek?: number; filters: string;}) {
+        if (options.seek > 0) this._buffer.total = (options.seek * 1e3) / 20;
+
+        // Расшифровщик
+        this.input = {
+            events: {
+                destroy: ["end", "close"],
+                destroy_callback: () => this.cleanup("opus"),
+
+                critical: ["error"],
+                critical_callback: () => this.cleanup(),
+            },
+            input: new OpusEncoder({
+                readableObjectMode: true,
+                autoDestroy: true
+            })
+        };
 
         // Процесс (FFmpeg)
         this.input = {
-            events: ["error"],
-            event: "stdout",
-            input: new Process([ "-vn",  "-loglevel", "panic",
+            events: {
+                path: "stdout",
+
+                destroy: ["end", "close"],
+                destroy_callback: () => this.cleanup("ffmpeg"),
+
+                critical: ["error"],
+                critical_callback: () => this.cleanup()
+            },
+            input: new Process([ "-vn", "-loglevel", "panic",
                 // Если это ссылка, то просим ffmpeg переподключиться при сбросе соединения
-                ...(options.path.startsWith("http") ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
-                "-ss", `${options.seek ?? 0}`, "-i", options.path,
+                ...(path.startsWith("http") ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
+
+                "-ss", `${options.seek ?? 0}`,
+
+                // Файл или ссылка на ресурс
+                "-i", path,
 
                 // Подключаем фильтры
                 ...(options.filters ? ["-af", options.filters] : []),
@@ -145,12 +165,44 @@ export class AudioResource {
                 "pipe:1"
             ])
         };
+    };
 
-        // Расшифровщик
-        this.input = {
-            input: this.stream,
-            events: ["end", "close", "error"]
-        };
+    /**
+     * @description Чистка от мусора
+     * @param type - Тип потока для удаления именно нужного потока
+     * @public
+     */
+    private cleanup = (type: "opus" | "ffmpeg" | "all" = "all") => {
+        // Если надо удалить opusEncoder
+        if (type === "opus") {
+            this.stream.removeAllListeners();
+            this.stream.destroy();
+        }
+
+        // Если надо удалить ffmpeg
+        else if (type === "ffmpeg") this.process.destroy();
+
+        // Если надо удалить все потоки!
+        else {
+            // Если streams уже удалены
+            if (!this._streams) return;
+
+            // Чистим все потоки от мусора
+            for (const stream of this._streams) {
+
+                // Если поток является OpusEncoder
+                if (stream instanceof OpusEncoder) {
+                    stream.removeAllListeners();
+                }
+
+                // Уничтожаем поток
+                stream.destroy();
+            }
+
+            Logger.log("DEBUG", `[AudioResource] has cleanup`);
+        }
+
+        Logger.log("DEBUG", `[AudioResource/${type}] has cleanup`);
     };
 
     /**
@@ -161,21 +213,8 @@ export class AudioResource {
         // Удаляем данные в следующем цикле
         setImmediate(() => {
             // Чистим все потоки от мусора
-            for (const stream of this._streams) {
+            this.cleanup();
 
-                // Если поток является OpusEncoder
-                if (stream instanceof OpusEncoder) {
-                    stream.removeAllListeners();
-                    stream.destroy();
-
-                    // Чистим поток от остатков пакетов
-                    while (stream.read()) {}
-
-                    stream.end();
-                }
-
-                else stream.destroy();
-            }
             // Удаляем все параметры
             for (let key of Object.keys(this)) this[key] = null;
             Logger.log("DEBUG", `[AudioResource] has destroyed`);
@@ -183,6 +222,24 @@ export class AudioResource {
     };
 }
 
+/**
+ * @author SNIPPIK
+ * @description Параметры для буфера потока
+ * @interface AudioResourceBuffer
+ */
+interface AudioResourceBuffer {
+    /**
+     * @description Место для хранения пакетов потока
+     * @protected
+     */
+    chunks: Buffer[];
+
+    /**
+     * @description Кол-во полученных пакетов
+     * @protected
+     */
+    total: number;
+}
 
 /**
  * @author SNIPPIK
@@ -194,17 +251,29 @@ interface AudioResourceInput {
      * @description Входящий поток
      * @readonly
      */
-    readonly input: NodeJS.ReadWriteStream | Process;
+    readonly input: OpusEncoder | Process;
 
     /**
      * @description Отслеживаемые события для удаления
      * @readonly
      */
-    readonly events: string[];
+    readonly events: {
+        // Имена событий для удаления потока
+        destroy: string[];
 
-    /**
-     * @description Если надо конкретно откуда-то отслеживать события
-     * @readonly
-     */
-    readonly event?: string;
+        // Функция для очистки потока
+        destroy_callback: () => void;
+
+        // Имена критичных событий для полного удаления потока
+        critical: string[];
+
+        // Функция для очистки потока
+        critical_callback: () => void;
+
+        /**
+         * @description Если надо конкретно откуда-то отслеживать события
+         * @readonly
+         */
+        path?: string
+    };
 }

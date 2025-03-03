@@ -34,15 +34,19 @@ export class AudioCycles {
 class AudioPlayers extends Cycle<AudioPlayer> {
     public constructor() {
         super({
-            name: "AudioPlayer",
+            name: "AudioPlayers",
             duration: 20,
             filter: (item) => item.playing,
             execute: (player) => {
                 const packet = player.audio.current.packet;
 
-                // Отправляем пакет
-                if (packet) player.voice.send = packet;
-                else player.stop();
+                // Делаем плавное переключение потока
+                if (player.audio.current.duration >= player.tracks.track.time.total - (db.queues.options.fade - 7)) {
+                    player.emit("player/wait", player);
+                }
+
+                // Отправляем пакет или пустышку
+                player.voice.send = packet;
             }
         });
     };
@@ -56,7 +60,7 @@ class AudioPlayers extends Cycle<AudioPlayer> {
 class Messages extends Cycle<Interact> {
     public constructor() {
         super({
-            name: "Message",
+            name: "Messages",
             duration: 18e3,
             custom: {
                 remove: (item) => { item.delete = 200; },
@@ -78,7 +82,7 @@ class Messages extends Cycle<Interact> {
                 }
 
                 // Если есть поток в плеере
-                else if (queue.player.audio?.current && queue.player.audio.current.duration > 0) {
+                else if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
                     // Обновляем сообщение о текущем треке
                     db.events.emitter.emit("message/playing", queue, message);
                     return;

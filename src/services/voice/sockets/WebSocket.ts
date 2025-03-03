@@ -1,10 +1,11 @@
 import {MessageEvent as WebSocketEvent, WebSocket as WS, CloseEvent} from "ws";
 import {VoiceOpcodes} from "discord-api-types/voice/v4";
+import type {WebSocketEvents} from "@service/voice";
 import {TypedEmitter} from "@utils";
 
 /**
  * @author SNIPPIK
- * @description WebSocket для взаимодействия с discord, node.js не предоставляет свой
+ * @description WebSocket для взаимодействия с discord websocket
  * @class WebSocket
  * @public
  */
@@ -14,48 +15,32 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
      * @readonly
      * @private
      */
-    private readonly webSocket: WS = null;
+    private readonly socket: WS = null;
+
+    /**
+     * @description Подключен ли WebSocket
+     * @readonly
+     * @private
+     */
+    private _isConnected: boolean = null;
 
     /**
      * @description Данные для проверки жизни
      * @readonly
      * @private
      */
-    private readonly KeepAlive = {
-        interval: null, miss: 0, send: 0
+    private readonly _alive: WebSocketKeepAlive = {
+        interval: null,
+        updated: 0,
+        asked: 0
     };
 
     /**
-     * @description Устанавливает/очищает интервал для отправки сердечных сокращений по веб-сокету.
-     * @param ms - Интервал в миллисекундах. Если значение отрицательное, интервал будет сброшен
+     * @description Номер отправленного пакета через websocket
      * @public
      */
-    public set keepAlive(ms: number) {
-        if (this.KeepAlive.interval !== undefined) clearInterval(this.KeepAlive.interval);
-
-        // Если есть время для проверки жизни
-        if (ms > 0) this.KeepAlive.interval = setInterval(() => {
-            if (this.KeepAlive.send !== 0 && this.KeepAlive.miss >= 3) {
-                // Пропущено слишком - отключаемся
-                this.keepAlive = -1;
-
-                try {
-                    this.webSocket.close();
-                } catch {
-                   // Скорее всего WebSocket уже разрушен!
-                }
-            }
-
-            // Задаем время и прочие параметры для правильной работы
-            this.KeepAlive.send = Date.now();
-            this.KeepAlive.miss++;
-
-            // Отправляем пакет
-            this.packet = {
-                op: VoiceOpcodes.Heartbeat,
-                d: this.KeepAlive.send
-            };
-        }, ms);
+    public get seq_ack() {
+        return this._alive.asked;
     };
 
     /**
@@ -64,61 +49,97 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
      * @public
      */
     public set packet(packet: string | object) {
+        // Если нет подключения
+        if (!this._isConnected) return;
+
         try {
-            this.webSocket.send(JSON.stringify(packet));
+            this.socket.send(JSON.stringify(packet));
         } catch (error) {
             this.emit("error", error as Error);
+        }
+    };
+
+    /**
+     * @description Устанавливает/очищает интервал для отправки времени жизни по веб-сокету.
+     * @param ms - Интервал в миллисекундах. Если значение отрицательное или 0, интервал будет сброшен
+     * @public
+     */
+    public set keepAlive(ms: number) {
+        if (this._alive.interval) clearInterval(this._alive.interval);
+
+        // Если есть время для проверки жизни
+        if (ms > 0) {
+            // Создаем новый интервал
+            this._alive.interval = setInterval(() => {
+                // Если WebSocket отключен
+                if (!this._isConnected) {
+                    this.destroy();
+                    return;
+                }
+
+                this._alive.updated = Date.now();
+                this._alive.asked++;
+
+                // Отправляем пакет
+                this.packet = {
+                    op: VoiceOpcodes.Heartbeat,
+                    d: {
+                        t: this._alive.updated,
+                        seq_ack: this._alive.asked
+                    }
+                };
+            }, ms);
         }
     };
 
     /**
      * @description Создаем WebSocket для передачи голосовых пакетов
-     * @param address - Адрес сервера для соединения
+     * @param endpoint - Адрес сервера для соединения
      * @public
      */
-    public constructor(address: string) {
+    public constructor(endpoint: string) {
         super();
-        const WebSocket = new WS(address);
+        this.socket = new WS(endpoint, { minVersion: "TLSv1.2", maxVersion: "TLSv1.3" });
 
-        WebSocket.onmessage = this.onmessage;
-        WebSocket.onopen = (event) => this.emit("open", event as any);
-        WebSocket.onclose = (event) => this.emit("close", event as any);
-        WebSocket.onerror = (event) => this.emit("error", event as any);
+        // Если WebSocket принял сообщение
+        this.socket.onmessage = (event: WebSocketEvent) => {
+            if (typeof event.data !== "string") return;
 
-        // Задаем сокет в класс
-        this.webSocket = WebSocket;
-    };
+            try {
+                this.emit("packet", JSON.parse(event.data));
+            } catch (error) {
+                this.emit("error", error as Error);
+            }
+        };
 
-    /**
-     * @description Используется для перехвата сообщения от сервера
-     * @param event - Данные для перехвата
-     * @readonly
-     * @private
-     */
-    private readonly onmessage = (event: WebSocketEvent) => {
-        if (typeof event.data !== "string") return;
+        // Если WebSocket открыт
+        this.socket.once("open", (event: Event) => {
+            this._isConnected = true;
+            this.emit("open", event);
+        });
 
-        let packet: any;
-        try {
-            packet = JSON.parse(event.data);
-        } catch (error) {
-            this.emit("error", error as Error);
-        }
+        // Если WebSocket закрыт
+        this.socket.once("close", (event: CloseEvent) => {
+            this._isConnected = false;
+            this.emit("close", event);
+        });
 
-        // Если надо обновить интервал жизни
-        if (packet.op === VoiceOpcodes.HeartbeatAck) this.KeepAlive.miss = 0;
-
-        this.emit("packet", packet);
+        // Если WebSocket выдал ошибку
+        this.socket.on("error", (event: Error) => {
+            this._isConnected = false;
+            this.emit("error", event);
+        });
     };
 
     /**
      * @description Уничтожает голосовой веб-сокет. Интервал очищается, и соединение закрывается
      * @public
      */
-    public destroy = (code?: number): void => {
+    public destroy = (code?: number) => {
         try {
             this.keepAlive = -1;
-            this.webSocket.close(code);
+            this.socket.close(code);
+            this.socket.terminate();
         } catch (error) {
             this.emit("error", error as Error);
         }
@@ -128,13 +149,26 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
 }
 
 /**
- * @description События для VoiceWebSocket
- * @interface WebSocketEvents
- * @class VoiceWebSocket
+ * @author SNIPPIK
+ * @description Параметры для общения с подключением к WebSocket
+ * @interface WebSocketKeepAlive
  */
-interface WebSocketEvents {
-    "error": (error: Error) => void;
-    "open": (event: Event) => void;
-    "close": (event: CloseEvent) => void;
-    "packet": (packet: any) => void;
+interface WebSocketKeepAlive {
+    /**
+     * @description Интервал для общения с подключением
+     * @private
+     */
+    interval: NodeJS.Timeout;
+
+    /**
+     * @description Номер запроса от подключения
+     * @private
+     */
+    asked: number;
+
+    /**
+     * @description Время обновления, отправки пакета
+     * @private
+     */
+    updated: number;
 }

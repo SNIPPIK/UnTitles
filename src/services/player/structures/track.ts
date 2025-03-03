@@ -21,42 +21,14 @@ export class Track {
      * @readonly
      * @private
      */
-    private _duration: {
-        /**
-         * @description Время визуальное 00:00
-         * @readonly
-         * @private
-         */
-        split: string;
-
-        /**
-         * @description Время в секундах
-         * @readonly
-         * @private
-         */
-        total: number;
-    } = null;
+    private _duration: TrackDuration = null;
 
     /**
      * @description Здесь хранятся данные с какой платформы был взят трек
      * @readonly
      * @private
      */
-    private _api: {
-        /**
-         * @description Имя платформы с которой был взят трек
-         * @readonly
-         * @private
-         */
-        platform: API["name"];
-
-        /**
-         * @description Цвет платформы
-         * @readonly
-         * @private
-         */
-        color: number;
-    } = null;
+    private _api: TrackAPI = null;
 
     /**
      * @description Параметр для сохранения lyrics
@@ -193,12 +165,13 @@ export class Track {
     public set user(author) {
         const { displayName, id, avatar } = author;
 
-        //Если нет автора трека, то автором станет сам пользователь
+        // Если нет автора трека, то автором станет сам пользователь
         if (!this.artist) this._track.artist = {
-            title: displayName, url: `https://discordapp.com/users/${id}`
+            url: `https://discordapp.com/users/${id}`,
+            title: displayName
         };
 
-        //Пользователь, который включил трек
+        // Пользователь, который включил трек
         this._user = {
             displayName: displayName, id,
             avatar: `https://cdn.discordapp.com/avatars/${id}/${avatar}.webp`
@@ -336,6 +309,48 @@ export class Track {
         // Добавляем данные
         this._track = track;
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Параметры времени трека
+ * @interface TrackDuration
+ */
+interface TrackDuration {
+    /**
+     * @description Время визуальное 00:00
+     * @readonly
+     * @private
+     */
+    split: string;
+
+    /**
+     * @description Время в секундах
+     * @readonly
+     * @private
+     */
+    total: number;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Параметры платформы трека
+ * @interface TrackAPI
+ */
+interface TrackAPI {
+    /**
+     * @description Имя платформы с которой был взят трек
+     * @readonly
+     * @private
+     */
+    platform: API["name"];
+
+    /**
+     * @description Цвет платформы
+     * @readonly
+     * @private
+     */
+    color: number;
 }
 
 /**

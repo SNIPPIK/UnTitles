@@ -190,7 +190,7 @@ export class CacheAudio extends Cycle<Track> {
                 return new Promise<boolean>((resolve) => {
                     const status = this.status(track);
 
-                    setImmediate(() => {
+                    setTimeout(() => {
                         // Создаем ffmpeg для скачивания трека
                         const ffmpeg = new Process([
                             "-vn", "-loglevel", "panic",
@@ -209,7 +209,7 @@ export class CacheAudio extends Cycle<Track> {
                         ffmpeg.stdout.once("close", () => {
                             return resolve(true);
                         });
-                    });
+                    }, 1e3);
                 });
             }
         });

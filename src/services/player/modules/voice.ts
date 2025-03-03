@@ -20,10 +20,10 @@ export class PlayerVoice {
     public set connection(connection: VoiceConnection) {
         if (connection?.config) {
             // Если боту нельзя говорить, то смысл продолжать
-            if (connection.config.selfMute) return;
+            if (connection.config.self_mute) return;
 
             // Если повторное подключение к тому же голосовому каналу
-            else if (this._connection && connection.config.channelId === this._connection.config.channelId) {
+            else if (this._connection && connection.config.channel_id === this._connection.config.channel_id) {
                 connection.configureSocket;
             }
         }

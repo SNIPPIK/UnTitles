@@ -19,7 +19,7 @@ class request_api extends Assign<Event<"request/api">> {
             name: "request/api",
             type: "player",
             once: false,
-            execute: async (message, argument) => {
+            execute: (message, argument) => {
                 const checkAPI = this.checkAPI(argument);
 
                 // Если API не доступен
@@ -30,6 +30,15 @@ class request_api extends Assign<Event<"request/api">> {
 
                 // Если API доступен, вытаскиваем из него данные
                 const {api, platform} = checkAPI;
+
+                // Отправляем сообщение о том что запрос производится
+                new message.builder().addEmbeds([
+                    {
+                        title: `${platform.platform}.${api.name}`,
+                        description: locale._(message.locale, "api.platform.request", [db.images.loading]),
+                        color: platform.color
+                    }
+                ]).setTime(5e3).send = message;
 
                 // Если ответ не был получен от сервера
                 const timeout = setTimeout(() => {
@@ -63,16 +72,6 @@ class request_api extends Assign<Event<"request/api">> {
                         // Удаляем timeout
                         clearTimeout(timeout);
                     });
-
-
-                // Отправляем сообщение о том что запрос производится
-                new message.builder().addEmbeds([
-                    {
-                        title: `${platform.platform}.${api.name}`,
-                        description: locale._(message.locale, "api.platform.request", [db.images.loading]),
-                        color: platform.color
-                    }
-                ]).setTime(5e3).send = message;
             }
         });
     };

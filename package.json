@@ -10,16 +10,18 @@
   },
   "dependencies": {
     "discord.js": "^14.18.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.1"
   },
   "devDependencies": {
-    "@types/node": "^22.10.4",
+    "@types/node": "^22.13.8",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.8.2"
   },
   "scripts": {
     "start": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src --ShardManager",
     "shard": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src",
+    "build:start": "node -r tsconfig-paths/register src --ShardManager",
+    "build:shard": "node -r tsconfig-paths/register src",
     "dev:bun:start": "bun run src/index.ts --ShardManager",
     "dev:bun:shard": "bun run src/index.ts"
   }

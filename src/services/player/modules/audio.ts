@@ -27,13 +27,12 @@ export class PlayerAudio {
      * @param stream
      */
     public set current(stream) {
-        // Если вносится не пустышка
-        if (stream) {
-            // Если есть активный поток
-            if (this.current && this.current?.stream) this.current.destroy();
-        }
+        const oldStream = this._audio;
 
         // Перезаписываем текущий поток
         this._audio = stream;
+
+        // Если есть активный поток
+        if (oldStream) oldStream.destroy();
     };
 }

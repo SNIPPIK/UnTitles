@@ -62,7 +62,7 @@ export class Queues extends Collection<Queue> {
                     else queue.player.tracks.position = item instanceof Track ? queue.player.tracks.total - 1 : queue.player.tracks.total - item.items.length;
 
                     // Запускаем проигрывание
-                    setTimeout(queue.player.play, 400);
+                    queue.player.play();
                 });
             }
         }

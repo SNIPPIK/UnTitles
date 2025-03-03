@@ -103,6 +103,27 @@ export class Queue {
     };
 
     /**
+     * @description Выдаем плеер привязанный к очереди
+     * @return AudioPlayer
+     * @public
+     */
+    public get player() {
+        // Если плеер уже не доступен
+        if (!this._data.player) return null;
+        return this._data.player;
+    };
+
+    /**
+     * @description Получаем доступ к трекам
+     * @public
+     */
+    public get tracks() {
+        // Если плеер уже не доступен
+        if (!this.player) return null;
+        return this.player.tracks;
+    };
+
+    /**
      * @description Выдаем сообщение
      * @return Client.message
      * @public
@@ -141,17 +162,6 @@ export class Queue {
     };
 
     /**
-     * @description Выдаем плеер привязанный к очереди
-     * @return AudioPlayer
-     * @public
-     */
-    public get player() {
-        // Если плеер уже не доступен
-        if (!this._data.player) return null;
-        return this._data.player;
-    };
-
-    /**
      * @description Выдаем голосовой канал
      * @return VoiceChannel
      * @public
@@ -173,11 +183,11 @@ export class Queue {
 
         // Задаем новое голосовое подключение
         this.player.voice.connection = db.voice.join({
-            selfDeaf: true,
-            selfMute: false,
+            self_deaf: true,
+            self_mute: false,
 
-            guildId: this.guild.id,
-            channelId: voice.channel.id
+            guild_id: this.guild.id,
+            channel_id: voice.channel.id
         }, this.guild.voiceAdapterCreator);
     };
 
@@ -188,18 +198,6 @@ export class Queue {
     public get timestamp() {
         return this._data.timestamp;
     };
-
-
-    /**
-     * @description Получаем доступ к трекам
-     * @public
-     */
-    public get tracks() {
-        // Если плеер уже не доступен
-        if (!this.player) return null;
-        return this.player.tracks;
-    };
-
 
     /**
      * @description Проверка и выдача кнопок

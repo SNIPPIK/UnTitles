@@ -1,3 +1,4 @@
+import {API} from "@handler/apis";
 import {env} from "@handler";
 
 /**
@@ -61,7 +62,7 @@ export class PlayerProgress {
      * @readonly
      * @private
      */
-    private readonly size: number = null;
+    private readonly size: number;
 
     /**
      * @description Создаем класс для отображения прогресс бара
@@ -73,10 +74,9 @@ export class PlayerProgress {
 
     /**
      * @description Получаем готовый прогресс бар
-     * @readonly
      * @public
      */
-    public bar = (options: {duration: {current: number; total: number}, platform: string}): string => {
+    public bar = (options: PlayerProgressInput): string => {
         const button = emoji["bottom_" + options.platform.toLowerCase()] || emoji.bottom;
         const {current, total} = options.duration;
         const size = this.size;
@@ -91,4 +91,16 @@ export class PlayerProgress {
 
         return txt + (current >= total ? `${emoji.upped.right}` : `${emoji.empty.right}`);
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные для создания прогресс бара
+ */
+interface PlayerProgressInput {
+    platform: API["name"];
+    duration: {
+        current: number;
+        total: number
+    }
 }

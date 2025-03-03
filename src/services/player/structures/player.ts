@@ -220,7 +220,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Создаем класс для управления потоком
-                const stream = new AudioResource(Object.assign({path, seek}, this._filters.compress));
+                const stream = new AudioResource(path, {seek, filters: this._filters.compress(track.time.total)});
 
                 // Если стрим можно прочитать
                 if (stream.readable) {
@@ -327,7 +327,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @readonly
      * @protected
      */
-    public readonly cleanup = (): void => {
+    public readonly cleanup = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has cleanup`);
 
         // Отключаем от цикла плеер

@@ -83,6 +83,12 @@ export class Interact {
     private readonly _temp: interact = null;
 
     /**
+     * @description Параметр отвечает за ложный ответ, если не хочет работать reply, будет работать <channel>.send
+     * @public
+     */
+    public _hookReply = false;
+
+    /**
      * @description Уникальный номер кнопки
      * @public
      */
@@ -228,12 +234,12 @@ export class Interact {
      */
     public send = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
         // Если бот уже ответил на сообщение
-        if (this._temp["replied"] && !this._temp["deferred"]) {
+        if (this._temp["replied"] && !this._temp["deferred"] && !this._hookReply) {
             return this._temp["followUp"](Object.assign({withResponse: true}, options));
         }
 
         // Если можно дать ответ на сообщение
-        else if (!this._temp["replied"]) {
+        else if (!this._temp["replied"] && !this._hookReply) {
             return this._temp["reply"](Object.assign({withResponse: true}, options));
         }
 

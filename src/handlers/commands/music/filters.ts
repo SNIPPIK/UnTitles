@@ -232,7 +232,7 @@ class AudioFiltersCommand extends Assign<Command> {
 
                             // Сообщаем о включении фильтров
                             message.fastBuilder = {
-                                description: locale._(message.locale, "command.filter.remove.before", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                                description: locale._(message.locale, "command.filter.remove.after", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
                                 color: Colors.Green, timestamp: new Date()
                             };
                         }
@@ -241,7 +241,7 @@ class AudioFiltersCommand extends Assign<Command> {
                         else {
                             // Сообщаем о включении фильтров
                             message.fastBuilder = {
-                                description: locale._(message.locale, "command.filter.remove.after", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                                description: locale._(message.locale, "command.filter.remove.before", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
                                 color: Colors.Green, timestamp: new Date()
                             };
                         }

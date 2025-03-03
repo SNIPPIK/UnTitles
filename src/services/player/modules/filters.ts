@@ -25,31 +25,22 @@ export class PlayerAudioFilters {
 
     /**
      * @description Сжимаем фильтры для работы ffmpeg
+     * @param time - Время длительности трека
+     * @public
      */
-    public get compress() {
-        const realFilters: string[] = [`volume=${db.queues.options.volume / 150}`, `afade=t=in:st=0:d=${db.queues.options.fade}`];
+    public compress = (time: number) => {
+        const realFilters: string[] = [`volume=${db.queues.options.volume / 150}`, `afade=t=in:st=0:d=${db.queues.options.fade}`, `afade=out:st=${time - (db.queues.options.fade + 2)}:d=${db.queues.options.fade + 2}`];
         const onFilters = this.enabled;
-        let chunk = 0;
 
         // Если есть включенные фильтры
         if (onFilters.length > 0) {
             // Берем данные из всех фильтров
             for (const filter of onFilters) {
                 realFilters.push(filter.args ? `${filter.filter}${filter.user_arg ?? ""}` : filter.filter);
-
-                // Если есть модификация скорости, то изменяем размер пакета
-                if (filter.speed) {
-                    if (typeof filter.speed === "number") {
-                        chunk += Number(filter.speed);
-                        continue;
-                    }
-
-                    chunk += Number(onFilters.slice(onFilters.indexOf(filter) + 1));
-                }
             }
         }
 
-        return { filters: realFilters.join(","), chunk };
+        return realFilters.join(",");
     };
 }
 
@@ -95,10 +86,4 @@ export interface AudioFilter {
      * @readonly
      */
     user_arg?: any;
-
-    /**
-     * @description Модификатор скорости
-     * @readonly
-     */
-    readonly speed?: string | number;
 }

@@ -1,7 +1,7 @@
 import {MessageComponents, MessageSendOptions} from "@type/discord";
 import {InteractionCallbackResponse} from "discord.js";
 import type {EmbedData, Message} from "discord.js";
-import {Interact, MessageUtils} from "@utils";
+import {Interact, Logger, MessageUtils} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -75,15 +75,28 @@ export class EmbedBuilder {
                 if (this._menu.pages.length > 0) this.constructor_menu(message instanceof InteractionCallbackResponse ? message.resource.message : message);
 
                 // Если надо выполнить действия после
-                if (this.promise) this.promise(new Interact(message as any));
+                if (this.promise) this.promise(new Interact(message));
             })
             .catch((err) => {
+                // Не даем запустить проверку повторно
+                if (interaction._hookReply) return;
+
                 // Если происходит ошибка при отправке сообщений
                 if (`${err}`.match(/Unknown interaction|Interaction has already been acknowledged/)) {
-                    interaction["replied"] = true;
-                    interaction["deferred"] = true;
+                    interaction._hookReply = true;
 
-                    this.send = interaction;
+                    setTimeout(() => {
+                        this.send = interaction;
+                        interaction._hookReply = false;
+                    }, 300);
+
+                    Logger.log("ERROR", "[DiscordAPI]: Error interaction, resend...");
+                    return;
+                }
+
+                // Если при отправке сообщения произошла ошибка связанная с авторизацией
+                else if (`${err}`.match(/Invalid Webhook Token/)) {
+                    Logger.log("ERROR", "[DiscordAPI]: Error webhook token, ignoring!");
                     return;
                 }
 

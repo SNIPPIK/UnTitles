@@ -444,10 +444,16 @@ abstract class Request {
 
             /**
              * @description Событие если подключение было сорвано
-             * @public
              */
             request.once("close", () => {
                 request.destroy();
+            });
+
+            /**
+             * @description Если время ожидания было превышено
+             */
+            request.once("timeout", () => {
+                return resolve(new Error(`[Timeout Request] Timeout connection to ${this.data.hostname}`));
             });
 
             request.end();
@@ -485,7 +491,7 @@ abstract class Request {
         // Надо ли генерировать user-agent
         else if (options?.useragent) {
             const OS = [ "(X11; Linux x86_64)", "(Windows NT 10.0; Win64; x64)" ];
-            const version = `${(128).random(96)}.0.${(6250).random(1280)}.${(250).random(59)}`;
+            const version = `${(133).random(110)}.0.${(6250).random(1280)}.${(250).random(59)}`;
 
             Object.assign(this.data.headers, {
                 "User-Agent": `Mozilla/5.0 ${OS[(OS.length - 1).random(0)]} AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`,

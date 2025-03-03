@@ -54,7 +54,7 @@ class sAPI extends Assign<API> {
         super({
             name: "SPOTIFY",
             audio: false,
-            auth: !!sAPI.authorization.token,
+            auth: !!sAPI.authorization.auth,
 
             color: 1420288,
             filter: /^(https?:\/\/)?(open\.)?(m\.)?(spotify\.com|spotify\.?ru)\/.+$/gi,
@@ -229,8 +229,8 @@ class sAPI extends Assign<API> {
                     const token = await new httpsClient(`${this.authorization.urls.account}/token`, {
                         headers: {
                             "Accept": "application/json",
-                            "Authorization": `Basic ${Buffer.from(this.authorization.auth).toString("base64")}`,
                             "Content-Type": "application/x-www-form-urlencoded",
+                            "Authorization": `Basic ${Buffer.from(this.authorization.auth).toString("base64")}`,
                             "accept-encoding": "gzip, deflate, br"
                         },
                         body: "grant_type=client_credentials",

@@ -152,7 +152,7 @@ else {
     // Создаем webhook клиент
     const webhook = new WebhookClient({
         id: env.get<string>("webhook.id", null),
-        token: env.get<string>("webhook.token", null),
+        token: env.get<string>("webhook.token", null)
     });
 
     // Создаем класс осколка

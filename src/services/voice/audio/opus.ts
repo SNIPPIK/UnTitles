@@ -24,6 +24,13 @@ const OGG = {
 
 /**
  * @author SNIPPIK
+ * @description Когда есть перерыв в отправленных данных, передача пакета не должна просто останавливаться. Вместо этого отправьте пять кадров молчания перед остановкой, чтобы избежать непреднамеренного интерполяции Opus с последующими передачами
+ * @public
+ */
+export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
+
+/**
+ * @author SNIPPIK
  * @description Создаем кодировщик в opus
  * @class OpusEncoder
  * @extends PassThrough
@@ -36,7 +43,6 @@ export class OpusEncoder extends PassThrough {
      * @private
      */
     private readonly db = {
-        remaining: null as Buffer,
         buffer: null    as Buffer,
         bitstream: null as number
     };
@@ -121,12 +127,6 @@ export class OpusEncoder extends PassThrough {
      * @public
      */
     public _transform = (chunk: Buffer, _: any, done: () => any): void => {
-        // Если есть прошлый фрагмент расшифровки
-        if (this.db.remaining) {
-            chunk = Buffer.concat([this.db.remaining, chunk]);
-            this.db.remaining = null;
-        }
-
         // Получаем пакеты из
         while (!!chunk) {
             const packet = this.packet(chunk);
@@ -138,21 +138,13 @@ export class OpusEncoder extends PassThrough {
     };
 
     /**
-     * @description Удаляем данные по окончанию
-     * @public
-     */
-    public _final = (cb: () => void) => {
-        this.destroy();
-        cb();
-    };
-
-    /**
      * @description Удаляем данные по завершению
      * @public
      */
     public _destroy = () => {
         // Отключаем все ивенты
         this.removeAllListeners();
+        this.destroy();
         for (let key of Object.keys(this.db)) this.db[key] = null;
     };
 }
