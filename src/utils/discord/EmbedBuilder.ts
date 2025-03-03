@@ -96,7 +96,7 @@ export class EmbedBuilder {
 
                 // Если при отправке сообщения произошла ошибка связанная с авторизацией
                 else if (`${err}`.match(/Invalid Webhook Token/)) {
-                    Logger.log("ERROR", "[DiscordAPI]: Error webhook token, ignoring!");
+                    //Logger.log("ERROR", "[DiscordAPI]: Error webhook token, ignoring!");
                     return;
                 }
 
