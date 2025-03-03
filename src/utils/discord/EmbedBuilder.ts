@@ -88,7 +88,7 @@ export class EmbedBuilder {
                     setTimeout(() => {
                         this.send = interaction;
                         interaction._hookReply = false;
-                    }, 300);
+                    }, 200);
 
                     Logger.log("ERROR", "[DiscordAPI]: Error interaction, resend...");
                     return;
@@ -96,7 +96,7 @@ export class EmbedBuilder {
 
                 // Если при отправке сообщения произошла ошибка связанная с авторизацией
                 else if (`${err}`.match(/Invalid Webhook Token/)) {
-                    //Logger.log("ERROR", "[DiscordAPI]: Error webhook token, ignoring!");
+                    Logger.log("ERROR", "[DiscordAPI]: Error webhook token, ignoring!");
                     return;
                 }
 

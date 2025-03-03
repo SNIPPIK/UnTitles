@@ -235,16 +235,16 @@ export class Interact {
     public send = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
         // Если бот уже ответил на сообщение
         if (this._temp["replied"] && !this._temp["deferred"] && !this._hookReply) {
-            return this._temp["followUp"](Object.assign({withResponse: true}, options));
+            return this._temp["followUp"](options);
         }
 
         // Если можно дать ответ на сообщение
         else if (!this._temp["replied"] && !this._hookReply) {
-            return this._temp["reply"](Object.assign({withResponse: true}, options));
+            return this._temp["reply"](options);
         }
 
         // Если нельзя отправить ответ
-        return this._temp.channel["send"](Object.assign({withResponse: true}, options));
+        return this._temp.channel["send"](options);
     };
 
     /**
