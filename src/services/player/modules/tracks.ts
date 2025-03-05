@@ -126,10 +126,8 @@ export class PlayerTracks {
             // Меняем треки в текущей очереди на оригинальные
             this._tracks._current = this._tracks._original;
 
-            setTimeout(() => {
-                // Удаляем оригинальные треки, поскольку они теперь и основной ветке
-                this._tracks._original = [];
-            }, 2e3);
+            // Удаляем оригинальные треки, поскольку они теперь и основной ветке
+            this._tracks._original = [];
         }
 
         // Меняем переменную

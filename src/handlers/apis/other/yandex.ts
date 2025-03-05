@@ -55,7 +55,7 @@ class sAPI extends Assign<API> {
                     name: "track",
                     filter: /track\/[0-9]+/gi,
                     execute: (url, options) => {
-                        const ID = /track\/[0-9]+/gi.exec(url)?.pop()?.split("track")?.pop();
+                        const ID = /track\/[0-9]+/gi.exec(url)?.at(0)?.split("track")?.at(0);
 
                         return new Promise<Track | Error>(async (resolve) => {
                             // Если ID трека не удалось извлечь из ссылки
@@ -101,7 +101,7 @@ class sAPI extends Assign<API> {
                     name: "album",
                     filter: /(album)\/[0-9]+/gi,
                     execute: (url, {limit}) => {
-                        const ID = /[0-9]+/gi.exec(url)?.pop()?.split("album")?.pop();
+                        const ID = /[0-9]+/gi.exec(url)?.at(0)?.split("album")?.at(0);
 
                         return new Promise<Track.playlist | Error>(async (resolve) => {
                             // Если ID альбома не удалось извлечь из ссылки
@@ -175,7 +175,7 @@ class sAPI extends Assign<API> {
                     name: "author",
                     filter: /(artist)\/[0-9]+/gi,
                     execute: (url, {limit}) => {
-                        const ID = /(artist)\/[0-9]+/gi.exec(url)?.pop()?.split("artist")?.pop();
+                        const ID = /(artist)\/[0-9]+/gi.exec(url)?.at(0)?.split("artist")?.at(0);
 
                         return new Promise<Track[] | Error>(async (resolve) => {
                             // Если ID автора не удалось извлечь из ссылки

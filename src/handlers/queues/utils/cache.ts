@@ -187,29 +187,27 @@ export class CacheAudio extends Cycle<Track> {
                 return true;
             },
             execute: (track) => {
-                return new Promise<boolean>((resolve) => {
+                return new Promise<boolean>(async (resolve) => {
                     const status = this.status(track);
 
-                    setTimeout(() => {
-                        // Создаем ffmpeg для скачивания трека
-                        const ffmpeg = new Process([
-                            "-vn", "-loglevel", "panic",
-                            "-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
-                            "-i", track.link,
-                            "-f", `opus`,
-                            `${status.path}.opus`
-                        ]);
+                    // Создаем ffmpeg для скачивания трека
+                    const ffmpeg = new Process([
+                        "-vn", "-loglevel", "panic",
+                        "-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+                        "-i", track.link,
+                        "-f", `opus`,
+                        `${status.path}.opus`
+                    ]);
 
-                        // Если была получена ошибка
-                        ffmpeg.stdout.once("error", () => {
-                            return resolve(false);
-                        });
+                    // Если была получена ошибка
+                    ffmpeg.stdout.once("error", () => {
+                        return resolve(false);
+                    });
 
-                        // Если запись была завершена
-                        ffmpeg.stdout.once("close", () => {
-                            return resolve(true);
-                        });
-                    }, 1e3);
+                    // Если запись была завершена
+                    ffmpeg.stdout.once("close", () => {
+                        return resolve(true);
+                    });
                 });
             }
         });

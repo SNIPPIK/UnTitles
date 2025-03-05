@@ -19,7 +19,8 @@ class request_api extends Assign<Event<"request/api">> {
             name: "request/api",
             type: "player",
             once: false,
-            execute: (message, argument) => {
+            execute: async (message, argument) => {
+                await message.deferReply();
                 const checkAPI = this.checkAPI(argument);
 
                 // Если API не доступен
@@ -44,7 +45,6 @@ class request_api extends Assign<Event<"request/api">> {
                 const timeout = setTimeout(() => {
                     db.events.emitter.emit("request/error", message, locale._(message.locale, "api.platform.timeout"));
                 }, 10e3);
-
 
                 // Получаем данные в системе API
                 api.execute(argument[1] as any, { limit: db.api.limits[api.name], audio: false })

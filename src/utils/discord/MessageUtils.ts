@@ -124,7 +124,6 @@ export class Interact {
     };
 
 
-
     /**
      * @description Данные о текущем сервере
      * @public
@@ -229,17 +228,31 @@ export class Interact {
     };
 
     /**
+     * @description Отправляем запрос discord, чтобы он подождал ответ бота
+     * @public
+     */
+    public deferReply = () => {
+        if ("deferReply" in this._temp && typeof this._temp.deferReply === "function") return this._temp.deferReply();
+        return null;
+    };
+
+    /**
      * @description Отправляем сообщение со соответствием параметров
      * @param options - Данные для отправки сообщения
      */
     public send = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
         // Если бот уже ответил на сообщение
-        if (this._temp["replied"] && !this._temp["deferred"] && !this._hookReply) {
+        if (this._temp["replied"]) {
             return this._temp["followUp"](options);
         }
 
+        // Если можно просто отредактировать сообщение
+        else if (this._temp["deferred"]) {
+            return this._temp["editReply"](options);
+        }
+
         // Если можно дать ответ на сообщение
-        else if (!this._temp["replied"] && !this._hookReply) {
+        else if (!this._temp["replied"] || !this._temp["deferred"]) {
             return this._temp["reply"](options);
         }
 

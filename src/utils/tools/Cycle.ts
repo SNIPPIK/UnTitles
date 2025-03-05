@@ -158,7 +158,7 @@ export abstract class Cycle<T = unknown> {
         let time = this._data.time - Date.now();
 
         // Если время меньше 1 ms
-        if (time < 1) time = 20;
+        if (time < 0) time = 20;
 
         // Выполняем функцию через ~time ms
         setTimeout(this._stepCycle, time);

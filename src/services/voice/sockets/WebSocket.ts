@@ -167,7 +167,7 @@ interface WebSocketKeepAlive {
     asked: number;
 
     /**
-     * @description Время обновления, отправки пакета
+     * @description Время обновления, время последней отправки пакета о жизни подключения
      * @private
      */
     updated: number;

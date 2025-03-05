@@ -61,7 +61,7 @@ export class EmbedBuilder {
      * @public
      */
     public set send(interaction: Interact) {
-        const options = {embeds: this.embeds, components: this.components};
+        const options = {embeds: this.embeds, components: this.components, withResponse: !!this.promise};
 
         interaction.send(options)
             .then((message) => {
