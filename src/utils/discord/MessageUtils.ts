@@ -252,7 +252,7 @@ export class Interact {
         }
 
         // Если можно дать ответ на сообщение
-        else if (!this._temp["replied"] || !this._temp["deferred"]) {
+        else if (!this._temp["replied"] && !this._temp["deferred"]) {
             return this._temp["reply"](options);
         }
 
