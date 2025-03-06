@@ -82,6 +82,7 @@ export class EmbedBuilder {
                 if (interaction._hookReply) return;
 
                 // Если происходит ошибка при отправке сообщений
+                // Эта ошибка возникает когда отправка сообщение превысило время ожидания
                 if (`${err}`.match(/Unknown interaction|Interaction has already been acknowledged/)) {
                     interaction._hookReply = true;
 
@@ -94,7 +95,13 @@ export class EmbedBuilder {
                     return;
                 }
 
+                // Ошибка discord, ее не слишком сильно хотят фиксить
+                else if (`${err}`.match(/code: 50027/)) {
+                    return;
+                }
+
                 // Если при отправке сообщения произошла ошибка связанная с авторизацией
+                // Эта ошибка возникает когда сообщение невозможно отредактировать, именно reply
                 else if (`${err}`.match(/Invalid Webhook Token/)) {
                     Logger.log("ERROR", "[DiscordAPI]: Error webhook token, ignoring!");
                     return;
