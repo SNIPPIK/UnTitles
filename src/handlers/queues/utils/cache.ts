@@ -44,12 +44,12 @@ export class CacheUtility {
         /**
          * @description Кешированные треки
          */
-        tracks: new Map<string, Track>(),
+        tracks: null as Map<string, Track>,
 
         /**
          * @description Класс кеширования аудио файлов
          */
-        audio: this._options.inFile ? new CacheAudio(this._options.dirname) : null
+        audio: null as CacheAudio
     };
 
     /**
@@ -78,6 +78,15 @@ export class CacheUtility {
      * @public
      */
     public get isOn() { return this._options.isOn; };
+
+    /**
+     * @description Задаем параметры при запуске класса
+     * @public
+     */
+    public constructor() {
+        if (this.inFile) this.data.audio = new CacheAudio(this._options.dirname);
+        else this.data.tracks = new Map<string, Track>();
+    };
 
     /**
      * @description Сохраняем данные в класс

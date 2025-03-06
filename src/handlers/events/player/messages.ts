@@ -64,14 +64,23 @@ class message_push extends Assign<Event<"message/push">> {
             execute: (message, obj) => {
                 const {artist, image } = obj;
 
+                // Текущая позиция в очереди
+                const position = message.queue ? message.queue.tracks.position + 1 : 1;
+
                 // Отправляем сообщение, о том что было добавлено в очередь
                 new message.builder().addEmbeds([
                     {
                         color: obj["color"] ?? Colors.Blue,
                         thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
                         footer: {
-                            text: `${message.author.username}`,
-                            iconURL: message.author.avatarURL()
+                            iconURL: message.author.avatarURL(),
+                            text: `${message.author.username} | ${obj instanceof Track ?
+                                // Если один трек в списке
+                                locale._(message.locale, "player.queue.push.position", [position + 1]) :
+                                
+                                // Если добавляется список треков (альбом или плейлист)
+                                locale._(message.locale, "player.queue.push.list.position", [position + 1, (position + 1) + obj.items.length])}
+                                `
                         },
                         author: {
                             name: artist?.title,
@@ -81,9 +90,15 @@ class message_push extends Assign<Event<"message/push">> {
                         fields: [
                             {
                                 name: locale._(message.locale, "player.queue.push"),
-                                value: obj instanceof Track ? `\`\`\`[${obj.time.split}] - ${obj.title}\`\`\`` : `${obj.items.slice(0, 5).map((track, index) => {
-                                    return `\`${index + 1}\` ${track.titleReplaced}`;
-                                }).join("\n")}${obj.items.length > 5 ? locale._(message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}`
+                                value: obj instanceof Track ?
+                                    // Если один трек в списке
+                                    `\`\`\`[${obj.time.split}] - ${obj.title}}\`\`\`` :
+
+                                    // Если добавляется список треков (альбом или плейлист)
+                                    `${obj.items.slice(0, 5).map((track, index) => {
+                                        return `\`${index + 1}\` ${track.titleReplaced}`;
+                                    }).join("\n")}${obj.items.length > 5 ? locale._(message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}
+                                    `
                             }
                         ]
                     }

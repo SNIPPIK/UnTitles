@@ -1,5 +1,5 @@
 import {MessageEvent as WebSocketEvent, WebSocket as WS, CloseEvent} from "ws";
-import {VoiceOpcodes} from "discord-api-types/voice/v4";
+import {VoiceOpcodes} from "discord-api-types/voice";
 import type {WebSocketEvents} from "@service/voice";
 import {TypedEmitter} from "@utils";
 

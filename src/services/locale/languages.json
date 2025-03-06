@@ -278,6 +278,16 @@
     "en-US": "Added in queue:"
   },
 
+  "player.queue.push.position": {
+    "ru": "Позиция в очереди: {ARGUMENT}",
+    "en-US": "Position in queue: {ARGUMENT}"
+  },
+
+  "player.queue.push.list.position": {
+    "ru": "Промежуток позиций: {ARGUMENT} - {ARGUMENT}",
+    "en-US": "Position span: {ARGUMENT} - {ARGUMENT}"
+  },
+
   "player.queue.push.more": {
     "ru": "\nТак-же {ARGUMENT} трек(ов)...",
     "en-US": "\nAnd {ARGUMENT} tracks..."

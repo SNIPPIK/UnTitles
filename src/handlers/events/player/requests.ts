@@ -32,15 +32,6 @@ class request_api extends Assign<Event<"request/api">> {
                 // Если API доступен, вытаскиваем из него данные
                 const {api, platform} = checkAPI;
 
-                // Отправляем сообщение о том что запрос производится
-                new message.builder().addEmbeds([
-                    {
-                        title: `${platform.platform}.${api.name}`,
-                        description: locale._(message.locale, "api.platform.request", [db.images.loading]),
-                        color: platform.color
-                    }
-                ]).setTime(5e3).send = message;
-
                 // Если ответ не был получен от сервера
                 const timeout = setTimeout(() => {
                     db.events.emitter.emit("request/error", message, locale._(message.locale, "api.platform.timeout"));
@@ -50,7 +41,7 @@ class request_api extends Assign<Event<"request/api">> {
                 api.execute(argument[1] as any, { limit: db.api.limits[api.name], audio: false })
 
                     // Получаем данные
-                    .then((item): void => {
+                    .then((item) => {
                         // Если нет данных или была получена ошибка
                         if (item instanceof Error) {
                             Logger.log("ERROR", `request/api - ${item}`);

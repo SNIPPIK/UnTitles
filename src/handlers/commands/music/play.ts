@@ -140,7 +140,10 @@ class PlayCommand extends Assign<Command> {
                     }
 
                     // Если пользователя пытается сделать запрос к API
-                    default: db.events.emitter.emit("request/api", message, args);
+                    default: {
+                        db.events.emitter.emit("request/api", message, args);
+                        return;
+                    }
                 }
             }
         });
