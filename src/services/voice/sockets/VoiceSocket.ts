@@ -1,5 +1,5 @@
 import {Encryption, TIMESTAMP_INC, SocketUDP, VoiceSocketEvents} from "@service/voice";
-import {VoiceOpcodes} from "discord-api-types/voice/v4";
+import {VoiceOpcodes} from "discord-api-types/voice";
 import {WebSocket} from "./WebSocket";
 import {TypedEmitter} from "@utils";
 

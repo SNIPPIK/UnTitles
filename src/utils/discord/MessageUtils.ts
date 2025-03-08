@@ -242,12 +242,12 @@ export class Interact {
      */
     public send = (options: MessageSendOptions): Promise<InteractionCallbackResponse | Message> => {
         // Если бот уже ответил на сообщение
-        if (this._temp["replied"]) {
+        if (this._temp["replied"] && !this._temp["deferred"]) {
             return this._temp["followUp"](options);
         }
 
         // Если можно просто отредактировать сообщение
-        else if (this._temp["deferred"]) {
+        else if (this._temp["deferred"] && !this._temp["replied"]) {
             return this._temp["editReply"](options);
         }
 

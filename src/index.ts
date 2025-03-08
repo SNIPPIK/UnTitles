@@ -1,5 +1,7 @@
 import {Client, ShardingManager, IntentsBitField, Partials, Options, Colors, WebhookClient} from "discord.js";
 import {CacheUtility, db_buttons, db_voice, Queues} from "@handler/queues";
+import {ActivityType} from "discord-api-types/v10";
+import {ActivityOptions} from "@type/discord";
 import {API_requester} from "@handler/apis";
 import {Commands} from "@handler/commands";
 import {Events} from "@handler/events";
@@ -202,6 +204,17 @@ else {
         // Что делаем после того как бот подключится к discord api
         .then(() => {
             Logger.log("WARN", `[Core/${id}] login successfully`);
+
+            // Задаем статус боту
+            client.user.setPresence({
+                status: env.get("client.status"),
+                activities: [
+                    {
+                        name: env.get("client.presence.name", "I ❤️ UnTitles bot"),
+                        type: ActivityType[env.get("client.presence.type")],
+                    }
+                ] as ActivityOptions[],
+            });
         })
 
         // Если при входе происходит ошибка

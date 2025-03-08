@@ -95,11 +95,6 @@ export class EmbedBuilder {
                     return;
                 }
 
-                // Ошибка discord, ее не слишком сильно хотят фиксить
-                else if (`${err}`.match(/code: 50027/)) {
-                    return;
-                }
-
                 // Если при отправке сообщения произошла ошибка связанная с авторизацией
                 // Эта ошибка возникает когда сообщение невозможно отредактировать, именно reply
                 else if (`${err}`.match(/Invalid Webhook Token/)) {

@@ -490,15 +490,12 @@ abstract class Request {
 
         // Надо ли генерировать user-agent
         else if (options?.useragent) {
-            const OS = [ "(X11; Linux x86_64)", "(Windows NT 10.0; Win64; x64)" ];
-            const version = `${(133).random(110)}.0.${(6250).random(1280)}.${(250).random(59)}`;
+            const OS = [ "X11; Linux x86_64;", "Windows NT 10.0; Win64; x64;" ];
+            const platform = OS[(OS.length - 1).random(0)];
+            const version = (136).random(120);
 
             Object.assign(this.data.headers, {
-                "User-Agent": `Mozilla/5.0 ${OS[(OS.length - 1).random(0)]} AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`,
-                "Sec-Ch-Ua-Full-Version": version,
-                "Sec-Ch-Ua-Bitness": `64`,
-                "Sec-Ch-Ua-Arch": "x86",
-                "Sec-Ch-Ua-Mobile": "?0"
+                "User-Agent": `Mozilla/5.0 (${platform} rv:${version}.0) Gecko/20100101 Firefox/${version}.0`,
             });
         }
 

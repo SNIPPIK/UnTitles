@@ -75,6 +75,11 @@ export class Encryption {
 
         // Зашифрованный звук
         rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
+
+        connectionData.nonce++;
+        if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
+        connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
+
         return this.crypto(packet, connectionData, rtp_packet);
     };
 
@@ -86,11 +91,6 @@ export class Encryption {
      * @private
      */
     private static crypto = (packet: Buffer, connectionData: ConnectionData, rtp_packet: Buffer) => {
-        connectionData.nonce++;
-
-        if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
-        connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
-
         const nonceBuffer = connectionData.nonceBuffer.subarray(0, 4);
 
         // Шифровка aead_aes256_gcm (support rtpsize)

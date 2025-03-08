@@ -1,4 +1,5 @@
 import {Message, InteractionCallbackResponse,BaseInteraction, ComponentData, ActionRowBuilder, EmbedData, MessageFlags} from "discord.js";
+import {ActivityType} from "discord-api-types/v10"
 import {SupportButtons} from "@handler/queues";
 
 /**
@@ -7,6 +8,18 @@ import {SupportButtons} from "@handler/queues";
  * @type ds_interact
  */
 export type ds_interact = Message | BaseInteraction | InteractionCallbackResponse; //| CommandInteraction | MessageComponentInteraction | ModalSubmitInteraction;
+
+/**
+ * @author SNIPPIK
+ * @description Параметры показа статуса
+ */
+export interface ActivityOptions {
+    name: string;
+    state?: string;
+    url?: string;
+    type?: ActivityType;
+    shardId?: number | readonly number[];
+}
 
 /**
  * @author SNIPPIK
