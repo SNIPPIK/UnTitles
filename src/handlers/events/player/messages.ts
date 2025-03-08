@@ -18,7 +18,7 @@ class message_error extends Assign<Event<"message/error">> {
             name: "message/error",
             type: "player",
             once: false,
-            execute: (queue, error) => {
+            execute: async (queue, error) => {
                 // Если нет треков или трека?!
                 if (!queue?.tracks || !queue?.tracks!.track) return;
 
@@ -61,11 +61,11 @@ class message_push extends Assign<Event<"message/push">> {
             name: "message/push",
             type: "player",
             once: false,
-            execute: (message, obj) => {
+            execute: async (message, obj) => {
                 const {artist, image } = obj;
 
                 // Текущая позиция в очереди
-                const position = message.queue ? message.queue.tracks.position + 1 : 1;
+                const position = message.queue ? message.queue.tracks.position : 0;
 
                 // Отправляем сообщение, о том что было добавлено в очередь
                 new message.builder().addEmbeds([
@@ -79,7 +79,7 @@ class message_push extends Assign<Event<"message/push">> {
                                 locale._(message.locale, "player.queue.push.position", [position + 1]) :
                                 
                                 // Если добавляется список треков (альбом или плейлист)
-                                locale._(message.locale, "player.queue.push.list.position", [position + 1, (position + 1) + obj.items.length])}
+                                locale._(message.locale, "player.queue.push.list.position", [position + 1, position + obj.items.length])}
                                 `
                         },
                         author: {
@@ -121,7 +121,7 @@ class message_search extends Assign<Event<"message/search">> {
             name: "message/search",
             type: "player",
             once: false,
-            execute: (tracks, platform, message) => {
+            execute: async (tracks, platform, message) => {
                 // Если не нашлись треки
                 if (tracks?.length < 1 || !tracks) {
                     message.fastBuilder = {
@@ -194,7 +194,7 @@ class message_playing extends Assign<Event<"message/playing">> {
             name: "message/playing",
             type: "player",
             once: false,
-            execute: (queue, message) => {
+            execute: async (queue, message) => {
                 const {color, artist, image, title, user} = queue.tracks.track;
                 const embed = new queue.message.builder().addEmbeds([
                     {
