@@ -1,7 +1,7 @@
+import {Colors, EmbedData} from "discord.js";
 import {RepeatType} from "@service/player";
 import {Collection, Logger} from "@utils";
 import {locale} from "@service/locale";
-import {Colors} from "discord.js";
 import {Interact} from "@utils";
 
 /**
@@ -204,51 +204,53 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             const queue = msg.queue;
             const page = parseInt((queue.tracks.position / 5).toFixed(0));
             const pages = queue.tracks.array(5, true) as string[];
+            const embed: EmbedData = {
+                color: Colors.Green,
+                author: {
+                    name: `${locale._(msg.locale, "queue")} - ${msg.guild.name}`,
+                    iconURL: queue.tracks.track.artist.image.url
+                },
+                thumbnail: {
+                    url: msg.guild.iconURL()
+                },
+                fields: [
+                    {
+                        name: locale._(msg.locale, "player.current.playing"),
+                        value: `\`\`${queue.tracks.position + 1}\`\` - ${queue.tracks.track.titleReplaced}`
+                    },
+                    pages.length > 0 ? {name: locale._(msg.locale, "queue"), value: pages[page]} : null
+                ],
+                footer: {
+                    text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.displayName, page + 1, pages.length, queue.tracks.total, queue.tracks.time]),
+                    iconURL: queue.tracks.track.user.avatar
+                },
+                timestamp: queue.timestamp
+            };
 
-            new msg.builder().addEmbeds([
-                {
-                    color: Colors.Green,
-                    author: {
-                        name: `${locale._(msg.locale, "queue")} - ${msg.guild.name}`,
-                        iconURL: queue.tracks.track.artist.image.url
-                    },
-                    thumbnail: {
-                        url: msg.guild.iconURL()
-                    },
-                    fields: [
-                        {
-                            name: locale._(msg.locale, "player.current.playing"),
-                            value: `\`\`${queue.tracks.position + 1}\`\` - ${queue.tracks.track.titleReplaced}`
-                        },
-                        pages.length > 0 ? {name: locale._(msg.locale, "queue"), value: pages[page]} : null
-                    ],
-                    footer: {
-                        text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.displayName, page + 1, pages.length, queue.tracks.total, queue.tracks.time]),
-                        iconURL: queue.tracks.track.user.avatar
-                    },
-                    timestamp: queue.timestamp
-                }
-            ]).setMenu({type: "table", pages, page}).setTime(60e3).setCallback((message, pages: string[], page: number) => {
-                return message.edit({
-                    embeds: [
-                        {
-                            ...message.embeds[0],
-                            color: Colors.Green,
-                            fields: [
-                                message.embeds[0].fields[0],
-                                {
-                                    name: locale._(msg.locale, "queue"),
-                                    value: pages[page]
+            new msg.builder().addEmbeds([embed])
+                .setMenu({type: "table", pages, page})
+                .setTime(60e3)
+                .setCallback((message, pages: string[], page: number) => {
+                    return message.edit({
+                        embeds: [
+                            {
+                                ...embed as any,
+                                color: Colors.Green,
+                                fields: [
+                                    embed.fields[0],
+                                    {
+                                        name: locale._(msg.locale, "queue"),
+                                        value: pages[page]
+                                    }
+                                ],
+                                footer: {
+                                    ...embed.footer,
+                                    text: locale._(msg.locale, "player.button.queue.footer", [msg.author.username, page + 1, pages.length, queue.tracks.total, queue.tracks.time])
                                 }
-                            ],
-                            footer: {
-                                ...message.embeds[0].footer,
-                                text: locale._(msg.locale, "player.button.queue.footer", [msg.author.username, page + 1, pages.length, queue.tracks.total, queue.tracks.time])
                             }
-                        }
-                    ]
-                });
-            }).send = msg;
+                        ]
+                    });
+                }).send = msg;
             return;
         });
 
