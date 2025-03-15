@@ -55,14 +55,17 @@ export class Queues extends Collection<Queue> {
 
                 // Если плеер не запустится сам
                 setImmediate(() => {
-                    // Меняем позиции на 0
-                    if (!item) queue.player.tracks.position = 0;
+                    // Если добавлен трек
+                    if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
 
-                    // Меняем позиции на самую последнюю
-                    else queue.player.tracks.position = item instanceof Track ? queue.player.tracks.total - 1 : queue.player.tracks.total - item.items.length;
+                    // Если очередь перезапущена
+                    else if (!item) queue.player.tracks.position = 0;
+
+                    // Если добавлен плейлист
+                    else queue.player.tracks.position = queue.player.tracks.total - item.items.length
 
                     // Запускаем проигрывание
-                    queue.player.play();
+                    setTimeout(queue.player.play, 400);
                 });
             }
         }

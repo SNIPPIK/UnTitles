@@ -9,9 +9,6 @@ import {Logger} from "@utils";
 import {env} from "@handler";
 import {global} from "@type";
 
-// Включение
-Logger.log("LOG", `[Core] has starting`);
-
 /**
  * @author SNIPPIK
  * @description Локальная база данных бота
@@ -121,7 +118,7 @@ export var db: Database = null;
  * @description Если требуется запустить менеджер осколков
  */
 if (process["argv"].includes("--ShardManager")) {
-    Logger.log("WARN", `[Manager] has running ShardManager...`);
+    Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
 
     // Создаем менеджер осколков
     const manager = new ShardingManager(__filename, {
@@ -134,9 +131,9 @@ if (process["argv"].includes("--ShardManager")) {
 
     // Слушаем событие для создания осколка
     manager.on("shardCreate", (shard) => {
-        shard.on("spawn", () => Logger.log("WARN",`[Manager/${shard.id}] added to manager`));
-        shard.on("ready", () => Logger.log("WARN",`[Manager/${shard.id}] is connecting to websocket`));
-        shard.on("death", () => Logger.log("WARN",`[Manager/${shard.id}] is killed`));
+        shard.on("spawn", () => Logger.log("LOG",`[Manager/${shard.id}] shard ${Logger.color(36, `added to manager`)}`));
+        shard.on("ready", () => Logger.log("LOG",`[Manager/${shard.id}] shard is ${Logger.color(36, `ready`)}`));
+        shard.on("death", () => Logger.log("LOG",`[Manager/${shard.id}] shard is ${Logger.color(31, `killed`)}`));
     });
 
     // Создаем дубликат
@@ -149,7 +146,7 @@ if (process["argv"].includes("--ShardManager")) {
  */
 else {
     Logger.log("DEBUG", `[Core] adding utilities${global}`);
-    Logger.log("WARN", `[Core] has running shard`);
+    Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
 
     // Создаем webhook клиент
     const webhook = new WebhookClient({
@@ -197,13 +194,13 @@ else {
     const id = client.shard?.ids[0] ?? 0;
 
     db = new Database();
-    Logger.log("LOG", `[Core/${id}] has initialize db`);
+    Logger.log("LOG", `[Core/${id}] has ${Logger.color(34, `initialize db`)}`);
 
     // Подключаем осколок к discord
     client.login(env.get("token.discord"))
         // Что делаем после того как бот подключится к discord api
         .then(() => {
-            Logger.log("WARN", `[Core/${id}] login successfully`);
+            Logger.log("WARN", `[Core/${id}] connected to discord as ${Logger.color(35, client.user.tag)}`);
 
             // Задаем статус боту
             client.user.setPresence({
@@ -218,27 +215,31 @@ else {
         })
 
         // Если при входе происходит ошибка
-        .catch(() => {
+        .catch((err) => {
             Logger.log("ERROR", `[Core/${id}] failed authorization in discord`);
+            Logger.log("ERROR", err);
         })
 
         // Что делаем после подключения к discord api
-        .finally(() => {
+        .finally(async () => {
+            // Загруженные кнопки
+            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
+
             // Загружаем платформы
             db.api.register();
-            Logger.log("DEBUG", `[Core/${id} | ${db.api.platforms.supported.length}/${db.api.platforms.authorization.length}] has load apis`);
+            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.platforms.supported.length} APIs Supported, ${db.api.platforms.authorization.length} APIs Unauthorized`)}`);
 
             // Загружаем события
             db.events.register(client);
-            Logger.log("DEBUG", `[Core/${id} | ${db.events.events.length}] has load events`);
+            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.events.length} events`)}`);
 
             // Загружаем команды
             db.commands.register(client);
-            Logger.log("DEBUG", `[Core/${id} | ${db.commands.public.length}] has load commands`);
+            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
         });
 
     // Отлавливаем все ошибки внутри процесса
-    process.on("uncaughtException", (err, origin) => {
+    process.on("uncaughtException", async (err, origin) => {
         //Выводим ошибку
         Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
 

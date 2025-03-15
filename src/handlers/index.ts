@@ -44,7 +44,7 @@ export abstract class handler<T = unknown> {
      * @description Загружаем директории полностью, за исключением index файлов
      * @protected
      */
-    protected load = () => {
+    protected load = async () => {
         const self_dir = path.resolve(this._dir);
 
         // Если указанной директории нет

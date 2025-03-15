@@ -67,14 +67,14 @@ class bot extends Assign<Command> {
     public constructor() {
         super({
             owner: true,
-            execute: ({message, args, type}) => {
+            execute: async ({message, args, type}) => {
                 switch (type) {
                     case "restart": {
                         // Перезагружаем все команды
                         if (args[0] === "commands") {
                             db.commands.preregister(message.guild.members.client);
 
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, `commands.reload`, [db.commands.public.length]),
                                 color: Colors.Green
                             }
@@ -84,7 +84,7 @@ class bot extends Assign<Command> {
                         else if (args[0] === "events") {
                             db.events.preregister(message.guild.members.client);
 
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, `events.reload`, [db.events.events.length]),
                                 color: Colors.Green
                             }
@@ -94,7 +94,7 @@ class bot extends Assign<Command> {
                         else if (args[0] === "apis") {
                             db.api.preregister();
 
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, `apis.reload`, [db.api.platforms.supported.length]),
                                 color: Colors.Green
                             };
@@ -102,7 +102,7 @@ class bot extends Assign<Command> {
 
                         // Перезагрузка бота (работает только в ShardManager)
                         else if (args[0] === "bot") {
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, `bot.reload`, [message.author]),
                                 color: Colors.Green
                             };

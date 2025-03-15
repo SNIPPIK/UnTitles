@@ -15,14 +15,14 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
      * @readonly
      * @private
      */
-    private readonly socket: WS = null;
+    private readonly socket: WS;
 
     /**
      * @description Подключен ли WebSocket
      * @readonly
      * @private
      */
-    private _isConnected: boolean = null;
+    private _isConnected: boolean;
 
     /**
      * @description Данные для проверки жизни
@@ -78,7 +78,6 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
                 }
 
                 this._alive.updated = Date.now();
-                this._alive.asked++;
 
                 // Отправляем пакет
                 this.packet = {
@@ -88,6 +87,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
                         seq_ack: this._alive.asked
                     }
                 };
+                this._alive.asked++;
             }, ms);
         }
     };

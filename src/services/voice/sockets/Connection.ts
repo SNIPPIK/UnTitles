@@ -1,6 +1,5 @@
-import { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData, GatewayOpcodes } from "discord-api-types/v10";
-import { VoiceConnectionStatus, VoiceSocket, VoiceSocketStatusCode } from "@service/voice";
-import type { VoiceSocketState } from "@service/voice";
+import {GatewayOpcodes, GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData} from "discord-api-types/v10";
+import {VoiceConnectionStatus, VoiceSocket, VoiceSocketState, VoiceSocketStatusCode} from "@service/voice";
 import {Logger} from "@utils";
 
 /**
@@ -15,14 +14,14 @@ export class VoiceConnection {
      * @readonly
      * @private
      */
-    private readonly _config: VoiceConnectionConfig = null;
+    private readonly _config: VoiceConnectionConfig;
 
     /**
      * @description Текущее состояние голосового подключения
      * @readonly
      * @private
      */
-    private readonly _state: ConnectionState.State = null;
+    private readonly _state: ConnectionState.State;
 
     /**
      * @description Пакеты для работы с голосовым подключением
@@ -172,7 +171,8 @@ export class VoiceConnection {
         // Если голосовое подключение еще не готово
         if (this.state.status !== VoiceConnectionStatus.Ready) return;
 
-        // Отправляем пакет
+        // Отправляем пакет, если его нет то будет отправлена пустышка.
+        // Пустышка требуется для не нарушения работы интерполятора opus.
         this.state.networking.cryptoPacket = buffer;
     };
 
@@ -310,18 +310,44 @@ export class VoiceConnection {
 
     /**
      * @description Вызывается при изменении состояния сетевого экземпляра. Используется для определения состояния голосового соединения.
-     * @param oldState - Предыдущее состояние
+     * @param _ - Предыдущее состояние
      * @param newState - Новое состояние
      * @private
      */
-    private VoiceSocketUpdate = (oldState: VoiceSocketState.States, newState: VoiceSocketState.States) => {
-        const state = this.state;
+    private VoiceSocketUpdate = (_: VoiceSocketState.States, newState: VoiceSocketState.States) => {
+        switch (newState.code) {
 
-        if (oldState.code === newState.code || state.status !== VoiceConnectionStatus.Connecting && state.status !== VoiceConnectionStatus.Ready) return;
+            /**
+             * @description Если VoiceSocket указывает на готовность к подключению
+             */
+            case VoiceSocketStatusCode.ready: {
+                // Если текущий статус уже является Ready
+                if (this.state.status === VoiceConnectionStatus.Ready) return;
 
-        this.state = { ...state,
-            status: newState.code === VoiceSocketStatusCode.ready ? VoiceConnectionStatus.Ready : newState.code !== VoiceSocketStatusCode.close ? VoiceConnectionStatus.Connecting : state.status
-        };
+                //@ts-ignore
+                this.state = {
+                    ...this.state,
+                    status: VoiceConnectionStatus.Ready
+                }
+                return;
+            }
+
+            /**
+             * @description Если VoiceSocket указывает на любой статус не Ready
+             */
+            default: {
+                // Если текущий статус уже является Connecting
+                if (this.state.status === VoiceConnectionStatus.Connecting) return;
+
+                //@ts-ignore
+                this.state = {
+                    ...this.state,
+                    status: VoiceConnectionStatus.Connecting
+                }
+
+                return;
+            }
+        }
     };
 
     /**

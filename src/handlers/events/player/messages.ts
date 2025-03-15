@@ -1,8 +1,8 @@
+import {Colors, EmbedData} from "discord.js";
+import {Assign, MessageUtils} from "@utils";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Event} from "@handler/events";
-import {Colors} from "discord.js";
-import {Assign} from "@utils";
 import {db} from "@app";
 
 /**
@@ -18,7 +18,7 @@ class message_error extends Assign<Event<"message/error">> {
             name: "message/error",
             type: "player",
             once: false,
-            execute: async (queue, error) => {
+            execute: (queue, error) => {
                 // Если нет треков или трека?!
                 if (!queue?.tracks || !queue?.tracks!.track) return;
 
@@ -61,11 +61,8 @@ class message_push extends Assign<Event<"message/push">> {
             name: "message/push",
             type: "player",
             once: false,
-            execute: async (message, obj) => {
+            execute: (message, obj) => {
                 const {artist, image } = obj;
-
-                // Текущая позиция в очереди
-                const position = message.queue ? message.queue.tracks.position : 0;
 
                 // Отправляем сообщение, о том что было добавлено в очередь
                 new message.builder().addEmbeds([
@@ -74,13 +71,7 @@ class message_push extends Assign<Event<"message/push">> {
                         thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
                         footer: {
                             iconURL: message.author.avatarURL(),
-                            text: `${message.author.username} | ${obj instanceof Track ?
-                                // Если один трек в списке
-                                locale._(message.locale, "player.queue.push.position", [position + 1]) :
-                                
-                                // Если добавляется список треков (альбом или плейлист)
-                                locale._(message.locale, "player.queue.push.list.position", [position + 1, position + obj.items.length])}
-                                `
+                            text: `${message.author.username}`
                         },
                         author: {
                             name: artist?.title,
@@ -102,7 +93,7 @@ class message_push extends Assign<Event<"message/push">> {
                             }
                         ]
                     }
-                ]).setTime(20e3).send = message;
+                ]).setTime(12e3).send = message;
             }
         });
     };
@@ -121,10 +112,10 @@ class message_search extends Assign<Event<"message/search">> {
             name: "message/search",
             type: "player",
             once: false,
-            execute: async (tracks, platform, message) => {
+            execute: (tracks, platform, message) => {
                 // Если не нашлись треки
-                if (tracks?.length < 1 || !tracks) {
-                    message.fastBuilder = {
+                if (tracks?.length < 1) {
+                    message.FBuilder = {
                         description: locale._(message.locale, "player.search.fail"),
                         color: Colors.DarkRed
                     };
@@ -132,26 +123,22 @@ class message_search extends Assign<Event<"message/search">> {
                 }
 
                 const track = tracks[0];
+                const embed: EmbedData = {
+                    color: Colors.Green,
+                    author: {
+                        name: locale._(message.locale, "player.search"),
+                        iconURL: track.artist.image.url
+                    },
+                    description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.title.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
+                    image: track.image,
+                    footer: {
+                        text: locale._(message.locale, "player.search.list", [tracks.length, 1, tracks.length])
+                    },
+                    timestamp: new Date()
+                }
 
                 // Создаем сообщение о поиске
-                new message.builder()
-                    .setTime(120e3)
-                    .setMenu({type: "selector", pages: tracks, page: 0})
-                    .addEmbeds([
-                        {
-                            color: Colors.Green,
-                            author: {
-                                name: locale._(message.locale, "player.search"),
-                                iconURL: track.artist.image.url
-                            },
-                            description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.title.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
-                            image: track.image,
-                            footer: {
-                                text: locale._(message.locale, "player.search.list", [tracks.length, 1, tracks.length])
-                            },
-                            timestamp: new Date()
-                        }
-                    ])
+                new message.builder().setTime(120e3).setMenu({type: "selector", pages: tracks, page: 0}).addEmbeds([embed])
                     .setCallback((msg, pages: Track[], page, embed, item: Track) => {
                         // Если был выбран объект
                         if (item) {
@@ -159,20 +146,19 @@ class message_search extends Assign<Event<"message/search">> {
                             return;
                         }
 
+                        // Текущий трек
                         const track = pages[page];
 
-                        // Изменяем сообщение
+                        // Обновляем сообщение
                         msg.edit({
-                            embeds: [
-                                {
-                                    ...embed[0],
-                                    description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.title.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
-                                    image: pages[page].image,
-                                    footer: {
-                                        text: locale._(message.locale, "player.search.list", [tracks.length, page+1, tracks.length])
-                                    },
+                            embeds: [{
+                                ...embed[0],
+                                description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.title.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
+                                image: pages[page].image,
+                                footer: {
+                                    text: locale._(message.locale, "player.search.list", [tracks.length, page + 1, tracks.length])
                                 }
-                            ]
+                            }]
                         });
                     }
                 ).send = message;
@@ -196,7 +182,7 @@ class message_playing extends Assign<Event<"message/playing">> {
             once: false,
             execute: async (queue, message) => {
                 const {color, artist, image, title, user} = queue.tracks.track;
-                const embed = new queue.message.builder().addEmbeds([
+                const builder = new queue.message.builder().addEmbeds([
                     {
                         color, thumbnail: image,
                         author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
@@ -226,21 +212,28 @@ class message_playing extends Assign<Event<"message/playing">> {
                     }
                 ]);
 
-                // Если надо обновить сообщение
-                if (message) {
-                    // Обновляем сообщение
-                    message.edit({ embeds: embed.embeds, components: queue.components }).catch(() => null);
+                // Отправляем сообщение
+                if (!message) {
+                    builder.setTime(0).addComponents(queue.components)
+                        // Для обновления сообщений
+                        .setPromise((msg) => {
+                            // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
+                            if (!db.queues.cycles.messages.array.includes(msg)) {
+                                // Добавляем сообщение в базу для обновления
+                                db.queues.cycles.messages.set(msg);
+
+                                // Отменяем удаление если оно начато
+                                MessageUtils.deferDeleteMessage(msg.message.id);
+                            }
+                        })
+
+                        // Создаем новое сообщение
+                        .send = queue.message;
                     return;
                 }
 
-                // Для обновления сообщений
-                embed.setPromise((msg) => {
-                    // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
-                    if (!db.queues.cycles.messages.array.includes(msg)) db.queues.cycles.messages.set(msg);
-                });
-
-                // Создаем новое сообщение
-                embed.setTime(0).addComponents(queue.components).send = queue.message;
+                // Обновляем сообщение
+                message.edit({ embeds: builder._embeds, components: queue.components }).catch(() => null);
             }
         });
     };

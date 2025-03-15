@@ -11,7 +11,7 @@ export class PlayerAudio {
      * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
      * @private
      */
-    private _audio: AudioResource = null;
+    private _audio: AudioResource;
 
     /**
      * @description Текущий стрим

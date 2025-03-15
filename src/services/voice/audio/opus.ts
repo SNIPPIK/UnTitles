@@ -126,7 +126,7 @@ export class OpusEncoder extends PassThrough {
      * @description При получении данных через pipe или write, модифицируем их для одобрения со стороны discord
      * @public
      */
-    public _transform = (chunk: Buffer, _: any, done: () => any): void => {
+    public _transform = (chunk: Buffer, _: any, done: () => any) => {
         // Получаем пакеты из
         while (!!chunk) {
             const packet = this.packet(chunk);

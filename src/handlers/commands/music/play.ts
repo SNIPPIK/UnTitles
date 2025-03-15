@@ -106,7 +106,10 @@ class PlayCommand extends Assign<Command> {
     public constructor() {
         super({
             rules: ["voice", "another_voice"],
-            execute: ({message, args, type}) => {
+            execute: async ({message, args, type}) => {
+                // Просим discord немного подождать бота
+                await message.message["deferReply"]();
+
                 switch (type) {
                     // Если пользователь прикрепил файл
                     case "file": {
@@ -114,7 +117,7 @@ class PlayCommand extends Assign<Command> {
 
                         // Если пользователь подсунул фальшивку
                         if (!attachment.contentType.match("audio")) {
-                            message.fastBuilder = { description: locale._(message.locale, "attachment.audio.fail"), color: Colors.Yellow };
+                            message.FBuilder = { description: locale._(message.locale, "attachment.audio.fail"), color: Colors.Yellow };
                             return;
                         }
 
@@ -128,14 +131,14 @@ class PlayCommand extends Assign<Command> {
 
                         // Если нет очереди, то и нечего перезапускать
                         if (!queue) {
-                            message.fastBuilder = { description: locale._(message.locale, "command.play.replay.queue", [message.author]), color: Colors.Yellow };
+                            message.FBuilder = { description: locale._(message.locale, "command.play.replay.queue", [message.author]), color: Colors.Yellow };
                             return;
                         }
 
                         // Перезапускаем очередь
                         db.queues.create(message);
 
-                        message.fastBuilder = { description: locale._(message.locale, "command.play.replay", [message.author]), color: Colors.Green };
+                        message.FBuilder = { description: locale._(message.locale, "command.play.replay", [message.author]), color: Colors.Green };
                         return;
                     }
 

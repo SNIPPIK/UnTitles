@@ -32,6 +32,9 @@ export class Process {
      * @public
      */
     public get stdout() {
+        // Если процесс уже уничтожен
+        if (!this._process || this._process.killed) return null;
+
         return this?.process?.stdout;
     };
 

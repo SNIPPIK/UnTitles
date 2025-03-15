@@ -1,4 +1,4 @@
-import {Encryption, UDPSocketEvents} from "@service/voice";
+import {UDPSocketEvents} from "@service/voice";
 import {createSocket} from "node:dgram";
 import {TypedEmitter} from "@utils";
 import {isIPv4} from "node:net";
@@ -15,14 +15,14 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
      * @readonly
      * @private
      */
-    private readonly socket = createSocket({ type: "udp4", reuseAddr: true });
+    private readonly socket = createSocket({ type: "udp4", sendBufferSize: 500 });
 
     /**
      * @description Данные сервера к которому надо подключится
      * @readonly
      * @private
      */
-    public readonly _connection: UDPConnection = null;
+    public readonly _connection: UDPConnection;
 
     /**
      * @description Отправка данных на сервер
@@ -37,7 +37,7 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public set discovery(ssrc: number) {
-        this.packet = Encryption.discoveryBuffer(ssrc);
+        this.packet = this.discoveryBuffer(ssrc);
 
         this.socket.once("message", async (message) => {
             if (message.readUInt16BE(0) === 2) {
@@ -51,7 +51,7 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
                     return;
                 }
 
-                this.emit("connected", { ip, port});
+                this.emit("connected", { ip, port });
                 return;
             }
         });
@@ -75,6 +75,19 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
         this.socket.once("close", () => {
             this.emit("close");
         });
+    };
+
+    /**
+     * @description Пакет для создания UDP соединения
+     * @public
+     */
+    private discoveryBuffer = (ssrc: number) => {
+        const packet = Buffer.alloc(74);
+        packet.writeUInt16BE(1, 0);
+        packet.writeUInt16BE(70, 2);
+        packet.writeUInt32BE(ssrc, 4);
+
+        return packet;
     };
 
     /**

@@ -283,23 +283,27 @@ export class Queue {
      * @readonly
      * @public
      */
-    public readonly cleanup = () => {
+    public cleanup = () => {
         Logger.log("DEBUG", `[Queue/${this.guild.id}] has cleanup`);
 
         // Останавливаем плеер
         if (this.player) this.player.cleanup();
+
+        // Удаляем старое сообщение, если оно есть
+        const message = db.queues.cycles.messages.array.find((msg) => {
+            return msg.guild.id === this.guild.id;
+        });
+
+        if (message) db.queues.cycles.messages.remove(message);
     };
 
     /**
-     * @description Эта функция полностью удаляет очередь и все сопутствующие данные
+     * @description Эта функция полностью удаляет очередь и все сопутствующие данные, используется в другом классе
      * @protected
      * @readonly
      */
-    protected readonly destroy = () => {
+    protected destroy = () => {
         Logger.log("DEBUG", `[Queue/${this.guild.id}] has destroyed`);
-
-        // Удаляем сообщение
-        this.message = null;
 
         // Удаляем плеер
         if (this.player) this.player.destroy();

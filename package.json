@@ -1,6 +1,6 @@
 {
   "name": "untitles",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "homepage": "https://github.com/SNIPPIK/UnTitles",
   "license": "BSD-3-Clause",
   "preferGlobal": true,
@@ -9,9 +9,11 @@
     "node": ">=23.0.0"
   },
   "dependencies": {
-    "bufferutil": "^4.0.9",
     "discord.js": "^14.18.0",
     "ws": "^8.18.1"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^4.0.9"
   },
   "devDependencies": {
     "@types/node": "^22.13.8",

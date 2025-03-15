@@ -449,13 +449,6 @@ abstract class Request {
                 request.destroy();
             });
 
-            /**
-             * @description Если время ожидания было превышено
-             */
-            request.once("timeout", () => {
-                return resolve(new Error(`[Timeout Request] Timeout connection to ${this.data.hostname}`));
-            });
-
             request.end();
         })
             // Удаляем данные после завершения ответа
@@ -518,7 +511,7 @@ export class httpsClient extends Request {
         let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage, data = "";
 
         return new Promise<string | Error>((resolve) => {
-            this.request.then((res) => {
+            this.request.then(async (res) => {
                 if (res instanceof Error) return resolve(res);
 
                 const encoding = res.headers["content-encoding"];
@@ -551,7 +544,7 @@ export class httpsClient extends Request {
      * @public
      */
     public get toJson(): Promise<json | Error> {
-        return this.toString.then((body) => {
+        return this.toString.then(async (body) => {
             if (body instanceof Error) return body;
 
             try {
@@ -585,7 +578,7 @@ export class httpsClient extends Request {
      * @public
      */
     public get status(): Promise<boolean> | false {
-        return this.request.then((resource) => {
+        return this.request.then(async (resource) => {
             if (resource instanceof Error) return false;
             return resource?.statusCode && resource.statusCode >= 200 && resource.statusCode <= 400;
         });

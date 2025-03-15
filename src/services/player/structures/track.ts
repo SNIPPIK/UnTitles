@@ -14,33 +14,33 @@ export class Track {
      * @readonly
      * @private
      */
-    private readonly _track: Track.data = null;
+    private readonly _track: Track.data;
 
     /**
      * @description Здесь хранятся данные времени трека
      * @readonly
      * @private
      */
-    private _duration: TrackDuration = null;
+    private _duration: TrackDuration;
 
     /**
      * @description Здесь хранятся данные с какой платформы был взят трек
      * @readonly
      * @private
      */
-    private _api: TrackAPI = null;
+    private _api: TrackAPI;
 
     /**
      * @description Параметр для сохранения lyrics
      * @private
      */
-    private _lyrics: string = null;
+    private _lyrics: string;
 
     /**
      * @description Пользователя включивший трек
      * @private
      */
-    private _user: Track.user = null;
+    private _user: Track.user;
 
     /**
      * @description Выдаем id трека
@@ -275,7 +275,7 @@ export class Track {
             if (this._lyrics) return resolve(this._lyrics);
 
             new httpsClient(`https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.title.split(" ").join("+")}`, {
-                useragent: "UnTitles 0.2.0, Music bot, github.com/SNIPPIK/UnTitles"
+                useragent: "UnTitles 0.2.2, Music bot, github.com/SNIPPIK/UnTitles"
             }).toJson.then((item) => {
                 // Если получаем вместо данных ошибку
                 if (item instanceof Error) return resolve(item);

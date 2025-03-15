@@ -26,7 +26,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @readonly
      * @public
      */
-    public readonly id: string = null;
+    public readonly id: string;
 
     /**
      * @description Подключаем класс для отображения прогресс бара
@@ -176,7 +176,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Загружаем события плеера
         for (const event of db.events.emitter.player)
-            this.on(event, (...args: any[]) => db.events.emitter.emit(event as any, ...args));
+            this.addListener(event, (...args: any) => db.events.emitter.emit(event, ...args));
 
         // Добавляем плеер в базу для отправки пакетов
         db.queues.cycles.players.set(this);
@@ -188,7 +188,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public play = (seek: number = 0) => {
-        let timeout: NodeJS.Timeout = null;
         const track = this._tracks?.track;
 
         // Если больше нет треков
@@ -200,7 +199,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Получаем асинхронные данные в синхронном потоке
         track?.resource
             // Если удалось получить исходный файл трека
-            .then((path) => {
+            .then(async (path) => {
                 // Если нет исходника
                 if (!path) {
                     this.emit("player/error", this, `Not found link audio!`, {
@@ -231,17 +230,15 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Если поток нельзя читать, возможно что он еще грузится
-                else if (this.status === "player/wait") {
-                    timeout = setTimeout(() => {
-                        this.emit("player/error", this, "Timeout the stream has been exceeded!", {
-                            skip: true,
-                            position: this.tracks.indexOf(track)
-                        });
+                let timeout = setTimeout(() => {
+                    this.emit("player/error", this, "Timeout the stream has been exceeded!", {
+                        skip: true,
+                        position: this.tracks.indexOf(track)
+                    });
 
-                        // Уничтожаем поток
-                        stream.destroy();
-                    }, 25e3);
-                }
+                    // Уничтожаем поток
+                    stream.destroy();
+                }, 10e3);
 
                 // Подключаем события для отслеживания работы потока (временные)
                 stream.stream
@@ -262,7 +259,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             })
 
             // Если возникла ошибка
-            .catch((err) => {
+            .catch(async (err) => {
                 // Сообщаем об ошибке
                 Logger.log("ERROR", `[Player] ${err}`);
 
@@ -271,12 +268,12 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             })
 
             // Создаем сообщение после всех действий
-            .finally(() => {
+            .finally(async () => {
                 // Если включается именно новый трек
                 if (seek === 0) {
                     const queue = db.queues.get(this.id);
 
-                    // Отправляем сообщение
+                    // Отправляем сообщение, если можно
                     db.events.emitter.emit("message/playing", queue);
                 }
             });
@@ -327,7 +324,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @readonly
      * @protected
      */
-    public readonly cleanup = () => {
+    public cleanup = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has cleanup`);
 
         // Отключаем от цикла плеер
@@ -335,6 +332,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Удаляем текущий поток, поскольку он больше не нужен
         this.audio.current = null;
+
+        // Переводим плеер в режим ожидания
+        this._status = "player/wait";
     };
 
     /**
@@ -342,7 +342,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @readonly
      * @protected
      */
-    public readonly destroy = () => {
+    public destroy = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has destroyed`);
 
         // Отключаем все ивенты от плеера

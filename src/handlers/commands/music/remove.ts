@@ -38,13 +38,13 @@ class RemoveTrackCommand extends Assign<Command> {
     public constructor() {
         super({
             rules: ["voice", "another_voice", "queue", "player-not-playing"],
-            execute: ({message, args}) => {
+            execute: async ({message, args}) => {
                 const queue = message.queue;
                 const number = args.length > 0 ? parseInt(args.pop()) : 1;
 
                 // Если аргумент не является числом
                 if (isNaN(number)) {
-                    message.fastBuilder = {
+                    message.FBuilder = {
                         description: locale._(message.locale, "command.seek.duration.nan"),
                         color: Colors.DarkRed
                     };
@@ -53,7 +53,7 @@ class RemoveTrackCommand extends Assign<Command> {
 
                 // Если аргумент больше кол-ва треков
                 else if (number > queue.tracks.size || number < 1) {
-                    message.fastBuilder = {
+                    message.FBuilder = {
                         description: locale._(message.locale, "command.seek.duration.big"),
                         color: Colors.DarkRed
                     };
@@ -69,7 +69,7 @@ class RemoveTrackCommand extends Assign<Command> {
                     queue.tracks.remove(number - 1);
                 }
 
-                message.fastBuilder = {
+                message.FBuilder = {
                     description: locale._(message.locale, "command.remove.track", [`[${title}](${url})`]),
                     color
                 };

@@ -11,7 +11,7 @@ export class PlayerVoice {
      * @description Текущее голосовое подключение к каналу на сервере
      * @private
      */
-    private _connection: VoiceConnection = null;
+    private _connection: VoiceConnection;
 
     /**
      * @description Производим подключение к голосовому каналу
@@ -46,11 +46,6 @@ export class PlayerVoice {
      */
     public set send(packet: Buffer) {
         // Отправляем пакет в голосовой канал
-        try {
-            if (packet) this.connection.packet = packet;
-        } catch (err) {
-            // Если возникает ошибка, то сообщаем о ней
-            console.log(err);
-        }
+        if (packet) this.connection.packet = packet;
     };
 }

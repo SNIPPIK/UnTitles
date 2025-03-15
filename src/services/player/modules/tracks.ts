@@ -47,7 +47,7 @@ export class PlayerTracks {
     };
 
     /**
-     * @description На сколько сделать пропуск треков
+     * @description Новая позиция трека в списке
      * @param number - Позиция трека
      * @public
      */

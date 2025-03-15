@@ -44,7 +44,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
 
             // Если в очереди менее 2 треков
             if (queue.tracks.size < 2) {
-                msg.fastBuilder = {
+                msg.FBuilder = {
                     description: locale._(msg.locale, "player.button.shuffle.fail"),
                     color: Colors.Yellow
                 };
@@ -55,7 +55,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             queue.tracks.shuffle = !queue.tracks.shuffle;
 
             // Отправляем сообщение о включении или выключении тасовки
-            msg.fastBuilder = {
+            msg.FBuilder = {
                 description: locale._(msg.locale, queue.tracks.shuffle ? "player.button.shuffle.on" : "player.button.shuffle.off"),
                 color: Colors.Green
             };
@@ -80,7 +80,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             queue.player.tracks.repeat = oldState;
 
             // Уведомляем пользователя о смене трека
-            msg.fastBuilder = {
+            msg.FBuilder = {
                 description: locale._(msg.locale, "player.button.last"),
                 color: Colors.Yellow
             };
@@ -101,7 +101,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
                 queue.player.pause();
 
                 // Сообщение о паузе
-                msg.fastBuilder = {
+                msg.FBuilder = {
                     description: locale._(msg.locale, "player.button.pause"),
                     color: Colors.Green
                 };
@@ -113,7 +113,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
                 queue.player.resume();
 
                 // Сообщение о возобновлении
-                msg.fastBuilder = {
+                msg.FBuilder = {
                     description: locale._(msg.locale, "player.button.resume"),
                     color: Colors.Green
                 };
@@ -133,7 +133,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             queue.player.stop(queue.tracks.position + 1);
 
             // Уведомляем пользователя о пропущенном треке
-            msg.fastBuilder = {
+            msg.FBuilder = {
                 description: locale._(msg.locale, "player.button.skip"),
                 color: Colors.Green
             };
@@ -151,7 +151,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             if (loop === RepeatType.None) {
                 queue.tracks.repeat = RepeatType.Songs;
 
-                msg.fastBuilder = {
+                msg.FBuilder = {
                     description: locale._(msg.locale, "player.button.repeat.songs"),
                     color: Colors.Green
                 };
@@ -161,7 +161,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             // Включение повтора трека
             else if (loop === RepeatType.Songs) {
                 queue.tracks.repeat = RepeatType.Song;
-                msg.fastBuilder = {
+                msg.FBuilder = {
                     description: locale._(msg.locale, "player.button.repeat.song"),
                     color: Colors.Green
                 };
@@ -169,7 +169,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             }
 
             queue.tracks.repeat = RepeatType.None;
-            msg.fastBuilder = {
+            msg.FBuilder = {
                 description: locale._(msg.locale, "player.button.repeat.off"),
                 color: Colors.Green
             };
@@ -181,14 +181,14 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
          * @description Повтор текущего трека
          * @button replay
          */
-        this.set("replay", (msg: Interact) => {
+        this.set("replay", (msg) => {
             const queue = msg.queue;
 
             // Запускаем проигрывание текущего трека
             queue.player.play();
 
             // Сообщаем о том что музыка начата с начала
-            msg.fastBuilder = {
+            msg.FBuilder = {
                 description: locale._(msg.locale, "player.button.replay", [queue.tracks.track.title]),
                 color: Colors.Green
             };
@@ -200,7 +200,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
          * @description Показ текущих треков
          * @button queue
          */
-        this.set("queue", (msg: Interact) => {
+        this.set("queue", (msg) => {
             const queue = msg.queue;
             const page = parseInt((queue.tracks.position / 5).toFixed(0));
             const pages = queue.tracks.array(5, true) as string[];
@@ -265,7 +265,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
 
             // Если нет фильтров
             if (filters.length === 0) {
-                msg.fastBuilder = {
+                msg.FBuilder = {
                     description: locale._(msg.locale, "player.button.filter.zero"),
                     color: Colors.White
                 };
@@ -360,7 +360,7 @@ export class db_buttons extends Collection<ButtonCallback, SupportButtons> {
             // Если есть очередь, то удаляем ее
             if (queue) queue.cleanup();
 
-            msg.fastBuilder = {
+            msg.FBuilder = {
                 description: locale._(msg.locale, "player.button.stop"),
                 color: Colors.Green
             };

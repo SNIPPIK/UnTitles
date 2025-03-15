@@ -27,7 +27,7 @@ const intends: { name: Command["rules"][number], callback: (message: Interact) =
 
             // Если нет голосового подключения
             if (!VoiceChannel) {
-                message.fastBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow };
+                message.FBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow };
                 return false;
             }
 
@@ -39,7 +39,7 @@ const intends: { name: Command["rules"][number], callback: (message: Interact) =
         callback: (message) => {
             // Если нет очереди
             if (!message.queue) {
-                message.fastBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow };
+                message.FBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow };
                 return false;
             }
 
@@ -51,7 +51,7 @@ const intends: { name: Command["rules"][number], callback: (message: Interact) =
         callback: (message) => {
             // Если музыку нельзя пропустить из-за плеера
             if (!message.queue.player.playing) {
-                message.fastBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
+                message.FBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
                 return false;
             }
 
@@ -72,7 +72,7 @@ const intends: { name: Command["rules"][number], callback: (message: Interact) =
                     if (queue.voice && queue.voice.channel) {
                         // Если в гс есть другие пользователи
                         if (message.me.voice.channel && message.me.voice.channel.members.filter((user) => !user.user.bot).size > 0) {
-                            message.fastBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
+                            message.FBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
                             return false;
                         }
 
@@ -81,7 +81,7 @@ const intends: { name: Command["rules"][number], callback: (message: Interact) =
                             queue.voice = message.voice;
                             queue.message = message;
 
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "voice.new", [message.voice.channel]),
                                 color: Colors.Yellow
                             };
@@ -136,7 +136,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 if (db.whitelist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
                     if (db.whitelist.ids.length > 0 && !db.whitelist.ids.includes(message.user.id)) {
-                        interact.fastBuilder = {
+                        interact.FBuilder = {
                             description: locale._(interact.locale, "whitelist.message", [interact.author]),
                             color: Colors.Yellow
                         }
@@ -149,7 +149,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 else if (db.blacklist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
                     if (db.blacklist.ids.length > 0 && !db.blacklist.ids.includes(message.user.id)) {
-                        interact.fastBuilder = {
+                        interact.FBuilder = {
                             description: locale._(interact.locale, "blacklist.message", [interact.author]),
                             color: Colors.Yellow
                         }
@@ -172,7 +172,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     else {
                         // Если время еще не прошло говорим пользователю об этом
                         if (user >= Date.now()) {
-                            interact.fastBuilder = {
+                            interact.FBuilder = {
                                 description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0), 5]),
                                 color: Colors.Yellow
                             }
@@ -192,13 +192,13 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     // Если нет команды
                     if (!command) {
                         db.commands.remove(client, message.commandGuildId, message.commandId);
-                        interact.fastBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
+                        interact.FBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
                         return;
                     }
 
                     // Если пользователь пытается использовать команду разработчика
                     else if (command?.owner && !db.owner.ids.includes(interact.author.id)) {
-                        interact.fastBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
+                        interact.FBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
                         return;
                     }
 
@@ -243,7 +243,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
                     // Если была не найдена кнопка
                     else if (!button) {
-                        interact.fastBuilder = { description: locale._(interact.locale, "button.fail"), color: Colors.DarkRed };
+                        interact.FBuilder = { description: locale._(interact.locale, "button.fail"), color: Colors.DarkRed };
                         return;
                     }
 

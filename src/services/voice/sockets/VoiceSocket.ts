@@ -14,7 +14,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @description Текущий статус подключения
      * @private
      */
-    private _state: VoiceSocketState.States = null;
+    private _state: VoiceSocketState.States;
     /**
      * @description Текущее состояние сетевого экземпляра
      * @public
@@ -50,7 +50,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
             }
 
             // Если происходит попытка вызова события из уничтоженного EventEmitter
-            this.emit("stateChange", oldState, newState);
+            if (oldState.code !== newState.code) this.emit("stateChange", oldState, newState);
         } catch {
             // :D
         }
@@ -139,6 +139,10 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
         const state = this.state;
 
         switch (state.code) {
+
+            /**
+             * @description Если происходит обрыв соединения ws, то пробуем его поднять заново
+             */
             case VoiceSocketStatusCode.resume: {
                 state.ws.packet = {
                     op: VoiceOpcodes.Resume,
@@ -151,6 +155,10 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                 };
                 return
             }
+
+            /**
+             * @description Если приходит статус поднятия ws, то необходимо отослать статус индификации клиента voice
+             */
             case VoiceSocketStatusCode.upWS: {
                 state.ws.packet = {
                     op: VoiceOpcodes.Identify,
@@ -160,7 +168,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                         session_id: state.connectionOptions.sessionId,
                         token: state.connectionOptions.token,
                         seq_ack: state.ws.seq_ack
-                    },
+                    }
                 };
                 this.state = {...state, code: VoiceSocketStatusCode.identify};
                 return;
@@ -200,7 +208,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @param packet - Полученный пакет
      * @private
      */
-    private WebSocketPacket = async (packet: {d: any, op: VoiceOpcodes}) => {
+    private WebSocketPacket = (packet: {d: any, op: VoiceOpcodes}) => {
         switch (packet.op) {
             /**
              * @description Если получен код о готовности подключения к голосовому каналу
@@ -235,7 +243,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                             data: {
                                 address: config.ip,
                                 port: config.port,
-                                mode: Encryption.mode,
+                                mode: Encryption.mode
                             },
                         }
                     };
@@ -262,7 +270,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                         nonce: 0,
                         nonceBuffer: Encryption.nonce,
                         speaking: false,
-                        packetsPlayed: 0,
+                        packetsPlayed: 0
                     })
                 };
 
@@ -284,7 +292,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                         delay: packet.d.delay,
                         ssrc: packet.d.ssrc
                     },
-                    seq: packet.d.seq,
+                    seq: packet.d.seq
                 };
                 return;
             }
@@ -296,7 +304,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
              */
             case VoiceOpcodes.Hello: {
                 // Задаем время жизни голосового подключения
-                if (this.state.code !== VoiceSocketStatusCode.close) this.state.ws.keepAlive = packet.d.heartbeat_interval;
+                if (this.state.code !== VoiceSocketStatusCode.close && packet.d.heartbeat_interval) this.state.ws.keepAlive = packet.d.heartbeat_interval;
 
                 return;
             }
@@ -330,11 +338,11 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @private
      */
     private SocketUDPClose = () => {
-        const state = this.state;
+        // Если статус код не соответствует с VoiceSocketStatusCode.ready
+        if (this.state.code !== VoiceSocketStatusCode.ready) return;
 
-        // Если статус код соответствует с VoiceSocketStatusCode.ready, то возобновляем работу
-        if (state.code === VoiceSocketStatusCode.ready) this.state = { ...state,
-            ws: this.createWebSocket(state.connectionOptions.endpoint),
+        this.state = { ...this.state,
+            ws: this.createWebSocket(this.state.connectionOptions.endpoint),
             code: VoiceSocketStatusCode.resume
         };
     };

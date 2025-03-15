@@ -44,10 +44,8 @@ class sAPI extends Assign<API> {
                             // Если ID плейлиста не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err("api.request.id.playlist"));
 
-                            try {
-                                // Создаем запрос
-                                const api = await sAPI.API(`https://www.youtube.com/${ID}`);
-
+                            // Создаем запрос
+                            sAPI.API(`https://www.youtube.com/${ID}`).then(async (api) => {
                                 // Если при запросе была получена ошибка
                                 if (api instanceof Error) return resolve(api);
 
@@ -69,7 +67,10 @@ class sAPI extends Assign<API> {
                                     const authorData = author[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
 
                                     // Получаем истинные данные об авторе плейлиста
-                                    artist = await sAPI.getChannel({ id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"], name: authorData.title["runs"][0].text });
+                                    artist = await sAPI.getChannel({
+                                        id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"],
+                                        name: authorData.title["runs"][0].text
+                                    });
                                 }
 
                                 return resolve({
@@ -78,9 +79,9 @@ class sAPI extends Assign<API> {
                                     image: playlist.thumbnail["thumbnails"].pop(),
                                     artist: artist ?? items.at(-1).artist
                                 });
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`));
-                            }
+                            }).catch((err) => {
+                                return resolve(new Error(`[APIs]: ${err}`))
+                            });
                         });
                     }
                 },
@@ -105,10 +106,8 @@ class sAPI extends Assign<API> {
                             // Если найден трек или похожий объект
                             if (cache && !options?.audio) return resolve(cache);
 
-                            try {
-                                // Создаем запрос
-                                const result = await sAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
-
+                            // Создаем запрос
+                            sAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`).then(async (result) => {
                                 /// Если при получении данных возникла ошибка
                                 if (result instanceof Error) return resolve(result);
 
@@ -125,9 +124,9 @@ class sAPI extends Assign<API> {
                                 db.cache.set(track);
 
                                 return resolve(track);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
-                            }
+                            }).catch((err) => {
+                                return resolve(new Error(`[APIs]: ${err}`));
+                            });
                         });
                     }
                 },
@@ -269,7 +268,7 @@ class sAPI extends Assign<API> {
             // Если произошла ошибка при расшифровке
             if (decoder[0] instanceof Error) return resolve(decoder[0]);
 
-            return resolve(decoder[0]);
+            return resolve(decoder.at(-1));
         });
     };
 
@@ -283,7 +282,7 @@ class sAPI extends Assign<API> {
         const endIndex = input.indexOf("};", startIndex + startPattern.length);
 
         // Если нет данных
-        if (startIndex === -1 && endIndex === -1) return null;
+        if (startIndex === -1 && endIndex === -1)return locale.err("api.request.fail");
 
         const data = JSON.parse(input.substring(startIndex + startPattern.length, endIndex + 1));
 
@@ -347,10 +346,12 @@ class sAPI extends Assign<API> {
                     url: `https://www.youtube.com${track["shortBylineText"]["runs"][0]["navigationEndpoint"]["browseEndpoint"]["canonicalBaseUrl"] || track["shortBylineText"]["runs"][0]["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"].url}`,
                 },
                 time: { total: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0 },
-                image: track.thumbnail["thumbnails"].pop(),
+                image: {
+                    url: `https://i.ytimg.com/vi/${track["videoId"]}/maxresdefault.jpg`
+                },
                 audio: track?.format?.url || undefined
             });
-        } catch (err) {
+        } catch {
             return new Track({
                 id: track["videoId"],
                 artist: {
@@ -362,13 +363,14 @@ class sAPI extends Assign<API> {
                 time: {
                     total: track["lengthSeconds"] ?? 0
                 },
-                image: track.thumbnail["thumbnails"].pop(),
+                image: {
+                    url: `https://i.ytimg.com/vi/${track["videoId"]}/maxresdefault.jpg`
+                },
                 audio: track?.format?.url || undefined
             })
         }
     };
 }
-
 
 
 /**
@@ -488,12 +490,13 @@ const extractors: { name: string, callback: (body: string) => string }[] = [
     }
 ];
 
+
 /**
  * @author SNIPPIK
  * @description Расшифровщик ссылок на исходный файл для youtube
  * @class Youtube_decoder
  */
-export class Youtube_decoder {
+class Youtube_decoder {
     /**
      * @description Применяем преобразования decipher и n параметров ко всем URL-адресам формата.
      * @param formats - Все форматы аудио или видео

@@ -120,7 +120,7 @@ class Command_Voice extends Assign<Command> {
                         else db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, guild.voiceAdapterCreator);
 
                         // Отправляем сообщение о подключении к каналу
-                        message.fastBuilder = {
+                        message.FBuilder = {
                             color: Colors.Green,
                             description: locale._(message.locale, "voice.join", [VoiceChannel])
                         };
@@ -133,7 +133,7 @@ class Command_Voice extends Assign<Command> {
                         VoiceChannel.setRTCRegion(null)
                             // Если не получилось сменить регион
                             .catch(() => {
-                                message.fastBuilder = {
+                                message.FBuilder = {
                                     color: Colors.DarkRed,
                                     description: locale._(message.locale, "voice.rtc.fail")
                                 }
@@ -144,7 +144,7 @@ class Command_Voice extends Assign<Command> {
                                 //Перенастройка подключения
                                 voiceConnection.configureSocket;
 
-                                message.fastBuilder = {
+                                message.FBuilder = {
                                     color: Colors.Green,
                                     description: locale._(message.locale, "voice.rtc")
                                 }
@@ -160,7 +160,7 @@ class Command_Voice extends Assign<Command> {
                         // Отключаемся от голосового канала
                         voiceConnection.disconnect;
 
-                        message.fastBuilder = {
+                        message.FBuilder = {
                             color: Colors.Green,
                             description: locale._(message.locale, "voice.leave", [VoiceChannel])
                         };
@@ -179,7 +179,7 @@ class Command_Voice extends Assign<Command> {
                             else await me.voice.setRequestToSpeak(true);
                         } catch (err) {
                             // Если не удалось подключиться или сделать запрос
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: args[0] === "join" ? locale._(message.locale, "voice.tribune.join.fail") : locale._(message.locale, "voice.tribune.join.request.fail"),
                                 color: Colors.DarkRed
                             };
@@ -187,7 +187,7 @@ class Command_Voice extends Assign<Command> {
                         }
 
                         // Если удалось подключиться или сделать запрос
-                        message.fastBuilder = {
+                        message.FBuilder = {
                             description: args[0] === "join" ? locale._(message.locale, "voice.tribune.join") : locale._(message.locale, "voice.tribune.join.request"),
                             color: Colors.Green
                         }

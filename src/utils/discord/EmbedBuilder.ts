@@ -1,7 +1,8 @@
 import {MessageComponents, MessageSendOptions} from "@type/discord";
-import {InteractionCallbackResponse} from "discord.js";
-import type {EmbedData, Message} from "discord.js";
+import {InteractionCallbackResponse, MessageFlags} from "discord.js";
 import {Interact, Logger, MessageUtils} from "@utils";
+import type {EmbedData, Message} from "discord.js";
+import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -10,44 +11,31 @@ import {Interact, Logger, MessageUtils} from "@utils";
  */
 export class EmbedBuilder {
     /**
-     * @description Временная база данных с ComponentData или классом ActionRowBuilder в array
-     * @readonly
-     * @public
-     */
-    public readonly components: Array<MessageComponents> = [];
-
-    /**
      * @description Временная база данных с embed json data в array
      * @readonly
      * @public
      */
-    public readonly embeds: Array<EmbedData> = [];
+    public _embeds: Array<EmbedData> = [];
+
+    /**
+     * @description Временная база данных с ComponentData или классом ActionRowBuilder в array
+     * @readonly
+     * @public
+     */
+    public _components: Array<MessageComponents>;
+
+    /**
+     * @description Параметр скрытного сообщения
+     * @private
+     */
+    private _ephemeral: boolean = false;
 
     /**
      * @description Параметры для создания меню
      * @readonly
      * @private
      */
-    private readonly _menu: {
-        /**
-         * @description Сами страницы
-         */
-        pages: any[];
-
-        /**
-         * @description Тип взаимодействия
-         */
-        type: "table" | "selector";
-
-        /**
-         * @description Номер текущей страницы
-         */
-        page: number;
-    } = {
-        pages: [],
-        type: null,
-        page: 0
-    };
+    private _menu: EmbedBuilderMenu;
 
     /**
      * @description Время жизни сообщения по умолчанию
@@ -61,47 +49,37 @@ export class EmbedBuilder {
      * @public
      */
     public set send(interaction: Interact) {
-        const options = {embeds: this.embeds, components: this.components, withResponse: !!this.promise || !!this.callback};
+        const options = {embeds: this._embeds, components: this._components, withResponse: !!this.promise || !!this.callback};
 
+        // Если надо скрывать сообщение
+        if (this._ephemeral) Object.assign(options, {flags: MessageFlags.Ephemeral});
+
+        // Отправляем сообщение
         interaction.send(options)
-            .then((message) => {
+            .then(async (message) => {
                 // Если получить возврат не удалось, то ничего не делаем
                 if (!message) return;
 
-                // Удаляем сообщение через время если это возможно
-                if (this.time !== 0) MessageUtils.delete(message, this.time);
-
                 // Создаем меню если есть параметры для него
-                if (this._menu.pages.length > 0) this.constructor_menu(message instanceof InteractionCallbackResponse ? message.resource.message : message);
+                if (this._menu) this.constructor_menu(message instanceof InteractionCallbackResponse ? message.resource.message : message);
 
                 // Если надо выполнить действия после
                 if (this.promise) this.promise(new Interact(message));
-            })
-            .catch((err) => {
-                // Не даем запустить проверку повторно
-                if (interaction._hookReply) return;
 
-                // Если происходит ошибка при отправке сообщений
-                // Эта ошибка возникает когда отправка сообщение превысило время ожидания
-                if (`${err}`.match(/Unknown interaction|Interaction has already been acknowledged/)) {
-                    interaction._hookReply = true;
-
-                    setTimeout(() => {
-                        this.send = interaction;
-                        interaction._hookReply = false;
-                    }, 200);
-
-                    Logger.log("ERROR", "[DiscordAPI]: Error interaction, resend...");
-                    return;
+                // Удаляем сообщение через время если это возможно
+                if (this.time !== 0) {
+                    MessageUtils.deleteMessage({message}, this.time);
                 }
-
+            })
+            .catch(async (err) => {
                 // Если при отправке сообщения произошла ошибка связанная с авторизацией
                 // Эта ошибка возникает когда сообщение невозможно отредактировать, именно reply
-                else if (`${err}`.match(/Invalid Webhook Token/)) {
+                if (`${err}`.match(/Invalid Webhook Token/)) {
                     Logger.log("ERROR", "[DiscordAPI]: Error webhook token, ignoring!");
                     return;
                 }
 
+                // Показываем ошибку если до нее дойдет речь
                 console.error(err);
             });
     };
@@ -124,9 +102,9 @@ export class EmbedBuilder {
      * @public
      */
     public addEmbeds = (data: EmbedData[]) => {
-        Object.assign(this.embeds, data);
+        Object.assign(this._embeds, data);
 
-        for (let embed of this.embeds) {
+        for (let embed of this._embeds) {
             // Добавляем цвет по-умолчанию
             if (!embed.color) embed.color = 258044;
 
@@ -148,12 +126,22 @@ export class EmbedBuilder {
     };
 
     /**
+     * @description Добавляем параметр скрытного сообщения
+     * @public
+     */
+    public setEphemeral = () => {
+        this._ephemeral = true;
+        return this;
+    };
+
+    /**
      * @description Добавляем components в базу для дальнейшей отправки
      * @param data - Компоненты под сообщением
      * @public
      */
     public addComponents = (data: MessageSendOptions["components"]) => {
-        Object.assign(this.components, data);
+        if (!this._components) this._components = [];
+        Object.assign(this._components, data);
         return this;
     };
 
@@ -183,9 +171,11 @@ export class EmbedBuilder {
      * @public
      */
     public setMenu = (options: EmbedBuilder["_menu"]) => {
+        if (!this._components) this._components = [];
+
         // Добавляем кнопки для просмотра
         if (options.type === "table") {
-            this.components.push(
+            this._components.push(
                 {
                     type: 1, components: [
                         MessageUtils.createButton({emoji: {name: "⬅"},  id: "menu_back"}),
@@ -198,7 +188,7 @@ export class EmbedBuilder {
 
         // Добавляем кнопки для выбора
         else {
-            this.components.push(
+            this._components.push(
                 {
                     type: 1, components: [
                         MessageUtils.createButton({emoji: {name: "⬅"},  id: "menu_back"}),
@@ -210,7 +200,7 @@ export class EmbedBuilder {
             )
         }
 
-        Object.assign(this._menu, options);
+        this._menu = options;
         return this;
     };
 
@@ -224,7 +214,7 @@ export class EmbedBuilder {
 
         // Создаем сборщик
         const collector = msg.createMessageComponentCollector({
-            time: 60e3, componentType: 2,
+            time: 120e3, componentType: 2,
             filter: (click) => click.user.id !== msg.client.user.id
         });
 
@@ -250,7 +240,7 @@ export class EmbedBuilder {
             else if (i.customId === "menu_select") {
                 if (pages.length === 1) return;
 
-                this.callback(msg, pages, page, this.embeds[0], pages[page]);
+                this.callback(msg, pages, page, this._embeds[0], pages[page]);
                 try { return msg.delete(); } catch { return; }
             }
 
@@ -259,7 +249,29 @@ export class EmbedBuilder {
                 try { return msg.delete(); } catch { return; }
             }
 
-            return this.callback(msg, pages, page, this.embeds[0]);
+            return this.callback(msg, pages, page, this._embeds[0]);
         });
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Параметры для создания меню с кнопками
+ * @interface EmbedBuilderMenu
+ */
+interface EmbedBuilderMenu {
+    /**
+     * @description Сами страницы
+     */
+    pages: any[];
+
+    /**
+     * @description Тип взаимодействия
+     */
+    type: "table" | "selector";
+
+    /**
+     * @description Номер текущей страницы
+     */
+    page: number;
 }

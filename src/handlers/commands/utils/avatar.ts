@@ -37,7 +37,7 @@ import {Assign} from "@utils";
 class AvatarCommand extends Assign<Command> {
     public constructor() {
         super({
-            execute: ({message, args}) => {
+            execute: async ({message, args}) => {
                 const user = message.guild.members.cache.get(args[0]).user;
 
                 // Отправляем сообщение в текстовый канал
@@ -52,7 +52,7 @@ class AvatarCommand extends Assign<Command> {
                             iconURL: message.me.user.avatarURL({size: 1024, forceStatic: false})
                         }
                     }
-                ]).setTime(30e3).send = message;
+                ]).setEphemeral().setTime(30e3).send = message;
             }
         });
     };

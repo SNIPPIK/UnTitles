@@ -105,7 +105,7 @@ export abstract class Cycle<T = unknown> {
      * @readonly
      * @private
      */
-    private readonly _stepCycle = () => {
+    private readonly _stepCycle = async () => {
         // Если нет объектов
         if (this._data.array?.length === 0) {
             this._data.time = 0;

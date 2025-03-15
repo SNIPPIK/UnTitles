@@ -40,19 +40,6 @@ export class Encryption {
     };
 
     /**
-     * @description Пакет для создания UDP соединения
-     * @public
-     */
-    public static discoveryBuffer = (ssrc: number) => {
-        const packet = Buffer.alloc(74);
-        packet.writeUInt16BE(1, 0);
-        packet.writeUInt16BE(70, 2);
-        packet.writeUInt32BE(ssrc, 4);
-
-        return packet;
-    };
-
-    /**
      * @description Задаем структуру пакета
      * @param packet - Пакет Opus для шифрования
      * @param connectionData - Текущие данные подключения экземпляра
@@ -77,9 +64,13 @@ export class Encryption {
         rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
 
         connectionData.nonce++;
-        if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
-        connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
 
+        // Если нет пакета или номер пакет превышен максимальный, то его надо сбросить
+        if (connectionData.nonce > MAX_NONCE_SIZE) {
+            connectionData.nonce = 0;
+        }
+
+        connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
         return this.crypto(packet, connectionData, rtp_packet);
     };
 
@@ -95,7 +86,7 @@ export class Encryption {
 
         // Шифровка aead_aes256_gcm (support rtpsize)
         if (connectionData.encryptionMode.startsWith("aead_aes256_gcm")) {
-            const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer)
+            const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer, { autoDestroy: true });
             cipher.setAAD(rtp_packet);
             return Buffer.concat([rtp_packet, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
         }

@@ -38,33 +38,33 @@ class SeekTrackCommand extends Assign<Command> {
     public constructor() {
         super({
             rules: ["queue", "voice", "another_voice", "player-not-playing"],
-            execute: ({message, args}) => {
+            execute: async ({message, args}) => {
                 const queue = message.queue;
                 const duration = args[0]?.duration();
 
-                //Если пользователь написал что-то не так
+                // Если пользователь написал что-то не так
                 if (isNaN(duration)) {
-                    message.fastBuilder = {
+                    message.FBuilder = {
                         color: Colors.DarkRed,
                         description: locale._(message.locale, "command.seek.duration.nan")
                     };
                     return;
                 }
 
-                //Если пользователь указал времени больше чем в треке
+                // Если пользователь указал времени больше чем в треке
                 else if (duration > queue.tracks.track.time.total) {
-                    message.fastBuilder = {
+                    message.FBuilder = {
                         color: Colors.DarkRed,
                         description: locale._(message.locale, "command.seek.duration.big")
                     };
                     return;
                 }
 
-                //Начинаем проигрывание трека с <пользователем указанного тайм кода>
+                // Начинаем проигрывание трека с <пользователем указанного тайм кода>
                 queue.player.play(duration);
 
-                //Отправляем сообщение о пропуске времени
-                message.fastBuilder = {
+                // Отправляем сообщение о пропуске времени
+                message.FBuilder = {
                     color: Colors.Green,
                     description: locale._(message.locale, "command.seek", [duration])
                 };

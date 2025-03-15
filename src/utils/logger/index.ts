@@ -38,13 +38,24 @@ export class Logger {
         // Игнорируем debug сообщения
         if (status === "DEBUG") return;
 
-        text = text.replace(/\[/g, "\x1b[100m \x1b[30m").replace(/]/g, " \x1b[0m");
+        text = text.replace(/\[/, "\x1b[102m \x1b[30m").replace(/]/, " \x1b[0m");
 
+        const date = new Date();
+        const ms = `${date.getMilliseconds()}`
         const extStatus = db.status[status];
-        const time = `\x1b[90m${new Date().toLocaleTimeString()}\x1b[0m`;
+        const time = `\x1b[90m${date.getDate().toSplit()}/${(date.getMonth() + 1).toSplit()}/${date.getFullYear()} ${date.getHours().toSplit()}:${date.getMinutes().toSplit()}.${ms.slice(0, 2)}\x1b[0m`;
 
         // Отправляем лог
-        console.log(`\x1b[35m${process.pid}\x1b[0m [${time}] |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}`);
+        console.log(`${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}`);
         return;
+    };
+
+    /**
+     * @description Добавляем цвет к тексту
+     * @param color - Цвет текста, в number console
+     * @param text - Текст
+     */
+    public static color = (color: number, text: string) => {
+        return `\x1b[${color}m${text}\x1b[0m`
     };
 }

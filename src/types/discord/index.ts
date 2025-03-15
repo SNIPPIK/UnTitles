@@ -12,6 +12,7 @@ export type ds_interact = Message | BaseInteraction | InteractionCallbackRespons
 /**
  * @author SNIPPIK
  * @description Параметры показа статуса
+ * @interface ActivityOptions
  */
 export interface ActivityOptions {
     name: string;
@@ -24,6 +25,7 @@ export interface ActivityOptions {
 /**
  * @author SNIPPIK
  * @description Внутренний тип сообщений
+ * @type interact
  */
 export type interact = Message | BaseInteraction;
 

@@ -1,5 +1,5 @@
+import {Interact, MessageUtils} from "@utils";
 import {AudioPlayer} from "@service/player";
-import {Interact} from "@utils";
 import {Cycle} from "@utils";
 import {db} from "@app";
 
@@ -38,15 +38,8 @@ class AudioPlayers extends Cycle<AudioPlayer> {
             duration: 20,
             filter: (item) => item.playing,
             execute: (player) => {
-                const packet = player.audio.current.packet;
-
-                // Делаем плавное переключение потока
-                if (player.audio.current.duration >= player.tracks.track.time.total - (db.queues.options.fade - 7)) {
-                    player.emit("player/wait", player);
-                }
-
-                // Отправляем пакет или пустышку
-                player.voice.send = packet;
+                // Отправляем пакет
+                player.voice.send = player.audio.current.packet;
             }
         });
     };
@@ -61,9 +54,9 @@ class Messages extends Cycle<Interact> {
     public constructor() {
         super({
             name: "Messages",
-            duration: 18e3,
+            duration: 20e3,
             custom: {
-                remove: (item) => { item.delete = 200; },
+                remove: (item) => { MessageUtils.deleteMessage(item, 200) },
                 push: (item) => {
                     const old = this.array.find(msg => msg.guild.id === item.guild.id);
 
@@ -72,17 +65,11 @@ class Messages extends Cycle<Interact> {
                 }
             },
             filter: (message) => message.editable,
-            execute: (message): void => {
+            execute: (message) => {
                 const queue = message.queue;
 
-                // При каких условиях надо будет удалить сообщение
-                if (!queue || !queue?.player || !db.queues.cycles.players.match(queue.player)) {
-                    this.remove(message);
-                    return;
-                }
-
                 // Если есть поток в плеере
-                else if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
+                if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
                     // Обновляем сообщение о текущем треке
                     db.events.emitter.emit("message/playing", queue, message);
                     return;

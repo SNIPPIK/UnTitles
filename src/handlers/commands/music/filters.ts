@@ -103,7 +103,7 @@ class AudioFiltersCommand extends Assign<Command> {
     public constructor() {
         super({
             rules: ["queue", "voice", "another_voice", "player-not-playing"],
-            execute: ({message, args, type}) => {
+            execute: async ({message, args, type}) => {
                 const player = message.queue.player;
 
                 const seek: number = player.audio.current?.duration ?? 0;
@@ -118,7 +118,7 @@ class AudioFiltersCommand extends Assign<Command> {
                     case "off": {
                         // Если нет включенных фильтров
                         if (player.filters.enabled.length === 0) {
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "command.filter.off.null")
                             };
                             return;
@@ -129,7 +129,7 @@ class AudioFiltersCommand extends Assign<Command> {
                             player.play(player.audio.current?.duration);
 
                             // Сообщаем о выключении фильтров
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "command.filter.off.after"),
                                 color: Colors.Green, timestamp: new Date()
                             };
@@ -138,7 +138,7 @@ class AudioFiltersCommand extends Assign<Command> {
                         // Если нельзя выключить фильтр или фильтры сейчас
                         else {
                             // Сообщаем о выключении фильтров
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "command.filter.off.before"),
                                 color: Colors.Green, timestamp: new Date()
                             };
@@ -153,7 +153,7 @@ class AudioFiltersCommand extends Assign<Command> {
                     case "push": {
                         // Пользователь пытается включить включенный фильтр
                         if (findFilter) {
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "command.filter.push.two")
                             };
                             return;
@@ -164,7 +164,7 @@ class AudioFiltersCommand extends Assign<Command> {
                             // Если аргументы подходят
                             if (argument && argument >= Filter.args[0] && argument <= Filter.args[1]) Filter.user_arg = argument;
                             else {
-                                message.fastBuilder = {
+                                message.FBuilder = {
                                     description: locale._(message.locale, "command.filter.push.argument", Filter.args)
                                 };
                                 return;
@@ -177,7 +177,7 @@ class AudioFiltersCommand extends Assign<Command> {
 
                             // Если фильтры не совместимы
                             if (filter && Filter.unsupported.includes(filter?.name)) {
-                                message.fastBuilder = {
+                                message.FBuilder = {
                                     description: locale._(message.locale, "command.filter.push.unsupported", [filter.name, Filter.name]),
                                     color: Colors.DarkRed
                                 };
@@ -194,7 +194,7 @@ class AudioFiltersCommand extends Assign<Command> {
                             player.play(seek);
 
                             // Сообщаем о включении фильтров
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "command.filter.push.before", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
                                 color: Colors.Green, timestamp: new Date()
                             };
@@ -203,7 +203,7 @@ class AudioFiltersCommand extends Assign<Command> {
                         // Если нельзя включить фильтр или фильтры сейчас
                         else {
                             // Сообщаем о включении фильтров
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "command.filter.push.after", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
                                 color: Colors.Green, timestamp: new Date()
                             };
@@ -215,7 +215,7 @@ class AudioFiltersCommand extends Assign<Command> {
                     case "disable": {
                         // Пользователь пытается выключить выключенный фильтр
                         if (!findFilter) {
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "command.filter.remove.two"),
                                 color: Colors.Yellow
                             };
@@ -231,7 +231,7 @@ class AudioFiltersCommand extends Assign<Command> {
                             player.play(seek);
 
                             // Сообщаем о включении фильтров
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "command.filter.remove.after", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
                                 color: Colors.Green, timestamp: new Date()
                             };
@@ -240,7 +240,7 @@ class AudioFiltersCommand extends Assign<Command> {
                         // Если нельзя выключить фильтр или фильтры сейчас
                         else {
                             // Сообщаем о включении фильтров
-                            message.fastBuilder = {
+                            message.FBuilder = {
                                 description: locale._(message.locale, "command.filter.remove.before", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
                                 color: Colors.Green, timestamp: new Date()
                             };
