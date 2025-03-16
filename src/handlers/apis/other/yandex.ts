@@ -55,7 +55,7 @@ class sAPI extends Assign<API> {
                     name: "track",
                     filter: /track\/[0-9]+/gi,
                     execute: (url, options) => {
-                        const ID = /track\/[0-9]+/gi.exec(url)?.at(0)?.split("track")?.at(0);
+                        const ID = /track\/[0-9]+/gi.exec(url)[0]?.split("track")?.at(1);
 
                         return new Promise<Track | Error>(async (resolve) => {
                             // Если ID трека не удалось извлечь из ссылки
