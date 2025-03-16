@@ -21,14 +21,14 @@ export abstract class Cycle<T = unknown> {
          * @description Время через которое надо будет выполнить функцию
          */
         time: number;
-    } = null;
+    };
 
     /**
      * @description Параметры для работы цикла
      * @readonly
      * @public
      */
-    public readonly _config: TimeCycleConfig<T> = null;
+    public readonly _config: TimeCycleConfig<T>;
 
     /**
      * @description Выдаем коллекцию
@@ -105,7 +105,7 @@ export abstract class Cycle<T = unknown> {
      * @readonly
      * @private
      */
-    private readonly _stepCycle = async () => {
+    private readonly _stepCycle = () => {
         // Если нет объектов
         if (this._data.array?.length === 0) {
             this._data.time = 0;
@@ -176,28 +176,28 @@ interface TimeCycleConfig<T> {
      * @readonly
      * @public
      */
-    readonly name: string,
+    readonly name: string;
 
     /**
      * @description Функция для выполнения
      * @readonly
      * @public
      */
-    readonly execute: (item: T) => void | Promise<boolean>,
+    readonly execute: (item: T) => void | Promise<boolean>;
 
     /**
      * @description Как фильтровать объекты, вдруг объект еще не готов
      * @readonly
      * @public
      */
-    readonly filter: (item: T) => boolean,
+    readonly filter: (item: T) => boolean;
 
     /**
      * @description Время прогона цикла, через n времени будет запущен цикл по новой
      * @readonly
      * @public
      */
-    readonly duration: number | "promise",
+    readonly duration: number | "promise";
 
     /**
      * @description Кастомные функции, необходимы для модификации или правильного удаления

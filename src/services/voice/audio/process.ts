@@ -68,9 +68,6 @@ export class Process {
                     if ("read" in std) {
                         // Отключаем от всех подключений
                         std.unpipe();
-
-                        // Чистим поток от остатков пакетов
-                        while (std.read()) {}
                     }
                 }
                 this._process.kill('SIGKILL');

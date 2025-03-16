@@ -1,3 +1,7 @@
+import type {VoiceSocketState} from "./sockets/VoiceSocket";
+import type {CloseEvent} from "ws";
+
+// Voice Sockets
 export * from "./sockets/SocketUDP";
 export * from "./sockets/VoiceSocket";
 export * from "./sockets/Connection";
@@ -9,9 +13,6 @@ export * from "./audio/process";
 // Decoder and encoders
 export * from "./audio/sodium";
 export * from "./audio/opus";
-
-import type {VoiceSocketState} from "./sockets/VoiceSocket";
-import type {CloseEvent} from "ws";
 
 /**
  * @author SNIPPIK

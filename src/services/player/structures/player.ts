@@ -199,7 +199,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Получаем асинхронные данные в синхронном потоке
         track?.resource
             // Если удалось получить исходный файл трека
-            .then(async (path) => {
+            .then((path) => {
                 // Если нет исходника
                 if (!path) {
                     this.emit("player/error", this, `Not found link audio!`, {
@@ -259,7 +259,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             })
 
             // Если возникла ошибка
-            .catch(async (err) => {
+            .catch((err) => {
                 // Сообщаем об ошибке
                 Logger.log("ERROR", `[Player] ${err}`);
 
@@ -268,7 +268,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             })
 
             // Создаем сообщение после всех действий
-            .finally(async () => {
+            .finally(() => {
                 // Если включается именно новый трек
                 if (seek === 0) {
                     const queue = db.queues.get(this.id);
@@ -347,8 +347,5 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Отключаем все ивенты от плеера
         this.removeAllListeners();
-
-        // Удаляем все параметры
-        for (let key of Object.keys(this)) this[key] = null;
     };
 }

@@ -307,8 +307,5 @@ export class Queue {
 
         // Удаляем плеер
         if (this.player) this.player.destroy();
-
-        // Удаляем все параметры
-        for (let key of Object.keys(this._data)) this._data[key] = null;
     };
 }

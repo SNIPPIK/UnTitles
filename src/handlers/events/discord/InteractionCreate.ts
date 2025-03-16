@@ -232,7 +232,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
                 // Управление кнопками
                 else if (message.isButton()) {
-                    const button = db.buttons.get(interact.custom_id as any);
+                    const button = db.buttons.get(interact.custom_id);
                     const queue = interact?.queue;
 
                     // Если пользователь не подключен к голосовым каналам и нет очереди
@@ -248,7 +248,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     }
 
                     // Если кнопка была найдена
-                    button(interact);
+                    return button(interact);
                 }
             }
         });

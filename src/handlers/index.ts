@@ -1,7 +1,6 @@
 import * as process from "node:process";
 import * as path from "node:path";
 import fs from "node:fs";
-import os from "node:os";
 
 /**
  * @author SNIPPIK
@@ -170,7 +169,6 @@ class Environment {
         return !(!env || env === "undefined");
     };
 }
-
 
 /**
  * @author SNIPPIK

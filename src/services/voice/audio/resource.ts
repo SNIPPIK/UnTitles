@@ -102,7 +102,7 @@ export class AudioResource {
         // Если вводимый поток является расшифровщиком
         if (options.input instanceof Process) this.process.stdout.pipe(this.stream);
         else {
-            this.stream.on("data", (data: Buffer) => {
+            this.stream.on("data", async (data: Buffer) => {
                 if (data) {
                     if (!this.readable && !this._buffer.total) this._buffer.chunks.push(SILENT_FRAME);
 
@@ -225,9 +225,6 @@ export class AudioResource {
         setImmediate(() => {
             // Чистим все потоки от мусора
             this.cleanup();
-
-            // Удаляем все параметры
-            for (let key of Object.keys(this)) this[key] = null;
             Logger.log("DEBUG", `[AudioResource] has destroyed`);
         });
     };

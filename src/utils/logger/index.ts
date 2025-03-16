@@ -5,6 +5,7 @@
 const db = {
     /**
      * @description Цвета текста
+     * @protected
      */
     colors: {
         "DEBUG": "\x1b[90m",
@@ -15,6 +16,7 @@ const db = {
 
     /**
      * @description Цвета фона
+     * @protected
      */
     status: {
         "DEBUG": "\x1b[34mi\x1b[0m",

@@ -511,7 +511,7 @@ export class httpsClient extends Request {
         let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage, data = "";
 
         return new Promise<string | Error>((resolve) => {
-            this.request.then(async (res) => {
+            this.request.then((res) => {
                 if (res instanceof Error) return resolve(res);
 
                 const encoding = res.headers["content-encoding"];
@@ -544,7 +544,7 @@ export class httpsClient extends Request {
      * @public
      */
     public get toJson(): Promise<json | Error> {
-        return this.toString.then(async (body) => {
+        return this.toString.then((body) => {
             if (body instanceof Error) return body;
 
             try {
@@ -577,8 +577,8 @@ export class httpsClient extends Request {
      * @description Проверяем ссылку на работоспособность
      * @public
      */
-    public get status(): Promise<boolean> | false {
-        return this.request.then(async (resource) => {
+    public get status(): Promise<boolean> {
+        return this.request.then((resource) => {
             if (resource instanceof Error) return false;
             return resource?.statusCode && resource.statusCode >= 200 && resource.statusCode <= 400;
         });
