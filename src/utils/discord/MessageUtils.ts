@@ -1,8 +1,9 @@
-import {MessageSendOptions, ds_interact, MessageComponent, interact, SupportButtons} from "@type/discord";
+import {MessageSendOptions, ds_interact, MessageComponent, interact} from "@type/discord";
 import {CommandInteractionOption, GuildTextBasedChannel, User} from "discord.js"
 import {Attachment, InteractionCallbackResponse} from "discord.js";
 import type {Message, EmbedData, GuildMember} from "discord.js"
 import {locale, languages} from "@service/locale";
+import {SupportButtons} from "@handler/modals";
 import {EmbedBuilder} from "./EmbedBuilder";
 import {env} from "@handler";
 import {db} from "@app";

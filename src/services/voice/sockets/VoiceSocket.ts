@@ -353,12 +353,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      */
     public destroy = () => {
         this.removeAllListeners();
-
-        // Удаляем данные в следующем цикле
-        setImmediate(() => {
-            this.state = { code: VoiceSocketStatusCode.close };
-            for (let key of Object.keys(this)) this[key] = null;
-        });
+        this.state = { code: VoiceSocketStatusCode.close };
     };
 }
 

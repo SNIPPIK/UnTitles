@@ -1,4 +1,4 @@
-import {API, httpsClient} from "@handler/apis";
+import {API, APISmall, httpsClient} from "@handler/apis";
 import querystring from "node:querystring";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
@@ -14,19 +14,26 @@ import {db} from "@app";
  */
 class sAPI extends Assign<API> {
     /**
+     * @description Данные для создания трека с этими данными
+     * @protected
+     * @static
+     */
+    protected static _platform: APISmall = {
+        name: "YOUTUBE",
+        url: "youtube.com",
+        color: 16711680
+    };
+
+    /**
      * @description Создаем экземпляр запросов
      * @constructor sAPI
      * @public
      */
     public constructor() {
-        super({
-            name: "YOUTUBE",
+        super({ ...sAPI._platform,
             audio: true,
             auth: true,
-
-            color: 16711680,
             filter: /https?:\/\/(?:youtu\.be|(?:(?:www|m|music|gaming)\.)?youtube\.com)/gi,
-            url: "youtube.com",
 
             requests: [
                 /**
@@ -101,7 +108,7 @@ class sAPI extends Assign<API> {
                             if (!ID) return resolve(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
-                            const cache = db.cache.get(ID);
+                            const cache = db.cache.get(`${sAPI._platform.url}/${ID}`);
 
                             // Если найден трек или похожий объект
                             if (cache && !options?.audio) return resolve(cache);
@@ -350,7 +357,7 @@ class sAPI extends Assign<API> {
                     url: `https://i.ytimg.com/vi/${track["videoId"]}/maxresdefault.jpg`
                 },
                 audio: track?.format?.url || undefined
-            });
+            }, sAPI._platform);
         } catch {
             return new Track({
                 id: track["videoId"],
@@ -367,7 +374,7 @@ class sAPI extends Assign<API> {
                     url: `https://i.ytimg.com/vi/${track["videoId"]}/maxresdefault.jpg`
                 },
                 audio: track?.format?.url || undefined
-            })
+            }, sAPI._platform)
         }
     };
 }

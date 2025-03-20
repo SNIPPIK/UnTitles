@@ -116,12 +116,15 @@ class PlayCommand extends Assign<Command> {
                         const attachment = message.options.getAttachment("input");
 
                         // Если пользователь подсунул фальшивку
-                        if (!attachment.contentType.match("audio")) {
+                        if (!attachment.contentType.match(/audio/)) {
                             message.FBuilder = { description: locale._(message.locale, "attachment.audio.fail"), color: Colors.Yellow };
                             return;
                         }
 
-                        db.events.emitter.emit("request/api", message, ["DISCORD", attachment]);
+                        // Запрос к платформе
+                        const platform = db.api.request("DISCORD");
+
+                        db.events.emitter.emit("api/request", platform, message, attachment.url);
                         return;
                     }
 
@@ -135,8 +138,11 @@ class PlayCommand extends Assign<Command> {
                             return;
                         }
 
+                        // Переключаем позицию трека на 0
+                        queue.player.tracks.position = 0;
+
                         // Перезапускаем очередь
-                        db.queues.create(message);
+                        db.queues.restartPlayer(queue);
 
                         message.FBuilder = { description: locale._(message.locale, "command.play.replay", [message.author]), color: Colors.Green };
                         return;
@@ -144,7 +150,22 @@ class PlayCommand extends Assign<Command> {
 
                     // Если пользователя пытается сделать запрос к API
                     default: {
-                        db.events.emitter.emit("request/api", message, args);
+                        // Запрос к платформе
+                        const platform = db.api.request(args[0]);
+
+                        // Если платформа заблокирована
+                        if (platform.block) {
+                            db.events.emitter.emit("api/error", message, locale._(message.locale, "api.platform.block"));
+                            return;
+                        }
+
+                        // Если есть проблема с авторизацией на платформе
+                        else if (platform.auth) {
+                            db.events.emitter.emit("api/error", message, locale._(message.locale, "api.platform.auth"));
+                            return;
+                        }
+
+                        db.events.emitter.emit("api/request", platform, message, args[1]);
                         return;
                     }
                 }

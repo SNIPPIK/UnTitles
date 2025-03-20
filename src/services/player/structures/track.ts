@@ -1,6 +1,5 @@
-import {httpsClient, API} from "@handler/apis";
+import {httpsClient, APISmall} from "@handler/apis";
 import {db} from "@app";
-import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -10,75 +9,89 @@ import * as console from "node:console";
  */
 export class Track {
     /**
-     * @description Сами данные трека полученный в результате API
+     * @description Внутренняя информация трека и его составных
      * @readonly
      * @private
      */
-    private readonly _track: Track.data;
+    private readonly _information = {
+        /**
+         * @description Сами данные трека полученный в результате API
+         * @readonly
+         * @private
+         */
+        _track: null as Track.data,
 
-    /**
-     * @description Здесь хранятся данные времени трека
-     * @readonly
-     * @private
-     */
-    private _duration: TrackDuration;
+        /**
+         * @description Здесь хранятся данные времени трека
+         * @readonly
+         * @private
+         */
+        _duration: null as TrackDuration,
 
-    /**
-     * @description Здесь хранятся данные с какой платформы был взят трек
-     * @readonly
-     * @private
-     */
-    private _api: TrackAPI;
+        /**
+         * @description Параметр для сохранения lyrics
+         * @private
+         */
+        _lyrics: null as string,
 
-    /**
-     * @description Параметр для сохранения lyrics
-     * @private
-     */
-    private _lyrics: string;
+        /**
+         * @description Пользователя включивший трек
+         * @private
+         */
+         _user: null as Track.user,
 
-    /**
-     * @description Пользователя включивший трек
-     * @private
-     */
-    private _user: Track.user;
-
-    /**
-     * @description Выдаем id трека
-     * @public
-     */
-    public get id() {
-        // Если нет id трека
-        if (!this._track?.id) return undefined;
-        return this._track.id;
+        /**
+         * @description Здесь хранятся данные с какой платформы был взят трек
+         * @readonly
+         * @private
+         */
+        _api: null as APISmall
     };
 
     /**
-     * @description Получаем название трека
+     * @description Идентификатор трека
      * @public
      */
-    public get title() {
-        if (!this._track?.title) return "null";
-        return this._track.title;
+    public get ID() {
+        return this._information._track.id;
+    };
+
+    /**
+     * @description Ссылки трека на его самого
+     * @public
+     */
+    public get url() {
+      return this._information._track.url
+    };
+
+    /**
+     * @description Наименование трека
+     * @public
+     */
+    public get name() {
+        return this._information._track.title;
     };
 
     /**
      * @description Получаем отредактированное название трека в формате time [author](author_url) - [title](track_url)
      * @public
      */
-    public get titleReplaced() {
+    public get name_replace() {
         // Удаляем лишнее скобки
-        const title = `[${this.title.replace(/[()\[\]"]/g, "").substring(0, 45)}](${this.url})`;
+        const title = `[${this.name.replace(/[()\[\]"]/g, "").substring(0, 45)}](${this.url})`;
 
-        if (this.platform === "YOUTUBE") return `\`\`${this.time.split}\`\` ${title}`;
+        if (this.api.name === "YOUTUBE") return `\`\`${this.time.split}\`\` ${title}`;
         return `\`\`${this.time.split}\`\` [${this.artist.title}](${this.artist.url}) - ${title}`;
     };
 
     /**
-     * @description Получаем ссылку на трек
+     * @description Получаем превью трека
      * @public
      */
-    public get url() {
-        return this._track.url;
+    public get image() {
+        // Если нет картинки
+        if (!this._information._track.image || !this._information._track.image.url) return { url: db.images.no_image };
+        return this._information._track.image;
     };
 
     /**
@@ -87,20 +100,21 @@ export class Track {
      */
     public get artist() {
         return {
-            url: this._track.artist?.url,
-            title: this._track.artist?.title,
+            url: this._information._track.artist?.url,
+            title: this._information._track.artist?.title,
             image: {
                 url: db.images.disk
             }
         };
     };
 
+
     /**
      * @description Получаем данные времени трека
      * @public
      */
     public get time() {
-        return this._duration;
+        return this._information._duration;
     };
 
     /**
@@ -111,42 +125,16 @@ export class Track {
     protected set time(time) {
         // Если время в числовом формате
         if (typeof time.total === "number") {
-            this._duration = { split: (time.total as number).duration(), total: time.total };
+            this._information._duration = { split: (time.total as number).duration(), total: time.total };
         }
         // Если что-то другое
         else {
             const total = parseInt(time.total);
 
             // Время трека
-            if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };
-            else this._duration = { split: total.duration(), total };
+            if (isNaN(total) || !total) this._information._duration = { split: "Live", total: 0 };
+            else this._information._duration = { split: total.duration(), total };
         }
-    };
-
-    /**
-     * @description Получаем превью трека
-     * @public
-     */
-    public get image() {
-        // Если нет картинки
-        if (!this._track.image || !this._track.image.url) return { url: db.images.no_image };
-        return this._track.image;
-    };
-
-    /**
-     * @description Получаем ссылку на исходный файл
-     * @public
-     */
-    public get link() {
-        return this._track.audio;
-    };
-
-    /**
-     * @description Добавление ссылки на трек
-     * @param url - Ссылка или путь
-     */
-    public set link(url: string) {
-        this._track.audio = url;
     };
 
 
@@ -155,7 +143,7 @@ export class Track {
      * @public
      */
     public get user() {
-        return this._user;
+        return this._information._user;
     };
 
     /**
@@ -166,13 +154,13 @@ export class Track {
         const { displayName, id, avatar } = author;
 
         // Если нет автора трека, то автором станет сам пользователь
-        if (!this.artist) this._track.artist = {
+        if (!this.artist) this._information._track.artist = {
             url: `https://discordapp.com/users/${id}`,
             title: displayName
         };
 
         // Пользователь, который включил трек
-        this._user = {
+        this._information._user = {
             displayName: displayName, id,
             avatar: `https://cdn.discordapp.com/avatars/${id}/${avatar}.webp`
         };
@@ -180,27 +168,27 @@ export class Track {
 
 
     /**
-     * @description Получаем платформу у которого был взят трек
+     * @description Получаем ссылку на исходный файл
      * @public
      */
-    public get platform() {
-        return this._api.platform;
+    public get link() {
+        return this._information._track.audio;
     };
 
     /**
-     * @description Добавление данных платформы
-     * @public
+     * @description Добавление ссылки на трек
+     * @param url - Ссылка или путь
      */
-    public set api(api: Track["_api"]) {
-        this._api = api;
+    public set link(url: string) {
+        this._information._track.audio = url;
     };
 
     /**
-     * @description Получаем цвет трека
+     * @description Данные о платформе с которой был получен трек
      * @public
      */
-    public get color() {
-        return this._api.color;
+    public get api() {
+        return this._information._api;
     };
 
 
@@ -210,7 +198,7 @@ export class Track {
      * @public
      */
     public get resource(): Promise<string | Error> {
-        const download = db.cache.isOn && this.platform !== "DISCORD";
+        const download = this.api.name !== "DISCORD";
 
         return new Promise(async (resolve) => {
             // Смотрим если ли кеш аудио
@@ -240,7 +228,7 @@ export class Track {
 
                 // Если нет ссылки, то ищем замену
                 if (!this.link) {
-                    const link = await db.api.fetch(this);
+                    const link = await db.api.fetch(this as any);
 
                     // Если вместо ссылки получили ошибку
                     if (link instanceof Error || !link) {
@@ -272,9 +260,9 @@ export class Track {
     public get lyrics(): Promise<string | Error> {
         return new Promise((resolve) => {
             // Выдаем повторно текст песни
-            if (this._lyrics) return resolve(this._lyrics);
+            if (this._information._lyrics) return resolve(this._information._lyrics);
 
-            new httpsClient(`https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.title.split(" ").join("+")}`, {
+            new httpsClient(`https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.name.split(" ").join("+")}`, {
                 useragent: "UnTitles 0.2.2, Music bot, github.com/SNIPPIK/UnTitles"
             }).toJson.then((item) => {
                 // Если получаем вместо данных ошибку
@@ -284,7 +272,7 @@ export class Track {
                 else if (item.statusCode === 404) return resolve(undefined);
 
                 // Сохраняем текст песни
-                this._lyrics = item?.syncedLyrics || item?.plainLyrics;
+                this._information._lyrics = item?.syncedLyrics || item?.plainLyrics;
 
                 // Выдаем впервые текст песни
                 return resolve(item?.syncedLyrics || item?.plainLyrics);
@@ -295,8 +283,9 @@ export class Track {
     /**
      * @description Создаем трек
      * @param track - Данные трека с учетом <Song.track>
+     * @param api   - Данне о платформе
      */
-    public constructor(track: Track.data) {
+    public constructor(track: Track.data, api: APISmall) {
         this.time = track.time as any;
 
         // Удаляем мусорные названия из текста
@@ -307,7 +296,8 @@ export class Track {
         delete track.time;
 
         // Добавляем данные
-        this._track = track;
+        this._information._track = track;
+        this._information._api = api;
     };
 }
 
@@ -330,27 +320,6 @@ interface TrackDuration {
      * @private
      */
     total: number;
-}
-
-/**
- * @author SNIPPIK
- * @description Параметры платформы трека
- * @interface TrackAPI
- */
-interface TrackAPI {
-    /**
-     * @description Имя платформы с которой был взят трек
-     * @readonly
-     * @private
-     */
-    platform: API["name"];
-
-    /**
-     * @description Цвет платформы
-     * @readonly
-     * @private
-     */
-    color: number;
 }
 
 /**

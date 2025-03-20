@@ -136,14 +136,14 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public get progress() {
-        const {platform, time} = this.tracks.track;
+        const {api, time} = this.tracks.track;
         let current = this.audio?.current?.duration;
 
         // Скорее всего трек играет следующий трек
         if (current > time.total || !this.playing) current = 0;
 
         // Создаем прогресс бар
-        const bar =  this._progress.bar({ platform, duration: { current, total: time.total } });
+        const bar =  this._progress.bar({ platform: api.name, duration: { current, total: time.total } });
 
         return `\n\`\`${current.duration()}\`\` ${bar} \`\`${time.split}\`\``;
     };

@@ -223,7 +223,7 @@ export class EmbedBuilder {
             // Кнопка переключения на предыдущую страницу
             if (i.customId === "menu_back") {
                 // Делаем перелистывание на последнею страницу
-                if (page === 0) page = pages.length;
+                if (page === 0) page = pages.length - 1;
                 else if (pages.length === 1) return;
                 else page--;
             }

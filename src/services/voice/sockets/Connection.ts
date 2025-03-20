@@ -1,6 +1,5 @@
 import {GatewayOpcodes, GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData} from "discord-api-types/v10";
 import {VoiceConnectionStatus, VoiceSocket, VoiceSocketState, VoiceSocketStatusCode} from "@service/voice";
-import {Logger} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -365,9 +364,6 @@ export class VoiceConnection {
         if (adapterAvailable) state.adapter.sendPayload(this.payload({...this.config, channel_id: null}));
 
         this.state = { status: VoiceConnectionStatus.Destroyed };
-
-        // DEBUG
-        Logger.log("DEBUG", `[VoiceConnection] has destroyed`);
     };
 }
 

@@ -220,7 +220,7 @@ export class PlayerTracks {
             // Создаем Array
             return this._tracks._current.ArraySort(size, (track) => {
                 number++;
-                return `\`${number}\` - ${track.titleReplaced}`;
+                return `\`${number}\` - ${track.name_replace}`;
             }, "\n");
         }
 

@@ -60,7 +60,7 @@ class RemoveTrackCommand extends Assign<Command> {
                     return;
                 }
 
-                let {title, color, url} = queue.tracks.get(number - 1);
+                let {name, api, url} = queue.tracks.get(number - 1);
 
                 // Удаляем трек указанный пользователем
                 if (number !== 1) queue.tracks.remove(number - 1);
@@ -70,8 +70,8 @@ class RemoveTrackCommand extends Assign<Command> {
                 }
 
                 message.FBuilder = {
-                    description: locale._(message.locale, "command.remove.track", [`[${title}](${url})`]),
-                    color
+                    description: locale._(message.locale, "command.remove.track", [`[${name}](${url})`]),
+                    color: api.color
                 };
                 return;
             }

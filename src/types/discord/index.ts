@@ -1,6 +1,6 @@
 import {Message, InteractionCallbackResponse,BaseInteraction, ComponentData, ActionRowBuilder, EmbedData, MessageFlags} from "discord.js";
 import {ActivityType} from "discord-api-types/v10"
-import {Interact} from "@utils";
+import {SupportButtons} from "@handler/modals";
 
 /**
  * @author SNIPPIK
@@ -15,30 +15,6 @@ export type ds_interact = Message | BaseInteraction | InteractionCallbackRespons
  * @type interact
  */
 export type interact = Message | BaseInteraction;
-
-
-
-/**
- * @author SNIPPIK
- * @description Доступные кнопки
- * @type SupportButtons
- */
-export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters" | MenuButtons;
-
-/**
- * @author SNIPPIK
- * @description Имена кнопок в меню взаимодействия
- * @type MenuButtons
- */
-export type MenuButtons = "menu_back" | "menu_select" | "menu_cancel" | "menu_next";
-
-/**
- * @author SNIPPIK
- * @description Что хранит в себе объект кнопки
- * @interface ButtonCallback
- */
-export type ButtonCallback = (msg: Interact) => void;
-
 
 
 /**

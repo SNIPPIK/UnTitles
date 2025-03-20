@@ -15,7 +15,7 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
      * @readonly
      * @private
      */
-    private readonly socket = createSocket({ type: "udp4", sendBufferSize: 500 });
+    private readonly socket = createSocket({ type: "udp4" });
 
     /**
      * @description Данные сервера к которому надо подключится
@@ -52,7 +52,6 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
                 }
 
                 this.emit("connected", { ip, port });
-                return;
             }
         });
     };

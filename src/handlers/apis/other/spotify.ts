@@ -1,4 +1,4 @@
-import {API, httpsClient} from "@handler/apis";
+import {API, APISmall, httpsClient} from "@handler/apis";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Assign} from "@utils";
@@ -12,6 +12,17 @@ import {db} from "@app";
  * @public
  */
 class sAPI extends Assign<API> {
+    /**
+     * @description Данные для создания трека с этими данными
+     * @protected
+     * @static
+     */
+    protected static _platform: APISmall = {
+        name: "SPOTIFY",
+        color: 1420288,
+        url: "open.spotify.com"
+    };
+
     /**
      * @description Данные для создания запросов
      * @protected
@@ -51,14 +62,10 @@ class sAPI extends Assign<API> {
      * @public
      */
     public constructor() {
-        super({
-            name: "SPOTIFY",
+        super({ ...sAPI._platform,
             audio: false,
             auth: !!sAPI.authorization.auth,
-
-            color: 1420288,
             filter: /^(https?:\/\/)?(open\.)?(m\.)?(spotify\.com|spotify\.?ru)\/.+$/gi,
-            url: "open.spotify.com",
 
             requests: [
                 /**
@@ -76,7 +83,7 @@ class sAPI extends Assign<API> {
                             if (!ID) return resolve(locale.err("api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
-                            const cache = db.cache.get(ID);
+                            const cache = db.cache.get(`${sAPI._platform.url}/${ID}`);
 
                             // Если найден трек или похожий объект
                             if (cache && !options?.audio) return resolve(cache);
@@ -283,7 +290,7 @@ class sAPI extends Assign<API> {
             },
             time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
             image: track.album.images.sort((item1: any, item2: any) => item1.width > item2.width)[0],
-        });
+        }, sAPI._platform);
     };
 }
 

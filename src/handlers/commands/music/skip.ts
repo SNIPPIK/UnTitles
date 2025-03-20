@@ -126,13 +126,13 @@ class SkipUtilityCommand extends Assign<Command> {
                             return;
                         }
 
-                        const {title, url, color} = tracks.get(number > 1 ? number : number - 1);
+                        const {name, url, api} = tracks.get(number > 1 ? number : number - 1);
 
                         // Меняем позицию трека в очереди
                         player.stop(number - 1);
                         message.FBuilder = {
-                            description: locale._(message.locale, "command.position", [number, `[${title}](${url})`]),
-                            color
+                            description: locale._(message.locale, "command.position", [number, `[${name}](${url})`]),
+                            color: api.color
                         };
                         return;
                     }
@@ -148,13 +148,13 @@ class SkipUtilityCommand extends Assign<Command> {
                             return;
                         }
 
-                        const {title, url, color} = tracks.get(number - 1);
+                        const {name, url, api} = tracks.get(number - 1);
 
                         // Пропускаем текущий трек
                         player.stop(number - 1);
                         message.FBuilder = {
-                            description: locale._(message.locale, "command.go.track", [`[${title}](${url})`]),
-                            color
+                            description: locale._(message.locale, "command.go.track", [`[${name}](${url})`]),
+                            color: api.color
                         };
                         return;
                     }
@@ -170,15 +170,15 @@ class SkipUtilityCommand extends Assign<Command> {
                             return;
                         }
 
-                        const {title, url, color} = tracks.get(number - 1);
+                        const {name, url, api} = tracks.get(number - 1);
 
                         // Если аргумент больше 1, то ищем трек
                         if (number > 1) {
                             // Меняем позицию трека в очереди
                             player.stop(tracks.position + number - 1);
                             message.FBuilder = {
-                                description: locale._(message.locale, "command.skip.arg.track", [number, `[${title}](${url})`]),
-                                color
+                                description: locale._(message.locale, "command.skip.arg.track", [number, `[${name}](${url})`]),
+                                color: api.color
                             };
                             return;
                         }
@@ -186,8 +186,8 @@ class SkipUtilityCommand extends Assign<Command> {
                         // Пропускаем текущий трек
                         player.stop(tracks.position + 1);
                         message.FBuilder = {
-                            description: locale._(message.locale, "command.skip.one.track", [`[${title}](${url})`]),
-                            color
+                            description: locale._(message.locale, "command.skip.one.track", [`[${name}](${url})`]),
+                            color: api.color
                         };
                         return;
                     }

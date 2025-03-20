@@ -1,6 +1,6 @@
-import {Logger} from "@utils";
 import {OpusEncoder, SILENT_FRAME} from "@service/voice";
 import {Process} from "./process";
+import {Logger} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -86,13 +86,13 @@ export class AudioResource {
 
         // Запускаем все события
         for (const event of [...options.events.destroy, ...options.events.critical]) {
-            // Если ивент относится к критичным
+            // Если событие относится к критичным
             if (options.events.critical.includes(event)) {
                 if (options.events.path) (options.input)[options.events.path]["once"](event, options.events.critical_callback);
                 else (options.input)["once"](event, options.events.critical_callback);
             }
 
-            // Если ивент не относится к критичным
+            // Если событие не относится к критичным
             else {
                 if (options.events.path) (options.input)[options.events.path]["once"](event, options.events.destroy_callback);
                 else (options.input)["once"](event, options.events.destroy_callback);
@@ -101,35 +101,30 @@ export class AudioResource {
 
         // Если вводимый поток является расшифровщиком
         if (options.input instanceof Process) this.process.stdout.pipe(this.stream);
-        else {
-            this.stream.on("data", async (data: Buffer) => {
-                if (data) {
-                    if (!this.readable && !this._buffer.total) this._buffer.chunks.push(SILENT_FRAME);
+        else this.stream.on("data", (packet) => {
+            // Если поток включается в первый раз.
+            // Добавляем пустышку для интерпретатора opus
+            if (!this.readable && !this._buffer.total) this._buffer.chunks.push(SILENT_FRAME);
 
-                    this._buffer.chunks.push(data);
-                    this._buffer.total++;
-                } else {
-
-                    this.stream.removeListener("data", () => null);
-                    this._buffer.chunks.push(SILENT_FRAME);
-                }
-            });
-        }
+            this._buffer.chunks.push(packet);
+            this._buffer.total++;
+        });
     };
 
     /**
      * @description Создаем класс и задаем параметры
      * @param path - Путь до файла или ссылка
-     * @param options - Настройки кодировщика
+     * @param options - Настройки аудио класса
      * @public
      *
      * @example <path> or <url>
      */
-    public constructor(path: string, options: {seek?: number; filters: string;}) {
+    public constructor(path: string, options: {seek?: number; filters?: string;}) {
         if (options.seek > 0) this._buffer.total = (options.seek * 1e3) / 20;
 
         // Расшифровщик
         this.input = {
+            // Управление событиями
             events: {
                 destroy: ["end", "close"],
                 destroy_callback: () => this.cleanup("opus"),
@@ -137,6 +132,7 @@ export class AudioResource {
                 critical: ["error"],
                 critical_callback: this.cleanup,
             },
+            // Создание потока
             input: new OpusEncoder({
                 readableObjectMode: true,
                 autoDestroy: true
@@ -145,6 +141,7 @@ export class AudioResource {
 
         // Процесс (FFmpeg)
         this.input = {
+            // Управление событиями
             events: {
                 path: "stdout",
 
@@ -154,9 +151,10 @@ export class AudioResource {
                 critical: ["error"],
                 critical_callback: this.cleanup
             },
+            // Создание потока
             input: new Process([ "-vn", "-loglevel", "panic",
                 // Если это ссылка, то просим ffmpeg переподключиться при сбросе соединения
-                ...(path.startsWith("http") ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
+                ...(path.startsWith("http") ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "2"] : []),
 
                 "-ss", `${options.seek ?? 0}`,
 
@@ -184,6 +182,9 @@ export class AudioResource {
         switch (type) {
             // Если надо удалить opusEncoder
             case "opus": {
+                // Добавляем пустышку для интерпретатора opus
+                this._buffer.chunks.push(SILENT_FRAME);
+
                 this.stream.removeAllListeners();
                 this.stream.destroy();
                 return;
@@ -223,9 +224,10 @@ export class AudioResource {
     public destroy = () => {
         // Удаляем данные в следующем цикле
         setImmediate(() => {
+            Logger.log("DEBUG", `[AudioResource] has destroyed`);
+
             // Чистим все потоки от мусора
             this.cleanup();
-            Logger.log("DEBUG", `[AudioResource] has destroyed`);
         });
     };
 }

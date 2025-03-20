@@ -1,10 +1,162 @@
 import {Client, ShardingManager, IntentsBitField, Partials, Options, Colors, WebhookClient} from "discord.js";
+import {DiscordGatewayAdapterCreator, VoiceConnection, VoiceConnectionStatus} from "@service/voice";
 import {ActivityType} from "discord-api-types/v10";
 import {ActivityOptions} from "@type/discord";
-import {Database} from "./db";
-import {Logger} from "@utils";
+import {Logger, Collection} from "@utils";
 import {env} from "@handler";
 import {global} from "@type";
+
+// db modules
+import {CacheUtility} from "@service/player/helpers/cache";
+
+import {API_requester} from "@handler/apis";
+import {Commands} from "@handler/commands";
+import {Buttons} from "@handler/modals";
+import {Events} from "@handler/events";
+import {Queues} from "@handler/queues";
+
+/**
+ * @author SNIPPIK
+ * @description Локальная база данных бота
+ * @class Database
+ * @public
+ */
+export class Database {
+    /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения запросов на платформы
+     * @readonly
+     * @public
+     */
+    public readonly api = new API_requester();
+
+    /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения событий
+     * @readonly
+     * @public
+     */
+    public readonly events = new Events();
+
+    /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения очередей, плееров, циклов
+     * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
+     * @readonly
+     * @public
+     */
+    public readonly queues = new Queues();
+
+    /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения голосовых подключений
+     * @readonly
+     * @public
+     */
+    public readonly voice = new class db_voice_system extends Collection<VoiceConnection> {
+        /**
+         * @description Подключение к голосовому каналу
+         * @param config - Данные для подключения
+         * @param adapterCreator - Для отправки пакетов
+         * @public
+         */
+        public join = (config: VoiceConnection["config"], adapterCreator: DiscordGatewayAdapterCreator) => {
+            let connection = this.get(config.guild_id);
+
+            // Если есть голосовое подключение при подключении
+            if (connection) {
+                // Удаляем голосовое подключение
+                this.remove(connection.config.guild_id);
+                connection = null;
+            }
+
+            // Если нет голосового подключения, то создаем и сохраняем в базу
+            if (!connection) {
+                connection = new VoiceConnection(config, adapterCreator);
+                this.set(config.guild_id, connection);
+            }
+
+            // Если есть голосовое подключение, то подключаемся заново
+            if (connection && connection.state.status !== VoiceConnectionStatus.Destroyed) {
+                if (connection.state.status === VoiceConnectionStatus.Disconnected) connection.rejoin(config);
+                else if (!connection.state.adapter.sendPayload(connection.payload(config))) {
+                    connection.state = { ...connection.state,
+                        status: VoiceConnectionStatus.Disconnected,
+                        reason: 1
+                    };
+                }
+            }
+
+            return connection;
+        };
+    };
+
+    /**
+     * @author SNIPPIK
+     * @description Класс для кеширования аудио и данных о треках
+     * @readonly
+     * @public
+     */
+    public readonly cache = new CacheUtility();
+
+    /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения кнопок бота
+     * @description Класс хранящий в себе все кнопки для бота
+     * @readonly
+     * @public
+     */
+    public readonly buttons = new Buttons();
+
+    /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения команд
+     * @readonly
+     * @public
+     */
+    public readonly commands = new Commands();
+
+    /**
+     * @description Для управления белым списком пользователей
+     * @readonly
+     * @public
+     */
+    public readonly whitelist: {toggle: boolean; ids: string[]} = {
+        toggle: env.get<boolean>("whitelist"),
+        ids: env.get("whitelist.list", "").split(",")
+    };
+
+    /**
+     * @description Для управления черным списком пользователей
+     * @readonly
+     * @public
+     */
+    public readonly blacklist: {toggle: boolean; ids: string[]} = {
+        toggle: env.get<boolean>("blacklist"),
+        ids: env.get("blacklist.list", "").split(",")
+    };
+
+    /**
+     * @description Для работы с командами для разработчика
+     * @readonly
+     * @public
+     */
+    public readonly owner: {ids: string[]; guildID: string} = {
+        guildID: env.get("owner.server"),
+        ids: env.get("owner.list").split(",")
+    };
+
+    /**
+     * @description Для отображения в embed сообщениях
+     * @readonly
+     * @public
+     */
+    public readonly images: {disk: string; no_image: string; loading: string} = {
+        disk: env.get("image.currentPlay"),
+        no_image: env.get("image.not"),
+        loading: env.get("loading.emoji")
+    };
+}
 
 /**
  * @author SNIPPIK
@@ -90,11 +242,7 @@ export var db: Database = null;
                     DMMessageManager: 0,
                     GuildInviteManager: 0,
                     GuildEmojiManager: 0,
-                    GuildStickerManager: 0,
-                    GuildMemberManager: {
-                        maxSize: 10,
-                        keepOverLimit: member => member.id === client.user.id
-                    }
+                    GuildStickerManager: 0
                 })
             });
             const id = client.shard?.ids[0] ?? 0;
@@ -129,6 +277,7 @@ export var db: Database = null;
                 // Что делаем после подключения к discord api
                 .finally(() => {
                     // Загруженные кнопки
+                    db.buttons.register();
                     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
 
                     // Загружаем платформы

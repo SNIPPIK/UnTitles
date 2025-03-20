@@ -1,4 +1,4 @@
-import {API, httpsClient} from "@handler/apis";
+import {API, APISmall, httpsClient} from "@handler/apis";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Assign} from "@utils";
@@ -12,6 +12,17 @@ import {db} from "@app";
  * @public
  */
 class sAPI extends Assign<API> {
+    /**
+     * @description Данные для создания трека с этими данными
+     * @protected
+     * @static
+     */
+    protected static _platform: APISmall = {
+        name: "VK",
+        color: 30719,
+        url: "vk.com",
+    };
+
     /**
      * @description Данные для создания запросов
      * @protected
@@ -36,14 +47,10 @@ class sAPI extends Assign<API> {
      * @public
      */
     public constructor() {
-        super({
-            name: "VK",
+        super({...sAPI._platform,
             audio: true,
             auth: !!sAPI.authorization.token,
-
-            color: 30719,
             filter: /^(https?:\/\/)?(vk\.com)\/.+$/gi,
-            url: "vk.com",
 
             requests: [
                 /**
@@ -61,7 +68,7 @@ class sAPI extends Assign<API> {
                             if (!ID) return resolve(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
-                            const cache = db.cache.get(ID);
+                            const cache = db.cache.get(`${sAPI._platform.url}/${ID}`);
 
                             // Если найден трек или похожий объект
                             if (cache && !options?.audio) return resolve(cache);
@@ -158,7 +165,7 @@ class sAPI extends Assign<API> {
             image: { url: image?.["photo_1200"] ?? image?.["photo_600"] ?? image?.["photo_300"] ?? image?.["photo_270"] ?? undefined },
             time: { total: track.duration.toFixed(0) },
             audio: track?.url
-        });
+        }, sAPI._platform);
     };
 
     /**

@@ -1,4 +1,4 @@
-import {API, httpsClient} from "@handler/apis";
+import {API, APISmall, httpsClient} from "@handler/apis";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import crypto from "node:crypto";
@@ -13,6 +13,17 @@ import {db} from "@app";
  * @public
  */
 class sAPI extends Assign<API> {
+    /**
+     * @description Данные для создания трека с этими данными
+     * @protected
+     * @static
+     */
+    protected static _platform: APISmall = {
+        name: "YANDEX",
+        color: 16705372,
+        url: "music.yandex.ru",
+    };
+
     /**
      * @description Данные для создания запросов
      * @protected
@@ -37,14 +48,10 @@ class sAPI extends Assign<API> {
      * @public
      */
     public constructor() {
-        super({
-            name: "YANDEX",
+        super({ ...sAPI._platform,
             audio: true,
             auth: !!sAPI.authorization.token,
-
-            color: 16705372,
             filter: /^(https?:\/\/)?(music\.)?(yandex\.ru)\/.+$/gi,
-            url: "music.yandex.ru",
 
             requests: [
                 /**
@@ -62,7 +69,7 @@ class sAPI extends Assign<API> {
                             if (!ID) return resolve(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
-                            const cache = db.cache.get(ID);
+                            const cache = db.cache.get(`${sAPI._platform.url}/${ID}`);
 
                             // Если найден трек или похожий объект
                             if (cache && options?.audio) return resolve(cache);
@@ -328,7 +335,7 @@ class sAPI extends Assign<API> {
                 url: `https://music.yandex.ru/artist/${author.id}`,
                 image: this.parseImage({image: author?.["ogImage"] ?? author?.["coverUri"]}) ?? null
             }
-        });
+        }, sAPI._platform);
     };
 }
 

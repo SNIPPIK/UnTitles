@@ -141,11 +141,11 @@ export class API_requester extends handler<API> {
         return new Promise(async (resolve) => {
 
             // Если платформа может сама выдавать данные о треке
-            if (!this.platforms.authorization.includes(track.platform) && !this.platforms.audio.includes(track.platform)) {
-                const api = this.request(track.platform).get("track");
+            if (!this.platforms.authorization.includes(track.api.name) && !this.platforms.audio.includes(track.api.name)) {
+                const api = this.request(track.api.name).get("track");
 
                 // Если нет такого запроса
-                if (!api) return resolve(Error(`[Song/${track.platform}]: not found callback for track`));
+                if (!api) return resolve(Error(`[Song/${track.api.name}]: not found callback for track`));
 
                 // Если исходник уже не актуален, то получаем новый
                 try {
@@ -166,7 +166,7 @@ export class API_requester extends handler<API> {
 
             try {
                 // Ищем подходящий трек
-                const tracks = await platform.get("search").execute(`${track.artist.title} - ${track.title}`, {limit: 5});
+                const tracks = await platform.get("search").execute(`${track.artist.title} - ${track.name}`, {limit: 5});
                 if (tracks instanceof Error || tracks.length === 0) return resolve(null);
 
                 // Если он был найден, то получаем исходник трека
@@ -253,6 +253,34 @@ export class APIRequest {
             return null;
         }) as T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "author" ? APIs.author : APIs.search;
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные о платформе в ограниченном кол-ве
+ * @interface APISmall
+ */
+export interface APISmall {
+    /**
+     * @description Имя платформы
+     * @readonly
+     * @public
+     */
+    readonly name: "YOUTUBE" | "SPOTIFY" | "VK" | "DISCORD" | "YANDEX";
+
+    /**
+     * @description Ссылка для работы фильтра
+     * @readonly
+     * @public
+     */
+    readonly url: string;
+
+    /**
+     * @description Цвет платформы
+     * @readonly
+     * @public
+     */
+    readonly color: number;
 }
 
 /**

@@ -22,14 +22,14 @@ class message_error extends Assign<Event<"message/error">> {
                 // Если нет треков или трека?!
                 if (!queue?.tracks || !queue?.tracks!.track) return;
 
-                const {color, artist, image, title, user} = queue.tracks.track;
+                const {api, artist, image, user, name} = queue.tracks.track;
                 new queue.message.builder().addEmbeds([
                     {
-                        color, thumbnail: image, timestamp: new Date(),
+                        color: api.color, thumbnail: image, timestamp: new Date(),
                         fields: [
                             {
                                 name: locale._(queue.message.locale, "player.current.playing"),
-                                value: `\`\`\`${title}\`\`\``
+                                value: `\`\`\`${name}\`\`\``
                             },
                             {
                                 name: locale._(queue.message.locale, "player.current.error"),
@@ -67,7 +67,7 @@ class message_push extends Assign<Event<"message/push">> {
                 // Отправляем сообщение, о том что было добавлено в очередь
                 new message.builder().addEmbeds([
                     {
-                        color: obj["color"] ?? Colors.Blue,
+                        color: obj["api"] ? obj["api"]["color"] : Colors.Blue,
                         thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
                         footer: {
                             iconURL: message.author.avatarURL(),
@@ -83,11 +83,11 @@ class message_push extends Assign<Event<"message/push">> {
                                 name: locale._(message.locale, "player.queue.push"),
                                 value: obj instanceof Track ?
                                     // Если один трек в списке
-                                    `\`\`\`[${obj.time.split}] - ${obj.title}}\`\`\`` :
+                                    `\`\`\`[${obj.time.split}] - ${obj.name}}\`\`\`` :
 
                                     // Если добавляется список треков (альбом или плейлист)
                                     `${obj.items.slice(0, 5).map((track, index) => {
-                                        return `\`${index + 1}\` ${track.titleReplaced}`;
+                                        return `\`${index + 1}\` ${track.name_replace}`;
                                     }).join("\n")}${obj.items.length > 5 ? locale._(message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}
                                     `
                             }
@@ -129,7 +129,7 @@ class message_search extends Assign<Event<"message/search">> {
                         name: locale._(message.locale, "player.search"),
                         iconURL: track.artist.image.url
                     },
-                    description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.title.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
+                    description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.name.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
                     image: track.image,
                     footer: {
                         text: locale._(message.locale, "player.search.list", [tracks.length, 1, tracks.length])
@@ -142,7 +142,7 @@ class message_search extends Assign<Event<"message/search">> {
                     .setCallback((msg, pages: Track[], page, embed, item: Track) => {
                         // Если был выбран объект
                         if (item) {
-                            db.events.emitter.emit("request/api", message, [platform, item.url]);
+                            db.events.emitter.emit("api/request", db.api.request(platform), message, item.url);
                             return;
                         }
 
@@ -153,7 +153,7 @@ class message_search extends Assign<Event<"message/search">> {
                         msg.edit({
                             embeds: [{
                                 ...embed[0],
-                                description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.title.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
+                                description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.name.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
                                 image: pages[page].image,
                                 footer: {
                                     text: locale._(message.locale, "player.search.list", [tracks.length, page + 1, tracks.length])
@@ -181,10 +181,10 @@ class message_playing extends Assign<Event<"message/playing">> {
             type: "player",
             once: false,
             execute: async (queue, message) => {
-                const {color, artist, image, title, user} = queue.tracks.track;
+                const {api, artist, image, name, user} = queue.tracks.track;
                 const builder = new queue.message.builder().addEmbeds([
                     {
-                        color, thumbnail: image,
+                        color: api.color, thumbnail: image,
                         author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
                         footer: {
                             text: `${user.displayName} ${queue.tracks.total > 1 ? `| 🎵 ${queue.player.tracks.position + 1} - ${queue.player.tracks.total} 🎶` : ""}`,
@@ -194,13 +194,13 @@ class message_playing extends Assign<Event<"message/playing">> {
                             // Текущий трек
                             {
                                 name: "", //locale._(queue.message.locale, "player.current.playing")
-                                value: `\`\`\`${title}\`\`\`` + queue.player.progress
+                                value: `\`\`\`${name}\`\`\`` + queue.player.progress
                             },
 
                             // Следующий трек или треки
                             queue.tracks.size > 1 ? (() => {
                                 const tracks = (queue.tracks.array(-2) as Track[]).map((track, index) => {
-                                    return `\`\`${index + 2}\`\` - ${track.titleReplaced}`;
+                                    return `\`\`${index + 2}\`\` - ${track.name_replace}`;
                                 });
 
                                 return {

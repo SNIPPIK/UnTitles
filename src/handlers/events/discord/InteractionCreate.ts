@@ -235,20 +235,20 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     const button = db.buttons.get(interact.custom_id);
                     const queue = interact?.queue;
 
-                    // Если пользователь не подключен к голосовым каналам и нет очереди
-                    if (!interact.voice.channel || !interact.guild.members.me.voice.channel) return;
-
-                    // Если есть очередь и пользователь не подключен к тому же голосовому каналу
-                    else if (!queue || interact.voice.channel?.id !== queue.voice.channel.id) return;
-
                     // Если была не найдена кнопка
-                    else if (!button) {
+                    if (!button) {
                         interact.FBuilder = { description: locale._(interact.locale, "button.fail"), color: Colors.DarkRed };
                         return;
                     }
 
+                    // Если пользователь не подключен к голосовым каналам и нет очереди
+                    else if (!interact.voice.channel || !interact.guild.members.me.voice.channel) return;
+
+                    // Если есть очередь и пользователь не подключен к тому же голосовому каналу
+                    else if (!queue || interact.voice.channel?.id !== queue.voice.channel.id) return;
+
                     // Если кнопка была найдена
-                    return button(interact);
+                    return button.callback(interact);
                 }
             }
         });

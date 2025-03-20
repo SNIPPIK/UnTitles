@@ -1,5 +1,5 @@
 import {Track} from "@service/player";
-import {API} from "@handler/apis";
+import {API, APISmall} from "@handler/apis";
 import {Assign} from "@utils";
 
 /**
@@ -10,19 +10,26 @@ import {Assign} from "@utils";
  */
 class sAPI extends Assign<API> {
     /**
+     * @description Данные для создания трека с этими данными
+     * @protected
+     * @static
+     */
+    protected static _platform: APISmall = {
+        name: "DISCORD",
+        color: 9807270,
+        url: "discord.com",
+    };
+
+    /**
      * @description Создаем экземпляр запросов
      * @constructor sAPI
      * @public
      */
     public constructor() {
-        super({
-            name: "DISCORD",
+        super({ ...sAPI._platform,
             audio: true,
             auth: true,
-
-            color: 9807270,
             filter: /^(https?:\/\/)?(cdn\.)?( )?(discordapp\.com|discord\.gg)\/.+$/gi,
-            url: "discord.com",
 
             requests: [
 
@@ -44,7 +51,7 @@ class sAPI extends Assign<API> {
                                     total: ((attachment.size / 1024) / 39.2).toFixed(0)
                                 },
                                 audio: attachment.url
-                            });
+                            }, sAPI._platform);
 
                             return resolve(track);
                         });

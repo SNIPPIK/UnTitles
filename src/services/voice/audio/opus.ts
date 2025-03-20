@@ -126,7 +126,7 @@ export class OpusEncoder extends PassThrough {
      * @description При получении данных через pipe или write, модифицируем их для одобрения со стороны discord
      * @public
      */
-    public _transform = async (chunk: Buffer, _: any, done: () => any) => {
+    public _transform = (chunk: Buffer, _: any, done: () => any) => {
         // Получаем пакеты из
         while (!!chunk) {
             const packet = this.packet(chunk);
@@ -141,9 +141,21 @@ export class OpusEncoder extends PassThrough {
      * @description Удаляем данные по завершению
      * @public
      */
-    public _destroy = () => {
-        // Отключаем все ивенты
-        this.removeAllListeners();
-        this.destroy();
+    public _destroy = (error?: Error, callback?: OpusEncoderCallback) => {
+        if (this.destroyed) return;
+
+        setImmediate(() => {
+            // Отключаем все ивенты
+            this.removeAllListeners();
+            this.destroy();
+
+            super._destroy(error, callback);
+        });
     };
 }
+
+/**
+ * @author SNIPPIK
+ * @description Тип функции PassThrough
+ */
+type OpusEncoderCallback = (error?: Error | null) => void;

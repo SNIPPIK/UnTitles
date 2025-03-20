@@ -56,25 +56,22 @@ export class Process {
      * @private
      */
     public destroy = () => {
-        // Удаляем данные в следующем цикле
-        setImmediate(() => {
-            if (this._process) {
-                Logger.log("DEBUG", `[Process/${this._process.pid}] has destroyed`);
+        if (this._process) {
+            Logger.log("DEBUG", `[Process/${this._process.pid}] has destroyed`);
 
-                for (const std of [this._process.stdout, this._process.stderr, this._process.stdin]) {
-                    std.removeAllListeners();
-                    std.destroy();
+            for (const std of [this._process.stdout, this._process.stderr, this._process.stdin]) {
+                std.removeAllListeners();
+                std.destroy();
 
-                    if ("read" in std) {
-                        // Отключаем от всех подключений
-                        std.unpipe();
-                    }
+                if ("read" in std) {
+                    // Отключаем от всех подключений
+                    std.unpipe();
                 }
-                this._process.kill('SIGKILL');
             }
+            this._process.kill('SIGKILL');
+        }
 
-            this._process = null;
-        });
+        this._process = null;
     };
 }
 
@@ -88,7 +85,7 @@ let ff_path = null;
  * @author SNIPPIK
  * @description Делаем проверку на наличие FFmpeg/avconv
  */
-(() => {
+(async () => {
     const cache = env.get("cache.dir");
     const names = [`${cache}/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 

@@ -1,6 +1,6 @@
 import {AudioPlayer, Queue, Track} from "@service/player";
 import {Cycle, Interact, MessageUtils} from "@utils";
-import {Attachment} from "discord.js";
+import {APIRequest} from "@handler/apis";
 import {db} from "@app";
 
 export * from "./structures/track";
@@ -152,15 +152,16 @@ export interface QueuesEvents {
 
     /**
      * @description Событие при котором коллекция будет искать трек в системе API
-     * @param message    - Сообщение с сервера
-     * @param argument   - Что надо будет найти, первый аргумент должен быть имя платформы
+     * @param api      - Класс платформы запросов
+     * @param message  - Сообщение с сервера
+     * @param url      - Ссылка на допустимый объект или текст для поиска
      */
-    readonly "request/api": (message: Interact, argument: (string | Attachment)[]) => void;
+    readonly "api/request": (api: APIRequest, message: Interact, url: string) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять ошибки в системе API
      * @param message    - Сообщение с сервера
      * @param error      - Ошибка в формате string
      */
-    readonly "request/error": (message: Interact, error: string) => void;
+    readonly "api/error": (message: Interact, error: string) => void;
 }
