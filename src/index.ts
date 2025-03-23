@@ -8,7 +8,6 @@ import {global} from "@type";
 
 // db modules
 import {CacheUtility} from "@service/player/helpers/cache";
-
 import {API_requester} from "@handler/apis";
 import {Commands} from "@handler/commands";
 import {Buttons} from "@handler/modals";
@@ -187,7 +186,7 @@ export var db: Database = null;
             });
 
             // Слушаем событие для создания осколка
-            manager.on("shardCreate", (shard) => {
+            manager.on("shardCreate", async (shard) => {
                 shard.on("spawn", () => Logger.log("LOG", `[Manager/${shard.id}] shard ${Logger.color(36, `added to manager`)}`));
                 shard.on("ready", () => Logger.log("LOG", `[Manager/${shard.id}] shard is ${Logger.color(36, `ready`)}`));
                 shard.on("death", () => Logger.log("LOG", `[Manager/${shard.id}] shard is ${Logger.color(31, `killed`)}`));
@@ -253,29 +252,29 @@ export var db: Database = null;
             // Подключаем осколок к discord
             client.login(env.get("token.discord"))
                 // Что делаем после того как бот подключится к discord api
-                .then(() => {
+                .then(async () => {
                     Logger.log("WARN", `[Core/${id}] connected to discord as ${Logger.color(35, client.user.tag)}`);
 
                     // Задаем статус боту
                     client.user.setPresence({
-                        status: env.get("client.status"),
+                        status: env.get("client.status", "online"),
                         activities: [
                             {
                                 name: env.get("client.presence.name", "I ❤️ UnTitles bot"),
-                                type: ActivityType[env.get("client.presence.type")],
+                                type: ActivityType[env.get("client.presence.type", "Watching")],
                             }
                         ] as ActivityOptions[],
                     });
                 })
 
                 // Если при входе происходит ошибка
-                .catch((err) => {
+                .catch(async (err) => {
                     Logger.log("ERROR", `[Core/${id}] failed authorization in discord`);
                     Logger.log("ERROR", err);
                 })
 
                 // Что делаем после подключения к discord api
-                .finally(() => {
+                .finally(async () => {
                     // Загруженные кнопки
                     db.buttons.register();
                     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
@@ -294,7 +293,7 @@ export var db: Database = null;
                 });
 
             // Отлавливаем все ошибки внутри процесса
-            process.on("uncaughtException", (err, origin) => {
+            process.on("uncaughtException", async (err, origin) => {
                 //Выводим ошибку
                 Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
 

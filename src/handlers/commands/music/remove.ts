@@ -40,7 +40,7 @@ class RemoveTrackCommand extends Assign<Command> {
             rules: ["voice", "another_voice", "queue", "player-not-playing"],
             execute: async ({message, args}) => {
                 const queue = message.queue;
-                const number = args.length > 0 ? parseInt(args.pop()) : 1;
+                const number = args.length > 0 ? parseInt(args[0]) + 1 : 1;
 
                 // Если аргумент не является числом
                 if (isNaN(number)) {

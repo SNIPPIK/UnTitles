@@ -1,5 +1,5 @@
 import {AudioPlayerEvents, PlayerTracks, PlayerAudioFilters} from "@service/player";
-import {AudioResource} from "@service/voice";
+import {AudioResource, SILENT_FRAME} from "@service/voice";
 import {Logger, TypedEmitter} from "@utils";
 import {db} from "@app";
 
@@ -332,6 +332,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Удаляем текущий поток, поскольку он больше не нужен
         this.audio.current = null;
+
+        // Отправляем пустышку
+        this.voice.send = SILENT_FRAME;
 
         // Переводим плеер в режим ожидания
         this._status = "player/wait";
