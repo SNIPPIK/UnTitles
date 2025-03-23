@@ -101,7 +101,7 @@ export class AudioResource {
 
         // Если вводимый поток является расшифровщиком
         if (options.input instanceof Process) this.process.stdout.pipe(this.stream);
-        else this.stream.on("data", (packet) => {
+        else this.stream.on("data", (packet: Buffer) => {
             // Если поток включается в первый раз.
             // Добавляем пустышку для интерпретатора opus
             if (!this.readable && !this._buffer.total) this._buffer.chunks.push(SILENT_FRAME);

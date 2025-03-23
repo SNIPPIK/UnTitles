@@ -293,7 +293,7 @@ export var db: Database = null;
                 });
 
             // Отлавливаем все ошибки внутри процесса
-            process.on("uncaughtException", async (err, origin) => {
+            process.on("uncaughtException", (err, origin) => {
                 //Выводим ошибку
                 Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
 

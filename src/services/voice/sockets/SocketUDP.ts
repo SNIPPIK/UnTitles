@@ -39,7 +39,7 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
     public set discovery(ssrc: number) {
         this.packet = this.discoveryBuffer(ssrc);
 
-        this.socket.once("message", async (message) => {
+        this.socket.once("message", (message) => {
             if (message.readUInt16BE(0) === 2) {
                 const packet = Buffer.from(message);
                 const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");

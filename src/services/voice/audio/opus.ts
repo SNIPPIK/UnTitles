@@ -147,7 +147,6 @@ export class OpusEncoder extends PassThrough {
         setImmediate(() => {
             // Отключаем все ивенты
             this.removeAllListeners();
-            this.destroy();
             super._destroy(error, callback);
         });
     };

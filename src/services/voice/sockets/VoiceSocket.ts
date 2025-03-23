@@ -135,7 +135,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * он либо идентифицируется с новым сеансом, либо попытается возобновить существующий сеанс.
      * @private
      */
-    private WebSocketOpen = async () => {
+    private WebSocketOpen = () => {
         const state = this.state;
 
         switch (state.code) {
@@ -183,7 +183,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @param code - Код закрытия
      * @private
      */
-    private WebSocketClose = async ({ code }: {code: number}) => {
+    private WebSocketClose = ({ code }: {code: number}) => {
         const state = this.state;
 
         // Если discord попытался разорвать соединение
@@ -208,7 +208,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @param packet - Полученный пакет
      * @private
      */
-    private WebSocketPacket = async (packet: {d: any, op: VoiceOpcodes}) => {
+    private WebSocketPacket = (packet: {d: any, op: VoiceOpcodes}) => {
         switch (packet.op) {
             /**
              * @description Если получен код о готовности подключения к голосовому каналу

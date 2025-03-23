@@ -313,7 +313,7 @@ export class VoiceConnection {
      * @param newState - Новое состояние
      * @private
      */
-    private VoiceSocketUpdate = async (_: VoiceSocketState.States, newState: VoiceSocketState.States) => {
+    private VoiceSocketUpdate = (_: VoiceSocketState.States, newState: VoiceSocketState.States) => {
         switch (newState.code) {
 
             /**

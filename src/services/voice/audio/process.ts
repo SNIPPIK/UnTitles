@@ -62,12 +62,9 @@ export class Process {
             for (const std of [this._process.stdout, this._process.stderr, this._process.stdin]) {
                 std.removeAllListeners();
                 std.destroy();
-
-                if ("read" in std) {
-                    // Отключаем от всех подключений
-                    std.unpipe();
-                }
             }
+
+            this._process.ref();
             this._process.kill('SIGKILL');
         }
 
