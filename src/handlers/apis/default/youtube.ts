@@ -4,6 +4,7 @@ import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Script} from "node:vm";
 import {Assign} from "@utils";
+import {env} from "@handler";
 import {db} from "@app";
 
 /**
@@ -13,6 +14,13 @@ import {db} from "@app";
  * @public
  */
 class sAPI extends Assign<API> {
+    /**
+     * @description Тип расшифровки аудио ссылок
+     * @readonly
+     * @private
+     */
+    private static readonly _encoder = env.get("youtube.encoder");
+
     /**
      * @description Данные для создания трека с этими данными
      * @protected
@@ -114,12 +122,12 @@ class sAPI extends Assign<API> {
                             if (cache && !options?.audio) return resolve(cache);
 
                             // Создаем запрос
-                            sAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`).then(async (result) => {
+                            sAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&bpctr=${Math.ceil(Date.now() / 1000)}&has_verified=1`).then(async (result) => {
                                 /// Если при получении данных возникла ошибка
                                 if (result instanceof Error) return resolve(result);
 
                                 // Расшифровываем аудио формат
-                                const format = await sAPI.extractFormat(result["streamingData"], result.html);
+                                const format = await sAPI.extractFormat(url, result["streamingData"], result.html);
 
                                 // Если есть расшифровка ссылки видео
                                 if (format) result["videoDetails"]["format"] = {url: format["url"]};
@@ -262,15 +270,17 @@ class sAPI extends Assign<API> {
 
     /**
      * @description Получаем аудио дорожки
+     * @param url - Ссылка на видео
      * @param data - <videoData>.streamingData все форматы видео, будет выбран оптимальный
      * @param html - Ссылка на html плеер
      * @protected
      * @static
      */
-    protected static extractFormat = (data: json, html: string): Promise<YouTubeFormat> => {
-        return new Promise(async (resolve) => {
+    protected static extractFormat = (url: string, data?: json, html?: string) => {
+        if (sAPI._encoder === "ytdl") return YouTube_encoder_ytd.decipherFormats(url);
+        else return new Promise(async (resolve) => {
             if (!data["formats"]) return resolve(null);
-            const decoder = await Youtube_decoder.decipherFormats(data["formats"], html);
+            const decoder = await Youtube_decoder_native.decipherFormats(data["formats"], html);
 
             // Если произошла ошибка при расшифровке
             if (decoder[0] instanceof Error) return resolve(decoder[0]);
@@ -380,6 +390,52 @@ class sAPI extends Assign<API> {
 }
 
 
+
+/**
+ * @author SNIPPIK
+ * @description Сторонний расшифровщик аудио
+ * @name YouTube_encoder_ytd
+ */
+class YouTube_encoder_ytd {
+    /**
+     * @description Код для выполнения запуска youtube-dl
+     * @private
+     */
+    private static runCommand = null;
+
+    /**
+     * @description Получаем аудио дорожку
+     * @param url - Ссылка на видео
+     * @public
+     */
+    public static decipherFormats = (url: string): Promise<YouTubeFormat | Error> => {
+        try {
+            // Если нет загруженной команды запуска
+            if (!this.runCommand) this.runCommand = require("youtube-dl-exec");
+        } catch {
+            // Если нет youtube-dl-exec
+            throw Error("YouTube-Dl is not installed! Pls install youtube-dl-exec");
+        }
+
+        // Запускаем команду
+        return new Promise((resolve) => {
+            return this.runCommand(url, {
+                printJson: true,
+                skipDownload: true,
+                noCheckCertificates: true,
+                noWarnings: true,
+                preferFreeFormats: true,
+                addHeader: ['referer:youtube.com', 'user-agent:googlebot']
+            }).then((output) => {
+                if (typeof output === "string") return resolve(Error(`[APIs]: ${output}`));
+
+                const format = output.formats.find((format) => format.acodec && format.acodec.match(/opus/));
+                return resolve(format);
+            })
+        });
+    }
+}
+
 /**
  * @author SNIPPIK
  * @description Ищем имена в строке
@@ -395,127 +451,106 @@ const mRegex = (regex: string | RegExp, body: string, id: number = 0) => {
 
 /**
  * @author SNIPPIK
- * @description Получаем имена функций
- * @param body - Станица youtube
- * @param regexps
- */
-const extractName = (body: string, regexps: any): string => {
-    let name: string;
-
-    for (const [regex, id] of Object.entries(regexps)) {
-        try {
-            name = mRegex(regex, body, id as number);
-            try {
-                name = mRegex(`${name.replace(/\$/g, "\\$")}=\\[([a-zA-Z0-9$\\[\\]]{2,})\\]`, body, 1);
-            } catch {
-                // Function name is not inside an array
-            }
-            break;
-        } catch {}
-    }
-
-    return name;
-};
-
-/**
- * @author SNIPPIK
- * @description Функции для расшифровки
- */
-const extractors: { name: string, callback: (body: string) => string }[] = [
-    /**
-     * @description Получаем функцию с данными
-     */
-    {
-        name: "extractDecipherFunction",
-        callback: (body) => {
-            try {
-                const helperObject = mRegex(HELPER_REGEXP, body);
-                const decipherFunc = mRegex(DECIPHER_REGEXP, body);
-                const resultFunc = `var ${DECIPHER_FUNC_NAME}=${decipherFunc};`;
-                const callerFunc = `${DECIPHER_FUNC_NAME}(${DECIPHER_ARGUMENT});`;
-                return helperObject + resultFunc + callerFunc;
-            } catch {
-                return null;
-            }
-        }
-    },
-
-    /**
-     * @description Получаем имя функции
-     */
-    {
-        name: "extractDecipherWithName",
-        callback: (body) => {
-            try {
-                const decipherFuncName = extractName(body, DECIPHER_NAME_REGEXPS);
-                const funcPattern = `(${decipherFuncName.replace(/\$/g, '\\$')}=function\\([a-zA-Z0-9_]+\\)\\{.+?\\})`;
-                const decipherFunc = `var ${mRegex(funcPattern, body, 1)};`;
-                const helperObjectName = mRegex(";([A-Za-z0-9_\\$]{2,})\\.\\w+\\(", decipherFunc, 1);
-                const helperPattern = `(var ${helperObjectName.replace(/\$/g, '\\$')}=\\{[\\s\\S]+?\\}\\};)`;
-                const helperObject = mRegex(helperPattern, body, 1);
-                const callerFunc = `${decipherFuncName}(${DECIPHER_ARGUMENT});`;
-                return helperObject + decipherFunc + callerFunc;
-            } catch {
-                return null;
-            }
-        }
-    },
-
-    /**
-     * @description Получаем данные n кода - для ускоренной загрузки с серверов
-     */
-    {
-        name: "extractNTransformFunction",
-        callback: (body) => {
-            try {
-                const nFunc = mRegex(N_TRANSFORM_REGEXP, body);
-                const resultFunc = `var ${N_TRANSFORM_FUNC_NAME}=${nFunc}`;
-                const callerFunc = `${N_TRANSFORM_FUNC_NAME}(${N_ARGUMENT});`;
-                return resultFunc + callerFunc;
-            } catch {
-                return null;
-            }
-        }
-    },
-
-    /**
-     * @description Извлекаем название n
-     */
-    {
-        name: "extractNTransformWithName",
-        callback: (body) => {
-            try {
-                const nFuncName = extractName(body, N_TRANSFORM_NAME_REGEXPS);
-                const funcPattern = `(${nFuncName.replace(/\$/g, "\\$")}=function\\([a-zA-Z0-9_]+\\)\\{.+?\\})`;
-                const nTransformFunc = `var ${mRegex(funcPattern, body, 1)};`;
-                const callerFunc = `${nFuncName}(${N_ARGUMENT});`;
-                return nTransformFunc + callerFunc;
-            } catch {
-                return null;
-            }
-        }
-    }
-];
-
-
-/**
- * @author SNIPPIK
  * @description Расшифровщик ссылок на исходный файл для youtube
  * @class Youtube_decoder
  */
-class Youtube_decoder {
+class Youtube_decoder_native {
+    /**
+     * @author SNIPPIK
+     * @description Функции для расшифровки
+     */
+    private static extractors: { name: string, callback: (body: string) => string }[] = [
+        /**
+         * @description Получаем функцию с данными
+         */
+        {
+            name: "extractDecipherFunction",
+            callback: (body) => {
+                try {
+                    const helperObject = mRegex(HELPER_REGEXP, body, 0);
+                    const decipherFunc = mRegex(DECIPHER_REGEXP, body, 0);
+                    const resultFunc = `var ${DECIPHER_FUNC_NAME}=${decipherFunc};`;
+                    const callerFunc = `${DECIPHER_FUNC_NAME}(${DECIPHER_ARGUMENT});`;
+                    const helperVar = mRegex(HELPER_VAR_REGEXP, body, 1) + ';';
+                    return helperVar + helperObject + resultFunc + callerFunc;
+                } catch {
+                    return null;
+                }
+            }
+        },
+
+        /**
+         * @description Получаем имя функции
+         */
+        {
+            name: "extractDecipherWithName",
+            callback: (body) => {
+                try {
+                    const decipherFuncName = this.extractName(body, DECIPHER_NAME_REGEXPS);
+                    const funcPattern = `(${decipherFuncName.replace(/\$/g, "\\$")}=function\\([a-zA-Z0-9_]+\\)\\{.+?\\})`;
+                    const decipherFunc = `var ${mRegex(funcPattern, body, 1)};`;
+                    const helperObjectName = mRegex(";([A-Za-z0-9_\\$]{2,})\\.\\w+\\(", decipherFunc, 1);
+                    const helperPattern = `(var ${helperObjectName.replace(/\$/g, "\\$")}=\\{[\\s\\S]+?\\}\\};)`;
+                    const helperObject = mRegex(helperPattern, body, 1);
+                    const callerFunc = `${decipherFuncName}(${DECIPHER_ARGUMENT});`;
+                    const helperVar = mRegex(HELPER_VAR_REGEXP, body, 1) + ';';
+                    return helperVar + helperObject + decipherFunc + callerFunc;
+                } catch {
+                    return null;
+                }
+            }
+        },
+
+        /**
+         * @description Получаем данные n кода - для ускоренной загрузки с серверов
+         */
+        {
+            name: "extractNTransformFunction",
+            callback: (body) => {
+                try {
+                    const nFunc = mRegex(N_TRANSFORM_REGEXP, body, 0);
+                    const resultFunc = `var ${N_TRANSFORM_FUNC_NAME}=${nFunc}`;
+                    const callerFunc = `${N_TRANSFORM_FUNC_NAME}(${N_ARGUMENT});`;
+                    return resultFunc + callerFunc;
+                } catch {
+                    return null;
+                }
+            }
+        },
+
+        /**
+         * @description Извлекаем название n
+         */
+        {
+            name: "extractNTransformWithName",
+            callback: (body) => {
+                try {
+                    const nFuncName = this.extractName(body, N_TRANSFORM_NAME_REGEXPS);
+                    const funcPattern = `(${nFuncName.replace(/\$/g, "\\$")}=function\\([a-zA-Z0-9_]+\\)\\{.+?\\})`;
+                    const nTransformFunc = `var ${mRegex(funcPattern, body, 1)};`;
+                    const callerFunc = `${nFuncName}(${N_ARGUMENT});`;
+                    return nTransformFunc + callerFunc;
+                } catch {
+                    return null;
+                }
+            }
+        }
+    ];
+
     /**
      * @description Применяем преобразования decipher и n параметров ко всем URL-адресам формата.
      * @param formats - Все форматы аудио или видео
      * @param html5player - Ссылка на плеер
      */
     public static decipherFormats = async (formats: YouTubeFormat[], html5player: string): Promise<YouTubeFormat[]> =>  {
-        const [decipherScript, nTransformScript] = await this.extractPage(html5player);
-
-        for (let item of formats) {
-            this.getting_url(item, {decipher: decipherScript, nTransform: nTransformScript});
+        // Переписать URL-адреса скрипта плеера tce на вариант, отличный от tce
+        if (html5player.includes("/player_ias_tce.vflset/")) {
+            console.debug("jsUrl URL points to tce-variant player script, rewriting to non-tce.");
+            html5player = html5player.replace("/player_ias_tce.vflset/", "/player_ias.vflset/");
         }
 
+        const [decipherScript, nTransformScript] = await this.extractPage(html5player);
+        for (let item of formats) this.getting_url(item, {decipher: decipherScript, nTransform: nTransformScript});
         return formats;
     };
 
@@ -530,13 +565,14 @@ class Youtube_decoder {
         const extractDecipher = (url: string): string => {
             try {
                 const args = querystring.parse(url);
-                if (!args.s || !decipher) return args.url as string;
-
+                if (!args.s) return args.url as string;
                 const components = new URL(decodeURIComponent(args.url as string));
-                components.searchParams.set(args.sp as string ? args.sp as string : DECIPHER_ARGUMENT, decipher.runInNewContext({sig: decodeURIComponent(args.s as string)}));
+                const context = {};
+                context[DECIPHER_ARGUMENT] = decodeURIComponent(args.s as string);
+                components.searchParams.set((args.sp || "sig") as string, decipher.runInNewContext(context));
                 return components.toString();
             } catch {
-                return null;
+                return url;
             }
         };
         const extractNTransform = (url: string): string => {
@@ -544,10 +580,12 @@ class Youtube_decoder {
                 const components = new URL(decodeURIComponent(url));
                 const n = components.searchParams.get("n");
                 if (!n || !nTransform) return url;
-                components.searchParams.set("n", nTransform.runInNewContext({ncode: n}));
+                const context = {};
+                context[N_ARGUMENT] = n;
+                components.searchParams.set("n", nTransform.runInNewContext(context));
                 return components.toString();
             } catch {
-                return null;
+                return url;
             }
         };
 
@@ -578,8 +616,8 @@ class Youtube_decoder {
      */
     private static extractNTransform = (body: string) => {
         try {
-            const nTransformFunc = this.extraction([extractors[2].callback, extractors[3].callback], body, (code: string) =>
-                code.replace(/if\s*\(\s*typeof\s*[\w$]+\s*===?.*?\)\s*return\s+[\w$]+\s*;?/, "")
+            const nTransformFunc = this.extraction([this.extractors[2].callback, this.extractors[3].callback], body, (code: string) =>
+                code.replace(/if\s*\(\s*typeof\s*[\w$]+\s*===?.*?\)\s*return\s+[\w$]+\s*;?/, ""),
             );
 
             if (!nTransformFunc) return null;
@@ -594,7 +632,7 @@ class Youtube_decoder {
      * @param body - Страница плеера
      */
     private static extractDecipher = (body: string) => {
-        const decipherFunc = this.extraction([extractors[0].callback, extractors[1].callback], body);
+        const decipherFunc = this.extraction([this.extractors[0].callback, this.extractors[1].callback], body);
         if (!decipherFunc) return null;
         return decipherFunc;
     };
@@ -625,6 +663,30 @@ class Youtube_decoder {
         // Возвращаем null если не получилось выполнить скрипт
         return null;
     };
+
+    /**
+     * @author SNIPPIK
+     * @description Получаем имена функций
+     * @param body - Станица youtube
+     * @param regexps
+     */
+    private static extractName = (body: string, regexps: any): string => {
+        let name: string;
+
+        for (const [regex, id] of Object.entries(regexps)) {
+            try {
+                name = mRegex(regex, body, id as number);
+                try {
+                    name = mRegex(`${name.replace(/\$/g, "\\$")}=\\[([a-zA-Z0-9$\\[\\]]{2,})\\]`, body, 1);
+                } catch {
+                    // Function name is not inside an array
+                }
+                break;
+            } catch {}
+        }
+
+        return name;
+    };
 }
 
 /**
@@ -642,8 +704,11 @@ interface YouTubeFormat {
     bitrate?: number;
 }
 
-const DECIPHER_FUNC_NAME = "getDecipherFunc";
-const N_TRANSFORM_FUNC_NAME = "getNTransformFunc";
+const DECIPHER_FUNC_NAME = "YTDDecipherFunc";
+const N_TRANSFORM_FUNC_NAME = "YTDNTransformFunc";
+
+// Updated VARIABLE_PART based on the Java code
+const VARIABLE_PART = "[a-zA-Z_\\$][a-zA-Z_0-9\\$]*";
 
 const DECIPHER_NAME_REGEXPS = {
     "\\b([a-zA-Z0-9_$]+)&&\\(\\1=([a-zA-Z0-9_$]{2,})\\(decodeURIComponent\\(\\1\\)\\)": 2,
@@ -655,8 +720,7 @@ const DECIPHER_NAME_REGEXPS = {
     '([\\w$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(""\\)\\s*;': 1,
 };
 
-// LavaPlayer regexps
-const VARIABLE_PART = "[a-zA-Z_\\$][a-zA-Z_0-9]*";
+// LavaPlayer regexps - update to use the new VARIABLE_PART
 const VARIABLE_PART_DEFINE = `\\"?${VARIABLE_PART}\\"?`;
 const BEFORE_ACCESS = '(?:\\[\\"|\\.)';
 const AFTER_ACCESS = '(?:\\"\\]|)';
@@ -667,15 +731,6 @@ const SPLICE_PART = ":function\\(\\w,\\w\\)\\{\\w\\.splice\\(0,\\w\\)\\}";
 const SWAP_PART =
     ":function\\(\\w,\\w\\)\\{var \\w=\\w\\[0\\];\\w\\[0\\]=\\w\\[\\w%\\w\\.length\\];\\w\\[\\w(?:%\\w.length|)\\]=\\w(?:;return \\w)?\\}";
 
-// LavaPlayer regexps
-const N_TRANSFORM_REGEXP =
-    "function\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
-    "var\\s*(\\w+)=(?:\\1\\.split\\(.*?\\)|String\\.prototype\\.split\\.call\\(\\1,.*?\\))," +
-    "\\s*(\\w+)=(\\[.*?]);\\s*\\3\\[\\d+]" +
-    "(.*?try)(\\{.*?})catch\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
-    '\\s*return"[\\w-]+([A-z0-9-]+)"\\s*\\+\\s*\\1\\s*}' +
-    '\\s*return\\s*(\\2\\.join\\(""\\)|Array\\.prototype\\.join\\.call\\(\\2,.*?\\))};';
-
 const DECIPHER_REGEXP =
     `function(?: ${VARIABLE_PART})?\\(([a-zA-Z])\\)\\{` +
     '\\1=\\1\\.split\\(""\\);\\s*' +
@@ -683,9 +738,12 @@ const DECIPHER_REGEXP =
     'return \\1\\.join\\(""\\)' +
     `\\}`;
 
-const HELPER_REGEXP = `var (${VARIABLE_PART})=\\{((?:(?:${VARIABLE_PART_DEFINE}${REVERSE_PART}|${
-    VARIABLE_PART_DEFINE
+const HELPER_REGEXP = `var (${VARIABLE_PART})=\\{((?:(?:${VARIABLE_PART_DEFINE}${REVERSE_PART}|${VARIABLE_PART_DEFINE
 }${SLICE_PART}|${VARIABLE_PART_DEFINE}${SPLICE_PART}|${VARIABLE_PART_DEFINE}${SWAP_PART}),?\\n?)+)\\};`;
+
+
+const STRING_PART = `(?:"(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*')`;
+const HELPER_VAR_REGEXP = `'use strict';[.\n]*(var ${VARIABLE_PART}=(?:\\[(?:${STRING_PART},?\\n?)*\\]|${STRING_PART}\\.split\\(${STRING_PART}\\)))`;
 
 const SCVR = "[a-zA-Z0-9$_]";
 const MCR = `${SCVR}+`;
@@ -698,6 +756,15 @@ const N_TRANSFORM_NAME_REGEXPS = {
     [`\\(${SCVR}=String\\.fromCharCode\\(110\\),${SCVR}=${SCVR}\\.get\\(${SCVR}\\)\\)&&\\(${SCVR}=(${MCR})(?:${AAR})?\\(${SCVR}\\)`]: 1,
     [`\\.get\\("n"\\)\\)&&\\(${SCVR}=(${MCR})(?:${AAR})?\\(${SCVR}\\)`]: 1,
 };
+
+// LavaPlayer regexps
+const N_TRANSFORM_REGEXP =
+    "function\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
+    "var\\s*(\\w+)=(?:\\1\\.split\\(.*?\\)|String\\.prototype\\.split\\.call\\(\\1,.*?\\))," +
+    "\\s*(\\w+)=(\\[.*?]);\\s*\\3\\[\\d+]" +
+    "(.*?try)(\\{.*?})catch\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
+    '\\s*return"[\\w-]+([A-z0-9-]+)"\\s*\\+\\s*\\1\\s*}' +
+    '\\s*return\\s*(\\2\\.join\\(""\\)|Array\\.prototype\\.join\\.call\\(\\2,.*?\\))};';
 
 const DECIPHER_ARGUMENT = "sig";
 const N_ARGUMENT = "ncode";
