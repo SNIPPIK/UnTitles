@@ -12,37 +12,11 @@ export class PlayerTracks {
      * @readonly
      * @private
      */
-    private readonly _tracks = {
-        /**
-         * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
-         * @readonly
-         * @private
-         */
+    private readonly _tracks: PlayerTracksData = {
         _current:  [] as Track[],
-
-        /**
-         * @description Хранилище треков в оригинальном порядке, необходимо для правильной работы shuffle
-         * @readonly
-         * @private
-         */
         _original: [] as Track[],
-
-        /**
-         * @description Текущая позиция в списке
-         * @private
-         */
         _position: 0,
-
-        /**
-         * @description Тип повтора
-         * @private
-         */
         _repeat: RepeatType.None as RepeatType,
-
-        /**
-         * @description Смешивание треков
-         * @private
-         */
         _shuffle: false as boolean
     };
 
@@ -266,4 +240,44 @@ export enum RepeatType {
      * @description Повтор всех треков
      */
     Songs = 2
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные хранящиеся в классе
+ * @interface PlayerTracksData
+ * @class PlayerTracks
+ */
+interface PlayerTracksData {
+    /**
+     * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
+     * @readonly
+     * @private
+     */
+    _current: Track[];
+
+    /**
+     * @description Хранилище треков в оригинальном порядке, необходимо для правильной работы shuffle
+     * @readonly
+     * @private
+     */
+    _original: Track[];
+
+    /**
+     * @description Текущая позиция в списке
+     * @private
+     */
+    _position: number;
+
+    /**
+     * @description Тип повтора
+     * @private
+     */
+    _repeat: RepeatType;
+
+    /**
+     * @description Смешивание треков
+     * @private
+     */
+    _shuffle: boolean;
 }

@@ -44,7 +44,8 @@ export class OpusEncoder extends PassThrough {
      */
     private readonly db = {
         buffer: null    as Buffer,
-        bitstream: null as number
+        bitstream: null as number,
+        _remainder: null as Buffer
     };
 
     /**
@@ -126,13 +127,22 @@ export class OpusEncoder extends PassThrough {
      * @description При получении данных через pipe или write, модифицируем их для одобрения со стороны discord
      * @public
      */
-    public _transform = (chunk: Buffer, _: any, done: () => any) => {
+    public _transform = async (chunk: Buffer, _: any, done: () => any) => {
+        // Если есть прошлый буфер
+        if (this.db._remainder) {
+            chunk = Buffer.concat([this.db._remainder, chunk]);
+            this.db._remainder = null;
+        }
+
         // Получаем пакеты из
         while (!!chunk) {
             const packet = this.packet(chunk);
             if (packet) chunk = packet;
             else break;
         }
+
+        // Добавляем не прошедшие данные в буфер
+        this.db._remainder = chunk;
 
         done();
     };

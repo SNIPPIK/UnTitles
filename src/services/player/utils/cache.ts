@@ -99,7 +99,6 @@ export class CacheUtility {
                 // Создаем файл
                 fs.createWriteStream(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`).destroy();
 
-
                 // Записываем данные в файл
                 fs.writeFile(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`, JSON.stringify({
                     track: {
@@ -129,11 +128,15 @@ export class CacheUtility {
 
         // Если есть трек в кеше
         if (fs.existsSync(`${this.dirname}/Data/${ID}.json`)) {
-            // Если трек кеширован в файл
-            const json = JSON.parse(fs.readFileSync(`${this.dirname}/Data/${ID}.json`, 'utf8'));
+            try {
+                // Если трек кеширован в файл
+                const json = JSON.parse(fs.readFileSync(`${this.dirname}/Data/${ID}.json`, 'utf8'));
 
-            // Если трек был найден среди файлов
-            if (json) return new Track(json.track, json.api);
+                // Если трек был найден среди файлов
+                if (json) return new Track(json.track, json.api);
+            } catch {
+                return null;
+            }
         }
         return null;
     };
@@ -181,7 +184,7 @@ class CacheAudio extends Cycle<Track> {
                 return true;
             },
             execute: (track) => {
-                return new Promise<boolean>((resolve) => {
+                return new Promise<boolean>(async (resolve) => {
                     const status = this.status(track);
 
                     // Создаем ffmpeg для скачивания трека

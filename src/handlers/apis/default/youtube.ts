@@ -422,8 +422,8 @@ class YouTube_encoder_ytd {
             return this.runCommand(url, {
                 printJson: true,
                 skipDownload: true,
-                noCheckCertificates: true,
                 noWarnings: true,
+                noCheckCertificates: true,
                 preferFreeFormats: true,
                 addHeader: ['referer:youtube.com', 'user-agent:googlebot']
             }).then((output) => {
@@ -542,15 +542,15 @@ class Youtube_decoder_native {
      * @param formats - Все форматы аудио или видео
      * @param html5player - Ссылка на плеер
      */
-    public static decipherFormats = async (formats: YouTubeFormat[], html5player: string): Promise<YouTubeFormat[]> =>  {
+    public static decipherFormats = async (formats: YouTubeFormat[], html5player: string): Promise<YouTubeFormat[]> => {
         // Переписать URL-адреса скрипта плеера tce на вариант, отличный от tce
         if (html5player.includes("/player_ias_tce.vflset/")) {
             console.debug("jsUrl URL points to tce-variant player script, rewriting to non-tce.");
             html5player = html5player.replace("/player_ias_tce.vflset/", "/player_ias.vflset/");
         }
 
-        const [decipherScript, nTransformScript] = await this.extractPage(html5player);
-        for (let item of formats) this.getting_url(item, {decipher: decipherScript, nTransform: nTransformScript});
+        const [decipher, nTransform] = await this.extractPage(html5player);
+        for (let item of formats) this.getting_url(item, {decipher, nTransform});
         return formats;
     };
 
@@ -559,9 +559,7 @@ class Youtube_decoder_native {
      * @param format - Аудио или видео формат на youtube
      * @param script - Скрипт для выполнения на виртуальной машине
      */
-    private static getting_url = (format: YouTubeFormat, script: {decipher?: Script, nTransform?: Script}): void => {
-        const {decipher, nTransform} = script;
-
+    private static getting_url = (format: YouTubeFormat, {decipher, nTransform}: YouTubeChanter): void => {
         const extractDecipher = (url: string): string => {
             try {
                 const args = querystring.parse(url);
@@ -571,8 +569,9 @@ class Youtube_decoder_native {
                 context[DECIPHER_ARGUMENT] = decodeURIComponent(args.s as string);
                 components.searchParams.set((args.sp || "sig") as string, decipher.runInNewContext(context));
                 return components.toString();
-            } catch {
-                return url;
+            } catch (err) {
+                console.log(err);
+                return null;
             }
         };
         const extractNTransform = (url: string): string => {
@@ -584,14 +583,16 @@ class Youtube_decoder_native {
                 context[N_ARGUMENT] = n;
                 components.searchParams.set("n", nTransform.runInNewContext(context));
                 return components.toString();
-            } catch {
-                return url;
+            } catch (err) {
+                console.log(err);
+                return null;
             }
         };
 
         const cipher = !format.url;
         const url = format.url || format.signatureCipher || format.cipher;
         format.url = extractNTransform(cipher ? extractDecipher(url) : url);
+
         delete format.signatureCipher;
         delete format.cipher;
     };
@@ -704,6 +705,16 @@ interface YouTubeFormat {
     bitrate?: number;
 }
 
+/**
+ * @author SNIPPIK
+ * @description Варианты расшифровки url
+ * @interface YouTubeChanter
+ */
+interface YouTubeChanter {
+    decipher?: Script;
+    nTransform?: Script;
+}
+
 const DECIPHER_FUNC_NAME = "YTDDecipherFunc";
 const N_TRANSFORM_FUNC_NAME = "YTDNTransformFunc";
 
@@ -717,7 +728,7 @@ const DECIPHER_NAME_REGEXPS = {
     "\\bm=([a-zA-Z0-9$]{2,})\\(decodeURIComponent\\(h\\.s\\)\\)": 1,
     "\\bc&&\\(c=([a-zA-Z0-9$]{2,})\\(decodeURIComponent\\(c\\)\\)": 1,
     '(?:\\b|[^a-zA-Z0-9$])([a-zA-Z0-9$]{2,})\\s*=\\s*function\\(\\s*a\\s*\\)\\s*\\{\\s*a\\s*=\\s*a\\.split\\(\\s*""\\s*\\)': 1,
-    '([\\w$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(""\\)\\s*;': 1,
+    '([\\w$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(""\\)\\s*;': 1
 };
 
 // LavaPlayer regexps - update to use the new VARIABLE_PART
@@ -726,10 +737,9 @@ const BEFORE_ACCESS = '(?:\\[\\"|\\.)';
 const AFTER_ACCESS = '(?:\\"\\]|)';
 const VARIABLE_PART_ACCESS = BEFORE_ACCESS + VARIABLE_PART + AFTER_ACCESS;
 const REVERSE_PART = ":function\\(\\w\\)\\{(?:return )?\\w\\.reverse\\(\\)\\}";
-const SLICE_PART = ":function\\(\\w,\\w\\)\\{return \\w\\.slice\\(\\w\\)\\}";
-const SPLICE_PART = ":function\\(\\w,\\w\\)\\{\\w\\.splice\\(0,\\w\\)\\}";
-const SWAP_PART =
-    ":function\\(\\w,\\w\\)\\{var \\w=\\w\\[0\\];\\w\\[0\\]=\\w\\[\\w%\\w\\.length\\];\\w\\[\\w(?:%\\w.length|)\\]=\\w(?:;return \\w)?\\}";
+const SLICE_PART =   ":function\\(\\w,\\w\\)\\{return \\w\\.slice\\(\\w\\)\\}";
+const SPLICE_PART =  ":function\\(\\w,\\w\\)\\{\\w\\.splice\\(0,\\w\\)\\}";
+const SWAP_PART =    ":function\\(\\w,\\w\\)\\{var \\w=\\w\\[0\\];\\w\\[0\\]=\\w\\[\\w%\\w\\.length\\];\\w\\[\\w(?:%\\w.length|)\\]=\\w(?:;return \\w)?\\}";
 
 const DECIPHER_REGEXP =
     `function(?: ${VARIABLE_PART})?\\(([a-zA-Z])\\)\\{` +
@@ -754,7 +764,7 @@ const N_TRANSFORM_NAME_REGEXPS = {
     [`${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}=${MCR}\\.get\\(${MCR}\\)\\).+\\|\\|(${MCR})\\(""\\)`]: 1,
     [`${SCVR}="nn"\\[\\+${MCR}\\.${MCR}],${MCR}=${MCR}\\.get\\(${MCR}\\)\\)&&\\(${MCR}=(${MCR})\\[(\\d+)]`]: 1,
     [`\\(${SCVR}=String\\.fromCharCode\\(110\\),${SCVR}=${SCVR}\\.get\\(${SCVR}\\)\\)&&\\(${SCVR}=(${MCR})(?:${AAR})?\\(${SCVR}\\)`]: 1,
-    [`\\.get\\("n"\\)\\)&&\\(${SCVR}=(${MCR})(?:${AAR})?\\(${SCVR}\\)`]: 1,
+    [`\\.get\\("n"\\)\\)&&\\(${SCVR}=(${MCR})(?:${AAR})?\\(${SCVR}\\)`]: 1
 };
 
 // LavaPlayer regexps

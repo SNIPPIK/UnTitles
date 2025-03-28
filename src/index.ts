@@ -7,7 +7,7 @@ import {env} from "@handler";
 import {global} from "@type";
 
 // db modules
-import {CacheUtility} from "@service/player/helpers/cache";
+import {CacheUtility} from "@service/player/utils/cache";
 import {API_requester} from "@handler/apis";
 import {Commands} from "@handler/commands";
 import {Buttons} from "@handler/modals";

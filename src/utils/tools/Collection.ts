@@ -13,13 +13,30 @@ export abstract class Collection<K, T = string> {
     private readonly _map = new Map<T, K>();
 
     /**
+     * @description Получаем случайный объект из MAP
+     * @public
+     */
+    public get random(): K {
+        const keys = Array.from(this._map.keys());
+        const key = keys[Math.floor(Math.random() * keys.length)];
+
+        return this.get(key);
+    };
+
+    /**
+     * @description Получаем кол-во объектов в списке
+     * @public
+     */
+    public get size() {
+        return this._map.size;
+    };
+
+    /**
      * @description Получаем объект из ID
      * @param ID - ID объекта
      * @public
      */
-    public get = (ID: T) => {
-        return this._map.get(ID);
-    };
+    public get = (ID: T) => this._map.get(ID);
 
     /**
      * @description Добавляем объект в список
@@ -61,24 +78,5 @@ export abstract class Collection<K, T = string> {
         }
 
         return;
-    };
-
-    /**
-     * @description Получаем случайный объект из MAP
-     * @public
-     */
-    public get random(): K {
-        const keys = Array.from(this._map.keys());
-        const key = keys[Math.floor(Math.random() * keys.length)];
-
-        return this.get(key);
-    };
-
-    /**
-     * @description Получаем кол-во объектов в списке
-     * @public
-     */
-    public get size() {
-        return this._map.size;
     };
 }

@@ -105,28 +105,16 @@ export abstract class Cycle<T = unknown> {
      * @readonly
      * @private
      */
-    private readonly _stepCycle = () => {
+    private _stepCycle = () => {
         // Если нет объектов
         if (this._data.array?.length === 0) {
             this._data.time = 0;
             return;
         }
 
-        // Если цикл запущен с режимом обещания
-        if (this._config.duration === "promise") {
-            // Высчитываем время для выполнения
-            this._data.time += 20e3;
-        }
-
-        // Если запущен стандартный цикл
-        else {
-            // Высчитываем время для выполнения
-            this._data.time += this._config.duration;
-        }
-
         // Запускаем цикл
-        for (let items = this._data.array.length; items > 0; items--) {
-            const item = this._data.array[items - 1];
+        for (let i = this._data.array.length; i > 0; i--) {
+            const item = this._data.array[i - 1];
 
             // Если объект не готов
             if (!this._config.filter(item)) continue;
@@ -135,12 +123,12 @@ export abstract class Cycle<T = unknown> {
                 // Если цикл запущен с режимом обещания
                 if (item instanceof Promise) {
                     (this._config.execute(item) as Promise<boolean>)
-                        // Если скачивание завершено
+                        // Если ответ был получен
                         .then((bool) => {
                             if (!bool) this.remove(item);
                         })
 
-                        // Если произошла ошибка при скачивании
+                        // Если произошла ошибка при получении ответа
                         .catch((error) => {
                             this.remove(item);
                             console.log(error);
@@ -155,10 +143,30 @@ export abstract class Cycle<T = unknown> {
             }
         }
 
+        // Запускаем цикл повторно
+        return this._stepCheckTimeCycle();
+    };
+
+    /**
+     * @description Проверяем время для запуска цикла повторно
+     * @readonly
+     * @private
+     */
+    private _stepCheckTimeCycle = () => {
+        // Если цикл запущен с режимом обещания.
+        // Высчитываем время для выполнения
+        if (this._config.duration === "promise") this._data.time += 20e3;
+
+        // Если запущен стандартный цикл.
+        // Высчитываем время для выполнения
+        else this._data.time += this._config.duration;
+
+
+        // Записываем время в переменную для проверки
         let time = this._data.time - Date.now();
 
         // Если время меньше 1 ms
-        if (time < 0) time = 20;
+        if (time < 0) time = (20).random(0);
 
         // Выполняем функцию через ~time ms
         setTimeout(this._stepCycle, time);

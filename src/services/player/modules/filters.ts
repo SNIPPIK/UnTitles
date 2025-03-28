@@ -36,7 +36,7 @@ export class PlayerAudioFilters {
         if (onFilters.length > 0) {
             // Берем данные из всех фильтров
             for (const filter of onFilters) {
-                realFilters.push(filter.args ? `${filter.filter}${filter.user_arg ?? ""}` : filter.filter);
+                realFilters.push(filter.args ? `${filter.filter}${filter.argument ?? ""}` : filter.filter);
             }
         }
 
@@ -85,5 +85,5 @@ export interface AudioFilter {
      * @description Аргументы указанные пользователем
      * @readonly
      */
-    user_arg?: any;
+    argument?: number;
 }

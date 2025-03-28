@@ -162,7 +162,7 @@ class AudioFiltersCommand extends Assign<Command> {
                         // Делаем проверку на аргументы
                         else if (Filter.args) {
                             // Если аргументы подходят
-                            if (argument && argument >= Filter.args[0] && argument <= Filter.args[1]) Filter.user_arg = argument;
+                            if (argument && argument >= Filter.args[0] && argument <= Filter.args[1]) Filter.argument = argument;
                             else {
                                 message.FBuilder = {
                                     description: locale._(message.locale, "command.filter.push.argument", Filter.args)

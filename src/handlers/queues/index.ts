@@ -43,17 +43,19 @@ export class Queues extends Collection<Queue> {
         else {
             // Значит что плеера нет в циклах
             if (!this.cycles.players.match(queue.player)) {
-                // Если добавлен трек
-                if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
+                setImmediate(() => {
+                    // Если добавлен трек
+                    if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
 
-                // Если очередь перезапущена
-                else if (!item) queue.player.tracks.position = 0;
+                    // Если очередь перезапущена
+                    else if (!item) queue.player.tracks.position = 0;
 
-                // Если добавлен плейлист
-                else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
+                    // Если добавлен плейлист
+                    else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
 
-                // Перезапускаем плеер
-                this.restartPlayer(queue);
+                    // Перезапускаем плеер
+                    this.restartPlayer(queue);
+                });
             }
         }
 
@@ -82,7 +84,7 @@ export class Queues extends Collection<Queue> {
      */
     private pushItems = (queue: Queue, message: Interact, item: Track.playlist | Track) => {
         // Отправляем сообщение о том что было добавлено
-        if ("items" in item || item instanceof Track && queue.tracks.total > 0) {
+        if ("items" in item || queue.tracks.total > 0) {
             db.events.emitter.emit("message/push", message, item);
         }
 

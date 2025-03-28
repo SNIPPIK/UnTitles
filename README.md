@@ -49,6 +49,12 @@
      - Открываем терминал
      - npm i && npm run build:start
 
+## Если не работает YouTube
+- Установить `youtube-dl-exec` и указать ytdl в `.env`
+```
+npm i youtube-dl-exec
+```
+
 
 ## Диаграмма всего проекта
 [<img align="center" alt="Diagram" width="" src=".prev/diagram.png" />]()
