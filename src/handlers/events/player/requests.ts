@@ -17,7 +17,7 @@ class api_request extends Assign<Event<"api/request">> {
             name: "api/request",
             type: "player",
             once: false,
-            execute: (platform, message, url) => {
+            execute: async (platform, message, url) => {
                 // Получаем функцию запроса данных с платформы
                 const api = platform.get(url);
 
@@ -45,7 +45,7 @@ class api_request extends Assign<Event<"api/request">> {
                 // Получаем данные в системе API
                 api.execute(url, { limit: db.api.limits[api.name], audio: false })
                     // Получаем данные
-                    .then((item) => {
+                    .then(async (item) => {
                         // Если нет данных или была получена ошибка
                         if (item instanceof Error) {
                             Logger.log("ERROR", `request/api - ${item}`);
@@ -76,13 +76,13 @@ class api_request extends Assign<Event<"api/request">> {
                     })
 
                     // Обрабатываем ошибки
-                    .catch((err: Error) => { // Отправляем сообщение об ошибке
+                    .catch(async (err: Error) => { // Отправляем сообщение об ошибке
                         console.error(err);
                         db.events.emitter.emit("api/error", message, `**${platform.platform}.${api.name}**\n**❯** **${err.message}**`);
                     })
 
                     // Действие в конце
-                    .finally(() => {
+                    .finally(async () => {
                         // Удаляем timeout
                         clearTimeout(timeout);
                     });

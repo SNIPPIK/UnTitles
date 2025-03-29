@@ -28,7 +28,7 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
             name: Events.VoiceStateUpdate,
             type: "client",
             once: false,
-            execute: (_, oldState, newState) => {
+            execute: async (_, oldState, newState) => {
                 setImmediate(() => {
                     const guild = oldState.guild || newState.guild;
                     const voice = db.voice.get(guild.id);

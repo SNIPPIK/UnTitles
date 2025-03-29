@@ -538,7 +538,7 @@ export class httpsClient extends Request {
     public get toString(): Promise<string | Error> {
         let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage, data = "";
 
-        return new Promise<string | Error>((resolve) => {
+        return new Promise<string | Error>(async (resolve) => {
             this.request.then((res) => {
                 if (res instanceof Error) return resolve(res);
 
@@ -572,7 +572,7 @@ export class httpsClient extends Request {
      * @public
      */
     public get toJson(): Promise<json | Error> {
-        return this.toString.then((body) => {
+        return this.toString.then(async (body) => {
             if (body instanceof Error) return body;
 
             try {
@@ -606,7 +606,7 @@ export class httpsClient extends Request {
      * @public
      */
     public get status(): Promise<boolean> {
-        return this.request.then((resource) => {
+        return this.request.then(async (resource) => {
             if (resource instanceof Error) return false;
             return resource?.statusCode && resource.statusCode >= 200 && resource.statusCode <= 400;
         });

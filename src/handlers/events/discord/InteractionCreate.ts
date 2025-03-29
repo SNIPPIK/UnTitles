@@ -120,7 +120,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             name: Events.InteractionCreate,
             type: "client",
             once: false,
-            execute: (client, message) => {
+            execute: async (client, message) => {
                 // Какие действия надо просто игнорировать
                 if (
                     // Игнорируем ботов
