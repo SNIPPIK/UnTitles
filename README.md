@@ -13,7 +13,8 @@
 
 > [!IMPORTANT]
 > Есть поддержка [`opus`](src/services/voice/audio/opus.ts), [`sodium`](src/services/voice/audio/sodium.ts)\
-> Голосовая составляющая была взята из `@discordjs/voice`, было внесено огромное кол-во модификаций
+> Голосовая составляющая была взята из `@discordjs/voice`, было внесено огромное кол-во модификаций\
+> Если не работает YouTube, установить `youtube-dl-exec` и указать ytdl в `.env`
 
 
 ## Доступные команды
@@ -48,12 +49,6 @@
      - Заходим в директорию проекта
      - Открываем терминал
      - npm i && npm run build:start
-
-## Если не работает YouTube
-- Установить `youtube-dl-exec` и указать ytdl в `.env`
-```
-npm i youtube-dl-exec
-```
 
 
 ## Диаграмма всего проекта
