@@ -46,6 +46,27 @@ export class Commands extends handler<Command> {
     }
 
     /**
+     * @description Команды для разработчика
+     * @return Command[]
+     * @public
+     */
+    public get owner() { return this.files.filter((command) => command.owner === true); };
+
+    /**
+     * @description Команды доступные для всех
+     * @return Command[]
+     * @public
+     */
+    public get public() { return this.files.filter((command) => command.owner !== true); };
+
+    /**
+     * @description Загружаем класс вместе с дочерним
+     */
+    public constructor() {
+        super("src/handlers/commands");
+    };
+
+    /**
      * @description Ищем в array подходящий тип
      * @param names - Имя или имена для поиска
      * @public
@@ -69,24 +90,21 @@ export class Commands extends handler<Command> {
     };
 
     /**
-     * @description Команды для разработчика
-     * @return Command[]
-     * @public
+     * @description Удаление команды, полезно когда команда все еще есть в списке, но на деле ее нет
+     * @param client - Клиент
+     * @param guildID - ID сервера
+     * @param CommandID - ID Команды
      */
-    public get owner() { return this.files.filter((command) => command.owner === true); };
+    public remove = (client: Client, guildID: string, CommandID: string) => {
+        // Удаление приватной команды
+        if (guildID) client.rest.delete(Routes.applicationGuildCommand(client.user.id, guildID, CommandID))
+            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed in guild ${guildID}`))
+            .catch(console.error);
 
-    /**
-     * @description Команды доступные для всех
-     * @return Command[]
-     * @public
-     */
-    public get public() { return this.files.filter((command) => command.owner !== true); };
-
-    /**
-     * @description Загружаем класс вместе с дочерним
-     */
-    public constructor() {
-        super("src/handlers/commands");
+        // Удаление глобальной команды
+        else client.rest.delete(Routes.applicationCommand(client.user.id, CommandID))
+            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed`))
+            .catch(console.error);
     };
 
     /**
@@ -108,24 +126,6 @@ export class Commands extends handler<Command> {
         // Загрузка приватных команд
         if (guild) guild.commands.set(this.owner as any)
             .then(() => Logger.log("DEBUG", `[App/Commands | ${this.owner.length}] has load guild commands`))
-            .catch(console.error);
-    };
-
-    /**
-     * @description Удаление команды, полезно когда команда все еще есть в списке, но на деле ее нет
-     * @param client - Клиент
-     * @param guildID - ID сервера
-     * @param CommandID - ID Команды
-     */
-    public remove = (client: Client, guildID: string, CommandID: string) => {
-        // Удаление приватной команды
-        if (guildID) client.rest.delete(Routes.applicationGuildCommand(client.user.id, guildID, CommandID))
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed in guild ${guildID}`))
-            .catch(console.error);
-
-        // Удаление глобальной команды
-        else client.rest.delete(Routes.applicationCommand(client.user.id, CommandID))
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed`))
             .catch(console.error);
     };
 

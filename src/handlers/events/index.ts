@@ -41,6 +41,7 @@ export class Events extends handler<Event<any>> {
 
     /**
      * @description Загружаем класс вместе с дочерним
+     * @public
      */
     public constructor() {
         super("src/handlers/events");
@@ -71,6 +72,7 @@ export class Events extends handler<Event<any>> {
         this.register(client);
     };
 }
+
 
 /**
  * @author SNIPPIK

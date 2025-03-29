@@ -470,40 +470,35 @@ class Youtube_decoder_native {
 
                     const helperObject = helperMatch[0];
                     const actionBody = helperMatch[2];
-                    const helperName = helperMatch[1];
 
                     const reverseKey = mRegex(REVERSE_PATTERN, actionBody);
                     const sliceKey = mRegex(SLICE_PATTERN, actionBody);
                     const spliceKey = mRegex(SPLICE_PATTERN, actionBody);
                     const swapKey = mRegex(SWAP_PATTERN, actionBody);
 
-                    const quotedFunctions = [reverseKey, sliceKey, spliceKey, swapKey]
-                        .filter(Boolean)
+                    const quotedFunctions = [reverseKey, sliceKey, spliceKey, swapKey].filter(Boolean)
                         .map(key => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
+                    // Если нет ожидаемых функций
                     if (quotedFunctions.length === 0) return null;
 
-                    let funcMatch = body.match(new RegExp(DECIPHER_REGEXP, "s"));
-                    let isTce = false;
-                    let decipherFunc;
+                    const funcMatch = body.match(new RegExp(DECIPHER_REGEXP, "s"));
+                    let tceVars = "";
+                    let decipherFunc: string
 
-                    if (funcMatch) {
-                        decipherFunc = funcMatch[0];
-                    } else {
-
+                    // Если найдена функция
+                    if (funcMatch) decipherFunc = funcMatch[0];
+                    else {
                         const tceFuncMatch = body.match(new RegExp(FUNCTION_TCE_REGEXP, "s"));
+
+                        // Если не найдена вспомогательная функция
                         if (!tceFuncMatch) return null;
 
                         decipherFunc = tceFuncMatch[0];
-                        isTce = true;
-                    }
-
-                    let tceVars = "";
-                    if (isTce) {
                         const tceVarsMatch = body.match(new RegExp(TCE_GLOBAL_VARS_REGEXP, "m"));
-                        if (tceVarsMatch) {
-                            tceVars = tceVarsMatch[1] + ";\n";
-                        }
+
+                        // Если удалось найти вспомогательные параметры
+                        if (tceVarsMatch) tceVars = tceVarsMatch[1] + ";\n";
                     }
 
                     const resultFunc = tceVars + helperObject + "\nvar " + DECIPHER_FUNC_NAME + "=" + decipherFunc + ";\n";
@@ -511,7 +506,7 @@ class Youtube_decoder_native {
 
                     return resultFunc + callerFunc;
                 } catch (e) {
-                    console.error("Error in extractDecipherFunc:", e);
+                    console.error("Error in extractDecipherFunction:", e);
                     return null;
                 }
             }
@@ -524,46 +519,40 @@ class Youtube_decoder_native {
             name: "extractNTransformFunction",
             callback: (body) => {
                 try {
+                    const nMatch = body.match(new RegExp(N_TRANSFORM_REGEXP, "s"));
+                    let tceVars = "";
+                    let nFunction: string;
 
-                    let nMatch = body.match(new RegExp(N_TRANSFORM_REGEXP, "s"));
-                    let isTce = false;
-                    let nFunction;
-
-                    if (nMatch) {
-                        nFunction = nMatch[0];
-                    } else {
-
+                    // Если найдена функция
+                    if (nMatch) nFunction = nMatch[0];
+                    else {
                         const nTceMatch = body.match(new RegExp(N_TRANSFORM_TCE_REGEXP, "s"));
+
+                        // Если нет вспомогательные функций вычисления
                         if (!nTceMatch) return null;
 
                         nFunction = nTceMatch[0];
-                        isTce = true;
+
+                        const tceVarsMatch = body.match(new RegExp(TCE_GLOBAL_VARS_REGEXP, "m"));
+
+                        // Если вспомогательные параметры найдены
+                        if (tceVarsMatch) tceVars = tceVarsMatch[1] + ";\n";
                     }
 
                     const paramMatch = nFunction.match(/function\s*\(\s*(\w+)\s*\)/);
+
+                    // Если не найдено параметров
                     if (!paramMatch) return null;
 
-                    const paramName = paramMatch[1];
-
-                    const cleanedFunction = nFunction.replace(
-                        new RegExp(`if\\s*\\(typeof\\s*[^\\s()]+\\s*===?.*?\\)return ${paramName}\\s*;?`, "g"),
+                    const resultFunc = tceVars + "var " + N_TRANSFORM_FUNC_NAME + "=" + nFunction.replace(
+                        new RegExp(`if\\s*\\(typeof\\s*[^\\s()]+\\s*===?.*?\\)return ${paramMatch[1]}\\s*;?`, "g"),
                         ""
-                    );
-
-                    let tceVars = "";
-                    if (isTce) {
-                        const tceVarsMatch = body.match(new RegExp(TCE_GLOBAL_VARS_REGEXP, "m"));
-                        if (tceVarsMatch) {
-                            tceVars = tceVarsMatch[1] + ";\n";
-                        }
-                    }
-
-                    const resultFunc = tceVars + "var " + N_TRANSFORM_FUNC_NAME + "=" + cleanedFunction + ";\n";
+                    ) + ";\n";
                     const callerFunc = N_TRANSFORM_FUNC_NAME + "(" + N_ARGUMENT + ");";
 
                     return resultFunc + callerFunc;
                 } catch (e) {
-                    console.error("Error in extractNTransformFunc:", e);
+                    console.error("Error in extractNTransformFunction:", e);
                     return null;
                 }
             }
@@ -646,7 +635,7 @@ class Youtube_decoder_native {
             delete format.signatureCipher;
             delete format.cipher;
         } catch (err) {
-            console.error("Error setting download URL:", err);
+            console.error("Error set download URL:", err);
         }
     };
 

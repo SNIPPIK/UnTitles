@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "lib": ["ES2023"],
+    "lib": ["ESNext"],
     "module": "CommonJS",
     "moduleResolution": "node",
-    "target": "ES2023",
+    "target": "ES6",
 
     "baseUrl": "src",
     "outDir": "build",
@@ -24,15 +24,15 @@
     "alwaysStrict": true,
     "sourceMap": false,
     "resolveJsonModule": true,
-
     "declaration": false,
-    "listFiles": false,
-    "listEmittedFiles": true,
+
+    "listFiles": true,
+    "listEmittedFiles": false,
     "removeComments": true,
 
     "esModuleInterop": true,
     "importHelpers": false,
-    "noEmitHelpers": false,
+    "noEmitHelpers": true,
 
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
