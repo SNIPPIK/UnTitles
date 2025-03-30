@@ -24,7 +24,7 @@ import {db} from "@app";
         {
             names: {
                 "en-US": "api",
-                "ru": "api"
+                "ru": "платформа"
             },
             descriptions: {
                 "en-US": "Turn on music by link or title!",
@@ -99,6 +99,17 @@ import {db} from "@app";
                 "en-US": "Restart queue!!! Necessary for re-enabling if playback has been completed!",
                 "ru": "Перезапуск очереди!!! Необходимо для повторного включения если проигрывание было завершено!"
             },
+        },
+        {
+            type: ApplicationCommandOptionType.Subcommand,
+            names: {
+                "en-US": "stop",
+                "ru": "стоп"
+            },
+            descriptions: {
+                "en-US": "Forced termination of music playback!",
+                "ru": "Принудительное завершение проигрывания музыки!"
+            },
         }
     ]
 })
@@ -107,12 +118,13 @@ class PlayCommand extends Assign<Command> {
         super({
             rules: ["voice", "another_voice"],
             execute: async ({message, args, type}) => {
-                // Просим discord немного подождать бота
-                await message.message["deferReply"]();
 
                 switch (type) {
                     // Если пользователь прикрепил файл
                     case "file": {
+                        // Просим discord немного подождать бота
+                        await message.message["deferReply"]();
+
                         const attachment = message.options.getAttachment("input");
 
                         // Если пользователь подсунул фальшивку
@@ -148,8 +160,31 @@ class PlayCommand extends Assign<Command> {
                         return;
                     }
 
+                    // Принудительное завершение проигрывания музыки
+                    case "stop": {
+                        const queue = message.queue;
+
+                        // Если нет очереди, то и нечего не делаем
+                        if (!queue) {
+                            message.FBuilder = { description: locale._(message.locale, "command.play.stop.queue", [message.author]), color: Colors.Yellow };
+                            return;
+                        }
+
+                        // Очищаем очередь
+                        queue.cleanup();
+
+                        // Удаляем очередь
+                        queue["destroy"]();
+
+                        message.FBuilder = { description: locale._(message.locale, "command.play.stop", [message.author]), color: Colors.Green };
+                        return;
+                    }
+
                     // Если пользователя пытается сделать запрос к API
                     default: {
+                        // Просим discord немного подождать бота
+                        await message.message["deferReply"]();
+
                         // Запрос к платформе
                         const platform = db.api.request(args[0]);
 

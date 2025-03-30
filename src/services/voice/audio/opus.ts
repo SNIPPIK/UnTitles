@@ -45,7 +45,7 @@ export class OpusEncoder extends PassThrough {
     private readonly db = {
         buffer: null    as Buffer,
         bitstream: null as number,
-        _remainder: null as Buffer
+        remainder: null as Buffer
     };
 
     /**
@@ -129,9 +129,9 @@ export class OpusEncoder extends PassThrough {
      */
     public _transform = async (chunk: Buffer, _: any, done: () => any) => {
         // Если есть прошлый буфер
-        if (this.db._remainder) {
-            chunk = Buffer.concat([this.db._remainder, chunk]);
-            this.db._remainder = null;
+        if (this.db.remainder) {
+            chunk = Buffer.concat([this.db.remainder, chunk]);
+            this.db.remainder = null;
         }
 
         // Получаем пакеты из
@@ -142,7 +142,7 @@ export class OpusEncoder extends PassThrough {
         }
 
         // Добавляем не прошедшие данные в буфер
-        this.db._remainder = chunk;
+        this.db.remainder = chunk;
 
         done();
     };

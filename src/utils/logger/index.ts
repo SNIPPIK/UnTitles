@@ -43,9 +43,8 @@ export class Logger {
         text = text.replace(/\[/, "\x1b[102m \x1b[30m").replace(/]/, " \x1b[0m");
 
         const date = new Date();
-        const ms = `${date.getMilliseconds()}`
         const extStatus = db.status[status];
-        const time = `\x1b[90m${date.getDate().toSplit()}/${(date.getMonth() + 1).toSplit()}/${date.getFullYear()} ${date.getHours().toSplit()}:${date.getMinutes().toSplit()}.${ms.slice(0, 2)}\x1b[0m`;
+        const time = `\x1b[90m${date.getDate().toSplit()}/${(date.getMonth() + 1).toSplit()}/${date.getFullYear()} ${date.getHours().toSplit()}:${date.getMinutes().toSplit()}\x1b[0m`;
 
         // Отправляем лог
         console.log(`${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}`);

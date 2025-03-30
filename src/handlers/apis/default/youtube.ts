@@ -431,7 +431,7 @@ class YouTube_encoder_ytd {
             }).then((output) => {
                 if (typeof output === "string") return resolve(Error(`[APIs]: ${output}`));
 
-                const format = output.formats.find((format) => format.acodec && format.acodec.match(/opus/));
+                const format = output.formats.find((format: YouTubeFormat) => format.acodec && format.acodec.match(/opus/));
                 return resolve(format);
             })
         });
@@ -721,6 +721,7 @@ interface YouTubeFormat {
     s?: string;
     mimeType?: string;
     bitrate?: number;
+    acodec?: string;
 }
 
 /**

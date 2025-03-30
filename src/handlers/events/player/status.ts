@@ -17,7 +17,6 @@ class player_wait extends Assign<Event<"player/wait">> {
             type: "player",
             once: false,
             execute: (player) => {
-                const queue = db.queues.get(player.id);
                 const repeat = player.tracks.repeat;
                 const current = player.tracks.position;
 
@@ -31,8 +30,13 @@ class player_wait extends Assign<Event<"player/wait">> {
 
                     // Если повтор выключен
                     if (repeat === RepeatType.None) {
+
                         // Если очередь началась заново
-                        if (current + 1 === player.tracks.total && player.tracks.position === 0) return queue.cleanup();
+                        if (current + 1 === player.tracks.total && player.tracks.position === 0) {
+                            const queue = db.queues.get(player.id);
+
+                            return queue.cleanup();
+                        }
                     }
                 }
 

@@ -526,5 +526,14 @@
   "command.play.replay": {
     "ru": "{ARGUMENT} | Перезапуск воспроизведенных треков!",
     "en-US": "{ARGUMENT} | Restarting played tracks!"
+  },
+
+  "command.play.stop.queue": {
+    "ru": "{ARGUMENT} | Я не могу выключить музыку, очереди нет!",
+    "en-US": "{ARGUMENT} | I can't turn off the music, there is no queue!"
+  },
+  "command.play.stop": {
+    "ru": "{ARGUMENT} | Выключение музыки!",
+    "en-US": "{ARGUMENT} | Turn off music!"
   }
 }
