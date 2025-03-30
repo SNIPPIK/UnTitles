@@ -10,6 +10,13 @@ import {PlayerAudio} from "../modules/audio";
 
 /**
  * @author SNIPPIK
+ * @description Создаем класс для вычисления progress bar
+ * @private
+ */
+const Progress = new PlayerProgress();
+
+/**
+ * @author SNIPPIK
  * @description Плеер для проигрывания музыки на серверах
  * @class AudioPlayer
  * @public
@@ -27,13 +34,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public readonly id: string;
-
-    /**
-     * @description Подключаем класс для отображения прогресс бара
-     * @readonly
-     * @private
-     */
-    private readonly _progress: PlayerProgress = new PlayerProgress();
 
     /**
      * @description Хранилище треков
@@ -143,7 +143,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (current > time.total || !this.playing) current = 0;
 
         // Создаем прогресс бар
-        const bar =  this._progress.bar({ platform: api.name, duration: { current, total: time.total } });
+        const bar =  Progress.bar({ platform: api.name, duration: { current, total: time.total } });
 
         return `\n\`\`${current.duration()}\`\` ${bar} \`\`${time.split}\`\``;
     };
@@ -303,15 +303,12 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public stop = (position?: number) => {
         // Работает с плавным переходом
-        if (position) {
+        if (typeof position === "number") {
             // Меняем позицию трека в очереди с учетом времени
             if (this.audio.current.duration < this.tracks.track.time.total + db.queues.options.optimization) {
                 this.tracks.position = position;
                 this.play();
                 return;
-            } else {
-                // Если надо вернуть прошлый трек, но времени уже нет!
-                if (this.tracks.position > position) this.tracks.position = position - 1;
             }
         }
 
@@ -326,6 +323,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public cleanup = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has cleanup`);
+
+        // Отключаем фильтры при очистке
+        if (this.filters.enabled.length > 0) this.filters.enabled.splice(0, this.filters.enabled.length);
 
         // Отключаем от цикла плеер
         db.queues.cycles.players.remove(this);

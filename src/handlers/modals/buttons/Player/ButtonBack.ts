@@ -1,4 +1,3 @@
-import {RepeatType} from "@service/player";
 import {locale} from "@service/locale";
 import {Button} from "@handler/modals";
 import {Colors} from "discord.js";
@@ -10,19 +9,14 @@ class ButtonBack extends Assign<Button> {
             name: "back",
             callback: (msg) => {
                 const queue = msg.queue;
-                const oldState = queue.player.tracks.repeat;
-
-                queue.player.tracks.repeat = RepeatType.Songs;
 
                 // Меняем позицию трека в очереди
                 queue.player.stop(queue.tracks.position - 1);
 
-                queue.player.tracks.repeat = oldState;
-
                 // Уведомляем пользователя о смене трека
                 msg.FBuilder = {
                     description: locale._(msg.locale, "player.button.last"),
-                    color: Colors.Yellow
+                    color: Colors.Green
                 };
             }
         });
