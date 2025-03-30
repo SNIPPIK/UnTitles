@@ -446,7 +446,7 @@ class YouTube_encoder_ytd {
  */
 const mRegex = (pattern: string | RegExp, text: string) => {
     const match = text.match(pattern);
-    return match ? match[1].replace(/\$/g, "\\$") : null;
+    return match ? match[1].replace(/[$\\]/g, "\\$&") : null;
 };
 
 /**
