@@ -219,8 +219,11 @@ class CacheAudio extends Cycle<Track> {
     public status = (track: Track): { status: "not-ended" | "ended" | "download", path: string } => {
         const file = `${this.cache_dir}/Audio/${track.api.url}/${track.ID}`;
 
-        // Если файл был найден в виде opus
-        if (fs.existsSync(`${file}.opus`)) return { status: "ended", path: `${file}.opus`};
+        // Если трека нет в очереди, значит он есть
+        if (!this.match(track)) {
+            // Если файл все таки есть
+            if (fs.existsSync(`${file}.opus`)) return { status: "ended", path: `${file}.opus`};
+        }
 
         // Выдаем что ничего нет
         return { status: "not-ended", path: file };
