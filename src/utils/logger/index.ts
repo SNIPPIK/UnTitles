@@ -40,7 +40,7 @@ export class Logger {
         // Игнорируем debug сообщения
         if (status === "DEBUG") return;
 
-        text = text.replace(/\[/g, "\x1b[102m \x1b[30m").replace(/]/g, " \x1b[0m");
+        text = text.replace(/\[/, "\x1b[102m \x1b[30m").replace(/]/, " \x1b[0m");
 
         const date = new Date();
         const extStatus = db.status[status];
