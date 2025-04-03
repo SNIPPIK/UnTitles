@@ -1,6 +1,6 @@
 {
   "name": "untitles",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "homepage": "https://github.com/SNIPPIK/UnTitles",
   "license": "BSD-3-Clause",
   "preferGlobal": true,
@@ -13,10 +13,12 @@
     "ws": "^8.18.1"
   },
   "optionalDependencies": {
+    "utf-8-validate": "^6.0.5",
+    "zlib-sync": "^0.1.9",
     "bufferutil": "^4.0.9"
   },
   "devDependencies": {
-    "@types/node": "^22.13.14",
+    "@types/node": "^22.14.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.2"
   },
@@ -25,9 +27,6 @@
     "shard": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src",
     "build:start": "node -r tsconfig-paths/register src --ShardManager",
     "build:shard": "node -r tsconfig-paths/register src",
-    "dev:bun:start": "bun run src/index.ts --ShardManager",
-    "dev:bun:shard": "bun run src/index.ts",
-
 
     "work:build": "tsc -p tsconfig.json"
   }

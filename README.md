@@ -13,7 +13,7 @@
 > [!IMPORTANT]
 > Есть поддержка [`opus`](src/services/voice/audio/opus.ts), [`sodium`](src/services/voice/audio/sodium.ts)\
 > Никаких Lava, lavalink, lavaplayer. Бот предоставляет свой кастомный плеер и свою поддержку платформ\
-> Голосовая составляющая была взята из `@discordjs/voice`, было внесено огромное кол-во модификаций\
+> Голосовая составляющая была взята из `@discordjs/voice`, было внесено огромное кол-во модификаций
 
 > [!NOTE]
 > У вас не получится пользоваться музыкой в боте, если ваша система не поддерживает aes-256-gcm. (проверьте, запустив этот код внутри node.js `require('node:crypto').getCiphers().includes('aes-256-gcm')`).\
