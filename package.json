@@ -16,7 +16,7 @@
     "bufferutil": "^4.0.9"
   },
   "devDependencies": {
-    "@types/node": "^22.13.8",
+    "@types/node": "^22.13.14",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.2"
   },
