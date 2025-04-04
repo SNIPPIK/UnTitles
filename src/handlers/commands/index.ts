@@ -304,6 +304,12 @@ export namespace SlashCommand {
          * @public
          */
         choices?: Choice[];
+
+        /**
+         * @description Если ли возможность редактировать данные ввода
+         * @public
+         */
+        autocomplete?: boolean;
     }
 }
 

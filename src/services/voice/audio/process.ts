@@ -1,5 +1,6 @@
 import type {ChildProcessWithoutNullStreams} from "node:child_process"
 import {spawn, spawnSync} from "node:child_process";
+import {isMainThread} from "node:worker_threads";
 import {Logger} from "@utils";
 import {env} from "@handler";
 import path from "node:path";
@@ -83,6 +84,8 @@ let ff_path = null;
  * @description Делаем проверку на наличие FFmpeg/avconv
  */
 (async () => {
+    if (!isMainThread) return;
+
     const cache = env.get("cache.dir");
     const names = [`${cache}/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 

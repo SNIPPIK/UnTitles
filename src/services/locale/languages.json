@@ -87,6 +87,12 @@
   },
 
 
+  "bot.reboot.message": {
+    "ru": "Внимание запланирован перезапуск, текущий трек будет доигран до конца!!",
+    "en-US": "Attention, a restart is planned, the current track will be played to the end!!"
+  },
+
+
 
 
 
@@ -281,16 +287,6 @@
   "player.queue.push.more": {
     "ru": "\nТак-же {ARGUMENT} трек(ов)...",
     "en-US": "\nAnd {ARGUMENT} tracks..."
-  },
-
-  "player.search": {
-    "ru": "Вот что мне удалось найти!",
-    "en-US": "This is what I managed to find!"
-  },
-
-  "player.search.list": {
-    "ru": "Найдено: {ARGUMENT} | Сейчас: {ARGUMENT} из {ARGUMENT}",
-    "en-US": "Founded: {ARGUMENT} | Current: {ARGUMENT} of {ARGUMENT}"
   },
 
   "player.search.fail": {

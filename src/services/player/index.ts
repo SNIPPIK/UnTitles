@@ -1,7 +1,11 @@
+import {Collection, Cycle, Interact, MessageUtils} from "@utils";
 import {AudioPlayer, Queue, Track} from "@service/player";
-import {Cycle, Interact, MessageUtils} from "@utils";
 import {APIRequest} from "@handler/apis";
+import {locale} from "@service/locale";
+import {Colors} from "discord.js";
+import {env} from "@handler";
 import {db} from "@app";
+
 
 export * from "./structures/track";
 export * from "./structures/queue";
@@ -11,11 +15,137 @@ export * from "./modules/tracks";
 
 /**
  * @author SNIPPIK
+ * @description Загружаем класс для хранения очередей, плееров, циклов
+ * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
+ * @readonly
+ * @public
+ */
+export class Queues extends Collection<Queue> {
+    /**
+     * @description Хранилище циклов для работы музыки
+     * @readonly
+     * @public
+     */
+    public readonly cycles = new AudioCycles();
+
+    /**
+     * @description Здесь хранятся модификаторы аудио
+     * @readonly
+     * @public
+     */
+    public readonly options = {
+        optimization: parseInt(env.get("duration.optimization")),
+        volume: parseInt(env.get("audio.volume")),
+        fade: parseInt(env.get("audio.fade"))
+    };
+
+    /**
+     * @description Перезапуск плеера или же перезапуск проигрывания
+     * @param player - Плеер
+     * @public
+     */
+    public set restartPlayer(player: AudioPlayer) {
+        // Добавляем плеер в базу цикла для отправки пакетов
+        this.cycles.players.set(player);
+
+        // Если у плеера стоит пауза
+        if (player.status === "player/pause") player.resume();
+
+        // Запускаем функцию воспроизведения треков
+        setImmediate(player.play);
+    };
+
+    /**
+     * @description отправляем сообщение о перезапуске бота
+     * @public
+     */
+    public get waitReboot() {
+        let timeout = 0;
+
+        // На все сервера отправляем сообщение о перезапуске
+        for (const queue of this.array) {
+            // Если плеер запущен
+            if (this.cycles.players.match(queue.player)) {
+                const time = queue.tracks.track.time.total * 1e3
+
+                // Если время ожидания меньше чем в очереди
+                if (timeout < time) timeout = time;
+            }
+
+            // Сообщение о перезапуске
+            queue.message.FBuilder = {
+                description: locale._(queue.message.locale, `bot.reboot.message`),
+                color: Colors.Yellow
+            };
+
+            // Тихо удаляем очередь
+            this.remove(queue.guild.id, true);
+        }
+
+        return timeout;
+    };
+
+    /**
+     * @description Ультимативная функция, позволяет как добавлять треки так и создавать очередь или переподключить очередь к системе
+     * @param message - Сообщение пользователя
+     * @param item    - Добавляемый объект
+     * @public
+     */
+    public create = (message: Interact, item: Track.playlist | Track) => {
+        let queue = this.get(message.guild.id);
+
+        // Проверяем есть ли очередь в списке, если нет то создаем
+        if (!queue) queue = new Queue(message);
+        else {
+            // Значит что плеера нет в циклах
+            if (!this.cycles.players.match(queue.player)) {
+                setImmediate(async () => {
+                    // Если добавлен трек
+                    if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
+
+                    // Если очередь перезапущена
+                    else if (!item) queue.player.tracks.position = 0;
+
+                    // Если добавлен плейлист
+                    else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
+
+                    // Перезапускаем плеер
+                    this.restartPlayer = queue.player;
+                });
+            }
+        }
+
+        // Добавляем данные в очередь
+        this.pushItems(queue, message, item);
+    };
+
+    /**
+     * @description Добавление данных в очередь
+     * @param queue   - Очередь сервера для проигрывания музыки
+     * @param message - Сообщение пользователя
+     * @param item    - Добавляемый объект
+     */
+    private pushItems = (queue: Queue, message: Interact, item: Track.playlist | Track) => {
+        // Отправляем сообщение о том что было добавлено
+        if ("items" in item || queue.tracks.total > 0) {
+            db.events.emitter.emit("message/push", message, item);
+        }
+
+        // Добавляем треки в очередь
+        for (const track of (item["items"] ?? [item]) as Track[]) {
+            track.user = message.author;
+            queue.tracks.push(track);
+        }
+    };
+}
+
+/**
+ * @author SNIPPIK
  * @description Циклы для работы аудио, лучше не трогать без понимания как все это работает
  * @class AudioCycles
  * @public
  */
-export class AudioCycles {
+class AudioCycles {
     /**
      * @author SNIPPIK
      * @description Цикл для работы плеера, необходим для отправки пакетов
@@ -62,8 +192,11 @@ export class AudioCycles {
                 execute: (message) => {
                     const queue = message.queue;
 
+                    // Если нет очереди
+                    if (!queue) this.remove(message);
+
                     // Если есть поток в плеере
-                    if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
+                    else if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
                         // Обновляем сообщение о текущем треке
                         db.events.emitter.emit("message/playing", queue, message);
                         return;
@@ -141,14 +274,6 @@ export interface QueuesEvents {
      * @param error     - Ошибка в формате string или в типе Error
      */
     readonly "message/error": (queue: Queue, error?: string | Error) => void;
-
-    /**
-     * @description Событие при котором коллекция будет отправлять сообщение об найденных треках
-     * @param tracks     - Найденные треки
-     * @param platform   - Имя платформы
-     * @param message    - Сообщение с сервера
-     */
-    readonly "message/search": (tracks: Track[], platform: string, message: Interact) => void;
 
     /**
      * @description Событие при котором коллекция будет искать трек в системе API

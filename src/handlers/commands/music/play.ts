@@ -60,7 +60,8 @@ import {db} from "@app";
                         "ru": "Необходимо указать ссылку или название трека!"
                     },
                     required: true,
-                    type: ApplicationCommandOptionType["String"]
+                    type: ApplicationCommandOptionType["String"],
+                    autocomplete: true
                 }
             ],
         },
@@ -154,7 +155,7 @@ class PlayCommand extends Assign<Command> {
                         queue.player.tracks.position = 0;
 
                         // Перезапускаем очередь
-                        db.queues.restartPlayer(queue);
+                        db.queues.restartPlayer = queue.player;
 
                         message.FBuilder = { description: locale._(message.locale, "command.play.replay", [message.author]), color: Colors.Green };
                         return;

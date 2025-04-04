@@ -1,3 +1,4 @@
+import {Worker, isMainThread, parentPort, workerData} from "node:worker_threads";
 import {API, APISmall, httpsClient} from "@handler/apis";
 import querystring from "node:querystring";
 import {locale} from "@service/locale";
@@ -280,14 +281,21 @@ class sAPI extends Assign<API> {
      */
     protected static extractFormat = (url: string, data?: json, html?: string) => {
         if (sAPI._encoder === "ytdl") return YouTube_encoder_ytd.decipherFormats(url);
-        else return new Promise(async (resolve) => {
+        else return new Promise(async (resolve, reject) => {
             if (!data["formats"]) return resolve(null);
-            const decoder = await Youtube_decoder_native.decipherFormats(data["formats"], html);
 
-            // Если произошла ошибка при расшифровке
-            if (decoder[0] instanceof Error) return resolve(decoder[0]);
-
-            return resolve(decoder.at(-1));
+            const worker = new Worker(__filename, {
+                workerData: {formats: data["formats"], html},
+                execArgv: ["-r", "tsconfig-paths/register"]
+            })
+                .once("error", async (err) => {
+                    await worker.terminate();
+                    return reject(err);
+                })
+                .once("message", async (data) => {
+                    await worker.terminate();
+                    return resolve(data);
+                })
         });
     };
 
@@ -390,7 +398,6 @@ class sAPI extends Assign<API> {
         }
     };
 }
-
 
 
 /**
@@ -576,6 +583,7 @@ class Youtube_decoder_native {
      * @description Применить расшифровку и n-преобразование к индивидуальному формату
      * @param format - Аудио или видео формат на youtube
      * @param script - Скрипт для выполнения на виртуальной машине
+     * @private
      */
     private static getting_url = (format: YouTubeFormat, {decipher, nTransform}: YouTubeChanter): void => {
         const extractDecipher = (url: string): string => {
@@ -644,6 +652,7 @@ class Youtube_decoder_native {
     /**
      * @description Извлекает функции расшифровки сигнатур и преобразования n параметров из файла html5 player.
      * @param html5 - Ссылка на плеер
+     * @private
      */
     private static extractPage = async (html5: string) => {
         const body = await new httpsClient(html5).toString;
@@ -658,10 +667,11 @@ class Youtube_decoder_native {
     /**
      * @description Извлекает функции расшифровки N типа
      * @param body - Страница плеера
+     * @private
      */
     private static extractNTransform = (body: string) => {
         try {
-            const nTransformFunc = this.extraction([this.extractors[1].callback], body);
+            const nTransformFunc = this.extraction(this.extractors[1].callback, body);
 
             if (!nTransformFunc) return null;
             return nTransformFunc;
@@ -673,38 +683,34 @@ class Youtube_decoder_native {
     /**
      * @description Извлекает функции расшифровки сигнатур и преобразования n параметров из файла html5 player.
      * @param body - Страница плеера
+     * @private
      */
     private static extractDecipher = (body: string) => {
-        const decipherFunc = this.extraction([this.extractors[0].callback], body);
+        const decipherFunc = this.extraction(this.extractors[0].callback, body);
         if (!decipherFunc) return null;
         return decipherFunc;
     };
 
     /**
      * @description Получаем функции для расшифровки
-     * @param functions - Функции расшифровки
+     * @param callback - Функция расшифровки
      * @param body - Станица youtube
      * @param postProcess - Если есть возможность обработать сторонний код
+     * @private
      */
-    private static extraction = (functions: Function[], body: string, postProcess = null) => {
-        // Перебираем функции
-        for (const callback of functions) {
-            try {
-                // Если есть функция
-                const func = callback(body);
+    private static extraction = (callback: Function, body: string, postProcess = null) => {
+        try {
+            // Если есть функция
+            const func = callback(body);
 
-                // Если нет функции
-                if (!func) continue;
+            // Если нет функции
+            if (!func) return null;
 
-                // Выполняем виртуальный код
-                return new Script(postProcess ? postProcess(func) : func);
-            } catch {
-                return null;
-            }
+            // Выполняем виртуальный код
+            return new Script(postProcess ? postProcess(func) : func);
+        } catch {
+            return null;
         }
-
-        // Возвращаем null если не получилось выполнить скрипт
-        return null;
     };
 }
 
@@ -803,6 +809,19 @@ const SWAP_PATTERN = new RegExp(PATTERN_PREFIX + SWAP_PART, "m");
 
 const DECIPHER_ARGUMENT = "sig";
 const N_ARGUMENT = "ncode";
+
+
+/**
+ * @author SNIPPIK
+ * @description Если запускается фрагмент кода в другом процессе
+ */
+if (!isMainThread) {
+    (async () => {
+        const formats = await Youtube_decoder_native.decipherFormats(workerData.formats, workerData.html);
+        parentPort.postMessage(formats[0]);
+        process.exit();
+    })();
+}
 
 /**
  * @export default

@@ -177,6 +177,9 @@ export class PlayerTracks {
 
         // Удаляем из очереди
         this._tracks._current.splice(position, 1);
+
+        // Меняем позицию, есть она не равна 0
+        if (this._tracks._position !== 0) this._tracks._position = this._tracks._position - 1;
     };
 
     /**

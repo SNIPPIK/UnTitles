@@ -5,6 +5,12 @@ import {API} from "@handler/apis";
 import {Assign} from "@utils";
 import {db} from "@app";
 
+/**
+ * @author SNIPPIK
+ * @description Управление доступом к api системе
+ * @class APISCommand
+ * @public
+ */
 @SlashCommand({
     names: {
         "en-US": "api",
@@ -77,7 +83,7 @@ import {db} from "@app";
         }
     ]
 })
-class apis extends Assign<Command> {
+class APISCommand extends Assign<Command> {
     public constructor() {
         super({
             owner: true,
@@ -130,4 +136,4 @@ class apis extends Assign<Command> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default Object.values({ apis });
+export default Object.values({ APISCommand });

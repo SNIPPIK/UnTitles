@@ -1,7 +1,7 @@
+import {Interact, Assign, Logger} from "@utils";
 import type { GuildMember} from "discord.js"
 import {Command} from "@handler/commands";
 import {Colors, Events} from "discord.js";
-import {Interact, Assign} from "@utils";
 import {locale} from "@service/locale";
 import {Event} from "@handler/events";
 import {db} from "@app";
@@ -120,7 +120,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             name: Events.InteractionCreate,
             type: "client",
             once: false,
-            execute: async (client, message) => {
+            execute: async (message) => {
                 // Какие действия надо просто игнорировать
                 if (
                     // Игнорируем ботов
@@ -130,7 +130,9 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     "customId" in message && (`${message.customId}`.startsWith("menu_"))
                 ) return;
 
+                // Модифицированный класс сообщения
                 const interact = new Interact(message);
+
 
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
@@ -171,7 +173,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     // Если пользователь уже в списке
                     else {
                         // Если время еще не прошло говорим пользователю об этом
-                        if (user >= Date.now()) {
+                        if (user >= Date.now() && !message.isAutocomplete()) {
                             interact.FBuilder = {
                                 description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0), 5]),
                                 color: Colors.Yellow
@@ -185,13 +187,62 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 }
 
 
+                // Если используется функция ответа от бота
+                if (message.isAutocomplete()) {
+                    // Если пользователь ищет трек
+                    if (message.commandName === "play") {
+                        const args = interact.options._hoistedOptions;
+
+                        // Если ничего не было указано или указана ссылка
+                        if (!args[1]?.value) return;
+
+                        // Если указан ссылка
+                        else if (`${args[1].value}`.startsWith("http")) {
+                            message.respond(
+                                [
+                                    {
+                                        value: args[1]?.value as string,
+                                        name: args[1]?.value as string
+                                    }
+                                ]
+                            );
+
+                            return;
+                        }
+
+                        const request = db.api.request(args[0].value as string);
+
+                        // Если с платформы нельзя получить данные
+                        if (request.block || request.auth) return;
+
+                        const api = request.get<"search">("search");
+
+                        // Ищем треки по названию
+                        api.execute(args[1].value as string, {limit: db.api.limits[api.name]}).then((items) => {
+                            if (items instanceof Error) return;
+
+                            message.respond(
+                                items.map((choice) => {
+                                    return {
+                                        value: choice.url,
+                                        name: choice.name
+                                    }
+                                }),
+                            );
+                        });
+                    }
+                    return;
+                }
+
                 // Если пользователь использует команду
-                if (message.isChatInputCommand()) {
+                else if (message.isChatInputCommand() && !message.isAutocomplete()) {
                     const command = interact.command;
+
+                    Logger.log("DEBUG", `${message.user.username} request in ${command.name}`);
 
                     // Если нет команды
                     if (!command) {
-                        db.commands.remove(client, message.commandGuildId, message.commandId);
+                        db.commands.remove(message.client, message.commandGuildId, message.commandId);
                         interact.FBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
                         return;
                     }
@@ -235,6 +286,8 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     const button = db.buttons.get(interact.custom_id);
                     const queue = interact?.queue;
 
+                    Logger.log("DEBUG", `${message.user.username} request in ${button.name}`);
+
                     // Если была не найдена кнопка
                     if (!button) {
                         interact.FBuilder = { description: locale._(interact.locale, "button.fail"), color: Colors.DarkRed };
@@ -248,7 +301,8 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     else if (!queue || interact.voice.channel?.id !== queue.voice.channel.id) return;
 
                     // Если кнопка была найдена
-                    return button.callback(interact);
+                    button.callback(interact);
+                    return;
                 }
             }
         });

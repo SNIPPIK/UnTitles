@@ -1,6 +1,7 @@
 import {Client, ShardingManager, IntentsBitField, Partials, Options, Colors, WebhookClient} from "discord.js";
 import {DiscordGatewayAdapterCreator, VoiceConnection, VoiceConnectionStatus} from "@service/voice";
 import {ActivityType} from "discord-api-types/v10";
+import {isMainThread} from "node:worker_threads";
 import {ActivityOptions} from "@type/discord";
 import {Logger, Collection} from "@utils";
 import {env} from "@handler";
@@ -12,7 +13,7 @@ import {API_requester} from "@handler/apis";
 import {Commands} from "@handler/commands";
 import {Buttons} from "@handler/modals";
 import {Events} from "@handler/events";
-import {Queues} from "@handler/queues";
+import {Queues} from "@service/player";
 
 /**
  * @author SNIPPIK
@@ -168,6 +169,9 @@ export var db: Database = null;
  * @description Запуск всего проекта в async режиме
  */
 (async () => {
+    // Если при запуске многопоточных элементов произойдет случайный запуск осколка
+    if (!isMainThread) return;
+
     switch (process["argv"].includes("--ShardManager")) {
         /**
          * @author SNIPPIK
@@ -187,10 +191,12 @@ export var db: Database = null;
 
             // Слушаем событие для создания осколка
             manager.on("shardCreate", async (shard) => {
+                shard.setMaxListeners(3);
                 shard.on("spawn", () => Logger.log("LOG", `[Manager/${shard.id}] shard ${Logger.color(36, `added to manager`)}`));
                 shard.on("ready", () => Logger.log("LOG", `[Manager/${shard.id}] shard is ${Logger.color(36, `ready`)}`));
                 shard.on("death", () => Logger.log("LOG", `[Manager/${shard.id}] shard is ${Logger.color(31, `killed`)}`));
             });
+            manager.setMaxListeners(1);
 
             // Создаем дубликат
             manager.spawn({amount: "auto", delay: -1}).catch((err: Error) => Logger.log("ERROR", `[Manager] ${err}`));
@@ -255,22 +261,24 @@ export var db: Database = null;
                 .then(async () => {
                     Logger.log("WARN", `[Core/${id}] connected to discord as ${Logger.color(35, client.user.tag)}`);
 
-                    // Задаем статус боту
-                    client.user.setPresence({
-                        status: env.get("client.status", "online"),
-                        activities: [
-                            {
-                                name: env.get("client.presence.name", "I ❤️ UnTitles bot"),
-                                type: ActivityType[env.get("client.presence.type", "Watching")],
-                            }
-                        ] as ActivityOptions[],
-                    });
-                })
+                    if (id === 0) {
+                        // Время обновления статуса
+                        const timeout = parseInt(env.get("client.presence.interval"));
 
-                // Если при входе происходит ошибка
-                .catch(async (err) => {
-                    Logger.log("ERROR", `[Core/${id}] failed authorization in discord`);
-                    Logger.log("ERROR", err);
+                        // Интервал для обновления статуса
+                        setInterval(async () => {
+                            // Задаем статус боту
+                            client.user.setPresence({
+                                status: env.get("client.status", "online"),
+                                activities: [
+                                    {
+                                        name: env.get("client.presence.name", "I ❤️ UnTitles bot"),
+                                        type: ActivityType[env.get("client.presence.type", "Watching")],
+                                    }
+                                ] as ActivityOptions[],
+                            });
+                        }, timeout);
+                    }
                 })
 
                 // Что делаем после подключения к discord api
@@ -299,16 +307,19 @@ export var db: Database = null;
 
                 // Отправляем данные об ошибке и отправляем через систему webhook
                 webhook.send({
-                    username: client.user.username, avatarURL: client.user.avatarURL(),
+                    username: client.user.username,
+                    avatarURL: client.user.avatarURL(),
                     embeds: [{
+                        color: Colors.DarkRed,
                         title: "Caught exception",
                         description: `\`\`\`${err.name} - ${err.message}\`\`\``,
-                        fields: [{
-                            name: "Stack:",
-                            value: `\`\`\`${err.stack}\`\`\``
-                        }],
-                        color: Colors.DarkRed,
-                    }],
+                        fields: [
+                            {
+                                name: "Stack:",
+                                value: `\`\`\`${err.stack}\`\`\``
+                            }
+                        ]
+                    }]
                 }).catch(() => {
                     Logger.log("ERROR", "[Webhook] Fail send message");
                 });

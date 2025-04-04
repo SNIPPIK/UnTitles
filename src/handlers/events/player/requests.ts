@@ -55,7 +55,17 @@ class api_request extends Assign<Event<"api/request">> {
 
                         // Если был произведен поиск
                         if (item instanceof Array) {
-                            db.events.emitter.emit("message/search", item, platform.platform, message);
+                            // Если не нашлись треки
+                            if (item?.length < 1) {
+                                message.FBuilder = { description: locale._(message.locale, "player.search.fail"), color: Colors.DarkRed };
+                                return;
+                            }
+
+                            // Сохраняем трек в системе
+                            db.cache.set(item[0]);
+
+                            // Добавляем данные в очередь
+                            db.queues.create(message, item[0]);
                             return;
                         }
 
@@ -67,7 +77,7 @@ class api_request extends Assign<Event<"api/request">> {
                                 return;
                             }
 
-                            // Сохраняем кеш в системе
+                            // Сохраняем трек в системе
                             db.cache.set(item);
                         }
 

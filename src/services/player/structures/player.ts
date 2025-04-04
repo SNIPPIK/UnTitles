@@ -187,7 +187,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @param seek  - Время трека для пропуска аудио дорожки
      * @public
      */
-    public play = (seek: number = 0) => {
+    public play = (seek: number = 0): void => {
         const track = this._tracks?.track;
 
         // Если больше нет треков
@@ -302,9 +302,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public stop = (position?: number) => {
-        // Работает с плавным переходом
+        // Если есть позиция трека, для плавного перехода
         if (typeof position === "number") {
-            // Меняем позицию трека в очереди с учетом времени
+            // Если можно сделать плавные переход
             if (this.audio.current.duration < this.tracks.track.time.total + db.queues.options.optimization) {
                 this.tracks.position = position;
                 this.play();

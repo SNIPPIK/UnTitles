@@ -474,15 +474,13 @@ abstract class Request {
              * @description Событие если подключение было сорвано
              */
             request.once("close", () => {
+                this.data = null;
+                request.removeAllListeners();
                 request.destroy();
             });
 
             request.end();
-        })
-            // Удаляем данные после завершения ответа
-            .finally(() => {
-                this.data = null;
-            });
+        });
     };
 
     /**
@@ -552,19 +550,16 @@ export class httpsClient extends Request {
 
                 // Запускаем расшифровку
                 decoder.setEncoding("utf-8")
-                    .on("data", (c) => data += c)
+                    .on("data", (chunk) => {
+                        data += chunk;
+                    })
                     .once("end", () => {
                         return resolve(data);
                     });
             }).catch((err) => {
                 return resolve(err);
             });
-        })
-            // Удаляем данные после завершения ответа
-            .finally(() => setImmediate(() => {
-                decoder = null;
-                data = null;
-            }));
+        });
     };
 
     /**

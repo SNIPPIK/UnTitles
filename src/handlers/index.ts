@@ -104,12 +104,12 @@ export abstract class handler<T = unknown> {
     };
 }
 
-
 /**
  * @author SNIPPIK
  * @description Тип выходящего параметра env.get
+ * @type EnvironmentOut
  */
-type EnvironmentExit<T> = T extends boolean ? T : T extends string ? T : never;
+type EnvironmentOut<T> = T extends boolean ? T : T extends string ? T : T extends number ? string : never;
 
 /**
  * @author SNIPPIK
@@ -136,7 +136,7 @@ class Environment {
      * @param safe - Этот параметр будет возращен если ничего нет
      * @public
      */
-    public get<T = string>(name: string, safe?: EnvironmentExit<T>): EnvironmentExit<T> {
+    public get<T = string>(name: string, safe?: EnvironmentOut<T>): EnvironmentOut<T> {
         const env = process.env[name];
 
         // Если нет параметра в файле .env
@@ -148,25 +148,13 @@ class Environment {
         }
 
         // Если параметр имеет правду
-        if (["on", "true"].includes(env)) return true as EnvironmentExit<T>;
+        if (["on", "true"].includes(env)) return true as EnvironmentOut<T>;
 
         // Если параметр имеет ложь
-        else if (["off", "false"].includes(env)) return false as EnvironmentExit<T>;
+        else if (["off", "false"].includes(env)) return false as EnvironmentOut<T>;
 
         // Если параметр имеет что-то другое
-        return env as EnvironmentExit<T>;
-    };
-
-    /**
-     * @description Проверяем есть ли данные
-     * @param name {string} Имя
-     * @readonly
-     * @public
-     */
-    public readonly check = (name: string) => {
-        const env = process.env[name];
-
-        return !(!env || env === "undefined");
+        return env as EnvironmentOut<T>;
     };
 }
 
@@ -175,4 +163,4 @@ class Environment {
  * @description Взаимодействуем с environment variables
  * @class Environment
  */
-export const env = new Environment();
+export let env: Environment = new Environment();

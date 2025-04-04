@@ -53,7 +53,7 @@ export class OpusEncoder extends PassThrough {
      * @readonly
      * @private
      */
-    private readonly packet = (chunk: Buffer): Buffer | false => {
+    private readonly packet = async (chunk: Buffer): Promise<Buffer | false> => {
         // Если размер буфера не является нужным, то пропускаем
         if (chunk.length < 26) return false;
 
@@ -136,7 +136,7 @@ export class OpusEncoder extends PassThrough {
 
         // Получаем пакеты из
         while (!!chunk) {
-            const packet = this.packet(chunk);
+            const packet = await this.packet(chunk);
             if (packet) chunk = packet;
             else break;
         }
@@ -146,24 +146,4 @@ export class OpusEncoder extends PassThrough {
 
         done();
     };
-
-    /**
-     * @description Удаляем данные по завершению
-     * @public
-     */
-    public _destroy = (error?: Error, callback?: OpusEncoderCallback) => {
-        if (this.destroyed) return;
-
-        setImmediate(() => {
-            // Отключаем все ивенты
-            this.removeAllListeners();
-            super._destroy(error, callback);
-        });
-    };
 }
-
-/**
- * @author SNIPPIK
- * @description Тип функции PassThrough
- */
-type OpusEncoderCallback = (error?: Error | null) => void;

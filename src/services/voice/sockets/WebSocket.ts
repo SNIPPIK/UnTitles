@@ -99,10 +99,10 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
      */
     public constructor(endpoint: string) {
         super();
-        this.socket = new WS(endpoint, { minVersion: "TLSv1.2", maxVersion: "TLSv1.3" });
+        this.socket = new WS(endpoint, { minVersion: "TLSv1.2", maxVersion: "TLSv1.3", joinDuplicateHeaders: true });
 
         // Если WebSocket принял сообщение
-        this.socket.onmessage = (event: WebSocketEvent) => {
+        this.socket.onmessage = async (event: WebSocketEvent) => {
             if (typeof event.data !== "string") return;
 
             try {
@@ -113,19 +113,19 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
         };
 
         // Если WebSocket открыт
-        this.socket.once("open", (event: Event) => {
+        this.socket.once("open", async (event: Event) => {
             this._isConnected = true;
             this.emit("open", event);
         });
 
         // Если WebSocket закрыт
-        this.socket.once("close", (event: CloseEvent) => {
+        this.socket.once("close", async (event: CloseEvent) => {
             this._isConnected = false;
             this.emit("close", event);
         });
 
         // Если WebSocket выдал ошибку
-        this.socket.on("error", (event: Error) => {
+        this.socket.on("error", async (event: Error) => {
             this._isConnected = false;
             this.emit("error", event);
         });
@@ -136,6 +136,8 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
      * @public
      */
     public destroy = (code?: number) => {
+        this.socket.removeAllListeners();
+
         try {
             this.keepAlive = -1;
             this.socket.close(code);
@@ -143,8 +145,6 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
         } catch (error) {
             this.emit("error", error as Error);
         }
-
-        this.removeAllListeners();
     };
 }
 

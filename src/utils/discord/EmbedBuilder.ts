@@ -67,9 +67,7 @@ export class EmbedBuilder {
                 if (this.promise) this.promise(new Interact(message));
 
                 // Удаляем сообщение через время если это возможно
-                if (this.time !== 0) {
-                    MessageUtils.deleteMessage({message}, this.time);
-                }
+                if (this.time !== 0) MessageUtils.deleteMessage({message}, this.time);
             })
             .catch(async (err) => {
                 // Если при отправке сообщения произошла ошибка связанная с авторизацией

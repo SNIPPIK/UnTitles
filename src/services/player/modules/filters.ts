@@ -29,8 +29,11 @@ export class PlayerAudioFilters {
      * @public
      */
     public compress = (time: number) => {
-        const realFilters: string[] = [`volume=${db.queues.options.volume / 150}`, `afade=t=in:st=0:d=${db.queues.options.fade + 2}`, `afade=out:st=${time - (db.queues.options.fade + 5)}:d=${db.queues.options.fade + 5}`];
+        const realFilters: string[] = [`volume=${db.queues.options.volume / 150}`, `afade=t=in:st=0:d=${db.queues.options.fade + 2}`];
         const onFilters = this.enabled;
+
+        // Если есть время трека
+        if (typeof time === "number") realFilters.push(`afade=out:st=${time - (db.queues.options.fade + 5)}:d=${db.queues.options.fade + 5}`);
 
         // Если есть включенные фильтры
         if (onFilters.length > 0) {

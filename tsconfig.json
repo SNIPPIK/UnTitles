@@ -32,7 +32,7 @@
 
     "esModuleInterop": true,
     "importHelpers": false,
-    "noEmitHelpers": true,
+    "noEmitHelpers": false,
 
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,

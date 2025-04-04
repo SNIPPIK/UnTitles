@@ -16,11 +16,8 @@ export abstract class Collection<K, T = string> {
      * @description Получаем случайный объект из MAP
      * @public
      */
-    public get random(): K {
-        const keys = Array.from(this._map.keys());
-        const key = keys[Math.floor(Math.random() * keys.length)];
-
-        return this.get(key);
+    public get array() {
+        return this._map.values();
     };
 
     /**
@@ -62,16 +59,26 @@ export abstract class Collection<K, T = string> {
     /**
      * @description Удаляем элемент из списка
      * @param ID - ID Сервера
+     * @param silent - тихое удаление объекта
      * @public
      */
-    public remove = (ID: T) => {
+    public remove = (ID: T, silent: boolean = false) => {
         const item = this._map.get(ID);
 
         // Если найден объект, то удаляем все сопутствующее, если это возможно
         if (item) {
-            // Если объект имеет функции удаления от они будут выполнены до удаления
-            for (const key of ["disconnect", "cleanup", "destroy"]) {
-                if (item[key] && typeof item[key] === "function") item[`${key}`]();
+
+            // Если надо удалить тихо
+            if (silent) {
+                // Если объект имеет функции удаления от они будут выполнены до удаления
+                for (const key of ["silent_destroy"]) {
+                    if (item[key] && typeof item[key] === "function") item[`${key}`]();
+                }
+            } else {
+                // Если объект имеет функции удаления от они будут выполнены до удаления
+                for (const key of ["disconnect", "cleanup", "destroy"]) {
+                    if (item[key] && typeof item[key] === "function") item[`${key}`]();
+                }
             }
 
             this._map.delete(ID);

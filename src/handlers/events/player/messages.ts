@@ -1,8 +1,8 @@
-import {Colors, EmbedData} from "discord.js";
 import {Assign, MessageUtils} from "@utils";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Event} from "@handler/events";
+import {Colors} from "discord.js";
 import {db} from "@app";
 
 /**
@@ -101,74 +101,6 @@ class message_push extends Assign<Event<"message/push">> {
 
 /**
  * @author SNIPPIK
- * @description Сообщение с выбором трека
- * @class message_search
- * @event message/search
- * @public
- */
-class message_search extends Assign<Event<"message/search">> {
-    public constructor() {
-        super({
-            name: "message/search",
-            type: "player",
-            once: false,
-            execute: (tracks, platform, message) => {
-                // Если не нашлись треки
-                if (tracks?.length < 1) {
-                    message.FBuilder = {
-                        description: locale._(message.locale, "player.search.fail"),
-                        color: Colors.DarkRed
-                    };
-                    return;
-                }
-
-                const track = tracks[0];
-                const embed: EmbedData = {
-                    color: Colors.Green,
-                    author: {
-                        name: locale._(message.locale, "player.search"),
-                        iconURL: track.artist.image.url
-                    },
-                    description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.name.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
-                    image: track.image,
-                    footer: {
-                        text: locale._(message.locale, "player.search.list", [tracks.length, 1, tracks.length])
-                    },
-                    timestamp: new Date()
-                }
-
-                // Создаем сообщение о поиске
-                new message.builder().setTime(120e3).setMenu({type: "selector", pages: tracks, page: 0}).addEmbeds([embed])
-                    .setCallback((msg, pages: Track[], page, embed, item: Track) => {
-                        // Если был выбран объект
-                        if (item) {
-                            db.events.emitter.emit("api/request", db.api.request(platform), message, item.url);
-                            return;
-                        }
-
-                        // Текущий трек
-                        const track = pages[page];
-
-                        // Обновляем сообщение
-                        msg.edit({
-                            embeds: [{
-                                ...embed[0],
-                                description: locale._(message.locale, "player.current.link", [track.url]) + `\`\`\`css\n👤 ${track.artist.title}\n💽 ${track.name.substring(0, 45)}\n\n🕐 ${track.time.split}\n\`\`\``,
-                                image: pages[page].image,
-                                footer: {
-                                    text: locale._(message.locale, "player.search.list", [tracks.length, page + 1, tracks.length])
-                                }
-                            }]
-                        });
-                    }
-                ).send = message;
-            }
-        });
-    };
-}
-
-/**
- * @author SNIPPIK
  * @description Сообщение о том что сейчас играет
  * @class message_playing
  * @event message/playing
@@ -243,4 +175,4 @@ class message_playing extends Assign<Event<"message/playing">> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({message_playing, message_search, message_push, message_error});
+export default Object.values({message_playing, message_push, message_error});

@@ -37,7 +37,7 @@ export interface ActivityOptions {
  * @interface MessageSendOptions
  */
 export interface MessageSendOptions {
-    components?: (ComponentData | ActionRowBuilder | MessageComponents)[];
+    components?: (ComponentData | ActionRowBuilder<any> | MessageComponents)[];
     embeds?: EmbedData[];
     flags?: MessageFlags;
     context?: string;

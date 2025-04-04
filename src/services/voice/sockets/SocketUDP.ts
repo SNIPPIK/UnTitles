@@ -66,12 +66,12 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
         this._connection = options;
 
         // Если подключение возвращает ошибки
-        this.socket.on("error", (err) => {
+        this.socket.on("error", async (err) => {
             this.emit("error", err);
         });
 
         // Если подключение оборвалось
-        this.socket.once("close", () => {
+        this.socket.on("close", async () => {
             this.emit("close");
         });
     };
@@ -95,6 +95,7 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
      */
     public destroy = () => {
         this.socket.removeAllListeners();
+        this.removeAllListeners();
 
         try {
             if (this.socket) this.socket?.close();

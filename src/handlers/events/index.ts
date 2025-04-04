@@ -56,8 +56,8 @@ export class Events extends handler<Event<any>> {
 
         // Проверяем ивенты
         for (let item of this.events) {
-            if (item.type === "client") client[item.once ? "once" : "on"](item.name as any, (...args) => item.execute(client, ...args));
-            else this.emitter[item.once ? "once" : "on"](item.name as any, (...args: any) => item.execute(...args));
+            if (item.type === "client") client[item.once ? "once" : "on"](item.name as any, item.execute);
+            else this.emitter[item.once ? "once" : "on"](item.name as any, item.execute);
         }
     };
 
@@ -73,6 +73,26 @@ export class Events extends handler<Event<any>> {
     };
 }
 
+/**
+ * @author SNIPPIK
+ * @description Все имена событий доступных для прослушивания
+ * @type EventNames
+ */
+type EventNames<T> = T extends keyof QueuesEvents ? keyof QueuesEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
+
+/**
+ * @author SNIPPIK
+ * @description Все типы для фильтрации событий
+ * @type EventType
+ */
+type EventType<T> = T extends keyof QueuesEvents | keyof AudioPlayerEvents ? "player" : "client";
+
+/**
+ * @author SNIPPIK
+ * @description Функция выполняемая при вызове события
+ * @type EventCallback
+ */
+type EventCallback<T> = T extends keyof QueuesEvents ? QueuesEvents[T] : T extends keyof AudioPlayerEvents ? AudioPlayerEvents[T] : T extends keyof ClientEvents ? (...args: ClientEvents[T]) => void : never;
 
 /**
  * @author SNIPPIK
@@ -87,7 +107,7 @@ export abstract class Event<T extends keyof ClientEvents | keyof QueuesEvents | 
      * @readonly
      * @public
      */
-    readonly name: T extends keyof QueuesEvents ? keyof QueuesEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
+    readonly name: EventNames<T>;
 
     /**
      * @description Тип события
@@ -95,7 +115,7 @@ export abstract class Event<T extends keyof ClientEvents | keyof QueuesEvents | 
      * @readonly
      * @public
      */
-    readonly type: T extends keyof QueuesEvents | keyof AudioPlayerEvents ? "player" : "client";
+    readonly type: EventType<T>;
 
     /**
      * @description Тип выполнения события
@@ -111,5 +131,5 @@ export abstract class Event<T extends keyof ClientEvents | keyof QueuesEvents | 
      * @readonly
      * @public
      */
-    readonly execute: T extends keyof QueuesEvents ? QueuesEvents[T] : T extends keyof AudioPlayerEvents ? (...args: Parameters<AudioPlayerEvents[T]>) => void : T extends keyof ClientEvents ? (client: Client, ...args: ClientEvents[T]) => void : never;
+    readonly execute: EventCallback<T>;
 }
