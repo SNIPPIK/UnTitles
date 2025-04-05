@@ -1,17 +1,23 @@
-import {Interact, Assign, Logger} from "@utils";
 import type { GuildMember} from "discord.js"
 import {Command} from "@handler/commands";
 import {Colors, Events} from "discord.js";
+import {Interact, Assign} from "@utils";
 import {locale} from "@service/locale";
 import {Event} from "@handler/events";
 import {db} from "@app";
+import {env} from "@handler";
 
 /**
  * @author SNIPPIK
  * @description База данных для системы ожидания
  * @private
  */
-const temple_db = new Map<string, number>;
+const cooldown = env.get("cooldown", true) ? {
+    db: new Map<string, number>,
+
+    autocomplete: parseInt(env.get("cooldown.autocomplete", "1")),
+    time: parseInt(env.get("cooldown.time", "1"))
+} : null;
 
 /**
  * @author SNIPPIK
@@ -133,7 +139,6 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 // Модифицированный класс сообщения
                 const interact = new Interact(message);
 
-
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
@@ -161,19 +166,21 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 }
 
                 // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
-                else if (!db.owner.ids.includes(message.user.id)) {
-                    const user = temple_db.get(message.user.id);
+                else if (!db.owner.ids.includes(message.user.id) && cooldown) {
+                    const user = cooldown.db.get(message.user.id);
 
                     // Если нет пользователя в системе ожидания
                     if (!user) {
                         // Добавляем пользователя в систему ожидания
-                        temple_db.set(message.user.id, Date.now() + 5e3);
+                        cooldown.db.set(message.user.id, Date.now() + ((message.isAutocomplete() ? cooldown.autocomplete : cooldown.time) * 1e3));
                     }
 
                     // Если пользователь уже в списке
                     else {
                         // Если время еще не прошло говорим пользователю об этом
-                        if (user >= Date.now() && !message.isAutocomplete()) {
+                        if (user >= Date.now()) {
+                            if (message.isAutocomplete()) return;
+
                             interact.FBuilder = {
                                 description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0), 5]),
                                 color: Colors.Yellow
@@ -182,7 +189,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                         }
 
                         // Удаляем пользователя из базы
-                        temple_db.delete(message.user.id);
+                        cooldown.db.delete(message.user.id);
                     }
                 }
 
@@ -238,8 +245,6 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 else if (message.isChatInputCommand() && !message.isAutocomplete()) {
                     const command = interact.command;
 
-                    Logger.log("DEBUG", `${message.user.username} request in ${command.name}`);
-
                     // Если нет команды
                     if (!command) {
                         db.commands.remove(message.client, message.commandGuildId, message.commandId);
@@ -285,8 +290,6 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 else if (message.isButton()) {
                     const button = db.buttons.get(interact.custom_id);
                     const queue = interact?.queue;
-
-                    Logger.log("DEBUG", `${message.user.username} request in ${button.name}`);
 
                     // Если была не найдена кнопка
                     if (!button) {
