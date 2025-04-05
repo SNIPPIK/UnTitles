@@ -13,10 +13,8 @@ import {env} from "@handler";
  * @private
  */
 const cooldown = env.get("cooldown", true) ? {
-    db: new Map<string, number>,
-
-    autocomplete: parseInt(env.get("cooldown.autocomplete", "1")),
-    time: parseInt(env.get("cooldown.time", "1"))
+    time: parseInt(env.get("cooldown.time", "2")),
+    db: new Map<string, number>
 } : null;
 
 /**
@@ -166,13 +164,13 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 }
 
                 // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
-                else if (!db.owner.ids.includes(message.user.id) && cooldown) {
+                else if (!db.owner.ids.includes(message.user.id) && !message.isAutocomplete()) {
                     const user = cooldown.db.get(message.user.id);
 
                     // Если нет пользователя в системе ожидания
                     if (!user) {
                         // Добавляем пользователя в систему ожидания
-                        cooldown.db.set(message.user.id, Date.now() + ((message.isAutocomplete() ? cooldown.autocomplete : cooldown.time) * 1e3));
+                        cooldown.db.set(message.user.id, Date.now() + (cooldown.time * 1e3));
                     }
 
                     // Если пользователь уже в списке
