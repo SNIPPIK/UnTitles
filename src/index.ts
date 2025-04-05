@@ -277,7 +277,7 @@ export var db: Database = null;
                                     }
                                 ] as ActivityOptions[],
                             });
-                        }, timeout);
+                        }, timeout * 1e3);
                     }
                 })
 
