@@ -86,7 +86,7 @@ export class Encryption {
 
         // Шифровка aead_aes256_gcm (support rtpsize)
         if (connectionData.encryptionMode.startsWith("aead_aes256_gcm")) {
-            const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer, { autoDestroy: true });
+            const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer);
             cipher.setAAD(rtp_packet);
             return Buffer.concat([rtp_packet, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
         }

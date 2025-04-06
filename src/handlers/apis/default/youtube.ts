@@ -740,8 +740,8 @@ interface YouTubeChanter {
     nTransform?: Script;
 }
 
-const DECIPHER_FUNC_NAME = "YTDDecipherFunc";
-const N_TRANSFORM_FUNC_NAME = "YTDNTransformFunc";
+const DECIPHER_FUNC_NAME = "getDecipherFunc";
+const N_TRANSFORM_FUNC_NAME = "getNTransformFunc";
 
 const VARIABLE_PART = "[a-zA-Z_\\$][a-zA-Z_0-9\\$]*";
 const VARIABLE_PART_DEFINE = "\\\"?" + VARIABLE_PART + "\\\"?";
@@ -818,8 +818,7 @@ const N_ARGUMENT = "ncode";
 if (!isMainThread) {
     (async () => {
         const formats = await Youtube_decoder_native.decipherFormats(workerData.formats, workerData.html);
-        parentPort.postMessage(formats[0]);
-        process.exit();
+        return parentPort.postMessage(formats[0]);
     })();
 }
 

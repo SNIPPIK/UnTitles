@@ -126,7 +126,8 @@ class Environment {
         try {
             process.loadEnvFile(".env");
         } catch (error) {
-            throw new Error(`[ENV] has not found .env file in current directory ${__dirname}`);
+            const path = __dirname.split("/");
+            throw new Error(`[ENV] has not found .env file in directory ${path.splice(path.length, 1).join("/")}`);
         }
     };
 

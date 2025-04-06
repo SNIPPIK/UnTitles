@@ -305,7 +305,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если есть позиция трека, для плавного перехода
         if (typeof position === "number") {
             // Если можно сделать плавные переход
-            if (this.audio.current.duration < this.tracks.track.time.total + db.queues.options.optimization) {
+            if (this.audio.current && this.audio.current?.duration < this.tracks.track.time.total + db.queues.options.optimization) {
                 this.tracks.position = position;
                 this.play();
                 return;
@@ -348,7 +348,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public destroy = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has destroyed`);
 
-        // Отключаем все ивенты от плеера
-        this.removeAllListeners();
+        this.off("player/wait", () => {});
+        this.off("player/error", () => {});
     };
 }

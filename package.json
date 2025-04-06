@@ -13,9 +13,9 @@
     "ws": "^8.18.1"
   },
   "optionalDependencies": {
+    "bufferutil": "^4.0.9",
     "utf-8-validate": "^6.0.5",
-    "zlib-sync": "^0.1.9",
-    "bufferutil": "^4.0.9"
+    "zlib-sync": "^0.1.9"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
@@ -27,7 +27,6 @@
     "shard": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src",
     "build:start": "node -r tsconfig-paths/register src --ShardManager",
     "build:shard": "node -r tsconfig-paths/register src",
-
     "work:build": "tsc -p tsconfig.json"
   }
 }

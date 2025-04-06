@@ -203,7 +203,6 @@ export class AudioResource {
 
                 // Чистим все потоки от мусора
                 for (const stream of this._streams) {
-
                     // Если поток является OpusEncoder
                     if (stream instanceof OpusEncoder) {
                         stream.removeAllListeners();

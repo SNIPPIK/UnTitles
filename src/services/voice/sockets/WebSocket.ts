@@ -99,7 +99,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
      */
     public constructor(endpoint: string) {
         super();
-        this.socket = new WS(endpoint, { minVersion: "TLSv1.2", maxVersion: "TLSv1.3", joinDuplicateHeaders: true });
+        this.socket = new WS(endpoint, { minVersion: "TLSv1.2", maxVersion: "TLSv1.3" });
 
         // Если WebSocket принял сообщение
         this.socket.onmessage = async (event: WebSocketEvent) => {

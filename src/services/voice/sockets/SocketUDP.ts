@@ -29,7 +29,9 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
      * @param packet - Отправляемый пакет
      */
     public set packet(packet: Buffer) {
-        this.socket.send(packet, this._connection.port, this._connection.ip);
+        this.socket.send(packet, this._connection.port, this._connection.ip, (err) => {
+            if (err) this.emit("error", err);
+        });
     };
 
     /**

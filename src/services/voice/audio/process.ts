@@ -44,10 +44,10 @@ export class Process {
      * @param args {string[]} Аргументы для запуска
      * @param name {string} Имя процесса
      */
-    public constructor(args: string[], name: string = ff_path) {
+    public constructor(args: string[], name: string = ffmpeg_path) {
         this._process = spawn(name, args);
 
-        for (let event of ["end", "close", "error", "disconnect", "exit"]) {
+        for (let event of ["end", "error", "exit"]) {
             this.process.once(event, this.destroy);
         }
     };
@@ -65,11 +65,10 @@ export class Process {
                 std.destroy();
             }
 
-            this._process.ref();
-            this._process.kill('SIGKILL');
+            this.process.removeAllListeners();
+            this._process.kill("SIGKILL");
+            this._process = null;
         }
-
-        this._process = null;
     };
 }
 
@@ -77,11 +76,11 @@ export class Process {
  * @author SNIPPIK
  * @description Путь до исполняемого файла ffmpeg
  */
-let ff_path = null;
+let ffmpeg_path = null;
 
 /**
  * @author SNIPPIK
- * @description Делаем проверку на наличие FFmpeg/avconv
+ * @description Делаем проверку на наличие FFmpeg
  */
 (async () => {
     if (!isMainThread) return;
@@ -90,15 +89,15 @@ let ff_path = null;
     const names = [`${cache}/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 
     // Проверяем имена, если есть FFmpeg/avconv
-    for (const name of ["ffmpeg", "avconv", ...names]) {
+    for (const name of ["ffmpeg", ...names]) {
         try {
             const result = spawnSync(name, ['-h'], {windowsHide: true});
             if (result.error) continue;
-            ff_path = name;
+            ffmpeg_path = name;
             return;
         } catch {}
     }
 
-    // Выдаем ошибку если нет FFmpeg/avconv
-    throw Error("[Critical] FFmpeg/avconv not found!");
+    // Выдаем ошибку если нет FFmpeg
+    throw Error("[Critical] FFmpeg not found!");
 })();
