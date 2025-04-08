@@ -137,7 +137,7 @@ class PlayCommand extends Assign<Command> {
                         // Запрос к платформе
                         const platform = db.api.request("DISCORD");
 
-                        db.events.emitter.emit("api/request", platform, message, attachment.url);
+                        db.events.emitter.emit("api/request", platform, message, attachment);
                         return;
                     }
 

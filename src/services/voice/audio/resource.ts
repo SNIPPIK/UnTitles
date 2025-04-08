@@ -156,7 +156,8 @@ export class AudioResource {
                 // Если это ссылка, то просим ffmpeg переподключиться при сбросе соединения
                 ...(path.startsWith("http") ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
 
-                "-ss", `${options.seek ?? 0}`,
+                // Пропуск времени
+                ...(typeof options.seek === "number" && options.seek > 0) ? ["-ss", `${options.seek ?? 0}`] : [],
 
                 // Файл или ссылка на ресурс
                 "-i", path,

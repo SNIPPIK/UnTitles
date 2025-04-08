@@ -289,8 +289,8 @@ export class Track {
         this.time = track.time as any;
 
         // Удаляем мусорные названия из текста
-        if (track.artist) track.artist.title = track.artist?.title.replace(/ - Topic/gi, "");
-        track.title = track.title.replace(/\(Lyrics Video\)/gi, "");
+        if (track.artist) track.artist.title = `${track.artist?.title}`.replace(/ - Topic/gi, "");
+        track.title = `${track.title}`.replace(/\(Lyrics Video\)/gi, "");
 
         // Удаляем ненужные данные
         delete track.time;

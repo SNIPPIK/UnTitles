@@ -19,7 +19,7 @@ class api_request extends Assign<Event<"api/request">> {
             once: false,
             execute: async (platform, message, url) => {
                 // Получаем функцию запроса данных с платформы
-                const api = platform.get(url);
+                const api = platform.get(typeof url === "string" ? url : url.url);
 
                 // Если нет поддержки такого запроса!
                 if (!api || !api.name) {
@@ -43,7 +43,7 @@ class api_request extends Assign<Event<"api/request">> {
 
 
                 // Получаем данные в системе API
-                api.execute(url, { limit: db.api.limits[api.name], audio: false })
+                api.execute(url as any, { limit: db.api.limits[api.name], audio: false })
                     // Получаем данные
                     .then(async (item) => {
                         // Если нет данных или была получена ошибка

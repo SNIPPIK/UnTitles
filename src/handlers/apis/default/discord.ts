@@ -42,15 +42,17 @@ class sAPI extends Assign<API> {
                     filter: /attachments|ephemeral-attachments/,
                     execute: (attachment: any) => {
                         return new Promise<Track>((resolve) => {
+                            const size = attachment.size / 1024;
+
                             const track = new Track({
                                 id: null,
                                 url: attachment.url,
                                 title: attachment.name, artist: null,
                                 image: {url: attachment.proxyURL},
                                 time: {
-                                    total: ((attachment.size / 1024) / 39.2).toFixed(0)
+                                    total: (size / 13.2).toFixed(0)
                                 },
-                                audio: attachment.url
+                                audio: attachment.proxyURL ?? attachment.url
                             }, sAPI._platform);
 
                             return resolve(track);
