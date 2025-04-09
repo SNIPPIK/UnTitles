@@ -188,7 +188,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @param position - Позиция нового трека
      * @public
      */
-    public play = (seek: number = 0, position: number = 0): void => {
+    public play = (seek: number = 0, position: number = null): void => {
         const track = this._tracks?.track;
 
         // Если больше нет треков
@@ -205,7 +205,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 if (!path) {
                     this.emit("player/error", this, `Not found link audio!`, {
                         skip: true,
-                        position: position || this.tracks.indexOf(track)
+                        position: position ?? this.tracks.indexOf(track)
                     });
                     return;
                 }
@@ -214,7 +214,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 else if (path instanceof Error) {
                     this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, {
                         skip: true,
-                        position: position || this.tracks.indexOf(track)
+                        position: position ?? this.tracks.indexOf(track)
                     });
                     return;
                 }
@@ -234,7 +234,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 let timeout = setTimeout(() => {
                     this.emit("player/error", this, "Timeout the stream has been exceeded!", {
                         skip: true,
-                        position: position || this.tracks.indexOf(track)
+                        position: position ?? this.tracks.indexOf(track)
                     });
 
                     // Уничтожаем поток
@@ -265,7 +265,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 Logger.log("ERROR", `[Player] ${err}`);
 
                 // Предпринимаем решение
-                this.emit("player/error", this, `${err}`, {skip: true, position: position || this.tracks.indexOf(track)});
+                this.emit("player/error", this, `${err}`, {skip: true, position: position ?? this.tracks.indexOf(track)});
             })
 
             // Создаем сообщение после всех действий

@@ -250,7 +250,7 @@ export class MessageUtils {
      * @param time - Время удаления
      */
     public static deleteMessage = (message: Interact | {message: InteractionCallbackResponse | Message}, time: number = 15e3) => {
-        const timer = setTimeout(() => {
+        const timer = setTimeout(async () => {
             if (message.message instanceof InteractionCallbackResponse) {
                 message.message.resource.message.delete().catch(() => null);
                 this._timers.delete(message.message.resource.message.id);

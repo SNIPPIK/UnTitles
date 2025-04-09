@@ -9,7 +9,7 @@ import {global} from "@type";
 
 // db modules
 import {CacheUtility} from "@service/player/utils/cache";
-import {API_requester} from "@handler/apis";
+import {RestObject} from "@handler/rest/apis";
 import {Commands} from "@handler/commands";
 import {Buttons} from "@handler/modals";
 import {Events} from "@handler/events";
@@ -28,7 +28,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly api = new API_requester();
+    public readonly api = new RestObject();
 
     /**
      * @author SNIPPIK

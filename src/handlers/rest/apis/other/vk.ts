@@ -1,4 +1,5 @@
-import {API, APISmall, httpsClient} from "@handler/apis";
+import {RestAPIBase, RestAPI} from "@handler/rest/apis";
+import {httpsClient} from "@handler/rest";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Assign} from "@utils";
@@ -8,16 +9,16 @@ import {db} from "@app";
 /**
  * @author SNIPPIK
  * @description Динамически загружаемый класс
- * @class sAPI
+ * @class RestVKAPI
  * @public
  */
-class sAPI extends Assign<API> {
+class RestVKAPI extends Assign<RestAPI> {
     /**
      * @description Данные для создания трека с этими данными
      * @protected
      * @static
      */
-    protected static _platform: APISmall = {
+    protected static _platform: RestAPIBase = {
         name: "VK",
         color: 30719,
         url: "vk.com",
@@ -43,19 +44,19 @@ class sAPI extends Assign<API> {
 
     /**
      * @description Создаем экземпляр запросов
-     * @constructor sAPI
+     * @constructor RestVKAPI
      * @public
      */
     public constructor() {
-        super({...sAPI._platform,
+        super({...RestVKAPI._platform,
             audio: true,
-            auth: !!sAPI.authorization.token,
+            auth: !!RestVKAPI.authorization.token,
             filter: /^(https?:\/\/)?(vk\.com)\/.+$/gi,
 
             requests: [
                 /**
                  * @description Запрос данных о треке
-                 * @type track
+                 * @type "track"
                  */
                 {
                     name: "track",
@@ -68,19 +69,19 @@ class sAPI extends Assign<API> {
                             if (!ID) return resolve(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
-                            const cache = db.cache.get(`${sAPI._platform.url}/${ID}`);
+                            const cache = db.cache.get(`${RestVKAPI._platform.url}/${ID}`);
 
                             // Если найден трек или похожий объект
                             if (cache && !options?.audio) return resolve(cache);
 
                             try {
                                 // Создаем запрос
-                                const api = await sAPI.API("audio", "getById", `&audios=${ID}`);
+                                const api = await RestVKAPI.API("audio", "getById", `&audios=${ID}`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
 
-                                const track = sAPI.track(api.response.pop(), url);
+                                const track = RestVKAPI.track(api.response.pop(), url);
 
                                 // Если нет ссылки на трек
                                 if (!track.link) return resolve(locale.err( "api.request.fail"));
@@ -98,7 +99,7 @@ class sAPI extends Assign<API> {
 
                 /**
                  * @description Запрос данных по поиску
-                 * @type search
+                 * @type "search"
                  */
                 {
                     name: "search",
@@ -106,11 +107,11 @@ class sAPI extends Assign<API> {
                         return new Promise<Track[] | Error>(async (resolve) => {
                             try {
                                 // Создаем запрос
-                                const api = await sAPI.API("audio", "search", `&q=${url}`);
+                                const api = await RestVKAPI.API("audio", "search", `&q=${url}`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
-                                const tracks = (api.response.items.splice(0, limit)).map((track: any) => sAPI.track(track));
+                                const tracks = (api.response.items.splice(0, limit)).map((track: any) => RestVKAPI.track(track));
 
                                 return resolve(tracks);
                             } catch (e) {
@@ -165,7 +166,7 @@ class sAPI extends Assign<API> {
             image: { url: image?.["photo_1200"] ?? image?.["photo_600"] ?? image?.["photo_300"] ?? image?.["photo_270"] ?? undefined },
             time: { total: track.duration.toFixed(0) },
             audio: track?.url
-        }, sAPI._platform);
+        }, RestVKAPI._platform);
     };
 
     /**
@@ -185,4 +186,4 @@ class sAPI extends Assign<API> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({ sAPI });
+export default Object.values({ sAPI: RestVKAPI });

@@ -199,41 +199,39 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                         const args = interact.options._hoistedOptions;
 
                         // Если ничего не было указано или указана ссылка
-                        if (!args[1]?.value) return;
-
-                        // Если указан ссылка
-                        else if (`${args[1].value}`.startsWith("http")) {
-                            message.respond(
-                                [
-                                    {
-                                        value: args[1]?.value as string,
-                                        name: args[1]?.value as string
-                                    }
-                                ]
-                            );
-
-                            return;
-                        }
+                        if (!args[1]?.value || args[1]?.value === "") return;
 
                         const request = db.api.request(args[0].value as string);
 
                         // Если с платформы нельзя получить данные
                         if (request.block || request.auth) return;
 
-                        const api = request.get<"search">("search");
+                        const api = request.get(args[1].value as string);
 
                         // Ищем треки по названию
-                        api.execute(args[1].value as string, {limit: db.api.limits[api.name]}).then((items) => {
-                            if (items instanceof Error) return;
+                        api.execute(args[1].value as string, {limit: db.api.limits[api.name], audio: false}).then((data) => {
+                            const items: {value: string; name: string}[] = [];
 
-                            message.respond(
-                                items.map((choice) => {
+                            // Если получена ошибка
+                            if (data instanceof Error || !data) return;
+
+                            // Поиск или ссылка на автора
+                            else if (data instanceof Array) {
+                                const tracks = data.map((choice) => {
                                     return {
                                         value: choice.url,
                                         name: choice.name
                                     }
-                                }),
-                            );
+                                });
+
+                                items.push(...tracks);
+                            }
+
+                            // Ссылка на плейлист или трек
+                            else items.push({ name: data.title ?? data.name, value: data.url });
+
+                            message.respond(items).catch(console.error);
+                            return;
                         });
                     }
                     return;
@@ -272,6 +270,9 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                         // Если нет доступа, то отклоняем
                         if (!isContinue) return;
                     }
+
+                    // Если надо дать время на обработку
+                    if (command.deferReply) await message.deferReply();
 
                     // Выполняем команду
                     interact.command.execute({

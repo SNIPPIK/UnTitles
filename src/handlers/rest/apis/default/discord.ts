@@ -1,20 +1,20 @@
+import {RestAPI, RestAPIBase} from "@handler/rest/apis";
 import {Track} from "@service/player";
-import {API, APISmall} from "@handler/apis";
 import {Assign} from "@utils";
 
 /**
  * @author SNIPPIK
  * @description Динамически загружаемый класс
- * @class sAPI
+ * @class RestDiscordAPI
  * @public
  */
-class sAPI extends Assign<API> {
+class RestDiscordAPI extends Assign<RestAPI> {
     /**
      * @description Данные для создания трека с этими данными
      * @protected
      * @static
      */
-    protected static _platform: APISmall = {
+    protected static _platform: RestAPIBase = {
         name: "DISCORD",
         color: 9807270,
         url: "discord.com",
@@ -22,11 +22,11 @@ class sAPI extends Assign<API> {
 
     /**
      * @description Создаем экземпляр запросов
-     * @constructor sAPI
+     * @constructor RestDiscordAPI
      * @public
      */
     public constructor() {
-        super({ ...sAPI._platform,
+        super({ ...RestDiscordAPI._platform,
             audio: true,
             auth: true,
             filter: /^(https?:\/\/)?(cdn\.)?( )?(discordapp\.com|discord\.gg)\/.+$/gi,
@@ -35,7 +35,7 @@ class sAPI extends Assign<API> {
 
                 /**
                  * @description Запрос данных о треке
-                 * @type track
+                 * @type "track"
                  */
                 {
                     name: "track",
@@ -53,7 +53,7 @@ class sAPI extends Assign<API> {
                                     total: (size / 13.2).toFixed(0)
                                 },
                                 audio: attachment.proxyURL ?? attachment.url
-                            }, sAPI._platform);
+                            }, RestDiscordAPI._platform);
 
                             return resolve(track);
                         });
@@ -68,4 +68,4 @@ class sAPI extends Assign<API> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({ sAPI });
+export default Object.values({ RestApiDiscord: RestDiscordAPI });

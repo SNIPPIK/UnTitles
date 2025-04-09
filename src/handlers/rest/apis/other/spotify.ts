@@ -1,4 +1,5 @@
-import {API, APISmall, httpsClient} from "@handler/apis";
+import {RestAPI, RestAPIBase} from "@handler/rest/apis";
+import {httpsClient} from "@handler/rest";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Assign} from "@utils";
@@ -8,16 +9,16 @@ import {db} from "@app";
 /**
  * @author SNIPPIK
  * @description Динамически загружаемый класс
- * @class sAPI
+ * @class RestSpotifyAPI
  * @public
  */
-class sAPI extends Assign<API> {
+class RestSpotifyAPI extends Assign<RestAPI> {
     /**
      * @description Данные для создания трека с этими данными
      * @protected
      * @static
      */
-    protected static _platform: APISmall = {
+    protected static _platform: RestAPIBase = {
         name: "SPOTIFY",
         color: 1420288,
         url: "open.spotify.com"
@@ -58,19 +59,19 @@ class sAPI extends Assign<API> {
 
     /**
      * @description Создаем экземпляр запросов
-     * @constructor sAPI
+     * @constructor RestSpotifyAPI
      * @public
      */
     public constructor() {
-        super({ ...sAPI._platform,
+        super({ ...RestSpotifyAPI._platform,
             audio: false,
-            auth: !!sAPI.authorization.auth,
+            auth: !!RestSpotifyAPI.authorization.auth,
             filter: /^(https?:\/\/)?(open\.)?(m\.)?(spotify\.com|spotify\.?ru)\/.+$/gi,
 
             requests: [
                 /**
                  * @description Запрос данных о треке
-                 * @type track
+                 * @type "track"
                  */
                 {
                     name: "track",
@@ -83,18 +84,18 @@ class sAPI extends Assign<API> {
                             if (!ID) return resolve(locale.err("api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
-                            const cache = db.cache.get(`${sAPI._platform.url}/${ID}`);
+                            const cache = db.cache.get(`${RestSpotifyAPI._platform.url}/${ID}`);
 
                             // Если найден трек или похожий объект
                             if (cache && !options?.audio) return resolve(cache);
 
                             try {
                                 // Создаем запрос
-                                const api = await sAPI.API(`tracks/${ID}`);
+                                const api = await RestSpotifyAPI.API(`tracks/${ID}`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
-                                const track = sAPI.track(api);
+                                const track = RestSpotifyAPI.track(api);
 
                                 db.cache.set(track);
 
@@ -108,7 +109,7 @@ class sAPI extends Assign<API> {
 
                 /**
                  * @description Запрос данных об альбоме
-                 * @type album
+                 * @type "album"
                  */
                 {
                     name: "album",
@@ -122,12 +123,12 @@ class sAPI extends Assign<API> {
 
                             try {
                                 // Создаем запрос
-                                const api: Error | any = await sAPI.API(`albums/${ID}?offset=0&limit=${limit}`);
+                                const api: Error | any = await RestSpotifyAPI.API(`albums/${ID}?offset=0&limit=${limit}`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
 
-                                const tracks = api.tracks.items.map(sAPI.track)
+                                const tracks = api.tracks.items.map(RestSpotifyAPI.track)
 
                                 return resolve({ url, title: api.name, image: api.images[0], items: tracks, artist: api?.["artists"][0] });
                             } catch (e) {
@@ -139,7 +140,7 @@ class sAPI extends Assign<API> {
 
                 /**
                  * @description Запрос данных об плейлисте
-                 * @type playlist
+                 * @type "playlist"
                  */
                 {
                     name: "playlist",
@@ -153,11 +154,11 @@ class sAPI extends Assign<API> {
 
                             try {
                                 // Создаем запрос
-                                const api: Error | any = await sAPI.API(`playlists/${ID}?offset=0&limit=${limit}`);
+                                const api: Error | any = await RestSpotifyAPI.API(`playlists/${ID}?offset=0&limit=${limit}`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
-                                const tracks = api.tracks.items.map(({ track }) => sAPI.track(track));
+                                const tracks = api.tracks.items.map(({ track }) => RestSpotifyAPI.track(track));
 
                                 return resolve({ url, title: api.name, image: api.images[0], items: tracks });
                             } catch (e) {
@@ -169,7 +170,7 @@ class sAPI extends Assign<API> {
 
                 /**
                  * @description Запрос данных треков артиста
-                 * @type author
+                 * @type "author"
                  */
                 {
                     name: "author",
@@ -183,12 +184,12 @@ class sAPI extends Assign<API> {
 
                             try {
                                 // Создаем запрос
-                                const api = await sAPI.API(`artists/${ID}/top-tracks?market=ES&limit=${limit}`);
+                                const api = await RestSpotifyAPI.API(`artists/${ID}/top-tracks?market=ES&limit=${limit}`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
 
-                                return resolve((api.tracks?.items ?? api.tracks).map(sAPI.track));
+                                return resolve((api.tracks?.items ?? api.tracks).map(RestSpotifyAPI.track));
                             } catch (e) {
                                 return resolve(new Error(`[APIs]: ${e}`))
                             }
@@ -198,7 +199,7 @@ class sAPI extends Assign<API> {
 
                 /**
                  * @description Запрос данных по поиску
-                 * @type search
+                 * @type "search"
                  */
                 {
                     name: "search",
@@ -206,12 +207,12 @@ class sAPI extends Assign<API> {
                         return new Promise<Track[] | Error>(async (resolve) => {
                             try {
                                 // Создаем запрос
-                                const api: Error | any = await sAPI.API(`search?q=${url}&type=track&limit=${limit}`);
+                                const api: Error | any = await RestSpotifyAPI.API(`search?q=${url}&type=track&limit=${limit}`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
 
-                                return resolve(api.tracks.items.map(sAPI.track));
+                                return resolve(api.tracks.items.map(RestSpotifyAPI.track));
                             } catch (e) {
                                 return resolve(new Error(`[APIs]: ${e}`))
                             }
@@ -290,7 +291,7 @@ class sAPI extends Assign<API> {
             },
             time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
             image: track.album.images.sort((item1: any, item2: any) => item1.width > item2.width)[0],
-        }, sAPI._platform);
+        }, RestSpotifyAPI._platform);
     };
 }
 
@@ -298,4 +299,4 @@ class sAPI extends Assign<API> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({ sAPI });
+export default Object.values({ sAPI: RestSpotifyAPI });

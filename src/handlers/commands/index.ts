@@ -388,6 +388,14 @@ export interface Command {
     readonly owner?: boolean;
 
     /**
+     * @description Нужно ли дать время на обработку команды
+     * @default false
+     * @readonly
+     * @public
+     */
+    readonly deferReply?: boolean;
+
+    /**
      * @description Права для использования той или иной команды
      * @default null
      * @readonly

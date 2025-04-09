@@ -189,8 +189,6 @@ class CacheAudio extends Cycle<Track> {
 
                     // Создаем ffmpeg для скачивания трека
                     const ffmpeg = new Process([
-                        "-vn", "-loglevel", "panic",
-                        "-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
                         "-i", track.link,
                         "-f", `opus`,
                         `${status.path}.opus`

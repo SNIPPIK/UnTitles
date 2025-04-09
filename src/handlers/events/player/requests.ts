@@ -1,20 +1,20 @@
 import {locale} from "@service/locale";
 import {Event} from "@handler/events";
-import {Logger, Assign} from "@utils";
 import {Colors} from "discord.js";
+import {Assign} from "@utils";
 import {db} from "@app";
 
 /**
  * @author SNIPPIK
  * @description Выполнение запроса пользователя через внутреннее API
- * @class api_request
+ * @class rest_request
  * @event api/request
  * @public
  */
-class api_request extends Assign<Event<"api/request">> {
+class rest_request extends Assign<Event<"rest/request">> {
     public constructor() {
         super({
-            name: "api/request",
+            name: "rest/request",
             type: "player",
             once: false,
             execute: async (platform, message, url) => {
@@ -23,13 +23,13 @@ class api_request extends Assign<Event<"api/request">> {
 
                 // Если нет поддержки такого запроса!
                 if (!api || !api.name) {
-                    db.events.emitter.emit("api/error", message, locale._(message.locale, "api.platform.support"));
+                    db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.support"));
                     return
                 }
 
                 // Если ответ не был получен от сервера
                 const timeout = setTimeout(() => {
-                    db.events.emitter.emit("api/error", message, locale._(message.locale, "api.platform.timeout"));
+                    db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.timeout"));
                 }, 10e3);
 
                 // Отправляем сообщение о том что запрос производится
@@ -48,8 +48,7 @@ class api_request extends Assign<Event<"api/request">> {
                     .then(async (item) => {
                         // Если нет данных или была получена ошибка
                         if (item instanceof Error) {
-                            Logger.log("ERROR", `request/api - ${item}`);
-                            db.events.emitter.emit("api/error", message, locale._(message.locale, "api.platform.error", [item]));
+                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.error", [item]));
                             return;
                         }
 
@@ -73,7 +72,7 @@ class api_request extends Assign<Event<"api/request">> {
                         else if ("time" in item) {
                             // Если был получен трек являющийся потоковым
                             if (item.time.total === 0) {
-                                db.events.emitter.emit("api/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
+                                db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
                                 return;
                             }
 
@@ -88,7 +87,7 @@ class api_request extends Assign<Event<"api/request">> {
                     // Обрабатываем ошибки
                     .catch(async (err: Error) => { // Отправляем сообщение об ошибке
                         console.error(err);
-                        db.events.emitter.emit("api/error", message, `**${platform.platform}.${api.name}**\n**❯** **${err.message}**`);
+                        db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.name}**\n**❯** **${err.message}**`);
                     })
 
                     // Действие в конце
@@ -104,14 +103,14 @@ class api_request extends Assign<Event<"api/request">> {
 /**
  * @author SNIPPIK
  * @description Если при выполнении запроса пользователя произошла ошибка
- * @class api_error
- * @event api/error
+ * @class rest_error
+ * @event rest/error
  * @public
  */
-class api_error extends Assign<Event<"api/error">> {
+class rest_error extends Assign<Event<"rest/error">> {
     public constructor() {
         super({
-            name: "api/error",
+            name: "rest/error",
             type: "player",
             once: false,
             execute: (message, error) => {
@@ -131,4 +130,4 @@ class api_error extends Assign<Event<"api/error">> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({api_request, request_error: api_error});
+export default Object.values({rest_request, rest_error});

@@ -1,4 +1,4 @@
-import {API} from "@handler/apis";
+import {RestAPI} from "@handler/rest/apis";
 import {env} from "@handler";
 
 /**
@@ -98,7 +98,7 @@ export class PlayerProgress {
  * @description Данные для создания прогресс бара
  */
 interface PlayerProgressInput {
-    platform: API["name"];
+    platform: RestAPI["name"];
     duration: {
         current: number;
         total: number

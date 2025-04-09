@@ -1,7 +1,7 @@
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {Command, SlashCommand} from "@handler/commands";
 import {locale} from "@service/locale";
-import {API} from "@handler/apis";
+import {RestAPI} from "@handler/rest/apis";
 import {Assign} from "@utils";
 import {db} from "@app";
 
@@ -92,7 +92,7 @@ class APISCommand extends Assign<Command> {
                     case "access": {
                         if (args[0] === "block") {
                             // Если платформа уже заблокирована
-                            if (db.api.platforms.block.includes(args[1] as API["name"])) {
+                            if (db.api.platforms.block.includes(args[1] as RestAPI["name"])) {
                                 message.FBuilder = {
                                     description: locale._(message.locale, "command.api.block.retry", [message.author]),
                                     color: Colors.Yellow
@@ -101,14 +101,14 @@ class APISCommand extends Assign<Command> {
                             }
 
                             // Блокируем платформу
-                            db.api.platforms.block.push(args[1] as API["name"]);
+                            db.api.platforms.block.push(args[1] as RestAPI["name"]);
                             message.FBuilder = {
                                 description: locale._(message.locale, "command.api.block", [message.author]),
                                 color: Colors.Green
                             };
                         } else if (args[0] === "unblock") {
                             // Если платформа не заблокирована
-                            if (!db.api.platforms.block.includes(args[1] as API["name"])) {
+                            if (!db.api.platforms.block.includes(args[1] as RestAPI["name"])) {
                                 message.FBuilder = {
                                     description: locale._(message.locale, "command.api.unblock.retry", [message.author]),
                                     color: Colors.Yellow
@@ -117,7 +117,7 @@ class APISCommand extends Assign<Command> {
                             }
 
                             // Разблокируем платформу
-                            const index = db.api.platforms.block.indexOf(args[1] as API["name"]);
+                            const index = db.api.platforms.block.indexOf(args[1] as RestAPI["name"]);
                             db.api.platforms.block.splice(index - 1, 1);
                             message.FBuilder = {
                                 description: locale._(message.locale, "command.api.unblock", [message.author]),

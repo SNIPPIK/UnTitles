@@ -1,4 +1,5 @@
-import {API, APISmall, httpsClient} from "@handler/apis";
+import {RestAPIBase, RestAPI} from "@handler/rest/apis";
+import {httpsClient} from "@handler/rest";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import crypto from "node:crypto";
@@ -9,16 +10,16 @@ import {db} from "@app";
 /**
  * @author SNIPPIK
  * @description Динамически загружаемый класс
- * @class sAPI
+ * @class RestYandexAPI
  * @public
  */
-class sAPI extends Assign<API> {
+class RestYandexAPI extends Assign<RestAPI> {
     /**
      * @description Данные для создания трека с этими данными
      * @protected
      * @static
      */
-    protected static _platform: APISmall = {
+    protected static _platform: RestAPIBase = {
         name: "YANDEX",
         color: 16705372,
         url: "music.yandex.ru",
@@ -44,19 +45,19 @@ class sAPI extends Assign<API> {
 
     /**
      * @description Создаем экземпляр запросов
-     * @constructor sAPI
+     * @constructor RestYandexAPI
      * @public
      */
     public constructor() {
-        super({ ...sAPI._platform,
+        super({ ...RestYandexAPI._platform,
             audio: true,
-            auth: !!sAPI.authorization.token,
+            auth: !!RestYandexAPI.authorization.token,
             filter: /^(https?:\/\/)?(music\.)?(yandex\.ru)\/.+$/gi,
 
             requests: [
                 /**
                  * @description Запрос данных о треке
-                 * @type track
+                 * @type "track"
                  */
                 {
                     name: "track",
@@ -69,21 +70,21 @@ class sAPI extends Assign<API> {
                             if (!ID) return resolve(locale.err( "api.request.id.track"));
 
                             // Интеграция с утилитой кеширования
-                            const cache = db.cache.get(`${sAPI._platform.url}/${ID}`);
+                            const cache = db.cache.get(`${RestYandexAPI._platform.url}/${ID}`);
 
                             // Если найден трек или похожий объект
                             if (cache && options?.audio) return resolve(cache);
 
                             try {
                                 // Делаем запрос
-                                const api = await sAPI.API(`tracks/${ID}`);
+                                const api = await RestYandexAPI.API(`tracks/${ID}`);
 
                                 // Обрабатываем ошибки
                                 if (api instanceof Error) return resolve(api);
                                 else if (!api[0]) return resolve(locale.err( "api.request.fail"));
 
-                                const track = sAPI.track(api[0]);
-                                const link = await sAPI.getAudio(ID);
+                                const track = RestYandexAPI.track(api[0]);
+                                const link = await RestYandexAPI.getAudio(ID);
 
                                 // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл
                                 if (link instanceof Error) return resolve(link);
@@ -102,7 +103,7 @@ class sAPI extends Assign<API> {
 
                 /**
                  * @description Запрос данных об альбоме
-                 * @type album
+                 * @type "album"
                  */
                 {
                     name: "album",
@@ -116,15 +117,15 @@ class sAPI extends Assign<API> {
 
                             try {
                                 // Создаем запрос
-                                const api = await sAPI.API(`albums/${ID}/with-tracks`);
+                                const api = await RestYandexAPI.API(`albums/${ID}/with-tracks`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
                                 else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return resolve(locale.err("api.request.fail"));
 
-                                const AlbumImage = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
+                                const AlbumImage = RestYandexAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
                                 const tracks: Track.data[] = api["volumes"]?.pop().splice(0, limit);
-                                const songs = tracks.map(sAPI.track);
+                                const songs = tracks.map(RestYandexAPI.track);
 
                                 return resolve({url, title: api.title, image: AlbumImage, items: songs});
                             } catch (e) {
@@ -136,7 +137,7 @@ class sAPI extends Assign<API> {
 
                 /**
                  * @description Запрос данных об плейлисте
-                 * @type playlist
+                 * @type "playlist"
                  */
                 {
                     name: "playlist",
@@ -150,15 +151,15 @@ class sAPI extends Assign<API> {
 
                             try {
                                 // Создаем запрос
-                                const api = await sAPI.API(ID[0]);
+                                const api = await RestYandexAPI.API(ID[0]);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
                                 else if (api?.tracks?.length === 0) return resolve(locale.err("api.request.fail.msg", ["Not found tracks in playlist"]));
 
-                                const image = sAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
+                                const image = RestYandexAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
                                 const tracks: any[] = api.tracks?.splice(0, limit);
-                                const songs = tracks.map(({track}) => sAPI.track(track));
+                                const songs = tracks.map(({track}) => RestYandexAPI.track(track));
 
                                 return resolve({
                                     url, title: api.title, image: image, items: songs,
@@ -176,7 +177,7 @@ class sAPI extends Assign<API> {
 
                 /**
                  * @description Запрос данных треков артиста
-                 * @type author
+                 * @type "author"
                  */
                 {
                     name: "author",
@@ -190,11 +191,11 @@ class sAPI extends Assign<API> {
 
                             try {
                                 // Создаем запрос
-                                const api = await sAPI.API(`artists/${ID}/tracks`);
+                                const api = await RestYandexAPI.API(`artists/${ID}/tracks`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
-                                const tracks = api.tracks.splice(0, limit).map(sAPI.track);
+                                const tracks = api.tracks.splice(0, limit).map(RestYandexAPI.track);
 
                                 return resolve(tracks);
                             } catch (e) {
@@ -214,13 +215,13 @@ class sAPI extends Assign<API> {
                         return new Promise<Track[] | Error>(async (resolve) => {
                             try {
                                 // Создаем запрос
-                                const api = await sAPI.API(`search?type=all&text=${url.split(" ").join("%20")}&page=0&nococrrect=false`);
+                                const api = await RestYandexAPI.API(`search?type=all&text=${url.split(" ").join("%20")}&page=0&nococrrect=false`);
 
                                 // Обрабатываем ошибки
                                 if (api instanceof Error) return resolve(api);
                                 else if (!api.tracks) return resolve(locale.err("api.request.fail"));
 
-                                const tracks = api.tracks["results"].splice(0, limit).map(sAPI.track);
+                                const tracks = api.tracks["results"].splice(0, limit).map(RestYandexAPI.track);
                                 return resolve(tracks);
                             } catch (e) {
                                 return resolve(new Error(`[APIs]: ${e}`))
@@ -335,7 +336,7 @@ class sAPI extends Assign<API> {
                 url: `https://music.yandex.ru/artist/${author.id}`,
                 image: this.parseImage({image: author?.["ogImage"] ?? author?.["coverUri"]}) ?? null
             }
-        }, sAPI._platform);
+        }, RestYandexAPI._platform);
     };
 }
 
@@ -343,4 +344,4 @@ class sAPI extends Assign<API> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({ sAPI });
+export default Object.values({ sAPI: RestYandexAPI });

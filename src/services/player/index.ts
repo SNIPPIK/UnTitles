@@ -1,7 +1,7 @@
 import {Collection, Cycle, Interact, MessageUtils} from "@utils";
 import {AudioPlayer, Queue, Track} from "@service/player";
 import {Colors, Attachment} from "discord.js";
-import {APIRequest} from "@handler/apis";
+import {RestRequest} from "@handler/rest/apis";
 import {locale} from "@service/locale";
 import {env} from "@handler";
 import {db} from "@app";
@@ -281,12 +281,12 @@ export interface QueuesEvents {
      * @param message  - Сообщение с сервера
      * @param url      - Ссылка на допустимый объект или текст для поиска
      */
-    readonly "api/request": (api: APIRequest, message: Interact, url: string | Attachment) => void;
+    readonly "rest/request": (api: RestRequest, message: Interact, url: string | Attachment) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять ошибки в системе API
      * @param message    - Сообщение с сервера
      * @param error      - Ошибка в формате string
      */
-    readonly "api/error": (message: Interact, error: string) => void;
+    readonly "rest/error": (message: Interact, error: string) => void;
 }

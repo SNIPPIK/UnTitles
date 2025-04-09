@@ -1,4 +1,5 @@
-import {httpsClient, APISmall} from "@handler/apis";
+import {RestAPIBase} from "@handler/rest/apis";
+import {httpsClient} from "@handler/rest";
 import {db} from "@app";
 
 /**
@@ -45,7 +46,7 @@ export class Track {
          * @readonly
          * @private
          */
-        _api: null as APISmall
+        _api: null as RestAPIBase
     };
 
     /**
@@ -285,7 +286,7 @@ export class Track {
      * @param track - Данные трека с учетом <Song.track>
      * @param api   - Данне о платформе
      */
-    public constructor(track: Track.data, api: APISmall) {
+    public constructor(track: Track.data, api: RestAPIBase) {
         this.time = track.time as any;
 
         // Удаляем мусорные названия из текста

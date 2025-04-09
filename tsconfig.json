@@ -31,8 +31,8 @@
     "removeComments": true,
 
     "esModuleInterop": true,
-    "importHelpers": false,
-    "noEmitHelpers": false,
+    "importHelpers": true,
+    "noEmitHelpers": true,
 
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,

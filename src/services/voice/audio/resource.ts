@@ -152,18 +152,15 @@ export class AudioResource {
                 critical_callback: this.cleanup
             },
             // Создание потока
-            input: new Process([ "-vn", "-loglevel", "panic",
-                // Если это ссылка, то просим ffmpeg переподключиться при сбросе соединения
-                ...(path.startsWith("http") ? ["-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"] : []),
-
+            input: new Process([
                 // Пропуск времени
-                ...(typeof options.seek === "number" && options.seek > 0) ? ["-ss", `${options.seek ?? 0}`] : [],
+                "-ss", `${options.seek ?? 0}`,
 
                 // Файл или ссылка на ресурс
                 "-i", path,
 
                 // Подключаем фильтры
-                ...(options.filters ? ["-af", options.filters] : []),
+                "-af", options.filters,
 
                 // Указываем формат аудио (ogg/opus)
                 "-c:a", "libopus", "-f", "opus",

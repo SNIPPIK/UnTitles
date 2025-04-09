@@ -1,6 +1,3 @@
-import {BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip} from "node:zlib";
-import {ClientRequest, IncomingMessage, request as httpRequest} from "node:http";
-import {request as httpsRequest, RequestOptions} from "node:https";
 import {Track} from "@service/player";
 import {env, handler} from "@handler";
 import {db} from "@app";
@@ -8,10 +5,10 @@ import {db} from "@app";
 /**
  * @author SNIPPIK
  * @description Коллекция для взаимодействия с APIs
- * @class API_requester
+ * @class RestObject
  * @public
  */
-export class API_requester extends handler<API> {
+export class RestObject extends handler<RestAPI> {
     /**
      * @description База с платформами
      * @protected
@@ -28,20 +25,20 @@ export class API_requester extends handler<API> {
          * @description Платформы без данных для авторизации
          * @protected
          */
-        authorization: [] as API["name"][],
+        authorization: [] as RestAPI["name"][],
 
         /**
          * @description Платформы без возможности получить аудио
          * @warn По-умолчанию запрос идет к track
          * @protected
          */
-        audio: [] as API["name"][],
+        audio: [] as RestAPI["name"][],
 
         /**
          * @description Заблокированные платформы
          * @protected
          */
-        block: [] as API["name"][]
+        block: [] as RestAPI["name"][]
     };
     /**
      * @description База с лимитами обрабатываемых данных
@@ -88,7 +85,7 @@ export class API_requester extends handler<API> {
      * @public
      */
     public constructor() {
-        super("src/handlers/apis");
+        super("src/handlers/rest/apis");
     };
 
     /**
@@ -119,7 +116,7 @@ export class API_requester extends handler<API> {
      * @return APIRequest
      * @public
      */
-    public request = (argument: API["name"] | string) => {
+    public request = (argument: RestAPI["name"] | string) => {
         // Ищем платформу
         const api = this.platforms.supported.find((item): boolean => {
             // Если была указана ссылка
@@ -130,7 +127,7 @@ export class API_requester extends handler<API> {
         });
 
         // Создаем класс для выполнения запросов
-        return new APIRequest(api);
+        return new RestRequest(api);
     };
 
     /**
@@ -185,16 +182,16 @@ export class API_requester extends handler<API> {
 /**
  * @author SNIPPIK
  * @description Получаем ответ от локальной базы APIs
- * @class APIRequest
+ * @class RestRequest
  * @private
  */
-export class APIRequest {
+export class RestRequest {
     /**
      * @description Класс который дает доступ к запросам платформы
      * @readonly
      * @private
      */
-    private readonly _api: API = null;
+    private readonly _api: RestAPI = null;
 
     /**
      * @description Выдаем название
@@ -226,10 +223,10 @@ export class APIRequest {
 
     /**
      * @description Ищем платформу из доступных
-     * @param argument {API.platform} Имя платформы
+     * @param argument {RestAPI.platform} Имя платформы
      * @public
      */
-    public constructor(argument: API) {
+    public constructor(argument: RestAPI) {
         this._api = argument;
     };
 
@@ -238,7 +235,7 @@ export class APIRequest {
      * @param type {get} Тип запроса
      * @public
      */
-    public get<T extends (APIs.track | APIs.playlist | APIs.album | APIs.author | APIs.search)["name"]>(type: T | string) {
+    public get<T extends (RestAPIs.track | RestAPIs.playlist | RestAPIs.album | RestAPIs.author | RestAPIs.search)["name"]>(type: T | string) {
         return this._api.requests.find((item)=> {
             // Если указана ссылка
             if (type.startsWith("http")) {
@@ -251,16 +248,17 @@ export class APIRequest {
             else if (item.name === "search" || item.name === type) return item;
 
             return null;
-        }) as T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "author" ? APIs.author : APIs.search;
+        }) as T extends "track" ? RestAPIs.track : T extends "album" ? RestAPIs.album : T extends "playlist" ? RestAPIs.playlist : T extends "author" ? RestAPIs.author : RestAPIs.search;
     };
 }
 
 /**
  * @author SNIPPIK
- * @description Данные о платформе в ограниченном кол-ве
- * @interface APISmall
+ * @description Создаем класс для итоговой платформы для взаимодействия с APIs
+ * @interface RestAPIBase
+ * @public
  */
-export interface APISmall {
+export interface RestAPIBase {
     /**
      * @description Имя платформы
      * @readonly
@@ -286,24 +284,10 @@ export interface APISmall {
 /**
  * @author SNIPPIK
  * @description Создаем класс для итоговой платформы для взаимодействия с APIs
- * @interface API
+ * @interface RestAPI
  * @public
  */
-export interface API {
-    /**
-     * @description Имя платформы
-     * @readonly
-     * @public
-     */
-    readonly name: "YOUTUBE" | "SPOTIFY" | "VK" | "DISCORD" | "YANDEX";
-
-    /**
-     * @description Ссылка для работы фильтра
-     * @readonly
-     * @public
-     */
-    readonly url: string;
-
+export interface RestAPI extends RestAPIBase {
     /**
      * @description Доступ к аудио
      * @readonly
@@ -326,27 +310,20 @@ export interface API {
     readonly filter: RegExp;
 
     /**
-     * @description Цвет платформы
-     * @readonly
-     * @public
-     */
-    readonly color: number;
-
-    /**
      * @description Запросы платформы
      * @readonly
      * @public
      */
-    readonly requests: (APIs.track | APIs.playlist | APIs.album | APIs.author | APIs.search)[];
+    readonly requests: (RestAPIs.track | RestAPIs.playlist | RestAPIs.album | RestAPIs.author | RestAPIs.search)[];
 }
 
 /**
  * @author SNIPPIK
  * @description Доступные запросы для платформ
- * @namespace APIs
+ * @namespace RestAPIs
  * @public
  */
-export namespace APIs {
+export namespace RestAPIs {
     /**
      * @description Что из себя должен представлять запрос данные трека
      * @interface track
@@ -418,212 +395,4 @@ export namespace APIs {
         // Функция получения данных
         execute: (text: string, options: {limit: number}) => Promise<Track[] | Error>
     }
-}
-
-
-
-
-
-
-
-
-
-
-/**
- * @author SNIPPIK
- * @description Класс создающий запрос
- * @class Request
- * @abstract
- */
-abstract class Request {
-    /**
-     * @description Данные хранимые для произведения запроса
-     * @protected
-     * @readonly
-     */
-    protected data: RequestData = { headers: {} };
-
-    /**
-     * @description Получаем протокол ссылки
-     * @private
-     */
-    private get protocol(): { (options: (RequestOptions | string | URL), callback?: (res: IncomingMessage) => void): ClientRequest } {
-        return this.data.protocol.startsWith("https") ? httpsRequest : httpRequest;
-    };
-
-    /**
-     * @description Создаем запрос по ссылке, модифицируем по необходимости
-     * @public
-     */
-    public get request(): Promise<IncomingMessage | Error> {
-        return new Promise<IncomingMessage | Error>((resolve) => {
-            const request = this.protocol(this.data, (res) => {
-                // Если надо сделать редирект на другой ресурс
-                if ((res.statusCode >= 300 && res.statusCode < 400) && res.headers?.location) {
-                    this.data.path = res.headers.location;
-                    return resolve(this.request);
-                }
-
-                return resolve(res);
-            });
-
-            // Если запрос POST, отправляем ответ на сервер
-            if (this.data.method === "POST" && this.data.body) request.write(this.data.body);
-
-            /**
-             * @description Событие если подключение было сорвано
-             */
-            request.once("close", () => {
-                this.data = null;
-                request.removeAllListeners();
-                request.destroy();
-            });
-
-            request.end();
-        });
-    };
-
-    /**
-     * @description Инициализируем класс
-     * @param url - Ссылка
-     * @param options - Опции
-     * @public
-     */
-    public constructor(url: string, options?: httpsClient["data"]) {
-        // Если ссылка является ссылкой
-        if (url.startsWith("http")) {
-            const {hostname, pathname, search, port, protocol} = new URL(url);
-
-            // Создаем стандартные настройки
-            Object.assign(this.data, {
-                port, hostname, path: pathname + search, protocol
-            });
-        }
-
-        // Если user-agent есть готовый
-        if (typeof options?.useragent === "string") {
-            Object.assign(this.data.headers, {
-                "User-Agent": options.useragent
-            });
-        }
-
-        // Надо ли генерировать user-agent
-        else if (options?.useragent) {
-            const OS = [ "X11; Linux x86_64;", "Windows NT 10.0; Win64; x64;" ];
-            const platform = OS[(OS.length - 1).random(0)];
-            const version = (136).random(120);
-
-            Object.assign(this.data.headers, {
-                "User-Agent": `Mozilla/5.0 (${platform} rv:${version}.0) Gecko/20100101 Firefox/${version}.0`,
-            });
-        }
-
-        Object.assign(this.data, options);
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Создаем http или https запрос
- * @class httpsClient
- * @public
- */
-export class httpsClient extends Request {
-    /**
-     * @description Получаем страницу в формате string
-     * @public
-     */
-    public get toString(): Promise<string | Error> {
-        let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage, data = "";
-
-        return new Promise<string | Error>(async (resolve) => {
-            this.request.then((res) => {
-                if (res instanceof Error) return resolve(res);
-
-                const encoding = res.headers["content-encoding"];
-
-                // Делаем выбор расшифровщика UFT-8
-                if (encoding === "br") decoder = res.pipe(createBrotliDecompress());
-                else if (encoding === "gzip") decoder = res.pipe(createGunzip());
-                else if (encoding === "deflate") decoder = res.pipe(createDeflate());
-                else decoder = res;
-
-                // Запускаем расшифровку
-                decoder.setEncoding("utf-8")
-                    .on("data", (chunk) => {
-                        data += chunk;
-                    })
-                    .once("end", () => {
-                        return resolve(data);
-                    });
-            }).catch((err) => {
-                return resolve(err);
-            });
-        });
-    };
-
-    /**
-     * @description Получаем со страницы JSON (Работает только тогда когда все страница JSON)
-     * @public
-     */
-    public get toJson(): Promise<json | Error> {
-        return this.toString.then(async (body) => {
-            if (body instanceof Error) return body;
-
-            try {
-                return JSON.parse(body);
-            } catch {
-                return Error(`Invalid json response body at ${this.data.hostname}`);
-            }
-        });
-    };
-
-    /**
-     * @description Берем данные из XML страницы
-     * @public
-     */
-    public get toXML(): Promise<Error | string[]> {
-        return new Promise(async (resolve) => {
-            const body = await this.toString;
-
-            // Если была получена ошибка
-            if (body instanceof Error) return resolve(Error("Not found XML data!"));
-
-            // Ищем данные в XML странице для дальнейшего вывода
-            const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
-            const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
-            return resolve(filtered.filter((text) => text.trim() !== ""));
-        });
-    };
-
-    /**
-     * @description Проверяем ссылку на работоспособность
-     * @public
-     */
-    public get status(): Promise<boolean> {
-        return this.request.then(async (resource) => {
-            if (resource instanceof Error) return false;
-            return resource?.statusCode && resource.statusCode >= 200 && resource.statusCode <= 400;
-        });
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Данные для произведения запроса
- * @interface RequestData
- * @private
- */
-interface RequestData extends RequestOptions {
-    // Метод запроса
-    method?: "POST" | "GET" | "HEAD" | "PATCH";
-
-    // Headers запроса
-    headers?: RequestOptions["headers"];
-
-    // Если мы хотим что-то отправить серверу
-    body?: string;
-
-    // Добавлять user-agent, рандомный или указанный
-    useragent?: boolean | string;
 }

@@ -20,13 +20,11 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.3"
   },
   "scripts": {
     "start": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src --ShardManager",
-    "shard": "tsc -p tsconfig.json && cd build && node -r tsconfig-paths/register src",
     "build:start": "node -r tsconfig-paths/register src --ShardManager",
-    "build:shard": "node -r tsconfig-paths/register src",
     "work:build": "tsc -p tsconfig.json"
   }
 }

@@ -45,7 +45,7 @@ import {db} from "@app";
                     required: true,
                     choices: db.api.allow.map((platform) => {
                         return {
-                            name: `[${platform.requests.length}] - ${platform.name} | ${platform.url}`,
+                            name: `${platform.name.toLowerCase()} | ${platform.url}`,
                             value: platform.name
                         }
                     })
@@ -117,15 +117,12 @@ import {db} from "@app";
 class PlayCommand extends Assign<Command> {
     public constructor() {
         super({
+            deferReply: true,
             rules: ["voice", "another_voice"],
             execute: async ({message, args, type}) => {
-
                 switch (type) {
                     // Если пользователь прикрепил файл
                     case "file": {
-                        // Просим discord немного подождать бота
-                        await message.message["deferReply"]();
-
                         const attachment = message.options.getAttachment("input");
 
                         // Если пользователь подсунул фальшивку
@@ -137,7 +134,7 @@ class PlayCommand extends Assign<Command> {
                         // Запрос к платформе
                         const platform = db.api.request("DISCORD");
 
-                        db.events.emitter.emit("api/request", platform, message, attachment);
+                        db.events.emitter.emit("rest/request", platform, message, attachment);
                         return;
                     }
 
@@ -183,25 +180,22 @@ class PlayCommand extends Assign<Command> {
 
                     // Если пользователя пытается сделать запрос к API
                     default: {
-                        // Просим discord немного подождать бота
-                        await message.message["deferReply"]();
-
                         // Запрос к платформе
                         const platform = db.api.request(args[0]);
 
                         // Если платформа заблокирована
                         if (platform.block) {
-                            db.events.emitter.emit("api/error", message, locale._(message.locale, "api.platform.block"));
+                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.block"));
                             return;
                         }
 
                         // Если есть проблема с авторизацией на платформе
                         else if (platform.auth) {
-                            db.events.emitter.emit("api/error", message, locale._(message.locale, "api.platform.auth"));
+                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.auth"));
                             return;
                         }
 
-                        db.events.emitter.emit("api/request", platform, message, args[1]);
+                        db.events.emitter.emit("rest/request", platform, message, args[1]);
                         return;
                     }
                 }
