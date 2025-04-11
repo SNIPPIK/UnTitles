@@ -170,7 +170,7 @@ export var db: Database = null;
  */
 (async () => {
     // Если при запуске многопоточных элементов произойдет случайный запуск осколка
-    if (!isMainThread) return;
+    if (!isMainThread) throw new Error("Not implemented.");
 
     switch (process["argv"].includes("--ShardManager")) {
         /**
@@ -212,10 +212,9 @@ export var db: Database = null;
             Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
 
             // Создаем webhook клиент
-            const webhook = new WebhookClient({
-                id: env.get<string>("webhook.id", null),
-                token: env.get<string>("webhook.token", null)
-            });
+            const webhookToken = env.get<string>("webhook.token", null);
+            const webhookID = env.get("webhook.id", null);
+            const webhook = webhookID && webhookToken ? new WebhookClient({ id: webhookID, token: webhookToken }) : null;
 
             // Создаем класс осколка
             const client = new Client({
@@ -261,6 +260,7 @@ export var db: Database = null;
                 .then(async () => {
                     Logger.log("WARN", `[Core/${id}] connected to discord as ${Logger.color(35, client.user.tag)}`);
 
+                    // Даем разрешение на запуск интервала
                     if (id === 0) {
                         // Время обновления статуса
                         const timeout = parseInt(env.get("client.presence.interval"));
@@ -306,7 +306,7 @@ export var db: Database = null;
                 Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
 
                 // Отправляем данные об ошибке и отправляем через систему webhook
-                webhook.send({
+                if (webhook) webhook.send({
                     username: client.user.username,
                     avatarURL: client.user.avatarURL(),
                     embeds: [{

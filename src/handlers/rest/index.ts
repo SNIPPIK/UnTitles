@@ -1,6 +1,6 @@
 import {BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip} from "node:zlib";
-import {ClientRequest, IncomingMessage, request as httpRequest} from "node:http";
 import {request as httpsRequest, RequestOptions} from "node:https";
+import {IncomingMessage, request as httpRequest} from "node:http";
 
 
 
@@ -24,7 +24,7 @@ abstract class Request {
      * @description Получаем протокол ссылки
      * @private
      */
-    private get protocol(): { (options: (RequestOptions | string | URL), callback?: (res: IncomingMessage) => void): ClientRequest } {
+    private get protocol() {
         return this.data.protocol.startsWith("https") ? httpsRequest : httpRequest;
     };
 
@@ -50,7 +50,7 @@ abstract class Request {
             /**
              * @description Событие если подключение было сорвано
              */
-            request.once("close", () => {
+            request.once("close", async () => {
                 this.data = null;
                 request.removeAllListeners();
                 request.destroy();

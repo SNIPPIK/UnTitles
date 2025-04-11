@@ -96,11 +96,23 @@ export class PlayerProgress {
 /**
  * @author SNIPPIK
  * @description Данные для создания прогресс бара
+ * @interface PlayerProgressInput
  */
 interface PlayerProgressInput {
+    /**
+     * @description Название платформы
+     * @readonly
+     */
     platform: RestAPI["name"];
+
+    /**
+     * @description Данные о времени трека
+     */
     duration: {
+        // Текущее время
         current: number;
+
+        // Общее время
         total: number
     }
 }

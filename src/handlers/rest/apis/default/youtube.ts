@@ -280,7 +280,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
      * @static
      */
     protected static extractFormat = (url: string, data?: json, html?: string) => {
-        return new Promise(async (resolve) => {
+        return new Promise((resolve) => {
             if (!data["formats"]) return resolve(null);
 
             const worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {

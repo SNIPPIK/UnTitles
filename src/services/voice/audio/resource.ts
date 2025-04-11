@@ -1,6 +1,6 @@
 import {OpusEncoder, SILENT_FRAME} from "@service/voice";
+import {Logger, TypedEmitter} from "@utils";
 import {Process} from "./process";
-import {Logger} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -8,14 +8,7 @@ import {Logger} from "@utils";
  * @class AudioResource
  * @public
  */
-export class AudioResource {
-    /**
-     * @description Временное хранилище для потоков
-     * @readonly
-     * @private
-     */
-    private readonly _streams: (Process | OpusEncoder)[] = [];
-
+export class AudioResource extends TypedEmitter<AudioResourceEvents> {
     /**
      * @description Параметры буфера потока
      * @readonly
@@ -54,54 +47,33 @@ export class AudioResource {
     };
 
     /**
-     * @description Получаем OpusEncoder
-     * @return OpusEncoder
-     * @public
-     */
-    public get stream() {
-        if (!this._streams) return null;
-
-        return this._streams.at(0) as OpusEncoder;
-    };
-
-    /**
-     * @description Получаем Process
-     * @return Process
-     * @public
-     */
-    protected get process() {
-        if (!this._streams) return null;
-
-        return this._streams.at(1) as Process;
-    };
-
-    /**
      * @description Подключаем поток к ffmpeg
      * @param options - Параметры для запуска
      * @private
      */
     private set input(options: AudioResourceInput) {
-        // Добавляем процесс в класс для отслеживания
-        this._streams.push(options.input);
-
         // Запускаем все события
-        for (const event of [...options.events.destroy, ...options.events.critical]) {
-            // Если событие относится к критичным
-            if (options.events.critical.includes(event)) {
-                if (options.events.path) (options.input)[options.events.path]["once"](event, options.events.critical_callback);
-                else (options.input)["once"](event, options.events.critical_callback);
-            }
+        for (const event of options.events.destroy) {
+            const path = options.events.path ? options.input[options.events.path] : options.input;
 
-            // Если событие не относится к критичным
-            else {
-                if (options.events.path) (options.input)[options.events.path]["once"](event, options.events.destroy_callback);
-                else (options.input)["once"](event, options.events.destroy_callback);
-            }
+            // Запускаем прослушивание события
+            path["once"](event, () => {
+                if (event === "error") this.emit("error", new Error("AudioResource get error for create stream"));
+                options.events.destroy_callback(options.input);
+            });
         }
 
+        // Разовая функция для удаления потока
+        this.once("close", () => {
+            options.events.destroy_callback(options.input);
+        });
+
         // Если вводимый поток является расшифровщиком
-        if (options.input instanceof Process) this.process.stdout.pipe(this.stream);
-        else this.stream.on("data", (packet: Buffer) => {
+        if (options.input instanceof Process) options.input.stdout.pipe(options.decoder);
+        else options.input.on("data", (packet: Buffer) => {
+            // Сообщаем что поток можно начать читать
+            if (this._buffer.chunks.length === 0) this.emit("readable");
+
             // Если поток включается в первый раз.
             // Добавляем пустышку для интерпретатора opus
             if (!this.readable && !this._buffer.total) this._buffer.chunks.push(SILENT_FRAME);
@@ -120,36 +92,46 @@ export class AudioResource {
      * @example <path> or <url>
      */
     public constructor(path: string, options: {seek?: number; filters?: string;}) {
+        super();
         if (options.seek > 0) this._buffer.total = (options.seek * 1e3) / 20;
+
+        const decoder = new OpusEncoder({
+            readableObjectMode: true,
+            autoDestroy: true
+        });
 
         // Расшифровщик
         this.input = {
             // Управление событиями
             events: {
-                destroy: ["end", "close"],
-                destroy_callback: () => this.cleanup("opus"),
+                destroy: ["end", "close", "error"],
+                destroy_callback: (input) => {
+                    // Если поток еще существует
+                    if (input) input.destroy();
 
-                critical: ["error"],
-                critical_callback: this.cleanup,
+                    // Добавляем пустышку для интерпретатора opus
+                    this._buffer.chunks.push(SILENT_FRAME);
+                    this.emit("end");
+                }
             },
             // Создание потока
-            input: new OpusEncoder({
-                readableObjectMode: true,
-                autoDestroy: true
-            })
+            input: decoder
         };
 
         // Процесс (FFmpeg)
         this.input = {
+            decoder,
             // Управление событиями
             events: {
                 path: "stdout",
 
-                destroy: ["end", "close"],
-                destroy_callback: () => this.cleanup("ffmpeg"),
+                destroy: ["end", "close", "error"],
+                destroy_callback: (input) => {
+                    // Если поток еще существует
+                    if (input) input.destroy();
 
-                critical: ["error"],
-                critical_callback: this.cleanup
+                    this.emit("end");
+                },
             },
             // Создание потока
             input: new Process([
@@ -170,63 +152,48 @@ export class AudioResource {
     };
 
     /**
-     * @description Чистка от мусора
-     * @param type - Тип потока для удаления именно нужного потока
-     * @public
-     */
-    private cleanup = (type: "opus" | "ffmpeg" | "all" = "all") => {
-        Logger.log("DEBUG", `[AudioResource/${type}] has cleanup`);
-
-        switch (type) {
-            // Если надо удалить opusEncoder
-            case "opus": {
-                // Добавляем пустышку для интерпретатора opus
-                this._buffer.chunks.push(SILENT_FRAME);
-
-                this.stream.removeAllListeners();
-                this.stream.destroy();
-                return;
-            }
-
-            // Если надо удалить ffmpeg
-            case "ffmpeg": {
-                this.process.destroy();
-                return;
-            }
-
-            // Если надо удалить все потоки!
-            default: {
-                // Если streams уже удалены
-                if (!this._streams) return;
-
-                // Чистим все потоки от мусора
-                for (const stream of this._streams) {
-                    // Если поток является OpusEncoder
-                    if (stream instanceof OpusEncoder) {
-                        stream.removeAllListeners();
-                    }
-
-                    // Уничтожаем поток
-                    stream.destroy();
-                }
-                return;
-            }
-        }
-    };
-
-    /**
      * @description Удаляем ненужные данные
      * @public
      */
     public destroy = () => {
-        // Удаляем данные в следующем цикле
-        setImmediate(() => {
-            Logger.log("DEBUG", `[AudioResource] has destroyed`);
+        Logger.log("DEBUG", `[AudioResource] has destroyed`);
+        // Чистим все потоки от мусора
+        this.emit("close");
 
-            // Чистим все потоки от мусора
-            this.cleanup();
-        });
+        // Удаляем все вызовы функций
+        this.removeAllListeners();
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description События аудио потока
+ * @interface AudioResourceEvents
+ */
+interface AudioResourceEvents {
+    /**
+     * @description События при котором можно начинать чтение потока
+     * @readonly
+     */
+    readonly "readable": () => void;
+
+    /**
+     * @description Событие при котором поток удален
+     * @readonly
+     */
+    readonly "end": () => void;
+
+    /**
+     * @description Событие при котором поток начнет уничтожатся
+     * @readonly
+     */
+    readonly "close": () => void;
+
+    /**
+     * @description Событие при котором поток получил ошибку
+     * @readonly
+     */
+    readonly "error": (error: Error) => void;
 }
 
 /**
@@ -261,6 +228,12 @@ interface AudioResourceInput {
     readonly input: OpusEncoder | Process;
 
     /**
+     * @description Расшифровывающий поток из ogg в opus
+     * @readonly
+     */
+    readonly decoder?: OpusEncoder;
+
+    /**
      * @description Отслеживаемые события для удаления
      * @readonly
      */
@@ -269,13 +242,7 @@ interface AudioResourceInput {
         destroy: string[];
 
         // Функция для очистки потока
-        destroy_callback: () => void;
-
-        // Имена критичных событий для полного удаления потока
-        critical: string[];
-
-        // Функция для очистки потока
-        critical_callback: () => void;
+        destroy_callback: (input: OpusEncoder | Process) => void;
 
         /**
          * @description Если надо конкретно откуда-то отслеживать события

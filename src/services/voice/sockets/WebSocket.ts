@@ -113,13 +113,13 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
         };
 
         // Если WebSocket открыт
-        this.socket.once("open", async (event: Event) => {
+        this.socket.on("open", async (event: Event) => {
             this._isConnected = true;
             this.emit("open", event);
         });
 
         // Если WebSocket закрыт
-        this.socket.once("close", async (event: CloseEvent) => {
+        this.socket.on("close", async (event: CloseEvent) => {
             this._isConnected = false;
             this.emit("close", event);
         });

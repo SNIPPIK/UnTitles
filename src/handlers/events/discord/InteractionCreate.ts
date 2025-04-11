@@ -9,116 +9,120 @@ import {env} from "@handler";
 
 /**
  * @author SNIPPIK
- * @description База данных для системы ожидания
- * @private
- */
-const cooldown = env.get("cooldown", true) ? {
-    time: parseInt(env.get("cooldown.time", "2")),
-    db: new Map<string, number>
-} : null;
-
-/**
- * @author SNIPPIK
- * @description Функции правил проверки, возвращает true или false
- * @true - Разрешено
- * @false - Запрещено
- */
-const intends: { name: Command["rules"][number], callback: (message: Interact) => boolean }[] = [
-    {
-        name: "voice",
-        callback: (message) => {
-            const VoiceChannel = message.voice.channel;
-
-            // Если нет голосового подключения
-            if (!VoiceChannel) {
-                message.FBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow };
-                return false;
-            }
-
-            return true;
-        }
-    },
-    {
-        name: "queue",
-        callback: (message) => {
-            // Если нет очереди
-            if (!message.queue) {
-                message.FBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow };
-                return false;
-            }
-
-            return true;
-        }
-    },
-    {
-        name: "player-not-playing",
-        callback: (message) => {
-            // Если музыку нельзя пропустить из-за плеера
-            if (!message.queue.player.playing) {
-                message.FBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
-                return false;
-            }
-
-            return true;
-        }
-    },
-    {
-        name: "another_voice",
-        callback: (message) => {
-            const queue = message.queue;
-            const VoiceChannel = (message.member as GuildMember)?.voice?.channel;
-
-            // Если музыка играет в другом голосовом канале
-            if (message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
-                // Если включена музыка на сервере
-                if (queue) {
-                    // Если есть голосовое подключение
-                    if (queue.voice && queue.voice.channel) {
-                        // Если в гс есть другие пользователи
-                        if (message.me.voice.channel && message.me.voice.channel.members.filter((user) => !user.user.bot).size > 0) {
-                            message.FBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
-                            return false;
-                        }
-
-                        // Если нет пользователей, то подключаемся к другому пользователю
-                        else {
-                            queue.voice = message.voice;
-                            queue.message = message;
-
-                            message.FBuilder = {
-                                description: locale._(message.locale, "voice.new", [message.voice.channel]),
-                                color: Colors.Yellow
-                            };
-                            return true;
-                        }
-                    }
-
-                    // Если есть очередь, но нет голосовых подключений
-                    else db.queues.remove(message.guild.id);
-                }
-
-                // Если нет очереди, но есть голосовое подключение
-                else {
-                    const connection = db.voice.get(message.guild.id);
-
-                    // Отключаемся от голосового канала
-                    if (connection) connection.disconnect;
-                }
-            }
-
-            return true;
-        }
-    }
-];
-
-/**
- * @author SNIPPIK
  * @description Класс для взаимодействия бота с slash commands, buttons
  * @class InteractionCreate
  * @event Events.InteractionCreate
  * @public
  */
 class Interaction extends Assign<Event<Events.InteractionCreate>> {
+    /**
+     * @author SNIPPIK
+     * @description Функции правил проверки, возвращает true или false
+     * @true - Разрешено
+     * @false - Запрещено
+     */
+    private intends: { name: Command["rules"][number], callback: (message: Interact) => boolean }[] = [
+        {
+            name: "voice",
+            callback: (message) => {
+                const VoiceChannel = message.voice.channel;
+
+                // Если нет голосового подключения
+                if (!VoiceChannel) {
+                    message.FBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow };
+                    return false;
+                }
+
+                return true;
+            }
+        },
+        {
+            name: "queue",
+            callback: (message) => {
+                // Если нет очереди
+                if (!message.queue) {
+                    message.FBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow };
+                    return false;
+                }
+
+                return true;
+            }
+        },
+        {
+            name: "player-not-playing",
+            callback: (message) => {
+                // Если музыку нельзя пропустить из-за плеера
+                if (!message.queue.player.playing) {
+                    message.FBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
+                    return false;
+                }
+
+                return true;
+            }
+        },
+        {
+            name: "another_voice",
+            callback: (message) => {
+                const queue = message.queue;
+                const VoiceChannel = (message.member as GuildMember)?.voice?.channel;
+
+                // Если музыка играет в другом голосовом канале
+                if (message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
+                    // Если включена музыка на сервере
+                    if (queue) {
+                        // Если есть голосовое подключение
+                        if (queue.voice && queue.voice.channel) {
+                            // Если в гс есть другие пользователи
+                            if (message.me.voice.channel && message.me.voice.channel.members.filter((user) => !user.user.bot).size > 0) {
+                                message.FBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
+                                return false;
+                            }
+
+                            // Если нет пользователей, то подключаемся к другому пользователю
+                            else {
+                                queue.voice = message.voice;
+                                queue.message = message;
+
+                                message.FBuilder = {
+                                    description: locale._(message.locale, "voice.new", [message.voice.channel]),
+                                    color: Colors.Yellow
+                                };
+                                return true;
+                            }
+                        }
+
+                        // Если есть очередь, но нет голосовых подключений
+                        else db.queues.remove(message.guild.id);
+                    }
+
+                    // Если нет очереди, но есть голосовое подключение
+                    else {
+                        const connection = db.voice.get(message.guild.id);
+
+                        // Отключаемся от голосового канала
+                        if (connection) connection.disconnect;
+                    }
+                }
+
+                return true;
+            }
+        }
+    ];
+
+    /**
+     * @author SNIPPIK
+     * @description База данных для системы ожидания
+     * @private
+     */
+    private cooldown = env.get("cooldown", true) ? {
+        time: parseInt(env.get("cooldown.time", "2")),
+        db: new Map<string, number>
+    } : null;
+
+    /**
+     * @description Создание события
+     * @public
+     */
     public constructor() {
         super({
             name: Events.InteractionCreate,
@@ -165,12 +169,12 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
                 // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
                 else if (!db.owner.ids.includes(message.user.id) && !message.isAutocomplete()) {
-                    const user = cooldown.db.get(message.user.id);
+                    const user = this.cooldown.db.get(message.user.id);
 
                     // Если нет пользователя в системе ожидания
                     if (!user) {
                         // Добавляем пользователя в систему ожидания
-                        cooldown.db.set(message.user.id, Date.now() + (cooldown.time * 1e3));
+                        this.cooldown.db.set(message.user.id, Date.now() + (this.cooldown.time * 1e3));
                     }
 
                     // Если пользователь уже в списке
@@ -187,7 +191,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                         }
 
                         // Удаляем пользователя из базы
-                        cooldown.db.delete(message.user.id);
+                        this.cooldown.db.delete(message.user.id);
                     }
                 }
 
@@ -209,7 +213,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                         const api = request.get(args[1].value as string);
 
                         // Ищем треки по названию
-                        api.execute(args[1].value as string, {limit: db.api.limits[api.name], audio: false}).then((data) => {
+                        api.execute(args[1].value as string, {limit: db.api.limits[api.name], audio: false}).then(async (data) => {
                             const items: {value: string; name: string}[] = [];
 
                             // Если получена ошибка
@@ -230,7 +234,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                             // Ссылка на плейлист или трек
                             else items.push({ name: data.title ?? data.name, value: data.url });
 
-                            message.respond(items).catch(console.error);
+                            await message.respond(items).catch(console.error);
                             return;
                         });
                     }
@@ -258,7 +262,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     else if (command.rules && command.rules?.length > 0) {
                         let isContinue = true;
 
-                        for (const rule of intends) {
+                        for (const rule of this.intends) {
                             // Если будет найдено совпадение
                             if (command.rules.includes(rule.name)) {
                                 // Если нет этого необходимости проверки запроса, то пропускаем

@@ -110,7 +110,7 @@ let ffmpeg_path = null;
     // Проверяем имена, если есть FFmpeg/avconv
     for (const name of ["ffmpeg", ...names]) {
         try {
-            const result = spawnSync(name, ['-h'], {windowsHide: true});
+            const result = spawnSync(name, ['-h'], { windowsHide: true });
             if (result.error) continue;
             ffmpeg_path = name;
             return;

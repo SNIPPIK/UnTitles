@@ -125,14 +125,14 @@ class message_playing extends Assign<Event<"message/playing">> {
                         fields: [
                             // Текущий трек
                             {
-                                name: "", //locale._(queue.message.locale, "player.current.playing")
+                                name: "",
                                 value: `\`\`\`${name}\`\`\`` + queue.player.progress
                             },
 
                             // Следующий трек или треки
-                            queue.tracks.size > 1 ? (() => {
-                                const tracks = (queue.tracks.array(-2) as Track[]).map((track, index) => {
-                                    return `\`\`${index + 2}\`\` - ${track.name_replace}`;
+                            queue.tracks.size > 0 ? (() => {
+                                const tracks = (queue.tracks.array(+3) as Track[]).map((track, index) => {
+                                    return `${index + 2} - ${track.name_replace}`;
                                 });
 
                                 return {
@@ -148,7 +148,7 @@ class message_playing extends Assign<Event<"message/playing">> {
                 if (!message) {
                     builder.setTime(0).addComponents(queue.components)
                         // Для обновления сообщений
-                        .setPromise((msg) => {
+                        .setPromise(async (msg) => {
                             // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
                             if (!db.queues.cycles.messages.array.includes(msg)) {
                                 // Добавляем сообщение в базу для обновления

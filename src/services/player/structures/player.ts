@@ -242,7 +242,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }, 10e3);
 
                 // Подключаем события для отслеживания работы потока (временные)
-                stream.stream
+                stream
                     // Если возникнет ошибка во время загрузки потока
                     .once("error", () => {
                         clearTimeout(timeout);

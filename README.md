@@ -55,4 +55,4 @@
 
 
 ## Диаграмма всего проекта
-[<img align="center" alt="Diagram" width="" src=".prev/diagram.png" />]()
+[<img align="center" alt="Diagram" width="" src=".github/images/src.png" />]()

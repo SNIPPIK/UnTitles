@@ -61,11 +61,11 @@
   {
     "name": "nightcore",
     "locale": {
-      "en-US": "Increases track speed by 25-35%!",
-      "ru": "Увеличивает скорость трека на 25-35%!"
+      "en-US": "Increases track speed by 20% and changes some tones!",
+      "ru": "Увеличивает скорость трека на 20% и изменяет некоторые тона!"
     },
     "unsupported": ["vaporwave"],
-    "filter": "asetrate=48000*1.25,aresample=48000,bass=g=5",
+    "filter": "asetrate=48000*1.20,aresample=128000,bass=g=5",
     "args": false
   },
   {
