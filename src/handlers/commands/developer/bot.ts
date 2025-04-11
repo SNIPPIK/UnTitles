@@ -72,7 +72,104 @@ class WorkBotCommand extends Assign<Command> {
     public constructor() {
         super({
             owner: true,
+            execute: async ({message, type}) => {
+                // Варианты команд (доп команд)
+                switch (type) {
+                    case "avatar": {
+                        const attachment = message.options.getAttachment("file");
+                        const embed = new message.builder().setTime(20e3);
+                        const client = message.me.client;
+
+                        //Если попытка всунуть не изображение
+                        if (!attachment.contentType.match(/image/)) {
+                            message.FBuilder = {
+                                description: locale._(message.locale, "command.bot.avatar.image.fail"),
+                                color: Colors.Yellow
+                            }
+                            return;
+                        }
+
+                        client.user.setAvatar(attachment.url)
+                            // Если удалось установить новый аватар
+                            .then(async () => {
+                                embed.addEmbeds([
+                                    {
+                                        author: {name: client.user.username, iconURL: client.user.avatarURL()},
+                                        description: locale._(message.locale, "command.bot.avatar.ok"),
+                                        color: Colors.Green
+                                    }
+                                ]).send = message;
+                            })
+
+                            // Если не удалось установить новый аватар
+                            .catch(async (err) => {
+                                embed.addEmbeds([
+                                    {
+                                        author: {name: client.user.username, iconURL: client.user.avatarURL()},
+                                        description: locale._(message.locale, "command.bot.avatar.fail", [err]),
+                                        color: Colors.DarkRed
+                                    }
+                                ]).send = message;
+                            });
+                        break;
+                    }
+                }
+            }
+        });
+    };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Управление профилем бота
+ * @class ManageBotCommand
+ * @public
+ */
+@SlashCommand({
+    names: {
+        "en-US": "bot-profile",
+        "ru": "бот-профиль"
+    },
+    descriptions: {
+        "en-US": "Manage profile bot!",
+        "ru": "Управление профилем бота!"
+    },
+    dm_permission: false,
+    options: [
+        {
+            names: {
+                "en-US": "avatar",
+                "ru": "аватар"
+            },
+            descriptions: {
+                "en-US": "Change avatar a bot",
+                "ru": "Изменение аватара бота!"
+            },
+            type: ApplicationCommandOptionType.Subcommand,
+            options: [
+                {
+                    names: {
+                        "en-US": "file",
+                        "ru": "файл"
+                    },
+                    descriptions: {
+                        "en-US": "New avatar, needed a file!",
+                        "ru": "Смена аватара, необходим файл!"
+                    },
+                    type: ApplicationCommandOptionType.Attachment,
+                    required: true
+                }
+            ]
+        }
+    ]
+})
+class ManageBotCommand extends Assign<Command> {
+    public constructor() {
+        super({
+            owner: true,
             execute: async ({message, args}) => {
+                // Варианты перезагрузки (аргументы)
                 switch (args[0]) {
                     // Перезагружаем все команды
                     case "commands": {
@@ -134,4 +231,4 @@ class WorkBotCommand extends Assign<Command> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default Object.values({WorkBotCommand});
+export default Object.values({WorkBotCommand, ManageBotCommand});

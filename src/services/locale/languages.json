@@ -450,6 +450,21 @@
     "ru": "{ARGUMENT} | Платформа не заблокирована!"
   },
 
+  "command.bot.avatar.image.fail": {
+    "en-US": "This file is not an image!",
+    "ru": "Этот файл не является изображением!"
+  },
+
+  "command.bot.avatar.ok": {
+    "en-US": "A new avatar has been installed",
+    "ru": "Установлен новый аватар"
+  },
+
+  "command.bot.avatar.fail": {
+    "en-US": "Failed to install a new avatar\nError: {ARGUMENT}",
+    "ru": "Не удалось установить новый аватар\nError: {ARGUMENT}"
+  },
+
 
   "command.remove.track": {
     "ru": "Был удален из очереди трек\n\n**❯** **{ARGUMENT}**",
