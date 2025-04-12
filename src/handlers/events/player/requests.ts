@@ -43,7 +43,7 @@ class rest_request extends Assign<Event<"rest/request">> {
 
 
                 // Получаем данные в системе API
-                api.execute(url as any, { limit: db.api.limits[api.name], audio: false })
+                api.execute(url as any, { limit: db.api.limits[api.name], audio: true })
                     // Получаем данные
                     .then(async (item) => {
                         // Если нет данных или была получена ошибка
@@ -60,9 +60,6 @@ class rest_request extends Assign<Event<"rest/request">> {
                                 return;
                             }
 
-                            // Сохраняем трек в системе
-                            db.cache.set(item[0]);
-
                             // Добавляем данные в очередь
                             db.queues.create(message, item[0]);
                             return;
@@ -75,9 +72,6 @@ class rest_request extends Assign<Event<"rest/request">> {
                                 db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
                                 return;
                             }
-
-                            // Сохраняем трек в системе
-                            db.cache.set(item);
                         }
 
                         // Добавляем данные в очередь
