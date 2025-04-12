@@ -51,8 +51,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
 
             // Если происходит попытка вызова события из уничтоженного EventEmitter
             if (oldState.code !== newState.code) this.emit("stateChange", oldState, newState);
-        } catch {
-            // :D
+        } catch (err) {
+            console.error(err);
         }
 
         this._state = newState;
@@ -139,7 +139,6 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
         const state = this.state;
 
         switch (state.code) {
-
             /**
              * @description Если происходит обрыв соединения ws, то пробуем его поднять заново
              * @type VoiceSocketStatusCode
@@ -169,8 +168,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                     d: {
                         max_dave_protocol_version: 0,
                         server_id: state.connectionOptions.serverId,
-                        user_id: state.connectionOptions.userId,
                         session_id: state.connectionOptions.sessionId,
+                        user_id: state.connectionOptions.userId,
                         token: state.connectionOptions.token
                     }
                 };
@@ -191,13 +190,11 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
         const state = this.state;
 
         // Если discord попытался разорвать соединение
-        if (code === 4_015 || code < 4_000) {
-            if (state.code === VoiceSocketStatusCode.ready) {
-                this.state = { ...state,
-                    ws: this.createWebSocket(state.connectionOptions?.endpoint),
-                    code: VoiceSocketStatusCode.resume
-                };
-            }
+        if ((code === 4_015 || code < 4_000) && state.code === VoiceSocketStatusCode.ready) {
+            this.state = { ...state,
+                ws: this.createWebSocket(state.connectionOptions?.endpoint),
+                code: VoiceSocketStatusCode.resume
+            };
         }
 
         // Если надо приостановить соединение с discord
@@ -299,7 +296,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                         delay: packet.d.delay,
                         ssrc: packet.d.ssrc
                     },
-                    seq: packet.d.seq || this.state.ws.seq_ack
+                    seq: packet.d.seq
                 };
                 return;
             }

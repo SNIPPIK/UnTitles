@@ -3,6 +3,21 @@ import {createSocket} from "node:dgram";
 import {TypedEmitter} from "@utils";
 import {isIPv4} from "node:net";
 
+
+/**
+ * @author SNIPPIK
+ * @description Интервал в миллисекундах, с которым отправляются датаграммы поддержания активности
+ * @private
+ */
+const ALIVE_INTERVAL = 5e3;
+
+/**
+ * @author SNIPPIK
+ * @description Максимальное значение счетчика активности
+ * @private
+ */
+const MAX_SIZE_VALUE = 2 ** 32 - 1;
+
 /**
  * @author SNIPPIK
  * @description Создает udp подключение к api discord
@@ -23,6 +38,26 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
      * @private
      */
     public readonly _connection: UDPConnection;
+
+    /**
+     * @description Интервал для предотвращения разрыва
+     * @readonly
+     * @private
+     */
+    private readonly keepAliveInterval: NodeJS.Timeout;
+
+    /**
+     * @description Буфер, используемый для записи счетчика активности
+     * @readonly
+     * @private
+     */
+    private readonly keepAliveBuffer: Buffer = Buffer.alloc(8);
+
+    /**
+     * @description Счетчика активности
+     * @private
+     */
+    private keepAliveCounter = 0;
 
     /**
      * @description Отправка данных на сервер
@@ -76,6 +111,9 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
         this.socket.on("close", async () => {
             this.emit("close");
         });
+
+        // Запускаем интервал
+        this.keepAliveInterval = setInterval(this.keepAlive, ALIVE_INTERVAL);
     };
 
     /**
@@ -92,10 +130,27 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
     };
 
     /**
+     * @description Функция для предотвращения разрыва UDP подключения
+     * @private
+     */
+    private keepAlive = () => {
+        this.keepAliveBuffer.writeUInt32LE(this.keepAliveCounter, 0);
+        this.packet = this.keepAliveBuffer;
+        this.keepAliveCounter++;
+
+        if (this.keepAliveCounter > MAX_SIZE_VALUE) {
+            this.keepAliveCounter = 0;
+        }
+    };
+
+    /**
      * @description Закрывает сокет, экземпляр не сможет быть повторно использован.
      * @public
      */
     public destroy = () => {
+        // Уничтожаем интервал активности
+        clearInterval(this.keepAliveInterval);
+
         this.socket.removeAllListeners();
         this.removeAllListeners();
 
