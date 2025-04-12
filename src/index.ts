@@ -228,13 +228,15 @@ export var db: Database = null;
                     IntentsBitField.Flags.Guilds
                 ],
 
-                // Данные которые обязательно надо кешировать
+                // Позволяет обрабатывать частичные данные
                 partials: [
                     Partials.Channel,
                     Partials.GuildMember,
                     Partials.Message,
                     Partials.Reaction,
-                    Partials.User
+                    Partials.User,
+                    Partials.GuildScheduledEvent,
+                    Partials.ThreadMember
                 ],
 
                 // Задаем параметры кеша
@@ -246,7 +248,8 @@ export var db: Database = null;
                     DMMessageManager: 0,
                     GuildInviteManager: 0,
                     GuildEmojiManager: 0,
-                    GuildStickerManager: 0
+                    GuildStickerManager: 0,
+                    GuildTextThreadManager: 0
                 })
             });
             const id = client.shard?.ids[0] ?? 0;

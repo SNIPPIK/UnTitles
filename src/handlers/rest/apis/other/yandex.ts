@@ -84,11 +84,15 @@ class RestYandexAPI extends Assign<RestAPI> {
                                 else if (!api[0]) return resolve(locale.err( "api.request.fail"));
 
                                 const track = RestYandexAPI.track(api[0]);
-                                const link = await RestYandexAPI.getAudio(ID);
 
-                                // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл
-                                if (link instanceof Error) return resolve(link);
-                                track.link = link;
+                                // Если указано получение аудио
+                                if (options.audio) {
+                                    const link = await RestYandexAPI.getAudio(ID);
+
+                                    // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл
+                                    if (link instanceof Error) return resolve(link);
+                                    track.link = link;
+                                }
 
                                 // Сохраняем кеш в системе
                                 db.cache.set(track);

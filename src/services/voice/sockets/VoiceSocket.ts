@@ -142,6 +142,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
 
             /**
              * @description Если происходит обрыв соединения ws, то пробуем его поднять заново
+             * @type VoiceSocketStatusCode
+             * @code 5
              */
             case VoiceSocketStatusCode.resume: {
                 state.ws.packet = {
@@ -153,21 +155,23 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                         seq_ack: state.ws.seq_ack
                     }
                 };
-                return
+                return;
             }
 
             /**
-             * @description Если приходит статус поднятия ws, то необходимо отослать статус индификации клиента voice
+             * @description Если приходит статус поднятия ws, то необходимо отослать статус идентификации клиента
+             * @type VoiceSocketStatusCode
+             * @code 0
              */
             case VoiceSocketStatusCode.upWS: {
                 state.ws.packet = {
                     op: VoiceOpcodes.Identify,
                     d: {
+                        max_dave_protocol_version: 0,
                         server_id: state.connectionOptions.serverId,
                         user_id: state.connectionOptions.userId,
                         session_id: state.connectionOptions.sessionId,
-                        token: state.connectionOptions.token,
-                        seq_ack: state.ws.seq_ack
+                        token: state.connectionOptions.token
                     }
                 };
                 this.state = {...state, code: VoiceSocketStatusCode.identify};
@@ -212,6 +216,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
         switch (packet.op) {
             /**
              * @description Если получен код о готовности подключения к голосовому каналу
+             * @type VoiceOpcodes
              * @private
              * @code 2
              */
@@ -253,6 +258,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
 
             /**
              * @description Если получен код о параметрах голосового соединения, то задаем их
+             * @type VoiceOpcodes
              * @private
              * @code 4
              */
@@ -278,7 +284,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
             }
 
             /**
-             * @description Шлюз может привести к повторному забуференным сообщениям. Чтобы поддержать это, шлюз включает номер последовательности со всеми сообщениями, которые могут потребоваться повторно.
+             * @description Шлюз может привести к повторному сообщению. Чтобы поддержать это, шлюз включает номер последовательности со всеми сообщениями, которые могут потребоваться повторно
+             * @type VoiceOpcodes
              * @private
              * @code 5
              */
@@ -292,13 +299,14 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                         delay: packet.d.delay,
                         ssrc: packet.d.ssrc
                     },
-                    seq: packet.d.seq
+                    seq: packet.d.seq || this.state.ws.seq_ack
                 };
                 return;
             }
 
             /**
              * @description Если получен код о необходимости ответа сервера
+             * @type VoiceOpcodes
              * @private
              * @code 8
              */
@@ -310,7 +318,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
             }
 
             /**
-             * @description Если получен код о ...
+             * @description Если получен код о возобновлении подключения к websocket
+             * @type VoiceOpcodes
              * @private
              * @code 9
              */

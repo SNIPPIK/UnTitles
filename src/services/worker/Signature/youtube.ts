@@ -1,7 +1,24 @@
-import {isMainThread, parentPort, workerData} from "node:worker_threads";
+import {isMainThread, parentPort} from "node:worker_threads";
 import {httpsClient} from "@handler/rest";
 import querystring from "node:querystring";
 import {Script} from "node:vm";
+
+/**
+ * @author SNIPPIK
+ * @description Если запускается фрагмент кода в другом процессе
+ */
+if (!isMainThread) {
+    // Разовое событие
+    parentPort.once("message", async (message) => {
+        if (message.type === "native") {
+            const formats = await Youtube_decoder_native.decipherFormats(message.formats, message.html);
+            return parentPort.postMessage(formats[0]);
+        }
+
+        const formats = await YouTube_encoder_ytd.decipherFormats(message.url);
+        return parentPort.postMessage(formats[0]);
+    });
+}
 
 /**
  * @author SNIPPIK
@@ -412,20 +429,3 @@ const SWAP_PATTERN = new RegExp(PATTERN_PREFIX + SWAP_PART, "m");
 
 const DECIPHER_ARGUMENT = "sig";
 const N_ARGUMENT = "ncode";
-
-
-/**
- * @author SNIPPIK
- * @description Если запускается фрагмент кода в другом процессе
- */
-if (!isMainThread) {
-    (async () => {
-        if (workerData.type === "native") {
-            const formats = await Youtube_decoder_native.decipherFormats(workerData.formats, workerData.html);
-            return parentPort.postMessage(formats[0]);
-        }
-
-        const formats = await YouTube_encoder_ytd.decipherFormats(workerData.url);
-        return parentPort.postMessage(formats[0]);
-    })();
-}

@@ -5,6 +5,22 @@ import {TypedEmitter} from "@utils";
 
 /**
  * @author SNIPPIK
+ * @description Не поддерживаемые статус коды, они не обрабатываются в этом коде никак
+ */
+const not_support_status_code: (VoiceOpcodes | number)[] = [
+    VoiceOpcodes.HeartbeatAck,
+    VoiceOpcodes.ClientConnect,
+    VoiceOpcodes.ClientDisconnect,
+
+    // Not documented opcodes
+    15, 18, 20,
+
+    // DAVE Opcodes
+    21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+];
+
+/**
+ * @author SNIPPIK
  * @description WebSocket для взаимодействия с discord websocket
  * @class WebSocket
  * @public
@@ -103,10 +119,16 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
 
         // Если WebSocket принял сообщение
         this.socket.onmessage = async (event: WebSocketEvent) => {
+            // Если получена не строка
             if (typeof event.data !== "string") return;
 
+            const json = JSON.parse(event.data);
+
+            // Если код не поддерживается внутри кода
+            if (not_support_status_code.includes(json.op)) return;
+
             try {
-                this.emit("packet", JSON.parse(event.data));
+                this.emit("packet", json);
             } catch (error) {
                 this.emit("error", error as Error);
             }

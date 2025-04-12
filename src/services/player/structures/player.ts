@@ -349,8 +349,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public destroy = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has destroyed`);
-
-        this.off("player/wait", () => {});
-        this.off("player/error", () => {});
+        this.removeAllListeners();
     };
 }

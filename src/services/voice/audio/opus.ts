@@ -1,5 +1,6 @@
 import {PassThrough} from "node:stream";
 import {Buffer} from "node:buffer";
+import {Logger} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -143,7 +144,21 @@ export class OpusEncoder extends PassThrough {
 
         // Добавляем не прошедшие данные в буфер
         this.db.remainder = chunk;
-
         done();
+    };
+
+    /**
+     * @description Уничтожаем расшифровщик
+     * @param error - Если получена ошибка
+     * @param callback - Если надо выполнить функцию
+     */
+    public _destroy(error: Error, callback: { (error?: Error): void }) {
+        Logger.log("DEBUG", `[OpusEncoder] has destroyed`);
+
+        super._destroy(error, callback);
+
+        this.db.remainder = null;
+        this.db.buffer = null;
+        this.db.bitstream = null;
     };
 }

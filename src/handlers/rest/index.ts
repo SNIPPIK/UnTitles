@@ -127,12 +127,8 @@ export class httpsClient extends Request {
 
                 // Запускаем расшифровку
                 decoder.setEncoding("utf-8")
-                    .on("data", (chunk) => {
-                        data += chunk;
-                    })
-                    .once("end", () => {
-                        return resolve(data);
-                    });
+                    .on("data", (chunk) => { data += chunk; })
+                    .once("end", () => resolve(data));
             }).catch((err) => {
                 return resolve(err);
             });

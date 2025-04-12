@@ -1,3 +1,4 @@
+import {RepeatType} from "@service/player";
 import {locale} from "@service/locale";
 import {Button} from "@handler/modals";
 import {Colors} from "discord.js";
@@ -9,9 +10,16 @@ class ButtonBack extends Assign<Button> {
             name: "back",
             callback: (msg) => {
                 const queue = msg.queue;
+                const repeat = queue.tracks.repeat;
+
+                // Делаем повтор временным
+                if (repeat === RepeatType.None) queue.tracks.repeat = RepeatType.Songs;
 
                 // Меняем позицию трека в очереди
                 queue.player.stop(queue.tracks.position - 1);
+
+                // Возвращаем повтор
+                queue.tracks.repeat = repeat;
 
                 // Уведомляем пользователя о смене трека
                 msg.FBuilder = {

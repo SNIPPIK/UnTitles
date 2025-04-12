@@ -129,11 +129,14 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                 /// Если при получении данных возникла ошибка
                                 if (api instanceof Error) return resolve(api);
 
-                                // Расшифровываем аудио формат
-                                const format = await RestYouTubeAPI.extractFormat(url, api["streamingData"], api.html);
+                                // Если указано получение аудио
+                                if (options.audio) {
+                                    // Расшифровываем аудио формат
+                                    const format = await RestYouTubeAPI.extractFormat(url, api["streamingData"], api.html);
 
-                                // Если есть расшифровка ссылки видео
-                                if (format) api["videoDetails"]["format"] = {url: format["url"]};
+                                    // Если есть расшифровка ссылки видео
+                                    if (format) api["videoDetails"]["format"] = {url: format["url"]};
+                                }
 
                                 // Класс трека
                                 const track = RestYouTubeAPI.track(api["videoDetails"]);
@@ -283,18 +286,46 @@ class RestYouTubeAPI extends Assign<RestAPI> {
         return new Promise((resolve) => {
             if (!data["formats"]) return resolve(null);
 
-            const worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {
-                workerData: {type: RestYouTubeAPI._encoder, formats: data["formats"], html, url},
-                execArgv: ["-r", "tsconfig-paths/register"]
-            })
-                .once("error", async (err) => {
-                    await worker.terminate();
-                    return resolve(err);
-                })
-                .once("message", async (data) => {
-                    await worker.terminate();
-                    return resolve(data);
-                })
+            // Создаем 2 поток
+            let worker: Worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {
+                workerData: null,
+                execArgv: ["-r", "tsconfig-paths/register"],
+                resourceLimits: {
+                    maxOldGenerationSizeMb: 20,
+                    maxYoungGenerationSizeMb: 0
+                }
+            });
+
+            // Отправляем сообщение во 2 поток
+            worker.postMessage({html, url, formats: data["formats"], type: RestYouTubeAPI._encoder} as any);
+
+            // Слушаем ответ от 2 потока
+            worker.once("message", (data) => {
+                // Через время убиваем поток если он не нужен
+                setImmediate(() => {
+                    setTimeout(async () => {
+                        await worker.terminate();
+                        worker.ref()
+                    }, 2e3)
+                });
+
+                return resolve(data);
+            });
+
+            // Если при создании получена ошибка
+            worker.once("error", async (err) => {
+                // Через время убиваем поток если он не нужен
+                setImmediate(() => {
+                    setTimeout(async () => {
+                        await worker.terminate();
+                        worker.ref()
+                    }, 2e3)
+                });
+
+                console.error(err);
+                return resolve(err);
+            });
+            return;
         });
     };
 
