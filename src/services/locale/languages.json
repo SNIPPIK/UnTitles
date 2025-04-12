@@ -82,7 +82,7 @@
   },
 
   "bot.reload": {
-    "ru": "{ARGUMENT} щас буду перезагружаться!",
+    "ru": "{ARGUMENT} Сейчас буду перезагружаться!",
     "en-US": "{ARGUMENT} i'm going to reboot now!"
   },
 
@@ -265,7 +265,7 @@
   },
 
   "player.current.playing": {
-    "ru": "Щас играет:",
+    "ru": "Сейчас играет:",
     "en-US": "Current:"
   },
 
