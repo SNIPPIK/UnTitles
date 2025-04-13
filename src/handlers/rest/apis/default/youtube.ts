@@ -124,7 +124,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                 // Если найден трек или похожий объект
                                 if (cache && !options?.audio) return resolve(cache);
 
-                                const api = await RestYouTubeAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&bpctr=${Math.ceil(Date.now() / 1000)}&has_verified=1`);
+                                const api = await RestYouTubeAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
 
                                 /// Если при получении данных возникла ошибка
                                 if (api instanceof Error) return resolve(api);
@@ -284,12 +284,16 @@ class RestYouTubeAPI extends Assign<RestAPI> {
      */
     protected static extractFormat = (url: string, data?: json, html?: string) => {
         return new Promise((resolve) => {
+            // Если нет форматов
             if (!data["formats"]) return resolve(null);
+
+            // Если расшифровка не требуется
+            else if (data["formats"][0].url) return data["formats"][0];
 
             // Создаем 2 поток
             let worker: Worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {
-                workerData: null,
                 execArgv: ["-r", "tsconfig-paths/register"],
+                workerData: null,
                 resourceLimits: {
                     maxOldGenerationSizeMb: 20,
                     maxYoungGenerationSizeMb: 0
@@ -297,7 +301,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
             });
 
             // Отправляем сообщение во 2 поток
-            worker.postMessage({html, url, formats: data["formats"], type: RestYouTubeAPI._encoder} as any);
+            worker.postMessage({html, url, formats: data["formats"], type: RestYouTubeAPI._encoder});
 
             // Слушаем ответ от 2 потока
             worker.once("message", (data) => {
@@ -313,7 +317,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
             });
 
             // Если при создании получена ошибка
-            worker.once("error", async (err) => {
+            worker.once("error", (err) => {
                 // Через время убиваем поток если он не нужен
                 setImmediate(() => {
                     setTimeout(async () => {
