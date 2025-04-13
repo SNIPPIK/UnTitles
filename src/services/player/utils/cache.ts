@@ -108,7 +108,7 @@ export class CacheUtility {
                         audio: null
                     },
                     api: track["_information"]["_api"]
-                }), (err) => console.error("Cached system error", err));
+                }), () => {});
             }
         });
     };
