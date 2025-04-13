@@ -170,8 +170,14 @@ class CacheAudio extends Cycle<Track> {
             filter: (item) => {
                 const names = this.status(item);
 
+                // Если трек уже есть в кеше или не возможно кешировать из-за длительности
+                if (names.status === "ended" || item.time.total > 600) {
+                    this.remove(item);
+                    return false;
+                }
+
                 // Если нет директории то, создаем ее
-                if (!fs.existsSync(names.path)) {
+                else if (!fs.existsSync(names.path)) {
                     let dirs = names.path.split("/");
 
                     if (!names.path.endsWith("/")) dirs.splice(dirs.length - 1);
@@ -183,12 +189,6 @@ class CacheAudio extends Cycle<Track> {
                 return new Promise<boolean>(async (resolve) => {
                     const status = this.status(track);
 
-                    // Если трек уже есть в кеше или не возможно кешировать из-за длительности
-                    if (status.status === "ended" || track.time.total > 600) {
-                        this.remove(track);
-                        return;
-                    }
-
                     // Создаем ffmpeg для скачивания трека
                     const ffmpeg = new Process([
                         "-i", track.link,
@@ -198,11 +198,13 @@ class CacheAudio extends Cycle<Track> {
 
                     // Если была получена ошибка
                     ffmpeg.stdout.once("error", () => {
+                        this.remove(track);
                         return resolve(false);
                     });
 
                     // Если запись была завершена
-                    ffmpeg.stdout.once("close", () => {
+                    ffmpeg.stdout.once("end", () => {
+                        this.remove(track);
                         return resolve(true);
                     });
                 });
