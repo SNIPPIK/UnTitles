@@ -4,7 +4,7 @@ import {Track} from "@service/player";
  * @author SNIPPIK
  * @description Все треки для проигрывания в плеере, хранит в себе все данные треков
  * @class PlayerTracks
- * @protected
+ * @public
  */
 export class PlayerTracks {
     /**
@@ -227,6 +227,7 @@ export class PlayerTracks {
  * @author SNIPPIK
  * @description Типы повторов
  * @enum RepeatType
+ * @public
  */
 export enum RepeatType {
     /**
@@ -250,6 +251,7 @@ export enum RepeatType {
  * @description Данные хранящиеся в классе
  * @interface PlayerTracksData
  * @class PlayerTracks
+ * @private
  */
 interface PlayerTracksData {
     /**

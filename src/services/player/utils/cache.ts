@@ -10,6 +10,7 @@ import {Cycle} from "@utils";
 /**
  * @author SNIPPIK
  * @description Класс для кеширования аудио и данных о треках
+ * @class CacheUtility
  * @readonly
  * @public
  */
@@ -91,7 +92,7 @@ export class CacheUtility {
             return;
         }
 
-        setImmediate(() => {
+        setImmediate(async () => {
             // Сохраняем данные в файл
             if (!fs.existsSync(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`)) {
                 fs.mkdirSync(`${this.dirname}/Data/${track.api.url}`, {recursive: true});
@@ -107,7 +108,7 @@ export class CacheUtility {
                         audio: null
                     },
                     api: track["_information"]["_api"]
-                }), () => null);
+                }), (err) => console.error("Cached system error", err));
             }
         });
     };

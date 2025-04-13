@@ -371,6 +371,7 @@ export class VoiceConnection {
  * @author SNIPPIK
  * @description Параметры для создания голосового соединения
  * @interface VoiceConnectionConfig
+ * @private
  */
 interface VoiceConnectionConfig {
     /**
@@ -406,6 +407,7 @@ interface VoiceConnectionConfig {
 /**
  * @author SNIPPIK
  * @description Причины, по которым голосовое соединение может находиться в отключенном состоянии.
+ * @enum VoiceConnectionDisconnectReason
  */
 enum VoiceConnectionDisconnectReason {
     /**

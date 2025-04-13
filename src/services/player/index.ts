@@ -17,6 +17,7 @@ export * from "./modules/tracks";
  * @author SNIPPIK
  * @description Загружаем класс для хранения очередей, плееров, циклов
  * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
+ * @class Queues
  * @readonly
  * @public
  */
@@ -211,6 +212,7 @@ class AudioCycles {
  * @author SNIPPIK
  * @description События плеера
  * @interface AudioPlayerEvents
+ * @public
  */
 export interface AudioPlayerEvents {
     /**
@@ -252,6 +254,7 @@ export interface AudioPlayerEvents {
  * @author SNIPPIK
  * @description События глобальной системы очередей
  * @interface QueuesEvents
+ * @public
  */
 export interface QueuesEvents {
     /**

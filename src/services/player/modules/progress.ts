@@ -4,6 +4,7 @@ import {env} from "@handler";
 /**
  * @author SNIPPIK
  * @description Эмодзи в качестве дизайнерского решения
+ * @private
  */
 const emoji = {
     /**
@@ -54,7 +55,7 @@ const emoji = {
  * @author SNIPPIK
  * @description Обработчик прогресс бара трека
  * @class PlayerProgress
- * @protected
+ * @public
  */
 export class PlayerProgress {
     /**

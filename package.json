@@ -18,7 +18,7 @@
     "zlib-sync": "^0.1.9"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
+    "@types/node": "^22.14.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },

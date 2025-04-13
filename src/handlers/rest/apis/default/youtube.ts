@@ -288,7 +288,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
             if (!data["formats"]) return resolve(null);
 
             // Если расшифровка не требуется
-            else if (data["formats"][0].url) return data["formats"][0];
+            else if (data["formats"][0]?.url) return data["formats"][0];
 
             // Создаем 2 поток
             let worker: Worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {

@@ -11,6 +11,7 @@ import {PlayerAudio} from "../modules/audio";
 /**
  * @author SNIPPIK
  * @description Создаем класс для вычисления progress bar
+ * @class PlayerProgress
  * @private
  */
 const Progress = new PlayerProgress();
@@ -227,6 +228,14 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     this.audio.current = stream;
                     this.status = "player/playing";
 
+                    // Если включается именно новый трек
+                    if (seek === 0) {
+                        const queue = db.queues.get(this.id);
+
+                        // Отправляем сообщение, если можно
+                        db.events.emitter.emit("message/playing", queue);
+                    }
+
                     return;
                 }
 
@@ -254,6 +263,14 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     .once("readable", () => {
                         clearTimeout(timeout);
 
+                        // Если включается именно новый трек
+                        if (seek === 0) {
+                            const queue = db.queues.get(this.id);
+
+                            // Отправляем сообщение, если можно
+                            db.events.emitter.emit("message/playing", queue);
+                        }
+
                         this.audio.current = stream;
                         this.status = "player/playing";
                     })
@@ -266,17 +283,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                 // Предпринимаем решение
                 this.emit("player/error", this, `${err}`, {skip: true, position: position ?? this.tracks.indexOf(track)});
-            })
-
-            // Создаем сообщение после всех действий
-            .finally(() => {
-                // Если включается именно новый трек
-                if (seek === 0) {
-                    const queue = db.queues.get(this.id);
-
-                    // Отправляем сообщение, если можно
-                    db.events.emitter.emit("message/playing", queue);
-                }
             });
     };
 

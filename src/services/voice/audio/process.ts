@@ -9,7 +9,7 @@ import path from "node:path";
  * @author SNIPPIK
  * @description Для уничтожения использовать <class>.emit("close")
  * @class Process
- * @private
+ * @public
  */
 export class Process {
     /**
@@ -95,6 +95,7 @@ export class Process {
 /**
  * @author SNIPPIK
  * @description Путь до исполняемого файла ffmpeg
+ * @private
  */
 let ffmpeg_path = null;
 

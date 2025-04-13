@@ -6,8 +6,7 @@ import {db} from "@app";
 /**
  * @author SNIPPIK
  * @description Динамические кнопки плеера
- * @readonly
- * @public
+ * @private
  */
 const button = {
     resume: MessageUtils.checkIDComponent("button.resume"),
@@ -19,6 +18,7 @@ const button = {
 /**
  * @author SNIPPIK
  * @description Кнопки для сообщения
+ * @private
  */
 const components: MessageComponents[] = [
     /**

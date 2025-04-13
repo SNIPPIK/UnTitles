@@ -24,6 +24,7 @@ if (!isMainThread) {
  * @author SNIPPIK
  * @description Сторонний расшифровщик аудио
  * @name YouTube_encoder_ytd
+ * @private
  */
 class YouTube_encoder_ytd {
     /**
@@ -80,6 +81,7 @@ const mRegex = (pattern: string | RegExp, text: string) => {
  * @author SNIPPIK
  * @description Расшифровщик ссылок на исходный файл для youtube
  * @class Youtube_decoder
+ * @private
  */
 class Youtube_decoder_native {
     /**
@@ -339,7 +341,7 @@ class Youtube_decoder_native {
  * @description Общий стандарт аудио или видео json объекта
  * @interface YouTubeFormat
  */
-export interface YouTubeFormat {
+interface YouTubeFormat {
     url: string;
     signatureCipher?: string;
     cipher?: string
@@ -355,7 +357,7 @@ export interface YouTubeFormat {
  * @description Варианты расшифровки url
  * @interface YouTubeChanter
  */
-export interface YouTubeChanter {
+interface YouTubeChanter {
     decipher?: Script;
     nTransform?: Script;
 }

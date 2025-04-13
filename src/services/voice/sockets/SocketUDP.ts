@@ -166,6 +166,7 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
  * @author SNIPPIK
  * @description Параметры подключения UDP
  * @interface UDPConnection
+ * @private
  */
 interface UDPConnection {
     /**

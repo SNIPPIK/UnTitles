@@ -4,7 +4,7 @@ import {AudioResource} from "@service/voice";
  * @author SNIPPIK
  * @description Класс для управления включенным потоком, хранит в себе все данные потока
  * @class PlayerAudio
- * @protected
+ * @public
  */
 export class PlayerAudio {
     /**

@@ -18,6 +18,7 @@ export * from "./audio/opus";
  * @author SNIPPIK
  * @description Различные коды состояния, которые может содержать голосовое соединение в любой момент времени
  * @enum VoiceConnectionStatus
+ * @public
  */
 export enum VoiceConnectionStatus {
     /**
@@ -50,6 +51,7 @@ export enum VoiceConnectionStatus {
  * @author SNIPPIK
  * @description События для VoiceWebSocket
  * @interface WebSocketEvents
+ * @public
  */
 export interface WebSocketEvents {
     /**
@@ -81,6 +83,7 @@ export interface WebSocketEvents {
  * @author SNIPPIK
  * @description События для VoiceSocket
  * @interface VoiceSocketEvents
+ * @public
  */
 export interface VoiceSocketEvents {
     /**
@@ -106,6 +109,7 @@ export interface VoiceSocketEvents {
  * @author SNIPPIK
  * @description События для UDP
  * @interface UDPSocketEvents
+ * @public
  */
 export interface UDPSocketEvents {
     /**

@@ -229,7 +229,7 @@ export class Track {
 
                 // Если нет ссылки, то ищем замену
                 if (!this.link) {
-                    const link = await db.api.fetch(this as any);
+                    const link = await db.api.fetch(this);
 
                     // Если вместо ссылки получили ошибку
                     if (link instanceof Error || !link) {
@@ -243,10 +243,9 @@ export class Track {
 
             // Если не удается найти ссылку через n попыток
             if (!this.link) return resolve(Error(`Fail update link resource`));
-            else {
-                // Сохраняем аудио кеш
-                if (download && db.cache.audio) db.cache.audio.set(this);
-            }
+
+            // Сохраняем кеш аудио
+            else if (download && db.cache.audio) db.cache.audio.set(this);
 
             // Отдаем ссылку на трек
             return resolve(this.link);
@@ -306,6 +305,7 @@ export class Track {
  * @author SNIPPIK
  * @description Параметры времени трека
  * @interface TrackDuration
+ * @private
  */
 interface TrackDuration {
     /**

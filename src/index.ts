@@ -161,6 +161,8 @@ export class Database {
 /**
  * @author SNIPPIK
  * @description Экспортируем базу данных глобально
+ * @class Database
+ * @public
  */
 export var db: Database = null;
 
@@ -172,6 +174,7 @@ export var db: Database = null;
     // Если при запуске многопоточных элементов произойдет случайный запуск осколка
     if (!isMainThread) throw new Error("Not implemented.");
 
+    // Проверяем на наличие аргумента запуска менеджера осколков
     switch (process["argv"].includes("--ShardManager")) {
         /**
          * @author SNIPPIK

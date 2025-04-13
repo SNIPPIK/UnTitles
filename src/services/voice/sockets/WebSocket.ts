@@ -6,6 +6,7 @@ import {TypedEmitter} from "@utils";
 /**
  * @author SNIPPIK
  * @description Не поддерживаемые статус коды, они не обрабатываются в этом коде никак
+ * @private
  */
 const not_support_status_code: (VoiceOpcodes | number)[] = [
     VoiceOpcodes.HeartbeatAck,
@@ -174,6 +175,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
  * @author SNIPPIK
  * @description Параметры для общения с подключением к WebSocket
  * @interface WebSocketKeepAlive
+ * @private
  */
 interface WebSocketKeepAlive {
     /**
