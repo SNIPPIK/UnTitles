@@ -1,3 +1,4 @@
+import {isMainThread} from "node:worker_threads";
 import {ConnectionData} from "@service/voice";
 import {Buffer} from "node:buffer";
 import crypto from "node:crypto";
@@ -18,6 +19,13 @@ export const TIMESTAMP_INC = (48_000 / 100) * 2;
 
 /**
  * @author SNIPPIK
+ * @description Поддерживаемые типы шифрования
+ * @private
+ */
+const EncryptionModes: EncryptionModes[] = [];
+
+/**
+ * @author SNIPPIK
  * @description Выдаваемы методы для использования sodium
  * @class Encryption
  * @public
@@ -28,7 +36,7 @@ export class Encryption {
      * @public
      */
     public static get mode(): EncryptionModes {
-        return "aead_aes256_gcm_rtpsize";
+        return EncryptionModes[0];
     };
 
     /**
@@ -36,7 +44,8 @@ export class Encryption {
      * @public
      */
     public static get nonce() {
-        return Buffer.alloc(12);
+        if (this.mode === "aead_aes256_gcm_rtpsize") return Buffer.alloc(12);
+        return Buffer.alloc(24);
     };
 
     /**
@@ -47,7 +56,7 @@ export class Encryption {
      */
     public static packet = (packet: Buffer, connectionData: ConnectionData) => {
         const { sequence, timestamp, ssrc } = connectionData;
-        const rtp_packet = this.nonce;
+        const rtp_packet = Buffer.alloc(12);
         // Version + Flags, Payload Type
         [rtp_packet[0], rtp_packet[1]] = [0x80, 0x78];
 
@@ -61,7 +70,7 @@ export class Encryption {
         rtp_packet.writeUIntBE(ssrc, 8, 4);
 
         // Зашифрованный звук
-        rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
+        rtp_packet.copy(Buffer.alloc(24), 0, 0, 12);
 
         connectionData.nonce++;
 
@@ -85,10 +94,16 @@ export class Encryption {
         const nonceBuffer = connectionData.nonceBuffer.subarray(0, 4);
 
         // Шифровка aead_aes256_gcm (support rtpsize)
-        if (connectionData.encryptionMode.startsWith("aead_aes256_gcm")) {
+        if (connectionData.encryptionMode === "aead_aes256_gcm_rtpsize") {
             const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer);
             cipher.setAAD(rtp_packet);
             return Buffer.concat([rtp_packet, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
+        }
+
+        // Шифровка через библиотеку
+        else if (connectionData.encryptionMode === "aead_xchacha20_poly1305_rtpsize") {
+            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, rtp_packet, connectionData.nonceBuffer, connectionData.secretKey);
+            return Buffer.concat([rtp_packet, cryptoPacket, nonceBuffer]);
         }
 
         // Если нет больше вариантов шифровки
@@ -105,6 +120,103 @@ export class Encryption {
 
 /**
  * @author SNIPPIK
+ * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
+ * @private
+ */
+let loaded_lib: Methods.current = {};
+
+/**
+ * @author SNIPPIK
+ * @description Делаем проверку на наличие поддержки sodium
+ */
+(async () => {
+    if (!isMainThread) return;
+
+    // Если поддерживается нативная расшифровка
+    if (crypto.getCiphers().includes("aes-256-gcm")) {
+        EncryptionModes.push("aead_aes256_gcm_rtpsize");
+        return;
+    }
+
+    // Если нет нативной поддержки шифрования
+    else {
+        /**
+         * @author SNIPPIK
+         * @description Поддерживаемые библиотеки
+         */
+        const support_libs: Methods.supported = {
+            sodium: (sodium) => ({
+                crypto_aead_xchacha20poly1305_ietf_encrypt:(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike) => {
+                    return sodium.api.crypto_aead_xchacha20poly1305_ietf_encrypt(plaintext, additionalData, null, nonce, key);
+                }
+            }),
+            "sodium-native": (lib) => ({
+                crypto_aead_xchacha20poly1305_ietf_encrypt:(plaintext, additionalData, nonce, key) => {
+                    const cipherText = Buffer.alloc(plaintext.length + lib.crypto_aead_xchacha20poly1305_ietf_ABYTES);
+                    lib.crypto_aead_xchacha20poly1305_ietf_encrypt(cipherText, plaintext, additionalData, null, nonce, key);
+                    return cipherText;
+                }
+            }),
+            '@stablelib/xchacha20poly1305': (stablelib) => ({
+                crypto_aead_xchacha20poly1305_ietf_encrypt(cipherText, additionalData, nonce, key) {
+                    const crypto = new stablelib.XChaCha20Poly1305(key);
+                    return crypto.seal(nonce, cipherText, additionalData);
+                },
+            }),
+            '@noble/ciphers/chacha': (noble) => ({
+                crypto_aead_xchacha20poly1305_ietf_encrypt(plaintext, additionalData, nonce, key) {
+                    const chacha = noble.xchacha20poly1305(key, nonce, additionalData);
+                    return chacha.encrypt(plaintext);
+                },
+            })
+        }, names = Object.keys(support_libs);
+
+        // Добавляем тип шифрования
+        EncryptionModes.push("aead_xchacha20_poly1305_rtpsize");
+
+        // Делаем проверку всех доступных библиотек
+        for (const name of names) {
+            try {
+                const library = await import(name);
+                if (library?.ready) await library.ready;
+                Object.assign(loaded_lib, support_libs[name](library));
+                delete require.cache[require.resolve(name)];
+                return;
+            } catch {}
+        }
+
+        // Если нет установленных библиотек
+        throw Error(`[Critical]: No encryption package is installed. Set one to choose from.\n - ${names.join("\n - ")}`);
+    }
+})();
+
+/**
+ * @author SNIPPIK
+ * @description Поддерживаемые методы шифровки пакетов
+ * @namespace Methods
+ * @private
+ */
+namespace Methods {
+    /**
+     * @description Поддерживаемый запрос к библиотеке
+     * @type supported
+     */
+    export type supported = {
+        [name: string]: (lib: any) => current
+    }
+
+    /**
+     * @description Новый тип шифровки пакетов
+     * @interface current
+     */
+    export interface current {
+        crypto_aead_xchacha20poly1305_ietf_encrypt?(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike | Uint8Array): Buffer;
+    }
+}
+
+/**
+ * @author SNIPPIK
  * @description Все актуальные типы шифровки discord
+ * @private
  */
 type EncryptionModes = "aead_aes256_gcm_rtpsize"| "aead_xchacha20_poly1305_rtpsize";
