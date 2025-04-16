@@ -202,47 +202,70 @@ export class Track {
         const download = this.api.name !== "DISCORD";
 
         return new Promise(async (resolve) => {
-            // Смотрим если ли кеш аудио
-            if (download && db.cache.audio) {
-                const status = db.cache.audio.status(this);
-
-                // Если есть кеш аудио, то выдаем его
-                if (status.status === "ended") return resolve(status.path);
+            // Если включено кеширование
+            if (db.cache.audio) {
+                // Если можно кешировать трек
+                if (!download) {
+                    const status = db.cache.audio.status(this);
+                    // Если есть кеш аудио, то выдаем его
+                    if (status.status === "ended") return resolve(status.path);
+                }
             }
 
-            // Проверяем ссылку на работоспособность, если 3 раза будет неудача ссылка будет удалена
-            for (let refresh = 0; refresh < 3; refresh++) {
+            // Запускаем цикл с проверкой ссылки на исходный файл
+            for (let i = 0; i < 3; i++) {
+                // Если есть ссылка на исходный файл
+                if (this.link) {
+                    // Проверяем ссылку на актуальность
+                    if (this.link.startsWith("http")) {
+                        try {
+                            const status = await new httpsClient(this.link, {method: "HEAD"}).status;
 
-                // Проверяем ссылку на актуальность
-                if (this.link && this.link.startsWith("http")) {
-                    try {
-                        const status = await new httpsClient(this.link, {method: "HEAD"}).status;
+                            if (status) break;
+                            else this.link = null;
+                        } catch (err) { // Если произошла ошибка при проверке статуса
+                            this.link = null;
 
-                        if (status) break;
-                        else this.link = null;
-                    } catch (err) {
-                        // Если произошла ошибка при проверке статуса
-                        console.log(err);
-                        this.link = null;
+                            if (i < 3) continue;
+
+                            console.log("[Check] Please report your issue to github", err);
+                            return resolve(Error(`${err}`));
+                        }
                     }
+
+                    console.log("[Type] Please report your issue to github", this.link);
+                    return resolve(Error(`This link type is not supported`));
                 }
 
-                // Если нет ссылки, то ищем замену
-                if (!this.link) {
-                    const link = await db.api.fetch(this);
+                // Если нет ссылки на исходный файл
+                else {
+                    try {
+                        const link = await db.api.fetch(this);
 
-                    // Если вместо ссылки получили ошибку
-                    if (link instanceof Error || !link) {
-                        if (refresh < 3) continue;
-                        return resolve(Error("Fail find other track, requested a max 3!"));
+                        // Если вместо ссылки получили ошибку
+                        if (link instanceof Error) {
+                            console.log("[Error] Please report your issue to github", link);
+                            return resolve(Error(`${link}`));
+                        }
+
+                        // Если платформа не хочет давать данные трека
+                        else if (!link) {
+                            console.log("[Rest] Please report your issue to github", link);
+                            return resolve(Error(`The platform does not provide a link`));
+                        }
+
+                        this.link = link;
+                    } catch (err) {
+                        if (i < 3) continue;
+
+                        console.log("[Update] Please report your issue to github", err);
+                        return resolve(Error(`${err}`));
                     }
-
-                    this.link = link;
                 }
             }
 
             // Если не удается найти ссылку через n попыток
-            if (!this.link) return resolve(Error(`Fail update link resource`));
+            if (!this.link) return resolve(Error(`This link track is not available...`));
 
             // Сохраняем кеш аудио
             else if (download && db.cache.audio) db.cache.audio.set(this);

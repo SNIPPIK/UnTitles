@@ -52,6 +52,8 @@ export class Queues extends Collection<Queue> {
         // Если у плеера стоит пауза
         if (player.status === "player/pause") player.resume();
 
+        player.voice.connection.configureSocket;
+
         // Запускаем функцию воспроизведения треков
         setImmediate(player.play);
     };
