@@ -130,6 +130,12 @@ export class Track {
         }
         // Если что-то другое
         else {
+            // Если время указано в формате 00:00
+            if (`${time.total}`.match(/:/)) {
+                this._information._duration = { split: time.total, total: (time.total as string).duration() };
+                return;
+            }
+
             const total = parseInt(time.total);
 
             // Время трека
