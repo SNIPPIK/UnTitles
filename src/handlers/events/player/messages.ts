@@ -83,7 +83,7 @@ class message_push extends Assign<Event<"message/push">> {
                                 name: locale._(message.locale, "player.queue.push"),
                                 value: obj instanceof Track ?
                                     // Если один трек в списке
-                                    `\`\`\`[${obj.time.split}] - ${obj.name}}\`\`\`` :
+                                    `\`\`\`[${obj.time.split}] - ${obj.name}\`\`\`` :
 
                                     // Если добавляется список треков (альбом или плейлист)
                                     `${obj.items.slice(0, 5).map((track, index) => {

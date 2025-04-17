@@ -56,7 +56,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                         const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/gi).pop();
                         let artist = null;
 
-                        return new Promise<Track.playlist | Error>(async (resolve) => {
+                        return new Promise<Track.list | Error>(async (resolve) => {
                             try {
                             // Если ID плейлиста не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err("api.request.id.playlist"));
@@ -131,11 +131,16 @@ class RestYouTubeAPI extends Assign<RestAPI> {
 
                                 // Если указано получение аудио
                                 if (options.audio) {
+                                    const data = api["streamingData"];
+
+                                    // Если нет форматов
+                                    if (!data["formats"]) return resolve(locale.err("api.request.audio.fail", [RestYouTubeAPI._platform.name]));
+
                                     // Расшифровываем аудио формат
-                                    const format = await RestYouTubeAPI.extractFormat(url, api["streamingData"], api.html);
+                                    const format = await RestYouTubeAPI.extractFormat(url, data, api.html);
 
                                     // Если есть расшифровка ссылки видео
-                                    if (format) api["videoDetails"]["format"] = {url: format["url"]};
+                                    if (format) api["videoDetails"]["format"] = { url: format["url"] };
                                 }
 
                                 // Класс трека
@@ -217,8 +222,8 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                 // Проверяем на наличие видео
                                 if (vanilla_videos?.length === 0 || !vanilla_videos) return resolve(locale.err("api.request.fail"));
 
-                                let filtered_ = vanilla_videos?.filter((video: any) => video && video?.["videoRenderer"] && video?.["videoRenderer"]?.["videoId"])?.splice(0, limit);
-                                let videos: Track[] = filtered_.map(({ videoRenderer }: any) => RestYouTubeAPI.track(videoRenderer));
+                                let filtered_ = vanilla_videos?.filter((video: json) => video && video?.["videoRenderer"] && video?.["videoRenderer"]?.["videoId"])?.splice(0, limit);
+                                let videos: Track[] = filtered_.map(({ videoRenderer }: json) => RestYouTubeAPI.track(videoRenderer));
 
                                 return resolve(videos);
                             } catch (e) {
@@ -284,20 +289,10 @@ class RestYouTubeAPI extends Assign<RestAPI> {
      */
     protected static extractFormat = (url: string, data?: json, html?: string) => {
         return new Promise((resolve) => {
-            // Если нет форматов
-            if (!data["formats"]) return resolve(null);
-
-            // Если расшифровка не требуется
-            else if (data["formats"][0]?.url) return data["formats"][0];
-
             // Создаем 2 поток
-            let worker: Worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {
+            const worker: Worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {
                 execArgv: ["-r", "tsconfig-paths/register"],
-                workerData: null,
-                resourceLimits: {
-                    maxOldGenerationSizeMb: 20,
-                    maxYoungGenerationSizeMb: 0
-                }
+                workerData: null
             });
 
             // Отправляем сообщение во 2 поток
@@ -309,7 +304,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                 setImmediate(() => {
                     setTimeout(async () => {
                         await worker.terminate();
-                        worker.ref()
+                        worker.ref();
                     }, 2e3)
                 });
 
@@ -322,7 +317,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                 setImmediate(() => {
                     setTimeout(async () => {
                         await worker.terminate();
-                        worker.ref()
+                        worker.ref();
                     }, 2e3)
                 });
 
@@ -422,7 +417,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                 url: `https://youtu.be/${track["videoId"]}`,
                 title: track.title,
                 time: {
-                    total: track["lengthSeconds"] ?? 0
+                    total: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0
                 },
                 image: {
                     url: `https://i.ytimg.com/vi/${track["videoId"]}/maxresdefault.jpg`

@@ -117,7 +117,7 @@ class RestSpotifyAPI extends Assign<RestAPI> {
                     execute: (url, {limit}) => {
                         const ID = /album\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("album\/")?.pop();
 
-                        return new Promise<Track.playlist | Error>(async (resolve) => {
+                        return new Promise<Track.list | Error>(async (resolve) => {
                             // Если ID альбома не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err( "api.request.id.album"));
 
@@ -148,7 +148,7 @@ class RestSpotifyAPI extends Assign<RestAPI> {
                     execute: (url, {limit}) => {
                         const ID = /playlist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("playlist\/")?.pop();
 
-                        return new Promise<Track.playlist | Error>(async (resolve) => {
+                        return new Promise<Track.list | Error>(async (resolve) => {
                             // Если ID плейлиста не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err( "api.request.id.playlist"));
 

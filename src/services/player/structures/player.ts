@@ -221,7 +221,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Создаем класс для управления потоком
-                const stream = new AudioResource(path, {seek, filters: this._filters.compress(track.time.total)});
+                const stream = new AudioResource(path, {seek, filters: this._filters.compress(track.api.name !== "DISCORD" ? track.time.total : null)});
 
                 // Если стрим можно прочитать
                 if (stream.readable) {
@@ -240,7 +240,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Если поток нельзя читать, возможно что он еще грузится
-                let timeout = setTimeout(() => {
+                const timeout = setTimeout(() => {
                     this.emit("player/error", this, "Timeout the stream has been exceeded!", {
                         skip: true,
                         position: position ?? this.tracks.indexOf(track)
@@ -273,7 +273,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                         this.audio.current = stream;
                         this.status = "player/playing";
-                    })
+                    });
             })
 
             // Если возникла ошибка

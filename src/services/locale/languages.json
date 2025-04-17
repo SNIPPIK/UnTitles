@@ -385,6 +385,11 @@
     "en-US": "[API error]: Failed to get author ID!"
   },
 
+  "api.request.audio.fail": {
+    "ru": "[Ошибка API]: {ARGUMENT} не предоставляет аудио ссылку!",
+    "en-US": "[API error]: {ARGUMENT} don't give audio link!"
+  },
+
 
 
 

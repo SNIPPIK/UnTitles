@@ -336,7 +336,7 @@ export namespace RestAPIs {
         filter: RegExp;
 
         // Функция получения данных
-        execute: (url: string, options: {audio: boolean}) => Promise<Track | Error>
+        execute: (url: string, options: {audio: boolean}) => Promise<Track | Error>;
     }
 
     /**
@@ -351,7 +351,7 @@ export namespace RestAPIs {
         filter: RegExp;
 
         // Функция получения данных
-        execute: (url: string, options: {limit: number}) => Promise<Track.playlist | Error>
+        execute: (url: string, options: {limit: number}) => Promise<Track.list | Error>;
     }
 
     /**
@@ -366,7 +366,7 @@ export namespace RestAPIs {
         filter: RegExp;
 
         // Функция получения данных
-        execute: (url: string, options: {limit: number}) => Promise<Track.playlist | Error>
+        execute: (url: string, options: {limit: number}) => Promise<Track.list | Error>;
     }
 
     /**
@@ -375,13 +375,13 @@ export namespace RestAPIs {
      */
     export interface author {
         // Название типа запроса
-        name: "author"
+        name: "author";
 
         // Фильтр типа запроса
         filter: RegExp;
 
         // Функция получения данных
-        execute: (url: string, options: {limit: number}) => Promise<Track[] | Error>
+        execute: (url: string, options: {limit: number}) => Promise<Track[] | Error>;
     }
 
     /**
@@ -390,9 +390,9 @@ export namespace RestAPIs {
      */
     export interface search {
         // Название типа запроса
-        name: "search"
+        name: "search";
 
         // Функция получения данных
-        execute: (text: string, options: {limit: number}) => Promise<Track[] | Error>
+        execute: (text: string, options: {limit: number}) => Promise<Track[] | Error>;
     }
 }

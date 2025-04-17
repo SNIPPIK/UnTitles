@@ -236,7 +236,6 @@ export class Track {
                             this.link = null;
 
                             if (i < 3) continue;
-
                             console.log("[Check] Please report your issue to github", err);
                             return resolve(Error(`${err}`));
                         }
@@ -266,7 +265,6 @@ export class Track {
                     break;
                 } catch (err) {
                     if (i < 3) continue;
-
                     console.log("[Update] Please report your issue to github", err);
                     return resolve(Error(`${err}`));
                 }
@@ -422,9 +420,9 @@ export namespace Track {
 
     /**
      * @description Пример получаемого плейлиста
-     * @interface playlist
+     * @interface list
      */
-    export interface playlist {
+    export interface list {
         /**
          * @description Ссылка на плейлист
          * @readonly

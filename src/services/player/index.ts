@@ -94,7 +94,7 @@ export class Queues extends Collection<Queue> {
      * @param item    - Добавляемый объект
      * @public
      */
-    public create = (message: Interact, item: Track.playlist | Track) => {
+    public create = (message: Interact, item: Track.list | Track) => {
         let queue = this.get(message.guild.id);
 
         // Проверяем есть ли очередь в списке, если нет то создаем
@@ -128,7 +128,7 @@ export class Queues extends Collection<Queue> {
      * @param message - Сообщение пользователя
      * @param item    - Добавляемый объект
      */
-    private pushItems = (queue: Queue, message: Interact, item: Track.playlist | Track) => {
+    private pushItems = (queue: Queue, message: Interact, item: Track.list | Track) => {
         // Отправляем сообщение о том что было добавлено
         if ("items" in item || queue.tracks.total > 0) {
             db.events.emitter.emit("message/push", message, item);
@@ -264,7 +264,7 @@ export interface QueuesEvents {
      * @param message - Сообщение с сервера
      * @param items   - Трек или плейлист, альбом
      */
-    readonly "message/push": (message: Interact, items: Track | Track.playlist) => void;
+    readonly "message/push": (message: Interact, items: Track | Track.list) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять сообщение о текущем треке

@@ -115,7 +115,7 @@ class RestYandexAPI extends Assign<RestAPI> {
                     execute: (url, {limit}) => {
                         const ID = /[0-9]+/gi.exec(url)?.at(0)?.split("album")?.at(0);
 
-                        return new Promise<Track.playlist | Error>(async (resolve) => {
+                        return new Promise<Track.list | Error>(async (resolve) => {
                             // Если ID альбома не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err( "api.request.id.album"));
 
@@ -149,7 +149,7 @@ class RestYandexAPI extends Assign<RestAPI> {
                     execute: (url, {limit}) => {
                         const ID = /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/gi.exec(url);
 
-                        return new Promise<Track.playlist | Error>(async (resolve) => {
+                        return new Promise<Track.list | Error>(async (resolve) => {
                             if (!ID[1]) return resolve(locale.err("api.request.id.author"));
                             else if (!ID[2]) return resolve(locale.err("api.request.id.playlist"));
 
