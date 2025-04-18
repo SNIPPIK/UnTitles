@@ -229,7 +229,6 @@ export class Track {
                             continue;
                         } catch (err) { // Если произошла ошибка при проверке статуса
                             this.link = null;
-
                             if (i < 3) continue;
                             return resolve(Error(`${err}`));
                         }
@@ -249,7 +248,6 @@ export class Track {
                     else if (!link) return resolve(Error(`The platform does not provide a link`));
 
                     this.link = link;
-                    break;
                 } catch (err) {
                     if (i < 3) continue;
                     return resolve(Error(`${err}`));

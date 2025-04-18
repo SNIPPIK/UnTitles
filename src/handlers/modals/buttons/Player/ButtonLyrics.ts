@@ -29,7 +29,7 @@ class ButtonLyrics extends Assign<Button> {
                                 description: `\`\`\`css\n${item !== undefined ? item : locale._(msg.locale, "player.button.lyrics.fail")}\n\`\`\``,
                                 timestamp: new Date()
                             }
-                        ]).setTime(20e3).send = msg;
+                        ]).setTime(60e3).send = msg;
                     })
 
                     // При ошибке, чтобы процесс нельзя было сломать
@@ -49,7 +49,7 @@ class ButtonLyrics extends Assign<Button> {
                                 description: `\`\`\`css\n${locale._(msg.locale, "player.button.lyrics.fail")}\n\`\`\``,
                                 timestamp: new Date()
                             }
-                        ]).setTime(20e3).send = msg;
+                        ]).setTime(10e3).send = msg;
                     })
             }
         });
