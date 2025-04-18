@@ -131,7 +131,7 @@ export class CacheUtility {
         if (fs.existsSync(`${this.dirname}/Data/${ID}.json`)) {
             try {
                 // Если трек кеширован в файл
-                const json = JSON.parse(fs.readFileSync(`${this.dirname}/Data/${ID}.json`, 'utf8'));
+                const json = JSON.parse(fs.readFileSync(`${this.dirname}/Data/${ID}.json`, "utf8"));
 
                 // Если трек был найден среди файлов
                 if (json) return new Track(json.track, json.api);

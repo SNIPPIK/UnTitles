@@ -8,7 +8,7 @@ import {db} from "@app";
  * @author SNIPPIK
  * @description Выполнение запроса пользователя через внутреннее API
  * @class rest_request
- * @event api/request
+ * @event rest/request
  * @public
  */
 class rest_request extends Assign<Event<"rest/request">> {
@@ -42,12 +42,11 @@ class rest_request extends Assign<Event<"rest/request">> {
                 }, 15e3);
 
                 // Получаем данные в системе rest/API
-                try {
-                    const rest = await api.execute(url as string, { limit: db.api.limits[api.name], audio: true });
-                    clearTimeout(timeout);
+                api.execute(url as string, {limit: db.api.limits[api.name], audio: true}).then(async (rest) => {
+                    if (timeout) clearTimeout(timeout);
 
                     // Если нет данных или была получена ошибка
-                    if (rest instanceof Error) {
+                    else if (rest instanceof Error) {
                         db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.error", [rest]));
                         return;
                     }
@@ -56,13 +55,12 @@ class rest_request extends Assign<Event<"rest/request">> {
                     else if (rest instanceof Array) {
                         // Если не нашлись треки
                         if (rest?.length === 0 || !rest) {
-                            message.FBuilder = { description: locale._(message.locale, "player.search.fail"), color: Colors.DarkRed };
+                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
                             return;
                         }
 
-                        // Добавляем данные в очередь
-                        db.queues.create(message, rest[0]);
-                        return;
+                        // Меняем данные
+                        rest = rest[0];
                     }
 
                     // Если надо добавить трек
@@ -76,11 +74,63 @@ class rest_request extends Assign<Event<"rest/request">> {
 
                     // Добавляем данные в очередь
                     db.queues.create(message, rest);
-                } catch (err) {
-                    clearTimeout(timeout);
+                }).catch(async (err) => {
+                    if (timeout) clearTimeout(timeout);
                     console.error(err);
                     db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.name}**\n**❯** **${err}**`);
-                }
+                });
+            }
+        });
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Выполнение запроса пользователя через внутреннее API
+ * @class rest/request-complete
+ * @event rest/request-complete
+ * @public
+ */
+class rest_request_complete extends Assign<Event<"rest/request-complete">> {
+    public constructor() {
+        super({
+            name: "rest/request-complete",
+            type: "player",
+            once: false,
+            execute: async (platform, message, url) => {
+                // Получаем функцию запроса данных с платформы
+                const api = platform.get(url);
+
+                // Если нет поддержки такого запроса!
+                if (!api || !api.name) return;
+
+                // Получаем данные в системе rest/API
+                api.execute(url as string, {limit: db.api.limits[api.name], audio: false}).then(async (rest) => {
+                    const items: {value: string; name: string}[] = [];
+
+                    // Если получена ошибка
+                    if (rest instanceof Error || !rest) return;
+
+                    // Поиск или ссылка на автора
+                    else if (rest instanceof Array) {
+                        const tracks = rest.map((choice) => {
+                            return {
+                                value: choice.url,
+                                name: choice.name
+                            }
+                        });
+
+                        items.push(...tracks);
+                    }
+
+                    // Ссылка на плейлист или трек
+                    else items.push({ name: rest.title ?? rest.name, value: rest.url });
+
+                    return message.respond(items);
+                }).catch(async (err) => {
+                    console.error(err);
+                    db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.name}**\n**❯** **${err}**`);
+                });
             }
         });
     };
@@ -116,4 +166,4 @@ class rest_error extends Assign<Event<"rest/error">> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({rest_request, rest_error});
+export default Object.values({rest_request, rest_error, rest_request_complete});

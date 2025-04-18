@@ -118,7 +118,7 @@ export class RestObject extends handler<RestAPI> {
      */
     public request = (argument: RestAPI["name"] | string) => {
         // Ищем платформу
-        const api = this.platforms.supported.find((item): boolean => {
+        const api = this.platforms.supported.find((item) => {
             // Если была указана ссылка
             if (argument.startsWith("http")) return !!item.filter.exec(argument) || !!argument.match(item.filter) || item.name === "DISCORD";
 
@@ -236,7 +236,7 @@ export class RestRequest {
      * @public
      */
     public get<T extends (RestAPIs.track | RestAPIs.playlist | RestAPIs.album | RestAPIs.author | RestAPIs.search)["name"]>(type: T | string) {
-        return this._api.requests.find((item)=> {
+        return this._api.requests.find((item) => {
             // Если указана ссылка
             if (type.startsWith("http")) {
                 if (item.name === "search") return null;

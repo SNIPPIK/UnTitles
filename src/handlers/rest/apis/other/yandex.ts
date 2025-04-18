@@ -87,6 +87,12 @@ class RestYandexAPI extends Assign<RestAPI> {
 
                                 // Если указано получение аудио
                                 if (options.audio) {
+                                    // Если включена утилита кеширования
+                                    if (db.cache.audio) {
+                                        // Если есть кеш аудио
+                                        if (db.cache.audio.status(track).status === "ended") return resolve(track);
+                                    }
+
                                     const link = await RestYandexAPI.getAudio(ID);
 
                                     // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл

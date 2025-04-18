@@ -50,7 +50,7 @@ abstract class Request {
             /**
              * @description Событие если подключение было сорвано
              */
-            request.once("close", async () => {
+            request.once("close", () => {
                 this.data = null;
                 request.removeAllListeners();
                 request.destroy();
@@ -113,7 +113,7 @@ export class httpsClient extends Request {
     public get toString(): Promise<string | Error> {
         let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage, data = "";
 
-        return new Promise<string | Error>(async (resolve) => {
+        return new Promise<string | Error>((resolve) => {
             this.request.then((res) => {
                 if (res instanceof Error) return resolve(res);
 
@@ -140,7 +140,7 @@ export class httpsClient extends Request {
      * @public
      */
     public get toJson(): Promise<json | Error> {
-        return this.toString.then(async (body) => {
+        return this.toString.then((body) => {
             if (body instanceof Error) return body;
 
             try {
@@ -156,16 +156,16 @@ export class httpsClient extends Request {
      * @public
      */
     public get toXML(): Promise<Error | string[]> {
-        return new Promise(async (resolve) => {
-            const body = await this.toString;
+        return new Promise((resolve) => {
+            this.toString.then((body) => {
+                // Если была получена ошибка
+                if (body instanceof Error) return resolve(Error("Not found XML data!"));
 
-            // Если была получена ошибка
-            if (body instanceof Error) return resolve(Error("Not found XML data!"));
-
-            // Ищем данные в XML странице для дальнейшего вывода
-            const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
-            const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
-            return resolve(filtered.filter((text) => text.trim() !== ""));
+                // Ищем данные в XML странице для дальнейшего вывода
+                const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
+                const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
+                return resolve(filtered.filter((text) => text.trim() !== ""));
+            });
         });
     };
 
@@ -174,7 +174,7 @@ export class httpsClient extends Request {
      * @public
      */
     public get status(): Promise<boolean> {
-        return this.request.then(async (resource) => {
+        return this.request.then((resource) => {
             if (resource instanceof Error) return false;
             return resource?.statusCode && resource.statusCode >= 200 && resource.statusCode <= 400;
         });

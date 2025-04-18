@@ -83,8 +83,14 @@ class RestVKAPI extends Assign<RestAPI> {
 
                                 const track = RestVKAPI.track(api.response.pop(), url);
 
+                                // Если включена утилита кеширования
+                                if (db.cache.audio) {
+                                    // Если есть кеш аудио
+                                    if (db.cache.audio.status(track).status === "ended") return resolve(track);
+                                }
+
                                 // Если нет ссылки на трек
-                                if (!track.link) return resolve(locale.err( "api.request.fail"));
+                                else if (!track.link) return resolve(locale.err( "api.request.fail"));
 
                                 // Сохраняем кеш в системе
                                 db.cache.set(track);

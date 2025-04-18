@@ -57,14 +57,14 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
             const path = options.events.path ? options.input[options.events.path] : options.input;
 
             // Запускаем прослушивание события
-            path["once"](event, () => {
+            path["once"](event, async () => {
                 if (event === "error") this.emit("error", new Error("AudioResource get error for create stream"));
                 options.events.destroy_callback(options.input);
             });
         }
 
         // Разовая функция для удаления потока
-        this.once("close", () => {
+        this.once("close", async () => {
             options.events.destroy_callback(options.input);
         });
 

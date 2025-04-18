@@ -95,6 +95,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
                 }
 
                 this._alive.updated = Date.now();
+                this._alive.asked++;
 
                 // Отправляем пакет
                 this.packet = {
@@ -104,7 +105,6 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
                         seq_ack: this._alive.asked
                     }
                 };
-                this._alive.asked++;
             }, ms);
         }
     };
@@ -163,8 +163,8 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
 
         try {
             this.keepAlive = -1;
-            this.socket.close(code);
             this.socket.terminate();
+            this.socket.close(code);
         } catch (error) {
             this.emit("error", error as Error);
         }

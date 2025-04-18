@@ -155,7 +155,7 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
         this.removeAllListeners();
 
         try {
-            if (this.socket) this.socket?.close();
+            this.socket.close();
         } catch (err) {
             if (`${err}`.match("Not running")) return;
         }

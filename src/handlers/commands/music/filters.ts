@@ -125,7 +125,7 @@ class AudioFiltersCommand extends Assign<Command> {
                         }
 
                         // Если можно выключить фильтр или фильтры сейчас
-                        if (player.audio.current.duration < player.tracks.track.time.total + db.queues.options.optimization) {
+                        if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
                             player.play(player.audio.current?.duration);
 
                             // Сообщаем о выключении фильтров
@@ -190,7 +190,7 @@ class AudioFiltersCommand extends Assign<Command> {
                         player.filters.enabled.push(Filter);
 
                         // Если можно включить фильтр или фильтры сейчас
-                        if (player.audio.current.duration < player.tracks.track.time.total + db.queues.options.optimization) {
+                        if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
                             player.play(seek);
 
                             // Сообщаем о включении фильтров
@@ -227,7 +227,7 @@ class AudioFiltersCommand extends Assign<Command> {
                         player.filters.enabled.splice(index, 1);
 
                         // Если можно выключить фильтр или фильтры сейчас
-                        if (player.audio.current.duration < player.tracks.track.time.total + db.queues.options.optimization) {
+                        if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
                             player.play(seek);
 
                             // Сообщаем о включении фильтров

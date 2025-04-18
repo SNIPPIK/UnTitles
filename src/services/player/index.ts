@@ -92,7 +92,7 @@ export class Queues extends Collection<Queue> {
      * @description Ультимативная функция, позволяет как добавлять треки так и создавать очередь или переподключить очередь к системе
      * @param message - Сообщение пользователя
      * @param item    - Добавляемый объект
-     * @public
+     * @private
      */
     public create = (message: Interact, item: Track.list | Track) => {
         let queue = this.get(message.guild.id);
@@ -118,17 +118,6 @@ export class Queues extends Collection<Queue> {
             }
         }
 
-        // Добавляем данные в очередь
-        this.pushItems(queue, message, item);
-    };
-
-    /**
-     * @description Добавление данных в очередь
-     * @param queue   - Очередь сервера для проигрывания музыки
-     * @param message - Сообщение пользователя
-     * @param item    - Добавляемый объект
-     */
-    private pushItems = (queue: Queue, message: Interact, item: Track.list | Track) => {
         // Отправляем сообщение о том что было добавлено
         if ("items" in item || queue.tracks.total > 0) {
             db.events.emitter.emit("message/push", message, item);
@@ -281,7 +270,7 @@ export interface QueuesEvents {
     readonly "message/error": (queue: Queue, error?: string | Error) => void;
 
     /**
-     * @description Событие при котором коллекция будет искать трек в системе API
+     * @description Событие при котором будет произведен поиск данных через систему API
      * @param api      - Класс платформы запросов
      * @param message  - Сообщение с сервера
      * @param url      - Ссылка на допустимый объект или текст для поиска
@@ -289,7 +278,15 @@ export interface QueuesEvents {
     readonly "rest/request": (api: RestRequest, message: Interact, url: string | Attachment) => void;
 
     /**
-     * @description Событие при котором коллекция будет отправлять ошибки в системе API
+     * @description  Событие при котором будет произведен поиск данных через систему API
+     * @param api      - Класс платформы запросов
+     * @param message  - Сообщение с сервера
+     * @param url      - Ссылка на допустимый объект или текст для поиска
+     */
+    readonly "rest/request-complete": (api: RestRequest, message: Interact, url: string) => void;
+
+    /**
+     * @description Событие при котором будут отправляться ошибки из системы API
      * @param message    - Сообщение с сервера
      * @param error      - Ошибка в формате string
      */

@@ -165,7 +165,7 @@ class message_playing extends Assign<Event<"message/playing">> {
                 }
 
                 // Обновляем сообщение
-                message.edit({ embeds: builder._embeds, components: queue.components }).catch(() => null);
+                message.edit({ embeds: builder._embeds, components: queue.components }).catch(() => {});
             }
         });
     };

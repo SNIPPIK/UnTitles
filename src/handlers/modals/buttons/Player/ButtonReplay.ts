@@ -11,7 +11,7 @@ class ButtonReplay extends Assign<Button> {
                 const queue = msg.queue;
 
                 // Запускаем проигрывание текущего трека
-                queue.player.play(1, queue.tracks.position);
+                queue.player.play(0, queue.tracks.position);
 
                 // Сообщаем о том что музыка начата с начала
                 msg.FBuilder = {

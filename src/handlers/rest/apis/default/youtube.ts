@@ -129,8 +129,17 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                 /// Если при получении данных возникла ошибка
                                 if (api instanceof Error) return resolve(api);
 
+                                // Класс трека
+                                const track = RestYouTubeAPI.track(api["videoDetails"]);
+
                                 // Если указано получение аудио
                                 if (options.audio) {
+                                    // Если включена утилита кеширования
+                                    if (db.cache.audio) {
+                                        // Если есть кеш аудио
+                                        if (db.cache.audio.status(track).status === "ended") return resolve(track);
+                                    }
+
                                     const data = api["streamingData"];
 
                                     // Если нет форматов
@@ -140,14 +149,11 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                     const format = await RestYouTubeAPI.extractFormat(url, data, api.html);
 
                                     // Если есть расшифровка ссылки видео
-                                    if (format) api["videoDetails"]["format"] = { url: format["url"] };
+                                    if (format) track.link = format["url"];
                                 }
 
-                                // Класс трека
-                                const track = RestYouTubeAPI.track(api["videoDetails"]);
-
                                 // Сохраняем кеш в системе
-                                db.cache.set(track);
+                                if (!cache) db.cache.set(track);
 
                                 return resolve(track);
                             } catch (e) {
@@ -305,7 +311,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                     setTimeout(async () => {
                         await worker.terminate();
                         worker.ref();
-                    }, 2e3)
+                    }, 5e3);
                 });
 
                 return resolve(data);
@@ -318,7 +324,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                     setTimeout(async () => {
                         await worker.terminate();
                         worker.ref();
-                    }, 2e3)
+                    }, 5e3);
                 });
 
                 console.error(err);

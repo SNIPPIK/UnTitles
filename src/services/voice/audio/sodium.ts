@@ -145,9 +145,9 @@ let loaded_lib: Methods.current = {};
          * @description Поддерживаемые библиотеки
          */
         const support_libs: Methods.supported = {
-            sodium: (sodium) => ({
+            sodium: (lib) => ({
                 crypto_aead_xchacha20poly1305_ietf_encrypt:(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike) => {
-                    return sodium.api.crypto_aead_xchacha20poly1305_ietf_encrypt(plaintext, additionalData, null, nonce, key);
+                    return lib.api.crypto_aead_xchacha20poly1305_ietf_encrypt(plaintext, additionalData, null, nonce, key);
                 }
             }),
             "sodium-native": (lib) => ({
@@ -157,15 +157,15 @@ let loaded_lib: Methods.current = {};
                     return cipherText;
                 }
             }),
-            '@stablelib/xchacha20poly1305': (stablelib) => ({
+            "@stablelib/xchacha20poly1305": (lib) => ({
                 crypto_aead_xchacha20poly1305_ietf_encrypt(cipherText, additionalData, nonce, key) {
-                    const crypto = new stablelib.XChaCha20Poly1305(key);
+                    const crypto = new lib.XChaCha20Poly1305(key);
                     return crypto.seal(nonce, cipherText, additionalData);
                 },
             }),
-            '@noble/ciphers/chacha': (noble) => ({
+            "@noble/ciphers/chacha": (lib) => ({
                 crypto_aead_xchacha20poly1305_ietf_encrypt(plaintext, additionalData, nonce, key) {
-                    const chacha = noble.xchacha20poly1305(key, nonce, additionalData);
+                    const chacha = lib.xchacha20poly1305(key, nonce, additionalData);
                     return chacha.encrypt(plaintext);
                 },
             })

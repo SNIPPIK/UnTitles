@@ -205,17 +205,12 @@ export class Track {
      * @public
      */
     public get resource(): Promise<string | Error> {
-        const download = this.api.name !== "DISCORD";
-
         return new Promise(async (resolve) => {
             // Если включено кеширование
             if (db.cache.audio) {
-                // Если можно кешировать трек
-                if (!download) {
-                    const status = db.cache.audio.status(this);
-                    // Если есть кеш аудио, то выдаем его
-                    if (status.status === "ended") return resolve(status.path);
-                }
+                const status = db.cache.audio.status(this);
+                // Если есть кеш аудио, то выдаем его
+                if (status.status === "ended") return resolve(status.path);
             }
 
             // Запускаем цикл с проверкой ссылки на исходный файл
@@ -236,12 +231,10 @@ export class Track {
                             this.link = null;
 
                             if (i < 3) continue;
-                            console.log("[Check] Please report your issue to github", err);
                             return resolve(Error(`${err}`));
                         }
                     }
 
-                    console.log("[Type] Please report your issue to github", this.link);
                     return resolve(Error(`This link type is not supported`));
                 }
 
@@ -250,22 +243,15 @@ export class Track {
                     const link = await db.api.fetch(this);
 
                     // Если вместо ссылки получили ошибку
-                    if (link instanceof Error) {
-                        console.log("[Error] Please report your issue to github", link);
-                        return resolve(Error(`${link}`));
-                    }
+                    if (link instanceof Error) return resolve(Error(`${link}`));
 
                     // Если платформа не хочет давать данные трека
-                    else if (!link) {
-                        console.log("[Rest] Please report your issue to github", link);
-                        return resolve(Error(`The platform does not provide a link`));
-                    }
+                    else if (!link) return resolve(Error(`The platform does not provide a link`));
 
                     this.link = link;
                     break;
                 } catch (err) {
                     if (i < 3) continue;
-                    console.log("[Update] Please report your issue to github", err);
                     return resolve(Error(`${err}`));
                 }
             }
@@ -274,7 +260,7 @@ export class Track {
             if (!this.link) return resolve(Error(`This link track is not available...`));
 
             // Сохраняем кеш аудио
-            else if (download && db.cache.audio) db.cache.audio.set(this);
+            else if (this.api.name !== "DISCORD" && db.cache.audio) db.cache.audio.set(this);
 
             // Отдаем ссылку на трек
             return resolve(this.link);

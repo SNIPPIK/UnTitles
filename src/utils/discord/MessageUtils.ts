@@ -193,6 +193,15 @@ export class Interact {
     };
 
     /**
+     * @description Отправляем ответ
+     * @param options - Данные для отправки сообщения
+     */
+    public respond = (options: {name: string; value: string}[]): void => {
+        if ("isAutocomplete" in this._message && this._message.isAutocomplete()) this._message.respond(options).catch(() => {});
+        return null;
+    };
+
+    /**
      * @description Отправляем сообщение со соответствием параметров
      * @param options - Данные для отправки сообщения
      */

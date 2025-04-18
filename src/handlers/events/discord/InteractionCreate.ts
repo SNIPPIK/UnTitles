@@ -210,33 +210,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                         // Если с платформы нельзя получить данные
                         if (request.block || request.auth) return;
 
-                        const api = request.get(args[1].value as string);
-
-                        // Ищем треки по названию
-                        api.execute(args[1].value as string, {limit: db.api.limits[api.name], audio: false}).then(async (data) => {
-                            const items: {value: string; name: string}[] = [];
-
-                            // Если получена ошибка
-                            if (data instanceof Error || !data) return;
-
-                            // Поиск или ссылка на автора
-                            else if (data instanceof Array) {
-                                const tracks = data.map((choice) => {
-                                    return {
-                                        value: choice.url,
-                                        name: choice.name
-                                    }
-                                });
-
-                                items.push(...tracks);
-                            }
-
-                            // Ссылка на плейлист или трек
-                            else items.push({ name: data.title ?? data.name, value: data.url });
-
-                            await message.respond(items).catch(console.error);
-                            return;
-                        });
+                        db.events.emitter.emit("rest/request-complete", request, interact, args[1].value as string);
                     }
                     return;
                 }
@@ -276,7 +250,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     }
 
                     // Если надо дать время на обработку
-                    if (command.deferReply) await message.deferReply();
+                    if (command.deferReply) await message.deferReply().catch(() => {});
 
                     // Выполняем команду
                     interact.command.execute({

@@ -2,7 +2,6 @@ import {MessageComponents, MessageSendOptions} from "@type/discord";
 import {InteractionCallbackResponse, MessageFlags} from "discord.js";
 import {Interact, Logger, MessageUtils} from "@utils";
 import type {EmbedData, Message} from "discord.js";
-import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -69,16 +68,15 @@ export class EmbedBuilder {
                 // Удаляем сообщение через время если это возможно
                 if (this.time !== 0) MessageUtils.deleteMessage({message}, this.time);
             })
-            .catch(async (err) => {
+            .catch((error) => {
                 // Если при отправке сообщения произошла ошибка связанная с авторизацией
                 // Эта ошибка возникает когда сообщение невозможно отредактировать, именно reply
-                if (`${err}`.match(/Invalid Webhook Token/)) {
+                if (`${error}`.match(/Invalid Webhook Token/)) {
                     Logger.log("ERROR", "[DiscordAPI]: Error webhook token, ignoring!");
                     return;
                 }
 
-                // Показываем ошибку если до нее дойдет речь
-                console.error(err);
+                console.error(error);
             });
     };
 
