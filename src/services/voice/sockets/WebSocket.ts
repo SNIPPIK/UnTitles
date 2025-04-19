@@ -9,7 +9,6 @@ import {TypedEmitter} from "@utils";
  * @private
  */
 const not_support_status_code: (VoiceOpcodes | number)[] = [
-    VoiceOpcodes.HeartbeatAck,
     VoiceOpcodes.ClientConnect,
     VoiceOpcodes.ClientDisconnect,
 
@@ -35,13 +34,6 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
     private readonly socket: WS;
 
     /**
-     * @description Подключен ли WebSocket
-     * @readonly
-     * @private
-     */
-    private _isConnected: boolean;
-
-    /**
      * @description Данные для проверки жизни
      * @readonly
      * @private
@@ -49,6 +41,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
     private readonly _alive: WebSocketKeepAlive = {
         interval: null,
         updated: 0,
+        miss: 0,
         asked: 0
     };
 
@@ -66,9 +59,6 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
      * @public
      */
     public set packet(packet: string | object) {
-        // Если нет подключения
-        if (!this._isConnected) return;
-
         try {
             this.socket.send(JSON.stringify(packet));
         } catch (error) {
@@ -89,12 +79,13 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
             // Создаем новый интервал
             this._alive.interval = setInterval(() => {
                 // Если WebSocket отключен
-                if (!this._isConnected) {
+                if (this._alive.miss >= 3 && this._alive.updated !== 0) {
                     this.destroy();
                     return;
                 }
 
                 this._alive.updated = Date.now();
+                this._alive.miss++;
                 this._alive.asked++;
 
                 // Отправляем пакет
@@ -123,13 +114,19 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
             // Если получена не строка
             if (typeof event.data !== "string") return;
 
-            const json = JSON.parse(event.data);
-
-            // Если код не поддерживается внутри кода
-            if (not_support_status_code.includes(json.op)) return;
-
             try {
-                this.emit("packet", json);
+                const packet = JSON.parse(event.data);
+
+                // Если код не поддерживается внутри кода
+                if (not_support_status_code.includes(packet.op)) return;
+
+                // Если WebSocket сообщил новые данные
+                else if (packet.op === VoiceOpcodes.HeartbeatAck) {
+                    this._alive.updated = Date.now();
+                    this._alive.miss = 0;
+                }
+
+                this.emit("packet", packet);
             } catch (error) {
                 this.emit("error", error as Error);
             }
@@ -137,19 +134,16 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
 
         // Если WebSocket открыт
         this.socket.on("open", async (event: Event) => {
-            this._isConnected = true;
             this.emit("open", event);
         });
 
         // Если WebSocket закрыт
         this.socket.on("close", async (event: CloseEvent) => {
-            this._isConnected = false;
             this.emit("close", event);
         });
 
         // Если WebSocket выдал ошибку
         this.socket.on("error", async (event: Error) => {
-            this._isConnected = false;
             this.emit("error", event);
         });
     };
@@ -195,4 +189,10 @@ interface WebSocketKeepAlive {
      * @private
      */
     updated: number;
+
+    /**
+     * @description Упущенные запросы от WebSocket
+     * @private
+     */
+    miss: number;
 }

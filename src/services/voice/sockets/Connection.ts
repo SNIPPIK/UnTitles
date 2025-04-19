@@ -69,9 +69,10 @@ export class VoiceConnection {
             try {
                 oldState.networking
                     .off("close", this.VoiceSocketClose)
-                    .off("stateChange", this.VoiceSocketUpdate)
+                    .off("stateChange", this.VoiceSocketStateChange)
                     .destroy();
-            } catch {
+            } catch (err) {
+                console.error(err);
                 // Возможно что VoiceSocket уже уничтожен
             }
         }
@@ -128,40 +129,6 @@ export class VoiceConnection {
     };
 
     /**
-     * @description Пытается настроить сетевой экземпляр для этого голосового соединения, используя полученные пакеты.
-     * Требуются оба пакета, и любой существующий сетевой экземпляр будет уничтожен.
-     *
-     * @remarks
-     * Это вызывается при изменении голосового сервера подключения, например, если бот перемещен на
-     * другой канал в той же гильдии, но имеет другой голосовой сервер. В этом случае
-     * необходимо повторно установить соединение с новым голосовым сервером.
-     *
-     * Соединение перейдет в состояние подключения, когда это будет вызвано.
-     * @public
-     */
-    public get configureSocket() {
-        const { server, state } = this._packets;
-
-        // Если нет некоторых данных, то прекращаем выполнение
-        if (!server || !state || this.state.status === VoiceConnectionStatus.Destroyed || !server.endpoint) return false;
-
-        // Создаем Socket подключение к discord
-        this.state = { ...this.state,
-            status: VoiceConnectionStatus.Connecting,
-            networking: new VoiceSocket({
-                sessionId: state.session_id,
-                endpoint: server.endpoint,
-                serverId: server.guild_id,
-                userId: state.user_id,
-                token: server.token
-            })
-                .once("close", this.VoiceSocketClose)
-                .on("stateChange", this.VoiceSocketUpdate),
-        };
-        return true;
-    };
-
-    /**
      * @description Подготавливает аудио пакет и немедленно отправляет его.
      * @param buffer - Пакет Opus для воспроизведения
      * @public
@@ -197,7 +164,7 @@ export class VoiceConnection {
 
                     this._packets.server = packet;
 
-                    if (packet.endpoint) this.configureSocket;
+                    if (packet.endpoint) this.configureSocket();
                     else if (state.status !== VoiceConnectionStatus.Destroyed) this.state = {
                         ...state,
                         reason: VoiceConnectionDisconnectReason.EndpointRemoved,
@@ -213,13 +180,51 @@ export class VoiceConnection {
                  */
                 onVoiceStateUpdate: (packet: GatewayVoiceStateUpdateDispatchData): void => {
                     this._packets.state = packet;
-                    Object.assign(this._config, packet);
+
+                    if (packet.self_deaf !== undefined) this._config.self_deaf = packet.self_deaf;
+                    if (packet.self_mute !== undefined) this._config.self_mute = packet.self_mute;
+                    if (packet.channel_id) this._config.channel_id = packet.channel_id;
                 },
                 destroy: this.destroy
             })
         };
 
         this._config = config;
+    };
+
+    /**
+     * @description Пытается настроить сетевой экземпляр для этого голосового соединения, используя полученные пакеты.
+     * Требуются оба пакета, и любой существующий сетевой экземпляр будет уничтожен.
+     *
+     * @remarks
+     * Это вызывается при изменении голосового сервера подключения, например, если бот перемещен на
+     * другой канал в той же гильдии, но имеет другой голосовой сервер. В этом случае
+     * необходимо повторно установить соединение с новым голосовым сервером.
+     *
+     * Соединение перейдет в состояние подключения, когда это будет вызвано.
+     * @public
+     */
+    public configureSocket = () => {
+        const { server, state } = this._packets;
+
+        // Если нет некоторых данных, то прекращаем выполнение
+        if (!server || !state || this.state.status === VoiceConnectionStatus.Destroyed || !server.endpoint) return;
+
+        const socket = new VoiceSocket({
+            sessionId: state.session_id,
+            endpoint: server.endpoint,
+            serverId: server.guild_id,
+            userId: state.user_id,
+            token: server.token
+        })
+            .once("close", this.VoiceSocketClose)
+            .on("stateChange", this.VoiceSocketStateChange)
+
+        // Создаем Socket подключение к discord
+        this.state = { ...this.state,
+            status: VoiceConnectionStatus.Connecting,
+            networking: socket
+        };
     };
 
     /**
@@ -309,44 +314,24 @@ export class VoiceConnection {
 
     /**
      * @description Вызывается при изменении состояния сетевого экземпляра. Используется для определения состояния голосового соединения.
-     * @param _ - Предыдущее состояние
+     * @param oldState - Предыдущее состояние
      * @param newState - Новое состояние
      * @private
      */
-    private VoiceSocketUpdate = (_: VoiceSocketState.States, newState: VoiceSocketState.States) => {
-        switch (newState.code) {
+    private VoiceSocketStateChange = (oldState: VoiceSocketState.States, newState: VoiceSocketState.States) => {
+        if (oldState.code === newState.code || this.state.status !== VoiceConnectionStatus.Connecting && this.state.status !== VoiceConnectionStatus.Ready) return;
 
-            /**
-             * @description Если VoiceSocket указывает на готовность к подключению
-             */
-            case VoiceSocketStatusCode.ready: {
-                // Если текущий статус уже является Ready
-                if (this.state.status === VoiceConnectionStatus.Ready) return;
+        // Если был получен статус готовности подключения
+        if (newState.code === VoiceSocketStatusCode.ready) this.state = {
+            ...this.state,
+            status: VoiceConnectionStatus.Ready,
+        };
 
-                //@ts-ignore
-                this.state = {
-                    ...this.state,
-                    status: VoiceConnectionStatus.Ready
-                }
-                return;
-            }
-
-            /**
-             * @description Если VoiceSocket указывает на любой статус не Ready
-             */
-            default: {
-                // Если текущий статус уже является Connecting
-                if (this.state.status === VoiceConnectionStatus.Connecting) return;
-
-                //@ts-ignore
-                this.state = {
-                    ...this.state,
-                    status: VoiceConnectionStatus.Connecting
-                }
-
-                return;
-            }
-        }
+        // Если был получен статус закрытия подключения
+        else if (newState.code !== VoiceSocketStatusCode.close) this.state = {
+            ...this.state,
+            status: VoiceConnectionStatus.Connecting
+        };
     };
 
     /**

@@ -24,7 +24,7 @@ export class PlayerVoice {
 
             // Если повторное подключение к тому же голосовому каналу
             else if (this._connection && connection.config.channel_id === this._connection.config.channel_id) {
-                connection.configureSocket;
+                connection.configureSocket();
             }
         }
 
@@ -46,9 +46,6 @@ export class PlayerVoice {
      */
     public set send(packet: Buffer) {
         // Отправляем пакет в голосовой канал
-        if (packet) {
-            if (this.connection.state.status !== "ready") this.connection.configureSocket;
-            this.connection.packet = packet;
-        }
+        if (packet) this.connection.packet = packet;
     };
 }

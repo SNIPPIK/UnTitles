@@ -131,6 +131,25 @@ class Command_Voice extends Assign<Command> {
                     case "re-configure": {
                         // Выбор лучшего региона для текущий голосовой сессии
                         VoiceChannel.setRTCRegion(null)
+                            // Если получилось сменить регион
+                            .then(() => {
+                                if (voiceConnection) {
+                                    // Перенастройка подключения
+                                    voiceConnection.configureSocket();
+
+                                    message.FBuilder = {
+                                        color: Colors.Green,
+                                        description: locale._(message.locale, "voice.rtc")
+                                    };
+                                    return;
+                                }
+
+                                message.FBuilder = {
+                                    color: Colors.DarkRed,
+                                    description: locale._(message.locale, "voice.rtc.fail")
+                                }
+                            })
+
                             // Если не получилось сменить регион
                             .catch(() => {
                                 message.FBuilder = {
@@ -138,17 +157,6 @@ class Command_Voice extends Assign<Command> {
                                     description: locale._(message.locale, "voice.rtc.fail")
                                 }
                             })
-
-                            // Если получилось сменить регион
-                            .finally(() => {
-                                //Перенастройка подключения
-                                voiceConnection.configureSocket;
-
-                                message.FBuilder = {
-                                    color: Colors.Green,
-                                    description: locale._(message.locale, "voice.rtc")
-                                }
-                            });
                         return;
                     }
 

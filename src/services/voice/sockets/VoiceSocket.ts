@@ -35,9 +35,9 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
             if (oldState && "ws" in oldState && oldState.ws !== newState["ws"]) {
                 oldState.ws
                     .off("error", this.emitError)
-                    .off("open", this.WebSocketOpen)
-                    .off("packet", this.WebSocketPacket)
-                    .off("close", this.WebSocketClose)
+                    .off("open", this.onWebSocketOpen)
+                    .off("packet", this.onWebSocketPacket)
+                    .off("close", this.onWebSocketClose)
                     .destroy()
             }
 
@@ -45,7 +45,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
             if (oldState && "udp" in oldState && oldState.udp !== newState["udp"]) {
                 oldState.udp
                     .off("error", this.emitError)
-                    .off("close", this.SocketUDPClose)
+                    .off("close", this.onUDPSocketClose)
                     .destroy();
             }
 
@@ -92,7 +92,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
         // Если код не соответствует с отправкой
         if (state.code !== VoiceSocketStatusCode.ready || !opusPacket) return;
 
-        const {connectionData, udp} = state;
+        const {connectionData} = state;
         connectionData.packetsPlayed++;
         connectionData.sequence++;
         connectionData.timestamp += TIMESTAMP_INC;
@@ -104,7 +104,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
         this.speaking = true;
 
         // Зашифровываем пакет для отправки на сервера discord
-        udp.packet = Encryption.packet(opusPacket, connectionData);
+        state.udp.packet = Encryption.packet(opusPacket, connectionData);
     };
 
     /**
@@ -113,6 +113,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      */
     public constructor(options: ConnectionOptions) {
         super();
+
         this._state = {
             ws: this.createWebSocket(options.endpoint),
             code: VoiceSocketStatusCode.upWS,
@@ -126,8 +127,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @private
      */
     private createWebSocket = (endpoint: string) => {
-        return new WebSocket(`wss://${endpoint}?v=8`).once("open", this.WebSocketOpen).once("close", this.WebSocketClose)
-            .on("packet", this.WebSocketPacket).on("error", this.emitError);
+        return new WebSocket(`wss://${endpoint}?v=8`).once("open", this.onWebSocketOpen).once("close", this.onWebSocketClose)
+            .on("packet", this.onWebSocketPacket).on("error", this.emitError);
     };
 
     /**
@@ -135,10 +136,29 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * он либо идентифицируется с новым сеансом, либо попытается возобновить существующий сеанс.
      * @private
      */
-    private WebSocketOpen = () => {
+    private onWebSocketOpen = () => {
         const state = this.state;
 
         switch (state.code) {
+            /**
+             * @description Если приходит статус поднятия ws, то необходимо отослать статус идентификации клиента
+             * @type VoiceSocketStatusCode
+             * @code 0
+             */
+            case VoiceSocketStatusCode.upWS: {
+                state.ws.packet = {
+                    op: VoiceOpcodes.Identify,
+                    d: {
+                        server_id: state.connectionOptions.serverId,
+                        session_id: state.connectionOptions.sessionId,
+                        user_id: state.connectionOptions.userId,
+                        token: state.connectionOptions.token
+                    }
+                };
+                this.state = {...state, code: VoiceSocketStatusCode.identify};
+                return;
+            }
+
             /**
              * @description Если происходит обрыв соединения ws, то пробуем его поднять заново
              * @type VoiceSocketStatusCode
@@ -156,26 +176,6 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                 };
                 return;
             }
-
-            /**
-             * @description Если приходит статус поднятия ws, то необходимо отослать статус идентификации клиента
-             * @type VoiceSocketStatusCode
-             * @code 0
-             */
-            case VoiceSocketStatusCode.upWS: {
-                state.ws.packet = {
-                    op: VoiceOpcodes.Identify,
-                    d: {
-                        max_dave_protocol_version: 0,
-                        server_id: state.connectionOptions.serverId,
-                        session_id: state.connectionOptions.sessionId,
-                        user_id: state.connectionOptions.userId,
-                        token: state.connectionOptions.token
-                    }
-                };
-                this.state = {...state, code: VoiceSocketStatusCode.identify};
-                return;
-            }
         }
     };
 
@@ -186,13 +186,13 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @param code - Код закрытия
      * @private
      */
-    private WebSocketClose = ({ code }: {code: number}) => {
-        const state = this.state;
+    private onWebSocketClose = ({ code }: {code: number}) => {
+        const state = this.state, canResume = code === 4_015 || code < 4_000;
 
         // Если discord попытался разорвать соединение
-        if ((code === 4_015 || code < 4_000) && state.code === VoiceSocketStatusCode.ready) {
+        if (canResume && state.code === VoiceSocketStatusCode.ready) {
             this.state = { ...state,
-                ws: this.createWebSocket(state.connectionOptions?.endpoint),
+                ws: this.createWebSocket(state.connectionOptions.endpoint),
                 code: VoiceSocketStatusCode.resume
             };
         }
@@ -209,7 +209,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @param packet - Полученный пакет
      * @private
      */
-    private WebSocketPacket = (packet: {d: any, op: VoiceOpcodes}) => {
+    private onWebSocketPacket = (packet: {d: any, op: VoiceOpcodes}) => {
         switch (packet.op) {
             /**
              * @description Если получен код о готовности подключения к голосовому каналу
@@ -218,38 +218,38 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
              * @code 2
              */
             case VoiceOpcodes.Ready: {
-                if (this.state.code !== VoiceSocketStatusCode.identify) return;
+                if (this.state.code === VoiceSocketStatusCode.identify) {
+                    const {ip, port, ssrc} = packet.d;
+                    const udp = new SocketUDP({ip, port});
 
-                const {ip, port, ssrc} = packet.d;
-                const udp = new SocketUDP({ip, port});
+                    udp.on("error", this.emitError);
+                    udp.once("close", this.onUDPSocketClose);
 
-                udp.on("error", this.emitError);
-                udp.once("close", this.SocketUDPClose);
+                    // Задаем состояние о запуске UDP соединения
+                    this.state = {...this.state, udp, code: VoiceSocketStatusCode.upUDP, connectionData: {ssrc} as any};
 
-                // Задаем состояние о запуске UDP соединения
-                this.state = {...this.state, udp, code: VoiceSocketStatusCode.upUDP, connectionData: {ssrc} as any};
+                    // Передаем данные для получения IP:PORT
+                    udp.discovery = ssrc;
 
-                // Передаем данные для получения IP:PORT
-                udp.discovery = ssrc;
+                    // Ждем ответа события когда можно будет подключиться к WebSocket
+                    udp.once("connected", (config) => {
+                        if (this.state.code !== VoiceSocketStatusCode.upUDP) return;
 
-                // Ждем ответа события когда можно будет подключиться к WebSocket
-                udp.once("connected", (config) => {
-                    if (this.state.code !== VoiceSocketStatusCode.upUDP) return;
-
-                    // Отправляем пакет, о подключении к сокету
-                    this.state = {...this.state, code: VoiceSocketStatusCode.protocol};
-                    this.state.ws.packet = {
-                        op: VoiceOpcodes.SelectProtocol,
-                        d: {
-                            protocol: "udp",
-                            data: {
-                                address: config.ip,
-                                port: config.port,
-                                mode: Encryption.mode
-                            },
-                        }
-                    };
-                });
+                        // Отправляем пакет, о подключении к сокету
+                        this.state = {...this.state, code: VoiceSocketStatusCode.protocol};
+                        this.state.ws.packet = {
+                            op: VoiceOpcodes.SelectProtocol,
+                            d: {
+                                protocol: "udp",
+                                data: {
+                                    address: config.ip,
+                                    port: config.port,
+                                    mode: Encryption.mode
+                                },
+                            }
+                        };
+                    });
+                }
                 return;
             }
 
@@ -260,44 +260,25 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
              * @code 4
              */
             case VoiceOpcodes.SessionDescription: {
-                if (this.state.code !== VoiceSocketStatusCode.protocol) return;
-                const { mode: encryptionMode, secret_key } = packet.d;
+                if (this.state.code === VoiceSocketStatusCode.protocol) {
+                    const {mode: encryptionMode, secret_key} = packet.d;
 
-                this.state = { ...this.state,
-                    code: VoiceSocketStatusCode.ready,
-                    connectionData: Object.assign(this.state.connectionData, {
-                        encryptionMode,
-                        secretKey: new Uint8Array(secret_key),
-                        sequence: Encryption.randomNBit(16),
-                        timestamp: Encryption.randomNBit(32),
-                        nonce: 0,
-                        nonceBuffer: Encryption.nonce,
-                        speaking: false,
-                        packetsPlayed: 0
-                    })
-                };
+                    this.state = {
+                        ...this.state,
+                        code: VoiceSocketStatusCode.ready,
+                        connectionData: Object.assign(this.state.connectionData, {
+                            encryptionMode,
+                            secretKey: new Uint8Array(secret_key),
+                            sequence: Encryption.randomNBit(16),
+                            timestamp: Encryption.randomNBit(32),
+                            nonce: 0,
+                            nonceBuffer: Encryption.nonce,
+                            speaking: false,
+                            packetsPlayed: 0
+                        })
+                    };
+                }
 
-                return;
-            }
-
-            /**
-             * @description Шлюз может привести к повторному сообщению. Чтобы поддержать это, шлюз включает номер последовательности со всеми сообщениями, которые могут потребоваться повторно
-             * @type VoiceOpcodes
-             * @private
-             * @code 5
-             */
-            case VoiceOpcodes.Speaking: {
-                if (this.state.code === VoiceSocketStatusCode.close) return;
-
-                this.state.ws.packet = {
-                    op: VoiceOpcodes.Speaking,
-                    d: {
-                        speaking: packet.d.speaking,
-                        delay: packet.d.delay,
-                        ssrc: packet.d.ssrc
-                    },
-                    seq: packet.d.seq
-                };
                 return;
             }
 
@@ -309,7 +290,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
              */
             case VoiceOpcodes.Hello: {
                 // Задаем время жизни голосового подключения
-                if (this.state.code !== VoiceSocketStatusCode.close && packet.d.heartbeat_interval) this.state.ws.keepAlive = packet.d.heartbeat_interval;
+                if (this.state.code !== VoiceSocketStatusCode.close) this.state.ws.keepAlive = packet.d.heartbeat_interval;
 
                 return;
             }
@@ -343,7 +324,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @description Вызывается, когда UDP-сокет сам закрылся, если он перестал получать ответы от Discord.
      * @private
      */
-    private SocketUDPClose = () => {
+    private readonly onUDPSocketClose = () => {
         // Если статус код не соответствует с VoiceSocketStatusCode.ready
         if (this.state.code !== VoiceSocketStatusCode.ready) return;
 

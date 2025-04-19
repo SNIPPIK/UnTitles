@@ -34,6 +34,7 @@ export class Encryption {
     /**
      * @description Задаем единственный актуальный вариант шифрования
      * @public
+     * @static
      */
     public static get mode(): EncryptionModes {
         return EncryptionModes[0];
@@ -42,6 +43,7 @@ export class Encryption {
     /**
      * @description Buffer для режима шифрования, нужен для правильно расстановки пакетов
      * @public
+     * @static
      */
     public static get nonce() {
         if (this.mode === "aead_aes256_gcm_rtpsize") return Buffer.alloc(12);
@@ -49,16 +51,28 @@ export class Encryption {
     };
 
     /**
+     * @description Пустой пакет для внесения данных по стандарту "Voice Packet Structure"
+     * @public
+     * @static
+     */
+    private static get rtp_packet() {
+        const rtp_packet = Buffer.alloc(12);
+        // Version + Flags, Payload Type
+        [rtp_packet[0], rtp_packet[1]] = [0x80, 0x78];
+
+        return rtp_packet;
+    };
+
+    /**
      * @description Задаем структуру пакета
      * @param packet - Пакет Opus для шифрования
      * @param connectionData - Текущие данные подключения экземпляра
      * @public
+     * @static
      */
     public static packet = (packet: Buffer, connectionData: ConnectionData) => {
         const { sequence, timestamp, ssrc } = connectionData;
-        const rtp_packet = Buffer.alloc(12);
-        // Version + Flags, Payload Type
-        [rtp_packet[0], rtp_packet[1]] = [0x80, 0x78];
+        const rtp_packet = this.rtp_packet;
 
         // Последовательность
         rtp_packet.writeUIntBE(sequence, 2, 2);
@@ -68,9 +82,6 @@ export class Encryption {
 
         // SSRC
         rtp_packet.writeUIntBE(ssrc, 8, 4);
-
-        // Зашифрованный звук
-        rtp_packet.copy(Buffer.alloc(24), 0, 0, 12);
 
         connectionData.nonce++;
 
@@ -89,6 +100,7 @@ export class Encryption {
      * @param connectionData - Текущие данные подключения экземпляра
      * @param rtp_packet - Доп данные для отправки
      * @private
+     * @static
      */
     private static crypto = (packet: Buffer, connectionData: ConnectionData, rtp_packet: Buffer) => {
         const nonceBuffer = connectionData.nonceBuffer.subarray(0, 4);
@@ -114,6 +126,7 @@ export class Encryption {
      * @description Возвращает случайное число, находящееся в диапазоне n бит
      * @param numberOfBits - Количество бит
      * @public
+     * @static
      */
     public static randomNBit = (numberOfBits: number) => Math.floor(Math.random() * 2 ** numberOfBits);
 }

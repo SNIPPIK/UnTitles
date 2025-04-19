@@ -55,9 +55,6 @@ export class Queues extends Collection<Queue> {
         // Если у плеера стоит пауза
         if (player.status === "player/pause") player.resume();
 
-        // Производим переподключение к голосовому каналу
-        player.voice.connection.configureSocket;
-
         // Запускаем функцию воспроизведения треков
         player.play();
     };

@@ -117,7 +117,7 @@ class rest_request_complete extends Assign<Event<"rest/request-complete">> {
                         const tracks = rest.map((choice) => {
                             return {
                                 value: choice.url,
-                                name: choice.name
+                                name: choice.name.slice(0, 120)
                             }
                         });
 
