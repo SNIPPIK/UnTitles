@@ -204,7 +204,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             .then((path) => {
                 // Если нет исходника
                 if (!path) {
-                    this.emit("player/error", this, `Not found link audio!`, {
+                    this.emit("player/error", this, `Fail to get audio link`, {
                         skip: true,
                         position: position ?? this.tracks.indexOf(track)
                     });
@@ -213,7 +213,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                 // Если получена ошибка вместо исходника
                 else if (path instanceof Error) {
-                    this.emit("player/error", this, `Failed to getting link audio!\n\n${path.name}\n- ${path.message}`, {
+                    this.emit("player/error", this, `Critical error in track.resource!\n\n${path.name}\n- ${path.message}`, {
                         skip: true,
                         position: position ?? this.tracks.indexOf(track)
                     });
@@ -241,6 +241,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                 // Если поток нельзя читать, возможно что он еще грузится
                 const timeout = setTimeout(() => {
+                    // Отправляем данные событию для отображения ошибки
                     this.emit("player/error", this, "Timeout the stream has been exceeded!", {
                         skip: true,
                         position: position ?? this.tracks.indexOf(track)

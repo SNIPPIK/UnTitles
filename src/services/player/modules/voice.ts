@@ -46,6 +46,9 @@ export class PlayerVoice {
      */
     public set send(packet: Buffer) {
         // Отправляем пакет в голосовой канал
-        if (packet) this.connection.packet = packet;
+        if (packet) {
+            if (this.connection.state.status !== "ready") this.connection.configureSocket;
+            this.connection.packet = packet;
+        }
     };
 }

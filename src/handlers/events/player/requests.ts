@@ -1,4 +1,5 @@
 import {locale} from "@service/locale";
+import {Track} from "@service/player";
 import {Event} from "@handler/events";
 import {Colors} from "discord.js";
 import {Assign} from "@utils";
@@ -42,11 +43,11 @@ class rest_request extends Assign<Event<"rest/request">> {
                 }, 15e3);
 
                 // Получаем данные в системе rest/API
-                api.execute(url as string, {limit: db.api.limits[api.name], audio: true}).then(async (rest) => {
+                api.execute(url as string, {limit: db.api.limits[api.name], audio: true}).then(async (rest: Track.list | Track | Track[] | Error) => {
                     if (timeout) clearTimeout(timeout);
 
                     // Если нет данных или была получена ошибка
-                    else if (rest instanceof Error) {
+                    if (rest instanceof Error) {
                         db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.error", [rest]));
                         return;
                     }
@@ -105,7 +106,7 @@ class rest_request_complete extends Assign<Event<"rest/request-complete">> {
                 if (!api || !api.name) return;
 
                 // Получаем данные в системе rest/API
-                api.execute(url as string, {limit: db.api.limits[api.name], audio: false}).then(async (rest) => {
+                api.execute(url as string, {limit: db.api.limits[api.name], audio: false}).then(async (rest: Track.list | Track | Track[] | Error) => {
                     const items: {value: string; name: string}[] = [];
 
                     // Если получена ошибка
@@ -124,7 +125,7 @@ class rest_request_complete extends Assign<Event<"rest/request-complete">> {
                     }
 
                     // Ссылка на плейлист или трек
-                    else items.push({ name: rest.title ?? rest.name, value: rest.url });
+                    else items.push({ name: rest["title"] ?? rest["name"], value: rest.url });
 
                     return message.respond(items);
                 }).catch(async (err) => {

@@ -91,7 +91,7 @@ export class Track {
      */
     public get image() {
         // Если нет картинки
-        if (!this._information._track.image || !this._information._track.image.url) return { url: db.images.no_image };
+        if (!this._information._track?.image?.url) return { url: db.images.no_image };
         return this._information._track.image;
     };
 
@@ -206,16 +206,8 @@ export class Track {
      */
     public get resource(): Promise<string | Error> {
         return new Promise(async (resolve) => {
-            // Если включено кеширование
-            if (db.cache.audio) {
-                const status = db.cache.audio.status(this);
-                // Если есть кеш аудио, то выдаем его
-                if (status.status === "ended") return resolve(status.path);
-            }
-
-            // Запускаем цикл с проверкой ссылки на исходный файл
             for (let i = 0; i < 3; i++) {
-                // Если есть ссылка на исходный файл
+                // Если есть данные об исходном файле
                 if (this.link) {
                     // Проверяем ссылку на актуальность
                     if (this.link.startsWith("http")) {
@@ -223,18 +215,34 @@ export class Track {
                             const status = await new httpsClient(this.link, {method: "HEAD"}).status;
 
                             // Если статус = good
-                            if (status) break;
+                            if (status) {
+                                // Добавляем трек в кеширование
+                                if (this.api.name !== "DISCORD" && db.cache.audio) db.cache.audio.set(this);
+                                break;
+                            }
 
+                            // Если статус плохой, то удаляем ссылку
                             this.link = null;
-                            continue;
                         } catch (err) { // Если произошла ошибка при проверке статуса
                             this.link = null;
                             if (i < 3) continue;
-                            return resolve(Error(`${err}`));
+                            return resolve(Error(`This link track is not available... Fail check link!`));
                         }
                     }
 
-                    return resolve(Error(`This link type is not supported`));
+                    // Если указан путь до файла, он будет рабочим наверно xD
+                    else break;
+                }
+
+                // Если включено кеширование
+                if (db.cache.audio) {
+                    const status = db.cache.audio.status(this);
+
+                    // Если есть кеш аудио, то выдаем его
+                    if (status.status === "ended") {
+                        this.link = status.path;
+                        break;
+                    }
                 }
 
                 // Если нет ссылки на исходный файл
@@ -250,17 +258,11 @@ export class Track {
                     this.link = link;
                 } catch (err) {
                     if (i < 3) continue;
-                    return resolve(Error(`${err}`));
+                    return resolve(Error(`This link track is not available... Fail update link!`));
                 }
             }
 
-            // Если не удается найти ссылку через n попыток
-            if (!this.link) return resolve(Error(`This link track is not available...`));
-
-            // Сохраняем кеш аудио
-            else if (this.api.name !== "DISCORD" && db.cache.audio) db.cache.audio.set(this);
-
-            // Отдаем ссылку на трек
+            // Отдаем ссылку или путь до файла
             return resolve(this.link);
         });
     };

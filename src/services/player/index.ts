@@ -46,16 +46,20 @@ export class Queues extends Collection<Queue> {
      * @public
      */
     public set restartPlayer(player: AudioPlayer) {
-        // Добавляем плеер в базу цикла для отправки пакетов
-        this.cycles.players.set(player);
+        // Если плеер удален из базы
+        if (!this.cycles.players.match(player)) {
+            // Добавляем плеер в базу цикла для отправки пакетов
+            this.cycles.players.set(player);
+        }
 
         // Если у плеера стоит пауза
         if (player.status === "player/pause") player.resume();
 
+        // Производим переподключение к голосовому каналу
         player.voice.connection.configureSocket;
 
         // Запускаем функцию воспроизведения треков
-        setImmediate(player.play);
+        player.play();
     };
 
     /**
@@ -102,7 +106,7 @@ export class Queues extends Collection<Queue> {
         else {
             // Значит что плеера нет в циклах
             if (!this.cycles.players.match(queue.player)) {
-                setImmediate(async () => {
+                setImmediate(() => {
                     // Если добавлен трек
                     if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
 
