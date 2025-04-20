@@ -18,16 +18,6 @@ export class PlayerVoice {
      * @public
      */
     public set connection(connection: VoiceConnection) {
-        if (connection?.config) {
-            // Если боту нельзя говорить, то смысл продолжать
-            if (connection.config.self_mute) return;
-
-            // Если повторное подключение к тому же голосовому каналу
-            else if (this._connection && connection.config.channel_id === this._connection.config.channel_id) {
-                connection.configureSocket();
-            }
-        }
-
         this._connection = connection;
     };
 
@@ -38,14 +28,5 @@ export class PlayerVoice {
      */
     public get connection() {
         return this._connection;
-    };
-
-    /**
-     * @description Отправляем пакет в голосовой канал
-     * @public
-     */
-    public set send(packet: Buffer) {
-        // Отправляем пакет в голосовой канал
-        if (packet) this.connection.packet = packet;
     };
 }

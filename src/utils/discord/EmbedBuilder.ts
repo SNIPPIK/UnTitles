@@ -76,6 +76,9 @@ export class EmbedBuilder {
                     return;
                 }
 
+                // Если по мнению discord'а что-то уже отправлено, хотя это не так
+                else if (`${error}`.match(/Unknown interaction/)) return;
+
                 console.error(error);
             });
     };

@@ -26,6 +26,12 @@ const EncryptionModes: EncryptionModes[] = [];
 
 /**
  * @author SNIPPIK
+ * @description Поддерживающие размеры начальных пакетов
+ */
+const EncryptionNonce: Buffer[] = [];
+
+/**
+ * @author SNIPPIK
  * @description Выдаваемы методы для использования sodium
  * @class Encryption
  * @public
@@ -46,8 +52,7 @@ export class Encryption {
      * @static
      */
     public static get nonce() {
-        if (this.mode === "aead_aes256_gcm_rtpsize") return Buffer.alloc(12);
-        return Buffer.alloc(24);
+        return EncryptionNonce[0];
     };
 
     /**
@@ -148,6 +153,7 @@ let loaded_lib: Methods.current = {};
     // Если поддерживается нативная расшифровка
     if (crypto.getCiphers().includes("aes-256-gcm")) {
         EncryptionModes.push("aead_aes256_gcm_rtpsize");
+        EncryptionNonce.push(Buffer.alloc(12));
         return;
     }
 
@@ -186,6 +192,7 @@ let loaded_lib: Methods.current = {};
 
         // Добавляем тип шифрования
         EncryptionModes.push("aead_xchacha20_poly1305_rtpsize");
+        EncryptionNonce.push(Buffer.alloc(24));
 
         // Делаем проверку всех доступных библиотек
         for (const name of names) {

@@ -19,7 +19,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @description Текущее состояние сетевого экземпляра
      * @public
      */
-    public get state() {
+    private get state() {
         return this._state;
     };
 
@@ -27,35 +27,34 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @description Устанавливает новое состояние для сетевого экземпляра, выполняя операции очистки там, где это необходимо
      * @public
      */
-    public set state(newState) {
-        const oldState = this._state;
+    private set state(newState) {
+        const oldWs = this._state["ws"] as WebSocket;
+        const newWs = newState["ws"] as WebSocket;
 
-        try {
-            // Уничтожаем прошлый WebSocket
-            if (oldState && "ws" in oldState && oldState.ws !== newState["ws"]) {
-                oldState.ws
-                    .off("error", this.emitError)
-                    .off("open", this.onWebSocketOpen)
-                    .off("packet", this.onWebSocketPacket)
-                    .off("close", this.onWebSocketClose)
-                    .destroy()
-            }
-
-            // Уничтожаем прошлое UDP подключение
-            if (oldState && "udp" in oldState && oldState.udp !== newState["udp"]) {
-                oldState.udp
-                    .off("error", this.emitError)
-                    .off("close", this.onUDPSocketClose)
-                    .destroy();
-            }
-
-            // Если происходит попытка вызова события из уничтоженного EventEmitter
-            if (oldState.code !== newState.code) this.emit("stateChange", oldState, newState);
-        } catch (err) {
-            console.error(err);
+        // Уничтожаем прошлый WebSocket
+        if (oldWs && oldWs !== newWs) {
+            oldWs
+                .off("error", this.emitError)
+                .off("open", this.onWebSocketOpen)
+                .off("packet", this.onWebSocketPacket)
+                .off("close", this.onWebSocketClose)
+                .destroy()
         }
 
+        const oldUdp = this._state["udp"] as SocketUDP;
+        const newUdp = newState["udp"] as SocketUDP;
+
+        // Уничтожаем прошлое UDP подключение
+        if (oldUdp && oldUdp !== newUdp) {
+            oldUdp
+                .off("error", this.emitError)
+                .off("close", this.onUDPSocketClose)
+                .destroy();
+        }
+
+        const oldState = this._state;
         this._state = newState;
+        this.emit("stateChange", oldState, newState);
     };
 
     /**
@@ -76,7 +75,8 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                 speaking: speaking ? 1 : 0,
                 delay: 0,
                 ssrc: state.connectionData.ssrc
-            }
+            },
+            seq: state.connectionData.seq
         };
     };
 
@@ -98,7 +98,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
         connectionData.timestamp += TIMESTAMP_INC;
 
         if (connectionData.sequence >= 2 ** 16) connectionData.sequence = 0;
-        else if (connectionData.timestamp >= 2 ** 32) connectionData.timestamp = 0;
+        if (connectionData.timestamp >= 2 ** 32) connectionData.timestamp = 0;
 
         // Принудительно включаем передачу голоса
         this.speaking = true;
@@ -233,21 +233,21 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
 
                     // Ждем ответа события когда можно будет подключиться к WebSocket
                     udp.once("connected", (config) => {
-                        if (this.state.code !== VoiceSocketStatusCode.upUDP) return;
-
-                        // Отправляем пакет, о подключении к сокету
-                        this.state = {...this.state, code: VoiceSocketStatusCode.protocol};
-                        this.state.ws.packet = {
-                            op: VoiceOpcodes.SelectProtocol,
-                            d: {
-                                protocol: "udp",
-                                data: {
-                                    address: config.ip,
-                                    port: config.port,
-                                    mode: Encryption.mode
-                                },
-                            }
-                        };
+                        if (this.state.code === VoiceSocketStatusCode.upUDP) {
+                            // Отправляем пакет, о подключении к сокету
+                            this.state = {...this.state, code: VoiceSocketStatusCode.protocol};
+                            this.state.ws.packet = {
+                                op: VoiceOpcodes.SelectProtocol,
+                                d: {
+                                    protocol: "udp",
+                                    data: {
+                                        address: config.ip,
+                                        port: config.port,
+                                        mode: Encryption.mode
+                                    },
+                                }
+                            };
+                        }
                     });
                 }
                 return;
@@ -339,8 +339,9 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
      * @public
      */
     public destroy = () => {
-        this.removeAllListeners();
         this.state = { code: VoiceSocketStatusCode.close };
+        this.emit("close", 10060);
+        this.removeAllListeners();
     };
 }
 
@@ -473,4 +474,5 @@ export interface ConnectionData {
     speaking: boolean;
     ssrc: number;
     timestamp: number;
+    seq: number;
 }

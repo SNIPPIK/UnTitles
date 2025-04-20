@@ -153,8 +153,8 @@ class AudioCycles {
                 duration: 20,
                 filter: (item) => item.playing,
                 execute: (player) => {
-                    // Отправляем пакет
-                    player.voice.send = player.audio.current.packet;
+                    // Отправляем пакет в голосовой канал
+                    player.voice.connection.packet = player.audio.current.packet;
                 }
             });
         };

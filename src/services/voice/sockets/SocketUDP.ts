@@ -151,14 +151,14 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
         // Уничтожаем интервал активности
         clearInterval(this.keepAliveInterval);
 
-        this.socket.removeAllListeners();
-        this.removeAllListeners();
-
         try {
             this.socket.close();
         } catch (err) {
             if (`${err}`.match("Not running")) return;
         }
+
+        this.socket.removeAllListeners();
+        this.removeAllListeners();
     };
 }
 

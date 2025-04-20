@@ -1,5 +1,5 @@
 import {Client, ShardingManager, IntentsBitField, Partials, Options, Colors, WebhookClient} from "discord.js";
-import {DiscordGatewayAdapterCreator, VoiceConnection, VoiceConnectionStatus} from "@service/voice";
+import {DiscordGatewayAdapterCreator, VoiceConnection} from "@service/voice";
 import {ActivityType} from "discord-api-types/v10";
 import {isMainThread} from "node:worker_threads";
 import {ActivityOptions} from "@type/discord";
@@ -63,29 +63,15 @@ export class Database {
         public join = (config: VoiceConnection["config"], adapterCreator: DiscordGatewayAdapterCreator) => {
             let connection = this.get(config.guild_id);
 
-            // Если есть голосовое подключение при подключении
-            if (connection) {
-                // Удаляем голосовое подключение
-                this.remove(connection.config.guild_id);
-                connection = null;
-            }
-
-            // Если нет голосового подключения, то создаем и сохраняем в базу
+            // Если нет голосового подключения
             if (!connection) {
+                // Если нет голосового подключения, то создаем
                 connection = new VoiceConnection(config, adapterCreator);
                 this.set(config.guild_id, connection);
             }
 
-            // Если есть голосовое подключение, то подключаемся заново
-            if (connection && connection.state.status !== VoiceConnectionStatus.Destroyed) {
-                if (connection.state.status === VoiceConnectionStatus.Disconnected) connection.rejoin(config);
-                else if (!connection.state.adapter.sendPayload(connection.payload(config))) {
-                    connection.state = { ...connection.state,
-                        status: VoiceConnectionStatus.Disconnected,
-                        reason: 1
-                    };
-                }
-            }
+            // Если есть голосовое подключение
+            else connection.rejoin();
 
             return connection;
         };

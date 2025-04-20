@@ -90,7 +90,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (this.status === "player/wait" || this?.status === "player/pause") return false;
 
         // Если голосовое состояние не позволяет отправлять пакеты
-        else if (!this.voice.connection || this.voice.connection?.state?.status !== "ready") return false;
+        else if (!this.voice.connection || this.voice.connection.status !== "ready") return false;
 
         // Если поток не читается, переходим в состояние ожидания
         else if (!this.audio.current?.readable) {
@@ -345,7 +345,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         this.audio.current = null;
 
         // Отправляем пустышку
-        this.voice.send = SILENT_FRAME;
+        this.voice.connection.packet = SILENT_FRAME;
 
         // Переводим плеер в режим ожидания
         this._status = "player/wait";

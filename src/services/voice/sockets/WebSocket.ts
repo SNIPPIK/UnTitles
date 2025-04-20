@@ -1,4 +1,4 @@
-import {MessageEvent as WebSocketEvent, WebSocket as WS, CloseEvent} from "ws";
+import {MessageEvent as WebSocketEvent, WebSocket as WS, ErrorEvent} from "ws";
 import {VoiceOpcodes} from "discord-api-types/voice";
 import type {WebSocketEvents} from "@service/voice";
 import {TypedEmitter} from "@utils";
@@ -80,6 +80,8 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
             this._alive.interval = setInterval(() => {
                 // Если WebSocket отключен
                 if (this._alive.miss >= 3 && this._alive.updated !== 0) {
+                    console.log("Timeout WS");
+
                     this.destroy();
                     return;
                 }
@@ -131,34 +133,24 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
                 this.emit("error", error as Error);
             }
         };
-
         // Если WebSocket открыт
-        this.socket.on("open", async (event: Event) => {
-            this.emit("open", event);
-        });
-
-        // Если WebSocket закрыт
-        this.socket.on("close", async (event: CloseEvent) => {
-            this.emit("close", event);
-        });
-
+        this.socket.onopen = (err) => this.emit('open', err as any);
         // Если WebSocket выдал ошибку
-        this.socket.on("error", async (event: Error) => {
-            this.emit("error", event);
-        });
+        this.socket.onerror = (err: Error | ErrorEvent) => this.emit('error', err instanceof Error ? err : err.error);
+        // Если WebSocket закрыт
+        this.socket.onclose = (err) => this.emit('close', err);
     };
 
     /**
      * @description Уничтожает голосовой веб-сокет. Интервал очищается, и соединение закрывается
      * @public
      */
-    public destroy = (code?: number) => {
-        this.socket.removeAllListeners();
-
+    public destroy = (code: number = 1_000) => {
         try {
             this.keepAlive = -1;
-            this.socket.terminate();
+            //this.socket.terminate();
             this.socket.close(code);
+            this.socket.removeAllListeners();
         } catch (error) {
             this.emit("error", error as Error);
         }

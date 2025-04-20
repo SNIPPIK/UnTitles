@@ -43,8 +43,6 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
                     return;
                 }
 
-                // Если есть голосовое соединение vvv
-
                 // Если есть очередь на сервере и голосовое подключение
                 if (queue) {
                     const members = oldState.guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
