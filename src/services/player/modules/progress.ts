@@ -1,5 +1,5 @@
 import {RestAPI} from "@handler/rest/apis";
-import {env} from "@handler";
+import {env} from "@app";
 
 /**
  * @author SNIPPIK

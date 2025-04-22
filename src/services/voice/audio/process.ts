@@ -2,8 +2,8 @@ import type {ChildProcessWithoutNullStreams} from "node:child_process"
 import {spawn, spawnSync} from "node:child_process";
 import {isMainThread} from "node:worker_threads";
 import {Logger} from "@utils";
-import {env} from "@handler";
 import path from "node:path";
+import {env} from "@app";
 
 /**
  * @author SNIPPIK

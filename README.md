@@ -46,12 +46,7 @@
      - Настраиваем `.env` файл в `./build`
      - Заходим в директорию проекта
      - Открываем терминал
-     - npm i && npm run start
-   - Готовый вариант (Prebuild), качаем [тут](https://github.com/SNIPPIK/UnTitles/releases/latest)
-     - Настраиваем `.env` файл
-     - Заходим в директорию проекта
-     - Открываем терминал
-     - npm i && npm run build:start
+     - npm i && npm run build && npm run start
 
 
 ## Диаграмма всего проекта

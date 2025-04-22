@@ -1,74 +1,7 @@
 import {AudioPlayer, RepeatType} from "@service/player";
 import {Logger, Interact, MessageUtils} from "@utils";
-import {MessageComponents} from "@type/discord";
+import {MessageComponents} from "discord.js";
 import {db} from "@app";
-
-/**
- * @author SNIPPIK
- * @description Динамические кнопки плеера
- * @private
- */
-const button = {
-    resume: MessageUtils.checkIDComponent("button.resume"),
-    pause: MessageUtils.checkIDComponent("button.pause"),
-    loop: MessageUtils.checkIDComponent("button.loop"),
-    loop_one: MessageUtils.checkIDComponent("button.loop_one")
-};
-
-/**
- * @author SNIPPIK
- * @description Кнопки для сообщения
- * @private
- */
-const components: MessageComponents[] = [
-    /**
-     * @description Первый сет кнопок
-     * @private
-     */
-    {
-        type: 1,
-        components: [
-            // Кнопка перетасовки
-            MessageUtils.createButton({env: "shuffle", disabled: true}),
-
-            // Кнопка назад
-            MessageUtils.createButton({env: "back", disabled: true}),
-
-            // Кнопка паузы/продолжить
-            MessageUtils.createButton({emoji: button.pause, id: "resume_pause"}),
-
-            // Кнопка пропуска/вперед
-            MessageUtils.createButton({env: "skip"}),
-
-            // Кнопка повтора
-            MessageUtils.createButton({emoji: button.loop, id: "repeat"})
-        ]
-    },
-
-    /**
-     * @description Второй сет кнопок
-     * @private
-     */
-    {
-        type: 1,
-        components: [
-            // Кнопка очереди
-            MessageUtils.createButton({env: "queue", disabled: true}),
-
-            // Кнопка текста песни
-            MessageUtils.createButton({env: "lyrics"}),
-
-            // Кнопка стоп
-            MessageUtils.createButton({env: "stop", style: 4}),
-
-            // Кнопка текущих фильтров
-            MessageUtils.createButton({env: "filters", disabled: true}),
-
-            // Кнопка повтора текущего трека
-            MessageUtils.createButton({env: "replay"})
-        ]
-    }
-];
 
 /**
  * @author SNIPPIK
@@ -204,54 +137,7 @@ export class Queue {
      * @public
      */
     public get components() {
-        const first = components[0].components;
-        const two = components[1].components;
-
-        if (this.tracks.total > 1) {
-            // Кнопка очереди
-            Object.assign(two[0], { disabled: false });
-
-            // Кнопка перетасовки очереди
-            Object.assign(first[0], { disabled: false });
-
-            // Кнопка назад
-            Object.assign(first[1], { disabled: false, style: 1 });
-
-            // Кнопка вперед
-            Object.assign(first[3], { disabled: false, style: 1 });
-        }
-        else {
-            // Кнопка очереди
-            Object.assign(two[0], { disabled: true });
-
-            // Кнопка перетасовки очереди
-            Object.assign(first[0], { disabled: true });
-
-            // Кнопка назад
-            Object.assign(first[1], { disabled: true, style: 2 });
-
-            // Кнопка вперед
-            Object.assign(first[3], { disabled: true, style: 2 });
-        }
-
-        // Кнопка повтора
-        if (this.tracks.repeat === RepeatType.Song) Object.assign(first[4], { emoji: button.loop_one, style: 3 });
-        else if (this.tracks.repeat === RepeatType.Songs) Object.assign(first[4],{ emoji: button.loop, style: 3 });
-        else Object.assign(first[4],{ emoji: button.loop, style: 2 });
-
-        // Делаем проверку на кнопку ПАУЗА/ПРОДОЛЖИТЬ
-        if (this.player.status === "player/pause") Object.assign(first[2], { emoji: button.resume });
-        else Object.assign(first[2], { emoji: button.pause });
-
-        // Кнопка перетасовки очереди
-        if (this.tracks.shuffle) Object.assign(first[0], { style: 3 });
-        else Object.assign(first[0], { style: 2 });
-
-        // Кнопка фильтров
-        if (this.player.filters.enabled.length === 0) Object.assign(two[3], { disabled: true });
-        else Object.assign(two[3], { disabled: false });
-
-        return components;
+        return QueueComponent.component(this.player);
     };
 
     /**
@@ -307,5 +193,135 @@ export class Queue {
 
         // Удаляем плеер
         if (this.player) this.player.destroy();
+    };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Класс для создания компонентов-кнопок
+ * @class QueueComponent
+ */
+class QueueComponent {
+    /**
+     * @author SNIPPIK
+     * @description Динамические кнопки плеера
+     * @private
+     */
+    public static button = {
+        resume: MessageUtils.checkIDComponent("button.resume"),
+        pause: MessageUtils.checkIDComponent("button.pause"),
+        loop: MessageUtils.checkIDComponent("button.loop"),
+        loop_one: MessageUtils.checkIDComponent("button.loop_one")
+    };
+
+    /**
+     * @author SNIPPIK
+     * @description Кнопки для сообщения
+     * @private
+     */
+    public static components: MessageComponents[] = [
+        /**
+         * @description Первый сет кнопок
+         * @private
+         */
+        {
+            type: 1,
+            components: [
+                // Кнопка перетасовки
+                MessageUtils.createButton({env: "shuffle", disabled: true}),
+
+                // Кнопка назад
+                MessageUtils.createButton({env: "back", disabled: true}),
+
+                // Кнопка паузы/продолжить
+                MessageUtils.createButton({emoji: this.button.pause, id: "resume_pause"}),
+
+                // Кнопка пропуска/вперед
+                MessageUtils.createButton({env: "skip"}),
+
+                // Кнопка повтора
+                MessageUtils.createButton({emoji: this.button.loop, id: "repeat"})
+            ]
+        },
+
+        /**
+         * @description Второй сет кнопок
+         * @private
+         */
+        {
+            type: 1,
+            components: [
+                // Кнопка очереди
+                MessageUtils.createButton({env: "queue", disabled: true}),
+
+                // Кнопка текста песни
+                MessageUtils.createButton({env: "lyrics"}),
+
+                // Кнопка стоп
+                MessageUtils.createButton({env: "stop", style: 4}),
+
+                // Кнопка текущих фильтров
+                MessageUtils.createButton({env: "filters", disabled: true}),
+
+                // Кнопка повтора текущего трека
+                MessageUtils.createButton({env: "replay"})
+            ]
+        }
+    ];
+
+    /**
+     * @description Проверка и выдача кнопок
+     * @public
+     */
+    public static component = (player: AudioPlayer) => {
+        const first = this.components[0].components;
+        const two = this.components[1].components;
+
+        if (player.tracks.total > 1) {
+            // Кнопка очереди
+            Object.assign(two[0], { disabled: false });
+
+            // Кнопка перетасовки очереди
+            Object.assign(first[0], { disabled: false });
+
+            // Кнопка назад
+            Object.assign(first[1], { disabled: false, style: 1 });
+
+            // Кнопка вперед
+            Object.assign(first[3], { disabled: false, style: 1 });
+        }
+        else {
+            // Кнопка очереди
+            Object.assign(two[0], { disabled: true });
+
+            // Кнопка перетасовки очереди
+            Object.assign(first[0], { disabled: true });
+
+            // Кнопка назад
+            Object.assign(first[1], { disabled: true, style: 2 });
+
+            // Кнопка вперед
+            Object.assign(first[3], { disabled: true, style: 2 });
+        }
+
+        // Кнопка повтора
+        if (player.tracks.repeat === RepeatType.Song) Object.assign(first[4], { emoji: this.button.loop_one, style: 3 });
+        else if (player.tracks.repeat === RepeatType.Songs) Object.assign(first[4],{ emoji: this.button.loop, style: 3 });
+        else Object.assign(first[4],{ emoji: this.button.loop, style: 2 });
+
+        // Делаем проверку на кнопку ПАУЗА/ПРОДОЛЖИТЬ
+        if (player.status === "player/pause") Object.assign(first[2], { emoji: this.button.resume });
+        else Object.assign(first[2], { emoji: this.button.pause });
+
+        // Кнопка перетасовки очереди
+        if (player.tracks.shuffle) Object.assign(first[0], { style: 3 });
+        else Object.assign(first[0], { style: 2 });
+
+        // Кнопка фильтров
+        if (player.filters.enabled.length === 0) Object.assign(two[3], { disabled: true });
+        else Object.assign(two[3], { disabled: false });
+
+        return this.components;
     };
 }

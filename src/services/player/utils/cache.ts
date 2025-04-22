@@ -4,8 +4,8 @@ import fs from "node:fs";
 // @service modules
 import {Process} from "@service/voice";
 import {Track} from "@service/player";
-import {env} from "@handler";
 import {Cycle} from "@utils";
+import {env} from "@app";
 
 /**
  * @author SNIPPIK
@@ -81,36 +81,37 @@ export class CacheUtility {
      * @param track - Кешируемый трек
      */
     public set = (track: Track) => {
+        if (this.inFile) {
+            setImmediate(async () => {
+                // Сохраняем данные в файл
+                if (!fs.existsSync(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`)) {
+                    fs.mkdirSync(`${this.dirname}/Data/${track.api.url}`, {recursive: true});
+
+                    // Создаем файл
+                    fs.createWriteStream(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`).destroy();
+
+                    // Записываем данные в файл
+                    fs.writeFile(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`, JSON.stringify({
+                        track: {
+                            ...track["_information"]["_track"],
+                            time: track["_information"]["_duration"],
+                            audio: null
+                        },
+                        api: track["_information"]["_api"]
+                    }), () => {});
+                }
+            });
+        }
+
         // Если включен режим без кеширования в файл
-        if (!this.inFile) {
+        else {
             const song = this.data.tracks.get(track.ID);
 
             // Если уже сохранен трек
             if (song) return;
 
             this.data.tracks.set(track.ID, track);
-            return;
         }
-
-        setImmediate(async () => {
-            // Сохраняем данные в файл
-            if (!fs.existsSync(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`)) {
-                fs.mkdirSync(`${this.dirname}/Data/${track.api.url}`, {recursive: true});
-
-                // Создаем файл
-                fs.createWriteStream(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`).destroy();
-
-                // Записываем данные в файл
-                fs.writeFile(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`, JSON.stringify({
-                    track: {
-                        ...track["_information"]["_track"],
-                        time: track["_information"]["_duration"],
-                        audio: null
-                    },
-                    api: track["_information"]["_api"]
-                }), () => {});
-            }
-        });
     };
 
     /**
@@ -118,27 +119,29 @@ export class CacheUtility {
      * @param ID - Идентификатор трека
      */
     public get = (ID: string): Track | null => {
+        if (this.inFile) {
+            // Если есть трек в кеше
+            if (fs.existsSync(`${this.dirname}/Data/${ID}.json`)) {
+                try {
+                    // Если трек кеширован в файл
+                    const json = JSON.parse(fs.readFileSync(`${this.dirname}/Data/${ID}.json`, "utf8"));
+
+                    // Если трек был найден среди файлов
+                    if (json) return new Track(json.track, json.api);
+                } catch {
+                    return null;
+                }
+            }
+        }
+
         // Если включен режим без кеширования в файл
-        if (!this.inFile) {
-            const track = this.data.tracks.get(ID);
+        else {
+            const track = this.data.tracks.get(ID.split("/").at(-1));
 
             // Если трек кеширован в память, то выдаем данные
             if (track) return track;
-            return null;
         }
 
-        // Если есть трек в кеше
-        if (fs.existsSync(`${this.dirname}/Data/${ID}.json`)) {
-            try {
-                // Если трек кеширован в файл
-                const json = JSON.parse(fs.readFileSync(`${this.dirname}/Data/${ID}.json`, "utf8"));
-
-                // Если трек был найден среди файлов
-                if (json) return new Track(json.track, json.api);
-            } catch {
-                return null;
-            }
-        }
         return null;
     };
 }

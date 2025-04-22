@@ -3,8 +3,7 @@ import {AudioPlayer, Queue, Track} from "@service/player";
 import {Colors, Attachment} from "discord.js";
 import {RestRequest} from "@handler/rest/apis";
 import {locale} from "@service/locale";
-import {env} from "@handler";
-import {db} from "@app";
+import {env, db} from "@app";
 
 
 export * from "./structures/track";
@@ -176,7 +175,6 @@ class AudioCycles {
                     remove: (item) => { MessageUtils.deleteMessage(item, 200) },
                     push: (item) => {
                         const old = this.array.find(msg => msg.guild.id === item.guild.id);
-
                         // Удаляем прошлое сообщение
                         if (old) this.remove(old);
                     }

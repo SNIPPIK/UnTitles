@@ -3,7 +3,8 @@ import {ApplicationCommandOption, Client, Routes} from "discord.js";
 import filters from "@service/player/filters.json";
 import {AudioFilter} from "@service/player";
 import {Logger, Interact} from "@utils";
-import {env, handler} from "@handler";
+import {handler} from "@handler";
+import {env} from "@app";
 
 /**
  * @author SNIPPIK

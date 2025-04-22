@@ -171,6 +171,7 @@ export class VoiceConnection {
 
         // Отправляем данные в adapter
         if (!this.adapter.sendPayload(config)) this.status = VoiceConnectionStatus.Disconnected;
+        this.rejoin();
     };
 
     /**

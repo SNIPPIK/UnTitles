@@ -4,8 +4,7 @@ import {Colors, Events} from "discord.js";
 import {Interact, Assign} from "@utils";
 import {locale} from "@service/locale";
 import {Event} from "@handler/events";
-import {db} from "@app";
-import {env} from "@handler";
+import {env, db} from "@app";
 
 /**
  * @author SNIPPIK
@@ -67,7 +66,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 const VoiceChannel = (message.member as GuildMember)?.voice?.channel;
 
                 // Если музыка играет в другом голосовом канале
-                if (message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
+                if (message.guild.members.me?.voice?.channel && message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
                     // Если включена музыка на сервере
                     if (queue) {
                         // Если есть голосовое подключение
@@ -128,23 +127,14 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             name: Events.InteractionCreate,
             type: "client",
             once: false,
-            execute: async (message) => {
-                // Какие действия надо просто игнорировать
-                if (
-                    // Игнорируем ботов
-                    (message.user || message?.member?.user).bot ||
-
-                    // Системные кнопки которые не отслеживаются здесь!
-                    "customId" in message && (`${message.customId}`.startsWith("menu_"))
-                ) return;
-
+            execute: async (ctx) => {
                 // Модифицированный класс сообщения
-                const interact = new Interact(message);
+                const interact = new Interact(ctx);
 
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
-                    if (db.whitelist.ids.length > 0 && !db.whitelist.ids.includes(message.user.id)) {
+                    if (db.whitelist.ids.length > 0 && !db.whitelist.ids.includes(ctx.user.id)) {
                         interact.FBuilder = {
                             description: locale._(interact.locale, "whitelist.message", [interact.author]),
                             color: Colors.Yellow
@@ -157,7 +147,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 // Если включен режим черного списка
                 else if (db.blacklist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
-                    if (db.blacklist.ids.length > 0 && !db.blacklist.ids.includes(message.user.id)) {
+                    if (db.blacklist.ids.length > 0 && !db.blacklist.ids.includes(ctx.user.id)) {
                         interact.FBuilder = {
                             description: locale._(interact.locale, "blacklist.message", [interact.author]),
                             color: Colors.Yellow
@@ -168,20 +158,20 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 }
 
                 // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
-                else if (!db.owner.ids.includes(message.user.id) && !message.isAutocomplete()) {
-                    const user = this.cooldown.db.get(message.user.id);
+                else if (!db.owner.ids.includes(ctx.user.id) && !ctx.isAutocomplete()) {
+                    const user = this.cooldown.db.get(ctx.user.id);
 
                     // Если нет пользователя в системе ожидания
                     if (!user) {
                         // Добавляем пользователя в систему ожидания
-                        this.cooldown.db.set(message.user.id, Date.now() + (this.cooldown.time * 1e3));
+                        this.cooldown.db.set(ctx.user.id, Date.now() + (this.cooldown.time * 1e3));
                     }
 
                     // Если пользователь уже в списке
                     else {
                         // Если время еще не прошло говорим пользователю об этом
                         if (user >= Date.now()) {
-                            if (message.isAutocomplete()) return;
+                            if (ctx.isAutocomplete()) return;
 
                             interact.FBuilder = {
                                 description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0), 5]),
@@ -191,15 +181,15 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                         }
 
                         // Удаляем пользователя из базы
-                        this.cooldown.db.delete(message.user.id);
+                        this.cooldown.db.delete(ctx.user.id);
                     }
                 }
 
 
                 // Если используется функция ответа от бота
-                if (message.isAutocomplete()) {
+                if (ctx.isAutocomplete()) {
                     // Если пользователь ищет трек
-                    if (message.commandName === "play") {
+                    if (ctx.commandName === "play") {
                         const args = interact.options._hoistedOptions;
 
                         // Если ничего не было указано или указана ссылка
@@ -216,12 +206,12 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 }
 
                 // Если пользователь использует команду
-                else if (message.isChatInputCommand() && !message.isAutocomplete()) {
+                else if (ctx.isChatInputCommand() && !ctx.isAutocomplete()) {
                     const command = interact.command;
 
                     // Если нет команды
                     if (!command) {
-                        db.commands.remove(message.client, message.commandGuildId, message.commandId);
+                        db.commands.remove(ctx.client, ctx.commandGuildId, ctx.commandId);
                         interact.FBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
                         return;
                     }
@@ -250,21 +240,23 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     }
 
                     // Если надо дать время на обработку
-                    if (command.deferReply) await message.deferReply().catch(() => {});
+                    if (command.deferReply) await ctx.deferReply().catch(() => {});
 
                     // Выполняем команду
-                    interact.command.execute({
-                        message: interact,
-                        args: interact.options?._hoistedOptions?.map((f) => `${f.value}`),
-                        type: interact.options._subcommand
-                    });
+                    interact.command.execute(
+                        {
+                            message: interact,
+                            args: interact.options?._hoistedOptions?.map((f) => `${f.value}`),
+                            type: interact.options._subcommand
+                        }
+                    );
 
                     // Завершаем действие
                     return;
                 }
 
                 // Управление кнопками
-                else if (message.isButton()) {
+                else if (ctx.isButton()) {
                     const button = db.buttons.get(interact.custom_id);
                     const queue = interact?.queue;
 

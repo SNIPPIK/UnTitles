@@ -1,4 +1,4 @@
-import { EventEmitter } from "node:events";
+import { EventEmitterAsyncResource } from "node:events";
 
 /**
  * @author SNIPPIK
@@ -24,7 +24,7 @@ type DefaultListener = {
  * @class TypedEmitter
  * @abstract
  */
-export abstract class TypedEmitter<L extends ListenerSignature<L> = DefaultListener> extends EventEmitter {
+export abstract class TypedEmitter<L extends ListenerSignature<L> = DefaultListener> extends EventEmitterAsyncResource {
     static defaultMaxListeners: number;
     //@ts-ignore
     addListener<U extends keyof L>(event: U, listener: L[U]): this;

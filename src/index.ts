@@ -1,19 +1,24 @@
-import {Client, ShardingManager, IntentsBitField, Partials, Options, Colors, WebhookClient} from "discord.js";
-import {DiscordGatewayAdapterCreator, VoiceConnection} from "@service/voice";
-import {ActivityType} from "discord-api-types/v10";
-import {isMainThread} from "node:worker_threads";
-import {ActivityOptions} from "@type/discord";
-import {Logger, Collection} from "@utils";
-import {env} from "@handler";
-import {global} from "@type";
+import {Environment} from "./environment";
 
-// db modules
+/**
+ * @author SNIPPIK
+ * @description Взаимодействуем с environment variables
+ * @class Environment
+ */
+export let env: Environment = new Environment();
+
+
+import {Client, ShardingManager, Partials, Options, Colors, WebhookClient} from "discord.js";
+import {DiscordGatewayAdapterCreator, VoiceConnection} from "@service/voice";
 import {CacheUtility} from "@service/player/utils/cache";
+import {isMainThread} from "node:worker_threads";
 import {RestObject} from "@handler/rest/apis";
 import {Commands} from "@handler/commands";
+import {Logger, Collection} from "@utils";
 import {Buttons} from "@handler/modals";
 import {Events} from "@handler/events";
 import {Queues} from "@service/player";
+
 
 /**
  * @author SNIPPIK
@@ -197,7 +202,6 @@ export var db: Database = null;
          * @description Если требуется запустить осколок
          */
         default: {
-            Logger.log("DEBUG", `[Core] adding utilities${global}`);
             Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
 
             // Создаем webhook клиент
@@ -209,12 +213,12 @@ export var db: Database = null;
             const client = new Client({
                 // Права бота
                 intents: [
-                    IntentsBitField.Flags.DirectMessages,
-                    IntentsBitField.Flags.GuildExpressions,
-                    IntentsBitField.Flags.GuildIntegrations,
-                    IntentsBitField.Flags.GuildVoiceStates,
-                    IntentsBitField.Flags.GuildMessages,
-                    IntentsBitField.Flags.Guilds
+                    "Guilds",
+                    "GuildMessages",
+                    "GuildVoiceStates",
+                    "GuildIntegrations",
+                    "GuildExpressions",
+                    "DirectMessages"
                 ],
 
                 // Позволяет обрабатывать частичные данные
@@ -251,26 +255,6 @@ export var db: Database = null;
                 // Что делаем после того как бот подключится к discord api
                 .then(async () => {
                     Logger.log("WARN", `[Core/${id}] connected to discord as ${Logger.color(35, client.user.tag)}`);
-
-                    // Даем разрешение на запуск интервала
-                    if (id === 0) {
-                        // Время обновления статуса
-                        const timeout = parseInt(env.get("client.presence.interval"));
-
-                        // Интервал для обновления статуса
-                        setInterval(async () => {
-                            // Задаем статус боту
-                            client.user.setPresence({
-                                status: env.get("client.status", "online"),
-                                activities: [
-                                    {
-                                        name: env.get("client.presence.name", "I ❤️ UnTitles bot"),
-                                        type: ActivityType[env.get("client.presence.type", "Watching")],
-                                    }
-                                ] as ActivityOptions[],
-                            });
-                        }, timeout * 1e3);
-                    }
                 })
 
                 // Что делаем после подключения к discord api
