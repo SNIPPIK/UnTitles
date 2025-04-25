@@ -26,79 +26,29 @@ const mRegex = (pattern: string | RegExp, text: string) => {
     return match ? match[1].replace(/\$/g, "\\$") : null;
 };
 
-const extractTCEVariable = (body) => {
-    const tceVarsMatch = body.match(new RegExp(TCE_GLOBAL_VARS_REGEXP, "m"));
-    if (tceVarsMatch) {
-        return new TCEVariable(
-            tceVarsMatch[2],
-            tceVarsMatch[1],
-            tceVarsMatch[1].split("=")[1].trim()
-        );
-    }
-
-    const tceVarsMatchJava = body.match(new RegExp(TCE_GLOBAL_VARS_PATTERN_JAVA));
-    if (tceVarsMatchJava && tceVarsMatchJava.groups) {
-        return new TCEVariable(
-            tceVarsMatchJava.groups.varname,
-            tceVarsMatchJava.groups.code,
-            tceVarsMatchJava.groups.value
-        );
-    }
-
-    return null;
-};
-const extractSigFunctionTCE = (body, tceVariable) => {
-    if (!tceVariable) return null;
-
+/**
+ * @author SNIPPIK
+ * @description Поиск вспомогательных данных
+ * @param body - Страница
+ */
+const extractTceFunc = (body: string) => {
     try {
-        const sigFunctionMatch = body.match(new RegExp(SIG_FUNCTION_TCE_PATTERN));
-        if (!sigFunctionMatch) return null;
-        const sigFunctionActionsMatch = body.match(new RegExp(TCE_SIG_FUNCTION_ACTIONS_PATTERN));
-        if (!sigFunctionActionsMatch) return null;
+        const tceVariableMatcher = body.match(new RegExp(NEW_TCE_GLOBAL_VARS_REGEXP, 'm'));
 
-        return {
-            sigFunction: sigFunctionMatch[0],
-            sigFunctionActions: sigFunctionActionsMatch[0],
-            actionVarName: sigFunctionActionsMatch[1] || "Dw"
-        };
+        if (!tceVariableMatcher) return null;
+
+        const tceVariableMatcherGroups = tceVariableMatcher.groups;
+        if (!tceVariableMatcher.groups) return null;
+
+        const code = tceVariableMatcherGroups.code;
+        const varname = tceVariableMatcherGroups.varname;
+
+        return { name: varname, code: code };
     } catch (e) {
+        console.error("Error in extractTceFunc:", e);
         return null;
     }
-};
-const extractNFunctionTCE = (body, tceVariable) => {
-    if (!tceVariable) return null;
-
-    try {
-        const nFunctionMatch = body.match(new RegExp(N_FUNCTION_TCE_PATTERN, "s"));
-        if (!nFunctionMatch) {
-            const nTceMatch = body.match(new RegExp(N_TRANSFORM_TCE_REGEXP, "s"));
-            if (!nTceMatch) return null;
-            return nTceMatch[0];
-        }
-
-        let nFunction = nFunctionMatch[0];
-        const shortCircuitPattern = new RegExp(
-            `;\\s*if\\s*\\(\\s*typeof\\s+[a-zA-Z0-9_$]+\\s*===?\\s*(?:"undefined"|'undefined'|${tceVariable.getEscapedName()}\\[\\d+\\])\\s*\\)\\s*return\\s+\\w+;`
-        );
-
-        if (shortCircuitPattern.test(nFunction)) {
-            nFunction = nFunction.replace(shortCircuitPattern, ";");
-        } else {
-            const paramMatch = nFunction.match(/function\s*\(\s*(\w+)\s*\)/);
-            if (paramMatch) {
-                const paramName = paramMatch[1];
-                nFunction = nFunction.replace(
-                    new RegExp(`if\\s*\\(typeof\\s*[^\\s()]+\\s*===?.*?\\)return ${paramName}\\s*;?`, "g"),
-                    ""
-                );
-            }
-        }
-
-        return nFunction;
-    } catch (e) {
-        return null;
-    }
-};
+}
 
 
 /**
@@ -112,39 +62,31 @@ class Youtube_decoder_native {
      * @author SNIPPIK
      * @description Функции для расшифровки
      */
-    private static extractors: { name: string, callback: (body: string) => any }[] = [
+    private static extractors: { name: string, callback: (body: string, name: string, code: number) => any }[] = [
         /**
          * @description Получаем функцию с данными
          */
         {
             name: "extractDecipherFunction",
-            callback: (body) => {
+            callback: (body, _, code) => {
                 try {
-                    const tceVariable = extractTCEVariable(body);
-                    if (tceVariable) {
+                    const callerFunc = DECIPHER_FUNC_NAME + "(" + DECIPHER_ARGUMENT + ");";
+                    let resultFunc;
 
-                        const tceSigResult = extractSigFunctionTCE(body, tceVariable);
-                        const nFunction = extractNFunctionTCE(body, tceVariable);
+                    const sigFunctionMatcher = body.match(new RegExp(TCE_SIGN_FUNCTION_REGEXP, 's'));
+                    const sigFunctionActionsMatcher = body.match(new RegExp(TCE_SIGN_FUNCTION_ACTION_REGEXP, 's'));
 
-                        if (tceSigResult && nFunction) {
-                            const { sigFunction, sigFunctionActions } = tceSigResult;
-                            return {
-                                script: `${tceVariable.getCode()}\n${sigFunctionActions}\nvar ${DECIPHER_FUNC_NAME}=${sigFunction};\nvar ${N_TRANSFORM_FUNC_NAME}=${nFunction};\n`,
-                                decipher: `${DECIPHER_FUNC_NAME}(${DECIPHER_ARGUMENT});`,
-                                nTransform: `${N_TRANSFORM_FUNC_NAME}(${N_ARGUMENT});`,
-                                isTCE: true
-                            };
-                        } else {
-                        }
+                    if (sigFunctionMatcher && sigFunctionActionsMatcher && code) {
+                        resultFunc = "var " + DECIPHER_FUNC_NAME + "=" + sigFunctionMatcher[0] + sigFunctionActionsMatcher[0] + code + ";\n";
+                        return resultFunc + callerFunc;
                     }
 
                     const helperMatch = body.match(new RegExp(HELPER_REGEXP, "s"));
-                    if (!helperMatch) {
-                        return null;
-                    }
+                    if (!helperMatch) return null;
 
                     const helperObject = helperMatch[0];
                     const actionBody = helperMatch[2];
+
                     const reverseKey = mRegex(REVERSE_PATTERN, actionBody);
                     const sliceKey = mRegex(SLICE_PATTERN, actionBody);
                     const spliceKey = mRegex(SPLICE_PATTERN, actionBody);
@@ -154,9 +96,7 @@ class Youtube_decoder_native {
                         .filter(Boolean)
                         .map(key => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
-                    if (quotedFunctions.length === 0) {
-                        return null;
-                    }
+                    if (quotedFunctions.length === 0) return null;
 
                     let funcMatch = body.match(new RegExp(DECIPHER_REGEXP, "s"));
                     let isTce = false;
@@ -165,10 +105,9 @@ class Youtube_decoder_native {
                     if (funcMatch) {
                         decipherFunc = funcMatch[0];
                     } else {
+
                         const tceFuncMatch = body.match(new RegExp(FUNCTION_TCE_REGEXP, "s"));
-                        if (!tceFuncMatch) {
-                            return null;
-                        }
+                        if (!tceFuncMatch) return null;
 
                         decipherFunc = tceFuncMatch[0];
                         isTce = true;
@@ -181,14 +120,11 @@ class Youtube_decoder_native {
                             tceVars = tceVarsMatch[1] + ";\n";
                         }
                     }
-                    const result = {
-                        script: tceVars + helperObject + "\nvar " + DECIPHER_FUNC_NAME + "=" + decipherFunc + ";\n",
-                        decipher: DECIPHER_FUNC_NAME + "(" + DECIPHER_ARGUMENT + ");",
-                        isTCE: false
-                    };
 
-                    return result;
+                    resultFunc = tceVars + helperObject + "\nvar " + DECIPHER_FUNC_NAME + "=" + decipherFunc + ";\n";
+                    return resultFunc + callerFunc;
                 } catch (e) {
+                    console.error("Error in extractDecipherFunc:", e);
                     return null;
                 }
             }
@@ -199,40 +135,51 @@ class Youtube_decoder_native {
          */
         {
             name: "extractNTransformFunction",
-            callback: (body) => {
+            callback: (body, name, code) => {
                 try {
-                    const tceVariable = extractTCEVariable(body);
-                    if (tceVariable) {
-                        const nFunction = extractNFunctionTCE(body, tceVariable);
-                        if (nFunction) {
-                            return {
-                                already: true
-                            };
+                    const callerFunc = N_TRANSFORM_FUNC_NAME + "(" + N_ARGUMENT + ");";
+                    let resultFunc;
+                    let nFunction;
+
+                    const nFunctionMatcher = body.match(new RegExp(TCE_N_FUNCTION_REGEXP, 's'));
+
+                    if (nFunctionMatcher && name && code) {
+                        nFunction = nFunctionMatcher[0];
+
+                        const tceEscapeName = name.replace("$", "\\$");
+                        const shortCircuitPattern = new RegExp(
+                            `;\\s*if\\s*\\(\\s*typeof\\s+[a-zA-Z0-9_$]+\\s*===?\\s*(?:\"undefined\"|'undefined'|${tceEscapeName}\\[\\d+\\])\\s*\\)\\s*return\\s+\\w+;`
+                        );
+
+                        const tceShortCircuitMatcher = nFunction.match(shortCircuitPattern);
+
+                        if (tceShortCircuitMatcher) {
+                            nFunction = nFunction.replaceAll(tceShortCircuitMatcher[0], ";");
                         }
+
+                        resultFunc = "var " + N_TRANSFORM_FUNC_NAME + "=" + nFunction + code + ";\n";
+                        return resultFunc + callerFunc;
                     }
 
                     let nMatch = body.match(new RegExp(N_TRANSFORM_REGEXP, "s"));
                     let isTce = false;
-                    let nFunction;
 
                     if (nMatch) {
                         nFunction = nMatch[0];
                     } else {
+
                         const nTceMatch = body.match(new RegExp(N_TRANSFORM_TCE_REGEXP, "s"));
-                        if (!nTceMatch) {
-                            return null;
-                        }
+                        if (!nTceMatch) return null;
 
                         nFunction = nTceMatch[0];
                         isTce = true;
                     }
 
                     const paramMatch = nFunction.match(/function\s*\(\s*(\w+)\s*\)/);
-                    if (!paramMatch) {
-                        return null;
-                    }
+                    if (!paramMatch) return null;
 
                     const paramName = paramMatch[1];
+
                     const cleanedFunction = nFunction.replace(
                         new RegExp(`if\\s*\\(typeof\\s*[^\\s()]+\\s*===?.*?\\)return ${paramName}\\s*;?`, "g"),
                         ""
@@ -246,13 +193,10 @@ class Youtube_decoder_native {
                         }
                     }
 
-                    const result = {
-                        script: tceVars + "var " + N_TRANSFORM_FUNC_NAME + "=" + cleanedFunction + ";\n",
-                        nTransform: N_TRANSFORM_FUNC_NAME + "(" + N_ARGUMENT + ");",
-                        isTCE: false
-                    };
-                    return result;
+                    resultFunc = tceVars + "var " + N_TRANSFORM_FUNC_NAME + "=" + cleanedFunction + ";\n";
+                    return resultFunc + callerFunc;
                 } catch (e) {
+                    console.error("Error in extractNTransformFunc:", e);
                     return null;
                 }
             }
@@ -351,119 +295,62 @@ class Youtube_decoder_native {
 
         if (body instanceof Error) return null;
 
-        try {
-            const decipherResult = this.extractDecipher(body);
-            const nTransformResult = this.extractNTransform(body);
-            if (decipherResult) {
-                try {
-                    const context = {};
-                    context[DECIPHER_ARGUMENT] = "testValue";
-                    decipherResult.runInNewContext(context);
-                } catch (error) {
-                }
-            }
-
-            if (nTransformResult) {
-                try {
-                    const context = {};
-                    context[N_ARGUMENT] = "testValue";
-                    nTransformResult.runInNewContext(context);
-                } catch (error) {
-                }
-            }
-
-            return [decipherResult, nTransformResult];
-        } catch (error) {
-            return [null, null];
-        }
+        const { name, code } = extractTceFunc(body);
+        return [this.extractDecipher(body, name, code), this.extractNTransform(body, name, code)];
     };
 
     /**
      * @description Извлекает функции расшифровки N типа
      * @param body - Страница плеера
+     * @param name - Имя функции
+     * @param code - Данные функции
      * @private
      */
-    private static extractNTransform = (body: string) => {
-        try {
-            const decipherFuncResult = this.extractors[0].callback(body);
-            if (decipherFuncResult && decipherFuncResult.isTCE && decipherFuncResult.nTransform) {
-                try {
-                    const scriptText = decipherFuncResult.script + '\n' + decipherFuncResult.nTransform;
-                    return new Script(scriptText);
-                } catch (err) {
-                }
-            }
-
-            const nTransformFuncResult = this.extractors[1].callback(body);
-            if (nTransformFuncResult && nTransformFuncResult.already) {
-                return null;
-            }
-
-            if (nTransformFuncResult) {
-                try {
-                    const scriptText = nTransformFuncResult.script + '\n' + nTransformFuncResult.nTransform;
-                    return new Script(scriptText);
-                } catch (err) {
-                }
-            }
-
-            return null;
-        } catch (error) {
-            return null;
-        }
+    private static extractNTransform = (body: string, name: string, code: string) => {
+        const nTransformFunc = this.extraction([this.extractors[1].callback], body, name, code);
+        if (!nTransformFunc) return null;
+        return nTransformFunc;
     };
 
     /**
      * @description Извлекает функции расшифровки сигнатур и преобразования n параметров из файла html5 player.
      * @param body - Страница плеера
+     * @param name - Имя функции
+     * @param code - Данные функции
      * @private
      */
-    private static extractDecipher = (body: string) => {
-        const decipherFunc = this.extractors[0].callback(body);
+    private static extractDecipher = (body: string, name: string, code: string) => {
+        const decipherFunc = this.extraction([this.extractors[0].callback], body, name, code);
         if (!decipherFunc) return null;
+        return decipherFunc;
+    };
 
-        if (decipherFunc) {
+    /**
+     * @description Получаем функции для расшифровки
+     * @param extractFunctions - Функция расшифровки
+     * @param body - Станица youtube
+     * @param name - Имя функции
+     * @param code - Данные функции
+     * @param postProcess - Если есть возможность обработать сторонний код
+     * @private
+     */
+    private static extraction = (extractFunctions: Function[], body: string, name: string, code: string, postProcess = null) => {
+        for (const extractFunction of extractFunctions) {
             try {
-                if (decipherFunc.isTCE) {
-                    const scriptText = decipherFunc.script + '\n' + decipherFunc.decipher;
-                    return new Script(scriptText);
-                }
-                const scriptText = decipherFunc.script + '\n' + decipherFunc.decipher;
-                return new Script(scriptText);
-            } catch (err) {
+                // Если есть функция
+                const func = extractFunction(body, name, code);
+
+                // Если нет функции
+                if (!func) continue;
+
+                // Выполняем виртуальный код
+                return new Script(postProcess ? postProcess(func) : func);
+            } catch {
             }
         }
 
-        return decipherFunc;
+        return null;
     };
-}
-
-class TCEVariable {
-    public name: string;
-    public code: number;
-    public value: string;
-
-    constructor(name, code, value) {
-        this.name = name;
-        this.code = code;
-        this.value = value;
-    }
-
-    getEscapedName() {
-        return this.name.replace(/\$/g, "\\$");
-    }
-
-    getName() {
-        return this.name;
-    }
-
-    getCode() {
-        return this.code;
-    }
-
-    getValue() {
-        return this.value;
-    }
 }
 
 
@@ -528,16 +415,6 @@ const FUNCTION_TCE_REGEXP =
     "\\s*((?:(?:\\w=)?[a-zA-Z_\\$][a-zA-Z0-9_\\$]*(?:\\[\\\"|\\.)[a-zA-Z_\\$][a-zA-Z0-9_\\$]*(?:\\\"\\]|)\\(\\w,\\d+\\);)+)" +
     "return \\w\\.join\\((?:\"\"|[a-zA-Z0-9_$]*\\[\\d+])\\)}";
 
-const SIG_FUNCTION_TCE_PATTERN =
-    "function\\(\\s*([a-zA-Z0-9$])\\s*\\)\\s*\\{" +
-    "\\s*\\1\\s*=\\s*\\1\\[(\\w+)\\[\\d+\\]\\]\\(\\2\\[\\d+\\]\\);" +
-    "([a-zA-Z0-9$]+)\\[\\2\\[\\d+\\]\\]\\(\\s*\\1\\s*,\\s*\\d+\\s*\\);" +
-    "\\s*\\3\\[\\2\\[\\d+\\]\\]\\(\\s*\\1\\s*,\\s*\\d+\\s*\\);" +
-    ".*?return\\s*\\1\\[\\2\\[\\d+\\]\\]\\(\\2\\[\\d+\\]\\)\\};";
-
-const TCE_SIG_FUNCTION_ACTIONS_PATTERN =
-    "var\\s*([a-zA-Z0-9$_]+)\\s*=\\s*\\{\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\((\\w+|\\s*\\w+\\s*,\\s*\\w+\\s*)\\)\\s*\\{\\s*(\\s*var\\s*\\w+=\\w+\\[\\d+\\];\\w+\\[\\d+\\]\\s*=\\s*\\w+\\[\\w+\\s*\\%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\];\\s*\\w+\\[\\w+\\s*%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\]\\s*=\\s*\\w+\\s*\\},|\\w+\\[\\w+\\[\\d+\\]\\]\\(\\)\\},)\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\((\\s*\\w+\\w*,\\s*\\w+\\s*|\\w+)\\)\\s*\\{(\\w+\\[\\w+\\[\\d+\\]\\]\\(\\)|\\s*var\\s*\\w+\\s*=\\s*\\w+\\[\\d+\\]\\s*;\\w+\\[\\d+\\]\\s*=\\w+\\[\\s*\\w+\\s*%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\]\\s*;\\w+\\[\\s*\\w+\\s*%\\s*\\w\\[\\w+\\[\\d+\\]\\]\\]\\s*=\\s*\\w+\\s*)\\},\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\s*\\(\\s*\\w+\\s*,\\s*\\w+\\s*\\)\\{\\w+\\[\\w+\\[\\d+\\]\\]\\(\\s*\\d+\\s*,\\s*\\w+\\s*\\)\\}\\};";
-
 const N_TRANSFORM_REGEXP =
     "function\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
     "var\\s*(\\w+)=(?:\\1\\.split\\(.*?\\)|String\\.prototype\\.split\\.call\\(\\1,.*?\\))," +
@@ -550,11 +427,8 @@ const N_TRANSFORM_TCE_REGEXP =
     "function\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
     "\\s*var\\s*(\\w+)=\\1\\.split\\(\\1\\.slice\\(0,0\\)\\),\\s*(\\w+)=\\[.*?];" +
     ".*?catch\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
-    "\\s*return(?:\"[^\"]+\"|\\s*[a-zA-Z0-9_$]*\\[\\d+])\\s*\\+\\s*\\1\\s*}" +
+    "\\s*return(?:\"[^\"]+\"|\\s*[a-zA-Z_0-9$]*\\[\\d+])\\s*\\+\\s*\\1\\s*}" +
     "\\s*return\\s*\\2\\.join\\((?:\"\"|[a-zA-Z_0-9$]*\\[\\d+])\\)};";
-
-const N_FUNCTION_TCE_PATTERN =
-    "function\\s*\\((\\w+)\\)\\s*\\{var\\s*\\w+\\s*=\\s*\\1\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\s*,\\s*\\w+\\s*=\\s*\\[.*?\\]\\;.*?catch\\(\\s*(\\w+)\\s*\\s*\\)\\s*\\{return\\s*\\w+\\[\\d+\\](\\+\\1)?\\}\\s*return\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\}\\;";
 
 const TCE_GLOBAL_VARS_REGEXP =
     "(?:^|[;,])\\s*(var\\s+([\\w$]+)\\s*=\\s*" +
@@ -565,11 +439,9 @@ const TCE_GLOBAL_VARS_REGEXP =
     "\\))" +
     "|" +
     "\\[\\s*(?:([\"'])(?:\\\\.|[^\\\\])*?\\6\\s*,?\\s*)+\\]" +
-    "|" +
-    "\"[^\"]*\"\\.split\\(\"[^\"]*\"\\)" +
     "))(?=\\s*[,;])";
 
-const TCE_GLOBAL_VARS_PATTERN_JAVA =
+const NEW_TCE_GLOBAL_VARS_REGEXP =
     "('use\\s*strict';)?" +
     "(?<code>var\\s*" +
     "(?<varname>[a-zA-Z0-9_$]+)\\s*=\\s*" +
@@ -587,6 +459,16 @@ const TCE_GLOBAL_VARS_PATTERN_JAVA =
     "\"[^\"]*\"\\.split\\(\"[^\"]*\"\\)" +
     ")" +
     ")";
+
+const TCE_SIGN_FUNCTION_REGEXP = "function\\(\\s*([a-zA-Z0-9$])\\s*\\)\\s*\\{" +
+    "\\s*\\1\\s*=\\s*\\1\\[(\\w+)\\[\\d+\\]\\]\\(\\2\\[\\d+\\]\\);" +
+    "([a-zA-Z0-9$]+)\\[\\2\\[\\d+\\]\\]\\(\\s*\\1\\s*,\\s*\\d+\\s*\\);" +
+    "\\s*\\3\\[\\2\\[\\d+\\]\\]\\(\\s*\\1\\s*,\\s*\\d+\\s*\\);" +
+    ".*?return\\s*\\1\\[\\2\\[\\d+\\]\\]\\(\\2\\[\\d+\\]\\)\\};";
+
+const TCE_SIGN_FUNCTION_ACTION_REGEXP = "var\\s*[a-zA-Z0-9$_]+\\s*=\\s*\\{\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\((\\w+|\\s*\\w+\\s*,\\s*\\w+\\s*)\\)\\s*\\{\\s*(\\s*var\\s*\\w+=\\w+\\[\\d+\\];\\w+\\[\\d+\\]\\s*=\\s*\\w+\\[\\w+\\s*\\%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\];\\s*\\w+\\[\\w+\\s*%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\]\\s*=\\s*\\w+\\s*\\},|\\w+\\[\\w+\\[\\d+\\]\\]\\(\\)\\},)\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\((\\s*\\w+\\w*,\\s*\\w+\\s*|\\w+)\\)\\s*\\{(\\w+\\[\\w+\\[\\d+\\]\\]\\(\\)|\\s*var\\s*\\w+\\s*=\\s*\\w+\\[\\d+\\]\\s*;\\w+\\[\\d+\\]\\s*=\\w+\\[\\s*\\w+\\s*%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\]\\s*;\\w+\\[\\s*\\w+\\s*%\\s*\\w\\[\\w+\\[\\d+\\]\\]\\]\\s*=\\s*\\w+\\s*)\\},\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\s*\\(\\s*\\w+\\s*,\\s*\\w+\\s*\\)\\{\\w+\\[\\w+\\[\\d+\\]\\]\\(\\s*\\d+\\s*,\\s*\\w+\\s*\\)\\}\\};";
+
+const TCE_N_FUNCTION_REGEXP = "function\\s*\\((\\w+)\\)\\s*\\{var\\s*\\w+\\s*=\\s*\\1\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\s*,\\s*\\w+\\s*=\\s*\\[.*?\\]\\;.*?catch\\(\\s*(\\w+)\\s*\\s*\\)\\s*\\{return\\s*\\w+\\[\\d+\\](\\+\\1)?\\}\\s*return\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\}\\;";
 
 const PATTERN_PREFIX = "(?:^|,)\\\"?(" + VARIABLE_PART + ")\\\"?";
 const REVERSE_PATTERN = new RegExp(PATTERN_PREFIX + REVERSE_PART, "m");

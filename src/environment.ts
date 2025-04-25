@@ -52,5 +52,3 @@ export class Environment {
  * @type EnvironmentOut
  */
 type EnvironmentOut<T> = T extends boolean ? T : T extends string ? T : T extends number ? string : never;
-
-

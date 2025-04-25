@@ -88,13 +88,13 @@ export class Encryption {
         // SSRC
         rtp_packet.writeUIntBE(ssrc, 8, 4);
 
+        // Зашифрованный звук
+        rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
+
         connectionData.nonce++;
 
         // Если нет пакета или номер пакет превышен максимальный, то его надо сбросить
-        if (connectionData.nonce > MAX_NONCE_SIZE) {
-            connectionData.nonce = 0;
-        }
-
+        if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
         connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
         return this.crypto(packet, connectionData, rtp_packet);
     };

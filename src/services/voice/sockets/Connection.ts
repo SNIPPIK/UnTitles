@@ -1,4 +1,5 @@
 import {GatewayOpcodes, GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData} from "discord-api-types/v10";
+import {DiscordGatewayAdapterCreator, DiscordGatewayAdapterImplementerMethods} from "@structures/discord/modules/VoiceManager";
 import {VoiceConnectionStatus, VoiceSocket, VoiceSocketState, VoiceSocketStatusCode} from "@service/voice";
 
 /**
@@ -19,15 +20,15 @@ export class VoiceConnection {
      * @private
      */
     private state = {
-        status: null as VoiceConnectionStatus,
+        status: VoiceConnectionStatus.Signalling as VoiceConnectionStatus,
         socket: null as VoiceSocket
     };
 
     /**
-     * @description
-     * @private
+     * @description Функции для общения с websocket клиента
+     * @public
      */
-    private adapter: VoiceAdapter = new VoiceAdapter();
+    public adapter: VoiceAdapter = new VoiceAdapter();
 
     /**
      * @description Текущая конфигурация голосового подключения
@@ -75,8 +76,13 @@ export class VoiceConnection {
      * @param status - Статус
      */
     public set status(status) {
+        // Уничтожаем старый адаптер
+        if (this.state.status !== VoiceConnectionStatus.Destroyed && status === VoiceConnectionStatus.Destroyed) {
+            this.adapter.adapter.destroy();
+        }
+
         // Если уже установлен такой статус
-        if (status === this.state.status) return;
+        else if (status === this.state.status) return;
 
         // Меняем статус
         this.state.status = status;
@@ -137,7 +143,6 @@ export class VoiceConnection {
      * @public
      */
     public constructor(config: VoiceConnectionConfig, adapterCreator: DiscordGatewayAdapterCreator) {
-        this.status = VoiceConnectionStatus.Signalling;
         this.configuration = config;
         this.adapter.adapter = adapterCreator({
             /**
@@ -147,14 +152,10 @@ export class VoiceConnection {
              */
             onVoiceServerUpdate: (packet: GatewayVoiceServerUpdateDispatchData) => {
                 this.adapter.packets.server = packet;
-                const state = this.state;
 
                 if (packet.endpoint) this.configureSocket();
-                else if (state.status !== VoiceConnectionStatus.Destroyed) {
-                    this.state.status = VoiceConnectionStatus.Disconnected;
-                }
+                else if (this.status !== VoiceConnectionStatus.Destroyed) this.state.status = VoiceConnectionStatus.Disconnected;
             },
-
             /**
              * @description Регистрирует пакет `VOICE_STATE_UPDATE` для голосового соединения. Самое главное, он сохраняет идентификатор
              * канала, к которому подключен клиент.
@@ -163,15 +164,13 @@ export class VoiceConnection {
              */
             onVoiceStateUpdate: (packet: GatewayVoiceStateUpdateDispatchData) => {
                 this.adapter.packets.state = packet;
-
                 if (packet.channel_id) this.configuration.channel_id = packet.channel_id;
             },
             destroy: this.destroy
         });
 
-        // Отправляем данные в adapter
-        if (!this.adapter.sendPayload(config)) this.status = VoiceConnectionStatus.Disconnected;
-        this.rejoin();
+        // Отправляем данные что мы хотим подключится
+        this.adapter.sendPayload(this.config);
     };
 
     /**
@@ -180,10 +179,8 @@ export class VoiceConnection {
      * @public
      */
     public rejoin = (configuration?: VoiceConnectionConfig) => {
-        const state = this.state;
-
         // Если статус не дает переподключиться
-        if (state.status === VoiceConnectionStatus.Destroyed) return false;
+        if (this.status === VoiceConnectionStatus.Destroyed) return false;
 
         // Если еще можно переподключиться
         else if (this.adapter.sendPayload(this.config)) {
@@ -195,7 +192,7 @@ export class VoiceConnection {
         this.status = VoiceConnectionStatus.Disconnected;
 
         // Обновляем конфиг
-        this.configuration = configuration;
+        if (configuration) this.configuration = configuration;
         return false;
     };
 
@@ -227,7 +224,7 @@ export class VoiceConnection {
         this.network = new VoiceSocket({
             sessionId: state.session_id,
             endpoint: server.endpoint,
-            serverId: server.guild_id,
+            serverId: server["guild_id"] ?? server["guildId"],
             userId: state.user_id,
             token: server.token
         });
@@ -375,47 +372,3 @@ interface VoiceConnectionConfig {
      */
     self_stream?: boolean;
 }
-
-/**
- * @description Шлюз Discord Адаптер, шлюза Discord.
- */
-interface DiscordGatewayAdapterLibraryMethods {
-    /**
-     * @description Call this when the adapter can no longer be used (e.g. due to a disconnect from the main gateway)
-     */
-    destroy(): void;
-    /**
-     * @description Call this when you receive a VOICE_SERVER_UPDATE payload that is relevant to the adapter.
-     * @param data - The inner data of the VOICE_SERVER_UPDATE payload
-     */
-    onVoiceServerUpdate(data: GatewayVoiceServerUpdateDispatchData): void;
-    /**
-     * @description Call this when you receive a VOICE_STATE_UPDATE payload that is relevant to the adapter.
-     * @param data - The inner data of the VOICE_STATE_UPDATE payload
-     */
-    onVoiceStateUpdate(data: GatewayVoiceStateUpdateDispatchData): void;
-}
-
-/**
- * @description Методы, предоставляемые разработчиком адаптера Discord Gateway для DiscordGatewayAdapter.
- */
-interface DiscordGatewayAdapterImplementerMethods {
-    /**
-     * @description Это будет вызвано voice, когда адаптер можно будет безопасно уничтожить, поскольку он больше не будет использоваться.
-     */
-    destroy(): void;
-    /**
-     * @description Реализуйте этот метод таким образом, чтобы данная полезная нагрузка отправлялась на основное соединение Discord gateway.
-     * @param payload - Полезная нагрузка для отправки на основное соединение Discord gateway
-     * @returns `false`, если полезная нагрузка определенно не была отправлена - в этом случае голосовое соединение отключается
-     */
-    sendPayload(payload: any): boolean;
-}
-
-/**
- * Функция, используемая для создания адаптеров. Она принимает параметр methods, содержащий функции, которые
- * могут быть вызваны разработчиком при получении новых данных по его шлюзовому соединению. В свою очередь,
- * разработчик вернет некоторые методы, которые может вызывать библиотека - например, для отправки сообщений на
- * шлюз или для подачи сигнала о том, что адаптер может быть удален.
- */
-export type DiscordGatewayAdapterCreator = ( methods: DiscordGatewayAdapterLibraryMethods) => DiscordGatewayAdapterImplementerMethods;

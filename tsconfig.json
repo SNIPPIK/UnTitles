@@ -12,11 +12,11 @@
       "@handler": ["./handlers/index"],
       "@handler/*": ["./handlers/*"],
 
+      "@structures/*": ["./structures/*"],
+      "@structures": ["./structures/index"],
+
       "@utils": ["./utils/index"],
       "@service/*": ["./services/*"],
-
-      "@type": ["./types/global"],
-      "@type/*": ["./types/*"],
 
       "@app": ["index"],
     },

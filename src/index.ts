@@ -1,4 +1,8 @@
+import {DiscordClient, ShardManager} from "@structures";
 import {Environment} from "./environment";
+import {Colors, WebhookClient} from "discord.js";
+import {isMainThread} from "node:worker_threads";
+import {Logger} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -8,17 +12,16 @@ import {Environment} from "./environment";
 export let env: Environment = new Environment();
 
 
-import {Client, ShardingManager, Partials, Options, Colors, WebhookClient} from "discord.js";
-import {DiscordGatewayAdapterCreator, VoiceConnection} from "@service/voice";
+
+import {VoiceConnection, VoiceConnectionStatus} from "@service/voice";
+import {DiscordGatewayAdapterCreator} from "@structures";
 import {CacheUtility} from "@service/player/utils/cache";
-import {isMainThread} from "node:worker_threads";
 import {RestObject} from "@handler/rest/apis";
 import {Commands} from "@handler/commands";
-import {Logger, Collection} from "@utils";
 import {Buttons} from "@handler/modals";
 import {Events} from "@handler/events";
 import {Queues} from "@service/player";
-
+import {Collection} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -62,7 +65,7 @@ export class Database {
         /**
          * @description Подключение к голосовому каналу
          * @param config - Данные для подключения
-         * @param adapterCreator - Для отправки пакетов
+         * @param adapterCreator
          * @public
          */
         public join = (config: VoiceConnection["config"], adapterCreator: DiscordGatewayAdapterCreator) => {
@@ -75,8 +78,12 @@ export class Database {
                 this.set(config.guild_id, connection);
             }
 
-            // Если есть голосовое подключение
-            else connection.rejoin();
+
+            // Если есть голосовое подключение, то подключаемся заново
+            else if (connection && connection.status !== VoiceConnectionStatus.Destroyed) {
+                if (connection.status === VoiceConnectionStatus.Signalling) connection.rejoin(config);
+                else connection.adapter.sendPayload(config);
+            }
 
             return connection;
         };
@@ -157,6 +164,7 @@ export class Database {
  */
 export var db: Database = null;
 
+
 /**
  * @author SNIPPIK
  * @description Запуск всего проекта в async режиме
@@ -175,25 +183,7 @@ export var db: Database = null;
             Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
 
             // Создаем менеджер осколков
-            const manager = new ShardingManager(__filename, {
-                execArgv: ["-r", "tsconfig-paths/register"],
-                token: env.get("token.discord"),
-                mode: "process",
-                respawn: true,
-                silent: false
-            });
-
-            // Слушаем событие для создания осколка
-            manager.on("shardCreate", async (shard) => {
-                shard.setMaxListeners(3);
-                shard.on("spawn", () => Logger.log("LOG", `[Manager/${shard.id}] shard ${Logger.color(36, `added to manager`)}`));
-                shard.on("ready", () => Logger.log("LOG", `[Manager/${shard.id}] shard is ${Logger.color(36, `ready`)}`));
-                shard.on("death", () => Logger.log("LOG", `[Manager/${shard.id}] shard is ${Logger.color(31, `killed`)}`));
-            });
-            manager.setMaxListeners(1);
-
-            // Создаем дубликат
-            manager.spawn({amount: "auto", delay: -1}).catch((err: Error) => Logger.log("ERROR", `[Manager] ${err}`));
+            new ShardManager(__filename);
             break;
         }
 
@@ -210,41 +200,7 @@ export var db: Database = null;
             const webhook = webhookID && webhookToken ? new WebhookClient({ id: webhookID, token: webhookToken }) : null;
 
             // Создаем класс осколка
-            const client = new Client({
-                // Права бота
-                intents: [
-                    "Guilds",
-                    "GuildMessages",
-                    "GuildVoiceStates",
-                    "GuildIntegrations",
-                    "GuildExpressions",
-                    "DirectMessages"
-                ],
-
-                // Позволяет обрабатывать частичные данные
-                partials: [
-                    Partials.Channel,
-                    Partials.GuildMember,
-                    Partials.Message,
-                    Partials.Reaction,
-                    Partials.User,
-                    Partials.GuildScheduledEvent,
-                    Partials.ThreadMember
-                ],
-
-                // Задаем параметры кеша
-                makeCache: Options.cacheWithLimits({
-                    ...Options.DefaultMakeCacheSettings,
-                    GuildBanManager: 0,
-                    GuildForumThreadManager: 0,
-                    AutoModerationRuleManager: 0,
-                    DMMessageManager: 0,
-                    GuildInviteManager: 0,
-                    GuildEmojiManager: 0,
-                    GuildStickerManager: 0,
-                    GuildTextThreadManager: 0
-                })
-            });
+            const client = new DiscordClient();
             const id = client.shard?.ids[0] ?? 0;
 
             db = new Database();

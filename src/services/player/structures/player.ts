@@ -7,6 +7,7 @@ import {db} from "@app";
 import {PlayerProgress} from "../modules/progress";
 import {PlayerVoice} from "../modules/voice";
 import {PlayerAudio} from "../modules/audio";
+import {RepeatType} from "../modules/tracks";
 
 /**
  * @author SNIPPIK
@@ -175,12 +176,58 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         super();
         this.id = guild;
 
-        // Загружаем события плеера
-        for (const event of db.events.emitter.player)
-            this.addListener(event, (...args: any) => db.events.emitter.emit(event, ...args));
-
         // Добавляем плеер в базу для отправки пакетов
         db.queues.cycles.players.set(this);
+
+        /**
+         * @description Событие смены позиции плеера
+         * @private
+         */
+        this.on("player/wait", (player) => {
+            const repeat = player.tracks.repeat;
+            const current = player.tracks.position;
+
+            // Если включен повтор трека сменить позицию нельзя
+            if (repeat === RepeatType.Song) player.tracks.position = current;
+
+            // Если включен повтор треков или его вовсе нет
+            else {
+                // Меняем позицию трека в списке
+                player.tracks.position = player.tracks.position + 1;
+
+                // Если повтор выключен
+                if (repeat === RepeatType.None) {
+
+                    // Если очередь началась заново
+                    if (current + 1 === player.tracks.total && player.tracks.position === 0) {
+                        const queue = db.queues.get(player.id);
+
+                        return queue.cleanup();
+                    }
+                }
+            }
+
+            // Через время запускаем трек, что-бы не нарушать работу VoiceSocket
+            // Что будет если нарушить работу VoiceSocket, пинг >=1000
+            setTimeout(player.play, 2e3);
+        });
+
+        /**
+         * @description Событие получения ошибки плеера
+         * @private
+         */
+        this.on("player/error", (player, _, skip) => {
+            const queue = db.queues.get(player.id);
+
+            // Заставляем плеер пропустить этот трек
+            if (skip) {
+                setImmediate(() => {
+                    player.tracks.remove(skip.position);
+
+                    if (player.tracks.size === 0) queue.cleanup();
+                })
+            }
+        });
     };
 
     /**
