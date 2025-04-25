@@ -244,7 +244,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     // Отправляем данные событию для отображения ошибки
                     this.emit("player/error", this, "Timeout the stream has been exceeded!", {
                         skip: true,
-                        position: position ?? this.tracks.indexOf(track)
+                        position: position || this.tracks.indexOf(track)
                     });
 
                     // Уничтожаем поток

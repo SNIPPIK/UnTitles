@@ -64,14 +64,17 @@ class player_error extends Assign<Event<"player/error">> {
             execute: (player, err, skip) => {
                 const queue = db.queues.get(player.id);
 
+                // Выводим сообщение об ошибке
+                db.events.emitter.emit("message/error", queue, err, skip.position);
+
                 // Заставляем плеер пропустить этот трек
                 if (skip) {
-                    if (player.tracks.size === 1) queue.cleanup();
-                    else player.tracks.remove(skip.position);
-                }
+                    setImmediate(() => {
+                        player.tracks.remove(skip.position);
 
-                // Выводим сообщение об ошибке
-                db.events.emitter.emit("message/error", queue, err);
+                        if (player.tracks.size === 0) queue.cleanup();
+                    })
+                }
             }
         });
     };

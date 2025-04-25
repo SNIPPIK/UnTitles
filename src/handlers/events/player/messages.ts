@@ -18,11 +18,11 @@ class message_error extends Assign<Event<"message/error">> {
             name: "message/error",
             type: "player",
             once: false,
-            execute: (queue, error) => {
+            execute: (queue, error, position) => {
                 // Если нет треков или трека?!
                 if (!queue?.tracks || !queue?.tracks!.track) return;
 
-                const {api, artist, image, user, name} = queue.tracks.track;
+                const {api, artist, image, user, name} = queue.tracks.get(position);
                 new queue.message.builder().addEmbeds([
                     {
                         color: api.color, thumbnail: image, timestamp: new Date(),

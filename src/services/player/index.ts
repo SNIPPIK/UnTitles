@@ -266,7 +266,7 @@ export interface QueuesEvents {
      * @param queue     - Очередь сервера
      * @param error     - Ошибка в формате string или в типе Error
      */
-    readonly "message/error": (queue: Queue, error?: string | Error) => void;
+    readonly "message/error": (queue: Queue, error?: string | Error, position?: number) => void;
 
     /**
      * @description Событие при котором будет произведен поиск данных через систему API
