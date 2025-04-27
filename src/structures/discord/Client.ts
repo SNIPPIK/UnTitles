@@ -55,15 +55,15 @@ export class DiscordClient extends Client {
         // Время обновления статуса
         const timeout = parseInt(env.get("client.presence.interval"));
         const array: { name: string; type: ActivityType }[] = JSON.parse(env.get("client.presence.array"));
+        const size = array.length - 1;
         let i = 0;
 
         // Интервал для обновления статуса
         setInterval(async () => {
             // Запрещаем выходить за диапазон допустимого значения
-            if (i >= array.length) i = 0;
-            else i++;
-
+            if (i > size) i = 0;
             const activity = array[i];
+            i++;
 
             // Задаем статус боту
             this.user.setPresence({
@@ -76,6 +76,7 @@ export class DiscordClient extends Client {
                 ] as ActivityOptions[],
                 shardId: this.shard?.ids[0] ?? 0
             });
+
         }, timeout * 1e3);
     };
 }
