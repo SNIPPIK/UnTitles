@@ -68,4 +68,4 @@ class RestDiscordAPI extends Assign<RestAPI> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({ RestApiDiscord: RestDiscordAPI });
+export default [RestDiscordAPI];

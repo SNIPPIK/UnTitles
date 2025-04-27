@@ -117,19 +117,28 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                 // Если ID видео не удалось извлечь из ссылки
                                 if (!ID) return resolve(locale.err("api.request.id.track"));
 
-                                // Интеграция с утилитой кеширования
                                 const cache = db.cache.get(`${RestYouTubeAPI._platform.url}/${ID}`);
 
-                                // Если найден трек или похожий объект
-                                if (cache && !options?.audio) return resolve(cache);
+                                // Если трек есть в кеше
+                                if (cache) {
+                                    // Если включена утилита кеширования аудио
+                                    if (db.cache.audio) {
+                                        // Если есть кеш аудио
+                                        if (db.cache.audio.status(cache).status === "ended") return resolve(cache);
+                                        else if (!options.audio) return resolve(cache);
+                                    }
+                                }
 
                                 const api = await RestYouTubeAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
 
-                                /// Если при получении данных возникла ошибка
+                                // Если при получении данных возникла ошибка
                                 if (api instanceof Error) return resolve(api);
 
                                 // Класс трека
                                 const track = RestYouTubeAPI.track(api["videoDetails"]);
+
+                                // Сохраняем кеш в системе
+                                if (!cache) db.cache.set(track);
 
                                 // Если указано получение аудио
                                 if (options.audio) {
@@ -150,9 +159,6 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                     // Если есть расшифровка ссылки видео
                                     if (format) track.link = format["url"];
                                 }
-
-                                // Сохраняем кеш в системе
-                                if (!cache) db.cache.set(track);
 
                                 return resolve(track);
                             } catch (e) {
@@ -438,4 +444,4 @@ class RestYouTubeAPI extends Assign<RestAPI> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({ RestYouTubeAPI });
+export default [RestYouTubeAPI];

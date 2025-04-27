@@ -70,8 +70,15 @@ class RestVKAPI extends Assign<RestAPI> {
                             // Интеграция с утилитой кеширования
                             const cache = db.cache.get(`${RestVKAPI._platform.url}/${ID}`);
 
-                            // Если найден трек или похожий объект
-                            if (cache && !options?.audio) return resolve(cache);
+                            // Если трек есть в кеше
+                            if (cache) {
+                                // Если включена утилита кеширования аудио
+                                if (db.cache.audio) {
+                                    // Если есть кеш аудио
+                                    if (db.cache.audio.status(cache).status === "ended") return resolve(cache);
+                                    else if (!options.audio) return resolve(cache);
+                                }
+                            }
 
                             try {
                                 // Создаем запрос
@@ -191,4 +198,4 @@ class RestVKAPI extends Assign<RestAPI> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({ sAPI: RestVKAPI });
+export default [RestVKAPI];

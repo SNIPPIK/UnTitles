@@ -71,8 +71,15 @@ class RestYandexAPI extends Assign<RestAPI> {
                             // Интеграция с утилитой кеширования
                             const cache = db.cache.get(`${RestYandexAPI._platform.url}/${ID}`);
 
-                            // Если найден трек или похожий объект
-                            if (cache && options?.audio) return resolve(cache);
+                            // Если трек есть в кеше
+                            if (cache) {
+                                // Если включена утилита кеширования аудио
+                                if (db.cache.audio) {
+                                    // Если есть кеш аудио
+                                    if (db.cache.audio.status(cache).status === "ended") return resolve(cache);
+                                    else if (!options.audio) return resolve(cache);
+                                }
+                            }
 
                             try {
                                 // Делаем запрос
@@ -353,4 +360,4 @@ class RestYandexAPI extends Assign<RestAPI> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({ sAPI: RestYandexAPI });
+export default [RestYandexAPI];
