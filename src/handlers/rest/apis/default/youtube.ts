@@ -147,7 +147,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                     if (!data["formats"]) return resolve(locale.err("api.request.audio.fail", [RestYouTubeAPI._platform.name]));
 
                                     // Расшифровываем аудио формат
-                                    const format = await RestYouTubeAPI.extractFormat(data);
+                                    const format = await RestYouTubeAPI.extractFormat(data, api.html);
 
                                     // Если есть расшифровка ссылки видео
                                     if (format) track.link = format["url"];
@@ -285,13 +285,12 @@ class RestYouTubeAPI extends Assign<RestAPI> {
 
     /**
      * @description Получаем аудио дорожки
-     * @param url - Ссылка на видео
      * @param data - <videoData>.streamingData все форматы видео, будет выбран оптимальный
      * @param html - Ссылка на html плеер
      * @protected
      * @static
      */
-    protected static extractFormat = (data?: json) => {
+    protected static extractFormat = (data: json, html: string) => {
         return new Promise((resolve) => {
             // Создаем 2 поток
             const worker: Worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {
@@ -300,7 +299,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
             });
 
             // Отправляем сообщение во 2 поток
-            worker.postMessage({formats: data["formats"]});
+            worker.postMessage({formats: data["formats"], html});
 
             // Слушаем ответ от 2 потока
             worker.once("message", (data) => {

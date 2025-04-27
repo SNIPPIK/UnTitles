@@ -34,16 +34,14 @@ const mRegex = (pattern: string | RegExp, text: string) => {
 const extractTceFunc = (body: string) => {
     try {
         const tceVariableMatcher = body.match(new RegExp(NEW_TCE_GLOBAL_VARS_REGEXP, 'm'));
+        const tceVariableMatcherGroups = tceVariableMatcher?.groups;
 
-        if (!tceVariableMatcher) return null;
+        if (!tceVariableMatcher || !tceVariableMatcherGroups) return null;
 
-        const tceVariableMatcherGroups = tceVariableMatcher.groups;
-        if (!tceVariableMatcher.groups) return null;
-
-        const code = tceVariableMatcherGroups.code;
-        const varname = tceVariableMatcherGroups.varname;
-
-        return { name: varname, code: code };
+        return {
+            name: tceVariableMatcherGroups.varname,
+            code: tceVariableMatcherGroups.code
+        };
     } catch (e) {
         console.error("Error in extractTceFunc:", e);
         return null;
@@ -102,10 +100,8 @@ class Youtube_decoder_native {
                     let isTce = false;
                     let decipherFunc;
 
-                    if (funcMatch) {
-                        decipherFunc = funcMatch[0];
-                    } else {
-
+                    if (funcMatch) decipherFunc = funcMatch[0];
+                    else {
                         const tceFuncMatch = body.match(new RegExp(FUNCTION_TCE_REGEXP, "s"));
                         if (!tceFuncMatch) return null;
 
@@ -116,9 +112,7 @@ class Youtube_decoder_native {
                     let tceVars = "";
                     if (isTce) {
                         const tceVarsMatch = body.match(new RegExp(TCE_GLOBAL_VARS_REGEXP, "m"));
-                        if (tceVarsMatch) {
-                            tceVars = tceVarsMatch[1] + ";\n";
-                        }
+                        if (tceVarsMatch) tceVars = tceVarsMatch[1] + ";\n";
                     }
 
                     resultFunc = tceVars + helperObject + "\nvar " + DECIPHER_FUNC_NAME + "=" + decipherFunc + ";\n";
@@ -138,8 +132,8 @@ class Youtube_decoder_native {
             callback: (body, name, code) => {
                 try {
                     const callerFunc = N_TRANSFORM_FUNC_NAME + "(" + N_ARGUMENT + ");";
-                    let resultFunc;
-                    let nFunction;
+                    let resultFunc = "";
+                    let nFunction = "";
 
                     const nFunctionMatcher = body.match(new RegExp(TCE_N_FUNCTION_REGEXP, 's'));
 
@@ -164,9 +158,8 @@ class Youtube_decoder_native {
                     let nMatch = body.match(new RegExp(N_TRANSFORM_REGEXP, "s"));
                     let isTce = false;
 
-                    if (nMatch) {
-                        nFunction = nMatch[0];
-                    } else {
+                    if (nMatch) nFunction = nMatch[0];
+                    else {
 
                         const nTceMatch = body.match(new RegExp(N_TRANSFORM_TCE_REGEXP, "s"));
                         if (!nTceMatch) return null;
@@ -188,9 +181,7 @@ class Youtube_decoder_native {
                     let tceVars = "";
                     if (isTce) {
                         const tceVarsMatch = body.match(new RegExp(TCE_GLOBAL_VARS_REGEXP, "m"));
-                        if (tceVarsMatch) {
-                            tceVars = tceVarsMatch[1] + ";\n";
-                        }
+                        if (tceVarsMatch) tceVars = tceVarsMatch[1] + ";\n";
                     }
 
                     resultFunc = tceVars + "var " + N_TRANSFORM_FUNC_NAME + "=" + cleanedFunction + ";\n";
@@ -228,14 +219,10 @@ class Youtube_decoder_native {
             if (!args.s || !decipher) return args.url;
 
             try {
-
                 const components = new URL(decodeURIComponent(args.url as any));
                 const context = {};
                 context[DECIPHER_ARGUMENT] = decodeURIComponent(args.s as any);
-                const decipheredSig = decipher.runInNewContext({
-                    ...context,
-                    console: console
-                });
+                const decipheredSig = decipher.runInNewContext(context);
 
                 components.searchParams.set((args.sp || "sig" as any), decipheredSig);
                 return components.toString();
@@ -252,19 +239,9 @@ class Youtube_decoder_native {
                 if (!n || !nTransform) return url;
                 const context = {};
                 context[N_ARGUMENT] = n;
-                const transformedN = nTransform.runInNewContext({
-                    ...context,
-                    console: console
-                });
+                const transformedN = nTransform.runInNewContext(context);
 
-                if (transformedN) {
-                    if (n === transformedN) {
-                    } else if (transformedN.startsWith("enhanced_except_") || transformedN.endsWith("_w8_" + n)) {
-                    }
-
-                    components.searchParams.set("n", transformedN);
-                } else {
-                }
+                if (transformedN) components.searchParams.set("n", transformedN);
 
                 return components.toString();
             } catch (err) {
