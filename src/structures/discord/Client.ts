@@ -1,4 +1,6 @@
 import {Client, Partials, Options} from "discord.js";
+import {ActivityType} from "discord-api-types/v10"
+import {env} from "@app";
 
 /**
  * @author SNIPPIK
@@ -42,5 +44,51 @@ export class DiscordClient extends Client {
                 GuildTextThreadManager: 0
             })
         });
+        this.IntervalStatus();
     };
+
+    /**
+     * @description Функция создания и управления статусом
+     * @private
+     */
+    private IntervalStatus = () => {
+        // Время обновления статуса
+        const timeout = parseInt(env.get("client.presence.interval"));
+        const array: { name: string; type: ActivityType }[] = JSON.parse(env.get("client.presence.array"));
+        let i = 0;
+
+        // Интервал для обновления статуса
+        setInterval(async () => {
+            // Запрещаем выходить за диапазон допустимого значения
+            if (i >= array.length) i = 0;
+            else i++;
+
+            const activity = array[i];
+
+            // Задаем статус боту
+            this.user.setPresence({
+                status: env.get("client.status", "online"),
+                activities: [
+                    {
+                        name: activity.name,
+                        type: ActivityType[activity.type as any] as any
+                    }
+                ] as ActivityOptions[],
+                shardId: this.shard?.ids[0] ?? 0
+            });
+        }, timeout * 1e3);
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Параметры показа статуса
+ * @interface ActivityOptions
+ */
+interface ActivityOptions {
+    name: string;
+    state?: string;
+    url?: string;
+    type?: ActivityType;
+    shardId?: number | readonly number[];
 }
