@@ -5,7 +5,7 @@ import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Assign} from "@utils";
 import path from "node:path";
-import {env, db} from "@app";
+import {db} from "@app";
 
 /**
  * @author SNIPPIK
@@ -14,13 +14,6 @@ import {env, db} from "@app";
  * @public
  */
 class RestYouTubeAPI extends Assign<RestAPI> {
-    /**
-     * @description Тип расшифровки аудио ссылок
-     * @readonly
-     * @private
-     */
-    private static readonly _encoder = env.get("youtube.encoder");
-
     /**
      * @description Данные для создания трека с этими данными
      * @protected
@@ -154,7 +147,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                     if (!data["formats"]) return resolve(locale.err("api.request.audio.fail", [RestYouTubeAPI._platform.name]));
 
                                     // Расшифровываем аудио формат
-                                    const format = await RestYouTubeAPI.extractFormat(url, data, api.html);
+                                    const format = await RestYouTubeAPI.extractFormat(data);
 
                                     // Если есть расшифровка ссылки видео
                                     if (format) track.link = format["url"];
@@ -298,7 +291,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
      * @protected
      * @static
      */
-    protected static extractFormat = (url: string, data?: json, html?: string) => {
+    protected static extractFormat = (data?: json) => {
         return new Promise((resolve) => {
             // Создаем 2 поток
             const worker: Worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {
@@ -307,7 +300,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
             });
 
             // Отправляем сообщение во 2 поток
-            worker.postMessage({html, url, formats: data["formats"], type: RestYouTubeAPI._encoder});
+            worker.postMessage({formats: data["formats"]});
 
             // Слушаем ответ от 2 потока
             worker.once("message", (data) => {
