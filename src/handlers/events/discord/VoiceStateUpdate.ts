@@ -49,13 +49,13 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
 
                     // Если есть пользователи
                     if (members > 0) {
-                        // Снимаем плеер с паузы, если она есть!
-                        if (queue.player.status === "player/pause") queue.player.resume();
-
                         // Если есть таймер для удаления очереди
                         if (temp) {
                             clearTimeout(temp);
                             temple_db.delete(guild.id);
+
+                            // Снимаем плеер с паузы, если она есть!
+                            if (queue.player.status === "player/pause") queue.player.resume();
                         }
                     }
 
@@ -89,4 +89,4 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({VoiceStateUpdate});
+export default [VoiceStateUpdate];
