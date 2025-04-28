@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
-    "@types/node": "^22.15.2",
+    "@types/node": "^22.15.3",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },
