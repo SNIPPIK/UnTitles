@@ -2,6 +2,7 @@ import {isMainThread, parentPort} from "node:worker_threads";
 import {httpsClient} from "@handler/rest";
 import querystring from "node:querystring";
 import {Script} from "node:vm";
+import fs from "node:fs";
 
 /**
  * @author SNIPPIK
@@ -10,6 +11,17 @@ import {Script} from "node:vm";
 if (!isMainThread) {
     // Разовое событие
     parentPort.once("message", async (message) => {
+        // Если установлен wrapper
+        if (fs.existsSync("node_modules/ytdlp-nodejs")) {
+            const {YtDlp} = require("ytdlp-nodejs");
+            const ytdlp = new YtDlp();
+
+            const result = await ytdlp.getInfoAsync(message.url);
+            const formats = (result.requested_formats as YouTubeFormat[]).find((format) => !format.fps);
+
+            return parentPort.postMessage(formats);
+        }
+
         const formats = await Youtube_decoder_native.decipherFormats(message.formats, message.html);
         return parentPort.postMessage(formats[0]);
     });
@@ -214,32 +226,30 @@ class Youtube_decoder_native {
     private static getting_url = (format: YouTubeFormat, {decipher, nTransform}: YouTubeChanter): void => {
         if (!format) return;
 
-        const decipherF = url => {
+        const decipherF = (url: string) => {
             const args = querystring.parse(url);
-            if (!args.s || !decipher) return args.url;
+            if (!args.s || !decipher) return args.url as string;
 
             try {
+                const context = { [DECIPHER_ARGUMENT]: decodeURIComponent(args.s as any) };
                 const components = new URL(decodeURIComponent(args.url as any));
-                const context = {};
-                context[DECIPHER_ARGUMENT] = decodeURIComponent(args.s as any);
-                const decipheredSig = decipher.runInNewContext(context);
+                const decipheredSig = decipher.runInNewContext(Object.assign(context, console));
 
                 components.searchParams.set((args.sp || "sig" as any), decipheredSig);
                 return components.toString();
             } catch (err) {
-                return args.url;
+                return args.url as string;
             }
         };
 
-        const nTransformF = url => {
+        const nTransformF = (url: string) => {
             try {
                 const components = new URL(decodeURIComponent(url));
                 const n = components.searchParams.get("n");
 
                 if (!n || !nTransform) return url;
-                const context = {};
-                context[N_ARGUMENT] = n;
-                const transformedN = nTransform.runInNewContext(context);
+                const context = { [N_ARGUMENT]: n };
+                const transformedN = nTransform.runInNewContext(Object.assign(context, console));
 
                 if (transformedN) components.searchParams.set("n", transformedN);
 
@@ -345,6 +355,7 @@ interface YouTubeFormat {
     mimeType?: string;
     bitrate?: number;
     acodec?: string;
+    fps?: number;
 }
 
 /**
