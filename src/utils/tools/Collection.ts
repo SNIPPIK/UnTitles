@@ -70,7 +70,7 @@ export abstract class Collection<K, T = string> {
         // Если не найден объект
         if (!item) return null;
 
-        const cleanupMethods = silent ? ["silent_destroy"] : ["destroy", "silent_destroy"];
+        const cleanupMethods = silent ? ["silent_destroy"] : ["disconnect", "cleanup", "destroy"];
         // Если объект имеет функции удаления от они будут выполнены до удаления
         for (const key of cleanupMethods) {
             const fn = (item as any)[key];
