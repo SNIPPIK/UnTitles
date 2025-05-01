@@ -14,30 +14,15 @@ export class Events extends handler<Event<any>> {
      * @readonly
      * @private
      */
-    public readonly emitter = new class extends TypedEmitter<QueuesEvents & AudioPlayerEvents> {
-        /**
-         * @description Имена событий плеера, с авто поиском
-         * @private
-         */
-        private _playerEvents: (keyof AudioPlayerEvents)[] = null;
-
-        /**
-         * @description События плеера
-         * @return (keyof AudioPlayerEvents)[]
-         */
-        public get player() {
-            if (this._playerEvents) return this._playerEvents;
-
-            this._playerEvents = this.eventNames().filter((item) => (item as string).match(/player\//)) as (keyof AudioPlayerEvents)[];
-            return this._playerEvents;
-        };
-    };
+    public readonly emitter = new class extends TypedEmitter<QueuesEvents & AudioPlayerEvents> {};
 
     /**
      * @description Выдаем все загруженные события
      * @public
      */
-    public get events() { return this.files; };
+    public get events() {
+        return this.files;
+    };
 
     /**
      * @description Загружаем класс вместе с дочерним
@@ -56,7 +41,7 @@ export class Events extends handler<Event<any>> {
 
         // Проверяем ивенты
         for (let item of this.events) {
-            if (item.type === "client") client[item.once ? "once" : "on"](item.name as any, item.execute);
+            if (item?.type === "client") client[item.once ? "once" : "on"](item.name as any, item.execute);
             else this.emitter[item.once ? "once" : "on"](item.name as any, item.execute);
         }
     };
@@ -66,9 +51,14 @@ export class Events extends handler<Event<any>> {
      * @public
      */
     public preregister = (client: Client) => {
-        this.unload();
-        client.removeAllListeners();
         this.emitter.removeAllListeners();
+
+        // Отключаем только загруженные события
+        for (let item of this.events) {
+            client.off(item.name as any, item.execute);
+        }
+
+        // Загружаем события заново
         this.register(client);
     };
 }
@@ -115,7 +105,7 @@ export abstract class Event<T extends keyof ClientEvents | keyof QueuesEvents | 
      * @readonly
      * @public
      */
-    readonly type: EventType<T>;
+    readonly type?: EventType<T>;
 
     /**
      * @description Тип выполнения события

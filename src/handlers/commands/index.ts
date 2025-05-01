@@ -1,9 +1,10 @@
 import type {LocalizationMap, Locale, Permissions} from "discord-api-types/v10";
-import {ApplicationCommandOption, Client, Routes} from "discord.js";
+import {ApplicationCommandOption, Client, Routes, PermissionsString} from "discord.js";
+import {CommandInteraction, CompeteInteraction} from "@structures";
 import filters from "@service/player/filters.json";
 import {AudioFilter} from "@service/player";
-import {Logger, Interact} from "@utils";
 import {handler} from "@handler";
+import {Logger} from "@utils";
 import {env} from "@app";
 
 /**
@@ -51,14 +52,18 @@ export class Commands extends handler<Command> {
      * @return Command[]
      * @public
      */
-    public get owner() { return this.files.filter((command) => command.owner === true); };
+    public get owner() {
+        return this.files.filter(cmd => cmd.owner === true);
+    }
 
     /**
      * @description Команды доступные для всех
      * @return Command[]
      * @public
      */
-    public get public() { return this.files.filter((command) => command.owner !== true); };
+    public get public() {
+        return this.files.filter(cmd => !cmd.owner);
+    }
 
     /**
      * @description Загружаем класс вместе с дочерним
@@ -73,21 +78,13 @@ export class Commands extends handler<Command> {
      * @public
      */
     public get = (names: string | string[]): Command | null => {
-        for (const cmd of this.files) {
-            // Если указанное имя совпало с именем команды
-            if (cmd.name === names) return cmd;
-
-            // Проверяем имена если это список
-            else if (names instanceof Array) {
-                // Проверяем все указанные имена команды
-                for (const name of names) {
-                    // Если нашлась подходящая
-                    if (cmd.name === name || cmd.name === name) return cmd;
-                }
-            }
+        // Если указанное имя совпало с именем команды
+        if (typeof names === "string") {
+            return this.files.find(cmd => cmd.name === names) ?? null;
         }
 
-        return null;
+        // Проверяем имена если это список
+        return this.files.find(cmd => names.includes(cmd.name)) ?? null;
     };
 
     /**
@@ -144,61 +141,206 @@ export class Commands extends handler<Command> {
 
 /**
  * @author SNIPPIK
+ * @description Интерфейс для команд
+ * @interface Command
+ */
+export interface Command {
+    /**
+     * @description Название команды
+     * @private
+     */
+    name?: string;
+
+    /**
+     * @description Переводы названия команды на другие языки
+     * @private
+     */
+    name_localizations?: LocalizationMap;
+
+    /**
+     * @description Описание команды
+     * @private
+     */
+    description?: string;
+
+    /**
+     * @description Описание команды на другие языки
+     * @private
+     */
+    description_localizations?: LocalizationMap;
+
+    /**
+     * @description Можно ли использовать команду в личном текстовом канале
+     * @private
+     */
+    dm_permission?: boolean;
+
+    /**
+     * @description Управление правами
+     * @private
+     */
+    readonly permissions: {
+        /**
+         * @description Права для пользователя
+         */
+        readonly user?: PermissionsString[],
+
+        /**
+         * @description Права для клиента (бота)
+         */
+        readonly client: PermissionsString[]
+    };
+
+    /**
+     * @description Права на использование команды
+     * @private
+     */
+    default_member_permissions?: Permissions | null | undefined;
+
+    /**
+     * @description 18+ доступ
+     * @private
+     */
+    nsfw?: boolean;
+
+    /**
+     * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
+     * @public
+     */
+    readonly integration_types?: number[];
+
+    /**
+     * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
+     * @private
+     */
+    readonly contexts?: number[];
+
+    /**
+     * @description Доп параметры для работы slashCommand
+     * @private
+     */
+    readonly options?: ApplicationCommandOption[];
+
+    /**
+     * @description Команду может использовать только разработчик
+     * @default false
+     * @readonly
+     * @public
+     */
+    readonly owner?: boolean;
+
+    /**
+     * @description Права для использования той или иной команды
+     * @default null
+     * @readonly
+     * @public
+     */
+    readonly rules?: ("voice" | "queue" | "another_voice" | "player-not-playing")[]
+
+    /**
+     * @description Выполнение команды
+     * @default null
+     * @readonly
+     * @public
+     */
+    readonly execute: (options: {
+        /**
+         * @description Сообщение пользователя для работы с discord
+         */
+        message: CommandInteraction;
+
+        /**
+         * @description Тип команды, необходимо для работы много ступенчатых команд
+         * @warning Необходимо правильно понимать логику загрузки команд для работы с этим параметром
+         */
+        type: Command["options"][number]["name"];
+
+        /**
+         * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
+         */
+        args?: SlashCommand.Component["choices"][number]["value"][];
+    }) => any;
+
+    /**
+     * @description Выполнение действия autocomplete
+     * @default null
+     * @readonly
+     * @public
+     */
+    readonly autocomplete?: (options: {
+        /**
+         * @description Сообщение пользователя для работы с discord
+         */
+        message: CompeteInteraction;
+
+        /**
+         * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
+         */
+        args?: SlashCommand.Component["choices"][number]["value"][];
+    }) => any;
+}
+
+/**
+ * @author SNIPPIK
  * @description Декоратор slash команды
  * @constructor
  * @decorator
  */
 export function SlashCommand(options: SlashCommand.Options) {
-    // Если указан конкретный язык
-    let language = env.get("language.command");
-
-    if (!language || language === "null") language = null;
-
     const name_key = Object.keys(options.names)[0] as Locale
-    const name = options.names[language ? language : name_key];
+    const name = options.names[name_key];
     const name_localizations = options.names;
 
     const description_key = Object.keys(options.descriptions)[0] as Locale;
     const description = options.descriptions[description_key];
     const description_localizations = options.descriptions;
 
-    const SubOptions: SlashCommand.Component[] = [];
-
-    // Создаем компонент команды для discord
-    for (let obj of options.options) {
-        // Если надо подменить данные для работы с discord
-        SubOptions.push(
-            {
-                ...obj,
-                name: obj.names[language ? language : Object.keys(obj.names)[0] as Locale],
-                nameLocalizations: obj.names,
-                description: obj.descriptions[Object.keys(obj.descriptions)[0] as Locale],
-                descriptionLocalizations: obj.descriptions,
-                options: obj.options ? obj.options.map((option) => {
-                    return {
-                        ...option,
-                        name: option.names[language ? language : Object.keys(option.names)[0] as Locale],
-                        nameLocalizations: option.names,
-                        description: option.descriptions[Object.keys(option.descriptions)[0] as Locale],
-                        descriptionLocalizations: option.descriptions,
-                    };
-                }) : undefined
-            } as any
-        );
-    }
 
     // Загружаем данные в класс
     return function (target: Function) {
         target.prototype.name = name;
-        target.prototype["name_localizations"] = language ? null : name_localizations;
+        target.prototype["name_localizations"] = name_localizations;
         target.prototype.description = description;
         target.prototype["description_localizations"] = description_localizations;
         target.prototype["default_member_permissions"] = null;
         target.prototype.dm_permission = options?.dm_permission ?? null;
         target.prototype["integration_types"] = [0];
         target.prototype["contexts"] = [0];
-        target.prototype.options = SubOptions;
         target.prototype["nsfw"] = false;
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Декоратор параметром доп команды
+ * @constructor
+ * @decorator
+ */
+export function SlashCommandSubCommand(component: SlashCommand.Component) {
+    const transformed: SlashCommand.Component = {
+        ...component,
+        name: component.names[Object.keys(component.names)[0] as Locale],
+        nameLocalizations: component.names,
+        description: component.descriptions[Object.keys(component.descriptions)[0] as Locale],
+        descriptionLocalizations: component.descriptions,
+        options: component.options
+            ? component.options.map(opt => ({
+                ...opt,
+                name: opt.names[Object.keys(opt.names)[0] as Locale],
+                nameLocalizations: opt.names,
+                description: opt.descriptions[Object.keys(opt.descriptions)[0] as Locale],
+                descriptionLocalizations: opt.descriptions,
+            }))
+            : undefined,
+    } as any;
+
+    return function (target: Function) {
+        // Если нет options — создаём массив
+        if (!Array.isArray(target.prototype.options)) {
+            target.prototype.options = [];
+        }
+        // Добавляем новый объект
+        target.prototype.options.push(transformed);
     };
 }
 
@@ -226,12 +368,6 @@ export namespace SlashCommand {
          * @public
          */
         descriptions: LocalizationMap;
-
-        /**
-         * @description Параметры команды
-         * @public
-         */
-        options: Component[];
 
         /**
          * @description Можно ли использовать эту команду в личных чатах
@@ -312,119 +448,4 @@ export namespace SlashCommand {
          */
         autocomplete?: boolean;
     }
-}
-
-/**
- * @author SNIPPIK
- * @description Интерфейс для команд
- * @interface Command
- */
-export interface Command {
-    /**
-     * @description Название команды
-     * @private
-     */
-    name?: string;
-
-    /**
-     * @description Переводы названия команды на другие языки
-     * @private
-     */
-    name_localizations?: LocalizationMap;
-
-    /**
-     * @description Описание команды
-     * @private
-     */
-    description?: string;
-
-    /**
-     * @description Описание команды на другие языки
-     * @private
-     */
-    description_localizations?: LocalizationMap;
-
-    /**
-     * @description Можно ли использовать команду в личном текстовом канале
-     * @private
-     */
-    dm_permission?: boolean;
-
-    /**
-     * @description Права на использование команды
-     * @private
-     */
-    default_member_permissions?: Permissions | null | undefined;
-
-    /**
-     * @description 18+ доступ
-     * @private
-     */
-    nsfw?: boolean;
-
-    /**
-     * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
-     * @public
-     */
-    readonly integration_types?: number[];
-
-    /**
-     * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
-     * @private
-     */
-    readonly contexts?: number[];
-
-    /**
-     * @description Доп параметры для работы slashCommand
-     * @private
-     */
-    readonly options?: ApplicationCommandOption[];
-
-    /**
-     * @description Команду может использовать только разработчик
-     * @default false
-     * @readonly
-     * @public
-     */
-    readonly owner?: boolean;
-
-    /**
-     * @description Нужно ли дать время на обработку команды
-     * @default false
-     * @readonly
-     * @public
-     */
-    readonly deferReply?: boolean;
-
-    /**
-     * @description Права для использования той или иной команды
-     * @default null
-     * @readonly
-     * @public
-     */
-    readonly rules?: ("voice" | "queue" | "another_voice" | "player-not-playing")[]
-
-    /**
-     * @description Выполнение команды
-     * @default null
-     * @readonly
-     * @public
-     */
-    readonly execute: (options: {
-        /**
-         * @description Сообщение пользователя для работы с discord
-         */
-        message: Interact;
-
-        /**
-         * @description Тип команды, необходимо для работы много ступенчатых команд
-         * @warning Необходимо правильно понимать логику загрузки команд для работы с этим параметром
-         */
-        type: Command["options"][number]["name"];
-
-        /**
-         * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
-         */
-        args?: SlashCommand.Component["choices"][number]["value"][];
-    }) => void;
 }

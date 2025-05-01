@@ -16,7 +16,7 @@ export class Process {
      * @description Процесс запущенный через spawn
      * @private
      */
-    private _process: ChildProcessWithoutNullStreams = null;
+    private _process: ChildProcessWithoutNullStreams;
 
     /**
      * @description Получаем ChildProcessWithoutNullStreams
@@ -24,7 +24,7 @@ export class Process {
      * @public
      */
     public get process() {
-        return this._process;
+        return this._process!;
     };
 
     /**
@@ -33,10 +33,7 @@ export class Process {
      * @public
      */
     public get stdout() {
-        // Если процесс уже уничтожен
-        if (!this._process || this._process.killed) return null;
-
-        return this?.process?.stdout;
+        return this?.process?.stdout ?? null;
     };
 
     /**

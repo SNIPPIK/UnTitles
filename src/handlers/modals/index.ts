@@ -1,5 +1,5 @@
+import {buttonInteraction} from "@structures";
 import {handler} from "@handler";
-import {Interact} from "@utils";
 
 /**
  * @author SNIPPIK
@@ -44,14 +44,7 @@ export class Buttons extends handler<Button> {
  * @description Доступные кнопки
  * @type SupportButtons
  */
-export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters" | MenuButtons;
-
-/**
- * @author SNIPPIK
- * @description Имена кнопок в меню взаимодействия
- * @type MenuButtons
- */
-export type MenuButtons = "menu_back" | "menu_select" | "menu_cancel" | "menu_next";
+export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters";
 
 /**
  * @author SNIPPIK
@@ -68,5 +61,5 @@ export interface Button {
      * @description Функция выполнения кнопки
      * @param msg - Сообщение пользователя
      */
-    callback: (msg: Interact) => void;
+    callback: (ctx: buttonInteraction) => void;
 }

@@ -47,7 +47,7 @@ class RestSpotifyAPI extends Assign<RestAPI> {
          * @description Токен авторизации
          * @protected
          */
-        token: "",
+        token: null,
 
         /**
          * @description Время жизни токена
@@ -237,46 +237,44 @@ class RestSpotifyAPI extends Assign<RestAPI> {
      */
     protected static API = (method: string): Promise<json | Error> => {
         return new Promise(async (resolve) => {
-            try {
-                // Нужно обновить токен
-                if (!(this.authorization.token !== undefined && this.authorization.time > Date.now() + 2)) {
-                    const token = await new httpsClient(`${this.authorization.urls.account}/token`, {
-                        headers: {
-                            "Accept": "application/json",
-                            "Content-Type": "application/x-www-form-urlencoded",
-                            "Authorization": `Basic ${Buffer.from(this.authorization.auth).toString("base64")}`,
-                            "accept-encoding": "gzip, deflate, br"
-                        },
-                        body: "grant_type=client_credentials",
-                        method: "POST"
-                    }).toJson;
-
-                    // Если при получении токена была получена ошибка
-                    if (token instanceof Error) return resolve(token);
-
-                    // Вносим данные авторизации
-                    this.authorization.time = Date.now() + token["expires_in"];
-                    this.authorization.token = token["access_token"];
-                }
-            } finally {
-                new httpsClient(`${this.authorization.urls.api}/${method}`, {
+            const getToken = async () => {
+                const token = await new httpsClient({
+                    url: `${this.authorization.urls.account}/token`,
                     headers: {
-                        "Accept": "application/json",
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Authorization": "Bearer " + this.authorization.token,
-                        "accept-encoding": "gzip, deflate, br"
-                    }
-                }).toJson.then((api) => {
-                    // Если на этапе получение данных получена одна из ошибок
-                    if (!api) return resolve(locale.err("api.request.fail"));
-                    else if (api instanceof Error) return resolve(api);
-                    else if (api.error) return resolve(locale.err( "api.request.fail.msg", [api.error.message]));
+                        "Authorization": `Basic ${Buffer.from(`${this.authorization.auth}`).toString('base64')}`,
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    body: "grant_type=client_credentials",
+                    method: "POST"
+                }).send();
 
-                    return resolve(api);
-                }).catch((err) => {
-                    return resolve(Error(`[APIs]: ${err}`));
-                });
+                // Если при получении токена была получена ошибка
+                if (token instanceof Error) return resolve(token);
+
+                // Вносим данные авторизации
+                this.authorization.time = Date.now() + token["expires_in"];
+                this.authorization.token = token["access_token"];
             }
+
+            // Нужно обновить токен
+            if (!this.authorization.token || this.authorization.time < Date.now()) await getToken();
+
+            new httpsClient({
+                url: `${this.authorization.urls.api}/${method}`,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": "Bearer " + this.authorization.token
+                }
+            }).send().then((api) => {
+                // Если на этапе получение данных получена одна из ошибок
+                if (!api) return resolve(locale.err("api.request.fail"));
+                else if (api instanceof Error) return resolve(api);
+                else if (api.error) return resolve(locale.err("api.request.fail.msg", [api.error.message]));
+
+                return resolve(api);
+            }).catch((err) => {
+                return resolve(Error(`[APIs]: ${err}`));
+            });
         });
     };
 

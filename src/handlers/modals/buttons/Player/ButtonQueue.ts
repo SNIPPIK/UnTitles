@@ -1,63 +1,127 @@
-import {Colors,EmbedData} from "discord.js";
-import {locale} from "@service/locale";
 import {Button} from "@handler/modals";
+import {locale} from "@service/locale"
 import {Assign} from "@utils";
+import {db} from "@app";
 
 class ButtonQueue extends Assign<Button> {
     public constructor() {
         super({
             name: "queue",
-            callback: (msg) => {
-                const queue = msg.queue;
-                const page = parseInt((queue.tracks.position / 5).toFixed(0));
+            callback: async (message) => {
+                const queue = db.queues.get(message.guild.id);
+                let page = parseInt((queue.tracks.position / 5).toFixed(0));
                 const pages = queue.tracks.array(5, true) as string[];
-                const embed: EmbedData = {
-                    color: Colors.Green,
-                    author: {
-                        name: `${locale._(msg.locale, "queue")} - ${msg.guild.name}`,
-                        iconURL: queue.tracks.track.artist.image.url
+                const lang = message.locale;
+                const components = [
+                    // Кнопки
+                    {
+                        type: 1,
+                        components: [
+                            {
+                                type: 2,
+                                style: 2,
+                                emoji: {
+                                    name: "⬅"
+                                },
+                                custom_id: "menu_back",
+                            },
+                            {
+                                type: 2,
+                                style: 4,
+                                emoji: {
+                                    name: "🗑️"
+                                },
+                                custom_id: "menu_cancel"
+                            },
+                            {
+                                type: 2,
+                                style: 2,
+                                emoji: {
+                                    name: "➡"
+                                },
+                                custom_id: "menu_next"
+                            }
+                        ]
                     },
-                    thumbnail: {
-                        url: msg.guild.iconURL()
-                    },
-                    fields: [
-                        {
-                            name: locale._(msg.locale, "player.current.playing"),
-                            value: `\`\`${queue.tracks.position + 1}\`\` - ${queue.tracks.track.name_replace}`
-                        },
-                        pages.length > 0 ? {name: locale._(msg.locale, "queue"), value: pages[page]} : null
-                    ],
-                    footer: {
-                    text: locale._(msg.locale, "player.button.queue.footer", [queue.tracks.track.user.displayName, page + 1, pages.length, queue.tracks.total, queue.tracks.time]),
-                        iconURL: queue.tracks.track.user.avatar
-                    },
-                    timestamp: queue.timestamp
-                };
+                ];
 
-                new msg.builder().addEmbeds([embed])
-                    .setMenu({type: "table", pages, page})
-                    .setTime(60e3)
-                    .setCallback((message, pages: string[], page: number) => {
+
+                return message.reply({
+                    flags: "IsComponentsV2",
+                    components: [
+                        {
+                            "type": 10,
+                            "content": `# ${locale._(lang, "queue")} - ${message.guild.name}\n${pages[0]}\n`
+                        },
+                        {
+                            "type": 14,
+                            "divider": true,
+                            "spacing": 1
+                        },
+                        {
+                            "type": 10,
+                            "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages.length, queue.tracks.total, queue.tracks.time])
+                        },
+                        ...components
+                    ],
+                    withResponse: true
+                }).then((msg) => {
+                    const message = msg.resource.message;
+
+                    // Создаем сборщик
+                    const collector = message.createMessageComponentCollector({
+                        time: 60e3, componentType: 2,
+                        filter: (click) => click.user.id !== msg.client.user.id
+                    });
+
+                    // Собираем кнопки на которые нажал пользователь
+                    collector.on("collect", (i) => {
+                        // Кнопка переключения на предыдущую страницу
+                        if (i.customId === "menu_back") {
+                            // Делаем перелистывание на последнею страницу
+                            if (page === 0) page = pages.length - 1;
+                            else if (pages.length === 1) return null;
+                            else page--;
+                        }
+
+                        // Кнопка переключения на предыдущую страницу
+                        else if (i.customId === "menu_next") {
+                            // Делаем перелистывание на первую страницу
+                            if (page === pages.length) page = 0;
+                            else if (pages.length === 1) return null;
+                            else page++;
+                        }
+
+                        // Кнопка отмены
+                        else if (i.customId === "menu_cancel") {
+                            try { return message.delete(); } catch { return null; }
+                        }
+
                         return message.edit({
-                            embeds: [
+                            components: [
                                 {
-                                    ...embed as any,
-                                    color: Colors.Green,
-                                    fields: [
-                                        embed.fields[0],
-                                        {
-                                            name: locale._(msg.locale, "queue"),
-                                            value: pages[page]
-                                        }
-                                    ],
-                                    footer: {
-                                        ...embed.footer,
-                                        text: locale._(msg.locale, "player.button.queue.footer", [msg.author.username, page + 1, pages.length, queue.tracks.total, queue.tracks.time])
-                                    }
-                                }
+                                    "type": 10,
+                                    "content": `# ${locale._(lang, "queue")} - ${message.guild.name}\n${pages[page]}\n`
+                                },
+                                {
+                                    "type": 14,
+                                    "divider": true,
+                                    "spacing": 1
+                                },
+                                {
+                                    "type": 10,
+                                    "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages.length, queue.tracks.total, queue.tracks.time])
+                                },
+                                ...components
                             ]
-                        });
-                    }).send = msg;
+                        })
+                    });
+
+                    // Таймер для удаления сообщения
+                    setTimeout(() => {
+                        message.delete().catch(() => null);
+                    }, 60e3);
+                })
             }
         });
     };
@@ -67,4 +131,4 @@ class ButtonQueue extends Assign<Button> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default Object.values({ButtonQueue});
+export default [ButtonQueue];

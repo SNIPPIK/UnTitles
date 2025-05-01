@@ -2,21 +2,27 @@ import {locale} from "@service/locale";
 import {Button} from "@handler/modals";
 import {Colors} from "discord.js";
 import {Assign} from "@utils";
+import {db} from "../../../../index";
 
 class ButtonStop extends Assign<Button> {
     public constructor() {
         super({
             name: "stop",
-            callback: (msg) => {
-                const queue = msg.queue;
+            callback: (message) => {
+                const queue = db.queues.get(message.guild.id);
 
                 // Если есть очередь, то удаляем ее
                 if (queue) queue.cleanup();
 
-                msg.FBuilder = {
-                    description: locale._(msg.locale, "player.button.stop"),
-                    color: Colors.Green
-                };
+                return message.reply({
+                    flags: "Ephemeral",
+                    embeds: [
+                        {
+                            description: locale._(message.locale, "player.button.stop"),
+                            color: Colors.Green
+                        }
+                    ]
+                });
             }
         });
     };
@@ -26,4 +32,4 @@ class ButtonStop extends Assign<Button> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default Object.values({ButtonStop});
+export default [ButtonStop];

@@ -1,5 +1,5 @@
-import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {Command, SlashCommand} from "@handler/commands";
+import {ApplicationCommandOptionType, Colors, GuildMember} from "discord.js";
+import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
 import {db} from "@app";
@@ -19,112 +19,114 @@ import {db} from "@app";
         "en-US": "Interaction with voice connections",
         "ru": "Взаимодействие с голосовыми подключениями"
     },
+    dm_permission: false
+})
+@SlashCommandSubCommand({
+    names: {
+        "en-US": "join",
+        "ru": "подключение"
+    },
+    descriptions: {
+        "en-US": "Connecting to voice channel!",
+        "ru": "Подключение к голосовому каналу!"
+    },
+    type: ApplicationCommandOptionType.Subcommand
+})
+@SlashCommandSubCommand({
+    names: {
+        "en-US": "leave",
+        "ru": "отключение"
+    },
+    descriptions: {
+        "en-US": "Disconnecting from the voice channel!",
+        "ru": "Отключение от голосового канала!"
+    },
+    type: ApplicationCommandOptionType.Subcommand
+})
+@SlashCommandSubCommand({
+    names: {
+        "en-US": "re-configure",
+        "ru": "переконфигурация"
+    },
+    descriptions: {
+        "en-US": "Reconnect to the voice channel!",
+        "ru": "Переподключение к голосовому каналу!"
+    },
+    type: ApplicationCommandOptionType.Subcommand
+})
+@SlashCommandSubCommand({
+    names: {
+        "en-US": "tribune",
+        "ru": "трибуна"
+    },
+    descriptions: {
+        "en-US": "Request to broadcast music to the podium!",
+        "ru": "Запрос на транслирование музыки в трибуну!"
+    },
+    type: ApplicationCommandOptionType.Subcommand,
     options: [
         {
             names: {
-                "en-US": "join",
-                "ru": "подключение"
+                "en-US": "choice",
+                "ru": "выбор"
             },
             descriptions: {
-                "en-US": "Connecting to voice channel!",
-                "ru": "Подключение к голосовому каналу!"
+                "en-US": "Options for interacting with the stands!",
+                "ru": "Варианты взаимодействия с трибунами"
             },
-            type: ApplicationCommandOptionType.Subcommand
-        },
-        {
-            names: {
-                "en-US": "leave",
-                "ru": "отключение"
-            },
-            descriptions: {
-                "en-US": "Disconnecting from the voice channel!",
-                "ru": "Отключение от голосового канала!"
-            },
-            type: ApplicationCommandOptionType.Subcommand
-        },
-        {
-            names: {
-                "en-US": "re-configure",
-                "ru": "переконфигурация"
-            },
-            descriptions: {
-                "en-US": "Reconnect to the voice channel!",
-                "ru": "Переподключение к голосовому каналу!"
-            },
-            type: ApplicationCommandOptionType.Subcommand
-        },
-        {
-            names: {
-                "en-US": "tribune",
-                "ru": "трибуна"
-            },
-            descriptions: {
-                "en-US": "Request to broadcast music to the podium!",
-                "ru": "Запрос на транслирование музыки в трибуну!"
-            },
-            type: ApplicationCommandOptionType.Subcommand,
-            options: [
+            required: true,
+            type: ApplicationCommandOptionType["String"],
+            choices: [
                 {
-                    names: {
-                        "en-US": "choice",
-                        "ru": "выбор"
+                    name: "join - Connecting to the podium",
+                    nameLocalizations: {
+                        "ru": "join - Подключение к трибуне"
                     },
-                    descriptions: {
-                        "en-US": "Options for interacting with the stands!",
-                        "ru": "Варианты взаимодействия с трибунами"
+                    value: "join"
+                },
+                {
+                    name: "request - Connection request",
+                    nameLocalizations: {
+                        "ru": "request - Запрос на подключение"
                     },
-                    required: true,
-                    type: ApplicationCommandOptionType["String"],
-                    choices: [
-                        {
-                            name: "join - Connecting to the podium",
-                            nameLocalizations: {
-                                "ru": "join - Подключение к трибуне"
-                            },
-                            value: "join"
-                        },
-                        {
-                            name: "request - Connection request",
-                            nameLocalizations: {
-                                "ru": "request - Запрос на подключение"
-                            },
-                            value: "request"
-                        }
-                    ]
+                    value: "request"
                 }
             ]
         }
-    ],
-    dm_permission: false
+    ]
 })
 class Command_Voice extends Assign<Command> {
     public constructor() {
         super({
+            permissions: {
+                client: ["Connect", "ViewChannel", "SendMessages"]
+            },
             rules: ["voice", "another_voice"],
             execute: async ({message, type, args}) => {
                 const { guild } = message;
-                const VoiceChannel = message.voice.channel;
+                const VoiceChannel = (message.member as GuildMember).voice.channel;
                 const voiceConnection = db.voice.get(guild.id);
-                const queue = message.queue;
+                const queue = db.queues.get(guild.id);
 
                 switch (type) {
                     // Подключение к голосовому каналу
                     case "join": {
                         // Если производится попытка подключится к тому же голосовому каналу
-                        if (voiceConnection && voiceConnection.config.channel_id === VoiceChannel.id) return;
-
-                        // Если есть очередь сервера
-                        if (queue) queue.voice = message.voice;
+                        if (voiceConnection && voiceConnection.config.channel_id === VoiceChannel.id) return null;
 
                         // Подключаемся к голосовому каналу без очереди
                         else db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, guild.voiceAdapterCreator);
 
                         // Отправляем сообщение о подключении к каналу
-                        message.FBuilder = {
-                            color: Colors.Green,
-                            description: locale._(message.locale, "voice.join", [VoiceChannel])
-                        };
-                        return;
+                        return message.reply({
+                            embeds: [
+                                {
+                                    color: Colors.Green,
+                                    description: locale._(message.locale, "voice.join", [VoiceChannel])
+                                }
+                            ],
+                            flags: "Ephemeral"
+                        });
                     }
 
                     // Переконфигурация голосового канала
@@ -136,28 +138,33 @@ class Command_Voice extends Assign<Command> {
                                 if (voiceConnection) {
                                     // Перенастройка подключения
                                     voiceConnection.configureSocket();
+                                    voiceConnection.rejoin();
 
-                                    message.FBuilder = {
-                                        color: Colors.Green,
-                                        description: locale._(message.locale, "voice.rtc")
-                                    };
-                                    return;
-                                }
-
-                                message.FBuilder = {
-                                    color: Colors.DarkRed,
-                                    description: locale._(message.locale, "voice.rtc.fail")
+                                    message.reply({
+                                        embeds: [
+                                            {
+                                                color: Colors.Green,
+                                                description: locale._(message.locale, "voice.rtc")
+                                            }
+                                        ],
+                                        flags: "Ephemeral"
+                                    });
                                 }
                             })
 
                             // Если не получилось сменить регион
                             .catch(() => {
-                                message.FBuilder = {
-                                    color: Colors.DarkRed,
-                                    description: locale._(message.locale, "voice.rtc.fail")
-                                }
+                                message.reply({
+                                    embeds: [
+                                        {
+                                            color: Colors.DarkRed,
+                                            description: locale._(message.locale, "voice.rtc.fail")
+                                        }
+                                    ],
+                                    flags: "Ephemeral"
+                                });
                             })
-                        return;
+                        break;
                     }
 
                     // Отключение от голосового канала
@@ -168,11 +175,15 @@ class Command_Voice extends Assign<Command> {
                         // Отключаемся от голосового канала
                         voiceConnection.disconnect;
 
-                        message.FBuilder = {
-                            color: Colors.Green,
-                            description: locale._(message.locale, "voice.leave", [VoiceChannel])
-                        };
-                        return;
+                        return message.reply({
+                            embeds: [
+                                {
+                                    color: Colors.Green,
+                                    description: locale._(message.locale, "voice.leave", [VoiceChannel])
+                                }
+                            ],
+                            flags: "Ephemeral"
+                        });
                     }
 
                     // Взаимодействие с трибуной
@@ -187,21 +198,30 @@ class Command_Voice extends Assign<Command> {
                             else await me.voice.setRequestToSpeak(true);
                         } catch (err) {
                             // Если не удалось подключиться или сделать запрос
-                            message.FBuilder = {
-                                description: args[0] === "join" ? locale._(message.locale, "voice.tribune.join.fail") : locale._(message.locale, "voice.tribune.join.request.fail"),
-                                color: Colors.DarkRed
-                            };
-                            return;
+                            return message.reply({
+                                embeds: [
+                                    {
+                                        description: args[0] === "join" ? locale._(message.locale, "voice.tribune.join.fail") : locale._(message.locale, "voice.tribune.join.request.fail"),
+                                        color: Colors.DarkRed
+                                    }
+                                ],
+                                flags: "Ephemeral"
+                            });
                         }
 
                         // Если удалось подключиться или сделать запрос
-                        message.FBuilder = {
-                            description: args[0] === "join" ? locale._(message.locale, "voice.tribune.join") : locale._(message.locale, "voice.tribune.join.request"),
-                            color: Colors.Green
-                        }
-                        return;
+                        return message.reply({
+                            embeds: [
+                                {
+                                    description: args[0] === "join" ? locale._(message.locale, "voice.tribune.join") : locale._(message.locale, "voice.tribune.join.request"),
+                                    color: Colors.Green
+                                }
+                            ],
+                            flags: "Ephemeral"
+                        });
                     }
                 }
+                return null;
             }
         });
     };
@@ -211,4 +231,4 @@ class Command_Voice extends Assign<Command> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default Object.values({Command_Voice});
+export default [Command_Voice];

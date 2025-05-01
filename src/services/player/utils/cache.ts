@@ -1,3 +1,4 @@
+import afs from "node:fs/promises";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -80,31 +81,31 @@ export class CacheUtility {
      * @description Сохраняем данные в класс
      * @param track - Кешируемый трек
      */
-    public set = (track: Track) => {
+    public set = async (track: Track) => {
         if (this.inFile) {
-            setImmediate(async () => {
-                // Сохраняем данные в файл
-                if (!fs.existsSync(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`)) {
-                    fs.mkdirSync(`${this.dirname}/Data/${track.api.url}`, {recursive: true});
+            const filePath = path.join(this.dirname, "Data", track.api.url, `${track.ID}.json`);
 
-                    // Создаем файл
-                    fs.createWriteStream(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`).destroy();
+            if (!fs.existsSync(filePath)) {
+                try {
+                    const dirPath = path.dirname(filePath);
+                    await afs.mkdir(dirPath, {recursive: true});
 
-                    // Записываем данные в файл
-                    fs.writeFile(`${this.dirname}/Data/${track.api.url}/${track.ID}.json`, JSON.stringify({
+                    const data = {
                         track: {
                             ...track["_information"]["_track"],
                             time: track["_information"]["_duration"],
                             audio: null
                         },
                         api: track["_information"]["_api"]
-                    }), () => {});
-                }
-            });
-        }
+                    };
 
-        // Если включен режим без кеширования в файл
-        else {
+                    // Записываем данные в файл
+                    await afs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+                } catch (error) {
+                    console.error("Failed to write track cache:", error);
+                }
+            }
+        } else {
             const song = this.data.tracks.get(track.ID);
 
             // Если уже сохранен трек
@@ -170,11 +171,20 @@ class CacheAudio extends Cycle<Track> {
         super({
             name: "AudioFile",
             duration: "promise",
+            custom: {
+                push: (track) => {
+                    // Защита от повторного добавления
+                    setImmediate(async () => {
+                        const find = this.array.filter((item) => track.url === item.url);
+                        if (find.length > 1) this.remove(find[0]);
+                    });
+                }
+            },
             filter: (item) => {
                 const names = this.status(item);
 
-                // Если трек уже есть в кеше или не возможно кешировать из-за длительности
-                if (names.status === "ended" || item.time.total > 600) {
+                // Если такой трек уже есть в системе кеширования
+                if (names.status === "ended" || item.time.total > 1000) {
                     this.remove(item);
                     return false;
                 }

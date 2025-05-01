@@ -3,13 +3,14 @@ import {locale} from "@service/locale";
 import {Button} from "@handler/modals";
 import {Colors} from "discord.js";
 import {Assign} from "@utils";
+import {db} from "@app";
 
 class ButtonBack extends Assign<Button> {
     public constructor() {
         super({
             name: "back",
-            callback: (msg) => {
-                const queue = msg.queue;
+            callback: (message) => {
+                const queue = db.queues.get(message.guild.id);
                 const repeat = queue.tracks.repeat;
 
                 // Делаем повтор временным
@@ -22,10 +23,15 @@ class ButtonBack extends Assign<Button> {
                 queue.tracks.repeat = repeat;
 
                 // Уведомляем пользователя о смене трека
-                msg.FBuilder = {
-                    description: locale._(msg.locale, "player.button.last"),
-                    color: Colors.Green
-                };
+                return message.reply({
+                    flags: "Ephemeral",
+                    embeds: [
+                        {
+                            description: locale._(message.locale, "player.button.last"),
+                            color: Colors.Green
+                        }
+                    ]
+                });
             }
         });
     };
@@ -35,4 +41,4 @@ class ButtonBack extends Assign<Button> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default Object.values({ButtonBack});
+export default [ButtonBack];

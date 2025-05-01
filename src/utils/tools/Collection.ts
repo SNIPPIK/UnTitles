@@ -17,7 +17,7 @@ export abstract class Collection<K, T = string> {
      * @public
      */
     public get array() {
-        return this._map.values();
+        return Array.from(this._map.values());
     };
 
     /**
@@ -33,7 +33,9 @@ export abstract class Collection<K, T = string> {
      * @param ID - ID объекта
      * @public
      */
-    public get = (ID: T) => this._map.get(ID);
+    public get = (ID: T) => {
+        return this._map.get(ID);
+    };
 
     /**
      * @description Добавляем объект в список
@@ -47,7 +49,7 @@ export abstract class Collection<K, T = string> {
 
         // Если нет объекта, то добавляем его
         if (!item) {
-            if (promise) promise(value);
+            promise?.(value);
             this._map.set(ID, value);
             return value;
         }
@@ -65,25 +67,16 @@ export abstract class Collection<K, T = string> {
     public remove = (ID: T, silent: boolean = false) => {
         const item = this._map.get(ID);
 
-        // Если найден объект, то удаляем все сопутствующее, если это возможно
-        if (item) {
+        // Если не найден объект
+        if (!item) return null;
 
-            // Если надо удалить тихо
-            if (silent) {
-                // Если объект имеет функции удаления от они будут выполнены до удаления
-                for (const key of ["silent_destroy"]) {
-                    if (item[key] && typeof item[key] === "function") item[`${key}`]();
-                }
-            } else {
-                // Если объект имеет функции удаления от они будут выполнены до удаления
-                for (const key of ["disconnect", "cleanup", "destroy"]) {
-                    if (item[key] && typeof item[key] === "function") item[`${key}`]();
-                }
-            }
-
-            this._map.delete(ID);
+        const cleanupMethods = silent ? ["silent_destroy"] : ["destroy", "silent_destroy"];
+        // Если объект имеет функции удаления от они будут выполнены до удаления
+        for (const key of cleanupMethods) {
+            const fn = (item as any)[key];
+            if (typeof fn === "function") fn.call(item);
         }
 
-        return;
+        this._map.delete(ID);
     };
 }

@@ -249,15 +249,16 @@ class RestYouTubeAPI extends Assign<RestAPI> {
     protected static API = (url: string): Promise<Error | json> => {
         return new Promise((resolve) => {
             // Если не надо использовать ключ, то используем систему поиска данных по странице
-            new httpsClient(url, {
-                useragent: true,
+            new httpsClient({
+                url,
+                //useragent: true,
                 headers: {
                     "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
                     "accept-encoding": "gzip, compress, deflate, br",
                 }
             })
                 // Получаем исходную страницу
-                .toString
+                .send()
 
                 // Получаем результат из Promise
                 .then((api) => {
@@ -368,12 +369,13 @@ class RestYouTubeAPI extends Assign<RestAPI> {
      */
     protected static getChannel = ({ id, name }: { id: string, name?: string }): Promise<Track.artist> => {
         return new Promise<Track.artist>((resolve) => {
-            new httpsClient(`https://www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`, {
+            new httpsClient({
+                url: `https://www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`,
                 headers: {
                     "x-youtube-client-name": "1",
                     "x-youtube-client-version": "2.20201021.03.00"
                 }
-            }).toJson.then((channel) => {
+            }).send().then((channel) => {
                 if (channel instanceof Error) return resolve(null);
 
                 const data = channel[1]?.response ?? channel?.response ?? null as any;

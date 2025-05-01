@@ -1,8 +1,8 @@
-import {Assign, MessageUtils} from "@utils";
+import {Colors, EmbedData} from "discord.js";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Event} from "@handler/events";
-import {Colors} from "discord.js";
+import {Assign} from "@utils";
 import {db} from "@app";
 
 /**
@@ -18,31 +18,36 @@ class message_error extends Assign<Event<"message/error">> {
             name: "message/error",
             type: "player",
             once: false,
-            execute: (queue, error, position) => {
+            execute: async (queue, error, position) => {
                 // Если нет треков или трека?!
-                if (!queue?.tracks || !queue?.tracks!.track) return;
+                if (!queue?.tracks || !queue?.tracks!.track) return null;
 
-                const {api, artist, image, user, name} = queue.tracks.get(position);
-                new queue.message.builder().addEmbeds([
-                    {
-                        color: api.color, thumbnail: image, timestamp: new Date(),
-                        fields: [
-                            {
-                                name: locale._(queue.message.locale, "player.current.playing"),
-                                value: `\`\`\`${name}\`\`\``
-                            },
-                            {
-                                name: locale._(queue.message.locale, "player.current.error"),
-                                value: `\`\`\`js\n${error}...\`\`\``
+                // Данные трека
+                const {api, artist, image, user, name} = position ? queue.tracks.get(position) : queue.tracks.track;
+
+                setTimeout(() => {
+                    queue.message.send({
+                        embeds: [{
+                            color: api.color, thumbnail: image, timestamp: new Date(),
+                            fields: [
+                                {
+                                    name: locale._(queue.message.locale, "player.current.playing"),
+                                    value: `\`\`\`${name}\`\`\``
+                                },
+                                {
+                                    name: locale._(queue.message.locale, "player.current.error"),
+                                    value: `\`\`\`js\n${error}...\`\`\``
+                                }
+                            ],
+                            author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
+                            footer: {
+                                text: `${user.username} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
+                                iconURL: user?.avatar
                             }
-                        ],
-                        author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
-                        footer: {
-                            text: `${user.displayName} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
-                            iconURL: user?.avatar
-                        }
-                    }
-                ]).setTime(10e3).send = queue.message;
+                        }],
+                        withResponse: true
+                    }).then((msg) => setTimeout(() => msg.delete().catch(() => null), 20e3));
+                }, 700);
             }
         });
     }
@@ -61,22 +66,22 @@ class message_push extends Assign<Event<"message/push">> {
             name: "message/push",
             type: "player",
             once: false,
-            execute: (message, obj) => {
+            execute: async (message, obj) => {
                 const {artist, image } = obj;
 
                 // Отправляем сообщение, о том что было добавлено в очередь
-                new message.builder().addEmbeds([
-                    {
+                return message.channel.send({
+                    embeds: [{
                         color: obj["api"] ? obj["api"]["color"] : Colors.Blue,
                         thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
                         footer: {
-                            iconURL: message.author.avatarURL(),
-                            text: `${message.author.username}`
+                            icon_url: message.member.avatarURL(),
+                            text: `${message.member.displayName}`
                         },
                         author: {
                             name: artist?.title,
                             url: artist?.url,
-                            iconURL: db.images.disk
+                            icon_url: db.images.disk
                         },
                         fields: [
                             {
@@ -92,8 +97,8 @@ class message_push extends Assign<Event<"message/push">> {
                                     `
                             }
                         ]
-                    }
-                ]).setTime(12e3).send = message;
+                    }]
+                }).then((msg) => setTimeout(() => msg.delete().catch(() => null), 12e3));
             }
         });
     };
@@ -114,58 +119,47 @@ class message_playing extends Assign<Event<"message/playing">> {
             once: false,
             execute: async (queue, message) => {
                 const {api, artist, image, name, user} = queue.tracks.track;
-                const builder = new queue.message.builder().addEmbeds([
-                    {
-                        color: api.color, thumbnail: image,
-                        author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
-                        footer: {
-                            text: `${user.displayName} ${queue.tracks.total > 1 ? `| 🎵 ${queue.player.tracks.position + 1} - ${queue.player.tracks.total} 🎶` : ""}`,
-                            iconURL: user.avatar
+                const Embed: EmbedData = {
+                    color: api.color, thumbnail: image,
+                    author: { name: artist.title, url: artist.url, iconURL: artist.image.url },
+                    footer: {
+                        text: `${user.username} ${queue.tracks.total > 1 ? `| 🎵 ${queue.player.tracks.position + 1} - ${queue.player.tracks.total} 🎶` : ""}`,
+                        iconURL: user.avatar
+                    },
+                    fields: [
+                        // Текущий трек
+                        {
+                            name: "",
+                            value: `\`\`\`${name}\`\`\`` + queue.player.progress
                         },
-                        fields: [
-                            // Текущий трек
-                            {
+
+                        // Следующий трек или треки
+                        queue.tracks.size > 0 ? (() => {
+                            const tracks = (queue.tracks.array(+3) as Track[]).map((track, index) => {
+                                return `${index + 2} - ${track.name_replace}`;
+                            });
+
+                            return {
                                 name: "",
-                                value: `\`\`\`${name}\`\`\`` + queue.player.progress
-                            },
-
-                            // Следующий трек или треки
-                            queue.tracks.size > 0 ? (() => {
-                                const tracks = (queue.tracks.array(+3) as Track[]).map((track, index) => {
-                                    return `${index + 2} - ${track.name_replace}`;
-                                });
-
-                                return {
-                                    name: "",
-                                    value: tracks.join("\n")
-                                };
-                            })() : null
-                        ]
-                    }
-                ]);
+                                value: tracks.join("\n")
+                            };
+                        })() : null
+                    ]
+                };
 
                 // Отправляем сообщение
                 if (!message) {
-                    builder.setTime(0).addComponents(queue.components)
-                        // Для обновления сообщений
-                        .setPromise(async (msg) => {
-                            // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
-                            if (!db.queues.cycles.messages.array.includes(msg)) {
-                                // Добавляем сообщение в базу для обновления
-                                db.queues.cycles.messages.set(msg);
-
-                                // Отменяем удаление если оно начато
-                                MessageUtils.deferDeleteMessage(msg.message.id);
-                            }
-                        })
-
-                        // Создаем новое сообщение
-                        .send = queue.message;
-                    return;
+                    return queue.message.send({embeds: [Embed], components: queue.components, withResponse: true}).then((msg) => {
+                        // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
+                        if (!db.queues.cycles.messages.array.includes(msg)) {
+                            // Добавляем сообщение в базу для обновления
+                            db.queues.cycles.messages.set(msg);
+                        }
+                    });
                 }
 
                 // Обновляем сообщение
-                message.edit({ embeds: builder._embeds, components: queue.components }).catch(() => {});
+                message.edit({ embeds: [Embed as any], components: queue.components }).catch(() => {});
             }
         });
     };
@@ -175,4 +169,4 @@ class message_playing extends Assign<Event<"message/playing">> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({message_playing, message_push, message_error});
+export default [message_playing, message_push, message_error];

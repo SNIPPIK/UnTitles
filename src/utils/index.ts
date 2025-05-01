@@ -1,5 +1,3 @@
-export * from "./discord/MessageUtils";
-
 export * from "./tools/Collection";
 export * from "./tools/Assign";
 export * from "./tools/Cycle";
@@ -139,72 +137,5 @@ declare global {
          * @param min {number} Мин число
          */
         random(min?: number): number;
-    }
-}
-
-// For discord.js
-import {SupportButtons} from "@handler/modals";
-import {MessageFlags} from "discord.js";
-declare module "discord.js" {
-    /**
-     * @author SNIPPIK
-     * @description Компоненты кнопок в json объекте
-     * @interface MessageComponents
-     */
-    export interface MessageComponents {
-        type: 1 | 2;
-        components: {
-            type: 1 | 2;
-            emoji?: {
-                id?:   string;
-                name?: string;
-            };
-            custom_id: SupportButtons;
-            style: 1 | 2 | 3 | 4;
-            disabled?: boolean;
-        }[]
-    }
-
-    /**
-     * @author SNIPPIK
-     * @description Параметры для отправки сообщения
-     * @interface MessageSendOptions
-     */
-    export interface MessageSendOptions {
-        components?: (ComponentData | ActionRowBuilder<any> | MessageComponents)[];
-        embeds?: EmbedData[];
-        flags?: MessageFlags;
-        context?: string;
-        withResponse?: boolean;
-    }
-
-    /**
-     * @author SNIPPIK
-     * @description Компоненты кнопок в json объекте
-     * @interface MessageComponents
-     */
-    export interface MessageComponents {
-        type: 1 | 2;
-        components: {
-            type: 1 | 2;
-            emoji?: {
-                id?:   string;
-                name?: string;
-            };
-            custom_id: SupportButtons;
-            style: 1 | 2 | 3 | 4;
-            disabled?: boolean;
-        }[]
-    }
-
-    /**
-     * @author SNIPPIK
-     * @description
-     */
-    interface InteractOptions {
-        _group?: string;
-        _subcommand?: string;
-        _hoistedOptions: CommandInteractionOption[];
-        getAttachment?: (name: string) => Attachment;
     }
 }

@@ -5,8 +5,8 @@ import { EventEmitterAsyncResource } from "node:events";
  * @description Параметры событий по указанию type
  * @type ListenerSignature
  */
-type ListenerSignature<L> = {
-    [E in keyof L]: (...args: any[]) => any;
+export type ListenerSignature<L> = {
+    [E in keyof L]: L[E] extends (...args: any[]) => any ? L[E] : (...args: any[]) => void;
 };
 
 /**
@@ -14,9 +14,7 @@ type ListenerSignature<L> = {
  * @description Параметры событий по умолчанию
  * @type DefaultListener
  */
-type DefaultListener = {
-    [k: string]: (...args: any[]) => any;
-};
+export type DefaultListener = (...args: any[]) => void;
 
 /**
  * @author SNIPPIK
@@ -24,39 +22,65 @@ type DefaultListener = {
  * @class TypedEmitter
  * @abstract
  */
-export abstract class TypedEmitter<L extends ListenerSignature<L> = DefaultListener> extends EventEmitterAsyncResource {
-    static defaultMaxListeners: number;
-    //@ts-ignore
-    addListener<U extends keyof L>(event: U, listener: L[U]): this;
-    //@ts-ignore
-    prependListener<U extends keyof L>(event: U, listener: L[U]): this;
-    //@ts-ignore
-    prependOnceListener<U extends keyof L>(event: U, listener: L[U]): this;
-    //@ts-ignore
-    removeListener<U extends keyof L>(event: U, listener: L[U]): this;
-    //@ts-ignore
-    removeAllListeners(event?: keyof L): this;
-    //@ts-ignore
-    once<U extends keyof L>(event: U, listener: L[U]): this;
-    //@ts-ignore
-    on<U extends keyof L>(event: U, listener: L[U]): this;
-    //@ts-ignore
-    off<U extends keyof L>(event: U, listener: L[U]): this;
-    //@ts-ignore
-    emit<U extends keyof L>(event: U, ...args: Parameters<L[U]>): boolean;
-    //@ts-ignore
-    eventNames<U extends keyof L>(): U[];
-    //@ts-ignore
-    listenerCount(type: keyof L): number;
-    //@ts-ignore
-    listeners<U extends keyof L>(type: U): L[U][];
-    //@ts-ignore
-    rawListeners<U extends keyof L>(type: U): L[U][];
-
-    public constructor() {
+export class TypedEmitter<L extends Record<string, any>> extends EventEmitterAsyncResource {
+    constructor() {
         super();
-
-        // Задаем максимально кол-во события к одному имени
         this.setMaxListeners(5);
-    };
+    }
+
+    // overloads for on
+    public on<E extends keyof ListenerSignature<L>>(
+        event: E,
+        listener: ListenerSignature<L>[E]
+    ): this;
+    public on<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
+    public on(event: string, listener: (...args: any[]) => any): this {
+        return super.on(event, listener);
+    }
+
+    // overloads for once
+    public once<E extends keyof ListenerSignature<L>>(
+        event: E,
+        listener: ListenerSignature<L>[E]
+    ): this;
+    public once<S extends string>(
+        event: Exclude<S, keyof ListenerSignature<L>>,
+        listener: DefaultListener
+    ): this;
+    public once(event: string, listener: (...args: any[]) => any): this {
+        return super.once(event, listener);
+    }
+
+    // overloads for emit
+    public emit<E extends keyof ListenerSignature<L>>(
+        event: E,
+        ...args: Parameters<ListenerSignature<L>[E]>
+    ): boolean;
+    public emit<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, ...args: any[]): boolean;
+    public emit(event: string, ...args: any[]): boolean {
+        return super.emit(event, ...args);
+    }
+
+    // overloads for off (removeListener)
+    public off<E extends keyof ListenerSignature<L>>(
+        event: E,
+        listener: ListenerSignature<L>[E]
+    ): this;
+    public off<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
+    public off(event: string, listener: (...args: any[]) => any): this {
+        return super.off(event, listener);
+    }
+
+    // alias removeListener
+    public removeListener<E extends keyof ListenerSignature<L>>(
+        event: E,
+        listener: ListenerSignature<L>[E]
+    ): this;
+    public removeListener<S extends string>(
+        event: Exclude<S, keyof ListenerSignature<L>>,
+        listener: DefaultListener
+    ): this;
+    public removeListener(event: string, listener: (...args: any[]) => any): this {
+        return super.removeListener(event, listener);
+    }
 }

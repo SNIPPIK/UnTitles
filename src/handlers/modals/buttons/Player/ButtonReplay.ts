@@ -2,22 +2,28 @@ import {locale} from "@service/locale";
 import {Button} from "@handler/modals";
 import {Colors} from "discord.js";
 import {Assign} from "@utils";
+import {db} from "../../../../index";
 
 class ButtonReplay extends Assign<Button> {
     public constructor() {
         super({
             name: "replay",
-            callback: (msg) => {
-                const queue = msg.queue;
+            callback: (message) => {
+                const queue = db.queues.get(message.guild.id);
 
                 // Запускаем проигрывание текущего трека
                 queue.player.play(0, queue.tracks.position);
 
                 // Сообщаем о том что музыка начата с начала
-                msg.FBuilder = {
-                    description: locale._(msg.locale, "player.button.replay", [queue.tracks.track.name]),
-                    color: Colors.Green
-                };
+                return message.reply({
+                    flags: "Ephemeral",
+                    embeds: [
+                        {
+                            description: locale._(message.locale, "player.button.replay", [queue.tracks.track.name]),
+                            color: Colors.Green
+                        }
+                    ]
+                });
             }
         });
     };
@@ -27,4 +33,4 @@ class ButtonReplay extends Assign<Button> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default Object.values({ButtonReplay});
+export default [ButtonReplay];

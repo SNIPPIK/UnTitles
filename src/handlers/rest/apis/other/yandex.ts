@@ -257,12 +257,13 @@ class RestYandexAPI extends Assign<RestAPI> {
      */
     protected static API = (method: string): Promise<json> => {
         return new Promise<any | Error>((resolve) => {
-            new httpsClient(`${this.authorization.api}/${method}`, {
+            new httpsClient({
+                url: `${this.authorization.api}/${method}`,
                 headers: {
                     "Authorization": "OAuth " + this.authorization.token
                 },
                 method: "GET",
-            }).toJson.then((req) => {
+            }).send().then((req) => {
                 // Если на этапе получение данных получена одна из ошибок
                 if (!req || req instanceof Error) return resolve(locale.err("api.request.fail"));
                 else if (req?.error?.name === "session-expired") return resolve(locale.err("api.request.login.session-expired"));
@@ -282,6 +283,7 @@ class RestYandexAPI extends Assign<RestAPI> {
      * @protected
      * @static
      */
+
     protected static getAudio = (ID: string): Promise<string | Error> => {
         return new Promise<string | Error>(async (resolve) => {
             try {

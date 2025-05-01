@@ -1,5 +1,7 @@
+import {DefaultWebSocketManagerOptions} from "@discordjs/ws";
 import {Client, Partials, Options} from "discord.js";
 import {ActivityType} from "discord-api-types/v10"
+import {Logger} from "@utils";
 import {env} from "@app";
 
 /**
@@ -45,6 +47,23 @@ export class DiscordClient extends Client {
             })
         });
         this.IntervalStatus();
+
+        // Устанавливаем параметр debug
+        if (!Logger.debug) {
+            const debug = env.get<string>("NODE_ENV", "production") === "development";
+
+            // Событие отладки
+            if (debug) {
+                this.on("debug", async (message) => {
+                    Logger.log("DEBUG", message);
+                });
+            }
+
+            Logger.debug = debug;
+        }
+
+        //@ts-ignore
+        DefaultWebSocketManagerOptions.identifyProperties["browser"] = env.get("client.browser", "discord.js");
     };
 
     /**
@@ -80,6 +99,7 @@ export class DiscordClient extends Client {
         }, timeout * 1e3);
     };
 }
+
 
 /**
  * @author SNIPPIK

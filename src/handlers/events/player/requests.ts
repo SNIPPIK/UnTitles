@@ -1,6 +1,6 @@
 import {locale} from "@service/locale";
-import {Track} from "@service/player";
 import {Event} from "@handler/events";
+import {Track} from "@service/player";
 import {Colors} from "discord.js";
 import {Assign} from "@utils";
 import {db} from "@app";
@@ -25,113 +25,65 @@ class rest_request extends Assign<Event<"rest/request">> {
                 // Если нет поддержки такого запроса!
                 if (!api || !api.name) {
                     db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.support"));
-                    return;
+                    return null;
                 }
 
                 // Отправляем сообщение о том что запрос производится
-                new message.builder().addEmbeds([
-                    {
+                // Сообщение о том, что запрос начался
+                const followUpPromise = message.followUp({
+                    flags: "Ephemeral",
+                    embeds: [{
                         title: `${platform.platform}.${api.name}`,
                         description: locale._(message.locale, "api.platform.request", [db.images.loading]),
                         color: platform.color
-                    }
-                ]).setTime(10e3).send = message;
+                    }]
+                });
 
                 // Если ответ не был получен от сервера
-                const timeout = setTimeout(() => {
-                    db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.timeout"));
-                }, 15e3);
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(locale._(message.locale, "api.platform.timeout"))), 15e3)
+                );
 
                 // Получаем данные в системе rest/API
-                api.execute(url as string, {limit: db.api.limits[api.name], audio: true}).then(async (rest: Track.list | Track | Track[] | Error) => {
-                    if (timeout) clearTimeout(timeout);
+                try {
+                    // Дожидаемся выполнения запроса
+                    const rest = await Promise.race([
+                        api.execute(url as string, { limit: db.api.limits[api.name], audio: true }),
+                        timeoutPromise
+                    ]) as Track.list | Track[] | Track | Error;
 
-                    // Если нет данных или была получена ошибка
+                    // Удаляем сообщение после выполнения запроса
+                    await followUpPromise.then(msg => msg.delete().catch(() => {}));
+
+                    // Обработка ошибки если что-то пошло не так
                     if (rest instanceof Error) {
                         db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.error", [rest]));
+                        return null;
+                    }
+
+                    // Если был получен результат в виде массива
+                    else if (Array.isArray(rest)) {
+                        if (rest.length === 0) {
+                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
+                            return null;
+                        }
+
+                        // Меняем на первый трек из массива
+                        (rest as any) = rest[0];
+                    }
+
+                    // Если был получен потоковый трек с временем 0
+                    else if ("time" in rest && rest.time.total === 0) {
+                        db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
                         return;
                     }
 
-                    // Если был произведен поиск
-                    else if (rest instanceof Array) {
-                        // Если не нашлись треки
-                        if (rest?.length === 0 || !rest) {
-                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
-                            return;
-                        }
-
-                        // Меняем данные
-                        rest = rest[0];
-                    }
-
-                    // Если надо добавить трек
-                    else if ("time" in rest) {
-                        // Если был получен трек являющийся потоковым
-                        if (rest.time.total === 0) {
-                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
-                            return;
-                        }
-                    }
-
-                    // Добавляем данные в очередь
-                    db.queues.create(message, rest);
-                }).catch(async (err) => {
-                    if (timeout) clearTimeout(timeout);
+                    // Добавляем в очередь
+                    db.queues.create(message, rest as any);
+                } catch (err) {
                     console.error(err);
-                    db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.name}**\n**❯** **${err}**`);
-                });
-            }
-        });
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Выполнение запроса пользователя через внутреннее API
- * @class rest/request-complete
- * @event rest/request-complete
- * @public
- */
-class rest_request_complete extends Assign<Event<"rest/request-complete">> {
-    public constructor() {
-        super({
-            name: "rest/request-complete",
-            type: "player",
-            once: false,
-            execute: async (platform, message, url) => {
-                // Получаем функцию запроса данных с платформы
-                const api = platform.get(url);
-
-                // Если нет поддержки такого запроса!
-                if (!api || !api.name) return;
-
-                // Получаем данные в системе rest/API
-                api.execute(url as string, {limit: db.api.limits[api.name], audio: false}).then(async (rest: Track.list | Track | Track[] | Error) => {
-                    const items: {value: string; name: string}[] = [];
-
-                    // Если получена ошибка
-                    if (rest instanceof Error || !rest) return;
-
-                    // Поиск или ссылка на автора
-                    else if (rest instanceof Array) {
-                        const tracks = rest.map((choice) => {
-                            return {
-                                value: choice.url,
-                                name: choice.name.slice(0, 120)
-                            }
-                        });
-
-                        items.push(...tracks);
-                    }
-
-                    // Ссылка на плейлист или трек
-                    else items.push({ name: rest["title"] ?? rest["name"], value: rest.url });
-
-                    return message.respond(items);
-                }).catch(async (err) => {
-                    console.error(err);
-                    db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.name}**\n**❯** **${err}**`);
-                });
+                    db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.name}**\\n**❯** **${err}**`);
+                }
             }
         });
     };
@@ -150,14 +102,14 @@ class rest_error extends Assign<Event<"rest/error">> {
             name: "rest/error",
             type: "player",
             once: false,
-            execute: (message, error) => {
-                new message.builder().addEmbeds([
-                    {
+            execute: async (message, error) => {
+                return message.reply({
+                    embeds: [{
                         title: locale._(message.locale, "api.error"),
                         description: error,
                         color: Colors.DarkRed
-                    }
-                ]).setTime(15e3).send = message;
+                    }]
+                }).then((msg) => setTimeout(msg.delete, 15e3))
             }
         });
     };
@@ -167,4 +119,4 @@ class rest_error extends Assign<Event<"rest/error">> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({rest_request, rest_error, rest_request_complete});
+export default [rest_request, rest_error];

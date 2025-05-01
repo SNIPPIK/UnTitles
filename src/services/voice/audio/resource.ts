@@ -15,7 +15,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @private
      */
     private readonly _buffer: AudioResourceBuffer = {
-        chunks: [],
+        chunks: new Array<Buffer>(),
         total: 0
     };
 
@@ -72,11 +72,13 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         if (options.input instanceof Process) options.input.stdout.pipe(options.decoder);
         else options.input.on("data", (packet: Buffer) => {
             // Сообщаем что поток можно начать читать
-            if (this._buffer.chunks.length === 0) this.emit("readable");
+            if (this._buffer.chunks.length === 0) {
+                this.emit("readable");
 
-            // Если поток включается в первый раз.
-            // Добавляем пустышку для интерпретатора opus
-            if (!this.readable && !this._buffer.total) this._buffer.chunks.push(SILENT_FRAME);
+                // Если поток включается в первый раз.
+                // Добавляем пустышку для интерпретатора opus
+                if (!this._buffer.total) this._buffer.chunks.push(SILENT_FRAME);
+            }
 
             this._buffer.chunks.push(packet);
             this._buffer.total++;

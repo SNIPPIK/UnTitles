@@ -34,13 +34,21 @@ const db = {
  */
 export class Logger {
     /**
+     * @description Если включен режим отладки
+     * @private
+     */
+    public static debug = null;
+
+    /**
      * @description Отправляем лог в консоль
+     * @public
+     * @static
      */
     public static log = (status: keyof typeof db.status, text: string) => {
         // Игнорируем debug сообщения
-        if (status === "DEBUG") return;
+        if (status === "DEBUG" && !this.debug) return;
 
-        text = text.replace(/\[/, "\x1b[102m \x1b[30m").replace(/]/, " \x1b[0m");
+        text = text.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
 
         const date = new Date();
         const extStatus = db.status[status];

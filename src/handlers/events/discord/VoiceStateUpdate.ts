@@ -61,14 +61,16 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
 
                     // Если нет пользователей
                     else {
-                        // Ставим плеер на паузу
-                        if (queue.player.status === "player/playing") queue.player.pause();
-
                         // Если нет таймера для удаления очереди
-                        if (!temp) temple_db.set(guild.id, setTimeout(() => {
-                            if (queue) db.queues.remove(guild.id);
-                            if (voice) db.voice.remove(guild.id);
-                        }, timeout * 1e3));
+                        if (!temp) {
+                            // Ставим плеер на паузу
+                            if (queue.player.status === "player/playing") queue.player.pause();
+
+                            temple_db.set(guild.id, setTimeout(() => {
+                                if (queue) db.queues.remove(guild.id);
+                                if (voice) db.voice.remove(guild.id);
+                            }, timeout * 1e3));
+                        }
                     }
                 }
 

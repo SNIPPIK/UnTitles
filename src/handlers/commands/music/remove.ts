@@ -1,7 +1,8 @@
+import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {Command, SlashCommand} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
+import {db} from "@app";
 
 /**
  * @author SNIPPIK
@@ -18,46 +19,55 @@ import {Assign} from "@utils";
         "en-US": "Deleting a track from the queue, without the possibility of recovery!",
         "ru": "Удаление трека из очереди, без возможности восстановить!"
     },
-    dm_permission: false,
-    options: [
-        {
-            type: ApplicationCommandOptionType["Number"],
-            required: true,
-            names: {
-                "en-US": "value",
-                "ru": "число"
-            },
-            descriptions: {
-                "en-US": "Number track in queue!",
-                "ru": "Номер трека!"
-            }
-        }
-    ]
+    dm_permission: false
+})
+@SlashCommandSubCommand({
+    type: ApplicationCommandOptionType["Number"],
+    required: true,
+    names: {
+        "en-US": "value",
+        "ru": "число"
+    },
+    descriptions: {
+        "en-US": "Number track in queue!",
+        "ru": "Номер трека!"
+    }
 })
 class RemoveTrackCommand extends Assign<Command> {
     public constructor() {
         super({
+            permissions: {
+                client: ["SendMessages", "ViewChannel"]
+            },
             rules: ["voice", "another_voice", "queue", "player-not-playing"],
             execute: async ({message, args}) => {
-                const queue = message.queue;
+                const queue = db.queues.get(message.guild.id);
                 const number = parseInt(args[0]) - 1;
 
                 // Если аргумент не является числом
                 if (isNaN(number)) {
-                    message.FBuilder = {
-                        description: locale._(message.locale, "command.seek.duration.nan"),
-                        color: Colors.DarkRed
-                    };
-                    return;
+                    return message.reply({
+                        embeds: [
+                            {
+                                description: locale._(message.locale, "command.seek.duration.nan"),
+                                color: Colors.DarkRed
+                            }
+                        ],
+                        flags: "Ephemeral"
+                    });
                 }
 
                 // Если аргумент больше кол-ва треков
                 else if (number > queue.tracks.total || number < 0) {
-                    message.FBuilder = {
-                        description: locale._(message.locale, "command.seek.duration.big"),
-                        color: Colors.DarkRed
-                    };
-                    return;
+                    return message.reply({
+                        embeds: [
+                            {
+                                description: locale._(message.locale, "command.seek.duration.big"),
+                                color: Colors.DarkRed
+                            }
+                        ],
+                        flags: "Ephemeral"
+                    });
                 }
 
                 const {name, api, url} = queue.tracks.get(number);
@@ -68,11 +78,15 @@ class RemoveTrackCommand extends Assign<Command> {
                 // Удаляем трек и очереди
                 queue.tracks.remove(number);
 
-                message.FBuilder = {
-                    description: locale._(message.locale, "command.remove.track", [`[${name}](${url})`]),
-                    color: api.color
-                };
-                return;
+                return message.reply({
+                    embeds: [
+                        {
+                            description: locale._(message.locale, "command.remove.track", [`[${name}](${url})`]),
+                            color: api.color
+                        }
+                    ],
+                    flags: "Ephemeral"
+                });
             }
         });
     };
@@ -82,4 +96,4 @@ class RemoveTrackCommand extends Assign<Command> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default Object.values({RemoveTrackCommand});
+export default [RemoveTrackCommand];

@@ -14,7 +14,7 @@ export abstract class handler<T = unknown> {
      * @readonly
      * @private
      */
-    private readonly _dir: string = null;
+    private readonly _dir: string;
 
     /**
      * @description Загруженные файлы, именно файлы не пути к файлам
@@ -27,7 +27,9 @@ export abstract class handler<T = unknown> {
      * @description Выдаем все загруженные файлы
      * @protected
      */
-    protected get files() { return this._files; };
+    protected get files() {
+        return this._files;
+    }
 
     /**
      * @description Даем классу необходимые данные
@@ -43,49 +45,57 @@ export abstract class handler<T = unknown> {
      * @protected
      */
     protected load = () => {
-        const self_dir = path.resolve(this._dir);
+        const selfDir = path.resolve(this._dir);
 
         // Если указанной директории нет
-        if (!fs.existsSync(self_dir)) throw new Error(`Not found dir ${self_dir}`);
+        if (!fs.existsSync(selfDir)) {
+            throw new Error(`Directory not found: ${selfDir}`);
+        }
 
-        for (let dir of fs.readdirSync(self_dir)) {
+        const directories = fs.readdirSync(selfDir);
+        for (const dir of directories) {
             // Не загружаем index файлы (они являются загрузочными)
             if (dir.startsWith("index")) continue;
 
-            // Если найдена директория
-            else if (!dir.endsWith(".ts") && !dir.endsWith(".js")) {
+            const isCodeFile = dir.endsWith(".ts") || dir.endsWith(".js");
+            // Если не найдена директория
+            if (isCodeFile) continue;
 
-                // Загружаем директорию
-                for (let file of fs.readdirSync(path.resolve(`${self_dir}/${dir}`))) {
-                    const res_path = path.resolve(`${self_dir}/${dir}/${file}`);
-                    const self_file = require(res_path);
+            const fullDirPath = path.resolve(selfDir, dir);
+            const files = fs.readdirSync(fullDirPath);
 
-                    // Удаляем кеш загружаемого файла
-                    delete require.cache[require.resolve(res_path)];
+            for (const file of files) {
+                const resPath = path.resolve(fullDirPath, file);
 
-                    // Если нет импортируемых объектов
-                    if (!self_file?.default) throw new Error(`Not found imported data in ${res_path}`);
+                // Удаляем кеш загружаемого файла
+                delete require.cache[require.resolve(resPath)];
 
-                    const default_export = self_file.default;
+                const imported = require(resPath);
 
-                    // Если полученные данные являются списком
-                    if (default_export instanceof Array) {
-                        for (const obj of default_export) {
-                            if (obj.prototype) this._files.push(new obj(null));
-                            else this._files.push(obj);
-                        }
-                        continue;
-                    }
-
-                    // Если загружаемый объект является классом
-                    else if (default_export.prototype) {
-                        this._files.push(new default_export(null));
-                        continue;
-                    }
-
-                    // Добавляем файл в базу для дальнейшего экспорта
-                    this._files.push(default_export);
+                // Если нет импортируемых объектов
+                if (!imported?.default) {
+                    throw new Error(`Missing default export in ${resPath}`);
                 }
+
+                const default_export = imported.default;
+
+                // Если полученные данные являются списком
+                if (default_export instanceof Array) {
+                    for (const obj of default_export) {
+                        if (obj.prototype) this._files.push(new obj(null));
+                        else this._files.push(obj);
+                    }
+                    continue;
+                }
+
+                // Если загружаемый объект является классом
+                else if (default_export.prototype) {
+                    this._files.push(new default_export(null));
+                    continue;
+                }
+
+                // Добавляем файл в базу для дальнейшего экспорта
+                this._files.push(default_export);
             }
         }
     };

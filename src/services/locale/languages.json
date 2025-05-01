@@ -65,6 +65,17 @@
   },
 
 
+  "permission.user": {
+    "ru": "{ARGUMENT} У вас нет прав для выполнения этой команды.",
+    "en-US": "{ARGUMENT} You are not a developer, so nope!"
+  },
+
+  "permission.client": {
+    "ru": "{ARGUMENT} У меня нет прав для выполнения этой команды.",
+    "en-US": "{ARGUMENT} You are not a developer, so nope!"
+  },
+
+
 
   "commands.reload": {
     "ru": "{ARGUMENT} были перезагружены!",

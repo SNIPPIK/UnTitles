@@ -88,7 +88,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public get playing() {
         // Если текущий статус не позволяет проигрывать музыку
-        if (this.status === "player/wait" || this?.status === "player/pause") return false;
+        if (this.status === "player/wait" || this.status === "player/pause") return false;
 
         // Если голосовое состояние не позволяет отправлять пакеты
         else if (!this.voice.connection || this.voice.connection.status !== "ready") return false;
@@ -183,7 +183,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
          * @description Событие смены позиции плеера
          * @private
          */
-        this.on("player/wait", (player) => {
+        this.on("player/wait", async (player) => {
             const repeat = player.tracks.repeat;
             const current = player.tracks.position;
 
@@ -216,7 +216,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
          * @description Событие получения ошибки плеера
          * @private
          */
-        this.on("player/error", (player, _, skip) => {
+        this.on("player/error", async (player, error, skip) => {
             const queue = db.queues.get(player.id);
 
             // Заставляем плеер пропустить этот трек
@@ -227,6 +227,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     if (player.tracks.size === 0) queue.cleanup();
                 })
             }
+
+            // Выводим сообщение об ошибке
+            db.events.emitter.emit("message/error", queue, error);
         });
     };
 

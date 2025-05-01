@@ -33,10 +33,12 @@ if (!isMainThread) {
  * @param pattern - Как искать имена
  * @param text - Строка где будем искать
  */
-const mRegex = (pattern: string | RegExp, text: string) => {
+const mRegex = (pattern: string | RegExp, text: string): string | null => {
     const match = text.match(pattern);
-    return match ? match[1].replace(/\$/g, "\\$") : null;
+    if (!match || match.length < 2) return null;
+    return match[1].replace(/\$/g, "\\$");
 };
+
 
 /**
  * @author SNIPPIK
@@ -45,20 +47,18 @@ const mRegex = (pattern: string | RegExp, text: string) => {
  */
 const extractTceFunc = (body: string) => {
     try {
-        const tceVariableMatcher = body.match(new RegExp(NEW_TCE_GLOBAL_VARS_REGEXP, 'm'));
-        const tceVariableMatcherGroups = tceVariableMatcher?.groups;
-
-        if (!tceVariableMatcher || !tceVariableMatcherGroups) return null;
+        const matcher = body.match(new RegExp(NEW_TCE_GLOBAL_VARS_REGEXP, "m"));
+        if (!matcher?.groups?.varname || !matcher.groups.code) return null;
 
         return {
-            name: tceVariableMatcherGroups.varname,
-            code: tceVariableMatcherGroups.code
+            name: matcher.groups.varname,
+            code: matcher.groups.code
         };
-    } catch (e) {
-        console.error("Error in extractTceFunc:", e);
+    } catch (error) {
+        console.error("extractTceFunc error:", error);
         return null;
     }
-}
+};
 
 
 /**
@@ -278,7 +278,7 @@ class Youtube_decoder_native {
      * @private
      */
     private static extractPage = async (html5: string) => {
-        const body = await new httpsClient(html5).toString;
+        const body = await new httpsClient({url: html5}).send();
 
         if (body instanceof Error) return null;
 
@@ -368,8 +368,8 @@ interface YouTubeChanter {
     nTransform?: Script;
 }
 
-const DECIPHER_FUNC_NAME = "getDecipherFunc";
-const N_TRANSFORM_FUNC_NAME = "getNTransformFunc";
+const DECIPHER_FUNC_NAME = "CORDODecipherFunc";
+const N_TRANSFORM_FUNC_NAME = "CORDONTransformFunc";
 
 const VARIABLE_PART = "[a-zA-Z_\\$][a-zA-Z_0-9\\$]*";
 const VARIABLE_PART_DEFINE = "\\\"?" + VARIABLE_PART + "\\\"?";
@@ -454,9 +454,9 @@ const TCE_SIGN_FUNCTION_REGEXP = "function\\(\\s*([a-zA-Z0-9$])\\s*\\)\\s*\\{" +
     "\\s*\\3\\[\\2\\[\\d+\\]\\]\\(\\s*\\1\\s*,\\s*\\d+\\s*\\);" +
     ".*?return\\s*\\1\\[\\2\\[\\d+\\]\\]\\(\\2\\[\\d+\\]\\)\\};";
 
-const TCE_SIGN_FUNCTION_ACTION_REGEXP = "var\\s*[a-zA-Z0-9$_]+\\s*=\\s*\\{\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\((\\w+|\\s*\\w+\\s*,\\s*\\w+\\s*)\\)\\s*\\{\\s*(\\s*var\\s*\\w+=\\w+\\[\\d+\\];\\w+\\[\\d+\\]\\s*=\\s*\\w+\\[\\w+\\s*\\%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\];\\s*\\w+\\[\\w+\\s*%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\]\\s*=\\s*\\w+\\s*\\},|\\w+\\[\\w+\\[\\d+\\]\\]\\(\\)\\},)\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\((\\s*\\w+\\w*,\\s*\\w+\\s*|\\w+)\\)\\s*\\{(\\w+\\[\\w+\\[\\d+\\]\\]\\(\\)|\\s*var\\s*\\w+\\s*=\\s*\\w+\\[\\d+\\]\\s*;\\w+\\[\\d+\\]\\s*=\\w+\\[\\s*\\w+\\s*%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\]\\s*;\\w+\\[\\s*\\w+\\s*%\\s*\\w\\[\\w+\\[\\d+\\]\\]\\]\\s*=\\s*\\w+\\s*)\\},\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\s*\\(\\s*\\w+\\s*,\\s*\\w+\\s*\\)\\{\\w+\\[\\w+\\[\\d+\\]\\]\\(\\s*\\d+\\s*,\\s*\\w+\\s*\\)\\}\\};";
+const TCE_SIGN_FUNCTION_ACTION_REGEXP = "var\\s+([A-Za-z0-9_]+)\\s*=\\s*\\{\\s*(?:[A-Za-z0-9_]+)\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}\\s*,\\s*(?:[A-Za-z0-9_]+)\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}\\s*,\\s*(?:[A-Za-z0-9_]+)\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}\\s*\\};";
 
-const TCE_N_FUNCTION_REGEXP = "function\\s*\\((\\w+)\\)\\s*\\{var\\s*\\w+\\s*=\\s*\\1\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\s*,\\s*\\w+\\s*=\\s*\\[.*?\\]\\;.*?catch\\(\\s*(\\w+)\\s*\\s*\\)\\s*\\{return\\s*\\w+\\[\\d+\\](\\+\\1)?\\}\\s*return\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\}\\;";
+const TCE_N_FUNCTION_REGEXP = "function\\s*\\((\\w+)\\)\\s*\\{var\\s*\\w+\\s*=\\s*\\1\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\s*,\\s*\\w+\\s*=\\s*\\[.*?\\]\\;.*?catch\\s*\\(\\s*(\\w+)\\s*\\)\\s*\\{return\\s*\\w+\\[\\d+\\]\\s*\\+\\s*\\1\\}\\s*return\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\}\\s*\\;";
 
 const PATTERN_PREFIX = "(?:^|,)\\\"?(" + VARIABLE_PART + ")\\\"?";
 const REVERSE_PATTERN = new RegExp(PATTERN_PREFIX + REVERSE_PART, "m");

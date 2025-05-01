@@ -9,7 +9,7 @@ import {Logger} from "@utils";
  * @private
  */
 const bufferCode = (name: string) => {
-    return Buffer.from([...`${name}`].map((x: string) => x.charCodeAt(0)));
+    return Buffer.from(name, "utf-8");
 };
 
 /**
@@ -43,10 +43,10 @@ export class OpusEncoder extends PassThrough {
      * @readonly
      * @private
      */
-    private readonly db = {
-        buffer: null    as Buffer,
-        bitstream: null as number,
-        remainder: null as Buffer
+    private readonly db: { buffer: Buffer, bitstream: number, remainder: Buffer } = {
+        buffer: null,
+        bitstream: null,
+        remainder: null
     };
 
     /**
@@ -54,26 +54,26 @@ export class OpusEncoder extends PassThrough {
      * @readonly
      * @private
      */
-    private readonly packet = async (chunk: Buffer): Promise<Buffer | false> => {
+    private readonly packet = (chunk: Buffer): Buffer | false => {
         // Если размер буфера не является нужным, то пропускаем
         if (chunk.length < 26) return false;
 
         // Если не находим OGGs_HEAD в буфере
         else if (!chunk.subarray(0, 4).equals(OGG.OGGs_HEAD)) {
-            this.emit("error", Error(`capture_pattern is not ${OGG.OGGs_HEAD}`));
+            this.emit("error", new Error("OpusEncoder error: capture_pattern is not ${OGG.OGGs_HEAD}"));
             return false;
         }
 
         // Если находим stream_structure_version в буфере, но не той версии
         else if (chunk.readUInt8(4) !== 0) {
-            this.emit("error", Error(`stream_structure_version is not 0`));
+            this.emit("error", new Error("OpusEncoder error: stream_structure_version is not 0"));
             return false;
         }
 
         const pageSegments = chunk.readUInt8(26);
 
         // Если размер буфера не подходит, то пропускаем
-        if (chunk.length < 27 || chunk.length < 27 + pageSegments) return false;
+        if (chunk.length < 27 + pageSegments) return false;
 
         const table = chunk.subarray(27, 27 + pageSegments), sizes: number[] = [];
         let totalSize = 0;
@@ -137,7 +137,7 @@ export class OpusEncoder extends PassThrough {
 
         // Получаем пакеты из
         while (!!chunk) {
-            const packet = await this.packet(chunk);
+            const packet = this.packet(chunk);
             if (packet) chunk = packet;
             else break;
         }

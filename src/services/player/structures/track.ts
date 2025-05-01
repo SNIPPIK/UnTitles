@@ -39,7 +39,7 @@ export class Track {
          * @description Пользователя включивший трек
          * @private
          */
-         _user: null as Track.user,
+        _user: null as Track.user,
 
         /**
          * @description Здесь хранятся данные с какой платформы был взят трек
@@ -62,7 +62,7 @@ export class Track {
      * @public
      */
     public get url() {
-      return this._information._track.url
+        return this._information._track.url
     };
 
     /**
@@ -158,17 +158,17 @@ export class Track {
      * @param author - Автор запроса
      */
     public set user(author) {
-        const { displayName, id, avatar } = author;
+        const { username, id, avatar } = author;
 
         // Если нет автора трека, то автором станет сам пользователь
         if (!this.artist) this._information._track.artist = {
             url: `https://discordapp.com/users/${id}`,
-            title: displayName
+            title: username
         };
 
         // Пользователь, который включил трек
         this._information._user = {
-            displayName: displayName, id,
+            username: username, id,
             avatar: `https://cdn.discordapp.com/avatars/${id}/${avatar}.webp`
         };
     };
@@ -207,17 +207,33 @@ export class Track {
     public get resource(): Promise<string | Error> {
         return new Promise(async (resolve) => {
             for (let i = 0; i < 3; i++) {
+                if (i === 3) break;
+
+                // Если включено кеширование
+                if (db.cache.audio) {
+                    const status = db.cache.audio.status(this);
+
+                    // Если есть кеш аудио, то выдаем его
+                    if (status.status === "ended") {
+                        this.link = status.path;
+                        break;
+                    }
+                }
+
                 // Если есть данные об исходном файле
                 if (this.link) {
                     // Проверяем ссылку на актуальность
                     if (this.link.startsWith("http")) {
                         try {
-                            const status = await new httpsClient(this.link, {method: "HEAD"}).status;
+                            const status = await new httpsClient({url: this.link, method: "HEAD"}).head();
 
                             // Если статус = good
-                            if (status) {
+                            if (status.statusCode < 300 && status.statusCode <= 200) {
                                 // Добавляем трек в кеширование
-                                if (this.api.name !== "DISCORD" && db.cache.audio) db.cache.audio.set(this);
+                                if (this.api.name !== "DISCORD" && db.cache.audio) {
+                                    setImmediate(async () => db.cache.audio.set(this));
+                                }
+
                                 break;
                             }
 
@@ -232,17 +248,6 @@ export class Track {
 
                     // Если указан путь до файла, он будет рабочим наверно xD
                     else break;
-                }
-
-                // Если включено кеширование
-                if (db.cache.audio) {
-                    const status = db.cache.audio.status(this);
-
-                    // Если есть кеш аудио, то выдаем его
-                    if (status.status === "ended") {
-                        this.link = status.path;
-                        break;
-                    }
                 }
 
                 // Если нет ссылки на исходный файл
@@ -277,9 +282,10 @@ export class Track {
             // Выдаем повторно текст песни
             if (this._information._lyrics) return resolve(this._information._lyrics);
 
-            new httpsClient(`https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.name.split(" ").join("+")}`, {
-                useragent: "UnTitles 0.2.2, Music bot, github.com/SNIPPIK/UnTitles"
-            }).toJson.then((item) => {
+            new httpsClient({
+                url: `https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.name.split(" ").join("+")}\``,
+                userAgent: "UnTitles 0.3.0, Music bot, github.com/SNIPPIK/UnTitles"
+            }).send().then((item) => {
                 // Если получаем вместо данных ошибку
                 if (item instanceof Error) return resolve(item);
 
@@ -485,12 +491,12 @@ export namespace Track {
          * @description Имя/ник пользователя
          * @readonly
          */
-        readonly displayName: string;
+        readonly username: string;
 
         /**
          * @description Ссылка на аватар пользователя
          * @readonly
          */
-        readonly avatar: string | null;
+        readonly avatar?: string | null;
     }
 }

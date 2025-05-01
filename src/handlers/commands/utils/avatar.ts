@@ -1,5 +1,5 @@
-import {ApplicationCommandOptionType} from "discord.js";
-import {Command, SlashCommand} from "@handler/commands";
+import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
+import {ApplicationCommandOptionType, MessageFlags} from "discord.js";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
 
@@ -18,41 +18,65 @@ import {Assign} from "@utils";
         "en-US": "If you need to take a closer look at the user's avatar!",
         "ru": "Если надо глянуть аватар пользователя поближе!"
     },
-    dm_permission: false,
-    options: [
-        {
-            names: {
-                "en-US": "user",
-                "ru": "пользователь"
-            },
-            descriptions: {
-                "en-US": "Specify the user!",
-                "ru": "Укажи пользователя!"
-            },
-            type: ApplicationCommandOptionType["User"],
-            required: true
-        }
-    ]
+    dm_permission: false
+})
+@SlashCommandSubCommand({
+    names: {
+        "en-US": "user",
+        "ru": "пользователь"
+    },
+    descriptions: {
+        "en-US": "Specify the user!",
+        "ru": "Укажи пользователя!"
+    },
+    type: ApplicationCommandOptionType["User"],
+    required: true
 })
 class AvatarCommand extends Assign<Command> {
     public constructor() {
         super({
+            permissions: {
+                client: ["ViewChannel", "SendMessages"]
+            },
             execute: async ({message, args}) => {
                 const user = message.guild.members.cache.get(args[0]).user;
+                const avatar= user.avatarURL({size: 1024, forceStatic: false});
 
                 // Отправляем сообщение в текстовый канал
-                new message.builder().addEmbeds([
-                    {
-                        color: user.accentColor,
-                        description: `${locale._(message.locale, "user")} <@!${user.id}>`,
-                        timestamp: new Date,
-                        image: { url: user.avatarURL({size: 1024, forceStatic: false}) },
-                        footer: {
-                            text: `${message.me.user.username}`,
-                            iconURL: message.me.user.avatarURL({size: 1024, forceStatic: false})
+                return message.reply({
+                    components:[
+                        {
+                            type: 1,
+                            components: [
+                                {
+                                    "type": 2,
+                                    "label": "User",
+                                    "style": 5,
+                                    "url": `https://discordapp.com/users/${user.id}`
+                                },
+                                {
+                                    "type": 2,
+                                    "label": "Image",
+                                    "style": 5,
+                                    "url": avatar
+                                },
+                            ]
                         }
-                    }
-                ]).setEphemeral().setTime(30e3).send = message;
+                    ],
+                    embeds: [
+                        {
+                            color: user.accentColor,
+                            description: `${locale._(message.locale, "user")} <@!${user.id}>`,
+                            timestamp: new Date() as any,
+                            image: { url: avatar },
+                            footer: {
+                                text: `${message.guild.members.me.user.username}`,
+                                icon_url: message.guild.members.me.user.avatarURL({size: 1024, forceStatic: false})
+                            }
+                        }
+                    ],
+                    flags: MessageFlags.Ephemeral
+                })
             }
         });
     };
@@ -62,4 +86,4 @@ class AvatarCommand extends Assign<Command> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default Object.values({AvatarCommand});
+export default [AvatarCommand];

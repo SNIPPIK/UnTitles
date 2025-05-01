@@ -1,8 +1,8 @@
-import {DiscordClient, ShardManager} from "@structures";
-import {Environment} from "./environment";
-import {Colors, WebhookClient} from "discord.js";
-import {isMainThread} from "node:worker_threads";
-import {Logger} from "@utils";
+import { DiscordClient, ShardManager } from "@structures";
+import { Colors, WebhookClient } from "discord.js";
+import { isMainThread } from "node:worker_threads";
+import { Environment } from "./environment";
+import { Logger } from "@utils";
 
 /**
  * @author SNIPPIK
@@ -11,17 +11,15 @@ import {Logger} from "@utils";
  */
 export let env: Environment = new Environment();
 
-
-
-import {VoiceConnection, VoiceConnectionStatus} from "@service/voice";
-import {DiscordGatewayAdapterCreator} from "@structures";
-import {CacheUtility} from "@service/player/utils/cache";
-import {RestObject} from "@handler/rest/apis";
-import {Commands} from "@handler/commands";
-import {Buttons} from "@handler/modals";
-import {Events} from "@handler/events";
-import {Queues} from "@service/player";
-import {Collection} from "@utils";
+import { VoiceConnection, VoiceConnectionStatus } from "@service/voice";
+import { DiscordGatewayAdapterCreator } from "@structures";
+import { CacheUtility } from "@service/player/utils/cache";
+import { RestObject } from "@handler/rest/apis";
+import { Commands } from "@handler/commands";
+import { Buttons } from "@handler/modals";
+import { Events } from "@handler/events";
+import { Queues } from "@service/player";
+import { Collection } from "@utils";
 
 /**
  * @author SNIPPIK
@@ -164,7 +162,6 @@ export class Database {
  */
 export var db: Database = null;
 
-
 /**
  * @author SNIPPIK
  * @description Запуск всего проекта в async режиме
@@ -210,7 +207,7 @@ export var db: Database = null;
             client.login(env.get("token.discord"))
                 // Что делаем после того как бот подключится к discord api
                 .then(async () => {
-                    Logger.log("WARN", `[Core/${id}] connected to discord as ${Logger.color(35, client.user.tag)}`);
+                    Logger.log("WARN", `[Core/${id}] logged in as ${Logger.color(35, client.user.tag)}`);
                 })
 
                 // Что делаем после подключения к discord api

@@ -1,10 +1,20 @@
-import type { GuildMember} from "discord.js"
+import {
+    CacheType,
+    ChatInputCommandInteraction,
+    AutocompleteInteraction,
+    ButtonInteraction,
+    AnySelectMenuInteraction,
+    Colors
+} from "discord.js"
+import {QueueMessage} from "@service/player/structures/message";
+import filters from "@service/player/filters.json"
+import {CommandInteraction} from "@structures";
 import {Command} from "@handler/commands";
-import {Colors, Events} from "discord.js";
-import {Interact, Assign} from "@utils";
 import {locale} from "@service/locale";
 import {Event} from "@handler/events";
-import {env, db} from "@app";
+import {Events} from "discord.js";
+import {Assign} from "@utils";
+import {db, env} from "@app";
 
 /**
  * @author SNIPPIK
@@ -20,15 +30,23 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @true - Разрешено
      * @false - Запрещено
      */
-    private intends: { name: Command["rules"][number], callback: (message: Interact) => boolean }[] = [
+    private intends: { name: Command["rules"][number], callback: (message: CommandInteraction) => Promise<boolean> }[] = [
         {
             name: "voice",
-            callback: (message) => {
-                const VoiceChannel = message.voice.channel;
+            callback: async (message) => {
+                const VoiceChannel = message.member.voice.channel;
 
                 // Если нет голосового подключения
                 if (!VoiceChannel) {
-                    message.FBuilder = { description: locale._(message.locale, "voice.need", [message.author]), color: Colors.Yellow };
+                    await message.reply({
+                        flags: "Ephemeral",
+                        embeds: [
+                            {
+                                description: locale._(message.locale, "voice.need", [message.member]),
+                                color: Colors.Yellow
+                            }
+                        ],
+                    })
                     return false;
                 }
 
@@ -37,10 +55,20 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         },
         {
             name: "queue",
-            callback: (message) => {
+            callback: async (message) => {
+                const queue = db.queues.get(message.guild.id);
+
                 // Если нет очереди
-                if (!message.queue) {
-                    message.FBuilder = { description: locale._(message.locale, "queue.need", [message.author]), color: Colors.Yellow };
+                if (!queue) {
+                    await message.reply({
+                        flags: "Ephemeral",
+                        embeds: [
+                            {
+                                description: locale._(message.locale, "queue.need", [message.member]),
+                                color: Colors.Yellow
+                            }
+                        ],
+                    });
                     return false;
                 }
 
@@ -49,10 +77,20 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         },
         {
             name: "player-not-playing",
-            callback: (message) => {
+            callback: async (message) => {
+                const queue = db.queues.get(message.guild.id);
+
                 // Если музыку нельзя пропустить из-за плеера
-                if (!message.queue.player.playing) {
-                    message.FBuilder = { description: locale._(message.locale, "player.playing.off"), color: Colors.DarkRed };
+                if (!queue && !queue.player.playing) {
+                    await message.reply({
+                        flags: "Ephemeral",
+                        embeds: [
+                            {
+                                description: locale._(message.locale, "player.playing.off"),
+                                color: Colors.DarkRed
+                            }
+                        ],
+                    });
                     return false;
                 }
 
@@ -61,9 +99,9 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         },
         {
             name: "another_voice",
-            callback: (message) => {
-                const queue = message.queue;
-                const VoiceChannel = (message.member as GuildMember)?.voice?.channel;
+            callback: async (message) => {
+                const queue = db.queues.get(message.guild.id);
+                const VoiceChannel = message.member?.voice?.channel;
 
                 // Если музыка играет в другом голосовом канале
                 if (message.guild.members.me?.voice?.channel && message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
@@ -71,21 +109,38 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     if (queue) {
                         // Если есть голосовое подключение
                         if (queue.voice && queue.voice.channel) {
+                            const me = message.guild.members.me;
+
                             // Если в гс есть другие пользователи
-                            if (message.me.voice.channel && message.me.voice.channel.members.filter((user) => !user.user.bot).size > 0) {
-                                message.FBuilder = { description: locale._(message.locale, "voice.alt", [message.voice.channel]), color: Colors.Yellow };
+                            if (me.voice.channel && me.voice.channel.members.filter((user) => !user.user.bot).size > 0) {
+                                await message.reply({
+                                    flags: "Ephemeral",
+                                    embeds: [
+                                        {
+                                            description: locale._(message.locale, "voice.alt", [me.voice.channel]), color: Colors.Yellow
+                                        }
+                                    ]
+                                });
                                 return false;
                             }
 
                             // Если нет пользователей, то подключаемся к другому пользователю
                             else {
-                                queue.voice = message.voice;
-                                queue.message = message;
+                                const queueMessage = new QueueMessage(message);
 
-                                message.FBuilder = {
-                                    description: locale._(message.locale, "voice.new", [message.voice.channel]),
-                                    color: Colors.Yellow
-                                };
+                                queue.voice = message.member?.voice;
+                                queue.message = queueMessage;
+
+                                // Сообщаем о подключении к другому каналу
+                                await message.reply({
+                                    flags: "Ephemeral",
+                                    embeds: [
+                                        {
+                                            description: locale._(message.locale, "voice.new", [VoiceChannel]),
+                                            color: Colors.Yellow
+                                        }
+                                    ]
+                                });
                                 return true;
                             }
                         }
@@ -113,10 +168,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @description База данных для системы ожидания
      * @private
      */
-    private cooldown = env.get("cooldown", true) ? {
-        time: parseInt(env.get("cooldown.time", "2")),
-        db: new Map<string, number>
-    } : null;
+    private cooldown: { time: number; db: Map<string, number> } | null;
 
     /**
      * @description Создание события
@@ -128,19 +180,21 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             type: "client",
             once: false,
             execute: async (ctx) => {
-                // Модифицированный класс сообщения
-                const interact = new Interact(ctx);
-
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
                     if (db.whitelist.ids.length > 0 && !db.whitelist.ids.includes(ctx.user.id)) {
-                        interact.FBuilder = {
-                            description: locale._(interact.locale, "whitelist.message", [interact.author]),
-                            color: Colors.Yellow
-                        }
+                        if (!("reply" in ctx)) return;
 
-                        return;
+                        return ctx.reply({
+                            flags: "Ephemeral",
+                            embeds: [
+                                {
+                                    description: locale._(ctx.locale, "whitelist.message", [ctx.member]),
+                                    color: Colors.Yellow
+                                }
+                            ]
+                        });
                     }
                 }
 
@@ -148,136 +202,196 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 else if (db.blacklist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
                     if (db.blacklist.ids.length > 0 && !db.blacklist.ids.includes(ctx.user.id)) {
-                        interact.FBuilder = {
-                            description: locale._(interact.locale, "blacklist.message", [interact.author]),
-                            color: Colors.Yellow
-                        }
+                        if (!("reply" in ctx)) return;
 
-                        return;
+                        return ctx.reply({
+                            flags: "Ephemeral",
+                            embeds: [
+                                {
+                                    description: locale._(ctx.locale, "blacklist.message", [ctx.member]),
+                                    color: Colors.Yellow
+                                }
+                            ]
+                        });
                     }
                 }
-
-                // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
-                else if (!db.owner.ids.includes(ctx.user.id) && !ctx.isAutocomplete()) {
-                    const user = this.cooldown.db.get(ctx.user.id);
-
-                    // Если нет пользователя в системе ожидания
-                    if (!user) {
-                        // Добавляем пользователя в систему ожидания
-                        this.cooldown.db.set(ctx.user.id, Date.now() + (this.cooldown.time * 1e3));
-                    }
-
-                    // Если пользователь уже в списке
-                    else {
-                        // Если время еще не прошло говорим пользователю об этом
-                        if (user >= Date.now()) {
-                            if (ctx.isAutocomplete()) return;
-
-                            interact.FBuilder = {
-                                description: locale._(interact.locale, "cooldown.message", [interact.author, (user / 1000).toFixed(0), 5]),
-                                color: Colors.Yellow
-                            }
-                            return;
-                        }
-
-                        // Удаляем пользователя из базы
-                        this.cooldown.db.delete(ctx.user.id);
-                    }
-                }
-
 
                 // Если используется функция ответа от бота
-                if (ctx.isAutocomplete()) {
-                    // Если пользователь ищет трек
-                    if (ctx.commandName === "play") {
-                        const args = interact.options._hoistedOptions;
-
-                        // Если ничего не было указано или указана ссылка
-                        if (!args[1]?.value || args[1]?.value === "") return;
-
-                        const request = db.api.request(args[0].value as string);
-
-                        // Если с платформы нельзя получить данные
-                        if (request.block || request.auth) return;
-
-                        db.events.emitter.emit("rest/request-complete", request, interact, args[1].value as string);
-                    }
-                    return;
-                }
+                if (ctx.isAutocomplete()) return this.SelectAutocomplete(ctx);
 
                 // Если пользователь использует команду
-                else if (ctx.isChatInputCommand() && !ctx.isAutocomplete()) {
-                    const command = interact.command;
+                else if (ctx.isChatInputCommand()) {
+                    // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
+                    if (!db.owner.ids.includes(ctx.user.id)) {
+                        const user = this.cooldown.db.get(ctx.user.id);
 
-                    // Если нет команды
-                    if (!command) {
-                        db.commands.remove(ctx.client, ctx.commandGuildId, ctx.commandId);
-                        interact.FBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
-                        return;
-                    }
+                        // Если нет пользователя в системе ожидания
+                        if (!user) {
+                            // Добавляем пользователя в систему ожидания
+                            this.cooldown.db.set(ctx.user.id, Date.now() + (this.cooldown.time * 1e3));
+                        }
 
-                    // Если пользователь пытается использовать команду разработчика
-                    else if (command?.owner && !db.owner.ids.includes(interact.author.id)) {
-                        interact.FBuilder = { description: locale._(interact.locale, "command.fail"), color: Colors.DarkRed };
-                        return;
-                    }
+                        // Если пользователь уже в списке
+                        else {
+                            // Если время еще не прошло говорим пользователю об этом
+                            if (user >= Date.now()) {
+                                if (ctx.isAutocomplete() || !("reply" in ctx)) return;
 
-                    // Если права не соответствуют правде
-                    else if (command.rules && command.rules?.length > 0) {
-                        let isContinue = true;
-
-                        for (const rule of this.intends) {
-                            // Если будет найдено совпадение
-                            if (command.rules.includes(rule.name)) {
-                                // Если нет этого необходимости проверки запроса, то пропускаем
-                                if (isContinue) isContinue = rule.callback(interact);
-                                else break;
+                                return ctx.reply({
+                                    flags: "Ephemeral",
+                                    embeds: [
+                                        {
+                                            description: locale._(ctx.locale, "cooldown.message", [ctx.member, (user / 1000).toFixed(0), 5]),
+                                            color: Colors.Yellow
+                                        }
+                                    ]
+                                });
                             }
-                        }
 
-                        // Если нет доступа, то отклоняем
-                        if (!isContinue) return;
+                            // Удаляем пользователя из базы
+                            this.cooldown.db.delete(ctx.user.id);
+                        }
                     }
 
-                    // Если надо дать время на обработку
-                    if (command.deferReply) await ctx.deferReply().catch(() => {});
-
-                    // Выполняем команду
-                    interact.command.execute(
-                        {
-                            message: interact,
-                            args: interact.options?._hoistedOptions?.map((f) => `${f.value}`),
-                            type: interact.options._subcommand
-                        }
-                    );
-
-                    // Завершаем действие
-                    return;
+                    return this.SelectCommand(ctx);
                 }
+
+                // Действия выбора
+                else if (ctx.isAnySelectMenu && !ctx.isButton()) return this.SelectMenuCallback(ctx as any);
 
                 // Управление кнопками
-                else if (ctx.isButton()) {
-                    const button = db.buttons.get(interact.custom_id);
-                    const queue = interact?.queue;
+                else if (ctx.isButton()) return this.SelectButton(ctx);
 
-                    // Если была не найдена кнопка
-                    if (!button) {
-                        interact.FBuilder = { description: locale._(interact.locale, "button.fail"), color: Colors.DarkRed };
-                        return;
-                    }
-
-                    // Если пользователь не подключен к голосовым каналам и нет очереди
-                    else if (!interact.voice.channel || !interact.guild.members.me.voice.channel) return;
-
-                    // Если есть очередь и пользователь не подключен к тому же голосовому каналу
-                    else if (!queue || interact.voice.channel?.id !== queue.voice.channel.id) return;
-
-                    // Если кнопка была найдена
-                    button.callback(interact);
-                    return;
-                }
+                return null;
             }
         });
+
+        this.cooldown = env.get("cooldown", true) ? { time: parseInt(env.get("cooldown.time", "2")), db: new Map() }: null;
+    };
+
+    /**
+     * @description Функция выполняющая действия SelectCommand
+     * @param ctx
+     * @constructor
+     */
+    private readonly SelectCommand = async (ctx: ChatInputCommandInteraction<CacheType>) => {
+        const command = db.commands.get(ctx.commandName);
+        const permissions = command.permissions;
+
+        // Если нет команды
+        // Если пользователь пытается использовать команду разработчика
+        if (!command || (command?.owner && !db.owner.ids.includes(ctx.member.user.id))) {
+            db.commands.remove(ctx.client, ctx.commandGuildId, ctx.commandId);
+
+            return ctx.reply({
+                flags: "Ephemeral",
+                embeds: [
+                    {
+                        description: locale._(ctx.locale, "command.fail"),
+                        color: Colors.DarkRed
+                    }
+                ]
+            });
+        }
+
+        // Если права не соответствуют правде
+        else if (command.rules && command.rules?.length > 0) {
+            for (const rule of command.rules) {
+                const check = this.intends[rule];
+                // Если будет найдено совпадение
+                if (check && !(await check(ctx as unknown as CommandInteraction))) return null;
+            }
+        }
+
+        if (permissions) {
+            // Проверка прав пользователя
+            const userPermissions = ctx.member?.permissions;
+            if (permissions.user && !permissions.user.every(perm => userPermissions?.has(perm))) {
+                return ctx.reply(locale._(ctx.locale, "permission.user", [ctx.member]));
+            }
+
+            // Проверка прав бота
+            const botPermissions = ctx.guild?.members.me?.permissionsIn(ctx.channel);
+            if (permissions.client && !permissions.client.every(perm => botPermissions?.has(perm))) {
+                return ctx.reply(locale._(ctx.locale, "permission.client", [ctx.member]));
+            }
+        }
+
+        // Выполняем команду
+        return command.execute({
+            message: ctx,
+            args: ctx.options?.["_hoistedOptions"]?.map((f) => `${f.value}`),
+            type: ctx.options.getSubcommand()
+        });
+    };
+
+    /**
+     * @description Функция выполняющая действия SelectAutocomplete
+     * @param ctx
+     * @constructor
+     */
+    private readonly SelectAutocomplete = (ctx: AutocompleteInteraction<CacheType>) => {
+        const command = db.commands.get(ctx.commandName);
+
+        // Если есть команда
+        if (command && command.autocomplete) {
+            command.autocomplete({
+                message: ctx,
+                args: ctx.options?.["_hoistedOptions"]?.map((f) => `${f.value}`),
+            })
+        }
+    };
+
+    /**
+     * @description Функция выполняющая действия SelectButton
+     * @param ctx
+     * @constructor
+     */
+    private readonly SelectButton = (ctx: ButtonInteraction<CacheType>) => {
+        const button = db.buttons.get(ctx.customId);
+        const queue = db.queues.get(ctx.guildId);
+        const userChannel = ctx.member.voice.channel;
+        const botChannel = ctx.guild.members.me.voice.channel;
+
+        // Если была не найдена кнопка
+        // Если пользователь не подключен к голосовым каналам и нет очереди
+        // Если есть очередь и пользователь не подключен к тому же голосовому каналу
+        const isValid = button && userChannel && botChannel && queue && userChannel.id === queue.voice.channel.id;
+        if (!isValid) return;
+
+        // Если кнопка была найдена
+        button.callback(ctx);
+        return;
+    };
+
+    /**
+     * @description Функция выполняющая действия SelectMenu
+     * @param ctx
+     * @constructor
+     */
+    private readonly SelectMenuCallback = (ctx: AnySelectMenuInteraction<CacheType>) => {
+        const id = ctx["customId"] as string;
+
+        if (id === "filter_select") {
+            const queue = db.queues.get(ctx.guildId);
+
+            // Если нет очереди
+            if (!queue) return;
+
+            const filter = ctx["values"][0] as string;
+            const Filter = filters.find((item) => item.name === filter) ;
+            const findFilter = Filter && queue.player.filters.enabled.length > 0 ? queue.player.filters.enabled.find((fl) => fl.name === Filter.name) : false;
+
+            const command = db.commands.get("filter");
+
+            if (!command) return;
+
+            command.execute({
+                message: ctx as any,
+                args: ctx["values"],
+                type: findFilter ? "disable" : "push"
+            });
+        }
     };
 }
 

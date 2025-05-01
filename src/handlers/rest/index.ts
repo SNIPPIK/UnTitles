@@ -1,155 +1,171 @@
-import {BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip} from "node:zlib";
-import {request as httpsRequest, RequestOptions} from "node:https";
-import {IncomingMessage, request as httpRequest} from "node:http";
-
-
-
-
+import { createGunzip, createBrotliDecompress, createInflate } from 'node:zlib';
+import { request as httpsRequest, RequestOptions } from 'node:https';
+import { request as httpRequest } from 'node:http';
+import { IncomingMessage } from 'node:http';
+import { URL } from 'node:url';
+import * as os from "node:os";
 
 /**
  * @author SNIPPIK
- * @description Класс создающий запрос
- * @class Request
- * @abstract
+ * @description Интерфейс с данными запроса
+ * @interface RequestData
  */
-abstract class Request {
-    /**
-     * @description Данные хранимые для произведения запроса
-     * @protected
-     * @readonly
-     */
-    protected data: RequestData = { headers: {} };
-
-    /**
-     * @description Получаем протокол ссылки
-     * @private
-     */
-    private get protocol() {
-        return this.data.protocol.startsWith("https") ? httpsRequest : httpRequest;
-    };
-
-    /**
-     * @description Создаем запрос по ссылке, модифицируем по необходимости
-     * @public
-     */
-    public get request(): Promise<IncomingMessage | Error> {
-        return new Promise<IncomingMessage | Error>((resolve) => {
-            const request = this.protocol(this.data, (res) => {
-                // Если надо сделать редирект на другой ресурс
-                if ((res.statusCode >= 300 && res.statusCode < 400) && res.headers?.location) {
-                    this.data.path = res.headers.location;
-                    return resolve(this.request);
-                }
-
-                return resolve(res);
-            });
-
-            // Если запрос POST, отправляем ответ на сервер
-            if (this.data.method === "POST" && this.data.body) request.write(this.data.body);
-
-            /**
-             * @description Событие если подключение было сорвано
-             */
-            request.once("close", () => {
-                this.data = null;
-                request.removeAllListeners();
-                request.destroy();
-            });
-
-            request.end();
-        });
-    };
-
-    /**
-     * @description Инициализируем класс
-     * @param url - Ссылка
-     * @param options - Опции
-     * @public
-     */
-    public constructor(url: string, options?: httpsClient["data"]) {
-        // Если ссылка является ссылкой
-        if (url.startsWith("http")) {
-            const {hostname, pathname, search, port, protocol} = new URL(url);
-
-            // Создаем стандартные настройки
-            Object.assign(this.data, {
-                port, hostname, path: pathname + search, protocol
-            });
-        }
-
-        // Если user-agent есть готовый
-        if (typeof options?.useragent === "string") {
-            Object.assign(this.data.headers, {
-                "User-Agent": options.useragent
-            });
-        }
-
-        // Надо ли генерировать user-agent
-        else if (options?.useragent) {
-            const OS = [ "X11; Linux x86_64;", "Windows NT 10.0; Win64; x64;" ];
-            const platform = OS[(OS.length - 1).random(0)];
-            const version = (136).random(120);
-
-            Object.assign(this.data.headers, {
-                "User-Agent": `Mozilla/5.0 (${platform} rv:${version}.0) Gecko/20100101 Firefox/${version}.0`,
-            });
-        }
-
-        Object.assign(this.data, options);
-    };
+export interface RequestData {
+    url: string; // Полный URL
+    method?: string; // HTTP-метод, по умолчанию "GET"
+    headers?: Record<string, string>; // Заголовки
+    body?: any; // Тело запроса (если применимо)
+    maxRedirects?: number; // Максимальное количество редиректов
+    validateStatus?: (statusCode: number) => boolean; // Проверка допустимости статус-кода
+    userAgent?: string; // Пользовательский User-Agent
 }
 
 /**
  * @author SNIPPIK
- * @description Создаем http или https запрос
- * @class httpsClient
- * @public
+ * @description Генерация User-Agent строки, эмулирующей браузер
+ * @private
  */
-export class httpsClient extends Request {
+function generateUserAgent(): string {
+    const platform = os.platform();
+    const arch = os.arch();
+    const nodeVersion = process.version;
+    return `Mozilla/5.0 (${platform}; ${arch}) Node/${nodeVersion} httpsClient/1.0`;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Класс HttpClient отправляет HTTP/HTTPS-запрос с автоматической обработкой ответа
+ * @class httpsClient
+ */
+export class httpsClient {
+    public constructor(private data: RequestData) {
+        this.data.method = this.data.method || 'GET';
+        this.data.headers = this.data.headers || {};
+        this.data.maxRedirects = this.data.maxRedirects ?? 5;
+
+        // Установим User-Agent, если передан
+        if (this.data.userAgent !== undefined) {
+            if (typeof this.data.userAgent === "string") this.data.headers['User-Agent'] = this.data.userAgent;
+            else this.data.headers['User-Agent'] = generateUserAgent();
+        }
+    };
+
     /**
-     * @description Получаем страницу в формате string
+     * @description Определяем, какую библиотеку использовать: http или https
+     * @param url - Ссылка
+     * @private
+     */
+    private getProtocol(url: string) {
+        const parsed = new URL(url);
+        return parsed.protocol === 'https:' ? httpsRequest : httpRequest;
+    };
+
+    /**
+     * @description Проверка, нужно ли выполнить редирект
+     * @param res - Исходный запрос
+     * @private
+     */
+    private shouldRedirect(res: IncomingMessage): boolean {
+        return (
+            res.statusCode !== undefined &&
+            res.statusCode >= 300 &&
+            res.statusCode < 400 &&
+            !!res.headers.location
+        );
+    };
+
+    /**
+     * @description Проверка, удовлетворяет ли статус ответа заданному условию
+     * @param statusCode - Статус код
+     * @private
+     */
+    private isStatusValid(statusCode: number): boolean {
+        if (!this.data.validateStatus) return true;
+        return this.data.validateStatus(statusCode);
+    };
+
+    /**
+     * @description Метод HEAD-запроса, возвращающий только заголовки и статус
      * @public
      */
-    public get toString(): Promise<string | Error> {
-        let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage, data = "";
+    public async head(): Promise<{ statusCode: number; headers: IncomingMessage['headers'] }> {
+        this.data.method = "HEAD";
+        const response = await this.send();
 
-        return new Promise<string | Error>((resolve) => {
-            this.request.then((res) => {
-                if (res instanceof Error) return resolve(res);
+        return {
+            statusCode: (response && response.statusCode) || 0,
+            headers: response && response.headers || {},
+        };
+    };
 
+    /**
+     * Метод отправки запроса с поддержкой редиректов и проверки статус-кода
+     * @returns Promise с автоматически разобранным ответом: JSON, текст или Buffer
+     * @public
+     */
+    public async send(currentRedirects = 0): Promise<any> {
+        const { url, method, headers, body, maxRedirects } = this.data;
+        const parsedUrl = new URL(url);
+
+        const options: RequestOptions = {
+            method,
+            hostname: parsedUrl.hostname,
+            port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+            path: parsedUrl.pathname + parsedUrl.search,
+            headers: headers,
+        };
+
+        return new Promise((resolve, reject) => {
+            const req = this.getProtocol(url)(options, (res: IncomingMessage) => {
+                // Обработка redirects (5xx)
+                if (this.shouldRedirect(res)) {
+                    if (currentRedirects >= (maxRedirects ?? 5)) return reject(new Error("Maximum number of redirects exceeded"));
+
+                    const redirectUrl = new URL(res.headers.location!, parsedUrl).toString();
+                    const newClient = new httpsClient({ ...this.data, url: redirectUrl });
+                    return resolve(newClient.send(currentRedirects + 1));
+                }
+
+                // Проверка статус-кода
+                if (!this.isStatusValid(res.statusCode || 0)) return reject(new Error(`Invalid response status: ${res.statusCode}`));
+
+                // HEAD-запрос — сразу вернуть результат без чтения тела
+                if (method === 'HEAD') return resolve({ statusCode: res.statusCode, headers: res.headers });
+
+                let stream: IncomingMessage | ReturnType<typeof createGunzip> = res;
+
+                // Распаковка, если ответ сжат
                 const encoding = res.headers["content-encoding"];
+                if (encoding === "gzip") stream = res.pipe(createGunzip());
+                else if (encoding === "br") stream = res.pipe(createBrotliDecompress());
+                else if (encoding === "deflate") stream = res.pipe(createInflate());
 
-                // Делаем выбор расшифровщика UFT-8
-                if (encoding === "br") decoder = res.pipe(createBrotliDecompress());
-                else if (encoding === "gzip") decoder = res.pipe(createGunzip());
-                else if (encoding === "deflate") decoder = res.pipe(createDeflate());
-                else decoder = res;
+                const chunks: Uint8Array[] = [];
+                stream.on("data", (chunk) => chunks.push(chunk));
+                stream.on("end", () => {
+                    const buffer = Buffer.concat(chunks);
+                    const contentType = res.headers['content-type'] || '';
 
-                // Запускаем расшифровку
-                decoder.setEncoding("utf-8")
-                    .on("data", (chunk) => { data += chunk; })
-                    .once("end", () => resolve(data));
-            }).catch((err) => {
-                return resolve(err);
+                    try {
+                        // Автоопределение формата ответа по Content-Type
+                        if (contentType.includes('application/json')) resolve(JSON.parse(buffer.toString('utf-8')));
+                        else if (contentType.includes('text/')) resolve(buffer.toString('utf-8'));
+                        else resolve(buffer); // бинарный контент
+                    } catch (err) {
+                        reject(new Error(`Error parsing response: ${err}`));
+                    }
+                });
+                stream.on("error", (err) => reject(err));
             });
-        });
-    };
 
-    /**
-     * @description Получаем со страницы JSON (Работает только тогда когда все страница JSON)
-     * @public
-     */
-    public get toJson(): Promise<json | Error> {
-        return this.toString.then((body) => {
-            if (body instanceof Error) return body;
+            req.on("error", (err) => reject(err));
 
-            try {
-                return JSON.parse(body);
-            } catch {
-                return Error(`Invalid json response body at ${this.data.hostname}`);
-            }
+            // Если есть тело — отправим его
+            if (body) req.write(typeof body === "string" ? body : JSON.stringify(body));
+
+            req.end();
         });
-    };
+    }
 
     /**
      * @description Берем данные из XML страницы
@@ -157,7 +173,7 @@ export class httpsClient extends Request {
      */
     public get toXML(): Promise<Error | string[]> {
         return new Promise((resolve) => {
-            this.toString.then((body) => {
+            this.send().then((body) => {
                 // Если была получена ошибка
                 if (body instanceof Error) return resolve(Error("Not found XML data!"));
 
@@ -168,35 +184,4 @@ export class httpsClient extends Request {
             });
         });
     };
-
-    /**
-     * @description Проверяем ссылку на работоспособность
-     * @public
-     */
-    public get status(): Promise<boolean> {
-        return this.request.then((resource) => {
-            if (resource instanceof Error) return false;
-            return resource?.statusCode && resource.statusCode >= 200 && resource.statusCode <= 400;
-        });
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Данные для произведения запроса
- * @interface RequestData
- * @private
- */
-interface RequestData extends RequestOptions {
-    // Метод запроса
-    method?: "POST" | "GET" | "HEAD" | "PATCH";
-
-    // Headers запроса
-    headers?: RequestOptions["headers"];
-
-    // Если мы хотим что-то отправить серверу
-    body?: string;
-
-    // Добавлять user-agent, рандомный или указанный
-    useragent?: boolean | string;
 }
