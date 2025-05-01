@@ -45,17 +45,6 @@ import {db} from "@app";
 })
 @SlashCommandSubCommand({
     names: {
-        "en-US": "re-configure",
-        "ru": "переконфигурация"
-    },
-    descriptions: {
-        "en-US": "Reconnect to the voice channel!",
-        "ru": "Переподключение к голосовому каналу!"
-    },
-    type: ApplicationCommandOptionType.Subcommand
-})
-@SlashCommandSubCommand({
-    names: {
         "en-US": "tribune",
         "ru": "трибуна"
     },
@@ -127,44 +116,6 @@ class Command_Voice extends Assign<Command> {
                             ],
                             flags: "Ephemeral"
                         });
-                    }
-
-                    // Переконфигурация голосового канала
-                    case "re-configure": {
-                        // Выбор лучшего региона для текущий голосовой сессии
-                        VoiceChannel.setRTCRegion(null)
-                            // Если получилось сменить регион
-                            .then(() => {
-                                if (voiceConnection) {
-                                    // Перенастройка подключения
-                                    voiceConnection.configureSocket();
-                                    voiceConnection.rejoin();
-
-                                    message.reply({
-                                        embeds: [
-                                            {
-                                                color: Colors.Green,
-                                                description: locale._(message.locale, "voice.rtc")
-                                            }
-                                        ],
-                                        flags: "Ephemeral"
-                                    });
-                                }
-                            })
-
-                            // Если не получилось сменить регион
-                            .catch(() => {
-                                message.reply({
-                                    embeds: [
-                                        {
-                                            color: Colors.DarkRed,
-                                            description: locale._(message.locale, "voice.rtc.fail")
-                                        }
-                                    ],
-                                    flags: "Ephemeral"
-                                });
-                            })
-                        break;
                     }
 
                     // Отключение от голосового канала

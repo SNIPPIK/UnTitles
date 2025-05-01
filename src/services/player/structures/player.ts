@@ -225,7 +225,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     player.tracks.remove(skip.position);
 
                     if (player.tracks.size === 0) queue.cleanup();
-                })
+                    else player.emit("player/wait", player);
+                });
             }
 
             // Выводим сообщение об ошибке
@@ -271,7 +272,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Создаем класс для управления потоком
-                const stream = new AudioResource(path, {seek, filters: this._filters.compress(track.api.name !== "DISCORD" ? track.time.total : null)});
+                const stream = new AudioResource(path, {seek, filters: this._filters.compress()});
 
                 // Если стрим можно прочитать
                 if (stream.readable) {

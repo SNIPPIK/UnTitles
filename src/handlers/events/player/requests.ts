@@ -1,8 +1,8 @@
 import {locale} from "@service/locale";
 import {Event} from "@handler/events";
 import {Track} from "@service/player";
+import {Logger, Assign} from "@utils";
 import {Colors} from "discord.js";
-import {Assign} from "@utils";
 import {db} from "@app";
 
 /**
@@ -103,13 +103,15 @@ class rest_error extends Assign<Event<"rest/error">> {
             type: "player",
             once: false,
             execute: async (message, error) => {
-                return message.reply({
+                Logger.log("ERROR", `[Rest/API] ${error}`);
+
+                return message.channel.send({
                     embeds: [{
                         title: locale._(message.locale, "api.error"),
                         description: error,
                         color: Colors.DarkRed
                     }]
-                }).then((msg) => setTimeout(msg.delete, 15e3))
+                }).then((msg) => setTimeout(msg.delete, 15e3));
             }
         });
     };

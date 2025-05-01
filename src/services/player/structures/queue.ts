@@ -514,8 +514,10 @@ class AudioCycles {
                 duration: 20,
                 filter: (item) => item.playing,
                 execute: (player) => {
+                    const connection = player.voice.connection;
+
                     // Отправляем пакет в голосовой канал
-                    player.voice.connection.packet = player.audio.current.packet;
+                    connection.packet = player.audio.current.packet;
                 }
             });
         };
