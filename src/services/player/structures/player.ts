@@ -225,7 +225,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     player.tracks.remove(skip.position);
 
                     if (player.tracks.size === 0) queue.cleanup();
-                    else player.emit("player/wait", player);
+                    else {
+                        // Переключаем позицию назад, плеер сам переключит на следующий трек
+                        player.tracks.position = player.tracks.position + 1;
+                        player.emit("player/wait", player);
+                    }
                 });
             }
 

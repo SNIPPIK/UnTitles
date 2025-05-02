@@ -59,38 +59,31 @@ const emoji = {
  */
 export class PlayerProgress {
     /**
-     * @description Размер прогресс бара
-     * @readonly
-     * @private
-     */
-    private readonly size: number;
-
-    /**
      * @description Создаем класс для отображения прогресс бара
      * @param size - Размер
      */
-    public constructor(size: number = 12) {
-        this.size = size;
-    };
+    public constructor(private readonly size: number = 12) {};
 
     /**
      * @description Получаем готовый прогресс бар
      * @public
      */
-    public bar = (options: PlayerProgressInput): string => {
-        const button = emoji["bottom_" + options.platform.toLowerCase()] || emoji.bottom;
-        const {current, total} = options.duration;
-        const size = this.size;
+    public bar = ({duration, platform}: PlayerProgressInput): string => {
+        const {current, total} = duration;
+        const filled = Math.round(this.size * (isNaN(current) ? 0 : current / total));
+        const button = emoji[`bottom_${platform.toLowerCase()}`] || emoji.bottom;
 
-        const number = Math.round(size * (isNaN(current) ? 0 : current / total));
-        let txt = current > 0 ? `${emoji.upped.left}` : `${emoji.empty.left}`;
+        const left = current > 0 ? emoji.upped.left : emoji.empty.left;
+        const right = current >= total ? emoji.upped.right : emoji.empty.right;
 
-        // Высчитываем размер прогресс бара
-        if (current === 0) txt += `${emoji.upped.center.repeat(number)}${emoji.empty.center.repeat((size + 1) - number)}`;
-        else if (current >= total) txt += `${emoji.upped.center.repeat(size)}`;
-        else txt += `${emoji.upped.center.repeat(number)}${button}${emoji.empty.center.repeat(size - number)}`;
+        const middle =
+            current === 0 ?
+                emoji.upped.center.repeat(filled) + emoji.empty.center.repeat(this.size + 1 - filled) :
+                current >= total ?
+                    emoji.upped.center.repeat(this.size) :
+                    emoji.upped.center.repeat(filled) + button + emoji.empty.center.repeat(this.size - filled);
 
-        return txt + (current >= total ? `${emoji.upped.right}` : `${emoji.empty.right}`);
+        return left + middle + right;
     };
 }
 

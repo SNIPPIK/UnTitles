@@ -1,4 +1,4 @@
-import {Colors, EmbedData} from "discord.js";
+import {Colors} from "discord.js";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Event} from "@handler/events";
@@ -117,49 +117,14 @@ class message_playing extends Assign<Event<"message/playing">> {
             name: "message/playing",
             type: "player",
             once: false,
-            execute: async (queue, message) => {
-                const {api, artist, image, name, user} = queue.tracks.track;
-                const Embed: EmbedData = {
-                    color: api.color, thumbnail: image,
-                    author: { name: artist.title, url: artist.url, iconURL: artist.image.url },
-                    footer: {
-                        text: `${user.username} ${queue.tracks.total > 1 ? `| 🎵 ${queue.player.tracks.position + 1} - ${queue.player.tracks.total} 🎶` : ""}`,
-                        iconURL: user.avatar
-                    },
-                    fields: [
-                        // Текущий трек
-                        {
-                            name: "",
-                            value: `\`\`\`${name}\`\`\`` + queue.player.progress
-                        },
-
-                        // Следующий трек или треки
-                        queue.tracks.size > 0 ? (() => {
-                            const tracks = (queue.tracks.array(+3) as Track[]).map((track, index) => {
-                                return `${index + 2} - ${track.name_replace}`;
-                            });
-
-                            return {
-                                name: "",
-                                value: tracks.join("\n")
-                            };
-                        })() : null
-                    ]
-                };
-
-                // Отправляем сообщение
-                if (!message) {
-                    return queue.message.send({embeds: [Embed], components: queue.components, withResponse: true}).then((msg) => {
-                        // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
-                        if (!db.queues.cycles.messages.array.includes(msg)) {
-                            // Добавляем сообщение в базу для обновления
-                            db.queues.cycles.messages.set(msg);
-                        }
-                    });
-                }
-
-                // Обновляем сообщение
-                message.edit({ embeds: [Embed as any], components: queue.components }).catch(() => {});
+            execute: async (queue) => {
+                return queue.message.send({embeds: [queue.componentEmbed], components: queue.components, withResponse: true}).then((msg) => {
+                    // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
+                    if (!db.queues.cycles.messages.array.includes(msg)) {
+                        // Добавляем сообщение в базу для обновления
+                        db.queues.cycles.messages.set(msg);
+                    }
+                });
             }
         });
     };

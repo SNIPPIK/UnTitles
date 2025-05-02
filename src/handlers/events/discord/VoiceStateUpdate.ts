@@ -34,18 +34,23 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
                 const queue = db.queues.get(guild.id);
                 const temp = temple_db.get(guild.id);
 
-                // Если нет гс, то не продолжаем
+                // Если нет гс и очереди, то не продолжаем
                 if (!voice && !queue) return;
 
                 // Если бота нет в голосовом канале, но есть очередь
-                else if (!voice && queue) {
-                    db.queues.remove(guild.id);
-                    return;
+                else if (!voice && queue) db.queues.remove(guild.id);
+
+                // Если есть гс, но нет очереди
+                else if (voice && !queue) {
+                    const members = guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
+
+                    // Если есть пользователи
+                    if (members == 0) db.voice.remove(guild.id);
                 }
 
-                // Если есть очередь на сервере и голосовое подключение
-                if (queue) {
-                    const members = oldState.guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
+                // Если есть гс и очередь
+                else {
+                    const members = guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
 
                     // Если есть пользователи
                     if (members > 0) {
@@ -72,15 +77,6 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
                             }, timeout * 1e3));
                         }
                     }
-                }
-
-                // Если нет очереди, но есть голосовое подключение
-                else {
-                    const members = oldState.guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size;
-
-                    // Если есть пользователи
-                    if (members > 0) return;
-                    else db.voice.remove(guild.id);
                 }
             }
         });

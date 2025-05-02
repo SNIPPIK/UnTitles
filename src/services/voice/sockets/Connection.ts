@@ -76,13 +76,8 @@ export class VoiceConnection {
      * @param status - Статус
      */
     public set status(status) {
-        // Уничтожаем старый адаптер
-        if (this.state.status !== VoiceConnectionStatus.Destroyed && status === VoiceConnectionStatus.Destroyed) {
-            this.adapter.adapter.destroy();
-        }
-
         // Если уже установлен такой статус
-        else if (status === this.state.status) return;
+        if (status === this.state.status) return;
 
         // Меняем статус
         this.state.status = status;
@@ -133,6 +128,12 @@ export class VoiceConnection {
             // Отправляем пакет, если его нет то будет отправлена пустышка.
             // Пустышка требуется для не нарушения работы интерполятора opus.
             if (packet) this.state.socket.cryptoPacket = packet;
+        }
+
+        // Если что-то не так с подключением при условии, что оно не уничтожено
+        else if (this.state.status !== VoiceConnectionStatus.Destroyed && this.state.status !== VoiceConnectionStatus.Disconnected) {
+            // Если голосовое подключение не готово
+            this.rejoin();
         }
     };
 
@@ -287,6 +288,9 @@ export class VoiceConnection {
 
         // Удаляем VoiceSocket
         this.network = null;
+
+        // Уничтожаем адаптер
+        this.adapter.adapter.destroy();
     };
 }
 

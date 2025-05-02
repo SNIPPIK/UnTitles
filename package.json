@@ -25,6 +25,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "cd build && node -r tsconfig-paths/register src --ShardManager"
+    "start": "cd build && node -r tsconfig-paths/register src --ShardManager",
+    "auto": "npm run build && npm run start"
   }
 }

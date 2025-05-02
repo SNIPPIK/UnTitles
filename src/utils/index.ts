@@ -15,16 +15,15 @@ const prototypes: { type: any, name: string, value: any}[] = [
     // Array
     {
         type: Array.prototype, name: "ArraySort",
-        value: function (number = 5, callback: (value: number, index: number) => void, joined = "\"\\n\\n\"") {
-            const pages: string[] = [];
-            let page: string = '';
+        value: function (count = 5, cb: (v: number, i: number) => any, sep = "\n\n") {
+            const out: string[] = [];
 
-            for (let i = 0; i < this["length"]; i += number) {
-                page = this["slice"](i, i + number).map((value: number, index: number) => callback(value, index)).join(joined);
-                if (page !== '') pages.push(page);
+            for (let i = 0; i < (this as any).length; i += count) {
+                const chunk = (this as any).slice(i, i + count).map(cb).join(sep);
+                if (chunk) out.push(chunk);
             }
 
-            return pages;
+            return out;
         }
     },
 
@@ -41,12 +40,13 @@ const prototypes: { type: any, name: string, value: any}[] = [
     {
         type: Number.prototype, name: "duration",
         value: function () {
-            const days = Math.floor((this as any) / (60 * 60 * 24)).toSplit() as number;
-            const hours = Math.floor(((this as any) % (60 * 60 * 24)) / (60 * 60)).toSplit() as number;
-            const minutes = Math.floor(((this as any) % (60 * 60)) / 60).toSplit() as number;
-            const seconds = Math.floor((this as any) % 60).toSplit() as number;
+            const t = Number(this), f = (n: number) => (n < 10 ? "0" : "") + n,
+                days = ~~(t / 86400),
+                hours = ~~(t % 86400 / 3600),
+                min = ~~(t % 3600 / 60),
+                sec = ~~(t % 60);
 
-            return (days > 0 ? `${days}:` : "") + (hours > 0 || days > 0 ? `${hours}:` : "") + (minutes > 0 ? `${minutes}:` : "00:") + (seconds > 0 ? `${seconds}` : "00");
+            return [days && days, (days || hours) && f(hours), f(min), f(sec)].filter(Boolean).join(":");
         }
     },
     {

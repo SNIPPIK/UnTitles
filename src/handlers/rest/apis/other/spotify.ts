@@ -87,11 +87,12 @@ class RestSpotifyAPI extends Assign<RestAPI> {
 
                             // Если трек есть в кеше
                             if (cache) {
+                                if (!options.audio) return resolve(cache);
+
                                 // Если включена утилита кеширования аудио
-                                if (db.cache.audio) {
+                                else if (db.cache.audio) {
                                     // Если есть кеш аудио
                                     if (db.cache.audio.status(cache).status === "ended") return resolve(cache);
-                                    else if (!options.audio) return resolve(cache);
                                 }
                             }
 

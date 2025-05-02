@@ -148,6 +148,41 @@ export class Queue {
     };
 
     /**
+     * @description Embed данные о текущем треке
+     * @public
+     */
+    public get componentEmbed() {
+        const {api, artist, image, name, user} = this.tracks.track;
+        return {
+            color: api.color, thumbnail: image,
+            author: { name: artist.title, url: artist.url, iconURL: artist.image.url },
+            footer: {
+                text: `${user.username} ${this.tracks.total > 1 ? `| 🎵 ${this.player.tracks.position + 1} - ${this.player.tracks.total} 🎶` : ""}`,
+                iconURL: user.avatar
+            },
+            fields: [
+                // Текущий трек
+                {
+                    name: "",
+                    value: `\`\`\`${name}\`\`\`` + this.player.progress
+                },
+
+                // Следующий трек или треки
+                this.tracks.size > 0 ? (() => {
+                    const tracks = (this.tracks.array(+3) as Track[]).map((track, index) => {
+                        return `${index + 2} - ${track.name_replace}`;
+                    });
+
+                    return {
+                        name: "",
+                        value: tracks.join("\n")
+                    };
+                })() : null
+            ]
+        };
+    };
+
+    /**
      * @description Создаем очередь для дальнейшей работы, все подключение находятся здесь
      * @param message - Опции для создания очереди
      * @public
@@ -553,8 +588,10 @@ class AudioCycles {
                     // Если есть поток в плеере
                     else if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
                         // Обновляем сообщение о текущем треке
-                        db.events.emitter.emit("message/playing", queue, message);
-                        return;
+                        message.edit({ embeds: [queue.componentEmbed], components: queue.components }).catch(() => {
+                            // Если при обновлении произошла ошибка
+                            this.remove(message);
+                        });
                     }
                 }
             });

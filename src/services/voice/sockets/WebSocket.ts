@@ -1,4 +1,4 @@
-import {MessageEvent as WebSocketEvent, WebSocket as WS, ErrorEvent} from "ws";
+import {Event, MessageEvent, WebSocket as WS, ErrorEvent, CloseEvent} from "ws";
 import {VoiceOpcodes} from "discord-api-types/voice";
 import type {WebSocketEvents} from "@service/voice";
 import {TypedEmitter} from "@utils";
@@ -59,11 +59,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
      * @public
      */
     public set packet(packet: string | object) {
-        try {
-            this.socket.send(JSON.stringify(packet));
-        } catch (error) {
-            this.emit("error", error as Error);
-        }
+        this.socket.send(JSON.stringify(packet));
     };
 
     /**
@@ -110,35 +106,58 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
     public constructor(endpoint: string) {
         super();
         this.socket = new WS(endpoint);
+        this.socket.onopen = this.onOpen;
+        this.socket.onclose = this.onClose;
+        this.socket.onerror = this.onError;
+        this.socket.onmessage = this.onMessage;
+    };
 
-        // Если WebSocket принял сообщение
-        this.socket.onmessage = async (event: WebSocketEvent) => {
-            // Если получена не строка
-            if (typeof event.data !== "string") return;
+    /**
+     * @description Если WebSocket открыт
+     * @param e
+     */
+    private onOpen = (e: Event) =>
+        this.emit("open", e as any);
 
-            try {
-                const packet = JSON.parse(event.data);
+    /**
+     * @description Если WebSocket закрыт
+     * @param e
+     */
+    private onClose = (e: CloseEvent) =>
+        this.emit("close", e);
 
-                // Если код не поддерживается внутри кода
-                if (not_support_status_code.includes(packet.op)) return;
+    /**
+     * @description Если WebSocket выдал ошибку
+     * @param e
+     */
+    private onError = (e: ErrorEvent) =>
+        this.emit("error", e instanceof Error ? e : e.error);
 
-                // Если WebSocket сообщил новые данные
-                else if (packet.op === VoiceOpcodes.HeartbeatAck) {
-                    this._alive.updated = Date.now();
-                    this._alive.miss = 0;
-                }
+    /**
+     * @description Если WebSocket принял сообщение
+     * @param e
+     */
+    private onMessage = (e: MessageEvent): void => {
+        if (typeof e.data !== "string") return;
 
-                this.emit("packet", packet);
-            } catch (error) {
-                this.emit("error", error as Error);
-            }
-        };
-        // Если WebSocket открыт
-        this.socket.onopen = (err) => this.emit('open', err as any);
-        // Если WebSocket выдал ошибку
-        this.socket.onerror = (err: Error | ErrorEvent) => this.emit('error', err instanceof Error ? err : err.error);
-        // Если WebSocket закрыт
-        this.socket.onclose = (err) => this.emit('close', err);
+        let packet: any;
+        try {
+            packet = JSON.parse(e.data);
+        } catch (error) {
+            this.emit("error", error as Error);
+            return;
+        }
+
+        // Если код не поддерживается внутри кода
+        if (not_support_status_code.includes(packet.op)) return;
+
+        // Если WebSocket сообщил новые данные
+        else if (packet.op === VoiceOpcodes.HeartbeatAck) {
+            this._alive.updated = Date.now();
+            this._alive.miss = 0;
+        }
+
+        this.emit("packet", packet);
     };
 
     /**
@@ -148,7 +167,7 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
     public destroy = (code: number = 1_000) => {
         try {
             this.keepAlive = -1;
-            //this.socket.terminate();
+            this.socket.terminate();
             this.socket.close(code);
             this.socket.removeAllListeners();
         } catch (error) {

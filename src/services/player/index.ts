@@ -1,7 +1,6 @@
 import {AudioPlayer, Queue, Track} from "@service/player";
 import {CommandInteraction} from "@structures";
 import {RestRequest} from "@handler/rest/apis";
-import {CycleInteraction} from "@structures";
 import {Attachment} from "discord.js";
 
 export * from "./structures/track";
@@ -69,9 +68,8 @@ export interface QueuesEvents {
     /**
      * @description Событие при котором коллекция будет отправлять сообщение о текущем треке
      * @param queue     - Очередь сервера
-     * @param message   - Сообщение с сервера
      */
-    readonly "message/playing": (queue: Queue, message?: CycleInteraction) => void;
+    readonly "message/playing": (queue: Queue) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять сообщение об ошибке
