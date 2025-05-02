@@ -321,7 +321,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         return command.execute({
             message: ctx,
             args: ctx.options?.["_hoistedOptions"]?.map((f) => `${f.value}`),
-            type: ctx.options.getSubcommand()
+            type: ctx.options?.["_subcommand"]
         });
     };
 
