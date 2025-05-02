@@ -25,7 +25,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                 // Если нет поддержки такого запроса!
                 if (!api || !api.name) {
                     db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.support"));
-                    return null;
+                    return;
                 }
 
                 // Отправляем сообщение о том что запрос производится
@@ -47,7 +47,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                 // Получаем данные в системе rest/API
                 try {
                     // Дожидаемся выполнения запроса
-                    const rest = await Promise.race([
+                    let rest = await Promise.race([
                         api.execute(url as string, { limit: db.api.limits[api.name], audio: true }),
                         timeoutPromise
                     ]) as Track.list | Track[] | Track | Error;
@@ -58,18 +58,18 @@ class rest_request extends Assign<Event<"rest/request">> {
                     // Обработка ошибки если что-то пошло не так
                     if (rest instanceof Error) {
                         db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.error", [rest]));
-                        return null;
+                        return;
                     }
 
                     // Если был получен результат в виде массива
                     else if (Array.isArray(rest)) {
                         if (rest.length === 0) {
-                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
-                            return null;
+                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "player.search.fail"));
+                            return;
                         }
 
                         // Меняем на первый трек из массива
-                        (rest as any) = rest[0];
+                        rest = rest[0];
                     }
 
                     // Если был получен потоковый трек с временем 0
