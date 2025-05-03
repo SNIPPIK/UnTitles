@@ -9,7 +9,7 @@
     "node": ">=23.0.0"
   },
   "dependencies": {
-    "discord.js": "^14.19.1",
+    "discord.js": "^14.19.3",
     "ws": "^8.18.1"
   },
   "optionalDependencies": {
