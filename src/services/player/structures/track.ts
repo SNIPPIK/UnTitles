@@ -259,7 +259,10 @@ export class Track extends BaseTrack {
                     if (link instanceof Error) return resolve(Error(`${link}`));
 
                     // Если платформа не хочет давать данные трека
-                    else if (!link) return resolve(Error(`The platform does not provide a link`));
+                    else if (!link) {
+                        if (i < 3) continue;
+                        return resolve(Error(`The platform does not provide a link`));
+                    }
 
                     this.link = link;
                 } catch (err) {
