@@ -3,6 +3,8 @@
 - Если хочется поддержать монеткой [`DonationAlerts`](https://www.donationalerts.com/r/snippik)
 - Есть идеи прошу в [`discussions`](https://github.com/SNIPPIK/UnTitles/discussions) или на [`Discord Server`](https://discord.gg/qMf2Sv3)
 
+> [!WARNING]
+> Эта ветка предназначена для регулярных обновлений, они могут как работать, так и не работать
 
 > [!TIP]
 > Сделано с душой, не забывайте указывать авторство от этого зависит разработка!!!\
