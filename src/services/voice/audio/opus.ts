@@ -14,6 +14,12 @@ export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
 
 /**
  * @author SNIPPIK
+ * @description Создаем фейковый буфер, для правильной работы OpusEncoder
+ */
+const buffer = Buffer.alloc(0);
+
+/**
+ * @author SNIPPIK
  * @description Создаем кодировщик в opus
  * @class OpusEncoder
  * @extends PassThrough
@@ -111,6 +117,8 @@ export class OpusEncoder extends PassThrough {
      * @public
      */
     public _transform(chunk: Buffer, _enc: string, cb: (err?: Error) => void) {
+        chunk = Buffer.concat([buffer, chunk]);
+
         // Получаем пакеты из
         while (chunk) {
             const packet = this.extractPacket(chunk);
