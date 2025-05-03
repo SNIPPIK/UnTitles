@@ -10,67 +10,162 @@ import {Track} from "./track";
 
 /**
  * @author SNIPPIK
- * @description Класс очереди для управления всей системой, бесконтрольное использование ведет к поломке всего процесса!!!
- * @class Queue
+ * @description Загружаем класс для хранения очередей, плееров, циклов
+ * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
+ * @extends Collection
+ * @class Queues
  * @public
  */
-export class Queue {
+export class Queues<T extends Queue> extends Collection<T> {
     /**
-     * @description Данные временно хранящиеся в очереди
+     * @description Хранилище циклов для работы музыки
      * @readonly
+     * @public
+     */
+    public readonly cycles = new AudioCycles();
+
+    /**
+     * @description Здесь хранятся модификаторы аудио
+     * @readonly
+     * @public
+     */
+    public readonly options = {
+        optimization: parseInt(env.get("duration.optimization")),
+        volume: parseInt(env.get("audio.volume")),
+        fade: parseInt(env.get("audio.fade"))
+    };
+
+    /**
+     * @description Перезапуск плеера или же перезапуск проигрывания
+     * @param player - Плеер
+     * @public
+     */
+    public set restartPlayer(player: AudioPlayer) {
+        // Если плеер удален из базы
+        if (!this.cycles.players.match(player)) {
+            // Добавляем плеер в базу цикла для отправки пакетов
+            this.cycles.players.set(player);
+        }
+
+        // Если у плеера стоит пауза
+        if (player.status === "player/pause") player.resume();
+
+        // Запускаем функцию воспроизведения треков
+        player.play();
+    };
+
+    /**
+     * @description отправляем сообщение о перезапуске бота
+     * @public
+     */
+    public get waitReboot() {
+        let timeout = 0;
+
+        // На все сервера отправляем сообщение о перезапуске
+        for (const queue of this.array) {
+            // Если плеер запущен
+            if (this.cycles.players.match(queue.player)) {
+                const time = queue.tracks.track.time.total * 1e3
+
+                // Если время ожидания меньше чем в очереди
+                if (timeout < time) timeout = time;
+            }
+
+            // Сообщение о перезапуске
+            queue.message.send({
+                withResponse: false,
+                embeds: [
+                    {
+                        description: locale._(queue.message.locale, `bot.reboot.message`),
+                        color: Colors.Yellow
+                    }
+                ]
+            });
+
+            // Тихо удаляем очередь
+            this.remove(queue.guild.id, true);
+        }
+
+        return timeout;
+    };
+
+    /**
+     * @description Ультимативная функция, позволяет как добавлять треки так и создавать очередь или переподключить очередь к системе
+     * @param message - Сообщение пользователя
+     * @param item    - Добавляемый объект
      * @private
      */
-    private readonly _data = {
-        /**
-         * @description Сообщение пользователя
-         * @private
-         */
-        message:    null as QueueMessage,
+    public create = (message: CommandInteraction, item: Track.list | Track) => {
+        let queue = this.get(message.guild.id);
 
-        /**
-         * @description Плеер для проигрывания музыки
-         * @private
-         */
-        player:     null as AudioPlayer,
+        // Проверяем есть ли очередь в списке, если нет то создаем
+        if (!queue) queue = new Queue(message) as T;
+        else {
+            // Значит что плеера нет в циклах
+            if (!this.cycles.players.match(queue.player)) {
+                setImmediate(() => {
+                    // Если добавлен трек
+                    if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
 
-        /**
-         * @description Время включения очереди или же проигрывания музыки
-         * @private
-         */
-        timestamp: new Date()
+                    // Если очередь перезапущена
+                    else if (!item) queue.player.tracks.position = 0;
+
+                    // Если добавлен плейлист
+                    else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
+
+                    // Перезапускаем плеер
+                    this.restartPlayer = queue.player;
+                });
+            }
+        }
+
+        // Отправляем сообщение о том что было добавлено
+        if ("items" in item || queue.tracks.total > 0) {
+            db.events.emitter.emit("message/push", message, item);
+        }
+
+        // Добавляем треки в очередь
+        for (const track of (item["items"] ?? [item]) as Track[]) {
+            track.user = message.member.user;
+            queue.tracks.push(track);
+        }
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Базовый класс очереди, содержит в себе все необходимые данные для создания очереди
+ * @class BaseQueue
+ * @protected
+ */
+abstract class BaseQueue {
+    /**
+     * @description Время включения очереди или же проигрывания музыки
+     * @readonly
+     * @protected
+     */
+    protected readonly _timestamp = new Date();
 
     /**
-     * @description Выдаем плеер привязанный к очереди
-     * @return AudioPlayer
-     * @public
+     * @description Плеер для проигрывания музыки
+     * @protected
      */
-    public get player() {
-        // Если плеер уже не доступен
-        if (!this._data.player) return null;
-        return this._data.player;
-    };
+    protected _player: AudioPlayer;
 
     /**
-     * @description Получаем доступ к трекам
-     * @public
+     * @description Сообщение пользователя
+     * @protected
      */
-    public get tracks() {
-        // Если плеер уже не доступен
-        if (!this.player) return null;
-        return this.player.tracks;
-    };
+    protected _message: QueueMessage<CommandInteraction>;
 
     /**
-     * @description Выдаем сообщение
-     * @return Client.message
+     * @description Время включения музыки текущей очереди
      * @public
      */
-    public get message() {
-        // Если сообщение с сервера уже не доступно
-        if (!this._data.message) return null;
-        return this._data.message;
+    public get timestamp() {
+        return this._timestamp;
     };
+
 
     /**
      * @description Выдаем сервер к которому привязана очередь
@@ -83,11 +178,22 @@ export class Queue {
     };
 
     /**
+     * @description Выдаем сообщение
+     * @return Client.message
+     * @public
+     */
+    public get message() {
+        // Если сообщение с сервера уже не доступно
+        if (!this._message) return null;
+        return this._message;
+    };
+
+    /**
      * @description Записываем сообщение в базу для дальнейшего использования
      * @param message - Сохраняемое сообщение
      * @public
      */
-    public set message(message: QueueMessage) {
+    public set message(message) {
         // Если введено новое сообщение
         if (message !== this.message && this.message !== undefined) {
             // Удаляем старое сообщение, если оно есть
@@ -98,8 +204,37 @@ export class Queue {
             if (message) db.queues.cycles.messages.remove(message);
         }
 
-        this._data.message = message;
+        this._message = message;
     };
+
+
+    /**
+     * @description Выдаем плеер привязанный к очереди
+     * @return AudioPlayer
+     * @public
+     */
+    public get player() {
+        // Если плеер уже не доступен
+        if (!this._player) return null;
+        return this._player;
+    };
+
+    /**
+     * @description Выдаем плеер привязанный к очереди
+     * @return AudioPlayer
+     * @public
+     */
+    public set player(player) {
+        // Если плеер уже есть
+        if (this._player) {
+            this._player.cleanup();
+            this._player.destroy();
+        }
+
+        // Записываем новый плеер
+        this._player = player;
+    };
+
 
     /**
      * @description Выдаем голосовой канал
@@ -132,11 +267,75 @@ export class Queue {
     };
 
     /**
-     * @description Время включения музыки текущей очереди
+     * @description Создаем очередь для дальнейшей работы, все подключение находятся здесь
+     * @param message - Опции для создания очереди
      * @public
      */
-    public get timestamp() {
-        return this._data.timestamp;
+    protected constructor(message: CommandInteraction) {
+        const queue_message = new QueueMessage(message);
+        const ID = message.guild.id;
+
+        // Создаем плеер
+        this.player = new AudioPlayer(ID);
+
+        // Добавляем данные в класс
+        this.message = queue_message;
+        this.voice = message.member.voice;
+
+        // В конце функции выполнить запуск проигрывания (полезно если треков в плеере еще нет)
+        setImmediate(this.player.play);
+
+        Logger.log("LOG", `[Queue/${ID}] has create`);
+    };
+
+    /**
+     * @description Эта функция частично удаляет очередь
+     * @readonly
+     * @public
+     */
+    public cleanup = () => {
+        Logger.log("LOG", `[Queue/${this.guild.id}] has cleanup`);
+
+        // Останавливаем плеер
+        if (this.player) this.player.cleanup();
+
+        // Удаляем старое сообщение, если оно есть
+        const message = db.queues.cycles.messages.array.find((msg) => {
+            return msg.guild.id === this.guild.id;
+        });
+
+        if (message) db.queues.cycles.messages.remove(message);
+    };
+
+    /**
+     * @description Эта функция полностью удаляет очередь и все сопутствующие данные, используется в другом классе
+     * @protected
+     * @readonly
+     */
+    protected destroy = () => {
+        Logger.log("LOG", `[Queue/${this.guild.id}] has destroyed`);
+
+        // Удаляем плеер
+        if (this.player) this.player.destroy();
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Класс очереди для управления всей системой, бесконтрольное использование ведет к поломке всего процесса!!!
+ * @extends BaseQueue
+ * @class Queue
+ * @public
+ */
+export class Queue extends BaseQueue {
+    /**
+     * @description Получаем доступ к трекам
+     * @public
+     */
+    public get tracks() {
+        // Если плеер уже не доступен
+        if (!this.player) return null;
+        return this.player.tracks;
     };
 
     /**
@@ -144,7 +343,7 @@ export class Queue {
      * @public
      */
     public get components() {
-        return QueueComponent.component(this.player);
+        return QueueButtons.component(this.player);
     };
 
     /**
@@ -188,64 +387,21 @@ export class Queue {
      * @public
      */
     public constructor(message: CommandInteraction) {
-        const queue_message = new QueueMessage(message);
+        super(message);
         const ID = message.guild.id;
-
-        // Создаем плеер
-        this._data.player = new AudioPlayer(ID);
-
-        // Добавляем данные в класс
-        this.message = queue_message;
-        this.voice = message.member.voice;
 
         // Добавляем очередь в список очередей
         db.queues.set(ID, this);
-
-        // В конце функции выполнить запуск проигрывания (полезно если треков в плеере еще нет)
-        setImmediate(this.player.play);
-
-        Logger.log("LOG", `[Queue/${ID}] has create`);
-    };
-
-    /**
-     * @description Эта функция частично удаляет очередь
-     * @readonly
-     * @public
-     */
-    public cleanup = () => {
-        Logger.log("LOG", `[Queue/${this.guild.id}] has cleanup`);
-
-        // Останавливаем плеер
-        if (this.player) this.player.cleanup();
-
-        // Удаляем старое сообщение, если оно есть
-        const message = db.queues.cycles.messages.array.find((msg) => {
-            return msg.guild.id === this.guild.id;
-        });
-
-        if (message) db.queues.cycles.messages.remove(message);
-    };
-
-    /**
-     * @description Эта функция полностью удаляет очередь и все сопутствующие данные, используется в другом классе
-     * @protected
-     * @readonly
-     */
-    protected destroy = () => {
-        Logger.log("LOG", `[Queue/${this.guild.id}] has destroyed`);
-
-        // Удаляем плеер
-        if (this.player) this.player.destroy();
     };
 }
-
 
 /**
  * @author SNIPPIK
  * @description Класс для создания компонентов-кнопок
- * @class QueueComponent
+ * @class QueueButtons
+ * @private
  */
-class QueueComponent {
+class QueueButtons {
     /**
      * @author SNIPPIK
      * @description Динамические кнопки плеера
@@ -403,136 +559,11 @@ class QueueComponent {
     };
 }
 
-
-/**
- * @author SNIPPIK
- * @description Загружаем класс для хранения очередей, плееров, циклов
- * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
- * @class Queues
- * @readonly
- * @public
- */
-export class Queues extends Collection<Queue> {
-    /**
-     * @description Хранилище циклов для работы музыки
-     * @readonly
-     * @public
-     */
-    public readonly cycles = new AudioCycles();
-
-    /**
-     * @description Здесь хранятся модификаторы аудио
-     * @readonly
-     * @public
-     */
-    public readonly options = {
-        optimization: parseInt(env.get("duration.optimization")),
-        volume: parseInt(env.get("audio.volume")),
-        fade: parseInt(env.get("audio.fade"))
-    };
-
-    /**
-     * @description Перезапуск плеера или же перезапуск проигрывания
-     * @param player - Плеер
-     * @public
-     */
-    public set restartPlayer(player: AudioPlayer) {
-        // Если плеер удален из базы
-        if (!this.cycles.players.match(player)) {
-            // Добавляем плеер в базу цикла для отправки пакетов
-            this.cycles.players.set(player);
-        }
-
-        // Если у плеера стоит пауза
-        if (player.status === "player/pause") player.resume();
-
-        // Запускаем функцию воспроизведения треков
-        player.play();
-    };
-
-    /**
-     * @description отправляем сообщение о перезапуске бота
-     * @public
-     */
-    public get waitReboot() {
-        let timeout = 0;
-
-        // На все сервера отправляем сообщение о перезапуске
-        for (const queue of this.array) {
-            // Если плеер запущен
-            if (this.cycles.players.match(queue.player)) {
-                const time = queue.tracks.track.time.total * 1e3
-
-                // Если время ожидания меньше чем в очереди
-                if (timeout < time) timeout = time;
-            }
-
-            // Сообщение о перезапуске
-            queue.message.send({
-                withResponse: false,
-                embeds: [
-                    {
-                        description: locale._(queue.message.locale, `bot.reboot.message`),
-                        color: Colors.Yellow
-                    }
-                ]
-            });
-
-            // Тихо удаляем очередь
-            this.remove(queue.guild.id, true);
-        }
-
-        return timeout;
-    };
-
-    /**
-     * @description Ультимативная функция, позволяет как добавлять треки так и создавать очередь или переподключить очередь к системе
-     * @param message - Сообщение пользователя
-     * @param item    - Добавляемый объект
-     * @private
-     */
-    public create = (message: CommandInteraction, item: Track.list | Track) => {
-        let queue = this.get(message.guild.id);
-
-        // Проверяем есть ли очередь в списке, если нет то создаем
-        if (!queue) queue = new Queue(message);
-        else {
-            // Значит что плеера нет в циклах
-            if (!this.cycles.players.match(queue.player)) {
-                setImmediate(() => {
-                    // Если добавлен трек
-                    if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
-
-                    // Если очередь перезапущена
-                    else if (!item) queue.player.tracks.position = 0;
-
-                    // Если добавлен плейлист
-                    else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
-
-                    // Перезапускаем плеер
-                    this.restartPlayer = queue.player;
-                });
-            }
-        }
-
-        // Отправляем сообщение о том что было добавлено
-        if ("items" in item || queue.tracks.total > 0) {
-            db.events.emitter.emit("message/push", message, item);
-        }
-
-        // Добавляем треки в очередь
-        for (const track of (item["items"] ?? [item]) as Track[]) {
-            track.user = message.member.user;
-            queue.tracks.push(track);
-        }
-    };
-}
-
 /**
  * @author SNIPPIK
  * @description Циклы для работы аудио, лучше не трогать без понимания как все это работает
  * @class AudioCycles
- * @public
+ * @private
  */
 class AudioCycles {
     /**
@@ -542,7 +573,7 @@ class AudioCycles {
      * @readonly
      * @public
      */
-    public readonly players = new class AudioPlayers extends Cycle<AudioPlayer> {
+    public readonly players = new class AudioPlayers<T extends AudioPlayer> extends Cycle<T> {
         public constructor() {
             super({
                 name: "AudioPlayers",
@@ -565,7 +596,7 @@ class AudioCycles {
      * @readonly
      * @public
      */
-    public readonly messages = new class Messages extends Cycle<CycleInteraction> {
+    public readonly messages = new class Messages<T extends CycleInteraction> extends Cycle<T> {
         public constructor() {
             super({
                 name: "Messages",

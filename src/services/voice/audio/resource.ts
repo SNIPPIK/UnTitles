@@ -4,27 +4,30 @@ import {Process} from "./process";
 
 /**
  * @author SNIPPIK
- * @description Конвертирует аудио в ogg/opus
+ * @description Конвертирует ссылку или путь до файла в чистый opus для работы с discord
  * @class AudioResource
  * @public
  */
 export class AudioResource extends TypedEmitter<AudioResourceEvents> {
     /**
-     * @description Параметры буфера потока
+     * @description Список аудио буферов, для временного хранения
+     * @protected
      * @readonly
-     * @private
      */
-    private readonly _buffer: AudioResourceBuffer = {
-        chunks: new Array<Buffer>(),
-        total: 0
-    };
+    protected readonly _audioBuffer = new Array<Buffer>();
+
+    /**
+     * @description Кол-во пакетов в изначальном буфере
+     * @protected
+     */
+    protected _bufferTotal = 0;
 
     /**
      * @description Если чтение возможно
      * @public
      */
     public get readable() {
-        return this._buffer.chunks.length > 0;
+        return this._audioBuffer.length > 0;
     };
 
     /**
@@ -32,9 +35,9 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @public
      */
     public get duration() {
-        if (!this._buffer.chunks.length) return 0;
+        if (!this._audioBuffer.length) return 0;
 
-        return ((this._buffer.total - this._buffer.chunks.length) * 20) / 1e3;
+        return ((this._bufferTotal - this._audioBuffer.length) * 20) / 1e3;
     };
 
     /**
@@ -43,7 +46,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @public
      */
     public get packet(): Buffer {
-        return this._buffer.chunks.shift();
+        return this._audioBuffer.shift();
     };
 
     /**
@@ -72,16 +75,16 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         if (options.input instanceof Process) options.input.stdout.pipe(options.decoder);
         else options.input.on("data", (packet: Buffer) => {
             // Сообщаем что поток можно начать читать
-            if (this._buffer.chunks.length === 0) {
+            if (this._audioBuffer.length === 0) {
                 this.emit("readable");
 
                 // Если поток включается в первый раз.
                 // Добавляем пустышку для интерпретатора opus
-                if (!this._buffer.total) this._buffer.chunks.push(SILENT_FRAME);
+                if (!this._bufferTotal) this._audioBuffer.push(SILENT_FRAME);
             }
 
-            this._buffer.chunks.push(packet);
-            this._buffer.total++;
+            this._audioBuffer.push(packet);
+            this._bufferTotal++;
         });
     };
 
@@ -95,7 +98,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     public constructor(path: string, options: {seek?: number; filters?: string;}) {
         super();
-        if (options.seek > 0) this._buffer.total = (options.seek * 1e3) / 20;
+        if (options.seek > 0) this._bufferTotal = (options.seek * 1e3) / 20;
 
         const decoder = new OpusEncoder({
             readableObjectMode: true,
@@ -112,7 +115,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
                     if (input) input.destroy();
 
                     // Добавляем пустышку для интерпретатора opus
-                    this._buffer.chunks.push(SILENT_FRAME);
+                    this._audioBuffer.push(SILENT_FRAME);
                     this.emit("end");
                 }
             },
@@ -196,25 +199,6 @@ interface AudioResourceEvents {
      * @readonly
      */
     readonly "error": (error: Error) => void;
-}
-
-/**
- * @author SNIPPIK
- * @description Параметры для буфера потока
- * @interface AudioResourceBuffer
- */
-interface AudioResourceBuffer {
-    /**
-     * @description Место для хранения пакетов потока
-     * @protected
-     */
-    chunks: Buffer[];
-
-    /**
-     * @description Кол-во полученных пакетов
-     * @protected
-     */
-    total: number;
 }
 
 /**

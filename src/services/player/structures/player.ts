@@ -19,51 +19,44 @@ const Progress = new PlayerProgress();
 
 /**
  * @author SNIPPIK
- * @description Плеер для проигрывания музыки на серверах
- * @class AudioPlayer
- * @public
+ * @description Базовый плеер, хранит в себе все данные плеера
+ * @class BasePlayer
+ * @protected
  */
-export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
+abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
     /**
      * @description Текущий статус плеера, при создании он должен быть в ожидании
      * @private
      */
-    private _status: keyof AudioPlayerEvents = "player/wait";
-
-    /**
-     * @description Плеер привязан к queue, и это его идентификатор
-     * @readonly
-     * @public
-     */
-    public readonly id: string;
+    protected _status: keyof AudioPlayerEvents = "player/wait";
 
     /**
      * @description Хранилище треков
      * @readonly
      * @private
      */
-    private readonly _tracks: PlayerTracks = new PlayerTracks();
+    protected readonly _tracks = new PlayerTracks();
 
     /**
      * @description Хранилище аудио фильтров
      * @readonly
      * @private
      */
-    private readonly _filters: PlayerAudioFilters = new PlayerAudioFilters();
+    protected readonly _filters = new PlayerAudioFilters();
 
     /**
      * @description Управление голосовыми состояниями
      * @readonly
      * @private
      */
-    private readonly _voice: PlayerVoice = new PlayerVoice();
+    protected readonly _voice = new PlayerVoice();
 
     /**
      * @description Управление потоковым вещанием
      * @readonly
      * @private
      */
-    private readonly _audio: PlayerAudio = new PlayerAudio();
+    protected readonly _audio = new PlayerAudio();
 
     /**
      * @description Делаем voice параметр публичным для использования вне класса
@@ -80,29 +73,21 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public get audio() {
         return this._audio;
     };
+}
 
+/**
+ * @author SNIPPIK
+ * @description Плеер для проигрывания музыки на серверах
+ * @class AudioPlayer
+ * @public
+ */
+export class AudioPlayer extends BasePlayer {
     /**
-     * @description Проверяем играет ли плеер
-     * @return boolean
+     * @description Плеер привязан к queue, и это его идентификатор
+     * @readonly
      * @public
      */
-    public get playing() {
-        // Если текущий статус не позволяет проигрывать музыку
-        if (this.status === "player/wait" || this.status === "player/pause") return false;
-
-        // Если голосовое состояние не позволяет отправлять пакеты
-        else if (!this.voice.connection || this.voice.connection.status !== "ready") return false;
-
-        // Если поток не читается, переходим в состояние ожидания
-        else if (!this.audio.current?.readable) {
-            this.audio.current = null;
-            this.status = "player/wait";
-            return false;
-        }
-
-        return true;
-    };
-
+    public readonly id: string;
 
 
     /**
@@ -133,6 +118,46 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         this._status = status;
     };
 
+
+    /**
+     * @description Проверяем играет ли плеер
+     * @return boolean
+     * @public
+     */
+    public get playing() {
+        // Если текущий статус не позволяет проигрывать музыку
+        if (this.status === "player/wait" || this.status === "player/pause") return false;
+
+        // Если голосовое состояние не позволяет отправлять пакеты
+        else if (!this.voice.connection || this.voice.connection.status !== "ready") return false;
+
+        // Если поток не читается, переходим в состояние ожидания
+        else if (!this.audio.current?.readable) {
+            this.audio.current = null;
+            this.status = "player/wait";
+            return false;
+        }
+
+        return true;
+    };
+
+    /**
+     * @description Делаем tracks параметр публичным для использования вне класса
+     * @public
+     */
+    public get tracks() {
+        return this._tracks;
+    };
+
+    /**
+     * @description Делаем filters параметр публичным для использования вне класса
+     * @public
+     */
+    public get filters() {
+        return this._filters;
+    };
+
+
     /**
      * @description Строка состояния трека
      * @public
@@ -150,23 +175,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         return `\n\`\`${current.duration()}\`\` ${bar} \`\`${time.split}\`\``;
     };
 
-
-
-    /**
-     * @description Делаем tracks параметр публичным для использования вне класса
-     * @public
-     */
-    public get tracks() {
-        return this._tracks;
-    };
-
-    /**
-     * @description Делаем filters параметр публичным для использования вне класса
-     * @public
-     */
-    public get filters() {
-        return this._filters;
-    };
 
     /**
      * @description Задаем параметры плеера перед началом работы
@@ -253,30 +261,34 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             return;
         }
 
+        // Позиция трека
+        const positionIndex = position ?? this.tracks.indexOf(track);
+
+        // Функция выполнения ошибки
+        const handleError = (message: string) => {
+            this.emit("player/error", this, message, { skip: true, position: positionIndex });
+        };
+
+        // Функция выполнения отправки сообщения
+        const emitPlaying = () => {
+            const queue = db.queues.get(this.id);
+            // Отправляем сообщение, если можно
+            db.events.emitter.emit("message/playing", queue);
+        };
+
+
         // Получаем асинхронные данные в синхронном потоке
         track?.resource
             // Если удалось получить исходный файл трека
             .then((path) => {
-                // Если нет исходника
-                if (!path) {
-                    this.emit("player/error", this, `Fail to get audio link`, {
-                        skip: true,
-                        position: position ?? this.tracks.indexOf(track)
-                    });
-                    return;
-                }
-
                 // Если получена ошибка вместо исходника
-                else if (path instanceof Error) {
-                    this.emit("player/error", this, `Critical error in track.resource!\n\n${path.name}\n- ${path.message}`, {
-                        skip: true,
-                        position: position ?? this.tracks.indexOf(track)
-                    });
-                    return;
-                }
+                if (path instanceof Error) return handleError(`Critical error in track.resource!\n\n${path.name}\n- ${path.message}`);
+
+                // Если нет исходника
+                else if (!path) return handleError("Fail to get audio link");
 
                 // Создаем класс для управления потоком
-                const stream = new AudioResource(path, {seek, filters: this._filters.compress()});
+                const stream = new AudioResource(path, {seek, filters: this._filters.compress(track.api.name !== "DISCORD" ? track.time.total : null)});
 
                 // Если стрим можно прочитать
                 if (stream.readable) {
@@ -284,23 +296,14 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     this.status = "player/playing";
 
                     // Если включается именно новый трек
-                    if (seek === 0) {
-                        const queue = db.queues.get(this.id);
-
-                        // Отправляем сообщение, если можно
-                        db.events.emitter.emit("message/playing", queue);
-                    }
-
+                    if (seek === 0) emitPlaying();
                     return;
                 }
 
                 // Если поток нельзя читать, возможно что он еще грузится
                 const timeout = setTimeout(() => {
                     // Отправляем данные событию для отображения ошибки
-                    this.emit("player/error", this, "Timeout the stream has been exceeded!", {
-                        skip: true,
-                        position: position || this.tracks.indexOf(track)
-                    });
+                    handleError("Timeout: the stream has been exceeded!");
 
                     // Уничтожаем поток
                     stream.destroy();
@@ -320,12 +323,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                         clearTimeout(timeout);
 
                         // Если включается именно новый трек
-                        if (seek === 0) {
-                            const queue = db.queues.get(this.id);
-
-                            // Отправляем сообщение, если можно
-                            db.events.emitter.emit("message/playing", queue);
-                        }
+                        if (seek === 0) emitPlaying();
 
                         this.audio.current = stream;
                         this.status = "player/playing";
@@ -335,10 +333,10 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             // Если возникла ошибка
             .catch((err) => {
                 // Сообщаем об ошибке
-                Logger.log("ERROR", `[Player] ${err}`);
+                Logger.log("ERROR", `[Player/${this.id}] ${err}`);
 
                 // Предпринимаем решение
-                this.emit("player/error", this, `${err}`, {skip: true, position: position ?? this.tracks.indexOf(track)});
+                handleError(String(err));
             });
     };
 

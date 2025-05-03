@@ -4,57 +4,58 @@ import {db} from "@app";
 
 /**
  * @author SNIPPIK
- * @description Класс трека, хранит все данные трека, время и возможность получить аудио ссылку или путь до файла
- * @class Track
- * @public
+ * @description Класс трека, хранит все данные трека, время и аудио ссылку или путь до файла
+ * @class BaseTrack
+ * @protected
  */
-export class Track {
+abstract class BaseTrack {
     /**
-     * @description Внутренняя информация трека и его составных
+     * @description Сами данные трека полученный в результате API
      * @readonly
      * @private
      */
-    private readonly _information = {
-        /**
-         * @description Сами данные трека полученный в результате API
-         * @readonly
-         * @private
-         */
-        _track: null as Track.data,
+    protected _track: Track.data;
 
-        /**
-         * @description Здесь хранятся данные времени трека
-         * @readonly
-         * @private
-         */
-        _duration: null as TrackDuration,
+    /**
+     * @description Здесь хранятся данные времени трека
+     * @readonly
+     * @private
+     */
+    protected _duration: TrackDuration;
 
-        /**
-         * @description Параметр для сохранения lyrics
-         * @private
-         */
-        _lyrics: null as string,
+    /**
+     * @description Параметр для сохранения lyrics
+     * @private
+     */
+    protected _lyrics: string;
 
-        /**
-         * @description Пользователя включивший трек
-         * @private
-         */
-        _user: null as Track.user,
+    /**
+     * @description Пользователя включивший трек
+     * @private
+     */
+    protected _user: Track.user;
 
-        /**
-         * @description Здесь хранятся данные с какой платформы был взят трек
-         * @readonly
-         * @private
-         */
-        _api: null as RestAPIBase
-    };
+    /**
+     * @description Здесь хранятся данные с какой платформы был взят трек
+     * @readonly
+     * @private
+     */
+    protected _api: RestAPIBase;
+}
 
+/**
+ * @author SNIPPIK
+ * @description Класс трека, реализует другой класс <BaseTrack>
+ * @class Track
+ * @public
+ */
+export class Track extends BaseTrack {
     /**
      * @description Идентификатор трека
      * @public
      */
     public get ID() {
-        return this._information._track.id;
+        return this._track.id;
     };
 
     /**
@@ -62,7 +63,7 @@ export class Track {
      * @public
      */
     public get url() {
-        return this._information._track.url
+        return this._track.url
     };
 
     /**
@@ -70,7 +71,7 @@ export class Track {
      * @public
      */
     public get name() {
-        return this._information._track.title;
+        return this._track.title;
     };
 
     /**
@@ -91,8 +92,8 @@ export class Track {
      */
     public get image() {
         // Если нет картинки
-        if (!this._information._track?.image?.url) return { url: db.images.no_image };
-        return this._information._track.image;
+        if (!this._track?.image?.url) return { url: db.images.no_image };
+        return this._track.image;
     };
 
     /**
@@ -101,8 +102,8 @@ export class Track {
      */
     public get artist() {
         return {
-            url: this._information._track.artist?.url,
-            title: this._information._track.artist?.title,
+            url: this._track.artist?.url,
+            title: this._track.artist?.title,
             image: {
                 url: db.images.disk
             }
@@ -115,7 +116,7 @@ export class Track {
      * @public
      */
     public get time() {
-        return this._information._duration;
+        return this._duration;
     };
 
     /**
@@ -126,21 +127,21 @@ export class Track {
     protected set time(time) {
         // Если время в числовом формате
         if (typeof time.total === "number") {
-            this._information._duration = { split: (time.total as number).duration(), total: time.total };
+            this._duration = { split: (time.total as number).duration(), total: time.total };
         }
         // Если что-то другое
         else {
             // Если время указано в формате 00:00
             if (`${time.total}`.match(/:/)) {
-                this._information._duration = { split: time.total, total: (time.total as string).duration() };
+                this._duration = { split: time.total, total: (time.total as string).duration() };
                 return;
             }
 
             const total = parseInt(time.total);
 
             // Время трека
-            if (isNaN(total) || !total) this._information._duration = { split: "Live", total: 0 };
-            else this._information._duration = { split: total.duration(), total };
+            if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };
+            else this._duration = { split: total.duration(), total };
         }
     };
 
@@ -150,7 +151,7 @@ export class Track {
      * @public
      */
     public get user() {
-        return this._information._user;
+        return this._user;
     };
 
     /**
@@ -161,13 +162,13 @@ export class Track {
         const { username, id, avatar } = author;
 
         // Если нет автора трека, то автором станет сам пользователь
-        if (!this.artist) this._information._track.artist = {
+        if (!this.artist) this._track.artist = {
             url: `https://discordapp.com/users/${id}`,
             title: username
         };
 
         // Пользователь, который включил трек
-        this._information._user = {
+        this._user = {
             username: username, id,
             avatar: `https://cdn.discordapp.com/avatars/${id}/${avatar}.webp`
         };
@@ -179,7 +180,7 @@ export class Track {
      * @public
      */
     public get link() {
-        return this._information._track.audio;
+        return this._track.audio;
     };
 
     /**
@@ -187,7 +188,7 @@ export class Track {
      * @param url - Ссылка или путь
      */
     public set link(url: string) {
-        this._information._track.audio = url;
+        this._track.audio = url;
     };
 
     /**
@@ -195,7 +196,7 @@ export class Track {
      * @public
      */
     public get api() {
-        return this._information._api;
+        return this._api;
     };
 
 
@@ -280,7 +281,7 @@ export class Track {
     public get lyrics(): Promise<string | Error> {
         return new Promise((resolve) => {
             // Выдаем повторно текст песни
-            if (this._information._lyrics) return resolve(this._information._lyrics);
+            if (this._lyrics) return resolve(this._lyrics);
 
             new httpsClient({
                 url: `https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.name.split(" ").join("+")}\``,
@@ -293,7 +294,7 @@ export class Track {
                 else if (item.statusCode === 404) return resolve(undefined);
 
                 // Сохраняем текст песни
-                this._information._lyrics = item?.syncedLyrics || item?.plainLyrics;
+                this._lyrics = item?.syncedLyrics || item?.plainLyrics;
 
                 // Выдаем впервые текст песни
                 return resolve(item?.syncedLyrics || item?.plainLyrics);
@@ -307,6 +308,7 @@ export class Track {
      * @param api   - Данне о платформе
      */
     public constructor(track: Track.data, api: RestAPIBase) {
+        super();
         this.time = track.time as any;
 
         // Удаляем мусорные названия из текста
@@ -317,8 +319,8 @@ export class Track {
         delete track.time;
 
         // Добавляем данные
-        this._information._track = track;
-        this._information._api = api;
+        this._track = track;
+        this._api = api;
     };
 }
 

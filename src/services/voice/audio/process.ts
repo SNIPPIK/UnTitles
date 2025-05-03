@@ -42,22 +42,23 @@ export class Process {
      * @param name {string} Имя процесса
      */
     public constructor(args: string[], name: string = ffmpeg_path) {
+        const index_resource = args.indexOf("-i");
+        const index_seek = args.indexOf("-ss");
+
         // Проверяем на наличие ссылки в пути
-        if (args.includes("-i")) {
-            const index = args.indexOf("-i");
-            const isLink = args.at(index + 1).startsWith("http");
+        if (index_resource !== -1) {
+            const isLink = args.at(index_resource + 1).startsWith("http");
 
             // Если указана ссылка
             if (isLink) args.unshift("-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5")
         }
 
         // Проверяем на наличие пропуска времени
-        if (args.includes("-ss")) {
-            const index = args.indexOf("-ss");
-            const seek = parseInt(args.at(index + 1));
+        if (index_seek !== -1) {
+            const seek = parseInt(args.at(index_seek + 1));
 
             // Если указано не число
-            if (isNaN(seek) || seek === 0) args.splice(index, 2);
+            if (isNaN(seek) || seek === 0) args.splice(index_seek, 2);
         }
 
         args.unshift("-vn", "-loglevel", "panic");

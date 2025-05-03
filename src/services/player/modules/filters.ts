@@ -7,13 +7,13 @@ import {db} from "@app";
  * @class PlayerAudioFilters
  * @public
  */
-export class PlayerAudioFilters {
+export class PlayerAudioFilters<T extends AudioFilter> {
     /**
      * @description Включенные фильтры
      * @readonly
      * @private
      */
-    private readonly _filters: AudioFilter[] = [];
+    private readonly _filters: T[] = [];
 
     /**
      * @description Получаем список включенных фильтров
@@ -27,27 +27,28 @@ export class PlayerAudioFilters {
      * @description Сжимаем фильтры для работы ffmpeg
      * @public
      */
-    public compress = () => {
-        const realFilters: string[] = [`volume=${db.queues.options.volume / 150}`];
-        const onFilters = this.enabled;
+    public compress = (time?: number) => {
+        const { volume, fade, optimization } = db.queues.options;
+        const filters: string[] = [`volume=${volume / 150}`];
 
         // Если есть приглушение аудио
-        if (db.queues.options.fade) {
-            realFilters.push(`afade=t=in:st=0:d=${db.queues.options.fade + 2}`);
+        if (fade) {
+            filters.push(`afade=t=in:st=0:d=${fade + 2}`);
 
             // Если есть время трека
-            //if (typeof time === "number" && time >= db.queues.options.optimization) realFilters.push(`afade=out:st=${time - (db.queues.options.fade + 5)}:d=${db.queues.options.fade + 5}`);
-        }
+            if (typeof time === "number" && time >= optimization) {
+                const start = time - (fade + 5);
 
-        // Если есть включенные фильтры
-        if (onFilters.length > 0) {
-            // Берем данные из всех фильтров
-            for (const filter of onFilters) {
-                realFilters.push(filter.args ? `${filter.filter}${filter.argument ?? ""}` : filter.filter);
+                if (start > 0) filters.push(`afade=t=out:st=${start}:d=${fade + 5}`);
             }
         }
 
-        return realFilters.join(",");
+        // Берем данные из всех фильтров
+        for (const { filter, args, argument } of this.enabled) {
+            filters.push(args ? `${filter}${argument ?? ""}` : filter);
+        }
+
+        return filters.join(",");
     };
 }
 

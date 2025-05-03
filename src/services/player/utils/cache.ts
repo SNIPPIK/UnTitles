@@ -92,11 +92,11 @@ export class CacheUtility {
 
                     const data = {
                         track: {
-                            ...track["_information"]["_track"],
-                            time: track["_information"]["_duration"],
+                            ...track["_track"],
+                            time: track["_duration"],
                             audio: null
                         },
-                        api: track["_information"]["_api"]
+                        api: track["_api"]
                     };
 
                     // Записываем данные в файл

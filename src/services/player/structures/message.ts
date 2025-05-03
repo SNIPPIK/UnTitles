@@ -1,18 +1,17 @@
 import {CommandInteraction, CycleInteraction} from "@structures";
 import {EmbedData} from "discord.js";
 
-
 /**
  * @author SNIPPIK
  * @description Прослойка для правильной работы очереди
  * @class QueueMessage
  */
-export class QueueMessage {
+export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description Оригинальный класс сообщения
      * @private
      */
-    private readonly _original: CommandInteraction;
+    private readonly _original: T;
 
     /**
      * @description Язык сообщения
@@ -92,7 +91,7 @@ export class QueueMessage {
      * @description Создаем класс для общения с discord api
      * @param ctx - Класс сообщения
      */
-    public constructor(ctx: CommandInteraction) {
+    public constructor(ctx: T) {
         this._original = ctx;
     };
 

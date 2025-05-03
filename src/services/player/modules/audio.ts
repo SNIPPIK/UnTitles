@@ -6,12 +6,12 @@ import {AudioResource} from "@service/voice";
  * @class PlayerAudio
  * @public
  */
-export class PlayerAudio {
+export class PlayerAudio<T extends AudioResource> {
     /**
      * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
      * @private
      */
-    private _audio: AudioResource;
+    private _audio: T;
 
     /**
      * @description Текущий стрим

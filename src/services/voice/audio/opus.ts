@@ -30,13 +30,13 @@ export class OpusEncoder extends PassThrough {
      * @description Текущий буфер
      * @private
      */
-    private buffer: Buffer | null = null;
+    private buffer: Buffer = null;
 
     /**
      * @description Номер потока
      * @private
      */
-    private bitstream: number | null = null;
+    private bitstream: number = null;
 
     /**
      * @description Декодирование фрагмента в opus
