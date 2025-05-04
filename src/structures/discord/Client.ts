@@ -67,7 +67,6 @@ export class DiscordClient extends Client {
                 GuildTextThreadManager: 0
             })
         });
-        this.IntervalStatus();
 
         // Устанавливаем параметр debug
         if (!Logger.debug) {
@@ -82,6 +81,9 @@ export class DiscordClient extends Client {
 
             Logger.debug = debug;
         }
+
+        // Запускаем статусы после инициализации клиента
+        this.once("ready", this.IntervalStatus);
     };
 
     /**
