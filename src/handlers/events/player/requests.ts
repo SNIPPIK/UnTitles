@@ -21,6 +21,7 @@ class rest_request extends Assign<Event<"rest/request">> {
             execute: async (platform, message, url) => {
                 // Получаем функцию запроса данных с платформы
                 const api = platform.get(typeof url === "string" ? url : url.url);
+                const timeout = platform.audio ? 2e3 : 0;
 
                 // Если нет поддержки такого запроса!
                 if (!api || !api.name) {
@@ -34,7 +35,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                     flags: "Ephemeral",
                     embeds: [{
                         title: `${platform.platform}.${api.name}`,
-                        description: locale._(message.locale, "api.platform.request", [db.images.loading]),
+                        description: timeout ? locale._(message.locale, "api.platform.request.long", [db.images.loading, platform.platform]) : locale._(message.locale, "api.platform.request", [db.images.loading]),
                         color: platform.color
                     }]
                 });
@@ -52,8 +53,9 @@ class rest_request extends Assign<Event<"rest/request">> {
                         timeoutPromise
                     ]) as Track.list | Track[] | Track | Error;
 
+
                     // Удаляем сообщение после выполнения запроса
-                    await followUpPromise.then(msg => msg.delete().catch(() => {}));
+                    await followUpPromise.then(msg => setTimeout(() => msg.delete().catch(() => {}), timeout));
 
                     // Обработка ошибки если что-то пошло не так
                     if (rest instanceof Error) {

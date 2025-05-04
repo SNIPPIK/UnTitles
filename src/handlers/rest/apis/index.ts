@@ -127,11 +127,13 @@ export class RestObject extends handler<RestAPI> {
 
             // Ищем трек по имени артиста и названия
             const tracks = await platform.get("search").execute(`${track.artist.title} - ${track.name}`, { limit: 5 });
-            if (tracks instanceof Error || tracks.length === 0) return null;
+            if (tracks instanceof Error) return tracks;
+            else if (tracks.length === 0) return new Error(`Fail searching tracks`);
 
             // Получаем исходник трека
             const song = await platform.get("track").execute(tracks[0]?.url, { audio: true });
-            if (song instanceof Error || !song.link) return null;
+            if (song instanceof Error) return song;
+            else if (!song.link) return Error("Fail getting link")
 
             return song.link;
         } catch (err) {
@@ -174,6 +176,13 @@ export class RestRequest {
      * @public
      */
     public get auth() { return db.api.platforms.authorization.includes(this.platform); };
+
+    /**
+     * @description Выдаем bool, есть ли доступ к получению аудио у платформы
+     * @return boolean
+     * @public
+     */
+    public get audio() { return db.api.platforms.audio.includes(this.platform); };
 
     /**
      * @description Выдаем int, цвет платформы

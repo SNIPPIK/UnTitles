@@ -208,66 +208,15 @@ export class Track extends BaseTrack {
     public get resource(): Promise<string | Error> {
         return new Promise(async (resolve) => {
             for (let i = 0; i < 3; i++) {
-                if (i === 3) break;
+                if (i >= 3) return resolve(Error(`The platform does not provide a link`));
 
-                // Если включено кеширование
-                if (db.cache.audio) {
-                    const status = db.cache.audio.status(this);
+                const resource = await this.prepareResource();
 
-                    // Если есть кеш аудио, то выдаем его
-                    if (status.status === "ended") {
-                        this.link = status.path;
-                        break;
-                    }
-                }
+                // Если произошла ошибка при получении ресурса
+                if (resource instanceof Error) {
+                    console.error(resource);
 
-                // Если есть данные об исходном файле
-                if (this.link) {
-                    // Проверяем ссылку на актуальность
-                    if (this.link.startsWith("http")) {
-                        try {
-                            const status = await new httpsClient({url: this.link, method: "HEAD"}).head();
-
-                            // Если статус = good
-                            if (status.statusCode < 300 && status.statusCode <= 200) {
-                                // Добавляем трек в кеширование
-                                if (this.api.name !== "DISCORD" && db.cache.audio) {
-                                    setImmediate(async () => db.cache.audio.set(this));
-                                }
-
-                                break;
-                            }
-
-                            // Если статус плохой, то удаляем ссылку
-                            this.link = null;
-                        } catch (err) { // Если произошла ошибка при проверке статуса
-                            this.link = null;
-                            if (i < 3) continue;
-                            return resolve(Error(`This link track is not available... Fail check link!`));
-                        }
-                    }
-
-                    // Если указан путь до файла, он будет рабочим наверно xD
-                    else break;
-                }
-
-                // Если нет ссылки на исходный файл
-                try {
-                    const link = await db.api.fetch(this);
-
-                    // Если вместо ссылки получили ошибку
-                    if (link instanceof Error) return resolve(Error(`${link}`));
-
-                    // Если платформа не хочет давать данные трека
-                    else if (!link) {
-                        if (i < 3) continue;
-                        return resolve(Error(`The platform does not provide a link`));
-                    }
-
-                    this.link = link;
-                } catch (err) {
-                    if (i < 3) continue;
-                    return resolve(Error(`This link track is not available... Fail update link!`));
+                    if (i >= 3) return resolve(resource);
                 }
             }
 
@@ -324,6 +273,69 @@ export class Track extends BaseTrack {
         // Добавляем данные
         this._track = track;
         this._api = api;
+    };
+
+    /**
+     * @description Функция подготавливающая путь до аудио, так же проверяющая его актуальность
+     * @private
+     */
+    private prepareResource = async (): Promise<string | Error> => {
+        // Если включено кеширование
+        if (db.cache.audio) {
+            const status = db.cache.audio.status(this);
+
+            // Если есть кеш аудио, то выдаем его
+            if (status.status === "ended") {
+                this.link = status.path;
+                return status.path;
+            }
+        }
+
+        // Если есть данные об исходном файле
+        if (this.link) {
+            // Проверяем ссылку на актуальность
+            if (this.link.startsWith("http")) {
+                try {
+                    const status = await new httpsClient({url: this.link, method: "HEAD"}).head();
+
+                    // Если статус = good
+                    if (status.statusCode < 300 && status.statusCode >= 200) {
+                        // Добавляем трек в кеширование
+                        if (this.api.name !== "DISCORD" && db.cache.audio) {
+                            setImmediate(async () => db.cache.audio.set(this));
+                        }
+
+                        return this.link;
+                    }
+
+                    // Если статус плохой, то удаляем ссылку
+                    this.link = null;
+                    return null;
+                } catch (err) { // Если произошла ошибка при проверке статуса
+                    this.link = null;
+                    return new Error(`This link track is not available... Fail check link!`);
+                }
+            }
+
+            // Скорее всего это файл
+            return this.link;
+        }
+
+        // Если нет ссылки на исходный файл
+        try {
+            const link = await db.api.fetch(this);
+
+            // Если вместо ссылки получили ошибку
+            if (link instanceof Error) return link;
+
+            // Если платформа не хочет давать данные трека
+            else if (!link) return new Error(`The platform does not provide a link`);
+
+            this.link = link;
+            return link;
+        } catch (err) {
+            return new Error(`This link track is not available... Fail update link!`);
+        }
     };
 }
 

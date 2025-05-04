@@ -294,8 +294,6 @@ abstract class BaseQueue {
      * @public
      */
     public cleanup = () => {
-        Logger.log("LOG", `[Queue/${this.guild.id}] has cleanup`);
-
         // Останавливаем плеер
         if (this.player) this.player.cleanup();
 
@@ -304,7 +302,11 @@ abstract class BaseQueue {
             return msg.guild.id === this.guild.id;
         });
 
-        if (message) db.queues.cycles.messages.remove(message);
+        if (message) {
+            db.queues.cycles.messages.remove(message);
+
+            Logger.log("LOG", `[Queue/${this.guild.id}] has cleanup`);
+        }
     };
 
     /**

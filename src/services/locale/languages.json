@@ -340,6 +340,11 @@
     "en-US": "{ARGUMENT} Waiting for response from server..."
   },
 
+  "api.platform.request.long": {
+    "ru": "{ARGUMENT} Ожидание ответа от сервера...\n\n**{ARGUMENT}** не может отдавать аудио данные!!!",
+    "en-US": "{ARGUMENT} Waiting for response from server...\n\n**{ARGUMENT}** cannot return audio data!!!"
+  },
+
   "api.platform.timeout": {
     "ru": "Истекло время ожидания сервера: сервер отказался передавать данные",
     "en-US": "Timeout server: The server refused to transmit data"

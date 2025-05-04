@@ -1,6 +1,6 @@
-import {DefaultWebSocketManagerOptions} from "@discordjs/ws";
-import {Client, Partials, Options} from "discord.js";
+import {Client, Partials, Options, SimpleShardingStrategy} from "discord.js";
 import {ActivityType} from "discord-api-types/v10"
+import {version} from "../../../package.json";
 import {Logger} from "@utils";
 import {env} from "@app";
 
@@ -10,8 +10,29 @@ import {env} from "@app";
  * @class DiscordClient
  */
 export class DiscordClient extends Client {
+    /**
+     * @description Номер осколка
+     * @public
+     */
+    public get shardID() {
+        return this.shard?.ids[0] ?? 0;
+    };
+
+    /**
+     * @description Создание стандартного осколка
+     * @public
+     */
     public constructor() {
         super({
+            ws: {
+                buildStrategy(ws) {
+                    const browser = env.get("client.browser", "discord.js");
+                    if (browser) ws.options.identifyProperties.browser = browser;
+
+                    return new SimpleShardingStrategy(ws);
+                }
+            },
+
             // Права бота
             intents: [
                 "Guilds",
@@ -61,24 +82,22 @@ export class DiscordClient extends Client {
 
             Logger.debug = debug;
         }
-
-        //@ts-ignore
-        DefaultWebSocketManagerOptions.identifyProperties["browser"] = env.get("client.browser", "discord.js");
     };
 
     /**
      * @description Функция создания и управления статусом
+     * @readonly
      * @private
      */
-    private IntervalStatus = () => {
+    private readonly IntervalStatus = () => {
         // Время обновления статуса
         const timeout = parseInt(env.get("client.presence.interval"));
-        const array: { name: string; type: ActivityType }[] = JSON.parse(env.get("client.presence.array"));
+        const array = this.parseStatuses();
         const size = array.length - 1;
         let i = 0;
 
         // Интервал для обновления статуса
-        setInterval(async () => {
+        setInterval(() => {
             // Запрещаем выходить за диапазон допустимого значения
             if (i > size) i = 0;
             const activity = array[i];
@@ -87,16 +106,53 @@ export class DiscordClient extends Client {
             // Задаем статус боту
             this.user.setPresence({
                 status: env.get("client.status", "online"),
-                activities: [
-                    {
-                        name: activity.name,
-                        type: ActivityType[activity.type as any] as any
-                    }
-                ] as ActivityOptions[],
+                activities: [activity] as ActivityOptions[],
                 shardId: this.shard?.ids[0] ?? 0
             });
 
         }, timeout * 1e3);
+    };
+
+    /**
+     * @description Функция подготавливающая статусы
+     * @readonly
+     * @private
+     */
+    private readonly parseStatuses = () => {
+        const statuses: ActivityOptions[] = [
+            // Статус с версией
+            {
+                name: `version ${version}`,
+                type: ActivityType["Watching"],
+                shardId: this.shardID
+            },
+
+            // Статус о кол-во гильдий
+            {
+                name: `guilds ${this.guilds.cache.size}`,
+                type: ActivityType["Watching"],
+                shardId: this.shardID
+            }
+        ];
+
+        // Получаем пользовательские статусы
+        try {
+            const envPresents = (JSON.parse(env.get("client.presence.array")) as ActivityOptions[]).map((status) => {
+                return {
+                    name: status.name,
+                    type: ActivityType[status.type] as any,
+                    shardId: this.shardID
+                }
+            });
+
+            // Добавляем пользовательские статусы
+            statuses.push(...envPresents);
+            Logger.log("LOG", `[Core/${this.shardID}] Success loading custom ${Logger.color(34, `${envPresents.length} statuses`)}`);
+        } catch (e) {
+            Logger.log("ERROR", `[Core/${this.shardID}] Failed to parse env statuses. ${e}`);
+        }
+
+        return statuses;
     };
 }
 

@@ -198,7 +198,7 @@ export var db: Database = null;
 
             // Создаем класс осколка
             const client = new DiscordClient();
-            const id = client.shard?.ids[0] ?? 0;
+            const id = client.shardID;
 
             db = new Database();
             Logger.log("LOG", `[Core/${id}] has ${Logger.color(34, `initialize db`)}`);
