@@ -1,44 +1,43 @@
 /**
  * @author SNIPPIK
- * @description База с циклами для дальнейшей работы этот класс надо подключить к другому
- * @class Cycle
- * @abstract
- * @public
+ * @description Базовый класс цикла
+ * @class BaseCycle
  */
-export abstract class Cycle<T = unknown> {
+abstract class BaseCycle<T = unknown> {
     /**
      * @description База с объектами
      * @protected
      * @readonly
      */
-    public readonly array: T[] = [];
+    public readonly array = new Array<T>();
 
     /**
      * @description Время через которое надо будет выполнить функцию
      * @private
      */
-    private time: number = 0;
+    protected time: number = 0;
 
     /**
-     * @description Параметры для работы цикла
-     * @readonly
-     * @public
-     */
-    public readonly _config: TimeCycleConfig<T>;
-
-    /**
-     * @description Создаем класс и добавляем параметры
-     * @param options - Параметры для работы класса
+     * @description Выполняет шаг цикла с учётом точного времени следующего запуска
      * @protected
      */
-    protected constructor(options: TimeCycleConfig<T>) {
-        this._config = {
-            name: "timeCycle",
-            execute: null,
-            filter: null,
-            duration: 10e3,
-            ...options
-        };
+    protected _stepCycle: () => void;
+
+    /**
+     * @description Проверяем время для запуска цикла повторно
+     * @readonly
+     * @private
+     */
+    protected _stepCheckTimeCycle = (duration: number) => {
+        // Если запущен стандартный цикл.
+        // Высчитываем время для выполнения
+        this.time += duration;
+
+        // Записываем время в переменную для проверки
+        let time = Math.max(0, this.time - Date.now());
+
+        // Выполняем функцию через ~time ms
+        setTimeout(this._stepCycle, time);
     };
 
     /**
@@ -46,18 +45,84 @@ export abstract class Cycle<T = unknown> {
      * @param item - Объект T
      * @public
      */
-    public set = (item: T) => {
-        if (this._config.custom?.push) this._config.custom?.push(item);
-        else if (this.array.includes(item)) this.remove(item);
-
-        // Добавляем данные в цикл
+    public add(item: T): void {
+        const existing = this.array.includes(item);
+        if (existing) this.remove(item);
         this.array.push(item);
 
         // Запускаем цикл
-        if (this.array?.length === 1 && this.time === 0) {
+        if (this.array.length === 1 && this.time === 0) {
             this.time = Date.now();
             setImmediate(this._stepCycle);
         }
+    };
+
+    /**
+     * @description Проверяет, существует ли элемент
+     * @param item Элемент типа T
+     * @public
+     */
+    public has(item: T): boolean {
+        return this.array.includes(item);
+    };
+
+    /**
+     * @description Удаляем элемент из очереди
+     * @param item - Объект T
+     * @public
+     */
+    public remove(item: T): void {
+        const index = this.array.indexOf(item);
+        if (index === -1) return;
+
+        this.array.splice(index, 1);
+    };
+
+    /**
+     * @description Очищает весь массив
+     * @protected
+     */
+    protected clear(): void {
+        this.array.splice(0, this.array.length);
+        this.time = 0;
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Класс для удобного управления циклами
+ * @class SyncCycle
+ * @abstract
+ * @public
+ */
+export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
+    /**
+     * @description Параметры для работы цикла
+     * @readonly
+     * @public
+     */
+    public readonly _config: SyncCycleConfig<T>;
+
+    /**
+     * @description Создаем класс и добавляем параметры
+     * @param options - Параметры для работы класса
+     * @protected
+     */
+    protected constructor(options: SyncCycleConfig<T>) {
+        super();
+        this._config = options;
+    };
+
+    /**
+     * @description Добавляем элемент в очередь
+     * @param item - Объект T
+     * @public
+     */
+    public add = (item: T) => {
+        if (this._config.custom?.push) this._config.custom?.push(item);
+        else if (this.array.includes(item)) this.remove(item);
+
+        super.add(item);
     };
 
     /**
@@ -76,23 +141,11 @@ export abstract class Cycle<T = unknown> {
     };
 
     /**
-     * @description Ищем есть ли объект в базе
-     * @param item - Объект T
-     * @public
-     */
-    public match = (item: T) => {
-        if (this.array.length === 0) return false;
-
-        // Ищем есть и в базе этот объект
-        return this.array.indexOf(item) !== -1;
-    };
-
-    /**
      * @description Здесь будет выполнен прогон объектов для выполнения execute
      * @readonly
      * @private
      */
-    private _stepCycle = () => {
+    protected _stepCycle = () => {
         // Если нет объектов
         if (this.array?.length === 0) {
             this.time = 0;
@@ -107,23 +160,7 @@ export abstract class Cycle<T = unknown> {
             if (!this._config.filter(item)) continue;
 
             try {
-                // Если цикл запущен с режимом обещания
-                if (item instanceof Promise) {
-                    (this._config.execute(item) as Promise<boolean>)
-                        // Если ответ был получен
-                        .then((bool) => {
-                            if (!bool) this.remove(item);
-                        })
-
-                        // Если произошла ошибка при получении ответа
-                        .catch((error) => {
-                            this.remove(item);
-                            console.log(error);
-                        });
-                }
-
-                // Если запущен стандартный цикл
-                else this._config.execute(item);
+                this._config.execute(item);
             } catch (error) {
                 this.remove(item);
                 console.log(error);
@@ -131,68 +168,117 @@ export abstract class Cycle<T = unknown> {
         }
 
         // Запускаем цикл повторно
-        return this._stepCheckTimeCycle();
-    };
-
-    /**
-     * @description Проверяем время для запуска цикла повторно
-     * @readonly
-     * @private
-     */
-    private _stepCheckTimeCycle = () => {
-        // Если цикл запущен с режимом обещания.
-        // Высчитываем время для выполнения
-        if (this._config.duration === "promise") this.time += 20e3;
-
-        // Если запущен стандартный цикл.
-        // Высчитываем время для выполнения
-        else this.time += this._config.duration;
-
-
-        // Записываем время в переменную для проверки
-        let time = this.time - Date.now();
-
-        // Если время меньше 1 ms
-        if (time < 0) time = (20).random(0);
-
-        // Выполняем функцию через ~time ms
-        setTimeout(this._stepCycle, time);
+        return this._stepCheckTimeCycle(this._config.duration);
     };
 }
 
 /**
  * @author SNIPPIK
- * @description Интерфейс для опций TimeCycle
+ * @description Класс для удобного управления promise циклами
+ * @class AsyncCycle
+ * @abstract
+ * @public
+ */
+export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
+    /**
+     * @description Параметры для работы цикла
+     * @readonly
+     * @public
+     */
+    public readonly _config: AsyncCycleConfig<T>;
+
+    /**
+     * @description Создаем класс и добавляем параметры
+     * @param options - Параметры для работы класса
+     * @protected
+     */
+    protected constructor(options: AsyncCycleConfig<T>) {
+        super();
+        this._config = options;
+    };
+
+    /**
+     * @description Добавляем элемент в очередь
+     * @param item - Объект T
+     * @public
+     */
+    public add = (item: T) => {
+        if (this._config.custom?.push) this._config.custom?.push(item);
+        else if (this.array.includes(item)) this.remove(item);
+
+        super.add(item);
+    };
+
+    /**
+     * @description Удаляем элемент из очереди
+     * @param item - Объект T
+     * @public
+     */
+    public remove = (item: T) => {
+        const index = this.array.indexOf(item);
+
+        // Если есть объект в базе
+        if (index !== -1) {
+            if (this._config.custom?.remove) this._config.custom.remove(item);
+            this.array.splice(index, 1);
+        }
+    };
+
+    /**
+     * @description Здесь будет выполнен прогон объектов для выполнения execute
+     * @readonly
+     * @private
+     */
+    protected _stepCycle = () => {
+        // Если нет объектов
+        if (this.array?.length === 0) {
+            this.time = 0;
+            return;
+        }
+
+        // Запускаем цикл
+        for (let i = this.array.length; i > 0; i--) {
+            const item = this.array[i - 1];
+
+            // Если объект не готов
+            if (!this._config.filter(item)) continue;
+
+            try {
+                this._config.execute(item)
+                    // Если ответ был получен
+                    .then((bool) => {
+                        if (!bool) this.remove(item);
+                    })
+
+                    // Если произошла ошибка при получении ответа
+                    .catch((error) => {
+                        this.remove(item);
+                        console.log(error);
+                    });
+            } catch (error) {
+                this.remove(item);
+                console.log(error);
+            }
+        }
+
+        // Запускаем цикл повторно
+        return this._stepCheckTimeCycle(20e3);
+    };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Интерфейс для опций BaseCycle
  * @private
  */
-interface TimeCycleConfig<T> {
-    /**
-     * @description Имя цикла, для удобства отладки
-     * @readonly
-     * @public
-     */
-    readonly name: string;
-
-    /**
-     * @description Функция для выполнения
-     * @readonly
-     * @public
-     */
-    readonly execute: (item: T) => void | Promise<boolean>;
-
+interface BaseCycleConfig<T> {
     /**
      * @description Как фильтровать объекты, вдруг объект еще не готов
      * @readonly
      * @public
      */
     readonly filter: (item: T) => boolean;
-
-    /**
-     * @description Время прогона цикла, через n времени будет запущен цикл по новой
-     * @readonly
-     * @public
-     */
-    readonly duration: number | "promise";
 
     /**
      * @description Кастомные функции, необходимы для модификации или правильного удаления
@@ -216,4 +302,39 @@ interface TimeCycleConfig<T> {
          */
         readonly remove?: (item: T) => void;
     }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Интерфейс для опций SyncCycle
+ * @private
+ */
+interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
+    /**
+     * @description Функция для выполнения
+     * @readonly
+     * @public
+     */
+    readonly execute: (item: T) => void;
+
+    /**
+     * @description Время прогона цикла, через n времени будет запущен цикл по новой
+     * @readonly
+     * @public
+     */
+    readonly duration: number;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Интерфейс для опций AsyncCycle
+ * @private
+ */
+interface AsyncCycleConfig<T> extends BaseCycleConfig<T> {
+    /**
+     * @description Функция для выполнения
+     * @readonly
+     * @public
+     */
+    readonly execute: (item: T) => Promise<boolean>;
 }

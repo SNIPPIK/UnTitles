@@ -120,9 +120,9 @@ class message_playing extends Assign<Event<"message/playing">> {
             execute: async (queue) => {
                 return queue.message.send({embeds: [queue.componentEmbed], components: queue.components, withResponse: true}).then((msg) => {
                     // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
-                    if (!db.queues.cycles.messages.array.includes(msg)) {
+                    if (!db.queues.cycles.messages.has(msg)) {
                         // Добавляем сообщение в базу для обновления
-                        db.queues.cycles.messages.set(msg);
+                        db.queues.cycles.messages.add(msg);
                     }
                 });
             }

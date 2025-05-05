@@ -235,23 +235,25 @@ export var db: Database = null;
                 Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
 
                 // Отправляем данные об ошибке и отправляем через систему webhook
-                if (webhook) webhook.send({
-                    username: client.user.username,
-                    avatarURL: client.user.avatarURL(),
-                    embeds: [{
-                        color: Colors.DarkRed,
-                        title: "Caught exception",
-                        description: `\`\`\`${err.name} - ${err.message}\`\`\``,
-                        fields: [
-                            {
-                                name: "Stack:",
-                                value: `\`\`\`${err.stack}\`\`\``
-                            }
-                        ]
-                    }]
-                }).catch(() => {
-                    Logger.log("ERROR", "[Webhook] Fail send message");
-                });
+                if (webhook) {
+                    webhook.send({
+                        username: client.user.username,
+                        avatarURL: client.user.avatarURL(),
+                        embeds: [{
+                            color: Colors.DarkRed,
+                            title: "Caught exception",
+                            description: `\`\`\`${err.name} - ${err.message}\`\`\``,
+                            fields: [
+                                {
+                                    name: "Stack:",
+                                    value: `\`\`\`${err.stack}\`\`\``
+                                }
+                            ]
+                        }]
+                    }).catch(() => {
+                        Logger.log("ERROR", "[Webhook] Fail send message");
+                    });
+                }
             });
             break;
         }

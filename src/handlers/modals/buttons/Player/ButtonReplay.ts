@@ -2,7 +2,7 @@ import {locale} from "@service/locale";
 import {Button} from "@handler/modals";
 import {Colors} from "discord.js";
 import {Assign} from "@utils";
-import {db} from "../../../../index";
+import {db} from "@app";
 
 class ButtonReplay extends Assign<Button> {
     public constructor() {
@@ -12,7 +12,7 @@ class ButtonReplay extends Assign<Button> {
                 const queue = db.queues.get(message.guild.id);
 
                 // Запускаем проигрывание текущего трека
-                queue.player.play(0, queue.tracks.position);
+                queue.player.replay();
 
                 // Сообщаем о том что музыка начата с начала
                 return message.reply({

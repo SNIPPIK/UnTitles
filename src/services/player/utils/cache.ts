@@ -5,7 +5,7 @@ import fs from "node:fs";
 // @service modules
 import {Process} from "@service/voice";
 import {Track} from "@service/player";
-import {Cycle} from "@utils";
+import {AsyncCycle} from "@utils";
 import {env} from "@app";
 
 /**
@@ -154,7 +154,7 @@ export class CacheUtility {
  * @class CacheAudio
  * @private
  */
-class CacheAudio extends Cycle<Track> {
+class CacheAudio extends AsyncCycle<Track> {
     /**
      * @description Путь до директории с кешированными данными
      * @readonly
@@ -169,8 +169,6 @@ class CacheAudio extends Cycle<Track> {
      */
     public constructor(cache_dir: string) {
         super({
-            name: "AudioFile",
-            duration: "promise",
             custom: {
                 push: (track) => {
                     // Защита от повторного добавления
@@ -235,7 +233,7 @@ class CacheAudio extends Cycle<Track> {
         const file = `${this.cache_dir}/Audio/${track.api.url}/${track.ID}`;
 
         // Если трека нет в очереди, значит он есть
-        if (!this.match(track)) {
+        if (!this.has(track)) {
             // Если файл все таки есть
             if (fs.existsSync(`${file}.opus`)) return { status: "ended", path: `${file}.opus`};
         }

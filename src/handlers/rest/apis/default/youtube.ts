@@ -296,7 +296,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
     protected static extractFormat = (data: json, html: string, url: string) => {
         return new Promise((resolve) => {
             // Создаем 2 поток
-            const worker: Worker = new Worker(path.resolve("src/services/worker/Signature/youtube.js"), {
+            const worker: Worker = new Worker(path.resolve("src/services/worker/crypto/youtube.js"), {
                 execArgv: ["-r", "tsconfig-paths/register"],
                 workerData: null
             });

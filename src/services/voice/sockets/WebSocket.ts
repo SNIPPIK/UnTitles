@@ -73,11 +73,9 @@ export class WebSocket extends TypedEmitter<WebSocketEvents> {
         // Если есть время для проверки жизни
         if (ms > 0) {
             // Создаем новый интервал
-            this._alive.interval = setInterval(() => {
+            this._alive.interval = setInterval(async () => {
                 // Если WebSocket отключен
                 if (this._alive.miss >= 3 && this._alive.updated !== 0) {
-                    console.log("Timeout WS");
-
                     this.destroy();
                     return;
                 }

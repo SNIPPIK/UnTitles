@@ -302,7 +302,7 @@ export class Track extends BaseTrack {
                     if (status.statusCode < 300 && status.statusCode >= 200) {
                         // Добавляем трек в кеширование
                         if (this.api.name !== "DISCORD" && db.cache.audio) {
-                            setImmediate(async () => db.cache.audio.set(this));
+                            db.cache.audio.add(this)
                         }
 
                         return this.link;

@@ -8,24 +8,24 @@ import fs from "node:fs";
  * @author SNIPPIK
  * @description Если запускается фрагмент кода в другом процессе
  */
-if (!isMainThread) {
-    // Разовое событие
-    parentPort.once("message", async (message) => {
-        // Если установлен wrapper
-        if (fs.existsSync("node_modules/ytdlp-nodejs")) {
-            const {YtDlp} = require("ytdlp-nodejs");
-            const ytdlp = new YtDlp();
+if (!parentPort || isMainThread) throw new Error('Worker must be run via worker_threads');
 
-            const result = await ytdlp.getInfoAsync(message.url);
-            const formats = (result.requested_formats as YouTubeFormat[]).find((format) => !format.fps);
+// Разовое событие
+parentPort.once("message", async (message) => {
+    // Если установлен wrapper
+    if (fs.existsSync("node_modules/ytdlp-nodejs")) {
+        const {YtDlp} = require("ytdlp-nodejs");
+        const ytdlp = new YtDlp();
 
-            return parentPort.postMessage(formats);
-        }
+        const result = await ytdlp.getInfoAsync(message.url);
+        const formats = (result.requested_formats as YouTubeFormat[]).find((format) => !format.fps);
 
-        const formats = await Youtube_decoder_native.decipherFormats(message.formats, message.html);
-        return parentPort.postMessage(formats[0]);
-    });
-}
+        return parentPort.postMessage(formats);
+    }
+
+    const formats = await Youtube_decoder_native.decipherFormats(message.formats, message.html);
+    return parentPort.postMessage(formats[0]);
+});
 
 /**
  * @author SNIPPIK

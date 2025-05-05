@@ -14,12 +14,6 @@ export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
 
 /**
  * @author SNIPPIK
- * @description Создаем фейковый буфер, для правильной работы OpusEncoder
- */
-const buffer = Buffer.alloc(0);
-
-/**
- * @author SNIPPIK
  * @description Создаем кодировщик в opus
  * @class OpusEncoder
  * @extends PassThrough
@@ -39,17 +33,35 @@ export class OpusEncoder extends PassThrough {
     private bitstream: number = null;
 
     /**
+     * @description Создаем фейковый буфер, для правильной работы OpusEncoder
+     */
+    public remainder: Buffer = Buffer.alloc(2);
+
+    /**
      * @description Декодирование фрагмента в opus
      * @private
      */
     private extractPacket = (chunk: Buffer): Buffer | null => {
-        // Минимальный размер ogg-страницы
-        if (chunk.length < 27 || !chunk.subarray(0, 4).equals(OGG_HEADER)) {
-            this.emit("error", new Error("OpusEncoder error: invalid OggS header"));
+        // Если размер буфера не является нужным, то пропускаем
+        if (chunk.length < 26) return null;
+
+        // Если не находим OGGs_HEAD в буфере
+        else if (!chunk.subarray(0, 4).equals(OGG_HEADER)) {
+            this.emit("error", Error(`capture_pattern is not ${OGG_HEADER}`));
+            return null;
+        }
+
+        // Если находим stream_structure_version в буфере, но не той версии
+        else if (chunk.readUInt8(4) !== 0) {
+            this.emit("error", Error(`stream_structure_version is not 0`));
             return null;
         }
 
         const segments = chunk[26];
+
+        // Если размер буфера не подходит, то пропускаем
+        if (chunk.length < 27 || chunk.length < 27 + segments) return null;
+
         const headerEnd = 27 + segments;
 
         // Если размер буфера не подходит, то пропускаем
@@ -117,10 +129,13 @@ export class OpusEncoder extends PassThrough {
      * @public
      */
     public _transform(chunk: Buffer, _enc: string, cb: (err?: Error) => void) {
-        chunk = Buffer.concat([buffer, chunk]);
+        // Если есть прошлый буфер
+        if (this.remainder) {
+            chunk = Buffer.concat([chunk, this.remainder]);
+        }
 
         // Получаем пакеты из
-        while (chunk) {
+        while (!!chunk) {
             const packet = this.extractPacket(chunk);
             if (packet) chunk = packet;
             else break;

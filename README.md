@@ -17,6 +17,8 @@
 > Есть поддержка [`opus`](src/services/voice/audio/opus.ts), [`sodium`](src/services/voice/audio/sodium.ts)\
 > Никаких Lava, Lavalink, Lavaplayer. Бот предоставляет свой кастомный плеер и свою поддержку платформ\
 > Голосовая составляющая была взята из `@discordjs/voice`, было внесено огромное кол-во модификаций
+> 
+---
 
 ## Доступные команды
 | Команда      | Аргументы                            | Описание                                                    | 
@@ -33,6 +35,7 @@
 | /voice       | (join, leave, re-configure)          | **Взаимодействие с голосовыми подключениями**               |
 | /tribune     | stage:(join, request)                | **Взаимодействие с подключением к трибуне**                 |
 
+---
 
 ## Как запустить проект
 1. Устанавливаем [`node.js`](https://nodejs.org/en)
@@ -47,6 +50,7 @@
      - Открываем терминал
      - npm i && npm run build && npm run start
 
+---
 
 ## Диаграмма всего проекта
 [<img align="center" alt="Diagram" width="" src=".github/images/src.png" />]()

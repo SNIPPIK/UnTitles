@@ -2,7 +2,7 @@ import {StringSelectMenuBuilder, ActionRowBuilder, Colors} from "discord.js";
 import {CommandInteraction, CycleInteraction} from "@structures";
 import {AudioPlayer, RepeatType} from "@service/player";
 import filters from "@service/player/filters.json";
-import {Logger, Collection, Cycle} from "@utils";
+import {Logger, Collection, SyncCycle} from "@utils";
 import {QueueMessage} from "./message";
 import {locale} from "@service/locale";
 import {db, env} from "@app";
@@ -42,9 +42,9 @@ export class Queues<T extends Queue> extends Collection<T> {
      */
     public set restartPlayer(player: AudioPlayer) {
         // Если плеер удален из базы
-        if (!this.cycles.players.match(player)) {
+        if (!this.cycles.players.has(player)) {
             // Добавляем плеер в базу цикла для отправки пакетов
-            this.cycles.players.set(player);
+            this.cycles.players.add(player);
         }
 
         // Если у плеера стоит пауза
@@ -64,7 +64,7 @@ export class Queues<T extends Queue> extends Collection<T> {
         // На все сервера отправляем сообщение о перезапуске
         for (const queue of this.array) {
             // Если плеер запущен
-            if (this.cycles.players.match(queue.player)) {
+            if (this.cycles.players.has(queue.player)) {
                 const time = queue.tracks.track.time.total * 1e3
 
                 // Если время ожидания меньше чем в очереди
@@ -102,7 +102,7 @@ export class Queues<T extends Queue> extends Collection<T> {
         if (!queue) queue = new Queue(message) as T;
         else {
             // Значит что плеера нет в циклах
-            if (!this.cycles.players.match(queue.player)) {
+            if (!this.cycles.players.has(queue.player)) {
                 setImmediate(() => {
                     // Если добавлен трек
                     if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
@@ -195,7 +195,7 @@ abstract class BaseQueue {
      */
     public set message(message) {
         // Если введено новое сообщение
-        if (message !== this.message && this.message !== undefined) {
+        if (this.message && this.message.guild && message !== this.message) {
             // Удаляем старое сообщение, если оно есть
             const message = db.queues.cycles.messages.array.find((msg) => {
                 return msg.guildId === this.message.guild.id;
@@ -575,12 +575,11 @@ class AudioCycles {
      * @readonly
      * @public
      */
-    public readonly players = new class AudioPlayers<T extends AudioPlayer> extends Cycle<T> {
+    public readonly players = new class AudioPlayers<T extends AudioPlayer> extends SyncCycle<T> {
         public constructor() {
             super({
-                name: "AudioPlayers",
                 duration: 20,
-                filter: (item) => item.playing,
+                filter: (item) => item.voice && item.playing,
                 execute: (player) => {
                     const connection = player.voice.connection;
 
@@ -598,10 +597,9 @@ class AudioCycles {
      * @readonly
      * @public
      */
-    public readonly messages = new class Messages<T extends CycleInteraction> extends Cycle<T> {
+    public readonly messages = new class Messages<T extends CycleInteraction> extends SyncCycle<T> {
         public constructor() {
             super({
-                name: "Messages",
                 duration: 20e3,
                 custom: {
                     remove: (item) => { item.delete(); },

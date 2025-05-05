@@ -185,7 +185,7 @@ export class AudioPlayer extends BasePlayer {
         this.id = guild;
 
         // Добавляем плеер в базу для отправки пакетов
-        db.queues.cycles.players.set(this);
+        db.queues.cycles.players.add(this);
 
         /**
          * @description Событие смены позиции плеера
@@ -288,7 +288,9 @@ export class AudioPlayer extends BasePlayer {
                 else if (!path) return handleError("Fail to get audio link");
 
                 // Создаем класс для управления потоком
-                const stream = new AudioResource(path, {seek, filters: this._filters.compress(track.api.name !== "DISCORD" ? track.time.total : null)});
+                const stream = new AudioResource(path, { seek,
+                    filters: this._filters.compress(track.api.name !== "DISCORD" ? track.time.total : null)
+                });
 
                 // Если стрим можно прочитать
                 if (stream.readable) {
@@ -378,6 +380,15 @@ export class AudioPlayer extends BasePlayer {
 
         if (this.status === "player/wait") return;
         this.status = "player/wait";
+    };
+
+    /**
+     * @description Функция проигрывание текущего трека заново
+     * @public
+     */
+    public replay = () => {
+        // Включаем текущий трек заново
+        this.play(0, this.tracks.position);
     };
 
     /**
