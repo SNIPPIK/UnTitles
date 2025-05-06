@@ -6,7 +6,7 @@ import fs from "node:fs";
 import {Process} from "@service/voice";
 import {Track} from "@service/player";
 import {AsyncCycle} from "@utils";
-import {env} from "@app";
+import {env} from "@app/env";
 
 /**
  * @author SNIPPIK

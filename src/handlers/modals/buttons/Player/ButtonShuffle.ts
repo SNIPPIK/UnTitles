@@ -2,7 +2,7 @@ import {locale} from "@service/locale";
 import {Button} from "@handler/modals";
 import {Colors} from "discord.js";
 import {Assign} from "@utils";
-import {db} from "../../../../index";
+import {db} from "@app/db";
 
 class ButtonShuffle extends Assign<Button> {
     public constructor() {

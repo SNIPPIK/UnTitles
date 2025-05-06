@@ -4,7 +4,8 @@ import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import crypto from "node:crypto";
 import {Assign} from "@utils";
-import {env, db} from "@app";
+import {env} from "@app/env";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

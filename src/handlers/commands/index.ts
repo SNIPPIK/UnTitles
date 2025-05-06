@@ -5,7 +5,7 @@ import filters from "@service/player/filters.json";
 import {AudioFilter} from "@service/player";
 import {handler} from "@handler";
 import {Logger} from "@utils";
-import {env} from "@app";
+import {env} from "@app/env";
 
 /**
  * @author SNIPPIK

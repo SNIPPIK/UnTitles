@@ -33,13 +33,6 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
     private readonly socket = createSocket({ type: "udp4" });
 
     /**
-     * @description Данные сервера к которому надо подключится
-     * @readonly
-     * @private
-     */
-    public readonly _connection: UDPConnection;
-
-    /**
      * @description Интервал для предотвращения разрыва
      * @readonly
      * @private
@@ -64,7 +57,7 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
      * @param packet - Отправляемый пакет
      */
     public set packet(packet: Buffer) {
-        this.socket.send(packet, this._connection.port, this._connection.ip, (err) => {
+        this.socket.send(packet, 0, packet.length, this.options.port, this.options.ip, (err) => {
             if (err) this.emit("error", err);
         });
     };
@@ -98,9 +91,8 @@ export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
      * @param options - Данные для подключения
      * @public
      */
-    public constructor(options: UDPConnection) {
+    public constructor(private options: UDPConnection) {
         super();
-        this._connection = options;
 
         // Если подключение возвращает ошибки
         this.socket.on("error", async (err) => {

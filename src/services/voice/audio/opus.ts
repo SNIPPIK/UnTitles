@@ -1,9 +1,10 @@
-import { PassThrough } from "node:stream";
-import { Logger } from "@utils";
+import { Writable } from "node:stream";
 
-const OGG_HEADER = Buffer.from("OggS");
-const OPUS_HEAD = Buffer.from("OpusHead");
-const OPUS_TAGS = Buffer.from("OpusTags");
+/**
+ * @author SNIPPIK
+ * @description Заголовок для поиска opus
+ */
+const OGG_MAGIC = Buffer.from("OggS");
 
 /**
  * @author SNIPPIK
@@ -14,144 +15,83 @@ export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
 
 /**
  * @author SNIPPIK
- * @description Создаем кодировщик в opus
+ * @description Создаем кодировщик в opus из OGG
  * @class OpusEncoder
- * @extends PassThrough
+ * @extends Writable
  * @public
  */
-export class OpusEncoder extends PassThrough {
+export class OpusEncoder extends Writable {
+    private _buffer: Buffer = Buffer.alloc(0);
+
     /**
-     * @description Текущий буфер
+     * @description Функция для работы чтения
+     * @protected
+     */
+    _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
+        this._buffer = Buffer.concat([this._buffer, chunk]);
+        this.parseAvailablePages();
+        callback();
+    };
+
+    /**
+     * @description Функция ищущая актуальный для взятия фрагмент
      * @private
      */
-    private buffer: Buffer = null;
+    private parseAvailablePages() {
+        let offset = 0;
+
+        while (offset + 27 <= this._buffer.length) {
+            const magic = this._buffer.subarray(offset, offset + 4);
+            if (!magic.equals(OGG_MAGIC)) break;
+
+            const pageSegments = this._buffer.readUInt8(offset + 26);
+            const headerLength = 27 + pageSegments;
+
+            if (offset + headerLength > this._buffer.length) break;
+
+            const segmentTable = this._buffer.subarray(offset + 27, offset + 27 + pageSegments);
+            const totalSegmentLength = segmentTable.reduce((sum, val) => sum + val, 0);
+            const fullPageLength = headerLength + totalSegmentLength;
+
+            if (offset + fullPageLength > this._buffer.length) break;
+
+            const payload = this._buffer.subarray(offset + headerLength, offset + fullPageLength);
+
+            this.extractPackets(segmentTable, payload);
+
+            offset += fullPageLength;
+        }
+
+        // Оставляем непрочитанный хвост
+        this._buffer = this._buffer.subarray(offset);
+    };
 
     /**
-     * @description Номер потока
+     * @description Функция выделяющая opus пакет для отправки и передается через событие frame
+     * @param segmentTable - Буфер сегментов
+     * @param payload - Данные для корректного поиска сегмента
      * @private
      */
-    private bitstream: number = null;
+    private extractPackets(segmentTable: Buffer, payload: Buffer) {
+        let payloadOffset = 0;
+        let currentPacket: Buffer[] = [];
 
-    /**
-     * @description Создаем фейковый буфер, для правильной работы OpusEncoder
-     */
-    public remainder: Buffer = Buffer.alloc(2);
+        for (const segmentLength of segmentTable) {
+            const segment = payload.subarray(payloadOffset, payloadOffset + segmentLength);
+            currentPacket.push(segment);
+            payloadOffset += segmentLength;
 
-    /**
-     * @description Декодирование фрагмента в opus
-     * @private
-     */
-    private extractPacket = (chunk: Buffer): Buffer | null => {
-        // Если размер буфера не является нужным, то пропускаем
-        if (chunk.length < 26) return null;
+            if (segmentLength < 255) {
+                const packet = Buffer.concat(currentPacket);
+                currentPacket = [];
 
-        // Если не находим OGGs_HEAD в буфере
-        else if (!chunk.subarray(0, 4).equals(OGG_HEADER)) {
-            this.emit("error", Error(`capture_pattern is not ${OGG_HEADER}`));
-            return null;
-        }
+                const packetHeader = packet.subarray(0, 8).toString();
 
-        // Если находим stream_structure_version в буфере, но не той версии
-        else if (chunk.readUInt8(4) !== 0) {
-            this.emit("error", Error(`stream_structure_version is not 0`));
-            return null;
-        }
+                // Пропустить служебные данные
+                if (packetHeader === "OpusHead" || packetHeader === "OpusTags") continue
 
-        const segments = chunk[26];
-
-        // Если размер буфера не подходит, то пропускаем
-        if (chunk.length < 27 || chunk.length < 27 + segments) return null;
-
-        const headerEnd = 27 + segments;
-
-        // Если размер буфера не подходит, то пропускаем
-        if (chunk.length < headerEnd) return null;
-
-        const lacing = chunk.subarray(27, headerEnd);
-        const sizes: number[] = [];
-        let total = 0, i = 0;
-
-        // Собираем размеры всех фреймов
-        while (i < segments) {
-            let size = 0, b: number;
-            do {
-                b = lacing[i++];
-                size += b;
-            } while (b === 255 && i < segments);
-            sizes.push(size);
-            total += size;
-        }
-
-        const pageEnd = headerEnd + total;
-        if (chunk.length < pageEnd) return null;
-
-        const bitstreamId = chunk.readUInt32LE(14);
-        let offset = headerEnd;
-
-        // Ищем номер нужного буфера, он и есть opus
-        for (const size of sizes) {
-            const seg = chunk.subarray(offset, offset + size);
-            offset += size;
-
-            if (!seg.length) continue;
-
-            const tag = seg.subarray(0, 8);
-
-            if (!this.buffer && tag.equals(OPUS_HEAD)) {
-                this.buffer = seg;
-                this.bitstream = bitstreamId;
-                this.emit("head", seg);
-                this.push(seg);
+                this.emit("frame", packet);
             }
-
-            // Не push — это не аудиоданные
-            else if (this.buffer && tag.equals(OPUS_TAGS)) this.emit("tags", seg);
-
-            // Только если это аудиофрейм и совпадает поток
-            else if (this.buffer && this.bitstream === bitstreamId) this.push(seg);
-
-            // Только если это аудиофрейм и совпадает поток
-            else this.emit("unknownSegment", seg);
         }
-
-        // Возвращаем остаток, только если он точно начинается с нового OggS
-        if (offset < chunk.length) {
-            const next = chunk.subarray(offset, offset + 4);
-            if (next.equals(OGG_HEADER)) return chunk.subarray(offset);
-        }
-
-        // Либо всё обработано, либо остаток сомнительный — отбрасываем
-        return null;
-    }
-
-    /**
-     * @description При получении данных через pipe или write, модифицируем их для одобрения со стороны discord
-     * @public
-     */
-    public _transform(chunk: Buffer, _enc: string, cb: (err?: Error) => void) {
-        // Если есть прошлый буфер
-        if (this.remainder) {
-            chunk = Buffer.concat([chunk, this.remainder]);
-        }
-
-        // Получаем пакеты из
-        while (!!chunk) {
-            const packet = this.extractPacket(chunk);
-            if (packet) chunk = packet;
-            else break;
-        }
-        cb();
-    }
-
-    /**
-     * @description Уничтожаем расшифровщик
-     * @param err - Если получена ошибка
-     * @param cb - Если надо выполнить функцию
-     */
-    public _destroy(err: Error | null, cb: (e?: Error) => void) {
-        Logger.log("DEBUG", `[OpusEncoder] destroyed`);
-        this.buffer = null;
-        this.bitstream = null;
-        super._destroy(err, cb);
-    }
+    };
 }

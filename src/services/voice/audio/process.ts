@@ -3,7 +3,7 @@ import {spawn, spawnSync} from "node:child_process";
 import {isMainThread} from "node:worker_threads";
 import {Logger} from "@utils";
 import path from "node:path";
-import {env} from "@app";
+import {env} from "@app/env";
 
 /**
  * @author SNIPPIK

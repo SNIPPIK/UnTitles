@@ -3,7 +3,7 @@ import {Event} from "@handler/events";
 import {Track} from "@service/player";
 import {Logger, Assign} from "@utils";
 import {Colors} from "discord.js";
-import {db} from "@app";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

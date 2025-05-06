@@ -2,7 +2,7 @@ import {Client, Partials, Options, SimpleShardingStrategy} from "discord.js";
 import {ActivityType} from "discord-api-types/v10"
 import {version} from "../../../package.json";
 import {Logger} from "@utils";
-import {env} from "@app";
+import {env} from "@app/env";
 
 /**
  * @author SNIPPIK

@@ -1,7 +1,7 @@
 import {Event} from "@handler/events";
 import {Events} from "discord.js";
 import {Assign} from "@utils";
-import {db} from "@app";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

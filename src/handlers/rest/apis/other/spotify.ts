@@ -3,7 +3,8 @@ import {httpsClient} from "@handler/rest";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Assign} from "@utils";
-import {env, db} from "@app";
+import {env} from "@app/env";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

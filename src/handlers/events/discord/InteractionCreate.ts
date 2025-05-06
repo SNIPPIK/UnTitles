@@ -14,7 +14,8 @@ import {locale} from "@service/locale";
 import {Event} from "@handler/events";
 import {Events} from "discord.js";
 import {Assign} from "@utils";
-import {db, env} from "@app";
+import {env} from "@app/env";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

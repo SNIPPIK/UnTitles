@@ -1,7 +1,7 @@
 import {AudioPlayerEvents, PlayerTracks, PlayerAudioFilters} from "@service/player";
-import {AudioResource, SILENT_FRAME} from "@service/voice";
+import {AudioResource} from "@service/voice";
 import {Logger, TypedEmitter} from "@utils";
-import {db} from "@app";
+import {db} from "@app/db";
 
 // Local modules
 import {PlayerProgress} from "../modules/progress";
@@ -409,7 +409,7 @@ export class AudioPlayer extends BasePlayer {
         this.audio.current = null;
 
         // Отправляем пустышку
-        this.voice.connection.packet = SILENT_FRAME;
+        //this.voice.connection.packet = SILENT_FRAME;
 
         // Переводим плеер в режим ожидания
         this._status = "player/wait";

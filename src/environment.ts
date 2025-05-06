@@ -1,3 +1,5 @@
+import {Logger} from "./utils";
+
 /**
  * @author SNIPPIK
  * @description Взаимодействуем с environment variables
@@ -14,7 +16,7 @@ export class Environment {
             process.loadEnvFile(".env");
         } catch (error) {
             const path = __dirname.split("/");
-            throw new Error(`[ENV] has not found .env file in directory ${path.splice(path.length, 1).join("/")}`);
+            throw new Error(`[Environment] has not found .env file in directory ${path.splice(path.length, 1).join("/")}`);
         }
     };
 
@@ -32,7 +34,7 @@ export class Environment {
             if (safe !== undefined) return safe;
 
             // Если нет <safe> параметра
-            throw new Error(`[ENV] Not found ${name} in .env`);
+            throw new Error(`[Environment] Not found key ${name} in .env file`);
         }
 
         // Если параметр имеет правду
@@ -52,3 +54,27 @@ export class Environment {
  * @type EnvironmentOut
  */
 type EnvironmentOut<T> = T extends boolean ? T : T extends string ? T : T extends number ? string : never;
+
+/**
+ * @author SNIPPIK
+ * @description Взаимодействуем с environment variables
+ * @class Environment
+ * @public
+ */
+export var env: Environment;
+
+/**
+ * @author SNIPPIK
+ * @description Инициализация .env файла
+ * @private
+ */
+(() => {
+    if (env) return;
+
+    try {
+        env = new Environment();
+        Logger.log("LOG", `[Core] has ${Logger.color(36, `initialize env`)}`);
+    } catch (err) {
+        throw new Error(`Fail init environment: ${err}`);
+    }
+})();

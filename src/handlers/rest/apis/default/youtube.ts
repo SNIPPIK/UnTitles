@@ -5,7 +5,7 @@ import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Assign} from "@utils";
 import path from "node:path";
-import {db} from "@app";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

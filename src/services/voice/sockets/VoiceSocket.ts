@@ -1,5 +1,6 @@
-import {Encryption, TIMESTAMP_INC, SocketUDP, VoiceSocketEvents} from "@service/voice";
+import {SocketUDP, VoiceSocketEvents} from "@service/voice";
 import {VoiceOpcodes} from "discord-api-types/voice";
+import {RTPEncryptor} from "../crypto/RTPEncryptor";
 import {WebSocket} from "./WebSocket";
 import {TypedEmitter} from "@utils";
 
@@ -11,10 +12,17 @@ import {TypedEmitter} from "@utils";
  */
 export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
     /**
+     * @description Класс для шифрования аудио
+     * @private
+     */
+    private encryptor: RTPEncryptor;
+
+    /**
      * @description Текущий статус подключения
      * @private
      */
     private _state: VoiceSocketState.States;
+
     /**
      * @description Текущее состояние сетевого экземпляра
      * @public
@@ -83,28 +91,19 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
     /**
      * @description Отправляет аудио пакет, ранее подготовленный с помощью prepare modules Packet(opus Packet).
      * Аудио пакет израсходован и не может быть отправлен повторно.
-     *
      * @public
      */
     public set cryptoPacket(opusPacket: Buffer) {
         const state = this.state;
 
         // Если код не соответствует с отправкой
-        if (state.code !== VoiceSocketStatusCode.ready || !opusPacket) return;
-
-        const {connectionData} = state;
-        connectionData.packetsPlayed++;
-        connectionData.sequence++;
-        connectionData.timestamp += TIMESTAMP_INC;
-
-        if (connectionData.sequence >= 2 ** 16) connectionData.sequence = 0;
-        if (connectionData.timestamp >= 2 ** 32) connectionData.timestamp = 0;
+        if (state.code !== VoiceSocketStatusCode.ready) return;
 
         // Принудительно включаем передачу голоса
         this.speaking = true;
 
         // Зашифровываем пакет для отправки на сервера discord
-        state.udp.packet = Encryption.packet(opusPacket, connectionData);
+        state.udp.packet = this.encryptor.packet(opusPacket);
     };
 
     /**
@@ -243,7 +242,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                                     data: {
                                         address: config.ip,
                                         port: config.port,
-                                        mode: Encryption.mode
+                                        mode: RTPEncryptor.mode
                                     },
                                 }
                             };
@@ -263,18 +262,17 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                 if (this.state.code === VoiceSocketStatusCode.protocol) {
                     const {mode: encryptionMode, secret_key} = packet.d;
 
+                    this.encryptor = new RTPEncryptor({
+                        key: new Uint8Array(secret_key),
+                        ssrc: this.state.connectionData.ssrc
+                    });
+
                     this.state = {
                         ...this.state,
                         code: VoiceSocketStatusCode.ready,
                         connectionData: Object.assign(this.state.connectionData, {
                             encryptionMode,
-                            secretKey: new Uint8Array(secret_key),
-                            sequence: Encryption.randomNBit(16),
-                            timestamp: Encryption.randomNBit(32),
-                            nonce: 0,
-                            nonceBuffer: Encryption.nonce,
-                            speaking: false,
-                            packetsPlayed: 0
+                            speaking: false
                         })
                     };
                 }
@@ -464,7 +462,7 @@ interface ConnectionOptions {
  *
  * @link https://discord.com/developers/docs/topics/voice-connections
  */
-export interface ConnectionData {
+interface ConnectionData {
     encryptionMode: string;
     nonce: number;
     nonceBuffer: Buffer;

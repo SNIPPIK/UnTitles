@@ -5,8 +5,9 @@ import filters from "@service/player/filters.json";
 import {Logger, Collection, SyncCycle} from "@utils";
 import {QueueMessage} from "./message";
 import {locale} from "@service/locale";
-import {db, env} from "@app";
 import {Track} from "./track";
+import {env} from "@app/env";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

@@ -4,7 +4,7 @@ import filters from "@service/player/filters.json"
 import {AudioFilter} from "@service/player";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
-import {db} from "@app";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

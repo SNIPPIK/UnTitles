@@ -11,7 +11,6 @@ export * from "./audio/resource";
 export * from "./audio/process";
 
 // Decoder and encoders
-export * from "./audio/sodium";
 export * from "./audio/opus";
 
 /**

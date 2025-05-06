@@ -2,7 +2,7 @@ import {locale} from "@service/locale";
 import {Button} from "@handler/modals";
 import {Assign, Logger} from "@utils";
 import {Colors} from "discord.js";
-import {db} from "@app";
+import {db} from "@app/db";
 
 class ButtonLyrics extends Assign<Button> {
     public constructor() {

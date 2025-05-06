@@ -1,6 +1,6 @@
 import {RestAPIBase} from "@handler/rest/apis";
 import {httpsClient} from "@handler/rest";
-import {db} from "@app";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

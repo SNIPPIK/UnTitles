@@ -3,7 +3,7 @@ import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {locale} from "@service/locale";
 import {RestAPI} from "@handler/rest/apis";
 import {Assign} from "@utils";
-import {db} from "@app";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

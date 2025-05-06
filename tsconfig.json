@@ -18,7 +18,9 @@
       "@utils": ["./utils/index"],
       "@service/*": ["./services/*"],
 
-      "@app": ["index"],
+      "@app": ["./index"],
+      "@app/db": ["./database"],
+      "@app/env": ["./environment"]
     },
 
     "alwaysStrict": true,

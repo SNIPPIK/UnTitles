@@ -1,21 +1,5 @@
+import crypto from 'crypto';
 import {isMainThread} from "node:worker_threads";
-import {ConnectionData} from "@service/voice";
-import {Buffer} from "node:buffer";
-import crypto from "node:crypto";
-
-/**
- * @author SNIPPIK
- * @description Максимальный размер пакета
- * @private
- */
-const MAX_NONCE_SIZE = 2 ** 32 - 1;
-
-/**
- * @author SNIPPIK
- * @description Время до следующей проверки жизни
- * @private
- */
-export const TIMESTAMP_INC = (48_000 / 100) * 2;
 
 /**
  * @author SNIPPIK
@@ -32,15 +16,61 @@ const EncryptionNonce: Buffer[] = [];
 
 /**
  * @author SNIPPIK
- * @description Выдаваемы методы для использования sodium
- * @class Encryption
+ * @description Максимальный размер пакета
+ * @private
+ */
+const MAX_NONCE_SIZE = 2 ** 32 - 1;
+
+/**
+ * @author SNIPPIK
+ * @description Время до следующей проверки жизни
+ * @private
+ */
+const TIMESTAMP_INC = (48_000 / 100) * 2;
+
+/**
+ * @author SNIPPIK
+ * @description Параметры для шифрования
+ */
+export interface EncryptorOptions {
+    ssrc: number;
+    key: Uint8Array<ArrayBuffer>;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Класс для шифрования данных через sodium или нативными способами
+ * @class RTPEncryptor
  * @public
  */
-export class Encryption {
+export class RTPEncryptor {
+    /**
+     * @description Пустой буфер
+     * @private
+     */
+    private readonly _nonceBuffer: Buffer = EncryptionNonce[0];
+
+    /**
+     * @description Порядковый номер пустого буфера
+     * @private
+     */
+    private _nonce = 0;
+
+    /**
+     * @description
+     * @private
+     */
+    private sequence: number;
+
+    /**
+     * @description Время прошлого аудио пакета
+     * @private
+     */
+    private timestamp: number;
+
     /**
      * @description Задаем единственный актуальный вариант шифрования
      * @public
-     * @static
      */
     public static get mode(): EncryptionModes {
         return EncryptionModes[0];
@@ -49,99 +79,97 @@ export class Encryption {
     /**
      * @description Buffer для режима шифрования, нужен для правильно расстановки пакетов
      * @public
-     * @static
      */
-    public static get nonce() {
-        return EncryptionNonce[0];
+    public get nonce() {
+        this._nonce++;
+
+        // Если нет пакета или номер пакет превышен максимальный, то его надо сбросить
+        if (this._nonce > MAX_NONCE_SIZE) this._nonce = 0;
+        this._nonceBuffer.writeUInt32BE(this._nonce, 0);
+
+        return this._nonceBuffer;
     };
 
     /**
      * @description Пустой пакет для внесения данных по стандарту "Voice Packet Structure"
      * @public
-     * @static
      */
-    private static get rtp_packet() {
+    private get rtp_packet() {
         const rtp_packet = Buffer.alloc(12);
         // Version + Flags, Payload Type
         [rtp_packet[0], rtp_packet[1]] = [0x80, 0x78];
+
+        // Последовательность
+        rtp_packet.writeUInt16BE(this.sequence, 2);
+
+        // Временная метка
+        rtp_packet.writeUInt32BE(this.timestamp, 4);
+
+        // SSRC
+        rtp_packet.writeUInt32BE(this.options.ssrc, 8);
 
         return rtp_packet;
     };
 
     /**
+     * @description Создаем класс
+     * @param options
+     */
+    public constructor(private options: EncryptorOptions) {
+        this.sequence = this.randomNBit(16);
+        this.timestamp = this.randomNBit(32);
+    };
+
+    /**
      * @description Задаем структуру пакета
      * @param packet - Пакет Opus для шифрования
-     * @param connectionData - Текущие данные подключения экземпляра
      * @public
-     * @static
      */
-    public static packet = (packet: Buffer, connectionData: ConnectionData) => {
-        const { sequence, timestamp, ssrc } = connectionData;
-        const rtp_packet = this.rtp_packet;
+    public packet = (packet: Buffer) => {
+        this.sequence++;
+        this.timestamp += TIMESTAMP_INC;
 
-        // Последовательность
-        rtp_packet.writeUIntBE(sequence, 2, 2);
+        if (this.sequence >= 2 ** 16) this.sequence = 0;
+        if (this.timestamp >= 2 ** 32) this.timestamp = 0;
 
-        // Временная метка
-        rtp_packet.writeUIntBE(timestamp, 4, 4);
-
-        // SSRC
-        rtp_packet.writeUIntBE(ssrc, 8, 4);
-
-        // Зашифрованный звук
-        rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
-
-        this.updateNonce(connectionData);
-        return this.crypto(packet, connectionData, rtp_packet);
+        return this.crypto(packet);
     };
 
     /**
      * @description Подготавливаем пакет к отправке, выставляем правильную очередность
      * @param packet - Пакет Opus для шифрования
-     * @param connectionData - Текущие данные подключения экземпляра
-     * @param rtp_packet - Доп данные для отправки
      * @private
-     * @static
      */
-    private static crypto = (packet: Buffer, connectionData: ConnectionData, rtp_packet: Buffer): Buffer => {
-        const nonceBuffer = connectionData.nonceBuffer.subarray(0, 4);
+    private crypto = (packet: Buffer): Buffer => {
+        const mode = RTPEncryptor.mode;
+        const aad = this.rtp_packet;
+        const nonce = this.nonce, sub = this.nonce.subarray(0, 4);
 
         // Шифровка aead_aes256_gcm (support rtpsize)
-        if (connectionData.encryptionMode === "aead_aes256_gcm_rtpsize") {
-            const cipher = crypto.createCipheriv("aes-256-gcm", connectionData.secretKey, connectionData.nonceBuffer);
-            cipher.setAAD(rtp_packet);
-            return Buffer.concat([rtp_packet, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
+        if (mode === "aead_aes256_gcm_rtpsize") {
+            const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce);
+            cipher.setAAD(aad);
+            return Buffer.concat([aad, cipher.update(packet), cipher.final(), cipher.getAuthTag(), sub]);
         }
 
         // Шифровка через библиотеку
-        else if (connectionData.encryptionMode === "aead_xchacha20_poly1305_rtpsize") {
-            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, rtp_packet, connectionData.nonceBuffer, connectionData.secretKey);
-            return Buffer.concat([rtp_packet, cryptoPacket, nonceBuffer]);
+        else if (mode === "aead_xchacha20_poly1305_rtpsize") {
+            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, aad, nonce, this.options.key);
+            return Buffer.concat([aad, cryptoPacket, sub]);
         }
 
         // Если нет больше вариантов шифровки
-        throw new Error(`[Sodium] ${this.mode} is not supported`);
-    };
-
-    /**
-     * @description Обновляет nonce и сбрасывает при переполнении
-     */
-    private static updateNonce = (connectionData: ConnectionData): void => {
-        connectionData.nonce++;
-
-        // Если нет пакета или номер пакет превышен максимальный, то его надо сбросить
-        if (connectionData.nonce > MAX_NONCE_SIZE) connectionData.nonce = 0;
-        connectionData.nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
+        throw new Error(`[Sodium] ${mode} is not supported`);
     };
 
     /**
      * @description Возвращает случайное число, находящееся в диапазоне n бит
      * @param numberOfBits - Количество бит
-     * @public
-     * @static
+     * @private
      */
-    public static randomNBit = (numberOfBits: number) => Math.floor(Math.random() * 2 ** numberOfBits);
+    private randomNBit = (numberOfBits: number) => Math.floor(Math.random() * 2 ** numberOfBits);
 }
+
 
 /**
  * @author SNIPPIK

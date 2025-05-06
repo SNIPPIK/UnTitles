@@ -2,7 +2,7 @@ import {ApplicationCommandOptionType, Colors, GuildMember} from "discord.js";
 import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
-import {db} from "@app";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK
@@ -100,11 +100,14 @@ class Command_Voice extends Assign<Command> {
                 switch (type) {
                     // Подключение к голосовому каналу
                     case "join": {
+                        /*
                         // Если производится попытка подключится к тому же голосовому каналу
                         if (voiceConnection && voiceConnection.config.channel_id === VoiceChannel.id) return null;
 
                         // Подключаемся к голосовому каналу без очереди
                         else db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, guild.voiceAdapterCreator);
+
+                         */
 
                         // Отправляем сообщение о подключении к каналу
                         return message.reply({

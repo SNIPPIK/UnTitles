@@ -73,7 +73,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
         // Если вводимый поток является расшифровщиком
         if (options.input instanceof Process) options.input.stdout.pipe(options.decoder);
-        else options.input.on("data", (packet: Buffer) => {
+        else options.input.on("frame", (packet: Buffer) => {
             // Сообщаем что поток можно начать читать
             if (this._audioBuffer.length === 0) {
                 this.emit("readable");
@@ -100,10 +100,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         super();
         if (options.seek > 0) this._bufferTotal = (options.seek * 1e3) / 20;
 
-        const decoder = new OpusEncoder({
-            readableObjectMode: true,
-            autoDestroy: true
-        });
+        const decoder = new OpusEncoder();
 
         // Расшифровщик
         this.input = {

@@ -2,7 +2,7 @@ import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
-import {db} from "@app";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK

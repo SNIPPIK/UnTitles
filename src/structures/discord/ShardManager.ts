@@ -1,6 +1,5 @@
 import {ShardingManager} from "discord.js";
 import {Logger} from "@utils";
-import {env} from "@app";
 
 /**
  * @author SNIPPIK
@@ -8,10 +7,10 @@ import {env} from "@app";
  * @class ShardManager
  */
 export class ShardManager extends ShardingManager {
-    public constructor(file: string) {
+    public constructor(file: string, token: string) {
         super(file, {
             execArgv: ["-r", "tsconfig-paths/register"],
-            token: env.get("token.discord"),
+            token: token,
             mode: "process",
             respawn: true,
             silent: false

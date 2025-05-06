@@ -1,6 +1,7 @@
 import {Track} from "@service/player";
 import {handler} from "@handler";
-import {env, db} from "@app";
+import {env} from "@app/env";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK
@@ -212,7 +213,11 @@ export class RestRequest {
 
             // Если указана ссылка
             else if (type.startsWith("http")) {
-                if (item["filter"].exec(type) || type.match(item["filter"])) return item;
+                try {
+                    if (item["filter"].exec(type) || type.match(item["filter"])) return item;
+                } catch {
+                    return null;
+                }
             }
 
             // Скорее всего надо произвести поиск

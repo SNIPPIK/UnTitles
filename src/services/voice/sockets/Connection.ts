@@ -10,12 +10,6 @@ import {VoiceConnectionStatus, VoiceSocket, VoiceSocketState, VoiceSocketStatusC
  */
 export class VoiceConnection {
     /**
-     * @description Конфигурация голосового подключения
-     * @private
-     */
-    private configuration: VoiceConnectionConfig = null;
-
-    /**
      * @description Текущее состояние голосового подключения
      * @private
      */
@@ -139,12 +133,11 @@ export class VoiceConnection {
 
     /**
      * @description Создаем голосовое подключение
-     * @param config - Данные для подключения
+     * @param configuration - Данные для подключения
      * @param adapterCreator - Параметры для сервера
      * @public
      */
-    public constructor(config: VoiceConnectionConfig, adapterCreator: DiscordGatewayAdapterCreator) {
-        this.configuration = config;
+    public constructor(private configuration: VoiceConnectionConfig, adapterCreator: DiscordGatewayAdapterCreator) {
         this.adapter.adapter = adapterCreator({
             /**
              * @description Регистрирует пакет `VOICE_SERVER_UPDATE` для голосового соединения. Это приведет к повторному подключению с использованием
