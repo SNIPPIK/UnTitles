@@ -3,6 +3,7 @@ import {ActivityType} from "discord-api-types/v10"
 import {version} from "../../../package.json";
 import {Logger} from "@utils";
 import {env} from "@app/env";
+import {db} from "../../database";
 
 /**
  * @author SNIPPIK
@@ -100,6 +101,10 @@ export class DiscordClient extends Client {
 
         // Интервал для обновления статуса
         setInterval(() => {
+            // Обновление статистики
+            array[1].name = `guilds ${this.guilds.cache.size}`;
+            array[2].name = `queues ${db.queues.size}`;
+
             // Запрещаем выходить за диапазон допустимого значения
             if (i > size) i = 0;
             const activity = array[i];
@@ -131,8 +136,15 @@ export class DiscordClient extends Client {
 
             // Статус о кол-во гильдий
             {
-                name: `guilds ${this.guilds.cache.size}`,
+                name: `guilds`,
                 type: ActivityType["Watching"],
+                shardId: this.shardID
+            },
+
+            // Статус о кол-во музыкальных очередей
+            {
+                name: `queues`,
+                type: ActivityType["Streaming"],
                 shardId: this.shardID
             }
         ];
