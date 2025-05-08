@@ -12,8 +12,8 @@ import {CommandInteraction} from "@structures";
 import {Command} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Event} from "@handler/events";
+import {Logger, Assign} from "@utils";
 import {Events} from "discord.js";
-import {Assign} from "@utils";
 import {env} from "@app/env";
 import {db} from "@app/db";
 
@@ -218,10 +218,15 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 }
 
                 // Если используется функция ответа от бота
-                if (ctx.isAutocomplete()) return this.SelectAutocomplete(ctx);
+                if (ctx.isAutocomplete()) {
+                    Logger.log("DEBUG", `User ${ctx.user.username} run autocomplete ${ctx?.commandName}`);
+                    return this.SelectAutocomplete(ctx);
+                }
 
                 // Если пользователь использует команду
                 else if (ctx.isChatInputCommand()) {
+                    Logger.log("DEBUG", `User ${ctx.user.username} run command ${ctx?.commandName}`);
+
                     // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
                     if (!db.owner.ids.includes(ctx.user.id)) {
                         const user = this.cooldown.db.get(ctx.user.id);
@@ -258,10 +263,16 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 }
 
                 // Действия выбора
-                else if (ctx.isAnySelectMenu && !ctx.isButton()) return this.SelectMenuCallback(ctx as any);
+                else if (ctx.isAnySelectMenu && !ctx.isButton()) {
+                    Logger.log("DEBUG", `User ${ctx.user.username} run selector menu ${ctx?.["customId"]}`);
+                    return this.SelectMenuCallback(ctx as any);
+                }
 
                 // Управление кнопками
-                else if (ctx.isButton()) return this.SelectButton(ctx);
+                else if (ctx.isButton()) {
+                    Logger.log("DEBUG", `User ${ctx.user.username} run button ${ctx?.customId}`);
+                    return this.SelectButton(ctx);
+                }
 
                 return null;
             }
@@ -336,7 +347,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
         // Если есть команда
         if (command && command.autocomplete) {
-            command.autocomplete({
+            return command.autocomplete({
                 message: ctx,
                 args: ctx.options?.["_hoistedOptions"]?.map((f) => `${f.value}`),
             })
@@ -361,8 +372,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         if (!isValid) return;
 
         // Если кнопка была найдена
-        button.callback(ctx);
-        return;
+        return button.callback(ctx);
     };
 
     /**
@@ -387,7 +397,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
             if (!command) return;
 
-            command.execute({
+            return command.execute({
                 message: ctx as any,
                 args: ctx["values"],
                 type: findFilter ? "disable" : "push"
@@ -400,4 +410,4 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default Object.values({ Interaction });
+export default [Interaction];

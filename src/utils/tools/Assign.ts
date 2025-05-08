@@ -8,7 +8,7 @@
 export abstract class Assign<T> {
     /**
      * @description Создаем команду
-     * @param options {Command}
+     * @param options Любые параметры указанные через T
      * @protected
      */
     protected constructor(options: T) {

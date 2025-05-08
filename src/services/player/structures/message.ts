@@ -8,12 +8,6 @@ import {EmbedData} from "discord.js";
  */
 export class QueueMessage<T extends CommandInteraction> {
     /**
-     * @description Оригинальный класс сообщения
-     * @private
-     */
-    private readonly _original: T;
-
-    /**
      * @description Язык сообщения
      * @public
      */
@@ -56,6 +50,7 @@ export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description Параметр отвечает за правильную работу сообщения
      * @example Ответил ли бот пользователю?
+     * @public
      */
     public get replied() {
         return this._original["replied"];
@@ -64,6 +59,7 @@ export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description Параметр отвечает за правильную работу сообщения
      * @example Можно ли ответить на другое сообщение?
+     * @public
      */
     public get deferred() {
         return this._original["deferred"];
@@ -89,15 +85,15 @@ export class QueueMessage<T extends CommandInteraction> {
 
     /**
      * @description Создаем класс для общения с discord api
-     * @param ctx - Класс сообщения
+     * @param _original - Класс сообщения
+     * @public
      */
-    public constructor(ctx: T) {
-        this._original = ctx;
-    };
+    public constructor(private readonly _original: T) {};
 
     /**
      * @description Авто отправка сообщения
      * @param options - Параметры сообщения
+     * @public
      */
     public send = (options: {embeds: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
         const type = this.type;

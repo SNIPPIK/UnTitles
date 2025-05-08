@@ -77,8 +77,8 @@ import {db} from "@app/db";
         "ru": "вперед"
     },
     descriptions: {
-        "en-US": "Skip tracks to the specified track!",
-        "ru": "Пропуск треков до указанного трека!"
+        "en-US": "Skip tracks from the current to the specified track!",
+        "ru": "Пропуск треков от текущего до указанного трека!"
     },
     type: ApplicationCommandOptionType.Subcommand,
     options: [

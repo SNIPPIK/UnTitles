@@ -51,12 +51,11 @@ export class Database {
         /**
          * @description Подключение к голосовому каналу
          * @param config - Данные для подключения
-         * @param adapterCreator
+         * @param adapterCreator - Функции для получения данных из VOICE_STATE_SERVER, VOICE_STATE_UPDATE
          * @public
          */
         public join = (config: VoiceConnection["config"], adapterCreator: DiscordGatewayAdapterCreator) => {
             let connection = this.get(config.guild_id);
-
 
             // Если нет голосового подключения
             if (!connection) {
@@ -65,13 +64,15 @@ export class Database {
                 this.set(config.guild_id, connection);
             }
 
+            // Если надо подключится заново к голосовому каналу
+            else if (connection.status !== VoiceConnectionStatus.Destroyed) connection.adapter.sendPayload(config);
 
-            // Если есть голосовое подключение, то подключаемся заново
-            else if (connection && connection.status !== VoiceConnectionStatus.Destroyed) {
-                if (connection.status === VoiceConnectionStatus.Signalling) connection.rejoin(config);
-                else connection.adapter.sendPayload(config);
+            // Если есть голосовое подключение, но оно было разорвано
+            else if (connection.status === VoiceConnectionStatus.Destroyed || connection.status === VoiceConnectionStatus.Disconnected) {
+                connection.rejoin(config);
             }
 
+            // Отдаем голосовое подключение
             return connection;
         };
     };

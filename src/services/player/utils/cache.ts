@@ -156,18 +156,11 @@ export class CacheUtility {
  */
 class CacheAudio extends AsyncCycle<Track> {
     /**
-     * @description Путь до директории с кешированными данными
-     * @readonly
-     * @private
-     */
-    private readonly cache_dir: string;
-
-    /**
      * @description Запускаем работу цикла
      * @constructor
      * @public
      */
-    public constructor(cache_dir: string) {
+    public constructor(private readonly cache_dir: string) {
         super({
             custom: {
                 push: (track) => {
@@ -221,8 +214,6 @@ class CacheAudio extends AsyncCycle<Track> {
                 });
             }
         });
-
-        this.cache_dir = cache_dir;
     };
 
     /**

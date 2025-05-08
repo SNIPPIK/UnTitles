@@ -67,13 +67,6 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
  */
 export class AudioPlayer extends BasePlayer {
     /**
-     * @description Плеер привязан к queue, и это его идентификатор
-     * @readonly
-     * @public
-     */
-    public readonly id: string;
-
-    /**
      * @description Делаем tracks параметр публичным для использования вне класса
      * @public
      */
@@ -177,11 +170,10 @@ export class AudioPlayer extends BasePlayer {
 
     /**
      * @description Задаем параметры плеера перед началом работы
-     * @param guild - ID сервера для аутентификации плеера
+     * @param id - ID сервера для аутентификации плеера
      */
-    public constructor(guild: string) {
+    public constructor(public id: string) {
         super();
-        this.id = guild;
 
         // Добавляем плеер в базу для отправки пакетов
         db.queues.cycles.players.add(this);

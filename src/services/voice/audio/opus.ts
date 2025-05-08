@@ -30,7 +30,7 @@ export class OpusEncoder extends Writable {
     _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
         this._buffer = Buffer.concat([this._buffer, chunk]);
         this.parseAvailablePages();
-        callback();
+        return callback();
     };
 
     /**
@@ -42,7 +42,12 @@ export class OpusEncoder extends Writable {
 
         while (offset + 27 <= this._buffer.length) {
             const magic = this._buffer.subarray(offset, offset + 4);
-            if (!magic.equals(OGG_MAGIC)) break;
+
+            // Если не находим OGGs_HEAD в буфере
+            if (!magic.equals(OGG_MAGIC)) {
+                this.emit("error", Error(`capture_pattern is not ${OGG_MAGIC}`));
+                break;
+            }
 
             const pageSegments = this._buffer.readUInt8(offset + 26);
             const headerLength = 27 + pageSegments;

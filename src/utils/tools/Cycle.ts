@@ -97,20 +97,12 @@ abstract class BaseCycle<T = unknown> {
  */
 export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
     /**
-     * @description Параметры для работы цикла
-     * @readonly
-     * @public
-     */
-    public readonly _config: SyncCycleConfig<T>;
-
-    /**
      * @description Создаем класс и добавляем параметры
      * @param options - Параметры для работы класса
      * @protected
      */
-    protected constructor(options: SyncCycleConfig<T>) {
+    protected constructor(public readonly options: SyncCycleConfig<T>) {
         super();
-        this._config = options;
     };
 
     /**
@@ -119,7 +111,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @public
      */
     public add = (item: T) => {
-        if (this._config.custom?.push) this._config.custom?.push(item);
+        if (this.options.custom?.push) this.options.custom?.push(item);
         else if (this.array.includes(item)) this.remove(item);
 
         super.add(item);
@@ -135,7 +127,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
 
         // Если есть объект в базе
         if (index !== -1) {
-            if (this._config.custom?.remove) this._config.custom.remove(item);
+            if (this.options.custom?.remove) this.options.custom.remove(item);
             this.array.splice(index, 1);
         }
     };
@@ -157,10 +149,10 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
             const item = this.array[i - 1];
 
             // Если объект не готов
-            if (!this._config.filter(item)) continue;
+            if (!this.options.filter(item)) continue;
 
             try {
-                this._config.execute(item);
+                this.options.execute(item);
             } catch (error) {
                 this.remove(item);
                 console.log(error);
@@ -168,7 +160,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
         }
 
         // Запускаем цикл повторно
-        return this._stepCheckTimeCycle(this._config.duration);
+        return this._stepCheckTimeCycle(this.options.duration);
     };
 }
 
@@ -181,20 +173,12 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
  */
 export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
     /**
-     * @description Параметры для работы цикла
-     * @readonly
-     * @public
-     */
-    public readonly _config: AsyncCycleConfig<T>;
-
-    /**
      * @description Создаем класс и добавляем параметры
      * @param options - Параметры для работы класса
      * @protected
      */
-    protected constructor(options: AsyncCycleConfig<T>) {
+    protected constructor(public readonly options: AsyncCycleConfig<T>) {
         super();
-        this._config = options;
     };
 
     /**
@@ -203,7 +187,7 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
      * @public
      */
     public add = (item: T) => {
-        if (this._config.custom?.push) this._config.custom?.push(item);
+        if (this.options.custom?.push) this.options.custom?.push(item);
         else if (this.array.includes(item)) this.remove(item);
 
         super.add(item);
@@ -219,7 +203,7 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
 
         // Если есть объект в базе
         if (index !== -1) {
-            if (this._config.custom?.remove) this._config.custom.remove(item);
+            if (this.options.custom?.remove) this.options.custom.remove(item);
             this.array.splice(index, 1);
         }
     };
@@ -241,10 +225,10 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
             const item = this.array[i - 1];
 
             // Если объект не готов
-            if (!this._config.filter(item)) continue;
+            if (!this.options.filter(item)) continue;
 
             try {
-                this._config.execute(item)
+                this.options.execute(item)
                     // Если ответ был получен
                     .then((bool) => {
                         if (!bool) this.remove(item);

@@ -10,13 +10,6 @@ import {db} from "@app/db";
  */
 abstract class BaseTrack {
     /**
-     * @description Сами данные трека полученный в результате API
-     * @readonly
-     * @private
-     */
-    protected _track: Track.data;
-
-    /**
      * @description Здесь хранятся данные времени трека
      * @readonly
      * @private
@@ -36,11 +29,54 @@ abstract class BaseTrack {
     protected _user: Track.user;
 
     /**
-     * @description Здесь хранятся данные с какой платформы был взят трек
-     * @readonly
-     * @private
+     * @description Получаем данные времени трека
+     * @public
      */
-    protected _api: RestAPIBase;
+    public get time() {
+        return this._duration;
+    };
+
+    /**
+     * @description Проверяем время и подгоняем к необходимым типам
+     * @param time - Данные о времени трека
+     * @protected
+     */
+    protected set time(time) {
+        // Если время в числовом формате
+        if (typeof time.total === "number") {
+            this._duration = { split: (time.total as number).duration(), total: time.total };
+        }
+        // Если что-то другое
+        else {
+            // Если время указано в формате 00:00
+            if (`${time.total}`.match(/:/)) {
+                this._duration = { split: time.total, total: (time.total as string).duration() };
+                return;
+            }
+
+            const total = parseInt(time.total);
+
+            // Время трека
+            if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };
+            else this._duration = { split: total.duration(), total };
+        }
+    };
+
+    /**
+     * @description Создаем трек
+     * @param _track - Данные трека с учетом <Song.track>
+     * @param _api   - Данне о платформе
+     */
+    public constructor(protected _track: Track.data, protected _api: RestAPIBase) {
+        this.time = _track.time as any;
+
+        // Удаляем мусорные названия из текста
+        if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic/gi, "");
+        _track.title = `${_track.title}`.replace(/\(Lyrics Video\)/gi, "");
+
+        // Удаляем ненужные данные
+        delete this._track.time;
+    };
 }
 
 /**
@@ -109,42 +145,6 @@ export class Track extends BaseTrack {
             }
         };
     };
-
-
-    /**
-     * @description Получаем данные времени трека
-     * @public
-     */
-    public get time() {
-        return this._duration;
-    };
-
-    /**
-     * @description Проверяем время и подгоняем к необходимым типам
-     * @param time - Данные о времени трека
-     * @protected
-     */
-    protected set time(time) {
-        // Если время в числовом формате
-        if (typeof time.total === "number") {
-            this._duration = { split: (time.total as number).duration(), total: time.total };
-        }
-        // Если что-то другое
-        else {
-            // Если время указано в формате 00:00
-            if (`${time.total}`.match(/:/)) {
-                this._duration = { split: time.total, total: (time.total as string).duration() };
-                return;
-            }
-
-            const total = parseInt(time.total);
-
-            // Время трека
-            if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };
-            else this._duration = { split: total.duration(), total };
-        }
-    };
-
 
     /**
      * @description Получаем пользователя который включил трек
@@ -252,27 +252,6 @@ export class Track extends BaseTrack {
                 return resolve(item?.syncedLyrics || item?.plainLyrics);
             });
         });
-    };
-
-    /**
-     * @description Создаем трек
-     * @param track - Данные трека с учетом <Song.track>
-     * @param api   - Данне о платформе
-     */
-    public constructor(track: Track.data, api: RestAPIBase) {
-        super();
-        this.time = track.time as any;
-
-        // Удаляем мусорные названия из текста
-        if (track.artist) track.artist.title = `${track.artist?.title}`.replace(/ - Topic/gi, "");
-        track.title = `${track.title}`.replace(/\(Lyrics Video\)/gi, "");
-
-        // Удаляем ненужные данные
-        delete track.time;
-
-        // Добавляем данные
-        this._track = track;
-        this._api = api;
     };
 
     /**
