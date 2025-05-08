@@ -260,7 +260,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
              */
             case VoiceOpcodes.SessionDescription: {
                 if (this.state.code === VoiceSocketStatusCode.protocol) {
-                    const {mode: encryptionMode, secret_key} = packet.d;
+                    const {secret_key} = packet.d;
 
                     this.encryptor = new RTPEncryptor({
                         key: new Uint8Array(secret_key),
@@ -270,10 +270,7 @@ export class VoiceSocket extends TypedEmitter<VoiceSocketEvents> {
                     this.state = {
                         ...this.state,
                         code: VoiceSocketStatusCode.ready,
-                        connectionData: Object.assign(this.state.connectionData, {
-                            encryptionMode,
-                            speaking: false
-                        })
+                        connectionData: Object.assign(this.state.connectionData, packet.d)
                     };
                 }
 

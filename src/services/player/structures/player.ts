@@ -1,5 +1,5 @@
 import {AudioPlayerEvents, PlayerTracks, PlayerAudioFilters} from "@service/player";
-import {AudioResource} from "@service/voice";
+import {AudioResource, SILENT_FRAME} from "@service/voice";
 import {Logger, TypedEmitter} from "@utils";
 import {db} from "@app/db";
 
@@ -57,22 +57,6 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
      * @private
      */
     protected readonly _audio = new PlayerAudio();
-
-    /**
-     * @description Делаем voice параметр публичным для использования вне класса
-     * @public
-     */
-    public get voice() {
-        return this._voice;
-    };
-
-    /**
-     * @description Делаем stream параметр публичным для использования вне класса
-     * @public
-     */
-    public get audio() {
-        return this._audio;
-    };
 }
 
 /**
@@ -89,6 +73,37 @@ export class AudioPlayer extends BasePlayer {
      */
     public readonly id: string;
 
+    /**
+     * @description Делаем tracks параметр публичным для использования вне класса
+     * @public
+     */
+    public get tracks() {
+        return this._tracks;
+    };
+
+    /**
+     * @description Делаем filters параметр публичным для использования вне класса
+     * @public
+     */
+    public get filters() {
+        return this._filters;
+    };
+
+    /**
+     * @description Делаем voice параметр публичным для использования вне класса
+     * @public
+     */
+    public get voice() {
+        return this._voice;
+    };
+
+    /**
+     * @description Делаем stream параметр публичным для использования вне класса
+     * @public
+     */
+    public get audio() {
+        return this._audio;
+    };
 
     /**
      * @description Текущий статус плеера
@@ -139,22 +154,6 @@ export class AudioPlayer extends BasePlayer {
         }
 
         return true;
-    };
-
-    /**
-     * @description Делаем tracks параметр публичным для использования вне класса
-     * @public
-     */
-    public get tracks() {
-        return this._tracks;
-    };
-
-    /**
-     * @description Делаем filters параметр публичным для использования вне класса
-     * @public
-     */
-    public get filters() {
-        return this._filters;
     };
 
 
@@ -271,6 +270,8 @@ export class AudioPlayer extends BasePlayer {
 
         // Функция выполнения отправки сообщения
         const emitPlaying = () => {
+            if (seek !== 0) return;
+
             const queue = db.queues.get(this.id);
             // Отправляем сообщение, если можно
             db.events.emitter.emit("message/playing", queue);
@@ -298,7 +299,7 @@ export class AudioPlayer extends BasePlayer {
                     this.status = "player/playing";
 
                     // Если включается именно новый трек
-                    if (seek === 0) emitPlaying();
+                    emitPlaying();
                     return;
                 }
 
@@ -325,7 +326,7 @@ export class AudioPlayer extends BasePlayer {
                         clearTimeout(timeout);
 
                         // Если включается именно новый трек
-                        if (seek === 0) emitPlaying();
+                        emitPlaying();
 
                         this.audio.current = stream;
                         this.status = "player/playing";
@@ -409,7 +410,7 @@ export class AudioPlayer extends BasePlayer {
         this.audio.current = null;
 
         // Отправляем пустышку
-        //this.voice.connection.packet = SILENT_FRAME;
+        this.voice.connection.packet = SILENT_FRAME;
 
         // Переводим плеер в режим ожидания
         this._status = "player/wait";

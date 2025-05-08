@@ -108,6 +108,9 @@ export class RTPEncryptor {
         // SSRC
         rtp_packet.writeUInt32BE(this.options.ssrc, 8);
 
+        // Зашифрованный звук
+        rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
+
         return rtp_packet;
     };
 
@@ -141,21 +144,23 @@ export class RTPEncryptor {
      * @private
      */
     private crypto = (packet: Buffer): Buffer => {
+        const nonceBuffer = this._nonceBuffer.subarray(0, 4);
+
         const mode = RTPEncryptor.mode;
-        const aad = this.rtp_packet;
-        const nonce = this.nonce, sub = this.nonce.subarray(0, 4);
+        const rtp = this.rtp_packet;
+        const nonce = this.nonce
 
         // Шифровка aead_aes256_gcm (support rtpsize)
         if (mode === "aead_aes256_gcm_rtpsize") {
             const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce);
-            cipher.setAAD(aad);
-            return Buffer.concat([aad, cipher.update(packet), cipher.final(), cipher.getAuthTag(), sub]);
+            cipher.setAAD(rtp);
+            return Buffer.concat([rtp, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
         }
 
         // Шифровка через библиотеку
         else if (mode === "aead_xchacha20_poly1305_rtpsize") {
-            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, aad, nonce, this.options.key);
-            return Buffer.concat([aad, cryptoPacket, sub]);
+            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, rtp, nonce, this.options.key);
+            return Buffer.concat([rtp, cryptoPacket, nonceBuffer]);
         }
 
         // Если нет больше вариантов шифровки
