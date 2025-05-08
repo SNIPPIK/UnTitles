@@ -225,6 +225,7 @@ export class AudioPlayer extends BasePlayer {
          */
         this.on("player/error", async (player, error, skip) => {
             const queue = db.queues.get(player.id);
+            const current = player.tracks.position;
 
             // Заставляем плеер пропустить этот трек
             if (skip) {
@@ -234,8 +235,9 @@ export class AudioPlayer extends BasePlayer {
                     if (player.tracks.size === 0) queue.cleanup();
                     else {
                         // Переключаем позицию назад, плеер сам переключит на следующий трек
-                        player.tracks.position = player.tracks.position + 1;
-                        player.emit("player/wait", player);
+                        player.tracks.position = current + 1;
+
+                        if (skip.position === current) player.emit("player/wait", player);
                     }
                 });
             }
@@ -300,37 +302,28 @@ export class AudioPlayer extends BasePlayer {
 
                     // Если включается именно новый трек
                     emitPlaying();
-                    return;
                 }
 
-                // Если поток нельзя читать, возможно что он еще грузится
-                const timeout = setTimeout(() => {
-                    // Отправляем данные событию для отображения ошибки
-                    handleError("Timeout: the stream has been exceeded!");
+                else {
+                    // Подключаем события для отслеживания работы потока (временные)
+                    stream
+                        // Если возникнет ошибка во время загрузки потока
+                        .once("error", (error) => {
+                            // Отправляем данные событию для отображения ошибки
+                            handleError(`${error}`);
 
-                    // Уничтожаем поток
-                    stream.destroy();
-                }, 10e3);
+                            // Уничтожаем поток
+                            stream.destroy();
+                        })
+                        // Если уже можно читать поток
+                        .once("readable", () => {
+                            // Если включается именно новый трек
+                            emitPlaying();
 
-                // Подключаем события для отслеживания работы потока (временные)
-                stream
-                    // Если возникнет ошибка во время загрузки потока
-                    .once("error", () => {
-                        clearTimeout(timeout);
-
-                        // Уничтожаем поток
-                        stream.destroy();
-                    })
-                    // Если уже можно читать поток
-                    .once("readable", () => {
-                        clearTimeout(timeout);
-
-                        // Если включается именно новый трек
-                        emitPlaying();
-
-                        this.audio.current = stream;
-                        this.status = "player/playing";
-                    });
+                            this.audio.current = stream;
+                            this.status = "player/playing";
+                        });
+                }
             })
 
             // Если возникла ошибка

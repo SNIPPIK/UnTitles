@@ -73,19 +73,30 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
         // Если вводимый поток является расшифровщиком
         if (options.input instanceof Process) options.input.stdout.pipe(options.decoder);
-        else options.input.on("frame", (packet: Buffer) => {
-            // Сообщаем что поток можно начать читать
-            if (this._audioBuffer.length === 0) {
-                this.emit("readable");
+        else {
+            // Если поток нельзя читать, возможно что он еще грузится
+            const timeout = setTimeout(() => {
+                // Отправляем данные событию для отображения ошибки
+                this.emit("error", new Error("Timeout: the stream has been exceeded!"));
+                // Начинаем уничтожение потока
+                this.emit("close");
+            }, 15e3);
 
-                // Если поток включается в первый раз.
-                // Добавляем пустышку для интерпретатора opus
-                if (!this._bufferTotal) this._audioBuffer.push(SILENT_FRAME);
-            }
+            options.input.on("frame", (packet: Buffer) => {
+                // Сообщаем что поток можно начать читать
+                if (this._audioBuffer.length === 0) {
+                    clearTimeout(timeout);
+                    this.emit("readable");
 
-            this._audioBuffer.push(packet);
-            this._bufferTotal++;
-        });
+                    // Если поток включается в первый раз.
+                    // Добавляем пустышку для интерпретатора opus
+                    if (!this._bufferTotal) this._audioBuffer.push(SILENT_FRAME);
+                }
+
+                this._audioBuffer.push(packet);
+                this._bufferTotal++;
+            });
+        }
     };
 
     /**
