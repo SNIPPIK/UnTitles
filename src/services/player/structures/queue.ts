@@ -172,6 +172,17 @@ abstract class BaseQueue {
 
 
     /**
+     * @description Получаем доступ к трекам
+     * @public
+     */
+    public get tracks() {
+        // Если плеер уже не доступен
+        if (!this.player) return null;
+        return this.player.tracks;
+    };
+
+
+    /**
      * @description Выдаем сервер к которому привязана очередь
      * @return Guild
      * @public
@@ -257,17 +268,15 @@ abstract class BaseQueue {
      * @public
      */
     public set voice(voice) {
-        // Если плеер уже не доступен
-        if (!this.player) return;
-
-        // Задаем новое голосовое подключение
-        this.player.voice.connection = db.voice.join({
+        const config = {
             self_deaf: true,
             self_mute: false,
-
             guild_id: this.guild.id,
             channel_id: voice.channel.id
-        }, this.guild.voiceAdapterCreator);
+        };
+
+        // Задаем новое голосовое подключение
+        this.player.voice.connection = db.voice.join(config, this.guild.voiceAdapterCreator);
     };
 
     /**
@@ -334,16 +343,6 @@ abstract class BaseQueue {
  * @public
  */
 export class Queue extends BaseQueue {
-    /**
-     * @description Получаем доступ к трекам
-     * @public
-     */
-    public get tracks() {
-        // Если плеер уже не доступен
-        if (!this.player) return null;
-        return this.player.tracks;
-    };
-
     /**
      * @description Проверка и выдача кнопок
      * @public

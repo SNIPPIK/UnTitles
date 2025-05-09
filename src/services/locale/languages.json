@@ -235,6 +235,11 @@
     "en-US": "{ARGUMENT} | Join success"
   },
 
+  "voice.rejoin": {
+    "ru": "{ARGUMENT}\n - Невозможно подключится к голосовому каналу, я уже подключен к нему!",
+    "en-US": "{ARGUMENT}\n - Unable to connect to voice channel, I am already connected to it"
+  },
+
   "voice.rtc": {
     "ru": "Смена RTC региона",
     "en-US": "Change RTC region!"
@@ -256,8 +261,8 @@
   },
 
   "voice.new": {
-    "ru": "В том голосовом канале никого нет, провожу подключение сюда {ARGUMENT}!",
-    "en-US": "There is no one in that voice channel, I’m connecting here {ARGUMENT}!"
+    "ru": "{ARGUMENT}\nВ том голосовом канале никого нет, провожу подключение!\n - Сообщение о текущем треке будет создано со следующим треком!",
+    "en-US": "{ARGUMENT}\nThere is no one in that voice channel, I’m connecting!\n - A message about the current track will be created with the next track!"
   },
 
 

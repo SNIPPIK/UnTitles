@@ -1,10 +1,11 @@
 import {
-    CacheType,
-    ChatInputCommandInteraction,
+    AnySelectMenuInteraction,
     AutocompleteInteraction,
     ButtonInteraction,
-    AnySelectMenuInteraction,
-    Colors
+    CacheType,
+    ChatInputCommandInteraction,
+    Colors,
+    Events
 } from "discord.js"
 import {QueueMessage} from "@service/player/structures/message";
 import filters from "@service/player/filters.json"
@@ -12,8 +13,7 @@ import {CommandInteraction} from "@structures";
 import {Command} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Event} from "@handler/events";
-import {Logger, Assign} from "@utils";
-import {Events} from "discord.js";
+import {Assign, Logger} from "@utils";
 import {env} from "@app/env";
 import {db} from "@app/db";
 
@@ -101,61 +101,57 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         {
             name: "another_voice",
             callback: async (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const VoiceChannelMe = message.guild?.members?.me?.voice?.channel;
                 const VoiceChannel = message.member?.voice?.channel;
 
-                // Если музыка играет в другом голосовом канале
-                if (message.guild.members.me?.voice?.channel && message.guild.members.me?.voice?.channel?.id !== VoiceChannel.id) {
-                    // Если включена музыка на сервере
-                    if (queue) {
-                        // Если есть голосовое подключение
-                        if (queue.voice && queue.voice.channel) {
-                            const me = message.guild.members.me;
+                // Если бот в голосовом канале и пользователь
+                if (VoiceChannelMe && VoiceChannel) {
+                    // Если пользователь и бот в разных голосовых каналах
+                    if (VoiceChannelMe.id !== VoiceChannel.id) {
+                        const queue = db.queues.get(message.guild.id);
 
-                            // Если в гс есть другие пользователи
-                            if (me.voice.channel && me.voice.channel.members.filter((user) => !user.user.bot).size > 0) {
-                                await message.reply({
-                                    flags: "Ephemeral",
-                                    embeds: [
-                                        {
-                                            description: locale._(message.locale, "voice.alt", [me.voice.channel]), color: Colors.Yellow
-                                        }
-                                    ]
-                                });
-                                return false;
-                            }
+                        // Если нет музыкальной очереди
+                        if (!queue) {
+                            const connection = db.voice.get(message.guild.id);
 
-                            // Если нет пользователей, то подключаемся к другому пользователю
-                            else {
-                                const queueMessage = new QueueMessage(message);
+                            // Отключаемся от голосового канала
+                            if (connection) connection.disconnect;
+                        }
 
-                                queue.voice = message.member?.voice;
-                                queue.message = queueMessage;
+                        // Если есть музыкальная очередь
+                        else {
+                            const users = VoiceChannelMe.members.filter((user) => !user.user.bot);
+
+                            // Если нет пользователей в голосовом канале очереди
+                            if (users.size === 0) {
+                                queue.message = new QueueMessage(message);
+                                queue.voice = message.member.voice;
 
                                 // Сообщаем о подключении к другому каналу
-                                await message.reply({
-                                    flags: "Ephemeral",
+                                message.channel.send({
                                     embeds: [
                                         {
                                             description: locale._(message.locale, "voice.new", [VoiceChannel]),
                                             color: Colors.Yellow
                                         }
                                     ]
-                                });
+                                }).then((msg) => setTimeout(() => msg.delete().catch(() => null), 5e3));
                                 return true;
                             }
+
+                            else {
+                                await message.reply({
+                                    flags: "Ephemeral",
+                                    embeds: [
+                                        {
+                                            description: locale._(message.locale, "voice.alt", [VoiceChannelMe]),
+                                            color: Colors.Yellow
+                                        }
+                                    ]
+                                });
+                                return false;
+                            }
                         }
-
-                        // Если есть очередь, но нет голосовых подключений
-                        else db.queues.remove(message.guild.id);
-                    }
-
-                    // Если нет очереди, но есть голосовое подключение
-                    else {
-                        const connection = db.voice.get(message.guild.id);
-
-                        // Отключаемся от голосового канала
-                        if (connection) connection.disconnect;
                     }
                 }
 
@@ -308,10 +304,10 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
         // Если права не соответствуют правде
         else if (command.rules && command.rules?.length > 0) {
-            for (const rule of command.rules) {
-                const check = this.intends[rule];
-                // Если будет найдено совпадение
-                if (check && !(await check(ctx as unknown as CommandInteraction))) return null;
+            const rules = this.intends.filter((rule) => command.rules.includes(rule.name));
+
+            for (const rule of rules) {
+                if (!(await rule.callback(ctx))) return null;
             }
         }
 
