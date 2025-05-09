@@ -29,7 +29,15 @@ export abstract class handler<T = unknown> {
      */
     protected get files() {
         return this._files;
-    }
+    };
+
+    /**
+     * @description Кол-во загруженных элементов
+     * @public
+     */
+    public get size() {
+        return this._files.length;
+    };
 
     /**
      * @description Даем классу необходимые данные
@@ -45,6 +53,12 @@ export abstract class handler<T = unknown> {
      * @protected
      */
     protected load = () => {
+        // Если есть загруженные файлы
+        if (this.size > 0) {
+            // Удаляем все загруженные файлы
+            this.files.splice(0, this.files.length);
+        }
+
         const selfDir = path.resolve(this._dir);
 
         // Если указанной директории нет
@@ -98,17 +112,5 @@ export abstract class handler<T = unknown> {
                 this._files.push(default_export);
             }
         }
-    };
-
-    /**
-     * @description Выгружаем директорию полностью
-     * @protected
-     */
-    protected unload = () => {
-        // Нечего выгружать
-        if (!this._files.length) return;
-
-        // Удаляем все загруженные файлы
-        this.files.splice(0, this.files.length);
     };
 }

@@ -68,7 +68,7 @@ function initClient() {
 
             // Загружаем события
             db.events.register(client);
-            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.events.length} events`)}`);
+            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.size} events`)}`);
 
             // Загружаем команды
             db.commands.register(client);

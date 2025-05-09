@@ -17,14 +17,6 @@ export class Events extends handler<Event<any>> {
     public readonly emitter = new class extends TypedEmitter<QueuesEvents & AudioPlayerEvents> {};
 
     /**
-     * @description Выдаем все загруженные события
-     * @public
-     */
-    public get events() {
-        return this.files;
-    };
-
-    /**
      * @description Загружаем класс вместе с дочерним
      * @public
      */
@@ -37,29 +29,23 @@ export class Events extends handler<Event<any>> {
      * @public
      */
     public register = (client: Client) => {
-        this.load();
+        if (this.size > 0) {
+            this.emitter.removeAllListeners();
 
-        // Проверяем ивенты
-        for (let item of this.events) {
-            if (item?.type === "client") client[item.once ? "once" : "on"](item.name as any, item.execute);
-            else this.emitter[item.once ? "once" : "on"](item.name as any, item.execute);
-        }
-    };
-
-    /**
-     * @description Функция для перезагрузки
-     * @public
-     */
-    public preregister = (client: Client) => {
-        this.emitter.removeAllListeners();
-
-        // Отключаем только загруженные события
-        for (let item of this.events) {
-            client.off(item.name as any, item.execute);
+            // Отключаем только загруженные события
+            for (let item of this.files) {
+                client.off(item.name as any, item.execute);
+            }
         }
 
         // Загружаем события заново
-        this.register(client);
+        this.load();
+
+        // Проверяем ивенты
+        for (let item of this.files) {
+            if (item?.type === "client") client[item.once ? "once" : "on"](item.name as any, item.execute);
+            else this.emitter[item.once ? "once" : "on"](item.name as any, item.execute);
+        }
     };
 }
 

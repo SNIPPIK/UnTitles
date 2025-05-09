@@ -45,7 +45,7 @@ export class Commands extends handler<Command> {
         }
 
         return temples;
-    }
+    };
 
     /**
      * @description Команды для разработчика
@@ -54,7 +54,7 @@ export class Commands extends handler<Command> {
      */
     public get owner() {
         return this.files.filter(cmd => cmd.owner === true);
-    }
+    };
 
     /**
      * @description Команды доступные для всех
@@ -63,7 +63,7 @@ export class Commands extends handler<Command> {
      */
     public get public() {
         return this.files.filter(cmd => !cmd.owner);
-    }
+    };
 
     /**
      * @description Загружаем класс вместе с дочерним
@@ -125,17 +125,6 @@ export class Commands extends handler<Command> {
         if (guild) guild.commands.set(this.owner as any)
             .then(() => Logger.log("DEBUG", `[App/Commands | ${this.owner.length}] has load guild commands`))
             .catch(console.error);
-    };
-
-    /**
-     * @description Функция для перезагрузки
-     * @public
-     */
-    public preregister = (client: Client) => {
-        this.unload();
-
-        // Регистрируем команды
-        this.register(client);
     };
 }
 

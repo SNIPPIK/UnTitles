@@ -7,17 +7,6 @@ import {handler} from "@handler";
  * @class Buttons
  */
 export class Buttons extends handler<Button> {
-    /**
-     * @description Кол-во загруженных кнопок
-     * @public
-     */
-    public get size() {
-        return this.files.length;
-    };
-
-    /**
-     * @description Загружаем класс вместе с дочерним
-     */
     public constructor() {
         super("src/handlers/modals/buttons");
     };

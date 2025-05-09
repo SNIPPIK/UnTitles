@@ -78,12 +78,12 @@ class WorkBotCommand extends Assign<Command> {
                 switch (args[0]) {
                     // Перезагружаем все команды
                     case "commands": {
-                        db.commands.preregister(message.guild.members.client);
+                        db.commands.register(message.guild.members.client);
 
                         return message.reply({
                             embeds: [
                                 {
-                                    description: locale._(message.locale, `commands.reload`, [db.commands.public.length]),
+                                    description: locale._(message.locale, `commands.reload`, [db.commands.size]),
                                     color: Colors.Green
                                 }
                             ],
@@ -93,12 +93,12 @@ class WorkBotCommand extends Assign<Command> {
 
                     // Перезагрузка всех событий
                     case "events": {
-                        db.events.preregister(message.guild.members.client);
+                        db.events.register(message.guild.members.client);
 
                         return message.reply({
                             embeds: [
                                 {
-                                    description: locale._(message.locale, `events.reload`, [db.events.events.length]),
+                                    description: locale._(message.locale, `events.reload`, [db.events.size]),
                                     color: Colors.Green
                                 }
                             ],
@@ -108,12 +108,12 @@ class WorkBotCommand extends Assign<Command> {
 
                     // Перезагрузка всех платформ
                     case "apis": {
-                        db.api.preregister();
+                        db.api.register();
 
                         return message.reply({
                             embeds: [
                                 {
-                                    description: locale._(message.locale, `apis.reload`, [db.api.platforms.supported.length]),
+                                    description: locale._(message.locale, `apis.reload`, [db.api.size]),
                                     color: Colors.Green
                                 }
                             ],

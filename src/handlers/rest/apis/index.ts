@@ -87,15 +87,6 @@ export class RestObject extends handler<RestAPI> {
     };
 
     /**
-     * @description Функция для перезагрузки
-     * @public
-     */
-    public preregister = () => {
-        this.unload();
-        this.register();
-    };
-
-    /**
      * @description Создание класса для взаимодействия с платформой
      * @return APIRequest
      * @public
