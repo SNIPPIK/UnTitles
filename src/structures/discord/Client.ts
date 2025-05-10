@@ -102,8 +102,8 @@ export class DiscordClient extends Client {
         // Интервал для обновления статуса
         setInterval(() => {
             // Обновление статистики
-            array[1].name = `guilds ${this.guilds.cache.size}`;
-            array[2].name = `queues ${db.queues.size}`;
+            array[1].name = `on ${this.guilds.cache.size} guilds`;
+            array[2].name = `${db.queues.size} queues`;
 
             // Запрещаем выходить за диапазон допустимого значения
             if (i > size) i = 0;
@@ -129,8 +129,8 @@ export class DiscordClient extends Client {
         const statuses: ActivityOptions[] = [
             // Статус с версией
             {
-                name: `version ${version}`,
-                type: ActivityType["Watching"],
+                name: `On ${version} version`,
+                type: ActivityType["Custom"],
                 shardId: this.shardID
             },
 
@@ -144,7 +144,7 @@ export class DiscordClient extends Client {
             // Статус о кол-во музыкальных очередей
             {
                 name: `queues`,
-                type: ActivityType["Streaming"],
+                type: ActivityType["Listening"],
                 shardId: this.shardID
             }
         ];

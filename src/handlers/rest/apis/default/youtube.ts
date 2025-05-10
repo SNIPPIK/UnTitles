@@ -252,7 +252,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
             // Если не надо использовать ключ, то используем систему поиска данных по странице
             new httpsClient({
                 url,
-                //useragent: true,
+                userAgent: true,
                 headers: {
                     "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
                     "accept-encoding": "gzip, compress, deflate, br",

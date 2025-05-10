@@ -17,7 +17,7 @@ export interface RequestData {
     body?: any; // Тело запроса (если применимо)
     maxRedirects?: number; // Максимальное количество редиректов
     validateStatus?: (statusCode: number) => boolean; // Проверка допустимости статус-кода
-    userAgent?: string; // Пользовательский User-Agent
+    userAgent?: string | boolean; // Пользовательский User-Agent
 }
 
 /**
@@ -29,7 +29,7 @@ function generateUserAgent(): string {
     const platform = os.platform();
     const arch = os.arch();
     const nodeVersion = process.version;
-    return `Mozilla/5.0 (${platform}; ${arch}) Node/${nodeVersion} httpsClient/1.0`;
+    return `Mozilla/5.0 (${platform}; ${arch}) Node/${nodeVersion} httpsClient/1.1`;
 }
 
 /**

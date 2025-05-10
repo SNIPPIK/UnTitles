@@ -13,7 +13,8 @@ export class ShardManager extends ShardingManager {
             token: token,
             mode: "process",
             respawn: true,
-            silent: false
+            totalShards: "auto",
+            shardList: "auto"
         });
 
         // Слушаем событие для создания осколка
@@ -27,5 +28,5 @@ export class ShardManager extends ShardingManager {
 
         // Создаем дубликат
         this.spawn({amount: "auto", delay: -1}).catch((err: Error) => Logger.log("ERROR", `[Manager] ${err}`));
-    }
+    };
 }
