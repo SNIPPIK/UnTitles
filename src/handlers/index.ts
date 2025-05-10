@@ -10,13 +10,6 @@ import fs from "node:fs";
  */
 export abstract class handler<T = unknown> {
     /**
-     * @description Путь до директории
-     * @readonly
-     * @private
-     */
-    private readonly _dir: string;
-
-    /**
      * @description Загруженные файлы, именно файлы не пути к файлам
      * @readonly
      * @private
@@ -44,9 +37,7 @@ export abstract class handler<T = unknown> {
      * @param directory - Имя директории
      * @protected
      */
-    protected constructor(directory: string) {
-        this._dir = directory;
-    };
+    protected constructor(private readonly directory: string) {};
 
     /**
      * @description Загружаем директории полностью, за исключением index файлов
@@ -59,7 +50,7 @@ export abstract class handler<T = unknown> {
             this.files.splice(0, this.files.length);
         }
 
-        const selfDir = path.resolve(this._dir);
+        const selfDir = path.resolve(this.directory);
 
         // Если указанной директории нет
         if (!fs.existsSync(selfDir)) {

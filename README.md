@@ -14,7 +14,7 @@
 
 > [!IMPORTANT]
 > Если нет ответа от youtube устанавливаем `ytdlp-nodejs`, в таком случае рекомендуется включения кеширования\
-> Есть поддержка [`opus`](src/services/voice/audio/opus.ts), [`sodium`](src/services/voice/audio/sodium.ts)\
+> Есть поддержка [`opus`](src/services/voice/audio/opus.ts), [`sodium`](src/services/voice/crypto/RTPEncryptor.ts)\
 > Никаких Lava, Lavalink, Lavaplayer. Бот предоставляет свой кастомный плеер и свою поддержку платформ\
 > Голосовая составляющая была взята из `@discordjs/voice`, было внесено огромное кол-во модификаций
 > 
@@ -34,10 +34,12 @@
 | /avatar      | {user}                               | **Для просмотра аватара пользователя**                      |
 | /voice       | (join, leave, re-configure)          | **Взаимодействие с голосовыми подключениями**               |
 | /tribune     | stage:(join, request)                | **Взаимодействие с подключением к трибуне**                 |
-
+- Эти функции есть в плеере и работают в сообщении о текущем треке
+  - `replay`, `shuffle`, `queue`, `lyrics`, `repeat (off, on, track)`, `pause/resume`, `stop`
+![img_1.png](.github/images/playing.png)
 ---
 
-## Как запустить проект
+## Как запустить проект!
 1. Устанавливаем [`node.js`](https://nodejs.org/en)
 2. Устанавливаем `FFmpeg`, необходимо выбрать один из вариантов
    - Установить FFmpeg в систему

@@ -142,13 +142,6 @@ export class RestObject extends handler<RestAPI> {
  */
 export class RestRequest {
     /**
-     * @description Класс который дает доступ к запросам платформы
-     * @readonly
-     * @private
-     */
-    private readonly _api: RestAPI = null;
-
-    /**
      * @description Выдаем название
      * @return API.platform
      * @public
@@ -185,12 +178,10 @@ export class RestRequest {
 
     /**
      * @description Ищем платформу из доступных
-     * @param argument {RestAPI.platform} Имя платформы
+     * @param _api {RestAPI.platform} Имя платформы
      * @public
      */
-    public constructor(argument: RestAPI) {
-        this._api = argument;
-    };
+    public constructor(private readonly _api: RestAPI) {};
 
     /**
      * @description Получаем функцию в зависимости от типа платформы и запроса
