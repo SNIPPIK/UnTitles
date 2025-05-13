@@ -1,4 +1,3 @@
-import {ActivityType} from "discord-api-types/v10"
 import {Event} from "@handler/events";
 import {Assign, Logger} from "@utils";
 import {Events} from "discord.js";
@@ -31,16 +30,3 @@ class ClientReady extends Assign<Event<Events.ClientReady>> {
  * @description Делаем классы глобальными
  */
 export default [ClientReady];
-
-/**
- * @author SNIPPIK
- * @description Параметры показа статуса
- * @interface ActivityOptions
- */
-export interface ActivityOptions {
-    name: string;
-    state?: string;
-    url?: string;
-    type?: ActivityType;
-    shardId?: number | readonly number[];
-}

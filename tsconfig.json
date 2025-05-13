@@ -22,6 +22,7 @@
       "@app/db": ["./database"],
       "@app/env": ["./environment"]
     },
+    "removeComments": true,
 
     "alwaysStrict": true,
     "sourceMap": false,

@@ -94,21 +94,30 @@ export class DiscordClient extends Client {
      */
     private readonly IntervalStatus = () => {
         // Время обновления статуса
-        const timeout = parseInt(env.get("client.presence.interval"));
-        const array = this.parseStatuses();
-        const size = array.length - 1;
-        let i = 0;
+        const timeout = parseInt(env.get("client.presence.interval", "120"));
+        const arrayUpdate = parseInt(env.get("client.presence.array.update", "3600")) * 1e3;
+
+        let array = this.parseStatuses();
+        let size = array.length - 1;
+        let i = 0, lastDate = Date.now() + arrayUpdate ;
+
+        // Если нет статусов
+        if (!array.length) return;
 
         // Интервал для обновления статуса
-        setInterval(() => {
-            // Обновление статистики
-            array[1].name = `on ${this.guilds.cache.size} guilds`;
-            array[2].name = `${db.queues.size} queues`;
+        setInterval(async () => {
+            // Обновляем статусы
+            if (lastDate < Date.now()) {
+                // Обновляем статусы
+                array = this.parseStatuses();
+
+                // Обновляем время для следующего обновления
+                lastDate = Date.now() + arrayUpdate;
+            }
 
             // Запрещаем выходить за диапазон допустимого значения
             if (i > size) i = 0;
             const activity = array[i];
-            i++;
 
             // Задаем статус боту
             this.user.setPresence({
@@ -117,6 +126,7 @@ export class DiscordClient extends Client {
                 shardId: this.shard?.ids[0] ?? 0
             });
 
+            i++;
         }, timeout * 1e3);
     };
 
@@ -126,34 +136,19 @@ export class DiscordClient extends Client {
      * @private
      */
     private readonly parseStatuses = () => {
-        const statuses: ActivityOptions[] = [
-            // Статус с версией
-            {
-                name: `On ${version} version`,
-                type: ActivityType["Custom"],
-                shardId: this.shardID
-            },
-
-            // Статус о кол-во гильдий
-            {
-                name: `guilds`,
-                type: ActivityType["Watching"],
-                shardId: this.shardID
-            },
-
-            // Статус о кол-во музыкальных очередей
-            {
-                name: `queues`,
-                type: ActivityType["Listening"],
-                shardId: this.shardID
-            }
-        ];
+        const statuses: ActivityOptions[] = [];
 
         // Получаем пользовательские статусы
         try {
             const envPresents = (JSON.parse(env.get("client.presence.array")) as ActivityOptions[]).map((status) => {
+                const edited = status.name
+                    .replace(/{shard}/g, `${this.shardID}`)
+                    .replace(/{queues}|{players}/g, `${db.queues.size}`)
+                    .replace(/{version}/g, `${version}`)
+                    .replace(/{guilds}/g, `${this.guilds.cache.size}`)
+
                 return {
-                    name: status.name,
+                    name: edited,
                     type: ActivityType[status.type] as any,
                     shardId: this.shardID
                 }
