@@ -1,4 +1,4 @@
-import {RestAPIBase, RestAPI} from "@handler/rest/apis";
+import type {RestServerSide} from "@handler/rest/apis";
 import {httpsClient} from "@handler/rest";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
@@ -12,13 +12,13 @@ import {db} from "@app/db";
  * @class RestVKAPI
  * @public
  */
-class RestVKAPI extends Assign<RestAPI> {
+class RestVKAPI extends Assign<RestServerSide.API> {
     /**
      * @description Данные для создания трека с этими данными
      * @protected
      * @static
      */
-    protected static _platform: RestAPIBase = {
+    protected static _platform: RestServerSide.APIBase = {
         name: "VK",
         color: 30719,
         url: "vk.com",
@@ -64,7 +64,7 @@ class RestVKAPI extends Assign<RestAPI> {
                     execute: (url, options) => {
                         const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi.exec(url).pop();
 
-                        return new Promise<Track | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             //Если ID трека не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err( "api.request.id.track"));
 
@@ -78,7 +78,7 @@ class RestVKAPI extends Assign<RestAPI> {
                                 // Если включена утилита кеширования аудио
                                 else if (db.cache.audio) {
                                     // Если есть кеш аудио
-                                    if (db.cache.audio.status(cache).status === "ended") return resolve(cache);
+                                    if (db.cache.audio.status(`${RestVKAPI._platform.url}/${ID}`).status === "ended") return resolve(cache);
                                 }
                             }
 
@@ -94,14 +94,14 @@ class RestVKAPI extends Assign<RestAPI> {
                                 // Если включена утилита кеширования
                                 if (db.cache.audio) {
                                     // Если есть кеш аудио
-                                    if (db.cache.audio.status(track).status === "ended") return resolve(track);
+                                    if (db.cache.audio.status(`${RestVKAPI._platform.url}/${ID}`).status === "ended") return resolve(track);
                                 }
 
                                 // Если нет ссылки на трек
-                                else if (!track.link) return resolve(locale.err( "api.request.fail"));
+                                if (!track.audio) return resolve(locale.err( "api.request.fail"));
 
                                 // Сохраняем кеш в системе
-                                db.cache.set(track);
+                                if (!cache) await db.cache.set(track, RestVKAPI._platform.url);
 
                                 return resolve(track);
                             } catch (e) {
@@ -118,7 +118,7 @@ class RestVKAPI extends Assign<RestAPI> {
                 {
                     name: "search",
                     execute: (url, {limit}) => {
-                        return new Promise<Track[] | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
                                 const api = await RestVKAPI.API("audio", "search", `&q=${url}`);
@@ -171,10 +171,10 @@ class RestVKAPI extends Assign<RestAPI> {
      * @protected
      * @static
      */
-    protected static track = (track: json, url: string = null): Track => {
+    protected static track = (track: json, url: string = null) => {
         const image = track?.album?.["thumb"];
 
-        return new Track({
+        return {
             id: `${track.owner_id}_${track.id}`,
             url: url || `https://vk.com/audio${track.owner_id}_${track.id}`,
             title: track.title,
@@ -182,7 +182,7 @@ class RestVKAPI extends Assign<RestAPI> {
             image: { url: image?.["photo_1200"] ?? image?.["photo_600"] ?? image?.["photo_300"] ?? image?.["photo_270"] ?? undefined },
             time: { total: track.duration.toFixed(0) },
             audio: track?.url
-        }, RestVKAPI._platform);
+        };
     };
 
     /**

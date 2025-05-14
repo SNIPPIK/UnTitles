@@ -1,4 +1,4 @@
-import {RestAPIBase} from "@handler/rest/apis";
+import type {RestServerSide} from "@handler/rest/apis";
 import {httpsClient} from "@handler/rest";
 import {db} from "@app/db";
 
@@ -43,13 +43,13 @@ abstract class BaseTrack {
      */
     protected set time(time) {
         // Если время в числовом формате
-        if (typeof time.total === "number") {
-            this._duration = { split: (time.total as number).duration(), total: time.total };
+        if (typeof time?.total === "number") {
+            this._duration = { split: (time?.total as number).duration(), total: time.total };
         }
         // Если что-то другое
         else {
             // Если время указано в формате 00:00
-            if (`${time.total}`.match(/:/)) {
+            if (`${time?.total}`.match(/:/)) {
                 this._duration = { split: time.total, total: (time.total as string).duration() };
                 return;
             }
@@ -67,15 +67,12 @@ abstract class BaseTrack {
      * @param _track - Данные трека с учетом <Song.track>
      * @param _api   - Данне о платформе
      */
-    public constructor(protected _track: Track.data, protected _api: RestAPIBase) {
+    public constructor(protected _track: Track.data, protected _api: RestServerSide.APIBase) {
         this.time = _track.time as any;
 
         // Удаляем мусорные названия из текста
         if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic/gi, "");
         _track.title = `${_track.title}`.replace(/\(Lyrics Video\)/gi, "");
-
-        // Удаляем ненужные данные
-        delete this._track.time;
     };
 }
 
@@ -213,8 +210,9 @@ export class Track extends BaseTrack {
                 const resource = await this.prepareResource();
 
                 // Если произошла ошибка при получении ресурса
-                if (resource instanceof Error) {
-                    console.error(resource);
+                if (resource instanceof Error || !resource) {
+                    if (resource) console.error(resource);
+                    this.link = null;
 
                     if (i >= 3) return resolve(resource);
                 }
@@ -258,7 +256,7 @@ export class Track extends BaseTrack {
      * @description Функция подготавливающая путь до аудио, так же проверяющая его актуальность
      * @private
      */
-    private prepareResource = async (): Promise<string | Error> => {
+    private prepareResource = async (): Promise<any> => {
         // Если включено кеширование
         if (db.cache.audio) {
             const status = db.cache.audio.status(this);
@@ -280,19 +278,17 @@ export class Track extends BaseTrack {
                     // Если статус = good
                     if (status.statusCode < 300 && status.statusCode >= 200) {
                         // Добавляем трек в кеширование
-                        if (this.api.name !== "DISCORD" && db.cache.audio) {
-                            db.cache.audio.add(this)
-                        }
-
-                        return this.link;
+                        db.cache.audio?.add(this);
                     }
 
-                    // Если статус плохой, то удаляем ссылку
-                    this.link = null;
+                    // Если статус код 400-500
+                    else if (status.statusCode >= 400 && status.statusCode < 500) {
+                        return Error(`This link track is not available... Status code 404`);
+                    }
+
                     return null;
                 } catch (err) { // Если произошла ошибка при проверке статуса
-                    this.link = null;
-                    return new Error(`This link track is not available... Fail check link!`);
+                    return Error(`This link track is not available... Fail check link!`);
                 }
             }
 
@@ -308,12 +304,12 @@ export class Track extends BaseTrack {
             if (link instanceof Error) return link;
 
             // Если платформа не хочет давать данные трека
-            else if (!link) return new Error(`The platform does not provide a link`);
+            else if (!link) return Error(`The platform does not provide a link`);
 
             this.link = link;
             return link;
         } catch (err) {
-            return new Error(`This link track is not available... Fail update link!`);
+            return Error(`This link track is not available... Fail update link!`);
         }
     };
 }

@@ -1,67 +1,34 @@
-import {Track} from "@service/player";
-import {handler} from "@handler";
-import {env} from "@app/env";
-import {db} from "@app/db";
+import { Worker } from "node:worker_threads";
+import { Track } from "@service/player";
+import path from "node:path";
+import { db } from "@app/db";
 
 /**
  * @author SNIPPIK
- * @description Коллекция для взаимодействия с APIs
+ * @description Коллекция базы данных для взаимодействия с Rest/API
  * @class RestObject
  * @public
  */
-export class RestObject extends handler<RestAPI> {
+export class RestObject {
+    /**
+     * @description Второстепенный поток, динамически создается и удаляется когда не требуется
+     * @readonly
+     * @private
+     */
+    private readonly worker: Worker;
+
     /**
      * @description База с платформами
-     * @protected
-     * @readonly
+     * @public
      */
-    public readonly platforms = {
-        /**
-         * @description Все загруженные платформы
-         * @protected
-         */
-        supported: this.files,
-
-        /**
-         * @description Платформы без данных для авторизации
-         * @protected
-         */
-        authorization: [] as RestAPI["name"][],
-
-        /**
-         * @description Платформы без возможности получить аудио
-         * @warn По-умолчанию запрос идет к track
-         * @protected
-         */
-        audio: [] as RestAPI["name"][],
-
-        /**
-         * @description Заблокированные платформы
-         * @protected
-         */
-        block: [] as RestAPI["name"][]
-    };
-
-    /**
-     * Лимиты на количество обрабатываемых элементов для различных типов запросов.
-     * Значения читаются из переменных окружения.
-     * @type {Record<string, number>}
-     */
-    public readonly limits: Record<string, number> = ((): Record<string, number> => {
-        const keys = ["playlist", "album", "search", "author"];
-        return keys.reduce((acc, key) => {
-            acc[key] = parseInt(env.get(`APIs.limit.${key}`));
-            return acc;
-        }, {} as Record<string, number>);
-    })();
+    public platforms: RestServerSide.Data;
 
     /**
      * @description Исключаем платформы из общего списка
-     * @return API.request[]
      * @public
      */
     public get allow() {
-        return this.platforms.supported.filter((platform) => platform.name !== "DISCORD" && platform.auth);
+        return this.platforms.supported.filter((platform) => platform.auth);
     };
 
     /**
@@ -69,21 +36,19 @@ export class RestObject extends handler<RestAPI> {
      * @public
      */
     public constructor() {
-        super("src/handlers/rest/apis");
-    };
+        this.worker = new Worker(path.resolve("src/services/worker/rest/index.js"), {
+            execArgv: ["-r", "tsconfig-paths/register"],
+            workerData: null
+        });
 
-    /**
-     * @description Функция загрузки api запросов
-     * @public
-     */
-    public register = () => {
-        this.load();
+        // Получаем данные о загруженных платформах
+        this.worker.postMessage({data: true});
+        this.worker.once("message", (data) => {
+            this.platforms = data;
+        });
 
-        // Загружаем команды в текущий класс
-        for (let file of this.files) {
-            if (!file.auth) db.api.platforms.authorization.push(file.name);
-            if (!file.audio) db.api.platforms.audio.push(file.name);
-        }
+        // Если возникнет ошибка
+        this.worker.on("error", (err) => console.log(err));
     };
 
     /**
@@ -91,24 +56,81 @@ export class RestObject extends handler<RestAPI> {
      * @return APIRequest
      * @public
      */
-    public request(name: RestAPI["name"]): RestRequest | null {
-        const platform = this.files.find(file => file.name === name);
-        return platform ? new RestRequest(platform) : null;
+    protected worker_request = (platform: RestServerSide.API["name"], payload: string, options?: {audio: boolean}): Promise<Track | Track[] | Track.list | Error> => {
+        const used = this.platforms.supported.find((plt) => plt.name === platform);
+        const baseAPI: RestServerSide.APIBase = {
+            name: used.name,
+            url: used.url,
+            color: used.color
+        };
+
+        return new Promise((resolve) => {
+            const handleMessage = (message: RestServerSide.Result) => {
+                // Отключаем эту функцию из-за ненадобности
+                this.worker.off('message', handleMessage);
+
+                // Если статус удачный
+                if (message.status === "success") {
+                    if (message.result instanceof Error) {
+                        return resolve(message.result);
+                    }
+
+                    switch (message.type) {
+                        case "track": {
+                            const track = new Track(message.result, baseAPI);
+                            return resolve(track);
+                        }
+
+                        case "album":
+                        case "playlist": {
+                            return resolve({
+                                ...message.result,
+                                items: message.result.items.map((item) => new Track(item, baseAPI)),
+                            });
+                        }
+
+                        case "artist":
+                        case "search": {
+                            return resolve(message.result.map((item) => new Track(item, baseAPI)));
+                        }
+                    }
+                }
+
+                else if (message.status === "error") {
+                    return resolve(Error(message.result as any));
+                }
+            };
+
+            // Передает данные запроса
+            this.worker.postMessage({ platform, payload, options });
+
+            // Ждем ответ от потока
+            this.worker.on('message', handleMessage);
+        });
+    };
+
+    /**
+     * @description Создание класса для взаимодействия с платформой
+     * @return APIRequest
+     * @public
+     */
+    public request(name: RestServerSide.API["name"]): RestClientSide.Request | null {
+        const platform = this.platforms.supported.find(file => file.name === name);
+        return platform ? new RestClientSide.Request(platform) : null;
     };
 
     /**
      * @description Если надо обновить ссылку на трек или аудио недоступно у платформы
      * @param track - Трек у которого надо получить ссылку на исходный файл
+     * @public
      */
     public fetch = async (track: Track): Promise<string | Error | null> => {
         try {
             // Проверяем, если платформа может сама выдавать данные о треке
             if (!this.platforms.authorization.includes(track.api.name) && !this.platforms.audio.includes(track.api.name)) {
-                const api = this.request(track.api.name).get("track");
+                const api = this.request(track.api.name).request<"track">(track.url, { audio: true });
 
-                if (!api) return Error(`[Song/${track.api.name}]: not found callback for track`);
-
-                const song = await api.execute(track.url, { audio: true });
+                const song = await api.request();
                 if (song instanceof Error) return song;
 
                 return song.link;
@@ -118,14 +140,14 @@ export class RestObject extends handler<RestAPI> {
             const platform = this.request(this.platforms.supported.find(plt => plt.requests.length >= 2 && plt.audio).name);
 
             // Ищем трек по имени артиста и названия
-            const tracks = await platform.get("search").execute(`${track.artist.title} - ${track.name}`, { limit: 5 });
+            const tracks = await platform.request<"search">(`${track.artist.title} - ${track.name}`).request();
             if (tracks instanceof Error) return tracks;
             else if (tracks.length === 0) return new Error(`Fail searching tracks`);
 
             // Получаем исходник трека
-            const song = await platform.get("track").execute(tracks[0]?.url, { audio: true });
+            const song = await platform.request<"track">(tracks[0]?.url).request();
             if (song instanceof Error) return song;
-            else if (!song.link) return Error("Fail getting link")
+            else if (!song.link) return Error("Fail getting link");
 
             return song.link;
         } catch (err) {
@@ -136,219 +158,448 @@ export class RestObject extends handler<RestAPI> {
 
 /**
  * @author SNIPPIK
- * @description Получаем ответ от локальной базы APIs
- * @class RestRequest
- * @private
+ * @description Данные для работы в основной системе бота
+ * @namespace RestClientSide
+ * @public
  */
-export class RestRequest {
+export namespace RestClientSide {
     /**
-     * @description Выдаем название
-     * @return API.platform
-     * @public
+     * @description Авто тип, на полученные данные
+     * @type ResultData
      */
-    public get platform() { return this._api.name; };
+    export type ResultData<T> = T extends "track" ? Track | Error : T extends "album" | "playlist" ? Track.list | Error : Track[] | Error;
 
     /**
-     * @description Выдаем bool, Недоступна ли платформа
-     * @return boolean
-     * @public
+     * @description Авто тип, на полученные типы данных
+     * @type ResultType
      */
-    public get block() { return db.api.platforms.block.includes(this.platform); };
+    export type ResultType<T> = T extends "track" ? "track" : T extends "album" ? "album" : T extends "playlist" ? "playlist" : T extends "artist" ? "artist" : "search";
 
     /**
-     * @description Выдаем bool, есть ли доступ к платформе
-     * @return boolean
+     * @author SNIPPIK
+     * @description Класс для взаимодействия с конкретной платформой
+     * @class ClientRestRequest
+     * @private
+     */
+    export class Request {
+        /**
+         * @description Выдаем название
+         * @return API.platform
+         * @public
+         */
+        public get platform() { return this._api.name; };
+
+        /**
+         * @description Выдаем bool, Недоступна ли платформа
+         * @return boolean
+         * @public
+         */
+        public get block() { return db.api.platforms.block.includes(this.platform); };
+
+        /**
+         * @description Выдаем bool, есть ли доступ к платформе
+         * @return boolean
+         * @public
+         */
+        public get auth() { return this._api.auth };
+
+        /**
+         * @description Выдаем bool, есть ли доступ к получению аудио у платформы
+         * @return boolean
+         * @public
+         */
+        public get audio() { return this._api.audio; };
+
+        /**
+         * @description Выдаем int, цвет платформы
+         * @return number
+         * @public
+         */
+        public get color() { return this._api.color; };
+
+        /**
+         * @description Ищем платформу из доступных
+         * @param _api - Данные платформы
+         * @public
+         */
+        public constructor(private readonly _api: RestServerSide.API) {};
+
+        /**
+         * @description Запрос в систему Rest/API, через систему worker
+         * @param payload - Данные для отправки
+         * @param options - Параметры для отправки
+         */
+        public request<T extends (RestServerSide.APIs.track | RestServerSide.APIs.playlist | RestServerSide.APIs.album | RestServerSide.APIs.artist | RestServerSide.APIs.search)["name"]>(payload: string | json, options?: {audio: boolean}) {
+            return {
+                type: this._api.requests.find((item) => {
+                    // Если производится прямой запрос по названию
+                    if (item.name === payload) return item;
+
+                    // Если указана ссылка
+                    else if (typeof payload === "string" && payload.startsWith("http")) {
+                        try {
+                            if (item["filter"].exec(payload) || payload.match(item["filter"])) return item;
+                        } catch {
+                            return null;
+                        }
+                    }
+
+                    // Если указано что-то другое
+                    else if (payload["url"]) return item.name === "track";
+
+                    // Скорее всего надо произвести поиск
+                    return item.name === "search";
+                }).name as RestClientSide.ResultType<T>,
+                request: () => db.api["worker_request"](this.platform, payload as any, options) as Promise<RestClientSide.ResultData<T>>
+            }
+        };
+    }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные для работы серверной части (Worker)
+ * @namespace RestServerSide
+ * @public
+ */
+export namespace RestServerSide {
+    /**
+     * @description Передаваемые данные из worker в основной поток
+     * @type Result
      * @public
      */
-    public get auth() { return db.api.platforms.authorization.includes(this.platform); };
+    export type Result =
+        | {
+        status: "success";
+        type: "track";
+        result: Track.data | Error;
+    }
+        | {
+        status: "success";
+        type: "album" | "playlist";
+        result: Track.list | Error;
+    }
+        | {
+        status: "success";
+        type: "artist" | "search";
+        result: Track.data[] | Error;
+    }
 
     /**
-     * @description Выдаем bool, есть ли доступ к получению аудио у платформы
-     * @return boolean
+     * @description Авто тип, на полученный тип запроса
+     * @type ResultAPIs
      * @public
      */
-    public get audio() { return db.api.platforms.audio.includes(this.platform); };
+    export type ResultAPIs<T> = T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "author" ? APIs.artist : APIs.search
 
     /**
-     * @description Выдаем int, цвет платформы
-     * @return number
+     * @author SNIPPIK
+     * @description Создаем класс для итоговой платформы для взаимодействия с APIs
+     * @interface APIBase
      * @public
      */
-    public get color() { return this._api.color; };
+    export interface APIBase {
+        /**
+         * @description Имя платформы
+         * @readonly
+         * @public
+         */
+        readonly name: "YOUTUBE" | "SPOTIFY" | "VK" | "YANDEX";
+
+        /**
+         * @description Ссылка для работы фильтра
+         * @readonly
+         * @public
+         */
+        readonly url: string;
+
+        /**
+         * @description Цвет платформы
+         * @readonly
+         * @public
+         */
+        readonly color: number;
+    }
 
     /**
-     * @description Ищем платформу из доступных
-     * @param _api {RestAPI.platform} Имя платформы
+     * @author SNIPPIK
+     * @description Создаем класс для итоговой платформы для взаимодействия с APIs
+     * @interface API
      * @public
      */
-    public constructor(private readonly _api: RestAPI) {};
+    export interface API extends APIBase {
+        /**
+         * @description Доступ к аудио
+         * @readonly
+         * @public
+         */
+        readonly audio: boolean;
+
+        /**
+         * @description Доступ с авторизацией
+         * @readonly
+         * @public
+         */
+        readonly auth: boolean;
+
+        /**
+         * @description Фильтр ссылки для работы определения
+         * @readonly
+         * @public
+         */
+        readonly filter: RegExp;
+
+        /**
+         * @description Запросы платформы
+         * @readonly
+         * @public
+         */
+        readonly requests: (APIs.track | APIs.playlist | APIs.album | APIs.artist | APIs.search)[];
+    }
 
     /**
-     * @description Получаем функцию в зависимости от типа платформы и запроса
-     * @param type {get} Тип запроса
+     * @author SNIPPIK
+     * @description Доступные запросы для платформ
+     * @namespace APIs
      * @public
      */
-    public get<T extends (RestAPIs.track | RestAPIs.playlist | RestAPIs.album | RestAPIs.author | RestAPIs.search)["name"]>(type: T | string) {
-        return this._api.requests.find((item) => {
-            // Если производится прямой запрос по названию
-            if (item.name === type) return item;
+    export namespace APIs {
+        /**
+         * @description Что из себя должен представлять запрос данные трека
+         * @interface track
+         */
+        export interface track {
+            // Название типа запроса
+            name: "track";
 
-            // Если указана ссылка
-            else if (type.startsWith("http")) {
-                try {
-                    if (item["filter"].exec(type) || type.match(item["filter"])) return item;
-                } catch {
-                    return null;
-                }
+            // Фильтр типа запроса
+            filter: RegExp;
+
+            // Функция получения данных (не доступна в основном потоке)
+            execute: (url: string, options: { audio: boolean }) => Promise<Track.data | Error>;
+        }
+
+        /**
+         * @description Что из себя должен представлять запрос данные плейлиста
+         * @interface playlist
+         */
+        export interface playlist {
+            // Название типа запроса
+            name: "playlist";
+
+            // Фильтр типа запроса
+            filter: RegExp;
+
+            // Функция получения данных (не доступна в основном потоке)
+            execute: (url: string, options: { limit: number }) => Promise<Track.list | Error>;
+        }
+
+        /**
+         * @description Что из себя должен представлять запрос данные альбома
+         * @interface album
+         */
+        export interface album {
+            // Название типа запроса
+            name: "album";
+
+            // Фильтр типа запроса
+            filter: RegExp;
+
+            // Функция получения данных (не доступна в основном потоке)
+            execute: (url: string, options: { limit: number }) => Promise<Track.list | Error>;
+        }
+
+        /**
+         * @description Что из себя должен представлять запрос данные треков автора
+         * @interface artist
+         */
+        export interface artist {
+            // Название типа запроса
+            name: "artist";
+
+            // Фильтр типа запроса
+            filter: RegExp;
+
+            // Функция получения данных (не доступна в основном потоке)
+            execute: (url: string, options: { limit: number }) => Promise<Track.data[] | Error>;
+        }
+
+        /**
+         * @description Что из себя должен представлять поиск треков
+         * @interface search
+         */
+        export interface search {
+            // Название типа запроса
+            name: "search";
+
+            // Функция получения данных (не доступна в основном потоке)
+            execute: (text: string, options: { limit: number }) => Promise<Track.data[] | Error>;
+        }
+    }
+
+    /**
+     * @author SNIPPIK
+     * @description Данные класса для работы с Rest/API
+     * @interface Data
+     * @public
+     */
+    export interface Data {
+        /**
+         * @description Все загруженные платформы
+         * @protected
+         */
+        supported: API[];
+
+        /**
+         * @description Платформы без данных для авторизации
+         * @protected
+         */
+        authorization: API["name"][];
+
+        /**
+         * @description Платформы без возможности получить аудио
+         * @warn По-умолчанию запрос идет к track
+         * @protected
+         */
+        audio: API["name"][];
+
+        /**
+         * @description Заблокированные платформы
+         * @protected
+         */
+        block: API["name"][]
+    }
+
+    /**
+     * @author SNIPPIK
+     * @description Все интерфейсы для работы с системой треков
+     * @namespace Track
+     * @public
+     */
+    export namespace Track {
+        /**
+         * @description Данные трека для работы класса
+         * @interface data
+         */
+        export interface data {
+            /**
+             * @description Уникальный id трека
+             * @readonly
+             */
+            readonly id: string
+
+            /**
+             * @description Название трека
+             * @readonly
+             */
+            title: string;
+
+            /**
+             * @description Ссылка на трек, именно на трек
+             * @readonly
+             */
+            readonly url: string;
+
+            /**
+             * @description Данные об авторе трека
+             */
+            artist: artist;
+
+            /**
+             * @description База с картинками трека и автора
+             */
+            image: {
+                /**
+                 * @description Ссылка на картинку трека
+                 */
+                url: string
+            };
+
+            /**
+             * @description Данные о времени трека
+             */
+            time: {
+                /**
+                 * @description Общее время трека
+                 */
+                total: string;
+
+                /**
+                 * @description Время конвертированное в 00:00
+                 */
+                split?: string;
             }
 
-            // Скорее всего надо произвести поиск
-            return item.name === "search";
-        }) as T extends "track" ? RestAPIs.track : T extends "album" ? RestAPIs.album : T extends "playlist" ? RestAPIs.playlist : T extends "author" ? RestAPIs.author : RestAPIs.search;
-    };
-}
+            /**
+             * @description Данные об исходном файле, он же сам трек
+             */
+            audio?: string;
+        }
 
-/**
- * @author SNIPPIK
- * @description Создаем класс для итоговой платформы для взаимодействия с APIs
- * @interface RestAPIBase
- * @public
- */
-export interface RestAPIBase {
-    /**
-     * @description Имя платформы
-     * @readonly
-     * @public
-     */
-    readonly name: "YOUTUBE" | "SPOTIFY" | "VK" | "DISCORD" | "YANDEX";
+        /**
+         * @description Пример получаемого плейлиста
+         * @interface list
+         */
+        export interface list {
+            /**
+             * @description Ссылка на плейлист
+             * @readonly
+             */
+            readonly url: string;
 
-    /**
-     * @description Ссылка для работы фильтра
-     * @readonly
-     * @public
-     */
-    readonly url: string;
+            /**
+             * @description Название плейлиста
+             * @readonly
+             */
+            readonly title: string;
 
-    /**
-     * @description Цвет платформы
-     * @readonly
-     * @public
-     */
-    readonly color: number;
-}
+            /**
+             * @description Что в себе содержит плейлист
+             */
+            items: Track.data[];
 
-/**
- * @author SNIPPIK
- * @description Создаем класс для итоговой платформы для взаимодействия с APIs
- * @interface RestAPI
- * @public
- */
-export interface RestAPI extends RestAPIBase {
-    /**
-     * @description Доступ к аудио
-     * @readonly
-     * @public
-     */
-    readonly audio: boolean;
+            /**
+             * @description Картинка автора плейлиста
+             */
+            image: {
+                /**
+                 * @description Ссылка на картинку плейлиста
+                 */
+                url: string;
+            };
 
-    /**
-     * @description Доступ с авторизацией
-     * @readonly
-     * @public
-     */
-    readonly auth: boolean;
+            /**
+             * @description Данные об авторе плейлиста
+             */
+            artist?: artist;
+        }
 
-    /**
-     * @description Фильтр ссылки для работы определения
-     * @readonly
-     * @public
-     */
-    readonly filter: RegExp;
+        /**
+         * @description Данные об авторе трека или плейлиста
+         * @interface artist
+         */
+        export interface artist {
+            /**
+             * @description Ник/имя автора трека
+             * @readonly
+             */
+            title: string;
 
-    /**
-     * @description Запросы платформы
-     * @readonly
-     * @public
-     */
-    readonly requests: (RestAPIs.track | RestAPIs.playlist | RestAPIs.album | RestAPIs.author | RestAPIs.search)[];
-}
+            /**
+             * @description Ссылка на автора трека
+             * @readonly
+             */
+            readonly url: string;
 
-/**
- * @author SNIPPIK
- * @description Доступные запросы для платформ
- * @namespace RestAPIs
- * @public
- */
-export namespace RestAPIs {
-    /**
-     * @description Что из себя должен представлять запрос данные трека
-     * @interface track
-     */
-    export interface track {
-        // Название типа запроса
-        name: "track";
-
-        // Фильтр типа запроса
-        filter: RegExp;
-
-        // Функция получения данных
-        execute: (url: string, options: {audio: boolean}) => Promise<Track | Error>;
-    }
-
-    /**
-     * @description Что из себя должен представлять запрос данные плейлиста
-     * @interface playlist
-     */
-    export interface playlist {
-        // Название типа запроса
-        name: "playlist";
-
-        // Фильтр типа запроса
-        filter: RegExp;
-
-        // Функция получения данных
-        execute: (url: string, options: {limit: number}) => Promise<Track.list | Error>;
-    }
-
-    /**
-     * @description Что из себя должен представлять запрос данные альбома
-     * @interface album
-     */
-    export interface album {
-        // Название типа запроса
-        name: "album";
-
-        // Фильтр типа запроса
-        filter: RegExp;
-
-        // Функция получения данных
-        execute: (url: string, options: {limit: number}) => Promise<Track.list | Error>;
-    }
-
-    /**
-     * @description Что из себя должен представлять запрос данные треков автора
-     * @interface author
-     */
-    export interface author {
-        // Название типа запроса
-        name: "author";
-
-        // Фильтр типа запроса
-        filter: RegExp;
-
-        // Функция получения данных
-        execute: (url: string, options: {limit: number}) => Promise<Track[] | Error>;
-    }
-
-    /**
-     * @description Что из себя должен представлять поиск треков
-     * @interface search
-     */
-    export interface search {
-        // Название типа запроса
-        name: "search";
-
-        // Функция получения данных
-        execute: (text: string, options: {limit: number}) => Promise<Track[] | Error>;
+            /**
+             * @description Картинка артиста трека
+             */
+            image?: {
+                /**
+                 * @description Ссылка на картинку артиста
+                 */
+                url: string
+            };
+        }
     }
 }

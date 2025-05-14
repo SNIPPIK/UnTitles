@@ -66,31 +66,6 @@ import {db} from "@app/db";
     ],
 })
 @SlashCommandSubCommand({
-    names: {
-        "en-US": "file",
-        "ru": "файл"
-    },
-    descriptions: {
-        "en-US": "Turning on music using a file!",
-        "ru": "Включение музыки с использованием файла!"
-    },
-    type: ApplicationCommandOptionType.Subcommand,
-    options: [
-        {
-            names: {
-                "en-US": "input",
-                "ru": "файл"
-            },
-            descriptions: {
-                "en-US": "You need to attach a file!",
-                "ru": "Необходимо прикрепить файл!"
-            },
-            type: ApplicationCommandOptionType["Attachment"],
-            required: true
-        }
-    ]
-})
-@SlashCommandSubCommand({
     type: ApplicationCommandOptionType.Subcommand,
     names: {
         "en-US": "replay",
@@ -127,17 +102,16 @@ class PlayCommand extends Assign<Command> {
                 const platform = db.api.request(args[0] as any);
 
                 // Если платформа заблокирована
-                if (platform.block || platform.auth) return;
+                if (platform.block || !platform.auth) return;
 
                 // Получаем функцию запроса данных с платформы
-                const api = platform.get(args[1]);
+                const api = platform.request(args[1], {audio: false});
 
-                // Если нет поддержки такого запроса!
-                if (!api || !api.name) return;
+                if (!api.type) return;
 
                 try {
                     // Получаем данные в системе rest/API
-                    const rest = await api.execute(args[1], { limit: db.api.limits[api.name], audio: false });
+                    const rest = await api.request();
                     const items: { value: string; name: string }[] = [];
 
                     // Если получена ошибка или нет данных
@@ -164,31 +138,6 @@ class PlayCommand extends Assign<Command> {
             },
             execute: async ({message, args, type}) => {
                 switch (type) {
-                    // Если пользователь прикрепил файл
-                    case "file": {
-                        const attachment = message.options.getAttachment("input");
-
-                        // Если пользователь подсунул фальшивку
-                        if (!attachment.contentType.match(/audio/)) {
-                            return message.reply({
-                                embeds: [
-                                    {
-                                        description: locale._(message.locale, "attachment.audio.fail"),
-                                        color: Colors.Yellow
-                                    }
-                                ],
-                                flags: "Ephemeral"
-                            });
-                        }
-
-                        // Запрос к платформе
-                        const platform = db.api.request("DISCORD");
-
-                        await message.deferReply().catch(() => {});
-                        db.events.emitter.emit("rest/request", platform, message, attachment);
-                        break;
-                    }
-
                     // Если надо перезапустить проигрывание
                     case "replay": {
                         const queue = db.queues.get(message.guild.id);
@@ -267,13 +216,14 @@ class PlayCommand extends Assign<Command> {
                         }
 
                         // Если есть проблема с авторизацией на платформе
-                        else if (platform.auth) {
+                        else if (!platform.auth) {
                             db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.auth"));
                             break
                         }
 
                         await message.deferReply().catch(() => {});
                         db.events.emitter.emit("rest/request", platform, message, args[1]);
+
                         break;
                     }
                 }

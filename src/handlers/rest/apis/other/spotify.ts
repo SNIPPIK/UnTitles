@@ -1,7 +1,6 @@
-import {RestAPI, RestAPIBase} from "@handler/rest/apis";
+import type {RestServerSide} from "@handler/rest/apis";
 import {httpsClient} from "@handler/rest";
 import {locale} from "@service/locale";
-import {Track} from "@service/player";
 import {Assign} from "@utils";
 import {env} from "@app/env";
 import {db} from "@app/db";
@@ -12,13 +11,13 @@ import {db} from "@app/db";
  * @class RestSpotifyAPI
  * @public
  */
-class RestSpotifyAPI extends Assign<RestAPI> {
+class RestSpotifyAPI extends Assign<RestServerSide.API> {
     /**
      * @description Данные для создания трека с этими данными
      * @protected
      * @static
      */
-    protected static _platform: RestAPIBase = {
+    protected static _platform: RestServerSide.APIBase = {
         name: "SPOTIFY",
         color: 1420288,
         url: "open.spotify.com"
@@ -79,7 +78,7 @@ class RestSpotifyAPI extends Assign<RestAPI> {
                     execute: (url: string, options) => {
                         const ID = /track\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("track\/")?.pop();
 
-                        return new Promise<Track | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             //Если ID трека не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err("api.request.id.track"));
 
@@ -93,7 +92,7 @@ class RestSpotifyAPI extends Assign<RestAPI> {
                                 // Если включена утилита кеширования аудио
                                 else if (db.cache.audio) {
                                     // Если есть кеш аудио
-                                    if (db.cache.audio.status(cache).status === "ended") return resolve(cache);
+                                    if (db.cache.audio.status(`${RestSpotifyAPI._platform.url}/${ID}`).status === "ended") return resolve(cache);
                                 }
                             }
 
@@ -105,7 +104,7 @@ class RestSpotifyAPI extends Assign<RestAPI> {
                                 if (api instanceof Error) return resolve(api);
                                 const track = RestSpotifyAPI.track(api);
 
-                                db.cache.set(track);
+                                if (!cache) await db.cache.set(track, RestSpotifyAPI._platform.url);
 
                                 return resolve(track);
                             } catch (e) {
@@ -125,7 +124,7 @@ class RestSpotifyAPI extends Assign<RestAPI> {
                     execute: (url, {limit}) => {
                         const ID = /album\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("album\/")?.pop();
 
-                        return new Promise<Track.list | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             // Если ID альбома не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err( "api.request.id.album"));
 
@@ -156,7 +155,7 @@ class RestSpotifyAPI extends Assign<RestAPI> {
                     execute: (url, {limit}) => {
                         const ID = /playlist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("playlist\/")?.pop();
 
-                        return new Promise<Track.list | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             // Если ID плейлиста не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err( "api.request.id.playlist"));
 
@@ -181,12 +180,12 @@ class RestSpotifyAPI extends Assign<RestAPI> {
                  * @type "author"
                  */
                 {
-                    name: "author",
+                    name: "artist",
                     filter: /artist\/[0-9z]+/i,
                     execute: (url, {limit}) => {
                         const ID = /artist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("artist\/")?.pop();
 
-                        return new Promise<Track[] | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             // Если ID автора не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err( "api.request.id.author"));
 
@@ -212,7 +211,7 @@ class RestSpotifyAPI extends Assign<RestAPI> {
                 {
                     name: "search",
                     execute: (url, {limit}) => {
-                        return new Promise<Track[] | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
                                 const api: Error | any = await RestSpotifyAPI.API(`search?q=${url}&type=track&limit=${limit}`);
@@ -286,18 +285,20 @@ class RestSpotifyAPI extends Assign<RestAPI> {
      * @protected
      * @static
      */
-    protected static track = (track: json): Track => {
-        return new Track({
+    protected static track = (track: json) => {
+        return {
             id: track.id,
             title: track.name,
             url: track["external_urls"]["spotify"],
+            //@ts-ignore
             artist: {
                 title: track["artists"][0].name,
                 url: track["artists"][0]["external_urls"]["spotify"]
             },
+            //@ts-ignore
             time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
             image: track.album.images.sort((item1: any, item2: any) => item1.width > item2.width)[0],
-        }, RestSpotifyAPI._platform);
+        };
     };
 }
 

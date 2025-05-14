@@ -47,10 +47,10 @@ export class Process {
 
         // Проверяем на наличие ссылки в пути
         if (index_resource !== -1) {
-            const isLink = args.at(index_resource + 1).startsWith("http");
+            const isLink = args.at(index_resource + 1)?.startsWith("http");
 
             // Если указана ссылка
-            if (isLink) args.unshift("-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5")
+            if (isLink) args.unshift("-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5");
         }
 
         // Проверяем на наличие пропуска времени

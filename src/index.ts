@@ -1,9 +1,9 @@
 import { DiscordClient, ShardManager } from "@structures";
 import { Colors, WebhookClient } from "discord.js";
 import { isMainThread } from "node:worker_threads";
-import { db, initDatabase } from "@app/db";
 import { Logger } from "@utils";
 import { env } from "@app/env";
+import { db} from "@app/db";
 
 /**
  * @author SNIPPIK
@@ -31,8 +31,6 @@ import { env } from "@app/env";
          * @description Если требуется запустить осколок
          */
         default: {
-            initDatabase();
-
             Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
 
             // Создаем класс осколка
@@ -63,7 +61,6 @@ function initClient() {
             Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
 
             // Загружаем платформы
-            db.api.register();
             Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.platforms.supported.length} APIs Supported, ${db.api.platforms.authorization.length} APIs Unauthorized`)}`);
 
             // Загружаем события

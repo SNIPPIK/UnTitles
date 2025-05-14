@@ -1,7 +1,7 @@
 import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
+import {RestServerSide} from "@handler/rest/apis";
 import {locale} from "@service/locale";
-import {RestAPI} from "@handler/rest/apis";
 import {Assign} from "@utils";
 import {db} from "@app/db";
 
@@ -93,7 +93,7 @@ class APISCommand extends Assign<Command> {
                     case "access": {
                         if (args[0] === "block") {
                             // Если платформа уже заблокирована
-                            if (db.api.platforms.block.includes(args[1] as RestAPI["name"])) {
+                            if (db.api.platforms.block.includes(args[1] as RestServerSide.API["name"])) {
                                 return message.reply({
                                     embeds: [
                                         {
@@ -106,7 +106,7 @@ class APISCommand extends Assign<Command> {
                             }
 
                             // Блокируем платформу
-                            db.api.platforms.block.push(args[1] as RestAPI["name"]);
+                            db.api.platforms.block.push(args[1] as RestServerSide.API["name"]);
                             return message.reply({
                                 embeds: [
                                     {
@@ -119,7 +119,7 @@ class APISCommand extends Assign<Command> {
                         }
                         else if (args[0] === "unblock") {
                             // Если платформа не заблокирована
-                            if (!db.api.platforms.block.includes(args[1] as RestAPI["name"])) {
+                            if (!db.api.platforms.block.includes(args[1] as RestServerSide.API["name"])) {
                                 return message.reply({
                                     embeds: [
                                         {
@@ -132,7 +132,7 @@ class APISCommand extends Assign<Command> {
                             }
 
                             // Разблокируем платформу
-                            const index = db.api.platforms.block.indexOf(args[1] as RestAPI["name"]);
+                            const index = db.api.platforms.block.indexOf(args[1] as RestServerSide.API["name"]);
                             db.api.platforms.block.splice(index - 1, 1);
 
                             return message.reply({

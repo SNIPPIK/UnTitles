@@ -1,7 +1,6 @@
 import {AudioPlayer, Queue, Track} from "@service/player";
+import {RestClientSide} from "@handler/rest/apis";
 import {CommandInteraction} from "@structures";
-import {RestRequest} from "@handler/rest/apis";
-import {Attachment} from "discord.js";
 
 export * from "./structures/track";
 export * from "./structures/queue";
@@ -84,7 +83,7 @@ export interface QueuesEvents {
      * @param message  - Сообщение с сервера
      * @param url      - Ссылка на допустимый объект или текст для поиска
      */
-    readonly "rest/request": (api: RestRequest, message: CommandInteraction, url: string | Attachment) => void;
+    readonly "rest/request": (api: RestClientSide.Request, message: CommandInteraction, url: string | json) => void;
 
     /**
      * @description Событие при котором будут отправляться ошибки из системы API

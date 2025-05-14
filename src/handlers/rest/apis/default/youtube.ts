@@ -1,11 +1,11 @@
-import {RestAPIBase, RestAPI} from "@handler/rest/apis";
-import {Worker} from "node:worker_threads";
+import {Youtube_decoder_native} from "@service/worker/crypto/youtube";
+import type {RestServerSide} from "@handler/rest/apis";
 import {httpsClient} from "@handler/rest";
 import {locale} from "@service/locale";
 import {Track} from "@service/player";
 import {Assign} from "@utils";
-import path from "node:path";
 import {db} from "@app/db";
+import fs from "node:fs";
 
 /**
  * @author SNIPPIK
@@ -13,13 +13,13 @@ import {db} from "@app/db";
  * @class RestYouTubeAPI
  * @public
  */
-class RestYouTubeAPI extends Assign<RestAPI> {
+class RestYouTubeAPI extends Assign<RestServerSide.API> {
     /**
      * @description Данные для создания трека с этими данными
      * @protected
      * @static
      */
-    protected static _platform: RestAPIBase = {
+    protected static _platform: RestServerSide.APIBase = {
         name: "YOUTUBE",
         url: "youtube.com",
         color: 16711680
@@ -31,7 +31,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
      * @public
      */
     public constructor() {
-        super({ ...RestYouTubeAPI._platform,
+        super({...RestYouTubeAPI._platform,
             audio: true,
             auth: true,
             filter: /https?:\/\/(?:youtu\.be|(?:(?:www|m|music|gaming)\.)?youtube\.com)/gi,
@@ -48,7 +48,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                         const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/gi).pop();
                         let artist = null;
 
-                        return new Promise<Track.list | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             try {
                             // Если ID плейлиста не удалось извлечь из ссылки
                             if (!ID) return resolve(locale.err("api.request.id.playlist"));
@@ -105,7 +105,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                     execute: (url: string, options) => {
                         const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
 
-                        return new Promise<Track | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             try {
                                 // Если ID видео не удалось извлечь из ссылки
                                 if (!ID) return resolve(locale.err("api.request.id.track"));
@@ -119,7 +119,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                     // Если включена утилита кеширования аудио
                                     else if (db.cache.audio) {
                                         // Если есть кеш аудио
-                                        if (db.cache.audio.status(cache).status === "ended") return resolve(cache);
+                                        if (db.cache.audio.status(`${RestYouTubeAPI._platform.url}/${ID}`).status === "ended") return resolve(cache);
                                     }
                                 }
 
@@ -132,14 +132,15 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                 const track = RestYouTubeAPI.track(api["videoDetails"]);
 
                                 // Сохраняем кеш в системе
-                                if (!cache) db.cache.set(track);
+                                if (!cache) await db.cache.set(track, RestYouTubeAPI._platform.url);
+
 
                                 // Если указано получение аудио
                                 if (options.audio) {
                                     // Если включена утилита кеширования
                                     if (db.cache.audio) {
                                         // Если есть кеш аудио
-                                        if (db.cache.audio.status(track).status === "ended") return resolve(track);
+                                        if (db.cache.audio.status(`${RestYouTubeAPI._platform.url}/${ID}`).status === "ended") return resolve(track);
                                     }
 
                                     const data = api["streamingData"];
@@ -151,7 +152,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                     const format = await RestYouTubeAPI.extractFormat(data, api.html, url);
 
                                     // Если есть расшифровка ссылки видео
-                                    if (format) track.link = format["url"];
+                                    if (format) track.audio = format["url"];
                                 }
 
                                 return resolve(track);
@@ -164,13 +165,13 @@ class RestYouTubeAPI extends Assign<RestAPI> {
 
                 /**
                  * @description Запрос данных треков артиста
-                 * @type "author"
+                 * @type "artist"
                  */
                 {
-                    name: "author",
+                    name: "artist",
                     filter: /\/(channel)?(@)/gi,
                     execute: (url: string, {limit}) => {
-                        return new Promise<Track[] | Error>(async (resolve) => {
+                        return new Promise(async (resolve) => {
                             try {
                                 let ID: string;
 
@@ -212,8 +213,8 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                  */
                 {
                     name: "search",
-                    execute: (url: string, {limit}): Promise<Track[] | Error> => {
-                        return new Promise<Track[] | Error>(async (resolve) => {
+                    execute: (url: string, {limit}) => {
+                        return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
                                 const details = await RestYouTubeAPI.API(`https://www.youtube.com/results?search_query=${url.split(" ").join("+")}`);
@@ -228,7 +229,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                                 if (vanilla_videos?.length === 0 || !vanilla_videos) return resolve(locale.err("api.request.fail"));
 
                                 let filtered_ = vanilla_videos?.filter((video: json) => video && video?.["videoRenderer"] && video?.["videoRenderer"]?.["videoId"])?.splice(0, limit);
-                                let videos: Track[] = filtered_.map(({ videoRenderer }: json) => RestYouTubeAPI.track(videoRenderer));
+                                let videos: Track.data[] = filtered_.map(({ videoRenderer }: json) => RestYouTubeAPI.track(videoRenderer));
 
                                 return resolve(videos);
                             } catch (e) {
@@ -293,45 +294,18 @@ class RestYouTubeAPI extends Assign<RestAPI> {
      * @protected
      * @static
      */
-    protected static extractFormat = (data: json, html: string, url: string) => {
-        return new Promise((resolve) => {
-            // Создаем 2 поток
-            const worker: Worker = new Worker(path.resolve("src/services/worker/crypto/youtube.js"), {
-                execArgv: ["-r", "tsconfig-paths/register"],
-                workerData: null
-            });
+    protected static extractFormat = async (data: json, html: string, url: string) => {
+        // Если установлен wrapper
+        if (fs.existsSync("node_modules/ytdlp-nodejs")) {
+            const {YtDlp} = require("ytdlp-nodejs");
+            const ytdlp = new YtDlp();
 
-            // Отправляем сообщение во 2 поток
-            worker.postMessage({formats: data["formats"], html, url});
+            const result = await ytdlp.getInfoAsync(url);
+            return (result.requested_formats).find((format) => !format.fps)
+        }
 
-            // Слушаем ответ от 2 потока
-            worker.once("message", (data) => {
-                // Через время убиваем поток если он не нужен
-                setImmediate(() => {
-                    setTimeout(async () => {
-                        await worker.terminate();
-                        worker.ref();
-                    }, 5e3);
-                });
-
-                return resolve(data);
-            });
-
-            // Если при создании получена ошибка
-            worker.once("error", (err) => {
-                // Через время убиваем поток если он не нужен
-                setImmediate(() => {
-                    setTimeout(async () => {
-                        await worker.terminate();
-                        worker.ref();
-                    }, 5e3);
-                });
-
-                console.error(err);
-                return resolve(err);
-            });
-            return;
-        });
+        const formats = await Youtube_decoder_native.decipherFormats(data["formats"], html);
+        return formats[0];
     };
 
     /**
@@ -400,7 +374,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
      */
     protected static track = (track: json) => {
         try {
-            return new Track({
+            return {
                 id: track["videoId"],
                 url: `https://youtu.be/${track["videoId"]}`,
                 title: track.title?.["runs"][0]?.text ?? track.title,
@@ -413,9 +387,9 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                     url: `https://i.ytimg.com/vi/${track["videoId"]}/maxresdefault.jpg`
                 },
                 audio: track?.format?.url || undefined
-            }, RestYouTubeAPI._platform);
+            };
         } catch {
-            return new Track({
+            return {
                 id: track["videoId"],
                 artist: {
                     title: track.author,
@@ -430,7 +404,7 @@ class RestYouTubeAPI extends Assign<RestAPI> {
                     url: `https://i.ytimg.com/vi/${track["videoId"]}/maxresdefault.jpg`
                 },
                 audio: track?.format?.url || undefined
-            }, RestYouTubeAPI._platform)
+            }
         }
     };
 }

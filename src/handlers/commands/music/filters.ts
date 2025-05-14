@@ -1,7 +1,7 @@
 import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import filters from "@service/player/filters.json"
-import {AudioFilter} from "@service/player";
+import type {AudioFilter} from "@service/player";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
 import {db} from "@app/db";

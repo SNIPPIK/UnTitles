@@ -28,56 +28,58 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
             name: Events.VoiceStateUpdate,
             type: "client",
             once: false,
-            execute: async (oldState, newState) => {
-                const guild = oldState.guild || newState.guild;
-                const voice = db.voice.get(guild.id);
-                const queue = db.queues.get(guild.id);
-                const temp = temple_db.get(guild.id);
+            execute: (oldState, newState) => {
+                setImmediate(() => {
+                    const guild = oldState.guild || newState.guild;
+                    const voice = db.voice.get(guild.id);
+                    const queue = db.queues.get(guild.id);
+                    const temp = temple_db.get(guild.id);
 
-                // Если нет гс и очереди, то не продолжаем
-                if (!voice && !queue) return;
+                    // Если нет гс и очереди, то не продолжаем
+                    if (!voice && !queue) return;
 
-                // Если бота нет в голосовом канале, но есть очередь
-                else if (!voice && queue) db.queues.remove(guild.id);
+                    // Если бота нет в голосовом канале, но есть очередь
+                    else if (!voice && queue) db.queues.remove(guild.id);
 
-                // Если есть гс, но нет очереди
-                else if (voice && !queue) {
-                    const members = guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
+                    // Если есть гс, но нет очереди
+                    else if (voice && !queue) {
+                        const members = guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
 
-                    // Если есть пользователи
-                    if (members == 0) db.voice.remove(guild.id);
-                }
-
-                // Если есть гс и очередь
-                else {
-                    const members = guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
-
-                    // Если есть пользователи
-                    if (members > 0) {
-                        // Если есть таймер для удаления очереди
-                        if (temp) {
-                            clearTimeout(temp);
-                            temple_db.delete(guild.id);
-
-                            // Снимаем плеер с паузы, если она есть!
-                            if (queue.player.status === "player/pause") queue.player.resume();
-                        }
+                        // Если есть пользователи
+                        if (members == 0) db.voice.remove(guild.id);
                     }
 
-                    // Если нет пользователей
+                    // Если есть гс и очередь
                     else {
-                        // Если нет таймера для удаления очереди
-                        if (!temp) {
-                            // Ставим плеер на паузу
-                            if (queue.player.status === "player/playing") queue.player.pause();
+                        const members = guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
 
-                            temple_db.set(guild.id, setTimeout(() => {
-                                if (queue) db.queues.remove(guild.id);
-                                if (voice) db.voice.remove(guild.id);
-                            }, timeout * 1e3));
+                        // Если есть пользователи
+                        if (members > 0) {
+                            // Если есть таймер для удаления очереди
+                            if (temp) {
+                                clearTimeout(temp);
+                                temple_db.delete(guild.id);
+
+                                // Снимаем плеер с паузы, если она есть!
+                                if (queue.player.status === "player/pause") queue.player.resume();
+                            }
+                        }
+
+                        // Если нет пользователей
+                        else {
+                            // Если нет таймера для удаления очереди
+                            if (!temp) {
+                                // Ставим плеер на паузу
+                                if (queue.player.status === "player/playing") queue.player.pause();
+
+                                temple_db.set(guild.id, setTimeout(() => {
+                                    if (queue) db.queues.remove(guild.id);
+                                    if (voice) db.voice.remove(guild.id);
+                                }, timeout * 1e3));
+                            }
                         }
                     }
-                }
+                });
             }
         });
     };

@@ -1,4 +1,4 @@
-import {RestAPI} from "@handler/rest/apis";
+import {RestServerSide} from "@handler/rest/apis";
 import {env} from "@app/env";
 
 /**
@@ -97,7 +97,7 @@ interface PlayerProgressInput {
      * @description Название платформы
      * @readonly
      */
-    platform: RestAPI["name"];
+    platform: RestServerSide.API["name"];
 
     /**
      * @description Данные о времени трека

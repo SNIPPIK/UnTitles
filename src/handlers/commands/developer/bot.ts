@@ -49,14 +49,6 @@ import {db} from "@app/db";
             }
         },
         {
-            value: "apis",
-            name: "apis",
-            nameLocalizations: {
-                "en-US": "apis",
-                "ru": "платформы"
-            }
-        },
-        {
             value: "events",
             name: "events",
             nameLocalizations: {
@@ -99,21 +91,6 @@ class WorkBotCommand extends Assign<Command> {
                             embeds: [
                                 {
                                     description: locale._(message.locale, `events.reload`, [db.events.size]),
-                                    color: Colors.Green
-                                }
-                            ],
-                            flags: "Ephemeral"
-                        });
-                    }
-
-                    // Перезагрузка всех платформ
-                    case "apis": {
-                        db.api.register();
-
-                        return message.reply({
-                            embeds: [
-                                {
-                                    description: locale._(message.locale, `apis.reload`, [db.api.size]),
                                     color: Colors.Green
                                 }
                             ],

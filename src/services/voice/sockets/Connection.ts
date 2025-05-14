@@ -150,6 +150,7 @@ export class VoiceConnection {
                 if (packet.endpoint) this.configureSocket();
                 else if (this.status !== VoiceConnectionStatus.Destroyed) this.state.status = VoiceConnectionStatus.Disconnected;
             },
+
             /**
              * @description Регистрирует пакет `VOICE_STATE_UPDATE` для голосового соединения. Самое главное, он сохраняет идентификатор
              * канала, к которому подключен клиент.
@@ -215,13 +216,15 @@ export class VoiceConnection {
         }
 
         // Записываем новое подключение WebSocket и SocketUDP
-        this.network = new VoiceSocket({
-            sessionId: state.session_id,
-            endpoint: server.endpoint,
-            serverId: server["guild_id"] ?? server["guildId"],
-            userId: state.user_id,
-            token: server.token
-        });
+        this.network = new VoiceSocket(
+            {
+                sessionId: state.session_id,
+                endpoint: server.endpoint,
+                serverId: server["guild_id"] ?? server["guildId"],
+                userId: state.user_id,
+                token: server.token
+            }
+        );
 
         // Создаем Socket подключение к discord
         this.status = VoiceConnectionStatus.Connecting;

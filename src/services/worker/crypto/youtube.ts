@@ -1,31 +1,6 @@
-import {isMainThread, parentPort} from "node:worker_threads";
 import {httpsClient} from "@handler/rest";
 import querystring from "node:querystring";
 import {Script} from "node:vm";
-import fs from "node:fs";
-
-/**
- * @author SNIPPIK
- * @description Если запускается фрагмент кода в другом процессе
- */
-if (!parentPort || isMainThread) throw new Error('Worker must be run via worker_threads');
-
-// Разовое событие
-parentPort.once("message", async (message) => {
-    // Если установлен wrapper
-    if (fs.existsSync("node_modules/ytdlp-nodejs")) {
-        const {YtDlp} = require("ytdlp-nodejs");
-        const ytdlp = new YtDlp();
-
-        const result = await ytdlp.getInfoAsync(message.url);
-        const formats = (result.requested_formats as YouTubeFormat[]).find((format) => !format.fps);
-
-        return parentPort.postMessage(formats);
-    }
-
-    const formats = await Youtube_decoder_native.decipherFormats(message.formats, message.html);
-    return parentPort.postMessage(formats[0]);
-});
 
 /**
  * @author SNIPPIK
@@ -67,7 +42,7 @@ const extractTceFunc = (body: string) => {
  * @class Youtube_decoder
  * @private
  */
-class Youtube_decoder_native {
+export class Youtube_decoder_native {
     /**
      * @author SNIPPIK
      * @description Функции для расшифровки

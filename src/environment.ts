@@ -1,5 +1,3 @@
-import {Logger} from "./utils";
-
 /**
  * @author SNIPPIK
  * @description Взаимодействуем с environment variables
@@ -73,7 +71,6 @@ export var env: Environment;
 
     try {
         env = new Environment();
-        Logger.log("LOG", `[Core] has ${Logger.color(36, `initialize env`)}`);
     } catch (err) {
         throw new Error(`Fail init environment: ${err}`);
     }

@@ -213,7 +213,7 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
      * @readonly
      * @private
      */
-    protected _stepCycle = () => {
+    protected _stepCycle = async () => {
         // Если нет объектов
         if (this.array?.length === 0) {
             this.time = 0;
@@ -228,17 +228,10 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
             if (!this.options.filter(item)) continue;
 
             try {
-                this.options.execute(item)
-                    // Если ответ был получен
-                    .then((bool) => {
-                        if (!bool) this.remove(item);
-                    })
+                const bool  = await this.options.execute(item);
 
-                    // Если произошла ошибка при получении ответа
-                    .catch((error) => {
-                        this.remove(item);
-                        console.log(error);
-                    });
+                // Если ответ был получен
+                if (!bool) this.remove(item);
             } catch (error) {
                 this.remove(item);
                 console.log(error);

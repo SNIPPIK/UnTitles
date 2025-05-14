@@ -1,7 +1,7 @@
 import {locale} from "@service/locale";
 import {Event} from "@handler/events";
-import {Track} from "@service/player";
 import {Logger, Assign} from "@utils";
+import {Track} from "@service/player";
 import {Colors} from "discord.js";
 import {db} from "@app/db";
 
@@ -20,11 +20,11 @@ class rest_request extends Assign<Event<"rest/request">> {
             once: false,
             execute: async (platform, message, url) => {
                 // Получаем функцию запроса данных с платформы
-                const api = platform.get(typeof url === "string" ? url : url.url);
+                const api = platform.request(url);
                 const timeout = platform.audio ? 2e3 : 0;
 
                 // Если нет поддержки такого запроса!
-                if (!api || !api.name) {
+                if (!api.type) {
                     db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.support"));
                     return;
                 }
@@ -34,7 +34,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                 const followUpPromise = message.followUp({
                     flags: "Ephemeral",
                     embeds: [{
-                        title: `${platform.platform}.${api.name}`,
+                        title: `${platform.platform}.${api.type}`,
                         description: timeout ? locale._(message.locale, "api.platform.request.long", [db.images.loading, platform.platform]) : locale._(message.locale, "api.platform.request", [db.images.loading]),
                         color: platform.color
                     }]
@@ -48,10 +48,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                 // Получаем данные в системе rest/API
                 try {
                     // Дожидаемся выполнения запроса
-                    let rest = await Promise.race([
-                        api.execute(url as string, { limit: db.api.limits[api.name], audio: true }),
-                        timeoutPromise
-                    ]) as Track.list | Track[] | Track | Error;
+                    let rest = await Promise.race([api.request(), timeoutPromise]) as Track.list | Track[] | Track | Error;
 
 
                     // Удаляем сообщение после выполнения запроса
@@ -81,10 +78,10 @@ class rest_request extends Assign<Event<"rest/request">> {
                     }
 
                     // Добавляем в очередь
-                    db.queues.create(message, rest as any);
+                    db.queues.create(message, rest);
                 } catch (err) {
                     console.error(err);
-                    db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.name}**\\n**❯** **${err}**`);
+                    db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.type}**\\n**❯** **${err}**`);
                 }
             }
         });

@@ -48,7 +48,7 @@ export class CacheUtility {
         /**
          * @description Кешированные треки
          */
-        tracks: !this.inFile ? new Map<string, Track>() : null as Map<string, Track>,
+        tracks: !this.inFile ? new Map<string, Track.data>() : null as Map<string, Track.data>,
 
         /**
          * @description Класс кеширования аудио файлов
@@ -80,10 +80,11 @@ export class CacheUtility {
     /**
      * @description Сохраняем данные в класс
      * @param track - Кешируемый трек
+     * @param api - Ссылка на платформу
      */
-    public set = async (track: Track) => {
+    public set = async (track: Track.data, api: string) => {
         if (this.inFile) {
-            const filePath = path.join(this.dirname, "Data", track.api.url, `${track.ID}.json`);
+            const filePath = path.join(this.dirname, "Data", api, `${track.id}.json`);
 
             if (!fs.existsSync(filePath)) {
                 try {
@@ -92,11 +93,9 @@ export class CacheUtility {
 
                     const data = {
                         track: {
-                            ...track["_track"],
-                            time: track["_duration"],
+                            ...track,
                             audio: null
-                        },
-                        api: track["_api"]
+                        }
                     };
 
                     // Записываем данные в файл
@@ -106,12 +105,12 @@ export class CacheUtility {
                 }
             }
         } else {
-            const song = this.data.tracks.get(track.ID);
+            const song = this.data.tracks.get(track.id);
 
             // Если уже сохранен трек
             if (song) return;
 
-            this.data.tracks.set(track.ID, track);
+            this.data.tracks.set(track.id, track);
         }
     };
 
@@ -119,7 +118,7 @@ export class CacheUtility {
      * @description Выдаем данные из класса
      * @param ID - Идентификатор трека
      */
-    public get = (ID: string): Track | null => {
+    public get = (ID: string): Track.data | null => {
         if (this.inFile) {
             // Если есть трек в кеше
             if (fs.existsSync(`${this.dirname}/Data/${ID}.json`)) {
@@ -128,7 +127,7 @@ export class CacheUtility {
                     const json = JSON.parse(fs.readFileSync(`${this.dirname}/Data/${ID}.json`, "utf8"));
 
                     // Если трек был найден среди файлов
-                    if (json) return new Track(json.track, json.api);
+                    if (json) return json.track;
                 } catch {
                     return null;
                 }
@@ -220,13 +219,25 @@ class CacheAudio extends AsyncCycle<Track> {
      * @description Получаем статус скачивания и путь до файла
      * @param track
      */
-    public status = (track: Track): { status: "not-ended" | "ended" | "download", path: string } => {
-        const file = `${this.cache_dir}/Audio/${track.api.url}/${track.ID}`;
+    public status = (track: Track | string): { status: "not-ended" | "ended" | "download", path: string } => {
+        let file: string;
 
-        // Если трека нет в очереди, значит он есть
-        if (!this.has(track)) {
+        if (track instanceof Track) {
+            file = `${this.cache_dir}/Audio/${track.api.url}/${track.ID}`;
+
+            // Если трека нет в очереди, значит он есть
+            if (!this.has(track)) {
+                // Если файл все таки есть
+                if (fs.existsSync(`${file}.opus`)) return {status: "ended", path: `${file}.opus`};
+            }
+
+            // Выдаем что ничего нет
+            return { status: "not-ended", path: file };
+        } else {
+            file = `${this.cache_dir}/Audio/${track}`;
+
             // Если файл все таки есть
-            if (fs.existsSync(`${file}.opus`)) return { status: "ended", path: `${file}.opus`};
+            if (fs.existsSync(`${file}.opus`)) return {status: "ended", path: `${file}.opus`};
         }
 
         // Выдаем что ничего нет

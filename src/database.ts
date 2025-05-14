@@ -1,12 +1,13 @@
 import {VoiceConnection, VoiceConnectionStatus} from "@service/voice";
 import { DiscordGatewayAdapterCreator } from "@structures";
 import { CacheUtility } from "@service/player/utils/cache";
+import { isMainThread } from "node:worker_threads";
 import { RestObject } from "@handler/rest/apis";
 import { Commands } from "@handler/commands";
-import { Logger, Collection } from "@utils";
 import { Buttons } from "@handler/modals";
 import { Events } from "@handler/events";
 import { Queues } from "@service/player";
+import { Collection } from "@utils";
 import { env } from "@app/env";
 
 /**
@@ -22,7 +23,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly api = new RestObject();
+    public readonly api = isMainThread ? new RestObject() : null;
 
     /**
      * @author SNIPPIK
@@ -30,7 +31,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly events = new Events();
+    public readonly events = isMainThread ? new Events() : null;
 
     /**
      * @author SNIPPIK
@@ -39,7 +40,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly queues = new Queues();
+    public readonly queues = isMainThread ? new Queues() : null;
 
     /**
      * @author SNIPPIK
@@ -47,7 +48,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly voice = new class db_voice_system extends Collection<VoiceConnection> {
+    public readonly voice = isMainThread ? new class db_voice_system extends Collection<VoiceConnection> {
         /**
          * @description Подключение к голосовому каналу
          * @param config - Данные для подключения
@@ -75,7 +76,7 @@ export class Database {
             // Отдаем голосовое подключение
             return connection;
         };
-    };
+    } : null;
 
     /**
      * @author SNIPPIK
@@ -92,7 +93,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly buttons = new Buttons();
+    public readonly buttons = isMainThread ? new Buttons() : null;
 
     /**
      * @author SNIPPIK
@@ -100,7 +101,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly commands = new Commands();
+    public readonly commands = isMainThread ? new Commands() : null;
 
     /**
      * @description Для управления белым списком пользователей
@@ -162,8 +163,9 @@ export function initDatabase() {
 
     try {
         db = new Database();
-        Logger.log("LOG", `[Core] has ${Logger.color(36, `initialize db`)}`);
     } catch (err) {
         throw new Error(`Fail init database: ${err}`);
     }
 }
+
+initDatabase();
