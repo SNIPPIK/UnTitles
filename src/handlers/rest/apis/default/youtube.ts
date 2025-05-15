@@ -134,7 +134,6 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                                 // Сохраняем кеш в системе
                                 if (!cache) await db.cache.set(track, RestYouTubeAPI._platform.url);
 
-
                                 // Если указано получение аудио
                                 if (options.audio) {
                                     // Если включена утилита кеширования

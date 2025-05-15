@@ -97,7 +97,7 @@ export class RestObject {
                 }
 
                 else if (message.status === "error") {
-                    return resolve(Error(message.result as any));
+                    return resolve(new Error(message.result as any));
                 }
             };
 
@@ -145,7 +145,7 @@ export class RestObject {
             else if (tracks.length === 0) return new Error(`Fail searching tracks`);
 
             // Получаем исходник трека
-            const song = await platform.request<"track">(tracks[0]?.url).request();
+            const song = await platform.request<"track">(tracks[0]?.url, {audio: true}).request();
             if (song instanceof Error) return song;
             else if (!song.link) return Error("Fail getting link");
 
@@ -243,9 +243,6 @@ export namespace RestClientSide {
                             return null;
                         }
                     }
-
-                    // Если указано что-то другое
-                    else if (payload["url"]) return item.name === "track";
 
                     // Скорее всего надо произвести поиск
                     return item.name === "search";

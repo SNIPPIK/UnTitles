@@ -101,7 +101,7 @@ class RestRequest {
             if (item.name === type) return item;
 
             // Если указана ссылка
-            else if (type.startsWith("http")) {
+            else if (typeof type === "string" && type.startsWith("http")) {
                 try {
                     if (item["filter"].exec(type) || type.match(item["filter"])) return item;
                 } catch {
@@ -127,7 +127,7 @@ if (!isMainThread) {
                 const {platform, payload, options} = message;
 
                 const thePlatform = ServerRest.request(platform);
-                const rest = thePlatform.get(typeof payload === "string" ? payload : payload?.url);
+                const rest = thePlatform.get(payload);
                 const result = await rest.execute(payload, {
                     audio: options?.audio !== undefined ? options.audio : true,
                     limit: ServerRest.limits[rest.name]
