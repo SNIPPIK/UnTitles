@@ -60,14 +60,14 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
             const path = options.events.path ? options.input[options.events.path] : options.input;
 
             // Запускаем прослушивание события
-            path["once"](event, async () => {
+            path["once"](event, () => {
                 if (event === "error") this.emit("error", new Error("AudioResource get error for create stream"));
                 options.events.destroy_callback(options.input);
             });
         }
 
         // Разовая функция для удаления потока
-        this.once("close", async () => {
+        this.once("close", () => {
             options.events.destroy_callback(options.input);
         });
 
@@ -159,7 +159,11 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
                 // Указываем формат аудио (ogg/opus)
                 "-c:a", "libopus", "-f", "opus",
-                "pipe:"
+
+                "-ar", "48000",
+                "-ac", "2",
+
+                "pipe:1"
             ])
         };
     };

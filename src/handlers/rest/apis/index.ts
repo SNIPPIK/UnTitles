@@ -140,7 +140,7 @@ export class RestObject {
             const platform = this.request(this.platforms.supported.find(plt => plt.requests.length >= 2 && plt.audio).name);
 
             // Ищем трек по имени артиста и названия
-            const tracks = await platform.request<"search">(`${track.artist.title} - ${track.name}`).request();
+            const tracks = await platform.request<"search">(`${track.name} ${track.artist.title}`).request();
             if (tracks instanceof Error) return tracks;
             else if (tracks.length === 0) return new Error(`Fail searching tracks`);
 

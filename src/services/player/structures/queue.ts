@@ -605,7 +605,13 @@ class AudioCycles {
             super({
                 duration: 20e3,
                 custom: {
-                    remove: (item) => { item.delete(); },
+                    remove: async (item) => {
+                        try {
+                            await item.delete();
+                        } catch {
+                            Logger.log("ERROR", `Failed delete message in cycle!`);
+                        }
+                    },
                     push: (item) => {
                         const old = this.array.find(msg => msg.guild.id === item.guild.id);
                         // Удаляем прошлое сообщение
@@ -613,7 +619,7 @@ class AudioCycles {
                     }
                 },
                 filter: (message) => message["editable"],
-                execute: (message) => {
+                execute: async (message) => {
                     const queue = db.queues.get(message.guild.id);
 
                     // Если нет очереди
@@ -621,11 +627,12 @@ class AudioCycles {
 
                     // Если есть поток в плеере
                     else if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
-                        // Обновляем сообщение о текущем треке
-                        message.edit({ embeds: [queue.componentEmbed], components: queue.components }).catch(() => {
+                        try {
+                            await message.edit({embeds: [queue.componentEmbed], components: queue.components});
+                        } catch {
                             // Если при обновлении произошла ошибка
                             this.remove(message);
-                        });
+                        }
                     }
                 }
             });

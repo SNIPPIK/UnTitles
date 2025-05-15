@@ -103,6 +103,9 @@ export class DiscordClient extends Client {
 
         // Если нет статусов
         if (!array.length) return;
+        else {
+            Logger.log("LOG", `[Core/${this.shardID}] Success loading custom ${Logger.color(34, `${array.length} statuses`)}`);
+        }
 
         // Интервал для обновления статуса
         setInterval(async () => {
@@ -156,7 +159,6 @@ export class DiscordClient extends Client {
 
             // Добавляем пользовательские статусы
             statuses.push(...envPresents);
-            Logger.log("LOG", `[Core/${this.shardID}] Success loading custom ${Logger.color(34, `${envPresents.length} statuses`)}`);
         } catch (e) {
             Logger.log("ERROR", `[Core/${this.shardID}] Failed to parse env statuses. ${e}`);
         }

@@ -8,7 +8,6 @@ import {
     Events
 } from "discord.js"
 import {QueueMessage} from "@service/player/structures/message";
-import filters from "@service/player/filters.json"
 import {CommandInteraction} from "@structures";
 import {Command} from "@handler/commands";
 import {locale} from "@service/locale";
@@ -386,8 +385,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             if (!queue) return;
 
             const filter = ctx["values"][0] as string;
-            const Filter = filters.find((item) => item.name === filter) ;
-            const findFilter = Filter && queue.player.filters.enabled.length > 0 ? queue.player.filters.enabled.find((fl) => fl.name === Filter.name) : false;
+            const findFilter = queue.player.filters.enabled.find((fl) => fl.name === filter);
 
             const command = db.commands.get("filter");
 

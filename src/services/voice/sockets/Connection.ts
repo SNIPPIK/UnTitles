@@ -51,10 +51,10 @@ export class VoiceConnection {
             socket
                 .once("close", this.VoiceSocketClose)
                 .on("stateChange", this.VoiceSocketStateChange);
-
-            // Создаем новое подключение
-            this.state.socket = socket;
         }
+
+        // Создаем новое подключение
+        this.state.socket = socket;
     };
 
     /**
@@ -93,7 +93,7 @@ export class VoiceConnection {
 
     /**
      * @description Отключает голосовое соединение, предоставляя возможность повторного подключения позже.
-     * @returns ``true`, если соединение было успешно отключено
+     * @returns `true`, если соединение было успешно отключено
      * @public
      */
     public get disconnect () {
@@ -125,7 +125,9 @@ export class VoiceConnection {
         }
 
         // Если что-то не так с подключением при условии, что оно не уничтожено
-        else if (this.state.status !== VoiceConnectionStatus.Destroyed && this.state.status !== VoiceConnectionStatus.Disconnected) {
+        else if (this.state.status !== VoiceConnectionStatus.Destroyed) {
+            if (!this.network) this.configureSocket();
+
             // Если голосовое подключение не готово
             this.rejoin();
         }

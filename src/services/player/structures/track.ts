@@ -229,26 +229,33 @@ export class Track extends BaseTrack {
      * @public
      */
     public get lyrics(): Promise<string | Error> {
-        return new Promise((resolve) => {
+        return new Promise(async (resolve) => {
             // Выдаем повторно текст песни
             if (this._lyrics) return resolve(this._lyrics);
 
-            new httpsClient({
-                url: `https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.name.split(" ").join("+")}\``,
-                userAgent: "UnTitles 0.3.0, Music bot, github.com/SNIPPIK/UnTitles"
-            }).send().then((item) => {
-                // Если получаем вместо данных ошибку
-                if (item instanceof Error) return resolve(item);
+            // Если ответ не был получен от сервера
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Timeout server request")), 10e3)
+            );
 
-                // Если нет текста песни
-                else if (item.statusCode === 404) return resolve(undefined);
+            let api = await Promise.race([await new httpsClient(
+                {
+                    url: `https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.name.split(" ").join("+")}\``,
+                    userAgent: "UnTitles 0.3.0, Music bot, github.com/SNIPPIK/UnTitles"
+                }
+            ).send(), timeoutPromise]) as json | Error;
 
-                // Сохраняем текст песни
-                this._lyrics = item?.syncedLyrics || item?.plainLyrics;
+            // Если получаем вместо данных ошибку
+            if (api instanceof Error) return resolve(api);
 
-                // Выдаем впервые текст песни
-                return resolve(item?.syncedLyrics || item?.plainLyrics);
-            });
+            // Если нет текста песни
+            else if (api.statusCode === 404) return resolve(undefined);
+
+            // Сохраняем текст песни
+            this._lyrics = api?.syncedLyrics || api?.plainLyrics;
+
+            // Выдаем впервые текст песни
+            return resolve(api?.syncedLyrics || api?.plainLyrics);
         });
     };
 

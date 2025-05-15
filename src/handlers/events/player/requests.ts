@@ -21,7 +21,7 @@ class rest_request extends Assign<Event<"rest/request">> {
             execute: async (platform, message, url) => {
                 // Получаем функцию запроса данных с платформы
                 const api = platform.request(url);
-                const timeout = platform.audio ? 2e3 : 0;
+                const timeout = !platform.audio ? 2e3 : 0;
 
                 // Если нет поддержки такого запроса!
                 if (!api.type) {
@@ -40,16 +40,15 @@ class rest_request extends Assign<Event<"rest/request">> {
                     }]
                 });
 
-                // Если ответ не был получен от сервера
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error(locale._(message.locale, "api.platform.timeout"))), 15e3)
-                );
-
                 // Получаем данные в системе rest/API
                 try {
+                    // Если ответ не был получен от сервера
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error(locale._(message.locale, "api.platform.timeout"))), 15e3)
+                    );
+
                     // Дожидаемся выполнения запроса
                     let rest = await Promise.race([api.request(), timeoutPromise]) as Track.list | Track[] | Track | Error;
-
 
                     // Удаляем сообщение после выполнения запроса
                     await followUpPromise.then(msg => setTimeout(() => msg.delete().catch(() => {}), timeout));
@@ -104,13 +103,15 @@ class rest_error extends Assign<Event<"rest/error">> {
             execute: async (message, error) => {
                 Logger.log("ERROR", `[Rest/API] ${error}`);
 
-                return message.channel.send({
+                const msg = await message.channel.send({
                     embeds: [{
                         title: locale._(message.locale, "api.error"),
                         description: error,
                         color: Colors.DarkRed
                     }]
-                }).then((msg) => setTimeout(msg.delete, 15e3));
+                });
+
+                if (msg) setTimeout(msg.delete, 15e3)
             }
         });
     };

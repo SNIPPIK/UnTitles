@@ -182,7 +182,7 @@ export class AudioPlayer extends BasePlayer {
          * @description Событие смены позиции плеера
          * @private
          */
-        this.on("player/wait", async (player) => {
+        this.on("player/wait", (player) => {
             const repeat = player.tracks.repeat;
             const current = player.tracks.position;
 
@@ -215,7 +215,7 @@ export class AudioPlayer extends BasePlayer {
          * @description Событие получения ошибки плеера
          * @private
          */
-        this.on("player/error", async (player, error, skip) => {
+        this.on("player/error", (player, error, skip) => {
             const queue = db.queues.get(player.id);
             const current = player.tracks.position;
 

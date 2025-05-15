@@ -37,7 +37,7 @@ export class OpusEncoder extends Writable {
      * @description Функция ищущая актуальный для взятия фрагмент
      * @private
      */
-    private parseAvailablePages() {
+    private parseAvailablePages = () => {
         let offset = 0;
 
         while (offset + 27 <= this._buffer.length) {
@@ -77,7 +77,7 @@ export class OpusEncoder extends Writable {
      * @param payload - Данные для корректного поиска сегмента
      * @private
      */
-    private extractPackets(segmentTable: Buffer, payload: Buffer) {
+    private extractPackets = (segmentTable: Buffer, payload: Buffer) => {
         let payloadOffset = 0;
         let currentPacket: Buffer[] = [];
 

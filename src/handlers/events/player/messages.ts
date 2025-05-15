@@ -20,34 +20,33 @@ class message_error extends Assign<Event<"message/error">> {
             once: false,
             execute: async (queue, error, position) => {
                 // Если нет треков или трека?!
-                if (!queue?.tracks || !queue?.tracks!.track) return null;
+                if (!queue || !queue?.tracks || !queue?.tracks!.track) return null;
 
                 // Данные трека
                 const {api, artist, image, user, name} = position ? queue.tracks.get(position) : queue.tracks.track;
-
-                setTimeout(() => {
-                    queue.message.send({
-                        embeds: [{
-                            color: api.color, thumbnail: image, timestamp: new Date(),
-                            fields: [
-                                {
-                                    name: locale._(queue.message.locale, "player.current.playing"),
-                                    value: `\`\`\`${name}\`\`\``
-                                },
-                                {
-                                    name: locale._(queue.message.locale, "player.current.error"),
-                                    value: `\`\`\`js\n${error}...\`\`\``
-                                }
-                            ],
-                            author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
-                            footer: {
-                                text: `${user.username} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
-                                iconURL: user?.avatar
+                const message = await queue.message.send({
+                    embeds: [{
+                        color: api.color, thumbnail: image, timestamp: new Date(),
+                        fields: [
+                            {
+                                name: locale._(queue.message.locale, "player.current.playing"),
+                                value: `\`\`\`${name}\`\`\``
+                            },
+                            {
+                                name: locale._(queue.message.locale, "player.current.error"),
+                                value: `\`\`\`js\n${error}...\`\`\``
                             }
-                        }],
-                        withResponse: true
-                    }).then((msg) => setTimeout(() => msg.delete().catch(() => null), 20e3));
-                }, 700);
+                        ],
+                        author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
+                        footer: {
+                            text: `${user.username} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
+                            iconURL: user?.avatar
+                        }
+                    }],
+                    withResponse: true
+                });
+
+                if (message) setTimeout(() => message.delete().catch(() => {}), 20e3);
             }
         });
     }
@@ -70,7 +69,7 @@ class message_push extends Assign<Event<"message/push">> {
                 const {artist, image } = obj;
 
                 // Отправляем сообщение, о том что было добавлено в очередь
-                return message.channel.send({
+                const msg = await message.channel.send({
                     embeds: [{
                         color: obj["api"] ? obj["api"]["color"] : Colors.Blue,
                         thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
@@ -98,7 +97,9 @@ class message_push extends Assign<Event<"message/push">> {
                             }
                         ]
                     }]
-                }).then((msg) => setTimeout(() => msg.delete().catch(() => null), 12e3));
+                });
+
+                if (msg) setTimeout(() => msg.delete().catch(() => {}), 12e3);
             }
         });
     };
@@ -118,13 +119,15 @@ class message_playing extends Assign<Event<"message/playing">> {
             type: "player",
             once: false,
             execute: async (queue) => {
-                return queue.message.send({embeds: [queue.componentEmbed], components: queue.components, withResponse: true}).then((msg) => {
+                const message = await queue.message.send({embeds: [queue.componentEmbed], components: queue.components, withResponse: true});
+
+                if (message) {
                     // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
-                    if (!db.queues.cycles.messages.has(msg)) {
+                    if (!db.queues.cycles.messages.has(message)) {
                         // Добавляем сообщение в базу для обновления
-                        db.queues.cycles.messages.add(msg);
+                        db.queues.cycles.messages.add(message);
                     }
-                });
+                }
             }
         });
     };

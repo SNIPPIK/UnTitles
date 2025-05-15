@@ -113,7 +113,7 @@ class AudioFiltersCommand extends Assign<Command> {
                 const argument = args && args?.length > 1 ? Number(args[1]) : null;
 
                 const Filter = filters.find((item) => item.name === name) as AudioFilter;
-                const findFilter = Filter && player.filters.enabled.length > 0 ? player.filters.enabled.find((fl) => fl.name === Filter.name) : false;
+                const findFilter = player.filters.enabled.find((fl) => fl.name === name);
 
                 switch (type) {
                     // Если пользователь хочет выключить все аудио фильтры
