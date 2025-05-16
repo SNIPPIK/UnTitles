@@ -101,7 +101,7 @@ class Command_Voice extends Assign<Command> {
                     // Подключение к голосовому каналу
                     case "join": {
                         // Если производится попытка подключится к тому же голосовому каналу
-                        if (voiceConnection && voiceConnection.config.channel_id === VoiceChannel.id) {
+                        if (voiceConnection && voiceConnection.configuration.channel_id === VoiceChannel.id) {
                             return message.reply({
                                 embeds: [
                                     {
@@ -136,7 +136,7 @@ class Command_Voice extends Assign<Command> {
                         if (queue) queue.cleanup();
 
                         // Отключаемся от голосового канала
-                        voiceConnection.disconnect;
+                        voiceConnection.disconnect();
 
                         return message.reply({
                             embeds: [

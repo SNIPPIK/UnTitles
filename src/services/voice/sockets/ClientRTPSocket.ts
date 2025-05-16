@@ -1,5 +1,5 @@
-import crypto from 'crypto';
 import {isMainThread} from "node:worker_threads";
+import crypto from "crypto";
 
 /**
  * @author SNIPPIK
@@ -30,20 +30,11 @@ const TIMESTAMP_INC = (48_000 / 100) * 2;
 
 /**
  * @author SNIPPIK
- * @description Параметры для шифрования
- */
-export interface EncryptorOptions {
-    ssrc: number;
-    key: Uint8Array<ArrayBuffer>;
-}
-
-/**
- * @author SNIPPIK
  * @description Класс для шифрования данных через sodium или нативными способами
  * @class RTPEncryptor
  * @public
  */
-export class RTPEncryptor {
+export class ClientRTPSocket {
     /**
      * @description Пустой буфер
      * @private
@@ -146,7 +137,7 @@ export class RTPEncryptor {
     private crypto = (packet: Buffer): Buffer => {
         const nonceBuffer = this._nonceBuffer.subarray(0, 4);
 
-        const mode = RTPEncryptor.mode;
+        const mode = ClientRTPSocket.mode;
         const rtp = this.rtp_packet;
         const nonce = this.nonce
 
@@ -174,7 +165,6 @@ export class RTPEncryptor {
      */
     private randomNBit = (numberOfBits: number) => Math.floor(Math.random() * 2 ** numberOfBits);
 }
-
 
 /**
  * @author SNIPPIK
@@ -280,3 +270,12 @@ namespace Methods {
  * @private
  */
 type EncryptionModes = "aead_aes256_gcm_rtpsize"| "aead_xchacha20_poly1305_rtpsize";
+
+/**
+ * @author SNIPPIK
+ * @description Параметры для шифрования
+ */
+export interface EncryptorOptions {
+    ssrc: number;
+    key: Uint8Array<ArrayBuffer>;
+}

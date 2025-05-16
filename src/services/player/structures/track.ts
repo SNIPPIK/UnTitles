@@ -285,7 +285,8 @@ export class Track extends BaseTrack {
                     // Если статус = good
                     if (status.statusCode < 300 && status.statusCode >= 200) {
                         // Добавляем трек в кеширование
-                        db.cache.audio?.add(this);
+                        if (db.cache.audio) db.cache.audio.add(this);
+                        return this.link;
                     }
 
                     // Если статус код 400-500

@@ -189,7 +189,7 @@ class CacheAudio extends AsyncCycle<Track> {
                 return true;
             },
             execute: (track) => {
-                return new Promise<boolean>(async (resolve) => {
+                return new Promise<boolean>((resolve) => {
                     const status = this.status(track);
 
                     // Создаем ffmpeg для скачивания трека

@@ -115,9 +115,6 @@ export class AudioPlayer extends BasePlayer {
     public set status(status: keyof AudioPlayerEvents) {
         // Если был введен новый статус
         if (status !== this.status) {
-            // Если начато воспроизведение, то даем возможность говорить боту
-            if (status === "player/playing") this.voice.connection.speak = true;
-
             // Запускаем событие
             this.emit(status, this);
         }
@@ -137,7 +134,7 @@ export class AudioPlayer extends BasePlayer {
         if (this.status === "player/wait" || this.status === "player/pause") return false;
 
         // Если голосовое состояние не позволяет отправлять пакеты
-        else if (!this.voice.connection || this.voice.connection.status !== "ready") return false;
+        else if (!this.voice.connection && this.voice.connection.ready) return false;
 
         // Если поток не читается, переходим в состояние ожидания
         else if (!this.audio.current || !this.audio.current?.readable) {

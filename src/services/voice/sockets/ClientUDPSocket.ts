@@ -1,4 +1,4 @@
-import {UDPSocketEvents} from "@service/voice";
+
 import {createSocket} from "node:dgram";
 import {TypedEmitter} from "@utils";
 import {isIPv4} from "node:net";
@@ -24,7 +24,7 @@ const MAX_SIZE_VALUE = 2 ** 32 - 1;
  * @class SocketUDP
  * @public
  */
-export class SocketUDP extends TypedEmitter<UDPSocketEvents> {
+export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /**
      * @description Socket UDP подключения
      * @readonly
@@ -172,4 +172,33 @@ interface UDPConnection {
      * @private
      */
     port: number
+}
+/**
+ * @author SNIPPIK
+ * @description События для UDP
+ * @interface UDPSocketEvents
+ * @public
+ */
+export interface UDPSocketEvents {
+    /**
+     * @description Событие при котором сокет получает ответ от сервера
+     * @param message - Само сообщение
+     */
+    readonly "message": (message: Buffer) => void;
+
+    /**
+     * @description Событие при котором сокет получает ошибку
+     * @param error - Ошибка
+     */
+    readonly "error": (error: Error) => void;
+
+    /**
+     * @description Событие при котором сокет закрывается
+     */
+    readonly "close": () => void;
+
+    /**
+     * @description Событие при котором будет возращены данные для подключения
+     */
+    readonly "connected": (info: { ip: string; port: number; }) => void;
 }

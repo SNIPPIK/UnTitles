@@ -114,7 +114,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                             const connection = db.voice.get(message.guild.id);
 
                             // Отключаемся от голосового канала
-                            if (connection) connection.disconnect;
+                            if (connection) connection.disconnect();
                         }
 
                         // Если есть музыкальная очередь

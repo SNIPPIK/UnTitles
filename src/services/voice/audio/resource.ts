@@ -163,7 +163,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
                 "-ar", "48000",
                 "-ac", "2",
 
-                "pipe:1"
+                "pipe:"
             ])
         };
     };

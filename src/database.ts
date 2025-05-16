@@ -1,8 +1,8 @@
-import {VoiceConnection, VoiceConnectionStatus} from "@service/voice";
 import { DiscordGatewayAdapterCreator } from "@structures";
 import { CacheUtility } from "@service/player/utils/cache";
 import { isMainThread } from "node:worker_threads";
 import { RestObject } from "@handler/rest/apis";
+import {VoiceConnection} from "@service/voice";
 import { Commands } from "@handler/commands";
 import { Buttons } from "@handler/modals";
 import { Events } from "@handler/events";
@@ -55,7 +55,7 @@ export class Database {
          * @param adapterCreator - Функции для получения данных из VOICE_STATE_SERVER, VOICE_STATE_UPDATE
          * @public
          */
-        public join = (config: VoiceConnection["config"], adapterCreator: DiscordGatewayAdapterCreator) => {
+        public join = (config: VoiceConnection["configuration"], adapterCreator: DiscordGatewayAdapterCreator) => {
             let connection = this.get(config.guild_id);
 
             // Если нет голосового подключения
@@ -63,14 +63,6 @@ export class Database {
                 // Если нет голосового подключения, то создаем
                 connection = new VoiceConnection(config, adapterCreator);
                 this.set(config.guild_id, connection);
-            }
-
-            // Если надо подключится заново к голосовому каналу
-            else if (connection.status !== VoiceConnectionStatus.Destroyed) connection.adapter.sendPayload(config);
-
-            // Если есть голосовое подключение, но оно было разорвано
-            else if (connection.status === VoiceConnectionStatus.Destroyed || connection.status === VoiceConnectionStatus.Disconnected) {
-                connection.rejoin(config);
             }
 
             // Отдаем голосовое подключение
