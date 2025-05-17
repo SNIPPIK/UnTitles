@@ -212,11 +212,11 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "search",
-                    execute: (url: string, {limit}) => {
+                    execute: (query: string, {limit}) => {
                         return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
-                                const details = await RestYouTubeAPI.API(`https://www.youtube.com/results?search_query=${url.split(" ").join("+")}`);
+                                const details = await RestYouTubeAPI.API(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAQ%3D%3D`);
 
                                 // Если при получении данных возникла ошибка
                                 if (details instanceof Error) return resolve(details);
@@ -256,6 +256,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 headers: {
                     "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
                     "accept-encoding": "gzip, compress, deflate, br",
+                    "Cookie": "PREF=f2=8000000; CONSENT=YES+cb.20210328-17-p0.en+FX+499;",
                 }
             })
                 // Получаем исходную страницу
