@@ -1,10 +1,9 @@
 import {GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData} from "discord-api-types/v10";
-import {DiscordGatewayAdapterCreator} from "@structures/discord/modules/VoiceManager";
+import {VoiceAdapter, DiscordGatewayAdapterCreator} from "./adapter";
 import {ClientWebSocket} from "./sockets/ClientWebSocket";
 import {ClientUDPSocket} from "./sockets/ClientUDPSocket";
 import {ClientRTPSocket} from "./sockets/ClientRTPSocket";
 import {VoiceOpcodes} from "discord-api-types/voice";
-import {VoiceAdapter} from "./adapter";
 
 /**
  * @author SNIPPIK
@@ -38,6 +37,18 @@ export class VoiceConnection {
     private rtpClient: ClientRTPSocket;
 
     /**
+     * @description Таймер для автоматического отключения Speaking
+     * @private
+     */
+    private speakingTimeout: NodeJS.Timeout | null = null;
+
+    /**
+     * @description Текущее состояние Speaking (включен/выключен)
+     * @private
+     */
+    private _speaking: boolean = false;
+
+    /**
      * @description Подготавливает аудио пакет и немедленно отправляет его.
      * @param packet - Пакет Opus для воспроизведения
      * @public
@@ -47,6 +58,7 @@ export class VoiceConnection {
             this.speaking = true;
 
             this.udpClient.packet = this.rtpClient.packet(packet);
+            this.resetSpeakingTimeout();
         }
     };
 
@@ -65,9 +77,11 @@ export class VoiceConnection {
      */
     public set speaking(speaking: boolean) {
         // Если нельзя по состоянию или уже бот говорит
-        if (this.configuration.self_mute === speaking) return;
+        if (this._speaking === speaking) return;
 
-        this.configuration.self_mute = speaking;
+        this._speaking = speaking;
+        this.configuration.self_mute = !speaking;
+
         this.websocket.packet = {
             op: VoiceOpcodes.Speaking,
             d: {
@@ -75,8 +89,8 @@ export class VoiceConnection {
                 delay: 0,
                 ssrc: this.websocket.ssrc
             },
-            seq: this.websocket.req.seq
-        }
+            seq: this.websocket.seq.last
+        };
     };
 
     /**
@@ -136,11 +150,10 @@ export class VoiceConnection {
      * @public
      */
     public disconnect = () => {
-        // Отправляем в discord сообщение об отключении бота
-        if (!this.adapter.sendPayload(this.configuration)) return false;
+        this.configuration.channel_id = null;
 
-        this.destroy();
-        return true;
+        // Отправляем в discord сообщение об отключении бота
+        return this.adapter.sendPayload(this.configuration);
     };
 
     /**
@@ -155,6 +168,7 @@ export class VoiceConnection {
         this.websocket.on("debug", console.log);
         this.websocket.on("warn", console.log);
 
+        // Подключаемся к websocket'у discord'а
         this.websocket.on("open", () => {
             this.websocket.packet = {
                 op: VoiceOpcodes.Identify,
@@ -167,34 +181,64 @@ export class VoiceConnection {
             };
         });
 
-        // Подключаем UDP
-        this.websocket.on("ready", (d) => {
-            this.udpClient = new ClientUDPSocket(d);
-
-            this.udpClient.discovery = d.ssrc;
-            this.udpClient.on("connected", (options) => {
-                this.websocket.packet = {
-                    op: VoiceOpcodes.SelectProtocol,
-                    d: {
-                        protocol: "udp",
-                        data: {
-                            address: options.ip,
-                            port: options.port,
-                            mode: ClientRTPSocket.mode
-                        },
-                    }
-                };
-            });
+        // Если websocket требует возобновления подключения
+        this.websocket.on("request_resume", () => {
+           this.websocket.packet = {
+               op: VoiceOpcodes.Resume,
+               d: {
+                   server_id: this.configuration.guild_id,
+                   session_id: this.voiceState.session_id,
+                   token: this.serverState.token,
+                   seq_ack: this.websocket.seq.lastAsk
+               }
+           };
         });
 
-        // Получаем данные для отправки пакетов
-        this.websocket.on("session_description", (d) => {
+        // Обрабатываем общий пакет данных
+        this.websocket.on("packet", ({op, d}) => {
+            switch (op) {
+                // Подключаем UDP
+                case VoiceOpcodes.SessionDescription: {
+                    this.rtpClient = new ClientRTPSocket({
+                        key: new Uint8Array(d.secret_key),
+                        ssrc: this.websocket.ssrc
+                    });
+                    break;
+                }
 
-            this.rtpClient = new ClientRTPSocket({
-                key: new Uint8Array(d.secret_key),
-                ssrc: this.websocket.ssrc
-            });
+                // Получаем данные для отправки пакетов
+                case VoiceOpcodes.Ready: {
+                    this.udpClient = new ClientUDPSocket(d);
+
+                    this.udpClient.discovery = d.ssrc;
+                    this.udpClient.on("connected", (options) => {
+                        this.websocket.packet = {
+                            op: VoiceOpcodes.SelectProtocol,
+                            d: {
+                                protocol: "udp",
+                                data: {
+                                    address: options.ip,
+                                    port: options.port,
+                                    mode: ClientRTPSocket.mode
+                                },
+                            }
+                        };
+                    });
+                    break;
+                }
+            }
         });
+    };
+
+    /**
+     * @description Сброс таймера отключения Speaking
+     * @private
+     */
+    private resetSpeakingTimeout = () => {
+        if (this.speakingTimeout) clearTimeout(this.speakingTimeout);
+        this.speakingTimeout = setTimeout(() => {
+            this.speaking = false;
+        }, 5e3);
     };
 
     /**
@@ -202,9 +246,19 @@ export class VoiceConnection {
      * @public
      */
     public destroy = () => {
-        this.websocket.emitDestroy();
-        this.rtpClient = null;
+        if (!this.websocket && !this.udpClient) return;
+
+        if (this.speakingTimeout) clearTimeout(this.speakingTimeout);
+
+        this.websocket.destroy();
         this.udpClient.destroy();
+
+        this.rtpClient = null;
+        this.websocket = null;
+        this.udpClient = null;
+
+        this.speakingTimeout = null;
+        this._speaking = false;
     };
 }
 

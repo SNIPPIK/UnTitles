@@ -6,15 +6,20 @@ import {WebSocket, Data} from "ws";
  * @author SNIPPIK
  * @description События выдаваемые голосовым подключением
  */
-export interface ClientWebSocketEvents {
+interface ClientWebSocketEvents {
     "error": (err: Error) => void;
-    "close": (code: number) => void;
+    "close": (code: number, reason: string) => void;
 
-
-    "identified": (d: opcode.identify["d"]) => void;
-    "ready": (d: opcode.ready["d"]) => void;
-    "session_description": (d: opcode.session["d"]) => void;
     "disconnect": (code: number, reason: string) => void;
+
+    /**
+     * @description Событие для opcodes, приходят не все
+     * @param full - Все opcode
+     */
+    "packet": (full: opcode.exported) => void;
+
+    // Требуется для переподключения WebSocket
+    "request_resume": () => void;
 }
 
 /**
@@ -33,12 +38,12 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @description Данные для проверки жизни websocket
      * @private
      */
-    private heartbeat = {
-        lastInterval: null as number | null,
+    private readonly heartbeat = {
         interval: null as NodeJS.Timeout,
         timeout: null as NodeJS.Timeout,
+        intervalMs: null as number,
         timeoutMs: 5e3,
-        reconnects: 0 as number
+        reconnects: 0
     };
 
     /**
@@ -48,18 +53,23 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public ssrc: number;
 
     /**
-     * @description Данные идентификационного пакета для повторной идентификации
-     * @private
-     */
-    private _rejoinData: opcode.identify["d"];
-
-    /**
      * @description Данные для порядковой очереди пакетов
      * @public
      */
-    public req = {
-        ask: 0, // Номер последнего принятого пакета
-        seq: 0  // Номер последнего полученного пакета
+    public readonly seq: {
+        // Номер последнего принятого пакета
+        lastAsk: number;
+
+        // Номер последнего полученного пакета
+        last: number;
+    };
+
+    /**
+     * @description Статус готовности подключения
+     * @public
+     */
+    public get ready() {
+        return !!this._client && this._client.readyState === WebSocket.OPEN;
     };
 
     /**
@@ -68,64 +78,9 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public set packet(payload: opcode.extract) {
-        // Перехватываем пакет для переподключения
-        if (payload.op === VoiceOpcodes.Identify) this._rejoinData = payload.d;
-
         if (this._client.readyState === WebSocket.OPEN) {
             this._client.send(JSON.stringify(payload));
         }
-    };
-
-    /**
-     * @description Разрываем соединение с Discord
-     * @public
-     */
-    public get disconnect() {
-        clearInterval(this.heartbeat.interval);
-        this._client.close(1000, "Client disconnect");
-
-        return true;
-    };
-
-    /**
-     * @description Заставляем Discord принять подключение
-     * @public
-     */
-    private get op_identify(): opcode.identify {
-        return {
-            op: VoiceOpcodes.Identify,
-            d: this._rejoinData
-        };
-    };
-
-    /**
-     * @description Данные для возобновления подключения
-     * @private
-     */
-    private get op_resume(): opcode.resume {
-        return {
-            op: VoiceOpcodes.Resume,
-            d: {
-                server_id: this._rejoinData.server_id,
-                session_id: this._rejoinData.session_id,
-                token: this._rejoinData.token,
-                seq_ack: this.req.ask
-            }
-        };
-    };
-
-    /**
-     * @description Данные для ответа жизни websocket
-     * @private
-     */
-    private get op_heartbeat(): opcode.heartbeat {
-        return {
-            op: VoiceOpcodes.Heartbeat,
-            d: {
-                t: Date.now(),
-                seq_ack: this.req.ask
-            }
-        };
     };
 
     /**
@@ -134,22 +89,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public constructor(private readonly endpoint: string) {
         super();
-    };
-
-    /**
-     * @description
-     * @private
-     */
-    private resume() {
-        if (!this._rejoinData.session_id) {
-            this.emit("warn", "RESUME called without sessionId or token.");
-            this.packet = this.op_identify; // Если данных для RESUME нет, выполняем IDENTIFY
-            return null;
-        }
-
-        this.emit("debug", "Attempting to RESUME session...");
-        this.packet = this.op_resume;
-        return null;
+        this.seq = {
+            last: 0,
+            lastAsk: 0
+        };
     };
 
     /**
@@ -159,17 +102,17 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public connect = () => {
         this._client = new WebSocket(this.endpoint);
         this._client.on("open",   () => this.emit("open"));
-        this._client.on("message", data => this.onMessage(data));
-        this._client.on("close",  code => this.emit("close", code));
+        this._client.on("message", this.onMessage);
+        this._client.on("close",  this.onClose);
         this._client.on("error",  err  => this.emit("error", err));
     };
 
     /**
      * @description Принимаем сообщение со стороны websocket
-     * @param data - Получаемые данные в string
+     * @param data - Получаемые данные в buffer
      * @private
      */
-    private onMessage = (data: Data): void => {
+    private onMessage = (data: Data) => {
         let payload: opcode.extract;
         try {
             payload = JSON.parse(data.toString());
@@ -179,13 +122,14 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         const { op, d } = payload;
+        if (payload?.["s"] !== null) this.seq.last = payload["s"];
 
-        if (payload?.["s"] !== null) this.req.seq = payload["s"];
-
+        // Внутрення обработка
         switch (op) {
             case VoiceOpcodes.Hello: {
-                this.req.ask++;
-                this.startHeartbeat(d.heartbeat_interval);
+                this.seq.lastAsk++;
+                this.manageHeartbeat(d.heartbeat_interval);
+                this.heartbeat.intervalMs = d.heartbeat_interval;
                 break;
             }
 
@@ -194,30 +138,16 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 break;
             }
 
-            case VoiceOpcodes.Identify: {
-                this.emit("identified", d);
-                break;
-            }
-
             case VoiceOpcodes.Ready: {
                 this.ssrc = d.ssrc;
-
-                // d содержит endpoint, ssrc и т.п.
-                this.emit("ready", d);
+                this.emit("packet", payload);
                 this.heartbeat.reconnects = 0; // Сбросить счётчик при успешном подключении
                 break;
             }
 
-            case VoiceOpcodes.SessionDescription: {
-                // d содержит secret_key для шифрования RTP
-                this.emit("session_description", d);
-                break;
-            }
-
             case VoiceOpcodes.Resumed: {
-                this.emit("resumed");
                 this.heartbeat.reconnects = 0;
-                this.restartHeartbeat();
+                this.manageHeartbeat();
                 break;
             }
 
@@ -226,68 +156,107 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 this.attemptReconnect();
                 break;
             }
+
+            default: this.emit("packet", payload);
         }
+    };
+
+    /**
+     * @description Принимаем сообщение со стороны websocket
+     * @param code - Код закрытия
+     * @param reason - Причина закрытия
+     */
+    private onClose = (code: WebSocketCloseCodes, reason: Buffer) => {
+        const error = reason.toString();
+
+        switch (code) {
+            case WebSocketCloseCodes.NORMAL_CLOSURE: // Normal closure
+            case WebSocketCloseCodes.GOING_AWAY: // Going away
+                this.emit("debug", `WebSocket closed normally.`);
+                this.emit("close", 1000, `Closed normally`);
+                this.destroy();
+                break;
+
+            case WebSocketCloseCodes.UNKNOWN_ERROR:
+                this.emit("debug", `Unknown error occurred, attempting to reconnect...`);
+                this.attemptReconnect(true);
+                break;
+
+            case WebSocketCloseCodes.INVALID_SESSION:
+                this.emit("debug", `Invalid session, need identification`);
+                this.emit("open");
+                break;
+
+            case WebSocketCloseCodes.INSUFFICIENT_RESOURCES:
+                this.emit("debug", `Voice server crashed. Attempting to reconnect...`);
+                this.attemptReconnect(true);
+                break;
+
+            case WebSocketCloseCodes.OVERLOADED:
+                this.emit("debug", `Voice server reboot, attempting to reconnect...`);
+                this.attemptReconnect(true);
+                break;
+
+            default:
+                this.emit("debug", `Unhandled WebSocket close code: ${code} - ${reason}`);
+                this.attemptReconnect(true);
+                break;
+        }
+
+        this.emit("close", code, error);
     };
 
     /**
      * @description Проверяем кол-во переподключений
      * @private
      */
-    private attemptReconnect() {
+    private attemptReconnect = (reconnect?: boolean) => {
         if (this.heartbeat.interval) clearInterval(this.heartbeat.interval);
         if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
 
-        if (this.heartbeat.reconnects >= 3) {
-            this.emit("debug", "Max reconnect attempts reached. Performing full reconnect.");
-            this.packet = this.op_identify;
+        if (reconnect || this.heartbeat.reconnects >= 3) {
+            this.emit("debug", `Reconnecting...`);
+            this.connect();
             return;
         }
 
         this.heartbeat.reconnects++;
-        const delay = Math.min(1000 * this.heartbeat.reconnects, 5000); // Exponential backoff
+        const delay = Math.min(1000 * this.heartbeat.reconnects, 5000);
 
         setTimeout(() => {
             this.emit("debug", `Reconnecting... Attempt ${this.heartbeat.reconnects}`);
-            this.resume();
+            this.emit("request_resume");
         }, delay);
-    }
-
-    /**
-     * @description Запускаем проверку жизни
-     * @param intervalMs
-     * @private
-     */
-    private startHeartbeat(intervalMs: number) {
-        if (this.heartbeat.interval) clearInterval(this.heartbeat.interval);
-
-        this.heartbeat.interval = setInterval(() => {
-            this.packet = this.op_heartbeat;
-            this.startHeartbeatTimeout();
-        }, intervalMs);
     };
 
     /**
-     * @description Перезапускаем циклическую систему для взаимодействия с websocket
+     * @description Управление состоянием heartbeat websocket'а
+     * @param intervalMs - Время в мс
      * @private
      */
-    private restartHeartbeat() {
-        if (this.heartbeat.interval) {
-            clearInterval(this.heartbeat.interval);
-        }
+    private manageHeartbeat(intervalMs?: number) {
+        if (this.heartbeat.interval) clearInterval(this.heartbeat.interval);
+        if (intervalMs) this.heartbeat.intervalMs = intervalMs;
 
-        this.req.seq = this.req.ask; // Сброс seq_ack после RESUME
+        this.heartbeat.interval = setInterval(() => {
+            this.packet = {
+                op: VoiceOpcodes.Heartbeat,
+                d: {
+                    t: Date.now(),
+                    seq_ack: this.seq.lastAsk
+                }
+            };
 
-        if (this.heartbeat.interval) {
-            this.startHeartbeat(this.heartbeat.lastInterval);
-        }
-    }
+            this.startHeartbeatTimeout();
+        }, this.heartbeat.intervalMs);
+    };
 
     /**
      * @description Если получен ответ от циклической системы discord
      * @param ackData - Полученное время
      * @private
      */
-    private handleHeartbeatAck(ackData: number) {
+    private handleHeartbeatAck = (ackData: number) => {
         this.emit("debug", `HEARTBEAT_ACK received. Latency: ${Date.now() - ackData} ms`);
 
         if (this.heartbeat.timeout) {
@@ -300,13 +269,30 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @description Если ответ от websocket не получен то пересоздадим подключение
      * @private
      */
-    private startHeartbeatTimeout() {
+    private startHeartbeatTimeout = () => {
         if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
 
         this.heartbeat.timeout = setTimeout(() => {
             this.emit("warn", "HEARTBEAT_ACK not received within timeout. Reconnecting...");
             this.attemptReconnect();
         }, this.heartbeat.timeoutMs);
+    };
+
+    /**
+     * @description Уничтожаем подключение
+     * @public
+     */
+    public destroy = () => {
+        // Проверяем на готовность
+        if (this.ready) this._client.close(1000);
+
+        this.removeAllListeners();
+        this._client.removeAllListeners();
+        this._client.terminate();
+        this._client = null;
+
+        if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
+        if (this.heartbeat.interval) clearTimeout(this.heartbeat.interval);
     };
 }
 
@@ -316,8 +302,17 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
  * @description Поддерживаемые коды
  * @namespace opcode
  */
-namespace opcode {
+export namespace opcode {
+    /**
+     * @description Все opcode, для типизации websocket
+     * @type extract
+     */
     export type extract = identify | select_protocol | ready | heartbeat | session | speaking | heartbeat_ask | resume | hello | resumed | disconnect;
+
+    /**
+     * @description Opcodes, эти коды выходят из события packet
+     */
+    export type exported = identify | select_protocol | ready | heartbeat | session | speaking | resume;
 
     /**
      * @description Данные для подключения именно к голосовому каналу
@@ -470,4 +465,106 @@ namespace opcode {
             "reason": string;
         }
     }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Статус коды, Discord Gateway WebSocket
+ * @enum WebSocketCloseCodes
+ */
+export enum WebSocketCloseCodes {
+    /** 1000 - Нормальное завершение соединения. */
+    NORMAL_CLOSURE = 1000,
+
+    /** 1001 - Соединение закрыто, т.к. сервер или клиент отключается. */
+    GOING_AWAY = 1001,
+
+    /** 1002 - Соединение закрыто из-за ошибки протокола. */
+    PROTOCOL_ERROR = 1002,
+
+    /** 1003 - Соединение закрыто из-за получения неподдерживаемого типа данных. */
+    UNSUPPORTED_DATA = 1003,
+
+    /** 1004 - Зарезервировано. */
+    RESERVED = 1004,
+
+    /** 1005 - Статус закрытия не был предоставлен. */
+    NO_STATUS_RECEIVED = 1005,
+
+    /** 1006 - Аномальное закрытие, соединение было закрыто без фрейма закрытия. */
+    ABNORMAL_CLOSURE = 1006,
+
+    /** 1007 - Соединение закрыто из-за получения некорректных данных. */
+    INVALID_PAYLOAD = 1007,
+
+    /** 1008 - Соединение закрыто из-за нарушения политики. */
+    POLICY_VIOLATION = 1008,
+
+    /** 1009 - Сообщение слишком большое для обработки. */
+    MESSAGE_TOO_BIG = 1009,
+
+    /** 1010 - Клиент закрыл соединение для согласования расширений. */
+    MISSING_EXTENSION = 1010,
+
+    /** 1011 - Внутренняя ошибка сервера. */
+    INTERNAL_ERROR = 1011,
+
+    /** 1012 - Сервис перезапускается. */
+    SERVICE_RESTART = 1012,
+
+    /** 1013 - Попробуйте позже. */
+    TRY_AGAIN_LATER = 1013,
+
+    // Discord Specific Codes
+
+    /** 4000 - Неизвестная ошибка. Попробуйте переподключиться. */
+    UNKNOWN_ERROR = 4000,
+
+    /** 4001 - Неизвестный opcode или некорректный payload. */
+    UNKNOWN_OPCODE = 4001,
+
+    /** 4002 - Некорректная структура payload. */
+    DECODE_ERROR = 4002,
+
+    /** 4003 - Не авторизован. */
+    NOT_AUTHENTICATED = 4003,
+
+    /** 4004 - Недействительный токен авторизации. */
+    AUTHENTICATION_FAILED = 4004,
+
+    /** 4005 - Уже авторизован. */
+    ALREADY_AUTHENTICATED = 4005,
+
+    /** 4006 - Недействительная сессия. */
+    INVALID_SESSION = 4006,
+
+    /** 4007 - Неверный sequence номер при восстановлении сессии. */
+    INVALID_SEQ = 4007,
+
+    /** 4008 - Превышен лимит запросов. Переподключитесь через некоторое время. */
+    RATE_LIMITED = 4008,
+
+    /** 4009 - Сессия истекла. Необходимо начать новую. */
+    SESSION_TIMEOUT = 4009,
+
+    /** 4010 - Неверный shard. */
+    INVALID_SHARD = 4010,
+
+    /** 4011 - Необходимо шардирование, но оно не настроено. */
+    SHARDING_REQUIRED = 4011,
+
+    /** 4012 - Некорректная версия gateway. */
+    INVALID_VERSION = 4012,
+
+    /** 4013 - Некорректные intent(s). */
+    INVALID_INTENTS = 4013,
+
+    /** 4014 - Недопустимые intent(s). */
+    DISALLOWED_INTENTS = 4014,
+
+    /** 4015 - Соединение закрыто из-за нехватки ресурсов. */
+    INSUFFICIENT_RESOURCES = 4015,
+
+    /** 4016 - Соединение закрыто из-за перегрузки. */
+    OVERLOADED = 4016,
 }

@@ -20,8 +20,8 @@ const MAX_SIZE_VALUE = 2 ** 32 - 1;
 
 /**
  * @author SNIPPIK
- * @description Создает udp подключение к api discord
- * @class SocketUDP
+ * @description Создает udp подключение к Discord Gateway
+ * @class ClientUDPSocket
  * @public
  */
 export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {

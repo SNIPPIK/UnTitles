@@ -228,11 +228,11 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "search",
-                    execute: (url , {limit}) => {
+                    execute: (query , {limit}) => {
                         return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
-                                const api = await RestYandexAPI.API(`search?type=all&text=${url.split(" ").join("%20")}&page=0&nococrrect=false`);
+                                const api = await RestYandexAPI.API(`search?type=all&text=${encodeURIComponent(query)}&page=0&nococrrect=false`);
 
                                 // Обрабатываем ошибки
                                 if (api instanceof Error) return resolve(api);

@@ -117,11 +117,11 @@ class RestVKAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "search",
-                    execute: (url, {limit}) => {
+                    execute: (query, {limit}) => {
                         return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
-                                const api = await RestVKAPI.API("audio", "search", `&q=${url}`);
+                                const api = await RestVKAPI.API("audio", "search", `&q=${encodeURIComponent(query)}`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);

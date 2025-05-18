@@ -210,11 +210,11 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "search",
-                    execute: (url, {limit}) => {
+                    execute: (query, {limit}) => {
                         return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
-                                const api: Error | any = await RestSpotifyAPI.API(`search?q=${url}&type=track&limit=${limit}`);
+                                const api: Error | any = await RestSpotifyAPI.API(`search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
 
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);

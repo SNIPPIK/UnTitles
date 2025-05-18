@@ -30,8 +30,8 @@ const TIMESTAMP_INC = (48_000 / 100) * 2;
 
 /**
  * @author SNIPPIK
- * @description Класс для шифрования данных через sodium или нативными способами
- * @class RTPEncryptor
+ * @description Класс для шифрования данных через библиотеки sodium или нативным способом
+ * @class ClientRTPSocket
  * @public
  */
 export class ClientRTPSocket {
