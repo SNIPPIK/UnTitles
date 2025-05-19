@@ -266,6 +266,11 @@ export interface Command {
          * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
          */
         args?: SlashCommand.Component["choices"][number]["value"][];
+
+        /**
+         * @description Тип опции, будет указан если используется много ступенчатая команда
+         */
+        type?: string
     }) => any;
 }
 

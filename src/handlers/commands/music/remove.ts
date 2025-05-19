@@ -1,5 +1,5 @@
 import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
-import {ApplicationCommandOptionType, Colors} from "discord.js";
+import {ApplicationCommandOptionType} from "discord.js";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
 import {db} from "@app/db";
@@ -24,6 +24,7 @@ import {db} from "@app/db";
 @SlashCommandSubCommand({
     type: ApplicationCommandOptionType["Number"],
     required: true,
+    autocomplete: true,
     names: {
         "en-US": "value",
         "ru": "число"
@@ -40,36 +41,48 @@ class RemoveTrackCommand extends Assign<Command> {
                 client: ["SendMessages", "ViewChannel"]
             },
             rules: ["voice", "another_voice", "queue", "player-not-playing"],
+            autocomplete: ({message, args}) => {
+                const number = parseInt(args[0]);
+                const queue = db.queues.get(message.guildId);
+                if (!queue || isNaN(number) || number <= 0) return null;
+
+                const total = queue.tracks.total;
+                const maxSuggestions = 5;
+                const index = number - 1;
+
+                if (index < 0 || index >= total) return null;
+
+                const half = Math.floor(maxSuggestions / 2);
+                let start = index - half;
+                let end = index + half;
+
+                if (start < 0) {
+                    end += Math.abs(start);
+                    start = 0;
+                }
+                if (end >= total) {
+                    const overshoot = end - (total - 1);
+                    start = Math.max(0, start - overshoot);
+                    end = total - 1;
+                }
+
+                const results = [];
+                for (let i = start; i <= end; i++) {
+                    const track = queue.tracks.get(i);
+                    if (!track) continue;
+
+                    const isTarget = i === index;
+                    results.push({
+                        name: `${i + 1}. ${isTarget ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
+                        value: i + 1
+                    });
+                }
+
+                return message.respond(results);
+            },
             execute: async ({message, args}) => {
                 const queue = db.queues.get(message.guild.id);
-                const number = parseInt(args[0]) - 1;
-
-                // Если аргумент не является числом
-                if (isNaN(number)) {
-                    return message.reply({
-                        embeds: [
-                            {
-                                description: locale._(message.locale, "command.seek.duration.nan"),
-                                color: Colors.DarkRed
-                            }
-                        ],
-                        flags: "Ephemeral"
-                    });
-                }
-
-                // Если аргумент больше кол-ва треков
-                else if (number > queue.tracks.total || number < 0) {
-                    return message.reply({
-                        embeds: [
-                            {
-                                description: locale._(message.locale, "command.seek.duration.big"),
-                                color: Colors.DarkRed
-                            }
-                        ],
-                        flags: "Ephemeral"
-                    });
-                }
-
+                const number = parseInt(args[0]);
                 const {name, api, url} = queue.tracks.get(number);
 
                 // Если выбран текущий трек

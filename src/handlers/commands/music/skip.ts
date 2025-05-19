@@ -1,5 +1,5 @@
 import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
-import {ApplicationCommandOptionType, Colors} from "discord.js";
+import {ApplicationCommandOptionType} from "discord.js";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
 import {db} from "@app/db";
@@ -42,7 +42,8 @@ import {db} from "@app/db";
                 "ru": "Нужно указать номер трека!"
             },
             required: true,
-            type: ApplicationCommandOptionType["Number"]
+            autocomplete: true,
+            type: ApplicationCommandOptionType["Number"],
         }
     ]
 })
@@ -67,6 +68,7 @@ import {db} from "@app/db";
                 "ru": "Нужно указать номер трека!"
             },
             required: true,
+            autocomplete: true,
             type: ApplicationCommandOptionType["Number"]
         }
     ]
@@ -92,6 +94,7 @@ import {db} from "@app/db";
                 "ru": "Нужно указать номер трека!"
             },
             required: true,
+            autocomplete: true,
             type: ApplicationCommandOptionType["Number"]
         }
     ]
@@ -103,48 +106,75 @@ class SkipUtilityCommand extends Assign<Command> {
                 client: ["ViewChannel", "SendMessages"]
             },
             rules: ["voice", "another_voice", "queue", "player-not-playing"],
-            execute: async ({message, args, type}) => {
-                const number = args.length > 0 ? parseInt(args.pop()) : 1;
-                const {player, tracks} = db.queues.get(message.guild.id);
+            autocomplete: ({message, args, type}) => {
+                const number = parseInt(args[0]);
+                const queue = db.queues.get(message.guildId);
+                if (!queue || isNaN(number) || number <= 0) return null;
 
-                // Если аргумент не является числом
-                if (isNaN(number)) {
-                    return message.reply({
-                        embeds: [
-                            {
-                                description: locale._(message.locale, "command.seek.duration.nan"),
-                                color: Colors.DarkRed
-                            }
-                        ],
-                        flags: "Ephemeral"
+                const total = queue.tracks.total;
+                const position = queue.tracks.position;
+                const maxSuggestions = 5;
+
+                let startIndex: number | null = null;
+                let icon: string;
+
+                if (type === "back") {
+                    if (position === 0) return null;
+                    startIndex = Math.max(0, position - number);
+                    icon = "⬅️";
+                } else if (type === "next") {
+                    startIndex = Math.min(total - 1, position + number);
+                    icon = "➡️";
+                } else {
+                    startIndex = number - 1;
+                    if (startIndex < 0 || startIndex >= total) return null;
+                    icon = "🎵";
+                }
+
+                // Окно подсказок с центровкой вокруг startIndex
+                const half = Math.floor(maxSuggestions / 2);
+                let start = startIndex - half;
+                let end = startIndex + half;
+
+                if (start < 0) {
+                    end += Math.abs(start);
+                    start = 0;
+                }
+                if (end >= total) {
+                    const overshoot = end - (total - 1);
+                    start = Math.max(0, start - overshoot);
+                    end = total - 1;
+                }
+
+                const results = [];
+                for (let i = start; i <= end; i++) {
+                    const track = queue.tracks.get(i);
+                    if (!track) continue;
+
+                    results.push({
+                        name: `${i + 1}. ${i === startIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
+                        value: i
                     });
                 }
+
+                return message.respond(results);
+            },
+            execute: async ({message, args, type}) => {
+                const number = parseInt(args[0]);
+                const {player, tracks} = db.queues.get(message.guild.id);
+
+                const {name, url, api} = tracks.get(number);
+
+                // Переходим к позиции
+                player.stop(number);
 
                 switch (type) {
                     // Переключение текущий позиции назад
                     case "back": {
-                        // Если пользователь укажет больше чем есть в очереди или меньше
-                        if (number > tracks.size || number < 1) {
-                            return message.reply({
-                                embeds: [
-                                    {
-                                        description: locale._(message.locale, "command.seek.duration.big"),
-                                        color: Colors.DarkRed
-                                    }
-                                ],
-                                flags: "Ephemeral"
-                            });
-                        }
-
-                        const {name, url, api} = tracks.get(number > 1 ? number : number - 1);
-
-                        // Меняем позицию трека в очереди
-                        player.stop(number - 1);
-
                         return message.reply({
                             embeds: [
                                 {
-                                    description: locale._(message.locale, "command.position", [number, `[${name}](${url})`]),
+                                    description: locale._(message.locale, "command.position", [number - 1, `[${name}](${url})`]),
                                     color: api.color
                                 }
                             ],
@@ -154,24 +184,6 @@ class SkipUtilityCommand extends Assign<Command> {
 
                     // Переключение текущий позиции в любую сторону
                     case "to": {
-                        // Если пользователь укажет больше чем есть в очереди или меньше
-                        if (number > tracks.total || number < 1) {
-                            return message.reply({
-                                embeds: [
-                                    {
-                                        description: locale._(message.locale, "command.seek.duration.big"),
-                                        color: Colors.DarkRed
-                                    }
-                                ],
-                                flags: "Ephemeral"
-                            });
-                        }
-
-                        const {name, url, api} = tracks.get(number - 1);
-
-                        // Пропускаем текущий трек
-                        player.stop(number - 1);
-
                         return message.reply({
                             embeds: [
                                 {
@@ -185,42 +197,10 @@ class SkipUtilityCommand extends Assign<Command> {
 
                     // Переключение текущий позиции вперед
                     case "next": {
-                        // Если пользователь укажет больше чем есть в очереди или меньше
-                        if (number > tracks.size || number < 1) {
-                            return message.reply({
-                                embeds: [
-                                    {
-                                        description: locale._(message.locale, "command.seek.duration.big"),
-                                        color: Colors.DarkRed
-                                    }
-                                ],
-                                flags: "Ephemeral"
-                            });
-                        }
-
-                        const {name, url, api} = tracks.get(number - 1);
-
-                        // Если аргумент больше 1, то ищем трек
-                        if (number > 1) {
-                            // Меняем позицию трека в очереди
-                            player.stop(tracks.position + number - 1);
-                            return message.reply({
-                                embeds: [
-                                    {
-                                        description: locale._(message.locale, "command.skip.arg.track", [number, `[${name}](${url})`]),
-                                        color: api.color
-                                    }
-                                ],
-                                flags: "Ephemeral"
-                            });
-                        }
-
-                        // Пропускаем текущий трек
-                        player.stop(tracks.position + 1);
                         return message.reply({
                             embeds: [
                                 {
-                                    description: locale._(message.locale, "command.skip.one.track", [`[${name}](${url})`]),
+                                    description: locale._(message.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
                                     color: api.color
                                 }
                             ],

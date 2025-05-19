@@ -345,6 +345,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             return command.autocomplete({
                 message: ctx,
                 args: ctx.options?.["_hoistedOptions"]?.map((f) => `${f.value}`),
+                type: ctx.options?.["_subcommand"]
             })
         }
     };

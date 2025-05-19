@@ -217,7 +217,9 @@ export class PlayerTracks<T extends Track> {
      * @param size - При -5 будут выданы выданные последние до текущего трека, при +5 будут выданы следующие треки
      * @param sorting - При включении треки перейдут в string[]
      */
-    public array = (size: number, sorting: boolean = false) => {
+    public array(size: number, sorting?: any): T[];
+    public array(size: number, sorting: true): string[];
+    public array(size: number, sorting: boolean = false): (string | T)[] {
         const position = this._position;
 
         // Сортируем треки в строки

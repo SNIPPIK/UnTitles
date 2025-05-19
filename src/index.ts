@@ -46,7 +46,7 @@ import { db} from "@app/db";
 
                     // Загружаем платформы
                     await db.api.startWorker();
-                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow} APIs`)}`);
+                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow.length} APIs`)}`);
 
                     // Загружаем события
                     db.events.register(client);
