@@ -40,7 +40,7 @@ class AvatarCommand extends Assign<Command> {
             },
             execute: async ({message, args}) => {
                 const user = message.guild.members.cache.get(args[0]).user;
-                const avatar= user.avatarURL({size: 1024, forceStatic: false});
+                const avatar = user.avatarURL({size: 1024, forceStatic: false});
 
                 // Отправляем сообщение в текстовый канал
                 return message.reply({

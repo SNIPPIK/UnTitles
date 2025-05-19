@@ -1,5 +1,4 @@
 import { DiscordClient, ShardManager } from "@structures";
-import { Colors, WebhookClient } from "discord.js";
 import { isMainThread } from "node:worker_threads";
 import { Logger } from "@utils";
 import { env } from "@app/env";
@@ -34,82 +33,43 @@ import { db} from "@app/db";
             Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
 
             // Создаем класс осколка
-            const client = initClient();
+            const client = new DiscordClient();
+            const id = client.shardID;
+
+            // Подключаем осколок к discord
+            client.login(env.get("token.discord"))
+                // Что делаем после подключения к discord api
+                .finally(() => {
+                    // Загруженные кнопки
+                    db.buttons.register();
+                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
+
+                    // Загружаем платформы
+                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.platforms.supported.length} APIs Supported, ${db.api.platforms.authorization.length} APIs Unauthorized`)}`);
+
+                    // Загружаем события
+                    db.events.register(client);
+                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.size} events`)}`);
+
+                    // Загружаем команды
+                    db.commands.register(client);
+                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
+                });
 
             // Создаем webhook клиент
-            return initProcessEvents(client);
+            return initProcessEvents();
         }
     }
 })();
 
 /**
  * @author SNIPPIK
- * @description Инициализирует осколок
- * @private
- */
-function initClient() {
-    // Создаем класс осколка
-    const client = new DiscordClient();
-    const id = client.shardID;
-
-    // Подключаем осколок к discord
-    client.login(env.get("token.discord"))
-        // Что делаем после подключения к discord api
-        .finally(() => {
-            // Загруженные кнопки
-            db.buttons.register();
-            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
-
-            // Загружаем платформы
-            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.platforms.supported.length} APIs Supported, ${db.api.platforms.authorization.length} APIs Unauthorized`)}`);
-
-            // Загружаем события
-            db.events.register(client);
-            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.size} events`)}`);
-
-            // Загружаем команды
-            db.commands.register(client);
-            Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
-        });
-
-    return client;
-}
-
-/**
- * @author SNIPPIK
  * @description Инициализирует события процесса
- * @param client - Запущенный осколок
  */
-function initProcessEvents(client: DiscordClient) {
-    // Создаем webhook клиент
-    const webhookToken = env.get<string>("webhook.token", null);
-    const webhookID = env.get("webhook.id", null);
-    const webhook = webhookID && webhookToken ? new WebhookClient({ id: webhookID, token: webhookToken }) : null;
-
+function initProcessEvents() {
     // Отлавливаем все ошибки внутри процесса
     process.on("uncaughtException", (err, origin) => {
         //Выводим ошибку
         Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
-
-        // Отправляем данные об ошибке и отправляем через систему webhook
-        if (webhook) {
-            webhook.send({
-                username: client.user.username,
-                avatarURL: client.user.avatarURL(),
-                embeds: [{
-                    color: Colors.DarkRed,
-                    title: "Caught exception",
-                    description: `\`\`\`${err.name} - ${err.message}\`\`\``,
-                    fields: [
-                        {
-                            name: "Stack:",
-                            value: `\`\`\`${err.stack}\`\`\``
-                        }
-                    ]
-                }]
-            }).catch(() => {
-                Logger.log("ERROR", "[Webhook] Fail send message");
-            });
-        }
     });
 }

@@ -34,6 +34,12 @@ export class DiscordClient extends Client {
                 }
             },
 
+            presence: {
+                afk: false,
+                status: env.get("client.status", "online"),
+                activities: [{name: " 🌟 ", type: ActivityType.Custom}]
+            },
+
             // Права бота
             intents: [
                 "Guilds",
@@ -69,19 +75,6 @@ export class DiscordClient extends Client {
             })
         });
 
-        // Устанавливаем параметр debug
-        if (!Logger.debug) {
-            const debug = env.get<string>("NODE_ENV", "production") === "development";
-
-            // Событие отладки
-            if (debug) {
-                this.on("debug", async (message) => {
-                    Logger.log("DEBUG", message);
-                });
-            }
-
-            Logger.debug = debug;
-        }
 
         // Запускаем статусы после инициализации клиента
         this.once("ready", this.IntervalStatus);
@@ -140,6 +133,8 @@ export class DiscordClient extends Client {
      */
     private readonly parseStatuses = () => {
         const statuses: ActivityOptions[] = [];
+        const guilds = this.guilds.cache.size;
+        const users = this.users.cache.size;
 
         // Получаем пользовательские статусы
         try {
@@ -148,7 +143,8 @@ export class DiscordClient extends Client {
                     .replace(/{shard}/g, `${this.shardID}`)
                     .replace(/{queues}|{players}/g, `${db.queues.size}`)
                     .replace(/{version}/g, `${version}`)
-                    .replace(/{guilds}/g, `${this.guilds.cache.size}`)
+                    .replace(/{guilds}/g, `${guilds}`)
+                    .replace(/{users}/g, `${users}`)
 
                 return {
                     name: edited,

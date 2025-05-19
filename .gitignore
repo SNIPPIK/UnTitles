@@ -3,5 +3,4 @@
 .env
 build
 node_modules
-changelog.md
 package-lock.json
