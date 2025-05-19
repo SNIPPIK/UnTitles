@@ -180,12 +180,12 @@ class CacheAudio extends AsyncCycle<Track> {
                 }
 
                 // Если нет директории то, создаем ее
-                else if (!fs.existsSync(names.path)) {
+                if (!fs.existsSync(names.path)) {
                     let dirs = names.path.split("/");
-
                     if (!names.path.endsWith("/")) dirs.splice(dirs.length - 1);
-                    fs.mkdirSync(dirs.join("/"), {recursive: true});
+                    fs.mkdirSync(dirs.join("/"), { recursive: true });
                 }
+
                 return true;
             },
             execute: (track) => {
@@ -206,13 +206,45 @@ class CacheAudio extends AsyncCycle<Track> {
                     });
 
                     // Если запись была завершена
-                    ffmpeg.stdout.once("end", () => {
+                    ffmpeg.stdout.once("end", async () => {
+                        const isValid = await this.validateFile(`${status.path}.opus`);
+                        if (!isValid) {
+                            fs.unlinkSync(`${status.path}.opus`);
+                            this.remove(track);
+                            return resolve(false);
+                        }
+
                         this.remove(track);
                         return resolve(true);
                     });
                 });
             }
         });
+    };
+
+    /**
+     * @description Проверяет, является ли файл корректным аудио
+     * @param filePath - Путь до файла
+     */
+    private async validateFile(filePath: string): Promise<boolean> {
+        try {
+            const stats = fs.statSync(filePath);
+            if (stats.size < 1024) return false;
+
+            const ffmpeg = new Process([
+                "-v", "error",
+                "-i", filePath,
+                "-f", "null",
+                "-"
+            ]);
+
+            return new Promise((resolve) => {
+                ffmpeg.stdout.once("end", () => resolve(true));
+                ffmpeg.stdout.once("error", () => resolve(false));
+            });
+        } catch (err) {
+            return false;
+        }
     };
 
     /**

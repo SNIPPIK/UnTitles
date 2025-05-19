@@ -39,13 +39,14 @@ import { db} from "@app/db";
             // Подключаем осколок к discord
             client.login(env.get("token.discord"))
                 // Что делаем после подключения к discord api
-                .finally(() => {
+                .finally(async () => {
                     // Загруженные кнопки
                     db.buttons.register();
                     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
 
                     // Загружаем платформы
-                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.platforms.supported.length} APIs Supported, ${db.api.platforms.authorization.length} APIs Unauthorized`)}`);
+                    await db.api.startWorker();
+                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow} APIs`)}`);
 
                     // Загружаем события
                     db.events.register(client);

@@ -11,6 +11,7 @@
     "paths": {
       "@handler": ["./handlers/index"],
       "@handler/*": ["./handlers/*"],
+      "@worker/*": ["./workers/*"],
 
       "@structures/*": ["./structures/*"],
       "@structures": ["./structures/index"],

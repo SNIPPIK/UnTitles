@@ -28,7 +28,7 @@ export class RestObject {
      * @public
      */
     public get allow() {
-        return this.platforms.supported.filter((platform) => platform.auth);
+        return Object.values(this.platforms.supported).filter(api => api.auth);
     };
 
     /**
@@ -36,15 +36,9 @@ export class RestObject {
      * @public
      */
     public constructor() {
-        this.worker = new Worker(path.resolve("src/services/worker/rest/index.js"), {
+        this.worker = new Worker(path.resolve("src/workers/RestAPIServerThread"), {
             execArgv: ["-r", "tsconfig-paths/register"],
-            workerData: null
-        });
-
-        // Получаем данные о загруженных платформах
-        this.worker.postMessage({data: true});
-        this.worker.once("message", (data) => {
-            this.platforms = data;
+            workerData: { rest: true }
         });
 
         // Если возникнет ошибка
@@ -52,60 +46,79 @@ export class RestObject {
     };
 
     /**
-     * @description Создание класса для взаимодействия с платформой
-     * @return APIRequest
+     * @description Функция для инициализации worker
      * @public
      */
-    protected worker_request = (platform: RestServerSide.API["name"], payload: string, options?: {audio: boolean}): Promise<Track | Track[] | Track.list | Error> => {
-        const used = this.platforms.supported.find((plt) => plt.name === platform);
-        const baseAPI: RestServerSide.APIBase = {
-            name: used.name,
-            url: used.url,
-            color: used.color
-        };
+    public startWorker = () => {
+        return new Promise(resolve => {
+            // Получаем данные о загруженных платформах
+            this.worker.postMessage({data: true});
+            this.worker.once("message", (data) => {
+                this.platforms = data;
+                return resolve(true);
+            });
+        });
+    };
 
+    /**
+     * @description Получаем платформу
+     * @param name - Имя платформы
+     */
+    private platform = (name: RestServerSide.API["name"] | string) => {
+        const platform = this.platforms.supported[name];
+        if (platform) return platform;
+
+        return this.allow.find((api) => api.filter.exec(name) !== null);
+    };
+
+    /**
+     * @description Создание класса для взаимодействия с платформой
+     * @public
+     */
+    protected worker_request = (platform: RestServerSide.API, payload: string, options?: {audio: boolean}): Promise<Track | Track[] | Track.list | Error> => {
+        const baseAPI: RestServerSide.APIBase = {
+            name: platform.name,
+            url: platform.url,
+            color: platform.color
+        };
         return new Promise((resolve) => {
+            // Передает данные запроса
+            this.worker.postMessage({
+                platform: platform.name,
+                payload,
+                options
+            });
+
             const handleMessage = (message: RestServerSide.Result) => {
                 // Отключаем эту функцию из-за ненадобности
-                this.worker.off('message', handleMessage);
+                this.worker.off("message", handleMessage);
+
+                if (message.result instanceof Error) {
+                    console.error(message);
+                    return resolve(message.result);
+                }
 
                 // Если статус удачный
                 if (message.status === "success") {
-                    if (message.result instanceof Error) {
-                        return resolve(message.result);
+                    const { result } = message;
+
+                    if (Array.isArray(result)) {
+                        return resolve(result.map((item) => new Track(item, baseAPI)));
                     }
 
-                    switch (message.type) {
-                        case "track": {
-                            const track = new Track(message.result, baseAPI);
-                            return resolve(track);
-                        }
-
-                        case "album":
-                        case "playlist": {
-                            return resolve({
-                                ...message.result,
-                                items: message.result.items.map((item) => new Track(item, baseAPI)),
-                            });
-                        }
-
-                        case "artist":
-                        case "search": {
-                            return resolve(message.result.map((item) => new Track(item, baseAPI)));
-                        }
+                    if (typeof result === "object" && "items" in result) {
+                        return resolve({
+                            ...result,
+                            items: result.items.map((item) => new Track(item, baseAPI)),
+                        });
                     }
-                }
 
-                else if (message.status === "error") {
-                    return resolve(new Error(message.result as any));
+                    return resolve(new Track(result, baseAPI));
                 }
             };
 
-            // Передает данные запроса
-            this.worker.postMessage({ platform, payload, options });
-
             // Ждем ответ от потока
-            this.worker.on('message', handleMessage);
+            this.worker.on("message", handleMessage);
         });
     };
 
@@ -114,8 +127,8 @@ export class RestObject {
      * @return APIRequest
      * @public
      */
-    public request(name: RestServerSide.API["name"]): RestClientSide.Request | null {
-        const platform = this.platforms.supported.find(file => file.name === name);
+    public request = (name: RestServerSide.API["name"] | string): RestClientSide.Request | null => {
+        const platform = this.platform(name);
         return platform ? new RestClientSide.Request(platform) : null;
     };
 
@@ -126,32 +139,33 @@ export class RestObject {
      */
     public fetch = async (track: Track): Promise<string | Error | null> => {
         try {
-            // Проверяем, если платформа может сама выдавать данные о треке
-            if (!this.platforms.authorization.includes(track.api.name) && !this.platforms.audio.includes(track.api.name)) {
-                const api = this.request(track.api.name).request<"track">(track.url, { audio: true });
+            const { name, artist, url, api } = track;
+            const { authorization, audio } = this.platforms;
 
-                const song = await api.request();
-                if (song instanceof Error) return song;
-
-                return song.link;
+            // Если платформа поддерживает получение аудио
+            if (!authorization.includes(api.name) && !audio.includes(api.name)) {
+                const song = await this.request(api.name).request<"track">(url, { audio: true }).request();
+                return song instanceof Error ? song : song.link;
             }
 
-            // Ищем платформу с поддержкой аудио и запросов
-            const platform = this.request(this.platforms.supported.find(plt => plt.requests.length >= 2 && plt.audio).name);
+            // Поиск платформы с аудио и запросами
+            const platform = this.allow.find(plt => plt.requests.length >= 2 && plt.audio);
+            if (!platform) return new Error("No suitable platform found");
 
-            // Ищем трек по имени артиста и названия
-            const tracks = await platform.request<"search">(`${track.artist.title} - ${track.name}`).request();
+            const platformAPI = this.request(platform.name);
+
+            // Поиск трека
+            const searchQuery = `${artist.title} ${name} (Lyric)`;
+            const tracks = await platformAPI.request<"search">(searchQuery).request();
             if (tracks instanceof Error) return tracks;
-            else if (tracks.length === 0) return new Error(`Fail searching tracks`);
+            if (!tracks.length) return new Error("No tracks found");
 
-            // Получаем исходник трека
-            const song = await platform.request<"track">(tracks[0]?.url, {audio: true}).request();
-            if (song instanceof Error) return song;
-            else if (!song.link) return Error("Fail getting link");
+            // Получение исходника
+            const song = await platformAPI.request<"track">(tracks[0]?.url, { audio: true }).request();
+            return song instanceof Error ? song : song.link ?? new Error("Link not found");
 
-            return song.link;
         } catch (err) {
-            return err instanceof Error ? err : new Error("Unknown error occurred");
+            return err instanceof Error ? err : new Error("Unexpected error");
         }
     };
 }
@@ -246,8 +260,8 @@ export namespace RestClientSide {
 
                     // Скорее всего надо произвести поиск
                     return item.name === "search";
-                }).name as RestClientSide.ResultType<T>,
-                request: () => db.api["worker_request"](this.platform, payload as any, options) as Promise<RestClientSide.ResultData<T>>
+                })?.name as RestClientSide.ResultType<T>,
+                request: () => db.api["worker_request"](this._api, payload as any, options) as Promise<RestClientSide.ResultData<T>>
             }
         };
     }
@@ -445,7 +459,7 @@ export namespace RestServerSide {
          * @description Все загруженные платформы
          * @protected
          */
-        supported: API[];
+        supported: Record<API["name"], API>;
 
         /**
          * @description Платформы без данных для авторизации

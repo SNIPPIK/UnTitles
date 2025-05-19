@@ -1,4 +1,4 @@
-import {Youtube_decoder_native} from "@service/worker/crypto/youtube";
+import {Youtube_decoder_native} from "@worker/YouTubeSignatureExtractor";
 import type {RestServerSide} from "@handler/rest/apis";
 import {httpsClient} from "@handler/rest";
 import {locale} from "@service/locale";

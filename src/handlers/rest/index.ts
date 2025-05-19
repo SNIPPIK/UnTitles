@@ -172,16 +172,16 @@ export class httpsClient {
      * @public
      */
     public get toXML(): Promise<Error | string[]> {
-        return new Promise((resolve) => {
-            this.send().then((body) => {
-                // Если была получена ошибка
-                if (body instanceof Error) return resolve(Error("Not found XML data!"));
+        return new Promise(async (resolve) => {
+            const body = await this.send() as string | Error;
 
-                // Ищем данные в XML странице для дальнейшего вывода
-                const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
-                const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
-                return resolve(filtered.filter((text) => text.trim() !== ""));
-            });
+            // Если была получена ошибка
+            if (body instanceof Error) return resolve(Error("Not found XML data!"));
+
+            // Ищем данные в XML странице для дальнейшего вывода
+            const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
+            const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
+            return resolve(filtered.filter((text) => text.trim() !== ""));
         });
     };
 }
