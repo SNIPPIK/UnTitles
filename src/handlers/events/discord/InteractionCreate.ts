@@ -416,8 +416,16 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
  * @description Получаем тип канала, для работы все сервера
  */
 function isBased(ctx: CommandInteraction) {
-    if (ctx.channel.type === ChannelType.GuildText || ctx.channel.type === ChannelType.GuildAnnouncement || ctx.channel.type === ChannelType.GuildStageVoice || ctx.channel.type === ChannelType.GuildVoice) return "guild";
-    else if (ctx.channel.type === ChannelType.PrivateThread) return "private";
+    // Проверяем на наличие типа канала
+    if (ctx.channel?.type !== undefined) {
+        // Если используется на сервере
+        if (ctx.channel?.type === ChannelType.GuildText || ctx.channel?.type === ChannelType.GuildAnnouncement || ctx.channel?.type === ChannelType.GuildStageVoice || ctx.channel?.type === ChannelType.GuildVoice) return "guild";
+
+        // Если используется в личном чате
+        else if (ctx.channel?.type === ChannelType.PrivateThread) return "private";
+    }
+
+    // Если используется на стороннем сервере
     return "public";
 }
 
