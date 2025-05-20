@@ -1,137 +1,12 @@
-import {StringSelectMenuBuilder, ActionRowBuilder, Colors} from "discord.js";
-import {CommandInteraction, CycleInteraction} from "@structures";
+import {StringSelectMenuBuilder, ActionRowBuilder} from "discord.js";
 import {AudioPlayer, RepeatType} from "@service/player";
 import filters from "@service/player/filters.json";
-import {Logger, Collection, SyncCycle} from "@utils";
+import {CommandInteraction} from "@structures";
 import {QueueMessage} from "./message";
-import {locale} from "@service/locale";
+import {Logger} from "@utils";
 import {Track} from "./track";
 import {env} from "@app/env";
 import {db} from "@app/db";
-
-/**
- * @author SNIPPIK
- * @description Загружаем класс для хранения очередей, плееров, циклов
- * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
- * @extends Collection
- * @class Queues
- * @public
- */
-export class Queues<T extends Queue> extends Collection<T> {
-    /**
-     * @description Хранилище циклов для работы музыки
-     * @readonly
-     * @public
-     */
-    public readonly cycles = new AudioCycles();
-
-    /**
-     * @description Здесь хранятся модификаторы аудио
-     * @readonly
-     * @public
-     */
-    public readonly options = {
-        optimization: parseInt(env.get("duration.optimization")),
-        volume: parseInt(env.get("audio.volume")),
-        fade: parseInt(env.get("audio.fade"))
-    };
-
-    /**
-     * @description Перезапуск плеера или же перезапуск проигрывания
-     * @param player - Плеер
-     * @public
-     */
-    public set restartPlayer(player: AudioPlayer) {
-        // Если плеер удален из базы
-        if (!this.cycles.players.has(player)) {
-            // Добавляем плеер в базу цикла для отправки пакетов
-            this.cycles.players.add(player);
-        }
-
-        // Если у плеера стоит пауза
-        if (player.status === "player/pause") player.resume();
-
-        // Запускаем функцию воспроизведения треков
-        player.play();
-    };
-
-    /**
-     * @description отправляем сообщение о перезапуске бота
-     * @public
-     */
-    public get waitReboot() {
-        let timeout = 0;
-
-        // На все сервера отправляем сообщение о перезапуске
-        for (const queue of this.array) {
-            // Если плеер запущен
-            if (this.cycles.players.has(queue.player)) {
-                const time = queue.tracks.track.time.total * 1e3
-
-                // Если время ожидания меньше чем в очереди
-                if (timeout < time) timeout = time;
-            }
-
-            // Сообщение о перезапуске
-            queue.message.send({
-                withResponse: false,
-                embeds: [
-                    {
-                        description: locale._(queue.message.locale, `bot.reboot.message`),
-                        color: Colors.Yellow
-                    }
-                ]
-            }).then((msg) => setTimeout(() => msg.delete().catch(() => null), 10e3));
-
-            // Тихо удаляем очередь
-            this.remove(queue.guild.id, true);
-        }
-
-        return timeout;
-    };
-
-    /**
-     * @description Ультимативная функция, позволяет как добавлять треки так и создавать очередь или переподключить очередь к системе
-     * @param message - Сообщение пользователя
-     * @param item    - Добавляемый объект
-     * @private
-     */
-    public create = (message: CommandInteraction, item: Track.list | Track) => {
-        let queue = this.get(message.guild.id);
-
-        // Проверяем есть ли очередь в списке, если нет то создаем
-        if (!queue) queue = new Queue(message) as T;
-        else {
-            // Значит что плеера нет в циклах
-            if (!this.cycles.players.has(queue.player)) {
-                setImmediate(() => {
-                    // Если добавлен трек
-                    if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
-
-                    // Если очередь перезапущена
-                    else if (!item) queue.player.tracks.position = 0;
-
-                    // Если добавлен плейлист
-                    else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
-
-                    // Перезапускаем плеер
-                    this.restartPlayer = queue.player;
-                });
-            }
-        }
-
-        // Отправляем сообщение о том что было добавлено
-        if ("items" in item || queue.tracks.total > 0) {
-            db.events.emitter.emit("message/push", message, item);
-        }
-
-        // Добавляем треки в очередь
-        for (const track of (item["items"] ?? [item]) as Track[]) {
-            track.user = message.member.user;
-            queue.tracks.push(track);
-        }
-    };
-}
 
 /**
  * @author SNIPPIK
@@ -353,34 +228,39 @@ export class Queue extends BaseQueue {
      * @public
      */
     public get componentEmbed() {
-        const {api, artist, image, name, user} = this.tracks.track;
-        return {
-            color: api.color, thumbnail: image,
-            author: { name: artist.title, url: artist.url, iconURL: artist.image.url },
-            footer: {
-                text: `${user.username} ${this.tracks.total > 1 ? `| 🎵 ${this.player.tracks.position + 1} - ${this.player.tracks.total} 🎶` : ""}`,
-                iconURL: user.avatar
-            },
-            fields: [
-                // Текущий трек
-                {
-                    name: "",
-                    value: `\`\`\`${name}\`\`\`` + this.player.progress
+        try {
+            const {api, artist, image, name, user} = this.tracks.track;
+            return {
+                color: api.color, thumbnail: image,
+                author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
+                footer: {
+                    text: `${user.username} ${this.tracks.total > 1 ? `| 🎵 ${this.player.tracks.position + 1} - ${this.player.tracks.total} 🎶` : ""}`,
+                    iconURL: user.avatar
                 },
-
-                // Следующий трек или треки
-                this.tracks.size > 0 ? (() => {
-                    const tracks = (this.tracks.array(+3) as Track[]).map((track, index) => {
-                        return `${index + 2} - ${track.name_replace}`;
-                    });
-
-                    return {
+                fields: [
+                    // Текущий трек
+                    {
                         name: "",
-                        value: tracks.join("\n")
-                    };
-                })() : null
-            ]
-        };
+                        value: `\`\`\`${name}\`\`\`` + this.player.progress
+                    },
+
+                    // Следующий трек или треки
+                    this.tracks.size > 0 ? (() => {
+                        const tracks = (this.tracks.array(+3) as Track[]).map((track, index) => {
+                            return `${index + 2} - ${track.name_replace}`;
+                        });
+
+                        return {
+                            name: "",
+                            value: tracks.join("\n")
+                        };
+                    })() : null
+                ]
+            };
+        } catch (error) {
+            Logger.log("ERROR", `[Queue/${this.guild.id}]: ${error}`);
+            return null;
+        }
     };
 
     /**
@@ -558,81 +438,5 @@ class QueueButtons {
         this.updateButton(secondRow, 0, { disabled: !isMultipleTracks });
 
         return this.components;
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Циклы для работы аудио, лучше не трогать без понимания как все это работает
- * @class AudioCycles
- * @private
- */
-class AudioCycles {
-    /**
-     * @author SNIPPIK
-     * @description Цикл для работы плеера, необходим для отправки пакетов
-     * @class AudioPlayers
-     * @readonly
-     * @public
-     */
-    public readonly players = new class AudioPlayers<T extends AudioPlayer> extends SyncCycle<T> {
-        public constructor() {
-            super({
-                duration: 20,
-                filter: (item) => item.voice && item.playing,
-                execute: (player) => {
-                    const connection = player.voice.connection;
-
-                    // Отправляем пакет в голосовой канал
-                    connection.packet = player.audio.current.packet;
-                }
-            });
-        };
-    };
-
-    /**
-     * @author SNIPPIK
-     * @description Цикл для обновления сообщений, необходим для красивого прогресс бара. :D
-     * @class Messages
-     * @readonly
-     * @public
-     */
-    public readonly messages = new class Messages<T extends CycleInteraction> extends SyncCycle<T> {
-        public constructor() {
-            super({
-                duration: 20e3,
-                custom: {
-                    remove: async (item) => {
-                        try {
-                            await item.delete();
-                        } catch {
-                            Logger.log("ERROR", `Failed delete message in cycle!`);
-                        }
-                    },
-                    push: (item) => {
-                        const old = this.array.find(msg => msg.guild.id === item.guild.id);
-                        // Удаляем прошлое сообщение
-                        if (old) this.remove(old);
-                    }
-                },
-                filter: (message) => message["editable"],
-                execute: async (message) => {
-                    const queue = db.queues.get(message.guild.id);
-
-                    // Если нет очереди
-                    if (!queue) this.remove(message);
-
-                    // Если есть поток в плеере
-                    else if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
-                        try {
-                            await message.edit({embeds: [queue.componentEmbed], components: queue.components});
-                        } catch {
-                            // Если при обновлении произошла ошибка
-                            this.remove(message);
-                        }
-                    }
-                }
-            });
-        };
     };
 }

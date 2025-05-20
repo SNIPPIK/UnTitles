@@ -1,5 +1,6 @@
 import { parentPort, workerData } from "node:worker_threads";
 import type {RestServerSide} from "@handler/rest/apis";
+import {initDatabase} from "@app/db";
 import {handler} from "@handler";
 import {env} from "@app/env";
 
@@ -78,6 +79,7 @@ class RestServer extends handler<RestServerSide.API> {
  * @private
  */
 if (parentPort && workerData.rest) {
+    initDatabase(null);
     const rest = new RestServer();
 
     // Получаем ответ от основного потока

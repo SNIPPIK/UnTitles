@@ -2,7 +2,7 @@ import {
     AnySelectMenuInteraction,
     AutocompleteInteraction,
     ButtonInteraction,
-    CacheType,
+    CacheType, ChannelType,
     ChatInputCommandInteraction,
     Colors,
     Events
@@ -310,7 +310,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             }
         }
 
-        if (permissions) {
+        if (permissions && isBased(ctx) === "guild") {
             // Проверка прав пользователя
             const userPermissions = ctx.member?.permissions;
             if (permissions.user && !permissions.user.every(perm => userPermissions?.has(perm))) {
@@ -327,7 +327,12 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         // Выполняем команду
         return command.execute({
             message: ctx,
-            args: ctx.options?.["_hoistedOptions"]?.map((f) => `${f.value}`),
+            args: ctx.options?.["_hoistedOptions"]?.map((f) => {
+                const value = f[f.name];
+
+                if (value) return value;
+                return f.value;
+            }),
             type: ctx.options?.["_subcommand"]
         });
     };
@@ -344,7 +349,12 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         if (command && command.autocomplete) {
             return command.autocomplete({
                 message: ctx,
-                args: ctx.options?.["_hoistedOptions"]?.map((f) => `${f.value}`),
+                args: ctx.options?.["_hoistedOptions"]?.map((f) => {
+                    const value = f[f.name];
+
+                    if (value) return value;
+                    return f.value;
+                }),
                 type: ctx.options?.["_subcommand"]
             })
         }
@@ -399,6 +409,16 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             });
         }
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Получаем тип канала, для работы все сервера
+ */
+function isBased(ctx: CommandInteraction) {
+    if (ctx.channel.type === ChannelType.GuildText || ctx.channel.type === ChannelType.GuildAnnouncement || ctx.channel.type === ChannelType.GuildStageVoice || ctx.channel.type === ChannelType.GuildVoice) return "guild";
+    else if (ctx.channel.type === ChannelType.PrivateThread) return "private";
+    return "public";
 }
 
 /**

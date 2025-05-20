@@ -46,6 +46,7 @@ class message_error extends Assign<Event<"message/error">> {
                     withResponse: true
                 });
 
+                // Если есть ответ от отправленного сообщения
                 if (message) setTimeout(() => message.delete().catch(() => {}), 20e3);
             }
         });
@@ -99,6 +100,7 @@ class message_push extends Assign<Event<"message/push">> {
                     }]
                 });
 
+                // Если есть ответ от отправленного сообщения
                 if (msg) setTimeout(() => msg.delete().catch(() => {}), 12e3);
             }
         });
@@ -119,8 +121,10 @@ class message_playing extends Assign<Event<"message/playing">> {
             type: "player",
             once: false,
             execute: async (queue) => {
+                // Отправляем сообщение
                 const message = await queue.message.send({embeds: [queue.componentEmbed], components: queue.components, withResponse: true});
 
+                // Если есть ответ от отправленного сообщения
                 if (message) {
                     // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
                     if (!db.queues.cycles.messages.has(message)) {

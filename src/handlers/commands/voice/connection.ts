@@ -1,5 +1,5 @@
+import {BaseCommand, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType, Colors, GuildMember} from "discord.js";
-import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
 import {db} from "@app/db";
@@ -19,7 +19,7 @@ import {db} from "@app/db";
         "en-US": "Interaction with voice connections",
         "ru": "Взаимодействие с голосовыми подключениями"
     },
-    dm_permission: false
+    integration_types: ["GUILD_INSTALL"]
 })
 @SlashCommandSubCommand({
     names: {
@@ -84,7 +84,7 @@ import {db} from "@app/db";
         }
     ]
 })
-class Command_Voice extends Assign<Command> {
+class Command_Voice extends Assign< BaseCommand > {
     public constructor() {
         super({
             permissions: {

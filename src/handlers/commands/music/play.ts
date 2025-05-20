@@ -1,4 +1,4 @@
-import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
+import {BaseCommand, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
@@ -19,7 +19,7 @@ import {db} from "@app/db";
         "en-US": "Turning on music, or searching for music!",
         "ru": "Включение музыки, или поиск музыки!"
     },
-    dm_permission: false,
+    integration_types: ["GUILD_INSTALL"]
 })
 @SlashCommandSubCommand({
     names: {
@@ -87,7 +87,7 @@ import {db} from "@app/db";
         "ru": "Принудительное завершение проигрывания музыки!"
     },
 })
-class PlayCommand extends Assign<Command> {
+class PlayCommand extends Assign< BaseCommand > {
     public constructor() {
         super({
             rules: ["voice", "another_voice"],

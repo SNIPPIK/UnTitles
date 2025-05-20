@@ -1,4 +1,4 @@
-import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
+import {BaseCommand, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import filters from "@service/player/filters.json"
 import type {AudioFilter} from "@service/player";
@@ -21,7 +21,7 @@ import {db} from "@app/db";
         "en-US": "Setting audio filters",
         "ru": "Управление фильтрами аудио!"
     },
-    dm_permission: false
+    integration_types: ["GUILD_INSTALL"]
 })
 @SlashCommandSubCommand({
     names: {
@@ -97,7 +97,7 @@ import {db} from "@app/db";
         }
     ]
 })
-class AudioFiltersCommand extends Assign<Command> {
+class AudioFiltersCommand extends Assign< BaseCommand > {
     public constructor() {
         super({
             rules: ["queue", "voice", "another_voice", "player-not-playing"],

@@ -64,25 +64,6 @@ export class QueueMessage<T extends CommandInteraction> {
     public get deferred() {
         return this._original["deferred"];
     };
-
-    /**
-     * @description Тип допустимого сообщения, какой тип сообщения можно использовать
-     * @public
-     */
-    public get type() {
-        // Если бот уже ответил на сообщение
-        if (this.replied && !this.deferred) return "followUp";
-
-        // Если можно просто отредактировать сообщение
-        else if (this.deferred && !this.replied) return "editReply";
-
-        // Если можно дать ответ на сообщение
-        else if (!this.deferred && !this.replied) return "reply";
-
-        // Если нельзя отправить ответ
-        return "send";
-    };
-
     /**
      * @description Создаем класс для общения с discord api
      * @param _original - Класс сообщения
@@ -96,10 +77,15 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public send = (options: {embeds: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
-        const type = this.type;
+        // Если бот уже ответил на сообщение
+        if (this.replied && !this.deferred) return this._original.followUp(options as any) as any;
 
-        // Отправляем обычное сообщение
-        if (type === "send") return this._original.channel[type](options as any);
-        return this._original[type](options as any) as any;
+        // Если можно просто отредактировать сообщение
+        else if (this.deferred && !this.replied) return this._original.editReply(options as any) as any;
+
+        // Если можно дать ответ на сообщение
+        else if (!this.deferred && !this.replied) return this._original.reply(options as any) as any;
+
+        return this._original.channel.send(options as any);
     };
 }

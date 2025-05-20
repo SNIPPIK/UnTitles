@@ -1,5 +1,5 @@
+import {BaseCommand, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
 import {db} from "@app/db";
@@ -19,7 +19,7 @@ import {db} from "@app/db";
         "en-US": "Jump to a specific track time!",
         "ru": "Переход к конкретному времени трека!"
     },
-    dm_permission: false
+    integration_types: ["GUILD_INSTALL"]
 })
 @SlashCommandSubCommand({
     type: ApplicationCommandOptionType["String"],
@@ -33,7 +33,7 @@ import {db} from "@app/db";
     },
     required: true,
 })
-class SeekTrackCommand extends Assign<Command> {
+class SeekTrackCommand extends Assign< BaseCommand > {
     public constructor() {
         super({
             permissions: {

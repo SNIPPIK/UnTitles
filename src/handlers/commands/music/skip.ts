@@ -1,4 +1,4 @@
-import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
+import {BaseCommand, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType} from "discord.js";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
@@ -19,7 +19,7 @@ import {db} from "@app/db";
         "en-US": "Skip tracks to the specified track! The specified track will be current!",
         "ru": "Универсальная команда для управления позицией трека!"
     },
-    dm_permission: false
+    integration_types: ["GUILD_INSTALL"]
 })
 @SlashCommandSubCommand({
     names: {
@@ -99,7 +99,7 @@ import {db} from "@app/db";
         }
     ]
 })
-class SkipUtilityCommand extends Assign<Command> {
+class SkipUtilityCommand extends Assign< BaseCommand<number> > {
     public constructor() {
         super({
             permissions: {
@@ -107,7 +107,7 @@ class SkipUtilityCommand extends Assign<Command> {
             },
             rules: ["voice", "another_voice", "queue", "player-not-playing"],
             autocomplete: ({message, args, type}) => {
-                const number = parseInt(args[0]);
+                const number = args[0];
                 const queue = db.queues.get(message.guildId);
                 if (!queue || isNaN(number) || number <= 0) return null;
 
@@ -160,10 +160,14 @@ class SkipUtilityCommand extends Assign<Command> {
                 return message.respond(results);
             },
             execute: async ({message, args, type}) => {
-                const number = parseInt(args[0]);
+                const number = args[0];
                 const {player, tracks} = db.queues.get(message.guild.id);
+                const track = tracks.get(number);
 
-                const {name, url, api} = tracks.get(number);
+                // Если указан трек которого нет
+                if (!track) return null;
+
+                const {name, url, api} = track;
 
                 // Переходим к позиции
                 player.stop(number);

@@ -1,4 +1,4 @@
-import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
+import {BaseCommand, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
@@ -19,7 +19,7 @@ import {db} from "@app/db";
         "en-US": "Managing bot!",
         "ru": "Управление ботом!"
     },
-    dm_permission: false
+    integration_types: ["GUILD_INSTALL"]
 })
 @SlashCommandSubCommand({
     names: {
@@ -58,7 +58,7 @@ import {db} from "@app/db";
         }
     ]
 })
-class WorkBotCommand extends Assign<Command> {
+class WorkBotCommand extends Assign< BaseCommand > {
     public constructor() {
         super({
             owner: true,
@@ -141,8 +141,7 @@ class WorkBotCommand extends Assign<Command> {
     descriptions: {
         "en-US": "Manage profile bot!",
         "ru": "Управление профилем бота!"
-    },
-    dm_permission: false
+    }
 })
 @SlashCommandSubCommand({
     names: {
@@ -169,7 +168,7 @@ class WorkBotCommand extends Assign<Command> {
         }
     ]
 })
-class ManageBotCommand extends Assign<Command> {
+class ManageBotCommand extends Assign<BaseCommand> {
     public constructor() {
         super({
             owner: true,

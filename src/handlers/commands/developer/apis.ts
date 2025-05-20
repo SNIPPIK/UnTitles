@@ -1,4 +1,4 @@
-import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
+import {BaseCommand, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
 import {RestServerSide} from "@handler/rest/apis";
 import {locale} from "@service/locale";
@@ -20,7 +20,7 @@ import {db} from "@app/db";
         "en-US": "Managing API work inside the bot!",
         "ru": "Управление системой APIs внутри бота!"
     },
-    dm_permission: false
+    integration_types: ["GUILD_INSTALL"]
 })
 @SlashCommandSubCommand({
     names: {
@@ -81,7 +81,7 @@ import {db} from "@app/db";
         }
     ]
 })
-class APISCommand extends Assign<Command> {
+class APISCommand extends Assign< BaseCommand > {
     public constructor() {
         super({
             owner: true,

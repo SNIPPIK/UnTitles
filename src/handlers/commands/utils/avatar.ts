@@ -1,7 +1,8 @@
-import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
-import {ApplicationCommandOptionType, MessageFlags} from "discord.js";
+import {SlashCommand, SlashCommandSubCommand, BaseCommand} from "@handler/commands";
+import {ApplicationCommandOptionType, MessageFlags, User} from "discord.js";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
+import {db} from "@app/db";
 
 /**
  * @author SNIPPIK
@@ -18,7 +19,8 @@ import {Assign} from "@utils";
         "en-US": "If you need to take a closer look at the user's avatar!",
         "ru": "Если надо глянуть аватар пользователя поближе!"
     },
-    dm_permission: false
+    integration_types: ["GUILD_INSTALL", "USER_INSTALL"],
+    contexts: ["GUILD", "BOT_DM", "PRIVATE_CHANNEL"]
 })
 @SlashCommandSubCommand({
     names: {
@@ -30,17 +32,18 @@ import {Assign} from "@utils";
         "ru": "Укажи пользователя!"
     },
     type: ApplicationCommandOptionType["User"],
-    required: true
+    required: true,
 })
-class AvatarCommand extends Assign<Command> {
+class AvatarCommand extends Assign< BaseCommand<User> > {
     public constructor() {
         super({
             permissions: {
                 client: ["ViewChannel", "SendMessages"]
             },
             execute: async ({message, args}) => {
-                const user = message.guild.members.cache.get(args[0]).user;
-                const avatar = user.avatarURL({size: 1024, forceStatic: false});
+                const user = args[0];
+                const me = message.client.user;
+                const avatar = user.avatar ? user.avatarURL({size: 1024, forceStatic: false}) : db.images.no_image;
 
                 // Отправляем сообщение в текстовый канал
                 return message.reply({
@@ -70,8 +73,8 @@ class AvatarCommand extends Assign<Command> {
                             timestamp: new Date() as any,
                             image: { url: avatar },
                             footer: {
-                                text: `${message.guild.members.me.user.username}`,
-                                icon_url: message.guild.members.me.user.avatarURL({size: 1024, forceStatic: false})
+                                text: `${me.username}`,
+                                icon_url: me.avatarURL({size: 1024, forceStatic: false})
                             }
                         }
                     ],

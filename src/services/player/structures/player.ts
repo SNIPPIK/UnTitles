@@ -134,7 +134,7 @@ export class AudioPlayer extends BasePlayer {
         if (this.status === "player/wait" || this.status === "player/pause") return false;
 
         // Если голосовое состояние не позволяет отправлять пакеты
-        else if (!this.voice.connection && this.voice.connection.ready) return false;
+        else if (!this.voice.connection && !this.voice.connection.ready) return false;
 
         // Если поток не читается, переходим в состояние ожидания
         else if (!this.audio.current || !this.audio.current?.readable) {

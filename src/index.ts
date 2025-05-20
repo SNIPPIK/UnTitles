@@ -3,6 +3,7 @@ import { isMainThread } from "node:worker_threads";
 import { Logger } from "@utils";
 import { env } from "@app/env";
 import { db} from "@app/db";
+import {initDatabase} from "./database";
 
 /**
  * @author SNIPPIK
@@ -35,6 +36,8 @@ import { db} from "@app/db";
             // Создаем класс осколка
             const client = new DiscordClient();
             const id = client.shardID;
+
+            initDatabase(client);
 
             // Подключаем осколок к discord
             client.login(env.get("token.discord"))

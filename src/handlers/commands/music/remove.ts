@@ -1,4 +1,4 @@
-import {Command, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
+import {BaseCommand, SlashCommand, SlashCommandSubCommand} from "@handler/commands";
 import {ApplicationCommandOptionType} from "discord.js";
 import {locale} from "@service/locale";
 import {Assign} from "@utils";
@@ -19,7 +19,7 @@ import {db} from "@app/db";
         "en-US": "Deleting a track from the queue, without the possibility of recovery!",
         "ru": "Удаление трека из очереди, без возможности восстановить!"
     },
-    dm_permission: false
+    integration_types: ["GUILD_INSTALL"]
 })
 @SlashCommandSubCommand({
     type: ApplicationCommandOptionType["Number"],
@@ -34,7 +34,7 @@ import {db} from "@app/db";
         "ru": "Номер трека!"
     }
 })
-class RemoveTrackCommand extends Assign<Command> {
+class RemoveTrackCommand extends Assign< BaseCommand<number> > {
     public constructor() {
         super({
             permissions: {
@@ -42,7 +42,7 @@ class RemoveTrackCommand extends Assign<Command> {
             },
             rules: ["voice", "another_voice", "queue", "player-not-playing"],
             autocomplete: ({message, args}) => {
-                const number = parseInt(args[0]);
+                const number = args[0];
                 const queue = db.queues.get(message.guildId);
                 if (!queue || isNaN(number) || number <= 0) return null;
 
@@ -74,7 +74,7 @@ class RemoveTrackCommand extends Assign<Command> {
                     const isTarget = i === index;
                     results.push({
                         name: `${i + 1}. ${isTarget ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
-                        value: i + 1
+                        value: i
                     });
                 }
 
@@ -82,14 +82,23 @@ class RemoveTrackCommand extends Assign<Command> {
             },
             execute: async ({message, args}) => {
                 const queue = db.queues.get(message.guild.id);
-                const number = parseInt(args[0]);
-                const {name, api, url} = queue.tracks.get(number);
+                const number = args[0];
+                const track = queue.tracks.get(number);
 
-                // Если выбран текущий трек
-                if (number === queue.tracks.position) queue.player.stop(queue.tracks.position + 1);
+                // Если указан трек которого нет
+                if (!track) return null;
+
+                const {name, url, api} = track;
 
                 // Удаляем трек и очереди
                 queue.tracks.remove(number);
+
+                // Если выбран текущий трек
+                if (number === queue.tracks.position) {
+                    // Если треков нет в очереди
+                    if (!queue.tracks.total) return queue.cleanup();
+                    queue.player.stop(queue.tracks.position);
+                }
 
                 return message.reply({
                     embeds: [

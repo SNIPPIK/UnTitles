@@ -1,5 +1,5 @@
-import type {LocalizationMap, Locale, Permissions} from "discord-api-types/v10";
 import {ApplicationCommandOption, Client, Routes, PermissionsString} from "discord.js";
+import type {LocalizationMap, Locale, Permissions} from "discord-api-types/v10";
 import {CommandInteraction, CompeteInteraction} from "@structures";
 import filters from "@service/player/filters.json";
 import {AudioFilter} from "@service/player";
@@ -130,39 +130,17 @@ export class Commands extends handler<Command> {
 
 /**
  * @author SNIPPIK
- * @description Интерфейс для команд
- * @interface Command
+ * @description Базовый интерфейс для команд, что должна включать в себя команда
+ * @interface BaseCommand
  */
-export interface Command {
+export interface BaseCommand<Argument = string> {
     /**
-     * @description Название команды
-     * @private
+     * @description Команду может использовать только разработчик
+     * @default false
+     * @readonly
+     * @public
      */
-    name?: string;
-
-    /**
-     * @description Переводы названия команды на другие языки
-     * @private
-     */
-    name_localizations?: LocalizationMap;
-
-    /**
-     * @description Описание команды
-     * @private
-     */
-    description?: string;
-
-    /**
-     * @description Описание команды на другие языки
-     * @private
-     */
-    description_localizations?: LocalizationMap;
-
-    /**
-     * @description Можно ли использовать команду в личном текстовом канале
-     * @private
-     */
-    dm_permission?: boolean;
+    readonly owner?: boolean;
 
     /**
      * @description Управление правами
@@ -179,44 +157,6 @@ export interface Command {
          */
         readonly client: PermissionsString[]
     };
-
-    /**
-     * @description Права на использование команды
-     * @private
-     */
-    default_member_permissions?: Permissions | null | undefined;
-
-    /**
-     * @description 18+ доступ
-     * @private
-     */
-    nsfw?: boolean;
-
-    /**
-     * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
-     * @public
-     */
-    readonly integration_types?: number[];
-
-    /**
-     * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
-     * @private
-     */
-    readonly contexts?: number[];
-
-    /**
-     * @description Доп параметры для работы slashCommand
-     * @private
-     */
-    readonly options?: ApplicationCommandOption[];
-
-    /**
-     * @description Команду может использовать только разработчик
-     * @default false
-     * @readonly
-     * @public
-     */
-    readonly owner?: boolean;
 
     /**
      * @description Права для использования той или иной команды
@@ -247,7 +187,7 @@ export interface Command {
         /**
          * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
          */
-        args?: SlashCommand.Component["choices"][number]["value"][];
+        args?: Argument[];
     }) => any;
 
     /**
@@ -265,13 +205,75 @@ export interface Command {
         /**
          * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
          */
-        args?: SlashCommand.Component["choices"][number]["value"][];
+        args?: Argument[];
 
         /**
          * @description Тип опции, будет указан если используется много ступенчатая команда
          */
         type?: string
     }) => any;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Интерфейс команды прошедший парсинг и все декораторы
+ * @warnig НЕ СОЗДАВАТЬ ПО НЕМУ КОМАНДЫ ЭТОТ ИНТЕРФЕЙС ЯВЛЯФЕТСЯ ТИПИЗАЦИОННЫМ И НЕ ВСЕ ПАРАМЕТРЫ МОГУТ БЫТЬ ПРАВИЛЬНО СОЗДАНЫ
+ * @interface Command
+ */
+export interface Command extends BaseCommand {
+    /**
+     * @description Название команды
+     * @private
+     */
+    name?: string;
+
+    /**
+     * @description Переводы названия команды на другие языки
+     * @private
+     */
+    name_localizations?: LocalizationMap;
+
+    /**
+     * @description Описание команды
+     * @private
+     */
+    description?: string;
+
+    /**
+     * @description Описание команды на другие языки
+     * @private
+     */
+    description_localizations?: LocalizationMap;
+
+    /**
+     * @description Права на использование команды
+     * @private
+     */
+    default_member_permissions?: Permissions | null | undefined;
+
+    /**
+     * @description 18+ доступ
+     * @private
+     */
+    nsfw?: boolean;
+
+    /**
+     * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
+     * @public
+     */
+    readonly integration_types?: (0 | 1)[];
+
+    /**
+     * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
+     * @private
+     */
+    readonly contexts?: (0 | 1 | 2)[];
+
+    /**
+     * @description Доп параметры для работы slashCommand
+     * @private
+     */
+    readonly options?: ApplicationCommandOption[];
 }
 
 /**
@@ -289,18 +291,14 @@ export function SlashCommand(options: SlashCommand.Options) {
     const description = options.descriptions[description_key];
     const description_localizations = options.descriptions;
 
-
     // Загружаем данные в класс
     return function (target: Function) {
         target.prototype.name = name;
         target.prototype["name_localizations"] = name_localizations;
         target.prototype.description = description;
         target.prototype["description_localizations"] = description_localizations;
-        target.prototype["default_member_permissions"] = null;
-        target.prototype.dm_permission = options?.dm_permission ?? null;
-        target.prototype["integration_types"] = [0];
-        target.prototype["contexts"] = [0];
-        target.prototype["nsfw"] = false;
+        target.prototype["integration_types"] = options.integration_types ? options.integration_types.map((type) => type === "GUILD_INSTALL" ? 0 : 1) : [0];
+        target.prototype["contexts"] = options.contexts ? options.contexts.map((type) => type === "GUILD" ? 0 : type === "BOT_DM" ? 1 : 2) : [0];
     };
 }
 
@@ -341,6 +339,7 @@ export function SlashCommandSubCommand(component: SlashCommand.Component) {
 /**
  * @author SNIPPIK
  * @description Интерфейсы slash-command
+ * @namespace SlashCommand
  */
 export namespace SlashCommand {
     /**
@@ -354,20 +353,32 @@ export namespace SlashCommand {
          * @example Первое именование будет выставлено для других языков как по-умолчанию
          * @public
          */
-        names: LocalizationMap;
+        readonly names: LocalizationMap;
 
         /**
          * @description Описание команды на розных языках
          * @example Первое именование будет выставлено для других языков как по-умолчанию
          * @public
          */
-        descriptions: LocalizationMap;
+        readonly descriptions: LocalizationMap;
 
         /**
-         * @description Можно ли использовать эту команду в личных чатах
+         * @description Права на использование команды
+         * @private
+         */
+        default_member_permissions?: Permissions | null | undefined;
+
+        /**
+         * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
          * @public
          */
-        dm_permission?: boolean;
+        readonly integration_types?: ("GUILD_INSTALL" | "USER_INSTALL")[];
+
+        /**
+         * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
+         * @private
+         */
+        readonly contexts?: ("GUILD" | "BOT_DM" | "PRIVATE_CHANNEL")[];
     }
 
     /**

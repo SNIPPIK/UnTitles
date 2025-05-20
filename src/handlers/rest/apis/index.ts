@@ -157,11 +157,19 @@ export class RestObject {
             // Поиск трека
             const searchQuery = `${artist.title} ${name} (Lyric)`;
             const tracks = await platformAPI.request<"search">(searchQuery).request();
+
             if (tracks instanceof Error) return tracks;
-            if (!tracks.length) return new Error("No tracks found");
+            else if (!tracks.length) return new Error("No tracks found");
+
+            const findTrack = tracks.find((song) => {
+                return Math.abs(song.time.total - track.time.total) <= 10;
+            });
+
+            // Если отфильтровать треки не удалось
+            if (!findTrack) return new Error("Fail filter tracks");
 
             // Получение исходника
-            const song = await platformAPI.request<"track">(tracks[0]?.url, { audio: true }).request();
+            const song = await platformAPI.request<"track">(findTrack?.url, { audio: true }).request();
             return song instanceof Error ? song : song.link ?? new Error("Link not found");
 
         } catch (err) {
@@ -301,7 +309,7 @@ export namespace RestServerSide {
      * @type ResultAPIs
      * @public
      */
-    export type ResultAPIs<T> = T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "author" ? APIs.artist : APIs.search
+    export type ResultAPIs<T> = T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "artist" | "search" ? APIs.artist : APIs.search
 
     /**
      * @author SNIPPIK

@@ -1,12 +1,12 @@
 import { DiscordGatewayAdapterCreator } from "@structures";
 import { CacheUtility } from "@service/player/utils/cache";
-import { isMainThread } from "node:worker_threads";
+import { Queues, Queue } from "@service/player";
 import { RestObject } from "@handler/rest/apis";
 import {VoiceConnection} from "@service/voice";
 import { Commands } from "@handler/commands";
+import {DiscordClient} from "./structures";
 import { Buttons } from "@handler/modals";
 import { Events } from "@handler/events";
-import { Queues, Queue } from "@service/player";
 import { Collection } from "@utils";
 import { env } from "@app/env";
 
@@ -103,8 +103,8 @@ export class Database {
      * @description Создаем класс с ограничениями не для главного потока
      * @public
      */
-    public constructor() {
-        if (isMainThread) {
+    public constructor(client?: DiscordClient) {
+        if (client) {
             this.api = new RestObject();
             this.queues = new Queues();
             this.voice = new db_voice_system();
@@ -140,7 +140,7 @@ export class Database {
 
 /**
  * @author SNIPPIK
- * @description Класс для хранения голосовыми подключениями
+ * @description Класс для хранения голосовых подключений
  * @class db_voice_system
  */
 class db_voice_system extends Collection<VoiceConnection> {
@@ -185,12 +185,12 @@ export var db: Database;
  * @description Инициализирует базу данных
  * @private
  */
-(() => {
+export function initDatabase(client: DiscordClient) {
     if (db) return;
 
     try {
-        db = new Database();
+        db = new Database(client);
     } catch (err) {
         throw new Error(`Fail init database: ${err}`);
     }
-})();
+}
