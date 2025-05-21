@@ -1,9 +1,7 @@
-import type {ChildProcessWithoutNullStreams} from "node:child_process"
-import {spawn, spawnSync} from "node:child_process";
-import {isMainThread} from "node:worker_threads";
-import {Logger} from "@utils";
+import type { ChildProcessWithoutNullStreams } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process";
+import { env } from "@app/env";
 import path from "node:path";
-import {env} from "@app/env";
 
 /**
  * @author SNIPPIK
@@ -75,8 +73,6 @@ export class Process {
      */
     public destroy = () => {
         if (this._process) {
-            Logger.log("DEBUG", `[Process/${this._process.pid}] has destroyed`);
-
             for (const std of [this._process.stdout, this._process.stderr, this._process.stdin]) {
                 std.removeAllListeners();
                 std.destroy();
@@ -102,8 +98,6 @@ let ffmpeg_path = null;
  * @description Делаем проверку на наличие FFmpeg
  */
 (async () => {
-    if (!isMainThread) return;
-
     const cache = env.get("cache.dir");
     const names = [`${cache}/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 

@@ -1,4 +1,3 @@
-import {isMainThread} from "node:worker_threads";
 import crypto from "crypto";
 
 /**
@@ -26,7 +25,7 @@ const MAX_NONCE_SIZE = 2 ** 32 - 1;
  * @description Время до следующей проверки жизни
  * @private
  */
-const TIMESTAMP_INC = (48_000 / 100) * 2;
+const TIMESTAMP_INC = 960;
 
 /**
  * @author SNIPPIK
@@ -100,7 +99,7 @@ export class ClientRTPSocket {
         rtp_packet.writeUInt32BE(this.options.ssrc, 8);
 
         // Зашифрованный звук
-        rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
+        //rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
 
         return rtp_packet;
     };
@@ -155,15 +154,15 @@ export class ClientRTPSocket {
         }
 
         // Если нет больше вариантов шифровки
-        throw new Error(`[Sodium] ${mode} is not supported`);
+        throw new Error(`[Encryption Error]: Unsupported encryption mode "${mode}".`);
     };
 
     /**
      * @description Возвращает случайное число, находящееся в диапазоне n бит
-     * @param numberOfBits - Количество бит
+     * @param bits - Количество бит
      * @private
      */
-    private randomNBit = (numberOfBits: number) => Math.floor(Math.random() * 2 ** numberOfBits);
+    private randomNBit = (bits: number) => crypto.randomBytes(Math.ceil(bits / 8)).readUIntBE(0, Math.ceil(bits / 8)) % (2 ** bits);
 }
 
 /**
@@ -178,8 +177,6 @@ let loaded_lib: Methods.current = {};
  * @description Делаем проверку на наличие поддержки sodium
  */
 (async () => {
-    if (!isMainThread) return;
-
     // Если поддерживается нативная расшифровка
     if (crypto.getCiphers().includes("aes-256-gcm")) {
         EncryptionModes.push("aead_aes256_gcm_rtpsize");
@@ -228,7 +225,7 @@ let loaded_lib: Methods.current = {};
         for (const name of names) {
             try {
                 const library = await import(name);
-                if (library?.ready) await library.ready;
+                if (typeof library?.ready?.then === "function") await library.ready;
                 Object.assign(loaded_lib, support_libs[name](library));
                 delete require.cache[require.resolve(name)];
                 return;
@@ -277,5 +274,5 @@ type EncryptionModes = "aead_aes256_gcm_rtpsize"| "aead_xchacha20_poly1305_rtpsi
  */
 export interface EncryptorOptions {
     ssrc: number;
-    key: Uint8Array<ArrayBuffer>;
+    key: Uint8Array;
 }

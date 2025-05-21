@@ -1,4 +1,4 @@
-import {OpusEncoder, SILENT_FRAME} from "@service/voice";
+import {OpusEncoder, SILENT_FRAME} from "./opus";
 import {Logger, TypedEmitter} from "@utils";
 import {Process} from "./process";
 

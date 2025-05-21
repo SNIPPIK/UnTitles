@@ -1,4 +1,4 @@
-import {AudioResource} from "@service/voice";
+import { AudioResource } from "@service/voice";
 
 /**
  * @author SNIPPIK

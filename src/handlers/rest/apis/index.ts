@@ -93,10 +93,7 @@ export class RestObject {
                 // Отключаем эту функцию из-за ненадобности
                 this.worker.off("message", handleMessage);
 
-                if (message.result instanceof Error) {
-                    console.error(message);
-                    return resolve(message.result);
-                }
+                if (message.result instanceof Error) return resolve(message.result);
 
                 // Если статус удачный
                 if (message.status === "success") {
@@ -106,7 +103,7 @@ export class RestObject {
                         return resolve(result.map((item) => new Track(item, baseAPI)));
                     }
 
-                    if (typeof result === "object" && "items" in result) {
+                    else if (typeof result === "object" && "items" in result) {
                         return resolve({
                             ...result,
                             items: result.items.map((item) => new Track(item, baseAPI)),

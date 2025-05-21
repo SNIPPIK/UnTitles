@@ -3,10 +3,10 @@ import path from "node:path";
 import fs from "node:fs";
 
 // @service modules
-import {Process} from "@service/voice";
-import {Track} from "@service/player";
-import {AsyncCycle} from "@utils";
-import {env} from "@app/env";
+import { Process } from "@service/voice";
+import { Track } from "@service/player";
+import { AsyncCycle } from "@utils";
+import { env } from "@app/env";
 
 /**
  * @author SNIPPIK

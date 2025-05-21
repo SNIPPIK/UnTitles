@@ -1,8 +1,6 @@
-
-import {createSocket} from "node:dgram";
-import {TypedEmitter} from "@utils";
-import {isIPv4} from "node:net";
-
+import { createSocket } from "node:dgram";
+import { TypedEmitter } from "@utils";
+import { isIPv4 } from "node:net";
 
 /**
  * @author SNIPPIK
@@ -26,6 +24,12 @@ const MAX_SIZE_VALUE = 2 ** 32 - 1;
  */
 export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /**
+     * @description Уничтожен ли класс
+     * @private
+     */
+    private destroyed = false;
+
+    /**
      * @description Socket UDP подключения
      * @readonly
      * @private
@@ -44,7 +48,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @readonly
      * @private
      */
-    private readonly keepAliveBuffer: Buffer = Buffer.alloc(8);
+    private readonly keepAliveBuffer: Buffer = Buffer.alloc(4);
 
     /**
      * @description Счетчика активности
@@ -59,30 +63,6 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     public set packet(packet: Buffer) {
         this.socket.send(packet, 0, packet.length, this.options.port, this.options.ip, (err) => {
             if (err) this.emit("error", err);
-        });
-    };
-
-    /**
-     * @description Подключаемся к серверу через UDP подключение
-     * @public
-     */
-    public set discovery(ssrc: number) {
-        this.packet = this.discoveryBuffer(ssrc);
-
-        this.socket.once("message", (message) => {
-            if (message.readUInt16BE(0) === 2) {
-                const packet = Buffer.from(message);
-                const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
-                const port = packet.readUInt16BE(packet.length - 2);
-
-                // Если провайдер не предоставляет или нет пути IPV4
-                if (!isIPv4(ip)) {
-                    this.emit("error", Error("Not found IPv4 address"));
-                    return;
-                }
-
-                this.emit("connected", { ip, port });
-            }
         });
     };
 
@@ -109,6 +89,30 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     };
 
     /**
+     * @description Подключаемся к серверу через UDP подключение
+     * @public
+     */
+    public discovery = (ssrc: number) => {
+        this.packet = this.discoveryBuffer(ssrc);
+
+        this.socket.once("message", (message) => {
+            if (message.readUInt16BE(0) === 2) {
+                const packet = Buffer.from(message);
+                const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
+                const port = packet.readUInt16BE(packet.length - 2);
+
+                // Если провайдер не предоставляет или нет пути IPV4
+                if (!isIPv4(ip)) {
+                    this.emit("error", Error("Not found IPv4 address"));
+                    return;
+                }
+
+                this.emit("connected", { ip, port });
+            }
+        });
+    };
+
+    /**
      * @description Пакет для создания UDP соединения
      * @public
      */
@@ -126,7 +130,6 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @private
      */
     private keepAlive = () => {
-        this.keepAliveBuffer.writeUInt32LE(this.keepAliveCounter, 0);
         this.packet = this.keepAliveBuffer;
         this.keepAliveCounter++;
 
@@ -140,13 +143,16 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public destroy = () => {
+        if (this.destroyed) return;
+        this.destroyed = true;
+
         // Уничтожаем интервал активности
         clearInterval(this.keepAliveInterval);
 
         try {
             this.socket.close();
         } catch (err) {
-            if (`${err}`.match("Not running")) return;
+            if (err instanceof Error && err.message.includes("Not running")) return;
         }
 
         this.socket.removeAllListeners();

@@ -8,9 +8,13 @@ import {WebSocket, Data} from "ws";
  */
 interface ClientWebSocketEvents {
     "error": (err: Error) => void;
-    "close": (code: number, reason: string) => void;
-
+    "close": (code: WebSocketCloseCodes, reason: string) => void;
     "disconnect": (code: number, reason: string) => void;
+
+    /**
+     * @description Успешное подключение WebSocket
+     */
+    "connect": () => void;
 
     /**
      * @description Событие для opcodes, приходят не все
@@ -18,7 +22,9 @@ interface ClientWebSocketEvents {
      */
     "packet": (full: opcode.exported) => void;
 
-    // Требуется для переподключения WebSocket
+    /**
+     * @description Требуется для переподключения WebSocket
+     */
     "request_resume": () => void;
 }
 
@@ -79,7 +85,11 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public set packet(payload: opcode.extract) {
         if (this._client.readyState === WebSocket.OPEN) {
-            this._client.send(JSON.stringify(payload));
+            try {
+                this._client.send(JSON.stringify(payload));
+            } catch (e) {
+                this.emit("error", new Error(`${e}`));
+            }
         }
     };
 
@@ -100,8 +110,19 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public connect = () => {
-        this._client = new WebSocket(this.endpoint);
-        this._client.on("open",   () => this.emit("open"));
+        // Если есть прошлый WS
+        if (this._client) {
+            this._client.close(1000);
+            this._client.terminate();
+            this._client.removeAllListeners();
+        }
+
+        this._client = new WebSocket(this.endpoint, {
+            headers: {
+                "User-Agent": "VoiceClient (https://github.com/SNIPPIK/DiscordVoiceClient)"
+            }
+        });
+        this._client.on("open",   () => this.emit("connect"));
         this._client.on("message", this.onMessage);
         this._client.on("close",  this.onClose);
         this._client.on("error",  err  => this.emit("error", err));
@@ -122,7 +143,9 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         const { op, d } = payload;
-        if (payload?.["s"] !== null) this.seq.last = payload["s"];
+
+        // Записываем последний запрос discord'а
+        if (payload?.["seq"] !== null) this.seq.last = payload["seq"];
 
         // Внутрення обработка
         switch (op) {
@@ -138,13 +161,6 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 break;
             }
 
-            case VoiceOpcodes.Ready: {
-                this.ssrc = d.ssrc;
-                this.emit("packet", payload);
-                this.heartbeat.reconnects = 0; // Сбросить счётчик при успешном подключении
-                break;
-            }
-
             case VoiceOpcodes.Resumed: {
                 this.heartbeat.reconnects = 0;
                 this.manageHeartbeat();
@@ -157,8 +173,18 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 break;
             }
 
+            case VoiceOpcodes.Ready: {
+                this.ssrc = d.ssrc;
+                this.emit("packet", payload);
+                this.heartbeat.reconnects = 0; // Сбросить счётчик при успешном подключении
+                break;
+            }
+
             default: this.emit("packet", payload);
         }
+
+        // Для отладки
+        this.emit("debug", payload);
     };
 
     /**
@@ -170,40 +196,48 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         const error = reason.toString();
 
         switch (code) {
-            case WebSocketCloseCodes.NORMAL_CLOSURE: // Normal closure
-            case WebSocketCloseCodes.GOING_AWAY: // Going away
-                this.emit("debug", `WebSocket closed normally.`);
+            case WebSocketCloseCodes.NORMAL_CLOSURE: // Обычное закрытие
+            case WebSocketCloseCodes.GOING_AWAY: // Сервер решил что соединение не требуется
+                this.emit("debug", `[${code}] WebSocket closed normally.`);
                 this.emit("close", 1000, `Closed normally`);
                 this.destroy();
                 break;
 
+            case WebSocketCloseCodes.DISALLOWED_INTENTS:
+                this.emit("debug", `[${code}] Client disconnected.`);
+                this.destroy();
+                break;
+
             case WebSocketCloseCodes.UNKNOWN_ERROR:
-                this.emit("debug", `Unknown error occurred, attempting to reconnect...`);
-                this.attemptReconnect(true);
+                this.emit("debug", `[${code}] Unknown error occurred, attempting to reconnect...`);
+                this.attemptReconnect();
                 break;
 
             case WebSocketCloseCodes.INVALID_SESSION:
-                this.emit("debug", `Invalid session, need identification`);
-                this.emit("open");
+                this.emit("debug", `[${code}] Invalid session, need identification`);
+                this.emit("connect");
                 break;
 
             case WebSocketCloseCodes.INSUFFICIENT_RESOURCES:
-                this.emit("debug", `Voice server crashed. Attempting to reconnect...`);
+                this.emit("debug", `[${code}] Voice server crashed. Attempting to reconnect...`);
                 this.attemptReconnect(true);
                 break;
 
             case WebSocketCloseCodes.OVERLOADED:
-                this.emit("debug", `Voice server reboot, attempting to reconnect...`);
-                this.attemptReconnect(true);
+                this.emit("debug", `[${code}] Voice server reboot, attempting to reconnect...`);
+                this.attemptReconnect();
+                break;
+
+            case WebSocketCloseCodes.NOT_AUTHENTICATED:
+                this.emit("debug", `[${code}] Not authenticated, attempting to reconnect...`);
+                this.attemptReconnect();
                 break;
 
             default:
-                this.emit("debug", `Unhandled WebSocket close code: ${code} - ${reason}`);
-                this.attemptReconnect(true);
+                this.emit("debug", `[${code}] Unhandled WebSocket close: ${reason}`);
+                this.emit("close", code, error);
                 break;
         }
-
-        this.emit("close", code, error);
     };
 
     /**
