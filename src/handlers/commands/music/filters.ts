@@ -133,7 +133,7 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
 
                         // Если можно выключить фильтр или фильтры сейчас
                         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
-                            player.play(player.audio.current?.duration);
+                            await player.play(player.audio.current?.duration);
 
                             // Сообщаем о выключении фильтров
                             return message.reply({
@@ -201,15 +201,29 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
                         }
 
                         // Делаем проверку на совместимость
-                        for (let i = 0; i < player.filters.enabled.length; i++) {
-                            const filter = player.filters.enabled[i];
+                        // Проверяем, не конфликтует ли новый фильтр с уже включёнными
+                        for (const enabledFilter of player.filters.enabled) {
+                            if (!enabledFilter) continue;
 
-                            // Если фильтры не совместимы
-                            if (filter && Filter.unsupported.includes(filter?.name)) {
+                            // Новый фильтр несовместим с уже включённым?
+                            if (Filter.unsupported.includes(enabledFilter.name)) {
                                 return message.reply({
                                     embeds: [
                                         {
-                                            description: locale._(message.locale, "command.filter.push.unsupported", [filter.name, Filter.name]),
+                                            description: locale._(message.locale, "command.filter.push.unsupported", [Filter.name, enabledFilter.name]),
+                                            color: Colors.DarkRed
+                                        }
+                                    ],
+                                    flags: "Ephemeral"
+                                });
+                            }
+
+                            // Уже включённый фильтр несовместим с новым?
+                            if (enabledFilter.unsupported.includes(Filter.name)) {
+                                return message.reply({
+                                    embeds: [
+                                        {
+                                            description: locale._(message.locale, "command.filter.push.unsupported", [enabledFilter.name, Filter.name]),
                                             color: Colors.DarkRed
                                         }
                                     ],
@@ -223,7 +237,7 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
 
                         // Если можно включить фильтр или фильтры сейчас
                         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
-                            player.play(seek);
+                            await player.play(seek);
 
                             // Сообщаем о включении фильтров
                             return message.reply({
@@ -273,7 +287,7 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
 
                         // Если можно выключить фильтр или фильтры сейчас
                         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
-                            player.play(seek);
+                            await player.play(seek);
 
                             // Сообщаем о включении фильтров
                             return message.reply({

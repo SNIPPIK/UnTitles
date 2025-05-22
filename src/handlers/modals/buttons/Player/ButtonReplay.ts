@@ -8,11 +8,11 @@ class ButtonReplay extends Assign<Button> {
     public constructor() {
         super({
             name: "replay",
-            callback: (message) => {
+            callback: async (message) => {
                 const queue = db.queues.get(message.guild.id);
 
                 // Запускаем проигрывание текущего трека
-                queue.player.replay();
+                await queue.player.play(0, queue.player.tracks.position);
 
                 // Сообщаем о том что музыка начата с начала
                 return message.reply({

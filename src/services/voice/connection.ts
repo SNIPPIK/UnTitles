@@ -89,7 +89,7 @@ export class VoiceConnection {
                 delay: 0,
                 ssrc: this.websocket.ssrc
             },
-            seq: this.websocket.seq.last
+            seq: this.websocket.lastAsk
         };
     };
 
@@ -219,7 +219,7 @@ export class VoiceConnection {
                     server_id: this.configuration.guild_id,
                     session_id: this.voiceState.session_id,
                     token: this.serverState.token,
-                    seq_ack: this.websocket.seq.lastAsk
+                    seq_ack: this.websocket.lastAsk
                 }
             };
         });
@@ -256,6 +256,18 @@ export class VoiceConnection {
             // Получаем данные для отправки пакетов
             case VoiceOpcodes.Ready: {
                 this.createUDPSocket(d);
+
+                // После установки UDP и RTP, включаем speaking
+                setTimeout(() => {
+                    // Если бот уже говорит
+                    if (this.speaking) this.speaking = false;
+
+                    // Сообщаем, что бот начал говорить
+                    this.speaking = true;
+
+                    // Сбрасываем таймер
+                    this.resetSpeakingTimeout();
+                }, 500); // Можно подстроить задержку по необходимости
                 break;
             }
         }
@@ -267,7 +279,8 @@ export class VoiceConnection {
      * @param reason - Причина кода
      */
     private onWSClose = (code: WebSocketCloseCodes, reason: string) => {
-        if (code === 1000) return;
+        if (code === 1000) return this.destroy();
+
         this.websocket.emit("debug", `[${code}] ${reason}. Attempting to reconnect...`);
         this.createClientWebSocket(this.adapter.packet.server.endpoint);
     };

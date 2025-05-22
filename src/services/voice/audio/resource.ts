@@ -4,6 +4,79 @@ import {Process} from "./process";
 
 /**
  * @author SNIPPIK
+ * @description Класс для хранения аудио фреймов потока, для повторного использования
+ * @class AudioBuffer
+ * @private
+ */
+class AudioBuffer {
+    /**
+     * @description Хранилище аудио фреймов
+     * @readonly
+     * @public
+     */
+    protected readonly _chunks: Buffer[] = new Array<Buffer>();
+
+    /**
+     * @description Текущая позиция в системе фреймов
+     * @private
+     */
+    private _position = 0;
+
+    /**
+     * @description Кол-во пакетов в буфере
+     * @public
+     */
+    public get size() {
+        return this._chunks.length;
+    };
+
+    /**
+     * @description Текущая позиция в буферной системе
+     * @public
+     */
+    public get position() {
+        return this._position;
+    };
+
+    /**
+     * @description Текущая позиция в буферной системе
+     * @public
+     */
+    public set position(position) {
+        if (position > this.size || position < 0) return;
+        this._position = position;
+    };
+
+    /**
+     * @description Сохранение фрагмента
+     * @public
+     */
+    public set packet(chunk) {
+        this._chunks.push(chunk);
+    };
+
+    /**
+     * @description Выдача пакета, через текущую позицию
+     * @public
+     */
+    public get packet() {
+        if (this.position >= this.size) return null;
+        const frame = this._chunks[this._position++];
+        return frame ?? null;
+    };
+
+    /**
+     * @description Удаляем данные буфера
+     * @public
+     */
+    public clear = () => {
+        // Удаляем ссылки на буферы
+        this._chunks.length = 0;
+    };
+}
+
+/**
+ * @author SNIPPIK
  * @description Конвертирует ссылку или путь до файла в чистый opus для работы с discord
  * @class AudioResource
  * @public
@@ -14,30 +87,29 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @protected
      * @readonly
      */
-    protected readonly _audioBuffer = new Array<Buffer>();
+    private readonly _buffer = new AudioBuffer();
 
     /**
-     * @description Кол-во пакетов в изначальном буфере
+     * @description Параметр seek, для вычисления времени проигрывания
      * @protected
      */
-    protected _bufferTotal = 0;
+    protected _seek = 0;
 
     /**
      * @description Если чтение возможно
      * @public
      */
     public get readable() {
-        return this._audioBuffer.length > 0;
+        return this._buffer.position !== this._buffer.size;
     };
 
     /**
-     * @description Получаем время проигрывания потока
+     * @description Duration в секундах с учётом текущей позиции в буфере и seek-а (предыдущего смещения)
      * @public
      */
     public get duration() {
-        if (!this._audioBuffer.length) return 0;
-
-        return ((this._bufferTotal - this._audioBuffer.length) * 20) / 1e3;
+        if (!this._buffer.position) return 0;
+        return Math.abs(((this._seek - this._buffer.position) * 20) / 1e3);
     };
 
     /**
@@ -46,7 +118,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @public
      */
     public get packet(): Buffer {
-        return this._audioBuffer.shift();
+        return this._buffer.packet;
     };
 
     /**
@@ -60,8 +132,8 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
             const path = options.events.path ? options.input[options.events.path] : options.input;
 
             // Запускаем прослушивание события
-            path["once"](event, () => {
-                if (event === "error") this.emit("error", new Error("AudioResource get error for create stream"));
+            path["once"](event, (err: any) => {
+                if (event === "error") this.emit("error", new Error(`AudioResource get ${err}`));
                 options.events.destroy_callback(options.input);
             });
         }
@@ -84,32 +156,30 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
             options.input.on("frame", (packet: Buffer) => {
                 // Сообщаем что поток можно начать читать
-                if (this._audioBuffer.length === 0) {
+                if (this._buffer.size === 0) {
                     clearTimeout(timeout);
                     this.emit("readable");
 
                     // Если поток включается в первый раз.
                     // Добавляем пустышку для интерпретатора opus
-                    if (!this._bufferTotal) this._audioBuffer.push(SILENT_FRAME);
+                    if (!this._seek) this._buffer.packet = SILENT_FRAME;
                 }
 
-                this._audioBuffer.push(packet);
-                this._bufferTotal++;
+                this._buffer.packet = packet;
             });
         }
     };
 
     /**
      * @description Создаем класс и задаем параметры
-     * @param path - Путь до файла или ссылка
-     * @param options - Настройки аудио класса
      * @public
      *
      * @example <path> or <url>
      */
-    public constructor(path: string, options: {seek?: number; filters?: string;}) {
+    public constructor(public config: AudioResourceOptions) {
         super();
-        if (options.seek > 0) this._bufferTotal = (options.seek * 1e3) / 20;
+        const {path, options} = config;
+        if (options?.seek > 0) this._seek = (options.seek * 1e3) / 20;
 
         const decoder = new OpusEncoder();
 
@@ -120,10 +190,13 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
                 destroy: ["end", "close", "error"],
                 destroy_callback: (input) => {
                     // Если поток еще существует
-                    if (input) input.destroy();
+                    if (input) {
+                        input.destroy();
 
-                    // Добавляем пустышку для интерпретатора opus
-                    this._audioBuffer.push(SILENT_FRAME);
+                        // Добавляем пустышку для интерпретатора opus
+                        this._buffer.packet = SILENT_FRAME;
+                    }
+
                     this.emit("end");
                 }
             },
@@ -158,7 +231,8 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
                 "-af", options.filters,
 
                 // Указываем формат аудио (ogg/opus)
-                "-c:a", "libopus", "-f", "opus",
+                "-c:a", "libopus", "-application", "audio",
+                "-f", "opus",
 
                 "-ar", "48000",
                 "-ac", "2",
@@ -166,6 +240,15 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
                 "pipe:"
             ])
         };
+    };
+
+    /**
+     * @description Обновление потока, без потерь
+     * @public
+     */
+    public refresh = () => {
+        this._seek = 0;
+        this._buffer.position = 0;
     };
 
     /**
@@ -177,9 +260,24 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         // Чистим все потоки от мусора
         this.emit("close");
 
+        this._buffer.clear();
+
         // Удаляем все вызовы функций
         this.removeAllListeners();
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Параметры для создания класса AudioResource
+ * @interface AudioResourceOptions
+ */
+interface AudioResourceOptions {
+    path: string;
+    options: {
+        seek?: number;
+        filters?: string;
+    }
 }
 
 /**

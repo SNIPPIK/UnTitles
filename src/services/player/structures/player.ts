@@ -265,7 +265,23 @@ export class AudioPlayer extends BasePlayer {
             db.events.emitter.emit("message/playing", queue);
         };
 
+        const options = {
+            seek, filters: this._filters.compress(track.time.total)
+        };
+
         try {
+            // Если всего 1 трек в системе и есть прошлый поток
+            if (this.tracks.total === 1 && this.audio.current) {
+
+                // Если фильтры совпадают
+                if (options.filters === this.audio.current.config.options.filters && !seek) {
+                    // Перезапускаем поток
+                    this.audio.current.refresh();
+                    this.status = "player/playing";
+                    return;
+                }
+            }
+
             // Получаем данные
             const path = await track?.resource;
 
@@ -276,7 +292,7 @@ export class AudioPlayer extends BasePlayer {
             else if (!path) return handleError("Fail to get audio link");
 
             // Создаем класс для управления потоком
-            const stream = new AudioResource(path, { seek, filters: this._filters.compress(track.time.total) });
+            const stream = new AudioResource({path, options});
 
             // Если стрим можно прочитать
             if (stream.readable) {
@@ -316,22 +332,34 @@ export class AudioPlayer extends BasePlayer {
     };
 
     /**
-     * @description Ставим на паузу плеер
+     * @description Приостанавливает воспроизведение плеера
      * @public
      */
-    public pause = () => {
+    public pause(): void {
+        // Проверяем, что плеер действительно играет
         if (this.status !== "player/playing") return;
+
+        // Переключаем статус на паузу
         this.status = "player/pause";
-    };
+
+        // Отправляем silent frame в голосовое соединение для паузы звука
+        this.voice.connection.packet = SILENT_FRAME;
+    }
 
     /**
-     * @description Убираем с паузы плеер
+     * @description Возобновляет воспроизведение плеера
      * @public
      */
-    public resume = () => {
+    public resume(): void {
+        // Проверяем, что плеер в состоянии паузы
         if (this.status !== "player/pause") return;
+
+        // Для возобновления отправляем silent frame, чтобы обновить состояние пакета
+        this.voice.connection.packet = SILENT_FRAME;
+
+        // Переключаем статус обратно в "playing"
         this.status = "player/playing";
-    };
+    }
 
     /**
      * @description Останавливаем воспроизведение текущего трека
@@ -353,15 +381,6 @@ export class AudioPlayer extends BasePlayer {
 
         if (this.status === "player/wait") return;
         this.status = "player/wait";
-    };
-
-    /**
-     * @description Функция проигрывание текущего трека заново
-     * @public
-     */
-    public replay = () => {
-        // Включаем текущий трек заново
-        this.play(0, this.tracks.position);
     };
 
     /**

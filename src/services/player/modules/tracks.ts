@@ -191,8 +191,14 @@ export class PlayerTracks<T extends Track> {
         // Удаляем из очереди
         this._current.splice(position, 1);
 
-        // Меняем позицию, есть она не равна 0
-        if (this._position !== 0) this._position = this._position - 1;
+        // Корректируем позицию, если она больше длины или не равна нулю
+        if (this._position > position) {
+            this._position--;
+        } else if (this._position >= this._current.length) {
+            this._position = this._current.length - 1;
+        }
+
+        if (this._position < 0) this._position = 0;
     };
 
     /**
@@ -220,22 +226,15 @@ export class PlayerTracks<T extends Track> {
     public array(size: number, sorting?: any): T[];
     public array(size: number, sorting: true): string[];
     public array(size: number, sorting: boolean = false): (string | T)[] {
-        const position = this._position;
+        const startIndex = size < 0 ? this._position + size : this._position + 1;
+        const endIndex = size < 0 ? this._position : this._position + 1 + size;
 
-        // Сортируем треки в строки
-        if (sorting) {
-            let number = 0;
+        const slice = this._current.slice(startIndex, endIndex);
 
-            // Создаем Array
-            return this._current.ArraySort(size, (track) => {
-                number++;
-                return `\`${number}\` - ${track.name_replace}`;
-            }, "\n");
-        }
+        if (!sorting) return slice;
 
-        // Выдаем список треков
-        if (size < 0) return this._current.slice(position - 1 - size, position - 1 - size);
-        return this._current.slice(position + 1, position + size);
+        // Форматируем треки в строки с номерами
+        return slice.map((track, idx) => `\`${idx + 1}\` - ${track.name_replace}`);
     };
 
     /**
@@ -243,7 +242,7 @@ export class PlayerTracks<T extends Track> {
      * @public
      */
     public get time() {
-        return this._current.reduce((total: number, item) => total + (item.time.total || 0), 0).duration();
+        return this._current.reduce((total, track) => total + (track.time?.total || 0), 0).duration();
     };
 }
 

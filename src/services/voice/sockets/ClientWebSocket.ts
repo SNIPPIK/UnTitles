@@ -59,16 +59,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public ssrc: number;
 
     /**
-     * @description Данные для порядковой очереди пакетов
+     * @description Номер последнего принятого пакета
      * @public
      */
-    public readonly seq: {
-        // Номер последнего принятого пакета
-        lastAsk: number;
-
-        // Номер последнего полученного пакета
-        last: number;
-    };
+    public lastAsk: number = 0;
 
     /**
      * @description Статус готовности подключения
@@ -99,10 +93,6 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public constructor(private readonly endpoint: string) {
         super();
-        this.seq = {
-            last: 0,
-            lastAsk: 0
-        };
     };
 
     /**
@@ -119,7 +109,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         this._client = new WebSocket(this.endpoint, {
             headers: {
-                "User-Agent": "VoiceClient (https://github.com/SNIPPIK/DiscordVoiceClient)"
+                "User-Agent": "VoiceClient (https://github.com/SNIPPIK/UnTitles/tree/beta/src/services/voice)"
             }
         });
         this._client.on("open",   () => this.emit("connect"));
@@ -144,13 +134,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         const { op, d } = payload;
 
-        // Записываем последний запрос discord'а
-        if (payload?.["seq"] !== null) this.seq.last = payload["seq"];
-
         // Внутрення обработка
         switch (op) {
             case VoiceOpcodes.Hello: {
-                this.seq.lastAsk++;
+                this.lastAsk++;
                 this.manageHeartbeat(d.heartbeat_interval);
                 this.heartbeat.intervalMs = d.heartbeat_interval;
                 break;
@@ -195,49 +182,24 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     private onClose = (code: WebSocketCloseCodes, reason: Buffer) => {
         const error = reason.toString();
 
-        switch (code) {
-            case WebSocketCloseCodes.NORMAL_CLOSURE: // Обычное закрытие
-            case WebSocketCloseCodes.GOING_AWAY: // Сервер решил что соединение не требуется
-                this.emit("debug", `[${code}] WebSocket closed normally.`);
-                this.emit("close", 1000, `Closed normally`);
-                this.destroy();
-                break;
+        const noReconnectCodes = [1000, 1003, 1007, 1008, 1009, 1010, 4001, 4002, 4004, 4005, 4013];
+        const reconnectCodes = [1001, 1006, 1011, 1012, 1013, 1015, 4000, 4006, 4009, 4011, 4014];
 
-            case WebSocketCloseCodes.DISALLOWED_INTENTS:
-                this.emit("debug", `[${code}] Client disconnected.`);
-                this.destroy();
-                break;
-
-            case WebSocketCloseCodes.UNKNOWN_ERROR:
-                this.emit("debug", `[${code}] Unknown error occurred, attempting to reconnect...`);
-                this.attemptReconnect();
-                break;
-
-            case WebSocketCloseCodes.INVALID_SESSION:
-                this.emit("debug", `[${code}] Invalid session, need identification`);
-                this.emit("connect");
-                break;
-
-            case WebSocketCloseCodes.INSUFFICIENT_RESOURCES:
-                this.emit("debug", `[${code}] Voice server crashed. Attempting to reconnect...`);
-                this.attemptReconnect(true);
-                break;
-
-            case WebSocketCloseCodes.OVERLOADED:
-                this.emit("debug", `[${code}] Voice server reboot, attempting to reconnect...`);
-                this.attemptReconnect();
-                break;
-
-            case WebSocketCloseCodes.NOT_AUTHENTICATED:
-                this.emit("debug", `[${code}] Not authenticated, attempting to reconnect...`);
-                this.attemptReconnect();
-                break;
-
-            default:
-                this.emit("debug", `[${code}] Unhandled WebSocket close: ${reason}`);
-                this.emit("close", code, error);
-                break;
+        if (noReconnectCodes.includes(code)) {
+            this.emit("debug", `[${code}] ${reason}. Not reconnecting.`);
+            this.emit("close", 1000, error);
+            return;
         }
+
+        if (reconnectCodes.includes(code) || code >= 4000) {
+            this.emit("debug", `[${code}] ${reason}. Reconnecting...`);
+            this.attemptReconnect();
+            return;
+        }
+
+        // По умолчанию — переподключаемся
+        this.emit("debug", `[${code}] ${reason}. Reconnecting by default...`);
+        this.emit("close", code, error);
     };
 
     /**
@@ -277,7 +239,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 op: VoiceOpcodes.Heartbeat,
                 d: {
                     t: Date.now(),
-                    seq_ack: this.seq.lastAsk
+                    seq_ack: this.lastAsk
                 }
             };
 
