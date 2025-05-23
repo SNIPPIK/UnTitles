@@ -280,6 +280,7 @@ export class VoiceConnection {
      */
     private onWSClose = (code: WebSocketCloseCodes, reason: string) => {
         if (code === 1000) return this.destroy();
+        else this.adapter.sendPayload(this.configuration);
 
         this.websocket.emit("debug", `[${code}] ${reason}. Attempting to reconnect...`);
         this.createClientWebSocket(this.adapter.packet.server.endpoint);
@@ -290,8 +291,6 @@ export class VoiceConnection {
      * @private
      */
     private onWSOpen = () => {
-        this.adapter.sendPayload(this.configuration);
-
         this._speaking = false;
         this.websocket.packet = {
             op: VoiceOpcodes.Identify,
