@@ -290,6 +290,8 @@ export class VoiceConnection {
      * @private
      */
     private onWSOpen = () => {
+        this.adapter.sendPayload(this.configuration);
+
         this._speaking = false;
         this.websocket.packet = {
             op: VoiceOpcodes.Identify,

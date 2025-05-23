@@ -182,8 +182,8 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     private onClose = (code: WebSocketCloseCodes, reason: Buffer) => {
         const error = reason.toString();
 
-        const noReconnectCodes = [1000, 1003, 1007, 1008, 1009, 1010, 4001, 4002, 4004, 4005, 4013];
-        const reconnectCodes = [1001, 1006, 1011, 1012, 1013, 1015, 4000, 4006, 4009, 4011, 4014];
+        const noReconnectCodes: WebSocketCloseCodes[] = [1000, 1003, 1007, 1008, 1009, 1010, 4001, 4002, 4004, 4005, 4013];
+        const reconnectCodes: WebSocketCloseCodes[] = [1001, 1006, 1011, 1012, 1013, 4000, 4006, 4009, 4011, 4014];
 
         if (noReconnectCodes.includes(code)) {
             this.emit("debug", `[${code}] ${reason}. Not reconnecting.`);

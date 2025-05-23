@@ -74,6 +74,14 @@ class rest_request extends Assign<Event<"rest/request">> {
                         rest = rest[0];
                     }
 
+                    // Если найден плейлист
+                    else if ("items" in rest) {
+                        if (rest.items.length === 0) {
+                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "player.search.fail"));
+                            return;
+                        }
+                    }
+
                     // Если был получен потоковый трек с временем 0
                     else if ("time" in rest && rest.time.total === 0) {
                         db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
