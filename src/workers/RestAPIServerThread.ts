@@ -91,8 +91,22 @@ if (parentPort && workerData.rest) {
 
                 const readPlatform: RestServerSide.API = rest.platforms.supported[platform];
 
-                const callback = readPlatform.requests.find((p) =>
-                    "filter" in p ? p.filter.exec(payload) !== null : p.name === "search"
+                const callback = readPlatform.requests.find((p) => {
+                        // Если производится прямой запрос по названию
+                        if (p.name === payload) return p;
+
+                        // Если указана ссылка
+                        else if (typeof payload === "string" && payload.startsWith("http")) {
+                            try {
+                                if (p["filter"].exec(payload) || payload.match(p["filter"])) return p;
+                            } catch {
+                                return null;
+                            }
+                        }
+
+                        // Скорее всего надо произвести поиск
+                        return p.name === "search";
+                    }
                 );
 
                 if (!callback) throw new Error(`Callback not found for platform: ${platform}`);
@@ -102,7 +116,7 @@ if (parentPort && workerData.rest) {
                     limit: rest.limits[callback.name]
                 });
 
-                parentPort.postMessage({ status: "success", result });
+                parentPort.postMessage({ status: "success", result, type: callback.name });
             } catch (err) {
                 parentPort.postMessage({status: "error", result: err});
                 throw new Error(`${err}`);

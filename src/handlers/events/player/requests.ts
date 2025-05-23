@@ -2,7 +2,7 @@ import {locale} from "@service/locale";
 import {Event} from "@handler/events";
 import {Logger, Assign} from "@utils";
 import {Track} from "@service/player";
-import {Colors} from "discord.js";
+import {Colors, Message} from "discord.js";
 import {db} from "@app/db";
 
 /**
@@ -31,14 +31,19 @@ class rest_request extends Assign<Event<"rest/request">> {
 
                 // Отправляем сообщение о том что запрос производится
                 // Сообщение о том, что запрос начался
-                const followUpPromise = message.followUp({
-                    flags: "Ephemeral",
-                    embeds: [{
-                        title: `${platform.platform}.${api.type}`,
-                        description: timeout ? locale._(message.locale, "api.platform.request.long", [db.images.loading, platform.platform]) : locale._(message.locale, "api.platform.request", [db.images.loading]),
-                        color: platform.color
-                    }]
-                });
+                let followUpPromise: Message<boolean>
+                try {
+                    followUpPromise = await message.followUp({
+                        flags: "Ephemeral",
+                        embeds: [{
+                            title: `${platform.platform}.${api.type}`,
+                            description: timeout ? locale._(message.locale, "api.platform.request.long", [db.images.loading, platform.platform]) : locale._(message.locale, "api.platform.request", [db.images.loading]),
+                            color: platform.color
+                        }]
+                    });
+                } catch (e) {
+                    console.error(e);
+                }
 
                 // Получаем данные в системе rest/API
                 try {
@@ -51,7 +56,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                     let rest = await Promise.race([api.request(), timeoutPromise]) as Track.list | Track[] | Track | Error;
 
                     // Удаляем сообщение после выполнения запроса
-                    await followUpPromise.then(msg => setTimeout(() => msg.delete().catch(() => {}), timeout));
+                    if (followUpPromise) setTimeout(() => followUpPromise.deletable ? followUpPromise.delete().catch(() => null) : {}, timeout);
 
                     // Обработка ошибки если что-то пошло не так
                     if (rest instanceof Error) {
@@ -65,7 +70,6 @@ class rest_request extends Assign<Event<"rest/request">> {
                             db.events.emitter.emit("rest/error", message, locale._(message.locale, "player.search.fail"));
                             return;
                         }
-
                         // Меняем на первый трек из массива
                         rest = rest[0];
                     }
@@ -103,15 +107,19 @@ class rest_error extends Assign<Event<"rest/error">> {
             execute: async (message, error) => {
                 Logger.log("ERROR", `[Rest/API] ${error}`);
 
-                const msg = await message.channel.send({
-                    embeds: [{
-                        title: locale._(message.locale, "api.error"),
-                        description: error,
-                        color: Colors.DarkRed
-                    }]
-                });
+                try {
+                    const msg = await message.channel.send({
+                        embeds: [{
+                            title: locale._(message.locale, "api.error"),
+                            description: error,
+                            color: Colors.DarkRed
+                        }]
+                    });
 
-                if (msg) setTimeout(msg.delete, 15e3)
+                    if (msg.deletable) setTimeout(msg.delete, 15e3);
+                } catch (err) {
+                    console.error(err);
+                }
             }
         });
     };

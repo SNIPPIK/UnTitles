@@ -366,16 +366,15 @@ export class AudioPlayer extends BasePlayer {
      * @param position - Позиция нового трека
      * @public
      */
-    public stop = (position?: number) => {
+    public stop = (position?: number): Promise<void> | void => {
         // Если есть позиция трека, для плавного перехода
         if (typeof position === "number") {
             const duration = this.tracks.track.time.total - db.queues.options.optimization;
 
-            // Если можно сделать плавные переход
+            // Если можно сделать плавный переход
             if (this.audio.current && duration > this.audio.current.duration) {
                 this.tracks.position = position;
-                this.play(0, position);
-                return;
+                return this.play(0, position);
             }
         }
 

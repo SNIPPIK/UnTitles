@@ -87,6 +87,50 @@ import {db} from "@app/db";
         "ru": "Принудительное завершение проигрывания музыки!"
     },
 })
+@SlashCommandSubCommand({
+    type: ApplicationCommandOptionType.Subcommand,
+    names: {
+        "en-US": "wave",
+        "ru": "поток"
+    },
+    descriptions: {
+        "en-US": "Endless track playback mode!",
+        "ru": "Добавление себе подобных треков!"
+    },
+    options: [
+        {
+            names: {
+                "en-US": "select",
+                "ru": "платформа"
+            },
+            descriptions: {
+                "en-US": "Which platform does the request belong to?",
+                "ru": "К какой платформе относится запрос?"
+            },
+            type: ApplicationCommandOptionType["String"],
+            required: true,
+            choices: db.api.allowWave.map((platform) => {
+                return {
+                    name: `${platform.name.toLowerCase()} | ${platform.url}`,
+                    value: platform.name
+                }
+            })
+        },
+        {
+            names: {
+                "en-US": "request",
+                "ru": "запрос"
+            },
+            descriptions: {
+                "en-US": "You must specify the link or the name of the track!",
+                "ru": "Необходимо указать ссылку или название трека!"
+            },
+            required: true,
+            type: ApplicationCommandOptionType["String"],
+            autocomplete: true
+        }
+    ]
+})
 class PlayCommand extends Assign< BaseCommand > {
     public constructor() {
         super({
@@ -202,6 +246,28 @@ class PlayCommand extends Assign< BaseCommand > {
                             ],
                             flags: "Ephemeral"
                         });
+                    }
+
+                    // Включение радио-потока на треку
+                    case "wave": {
+                        // Запрос к платформе
+                        const platform = db.api.request(args[0] as any);
+
+                        // Если платформа заблокирована
+                        if (platform.block) {
+                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.block"));
+                            break;
+                        }
+
+                        // Если есть проблема с авторизацией на платформе
+                        else if (!platform.auth) {
+                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.auth"));
+                            break
+                        }
+
+                        await message.deferReply().catch(() => {});
+                        db.events.emitter.emit("rest/request", platform, message, `${args[1]}&list=RD`);
+                        break;
                     }
 
                     // Если пользователя пытается сделать запрос к API

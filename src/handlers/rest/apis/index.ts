@@ -32,6 +32,14 @@ export class RestObject {
     };
 
     /**
+     * @description Исключаем платформы из общего списка
+     * @public
+     */
+    public get allowWave() {
+        return Object.values(this.platforms.supported).filter(api => api.auth && api.requests.some((apis) => apis.name === "wave"));
+    };
+
+    /**
      * @description Загружаем класс вместе с дочерним
      * @public
      */
@@ -93,6 +101,7 @@ export class RestObject {
                 // Отключаем эту функцию из-за ненадобности
                 this.worker.off("message", handleMessage);
 
+                // Если в результате ошибка
                 if (message.result instanceof Error) return resolve(message.result);
 
                 // Если статус удачный
@@ -192,7 +201,7 @@ export namespace RestClientSide {
      * @description Авто тип, на полученные типы данных
      * @type ResultType
      */
-    export type ResultType<T> = T extends "track" ? "track" : T extends "album" ? "album" : T extends "playlist" ? "playlist" : T extends "artist" ? "artist" : "search";
+    export type ResultType<T> = T extends "track" ? "track" : T extends "album" ? "album" : T extends "playlist" ? "playlist" : T extends "artist" ? "artist" : T extends "wave" ? "wave" : "search";
 
     /**
      * @author SNIPPIK
@@ -248,7 +257,7 @@ export namespace RestClientSide {
          * @param payload - Данные для отправки
          * @param options - Параметры для отправки
          */
-        public request<T extends (RestServerSide.APIs.track | RestServerSide.APIs.playlist | RestServerSide.APIs.album | RestServerSide.APIs.artist | RestServerSide.APIs.search)["name"]>(payload: string | json, options?: {audio: boolean}) {
+        public request<T extends (RestServerSide.APIs.track | RestServerSide.APIs.playlist | RestServerSide.APIs.album | RestServerSide.APIs.artist | RestServerSide.APIs.search | RestServerSide.APIs.wave)["name"]>(payload: string | json, options?: {audio: boolean}) {
             return {
                 type: this._api.requests.find((item) => {
                     // Если производится прямой запрос по названию
@@ -297,7 +306,7 @@ export namespace RestServerSide {
     }
         | {
         status: "success";
-        type: "artist" | "search";
+        type: "artist" | "search" | "wave";
         result: Track.data[] | Error;
     }
 
@@ -306,7 +315,12 @@ export namespace RestServerSide {
      * @type ResultAPIs
      * @public
      */
-    export type ResultAPIs<T> = T extends "track" ? APIs.track : T extends "album" ? APIs.album : T extends "playlist" ? APIs.playlist : T extends "artist" | "search" ? APIs.artist : APIs.search
+    export type ResultAPIs<T> =
+        T extends "track" ? APIs.track :
+            T extends "album" ? APIs.album :
+                T extends "playlist" ? APIs.playlist :
+                    T extends "artist" ? APIs.artist :
+                        T extends "search" ? APIs.search : APIs.wave
 
     /**
      * @author SNIPPIK
@@ -370,7 +384,7 @@ export namespace RestServerSide {
          * @readonly
          * @public
          */
-        readonly requests: (APIs.track | APIs.playlist | APIs.album | APIs.artist | APIs.search)[];
+        readonly requests: (APIs.track | APIs.playlist | APIs.album | APIs.artist | APIs.search | APIs.wave)[];
     }
 
     /**
@@ -438,6 +452,19 @@ export namespace RestServerSide {
 
             // Функция получения данных (не доступна в основном потоке)
             execute: (url: string, options: { limit: number }) => Promise<Track.data[] | Error>;
+        }
+        /**
+         * @description Что из себя должен представлять поиск треков
+         * @interface wave
+         */
+        export interface wave {
+            // Название типа запроса
+            name: "wave";
+
+            filter: RegExp;
+
+            // Функция получения данных (не доступна в основном потоке)
+            execute: (text: string, options: { limit: number }) => Promise<Track.list | Error>;
         }
 
         /**

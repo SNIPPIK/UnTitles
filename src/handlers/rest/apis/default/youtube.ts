@@ -96,6 +96,48 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 },
 
                 /**
+                 * @description Запрос треков из волны, для выполнения требуется указать list=RD в ссылке
+                 * @type "wave"
+                 */
+                {
+                    name: "wave",
+                    filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})?(list=RD)/,
+                    execute: (url) => {
+                        return new Promise(async (resolve) => {
+                            const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
+
+                            try {
+                                const api = await RestYouTubeAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`, 0);
+
+                                // Если при получении данных возникла ошибка
+                                if (api instanceof Error) return resolve(api);
+
+                                const related = api.contents?.twoColumnWatchNextResults?.secondaryResults?.secondaryResults?.results ?? [];
+                                const relatedVideos = [];
+
+                                // Подготавливаем данные треков (video)
+                                for (const item of related) {
+                                    const videoRenderer = item.compactVideoRenderer;
+                                    if (!videoRenderer || videoRenderer.lengthText?.simpleText.duration() > 400) continue;
+
+                                    relatedVideos.push(RestYouTubeAPI.track(videoRenderer));
+                                }
+
+                                return resolve({
+                                    url,
+                                    items: relatedVideos,
+                                    title: null,
+                                    image: null,
+                                    artist: null
+                                });
+                            } catch (e) {
+                                return resolve(new Error(`[APIs]: ${e}`))
+                            }
+                        });
+                    }
+                },
+
+                /**
                  * @description Запрос данных о треке
                  * @type "track"
                  */
@@ -203,7 +245,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                                 return resolve(new Error(`[APIs]: ${e}`))
                             }
                         });
-                    }
+                    },
                 },
 
                 /**
@@ -244,10 +286,11 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
     /**
      * @description Получаем страницу и ищем на ней данные
      * @param url - Ссылка на видео или ID видео
+     * @param pattern - Условие получения ytInitialData
      * @protected
      * @static
      */
-    protected static API = (url: string): Promise<Error | json> => {
+    protected static API = (url: string, pattern = 1): Promise<Error | json> => {
         return new Promise((resolve) => {
             // Если не надо использовать ключ, то используем систему поиска данных по странице
             new httpsClient({
@@ -255,8 +298,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 userAgent: true,
                 headers: {
                     "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
-                    "accept-encoding": "gzip, compress, deflate, br",
-                    "Cookie": "PREF=f2=8000000; CONSENT=YES+cb.20210328-17-p0.en+FX+499;",
+                    "accept-encoding": "gzip, compress, deflate, br"
                 }
             })
                 // Получаем исходную страницу
@@ -268,7 +310,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                     if (api instanceof Error) return resolve(locale.err("api.request.fail"));
 
                     // Ищем данные на странице
-                    const data = this.extractInitialDataResponse(api);
+                    const data = this.extractInitialDataResponse(api, pattern);
 
                     // Если возникает ошибка при поиске на странице
                     if (data instanceof Error) return resolve(data);
@@ -311,14 +353,29 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
     /**
      * @description Получаем данные из страницы
      * @param input - Страница
+     * @param pattern - Условие получения ytInitialData
      */
-    protected static extractInitialDataResponse = (input: string): json | Error => {
+    protected static extractInitialDataResponse = (input: string, pattern: number = 1): json | Error => {
+        if (pattern === 0) {
+            const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
+            if (!initialDataMatch) return [];
+
+            let initialData: Error | json;
+            try {
+                initialData = JSON.parse(initialDataMatch[1]);
+            } catch (e) {
+                return null;
+            }
+
+            return initialData;
+        }
+
         const startPattern: string = input.match("var ytInitialPlayerResponse = ") ? "var ytInitialPlayerResponse = " : "var ytInitialData = ";
         const startIndex = input.indexOf(startPattern);
         const endIndex = input.indexOf("};", startIndex + startPattern.length);
 
         // Если нет данных
-        if (startIndex === -1 && endIndex === -1)return locale.err("api.request.fail");
+        if (startIndex === -1 && endIndex === -1) return locale.err("api.request.fail");
 
         const data = JSON.parse(input.substring(startIndex + startPattern.length, endIndex + 1));
 
@@ -377,7 +434,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
             return {
                 id: track["videoId"],
                 url: `https://youtu.be/${track["videoId"]}`,
-                title: track.title?.["runs"][0]?.text ?? track.title,
+                title: track.title?.simpleText ?? track.title?.["runs"][0]?.text ?? track.title,
                 artist: {
                     title: track["shortBylineText"]["runs"][0].text ?? track.author ?? undefined,
                     url: `https://www.youtube.com${track["shortBylineText"]["runs"][0]["navigationEndpoint"]["browseEndpoint"]["canonicalBaseUrl"] || track["shortBylineText"]["runs"][0]["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"].url}`,
@@ -396,7 +453,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                     url: `https://www.youtube.com/channel/${track.channelId}`
                 },
                 url: `https://youtu.be/${track["videoId"]}`,
-                title: track.title,
+                title: track.title ?? track.title?.simpleText,
                 time: {
                     total: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0
                 },
