@@ -335,8 +335,8 @@ export class VoiceConnection {
 
         if (this.speakingTimeout) clearTimeout(this.speakingTimeout);
 
-        this.websocket.destroy();
-        this.udpClient.destroy();
+        this.websocket?.destroy();
+        this.udpClient?.destroy();
 
         this.rtpClient = null;
         this.websocket = null;
