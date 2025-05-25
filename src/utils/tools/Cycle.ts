@@ -12,7 +12,7 @@ abstract class BaseCycle<T = unknown> {
     public readonly array = new Array<T>();
 
     /**
-     * @description Время через которое надо будет выполнить функцию
+     * @description Следующее запланированное время запуска (в ms, с плавающей точкой)
      * @private
      */
     protected time: number = 0;

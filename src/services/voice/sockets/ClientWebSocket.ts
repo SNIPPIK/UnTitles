@@ -101,7 +101,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public get ready() {
-        return !!this._client && this._client.readyState === WebSocket.OPEN;
+        return !!this._client && this._client?.readyState === WebSocket.OPEN;
     };
 
     /**
@@ -110,7 +110,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public set packet(payload: opcode.extract) {
-        if (this._client.readyState === WebSocket.OPEN) {
+        if (this._client?.readyState && this._client?.readyState === WebSocket.OPEN) {
             try {
                 this._client.send(JSON.stringify(payload));
             } catch (e) {

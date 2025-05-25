@@ -78,7 +78,7 @@ export class QueueMessage<T extends CommandInteraction> {
      */
     public send = (options: {embeds: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
         // Если бот уже ответил на сообщение
-        if (this.replied) return this._original.followUp(options as any) as any;
+        if (this.replied && !this.deferred) return this._original.followUp(options as any) as any;
 
         // Если можно просто отредактировать сообщение
         else if (this.deferred && !this.replied) return this._original.editReply(options as any) as any;

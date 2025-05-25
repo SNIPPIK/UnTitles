@@ -98,9 +98,6 @@ export class ClientRTPSocket {
         // SSRC
         rtp_packet.writeUInt32BE(this.options.ssrc, 8);
 
-        // Зашифрованный звук
-        //rtp_packet.copy(Buffer.alloc(32), 0, 0, 12);
-
         return rtp_packet;
     };
 

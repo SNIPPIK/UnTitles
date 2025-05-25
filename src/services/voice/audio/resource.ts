@@ -231,8 +231,9 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
                 "-af", options.filters,
 
                 // Указываем формат аудио (ogg/opus)
-                "-c:a", "libopus", "-application", "audio",
+                "-c:a", "libopus",
                 "-f", "opus",
+                "-application", "audio",
 
                 "-ar", "48000",
                 "-ac", "2",

@@ -25,35 +25,32 @@ class message_error extends Assign<Event<"message/error">> {
                 // Данные трека
                 const {api, artist, image, user, name} = position ? queue.tracks.get(position) : queue.tracks.track;
 
-                try {
-                    const message = await queue.message.send({
-                        embeds: [{
-                            color: api.color, thumbnail: image, timestamp: new Date(),
-                            fields: [
-                                {
-                                    name: locale._(queue.message.locale, "player.current.playing"),
-                                    value: `\`\`\`${name}\`\`\``
-                                },
-                                {
-                                    name: locale._(queue.message.locale, "player.current.error"),
-                                    value: `\`\`\`js\n${error}...\`\`\``
-                                }
-                            ],
-                            author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
-                            footer: {
-                                text: `${user.username} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
-                                iconURL: user?.avatar
-                            }
-                        }],
-                        withResponse: true
-                    });
 
-                    // Если есть ответ от отправленного сообщения
-                    if (message) setTimeout(() => message.delete().catch(() => {
-                    }), 20e3);
-                } catch (e) {
-                    console.error(e);
-                }
+                const message = await queue.message.send({
+                    embeds: [{
+                        color: api.color, thumbnail: image, timestamp: new Date(),
+                        fields: [
+                            {
+                                name: locale._(queue.message.locale, "player.current.playing"),
+                                value: `\`\`\`${name}\`\`\``
+                            },
+                            {
+                                name: locale._(queue.message.locale, "player.current.error"),
+                                value: `\`\`\`js\n${error}...\`\`\``
+                            }
+                        ],
+                        author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
+                        footer: {
+                            text: `${user.username} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
+                            iconURL: user?.avatar
+                        }
+                    }],
+                    withResponse: true
+                });
+
+                // Если есть ответ от отправленного сообщения
+                if (message) setTimeout(() => message.delete().catch(() => {
+                }), 20e3);
             }
         });
     }
@@ -73,45 +70,41 @@ class message_push extends Assign<Event<"message/push">> {
             type: "player",
             once: false,
             execute: async (message, obj) => {
-                const {artist, image } = obj;
+                const {artist, image} = obj;
 
-                try {
-                    // Отправляем сообщение, о том что было добавлено в очередь
-                    const msg = await message.channel.send({
-                        embeds: [{
-                            color: obj["api"] ? obj["api"]["color"] : Colors.Blue,
-                            thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
-                            footer: {
-                                icon_url: message.member.avatarURL(),
-                                text: `${message.member.displayName}`
-                            },
-                            author: {
-                                name: artist?.title,
-                                url: artist?.url,
-                                icon_url: db.images.disk
-                            },
-                            fields: [
-                                {
-                                    name: locale._(message.locale, "player.queue.push"),
-                                    value: obj instanceof Track ?
-                                        // Если один трек в списке
-                                        `\`\`\`[${obj.time.split}] - ${obj.name}\`\`\`` :
+                // Отправляем сообщение, о том что было добавлено в очередь
+                const msg = await message.channel.send({
+                    embeds: [{
+                        color: obj["api"] ? obj["api"]["color"] : Colors.Blue,
+                        thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
+                        footer: {
+                            icon_url: message.member.avatarURL(),
+                            text: `${message.member.displayName}`
+                        },
+                        author: {
+                            name: artist?.title,
+                            url: artist?.url,
+                            icon_url: db.images.disk
+                        },
+                        fields: [
+                            {
+                                name: locale._(message.locale, "player.queue.push"),
+                                value: obj instanceof Track ?
+                                    // Если один трек в списке
+                                    `\`\`\`[${obj.time.split}] - ${obj.name}\`\`\`` :
 
-                                        // Если добавляется список треков (альбом или плейлист)
-                                        `${obj.items.slice(0, 5).map((track, index) => {
-                                            return `\`${index + 1}\` ${track.name_replace}`;
-                                        }).join("\n")}${obj.items.length > 5 ? locale._(message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}
+                                    // Если добавляется список треков (альбом или плейлист)
+                                    `${obj.items.slice(0, 5).map((track, index) => {
+                                        return `\`${index + 1}\` ${track.name_replace}`;
+                                    }).join("\n")}${obj.items.length > 5 ? locale._(message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}
                                     `
-                                }
-                            ]
-                        }]
-                    });
+                            }
+                        ]
+                    }]
+                });
 
-                    // Если есть ответ от отправленного сообщения
-                    if (msg) setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : {}, 12e3);
-                } catch (e) {
-                    console.error(e);
-                }
+                // Если есть ответ от отправленного сообщения
+                if (msg) setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : {}, 12e3);
             }
         });
     };

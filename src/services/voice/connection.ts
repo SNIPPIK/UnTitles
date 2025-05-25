@@ -331,12 +331,12 @@ export class VoiceConnection {
      * @public
      */
     public destroy = () => {
-        if (!this.websocket && !this.udpClient) return;
-
         if (this.speakingTimeout) clearTimeout(this.speakingTimeout);
 
-        this.websocket?.destroy();
-        this.udpClient?.destroy();
+        if (this.websocket && this.udpClient) {
+            this.websocket?.destroy();
+            this.udpClient?.destroy();
+        }
 
         this.rtpClient = null;
         this.websocket = null;
