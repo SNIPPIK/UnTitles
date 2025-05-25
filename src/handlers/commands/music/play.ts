@@ -203,7 +203,7 @@ class PlayCommand extends Assign< BaseCommand > {
                         queue.player.tracks.position = 0;
 
                         // Перезапускаем очередь
-                        db.queues.create(message);
+                        db.queues.restartPlayer = queue.player;
                         return message.reply({
                             embeds: [
                                 {

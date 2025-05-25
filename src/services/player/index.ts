@@ -78,6 +78,25 @@ export class Queues<T extends Queue> extends Collection<T> {
     };
 
     /**
+     * @description Перезапуск плеера или же перезапуск проигрывания
+     * @param player - Плеер
+     * @public
+     */
+    public set restartPlayer(player: AudioPlayer) {
+        // Если плеер удален из базы
+        if (!this.cycles.players.has(player)) {
+            // Добавляем плеер в базу цикла для отправки пакетов
+            this.cycles.players.add(player);
+        }
+
+        // Если у плеера стоит пауза
+        if (player.status === "player/pause") player.resume();
+
+        // Запускаем функцию воспроизведения треков
+        player.play();
+    };
+
+    /**
      * @description Ультимативная функция, позволяет как добавлять треки так и создавать очередь или переподключить очередь к системе
      * @param message - Сообщение пользователя
      * @param item    - Добавляемый объект
@@ -101,11 +120,7 @@ export class Queues<T extends Queue> extends Collection<T> {
                     // Если добавлен плейлист
                     else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
 
-                    // Если у плеера стоит пауза
-                    if (queue.player.status === "player/pause") queue.player.resume();
-
-                    // Запускаем функцию воспроизведения треков
-                    return queue.player.play();
+                    this.restartPlayer = queue.player;
                 });
             }
         }
