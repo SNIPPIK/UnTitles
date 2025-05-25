@@ -57,6 +57,15 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     private keepAliveCounter = 0;
 
     /**
+     * @description Данные подключения
+     * @public
+     */
+    public _discovery = {
+        ip: null as string,
+        port: 0
+    };
+
+    /**
      * @description Отправка данных на сервер
      * @param packet - Отправляемый пакет
      */
@@ -107,6 +116,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
                     return;
                 }
 
+                this._discovery = { ip, port }
                 this.emit("connected", { ip, port });
             }
         });

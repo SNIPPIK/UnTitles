@@ -1,6 +1,7 @@
 import {Event} from "@handler/events";
 import {Assign, Logger} from "@utils";
 import {Events} from "discord.js";
+import {db} from "../../../database";
 
 /**
  * @author SNIPPIK
@@ -17,7 +18,7 @@ class GuildCreate extends Assign<Event<Events.GuildCreate>> {
             once: false,
             execute: async (guild) => {
                 const id = guild.client.shard?.ids[0] ?? 0;
-                Logger.log("LOG", `[Core/${id}] has ${Logger.color(32, `added a new guild ${guild.id}`)}`)
+                Logger.log("LOG", `[Core/${id}] has ${Logger.color(32, `added a new guild ${guild.id}`)}`);
             }
         });
     };
@@ -39,7 +40,11 @@ class GuildRemove extends Assign<Event<Events.GuildDelete>> {
             once: false,
             execute: async (guild) => {
                 const id = guild.client.shard?.ids[0] ?? 0;
-                Logger.log("LOG", `[Core/${id}] has ${Logger.color(31, `remove a guild ${guild.id}`)}`)
+                Logger.log("LOG", `[Core/${id}] has ${Logger.color(31, `remove a guild ${guild.id}`)}`);
+
+                // Если бота отключили при включенной музыке
+                const queue = db.queues.get(guild.id);
+                if (queue) db.queues.remove(guild.id);
             }
         });
     };

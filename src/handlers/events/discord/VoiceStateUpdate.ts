@@ -51,6 +51,14 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
 
                     // Если есть гс и очередь
                     else {
+                        const meVoice = !!guild.members.me.voice.channel?.members?.find(member => member.id ===guild.members.me.id);
+
+                        // Если бота выгнали из голосового канала
+                        if (!meVoice) {
+                            db.voice.remove(guild.id);
+                            db.queues.remove(guild.id);
+                        }
+
                         const members = guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
 
                         // Если есть пользователи

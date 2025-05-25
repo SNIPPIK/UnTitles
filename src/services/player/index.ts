@@ -43,25 +43,6 @@ export class Queues<T extends Queue> extends Collection<T> {
     };
 
     /**
-     * @description Перезапуск плеера или же перезапуск проигрывания
-     * @param player - Плеер
-     * @public
-     */
-    public set restartPlayer(player: AudioPlayer) {
-        // Если плеер удален из базы
-        if (!this.cycles.players.has(player)) {
-            // Добавляем плеер в базу цикла для отправки пакетов
-            this.cycles.players.add(player);
-        }
-
-        // Если у плеера стоит пауза
-        if (player.status === "player/pause") player.resume();
-
-        // Запускаем функцию воспроизведения треков
-        player.play();
-    };
-
-    /**
      * @description отправляем сообщение о перезапуске бота
      * @public
      */
@@ -102,7 +83,7 @@ export class Queues<T extends Queue> extends Collection<T> {
      * @param item    - Добавляемый объект
      * @private
      */
-    public create = (message: CommandInteraction, item: Track.list | Track) => {
+    public create = (message: CommandInteraction, item?: Track.list | Track) => {
         let queue = this.get(message.guild.id);
 
         // Проверяем есть ли очередь в списке, если нет то создаем
@@ -120,21 +101,27 @@ export class Queues<T extends Queue> extends Collection<T> {
                     // Если добавлен плейлист
                     else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
 
-                    // Перезапускаем плеер
-                    this.restartPlayer = queue.player;
+                    // Если у плеера стоит пауза
+                    if (queue.player.status === "player/pause") queue.player.resume();
+
+                    // Запускаем функцию воспроизведения треков
+                    return queue.player.play();
                 });
             }
         }
 
-        // Отправляем сообщение о том что было добавлено
-        if ("items" in item || queue.tracks.total > 0) {
-            db.events.emitter.emit("message/push", message, item);
-        }
+        // Если вносятся треки
+        if (item) {
+            // Отправляем сообщение о том что было добавлено
+            if ("items" in item || queue.tracks.total > 0) {
+                db.events.emitter.emit("message/push", message, item);
+            }
 
-        // Добавляем треки в очередь
-        for (const track of (item["items"] ?? [item]) as Track[]) {
-            track.user = message.member.user;
-            queue.tracks.push(track);
+            // Добавляем треки в очередь
+            for (const track of (item["items"] ?? [item]) as Track[]) {
+                track.user = message.member.user;
+                queue.tracks.push(track);
+            }
         }
     };
 }
