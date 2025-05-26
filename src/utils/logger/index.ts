@@ -54,8 +54,12 @@ export class Logger {
         const extStatus = db.status[status];
         const time = `\x1b[90m${date.getDate().toSplit()}/${(date.getMonth() + 1).toSplit()}/${date.getFullYear()} ${date.getHours().toSplit()}:${date.getMinutes().toSplit()}\x1b[0m`;
 
+        // Получаем память в мегабайтах с двумя знаками после запятой
+        const mem = process.memoryUsage();
+        const memUsedMB = (mem.heapUsed / 1024 / 1024).toFixed(2);
+
         // Отправляем лог
-        console.log(`${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}`);
+        console.log(`\x1b[35m[RAM: ${memUsedMB} MB]\x1b[0m ${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}`);
         return;
     };
 

@@ -1,10 +1,9 @@
-import { DiscordGatewayAdapterCreator } from "@structures";
+import { DiscordClient, DiscordGatewayAdapterCreator } from "@structures";
 import { CacheUtility } from "@service/player/utils/cache";
 import { VoiceConnection } from "@service/voice";
 import { Queues, Queue } from "@service/player";
 import { RestObject } from "@handler/rest/apis";
 import { Commands } from "@handler/commands";
-import { DiscordClient } from "./structures";
 import { Buttons } from "@handler/modals";
 import { Events } from "@handler/events";
 import { Collection } from "@utils";
