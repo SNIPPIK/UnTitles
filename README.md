@@ -46,15 +46,10 @@
 
 ## И как это запустить?!
 - Требуется Node.js или Bun, не забываем про FFmpeg
-- Настраиваем env файл
-    - Для Bun он будет в текущей директории
-    - Для Node.js в build/.env
+- Настраиваем env файл в build/.env
 - Пример запуска
 ```shell
 git clone https://github.com/SNIPPIK/UnTitles
-
-# Bun
-npm run start-new
 
 # NodeJS
 npm run build && npm run start
