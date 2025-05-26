@@ -380,6 +380,9 @@ export class AudioPlayer extends BasePlayer {
 
         if (this.status === "player/wait") return;
         this.status = "player/wait";
+
+        // Отправляем silent frame в голосовое соединение для паузы звука
+        this.voice.connection.packet = SILENT_FRAME;
     };
 
     /**

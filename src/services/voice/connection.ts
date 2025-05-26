@@ -203,8 +203,8 @@ export class VoiceConnection {
         this.websocket = new ClientWebSocket(`wss://${endpoint}?v=8`);
         this.websocket.connect(); // Подключаемся к endpoint
 
-        this.websocket.on("debug", console.log);
-        this.websocket.on("warn", console.log);
+        //this.websocket.on("debug", console.log);
+        //this.websocket.on("warn", console.log);
 
         this.websocket.on("error", (err) => {
             this.websocket.emit("close", 4000 as any, err.name);

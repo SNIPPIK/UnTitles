@@ -8,7 +8,7 @@ import { env } from "@app/env";
  * @author SNIPPIK
  * @description Запуск всего проекта в async режиме
  */
-(async () => {
+(() => {
     // Если при запуске многопоточных элементов произойдет случайный запуск осколка
     if (!isMainThread) throw new Error("Not implemented.");
 
