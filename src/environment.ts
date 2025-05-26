@@ -1,3 +1,5 @@
+import {config} from "dotenv"
+
 /**
  * @author SNIPPIK
  * @description Взаимодействуем с environment variables
@@ -11,7 +13,9 @@ export class Environment {
      */
     public constructor() {
         try {
-            process.loadEnvFile(".env");
+            config();
+
+            //process.loadEnvFile(".env");
         } catch (error) {
             const path = __dirname.split("/");
             throw new Error(`[Environment] has not found .env file in directory ${path.splice(path.length, 1).join("/")}`);

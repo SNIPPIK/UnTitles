@@ -44,19 +44,21 @@
 ![img_1.png](.github/images/playing.png)
 ---
 
-## Как запустить проект!
-1. Устанавливаем [`node.js`](https://nodejs.org/en)
-2. Устанавливаем `FFmpeg`, необходимо выбрать один из вариантов
-   - Установить FFmpeg в систему
-   - Указать в `env` параметр `ffmpeg.path`
-   - Закинуть в `cache.dir`, смотреть [`тут`](https://github.com/SNIPPIK/UnTitles/blob/5b71c70907f62c975ce3ea8ccae6d092e46d9ee6/.env.example#L101)
-3. Варианты запуска
-   - Исходный вариант (typescript), качаем [тут](https://github.com/SNIPPIK/UnTitles/archive/refs/heads/main.zip)
-     - Настраиваем `.env` файл в `./build`
-     - Заходим в директорию проекта
-     - Открываем терминал
-     - npm i && npm run auto
----
+## И как это запустить?!
+- Требуется Node.js или Bun, не забываем про FFmpeg
+- Настраиваем env файл
+    - Для Bun он будет в текущей директории
+    - Для Node.js в build/.env
+- Пример запуска
+```shell
+git clone https://github.com/SNIPPIK/UnTitles
+
+# Bun
+npm run start-new
+
+# NodeJS
+npm run build && npm run start
+```
 
 ## Диаграмма всего проекта
 [<img align="center" alt="Diagram" width="" src=".github/images/src.png" />]()

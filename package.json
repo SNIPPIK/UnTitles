@@ -11,17 +11,20 @@
   "dependencies": {
     "discord-api-types": "^0.38.8",
     "discord.js": "^14.19.3",
+    "dotenv": "^16.5.0",
     "ws": "^8.18.2"
   },
   "devDependencies": {
     "@types/node": "^22.15.19",
     "@types/ws": "^8.18.1",
-    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "start-new": "bun src --ShardManager",
     "start": "cd build && node -r tsconfig-paths/register src --ShardManager",
-    "auto": "npm run build && npm run start"
+
+
+    "build": "tsc -p tsconfig.json",
+    "auto": "npm run start-new"
   }
 }
