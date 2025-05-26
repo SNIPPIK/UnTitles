@@ -5,12 +5,11 @@
 [![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
 ---
 
-[<img align="right" alt="Woman" width="300" src=".github/images/woman.png" />]()
+[<img align="center" alt="Woman" width="" src=".github/images/woman.png" />]()
 
 # 🌟 Discord Music Bot
 - Авторы: [`SNIPPIK`](https://github.com/SNIPPIK), [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS)
 - Если хочется поддержать монеткой [`DonationAlerts`](https://www.donationalerts.com/r/snippik)
-- Есть идеи прошу в [`discussions`](https://github.com/SNIPPIK/UnTitles/discussions) или на [`Discord Server`](https://discord.gg/qMf2Sv3)
 - Все работает без Lavalink, Lavaplayer. Это дает полный доступ и лучшее взаимодействие!
 - Возможны ошибки или недочеты, прошу сообщать о них, в [`issues`](https://github.com/SNIPPIK/UnTitles/issues)
 - Мы не может запускать бота на постоянной основе. По-этому он может быть не доступен!
