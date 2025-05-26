@@ -1,10 +1,3 @@
-![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
-![Discord.js](https://img.shields.io/badge/discord.js-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
-![NodeJS](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
-[![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
-[![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
----
-
 [<img align="center" alt="Woman" width="" src=".github/images/woman.png" />]()
 
 # 🌟 Discord Music Bot
@@ -13,6 +6,9 @@
 - Все работает без Lavalink, Lavaplayer. Это дает полный доступ и лучшее взаимодействие!
 - Возможны ошибки или недочеты, просим сообщать о них, в [`issues`](https://github.com/SNIPPIK/UnTitles/issues)
 - Мы не может запускать бота на постоянной основе. По-этому он может быть не доступен!
+
+[![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
+[![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
 
 > [!TIP]
 > Сделано с душой, не забывайте указывать авторство от этого зависит разработка!!!
@@ -61,6 +57,11 @@ npm run build && npm run start
 | /skip   | ✅              | (back, to, next)                        | **Универсальная команда для управления позицией трека**     |
 | /avatar | ✅              | {user}                                  | **Для просмотра аватара пользователя**                      |
 | /voice  | ⛔              | (join, leave, tribune: (join, request)) | **Взаимодействие с голосовыми подключениями**               |
+---
+![TypeScript](https://img.shields.io/badge/typescript-5.8.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
+![Discord.js](https://img.shields.io/badge/discord.js-14.9.3-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
+![ws](https://img.shields.io/badge/ws-8.18.2-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
 ---
 # 📊 Диаграмма всего проекта
 - Вдруг вам интересно как построен бот
