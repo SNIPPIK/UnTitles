@@ -8,10 +8,10 @@
 [<img align="center" alt="Woman" width="" src=".github/images/woman.png" />]()
 
 # 🌟 Discord Music Bot
-- Авторы: [`SNIPPIK`](https://github.com/SNIPPIK), [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS)
+- Авторы: [`SNIPPIK`](https://github.com/SNIPPIK), [`GHOST-OF-THE-ABYSS (идеи и предложения)`](https://github.com/GHOST-OF-THE-ABYSS)
 - Если хочется поддержать монеткой [`DonationAlerts`](https://www.donationalerts.com/r/snippik)
 - Все работает без Lavalink, Lavaplayer. Это дает полный доступ и лучшее взаимодействие!
-- Возможны ошибки или недочеты, прошу сообщать о них, в [`issues`](https://github.com/SNIPPIK/UnTitles/issues)
+- Возможны ошибки или недочеты, просим сообщать о них, в [`issues`](https://github.com/SNIPPIK/UnTitles/issues)
 - Мы не может запускать бота на постоянной основе. По-этому он может быть не доступен!
 
 > [!TIP]
@@ -22,13 +22,14 @@
 
 
 ## 💡 И как это запустить?!
-- Требуется Node.js, FFmpeg
-- Настраиваем env файл в build/.env
+- Требуется `Node.js`, `FFmpeg`
+- Настраиваем `.env` файл по пути `build/.env`
 - Пример запуска
 ```shell
+# Клонируем
 git clone https://github.com/SNIPPIK/UnTitles
 
-# NodeJS
+# Запускаем через NodeJS
 npm run build && npm run start
 ```
 
@@ -62,4 +63,5 @@ npm run build && npm run start
 | /voice  | ⛔              | (join, leave, tribune: (join, request)) | **Взаимодействие с голосовыми подключениями**               |
 ---
 # 📊 Диаграмма всего проекта
+- Вдруг вам интересно как построен бот
 [<img align="center" alt="Diagram" width="" src=".github/images/src.png" />]()
