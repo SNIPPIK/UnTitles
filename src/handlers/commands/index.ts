@@ -164,7 +164,7 @@ export interface BaseCommand<Argument = string> {
      * @readonly
      * @public
      */
-    readonly rules?: ("voice" | "queue" | "another_voice" | "player-not-playing")[]
+    readonly rules?: ("voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream")[]
 
     /**
      * @description Выполнение команды

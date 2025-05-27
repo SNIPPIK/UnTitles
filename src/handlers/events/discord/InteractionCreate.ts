@@ -98,6 +98,28 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             }
         },
         {
+            name: "player-wait-stream",
+            callback: async (message) => {
+                const queue = db.queues.get(message.guild.id);
+
+                // Если музыку нельзя пропустить из-за плеера
+                if (queue && queue.player.waitStream) {
+                    await message.reply({
+                        flags: "Ephemeral",
+                        embeds: [
+                            {
+                                description: locale._(message.locale, "player.stream.wait"),
+                                color: Colors.DarkRed
+                            }
+                        ],
+                    });
+                    return false;
+                }
+
+                return true;
+            }
+        },
+        {
             name: "another_voice",
             callback: async (message) => {
                 const VoiceChannelMe = message.guild?.members?.me?.voice?.channel;
@@ -386,7 +408,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @param ctx
      * @constructor
      */
-    private readonly SelectMenuCallback = (ctx: AnySelectMenuInteraction<CacheType>) => {
+    private readonly SelectMenuCallback = async (ctx: AnySelectMenuInteraction<CacheType>) => {
         const id = ctx["customId"] as string;
 
         if (id === "filter_select") {
@@ -401,6 +423,15 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             const command = db.commands.get("filter");
 
             if (!command) return;
+
+            // Если права не соответствуют правде
+            if (command.rules && command.rules?.length > 0) {
+                const rules = this.intends.filter((rule) => command.rules.includes(rule.name));
+
+                for (const rule of rules) {
+                    if (!(await rule.callback(ctx as any))) return null;
+                }
+            }
 
             return command.execute({
                 message: ctx as any,

@@ -57,6 +57,12 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
      * @private
      */
     protected readonly _audio = new PlayerAudio();
+
+    /**
+     * @description Параметр отвечающий за загрузку потока
+     * @help Если поток загружается или ждет начала, то новый загрузить не получится
+     */
+    public waitStream = false;
 }
 
 /**
@@ -123,7 +129,6 @@ export class AudioPlayer extends BasePlayer {
         this._status = status;
     };
 
-
     /**
      * @description Проверяем играет ли плеер
      * @return boolean
@@ -179,7 +184,7 @@ export class AudioPlayer extends BasePlayer {
          * @description Событие смены позиции плеера
          * @private
          */
-        this.on("player/wait", (player) => {
+        this.on("player/wait", async (player) => {
             const repeat = player.tracks.repeat;
             const current = player.tracks.position;
 
@@ -205,7 +210,7 @@ export class AudioPlayer extends BasePlayer {
 
             // Через время запускаем трек, что-бы не нарушать работу VoiceSocket
             // Что будет если нарушить работу VoiceSocket, пинг >=1000
-            setTimeout(player.play, 2e3);
+            return player.play(0, 2e3);
         });
 
         /**
@@ -237,97 +242,126 @@ export class AudioPlayer extends BasePlayer {
     };
 
     /**
+     * @description Запуск чтения потока
+     * @param path - Путь до файла или ссылка на аудио
+     * @param time - Длительность трека
+     * @param seek - Время пропуска, трек начнется с указанного времени
+     */
+    private _readStream = (path: string, time: number = 0, seek: number = 0) => {
+        // Если аудио уже загружается
+        if (this.waitStream) return;
+
+        this.waitStream = true;
+        const options = { seek, filters: this._filters.compress(time) };
+
+        // Если всего 1 трек в системе и есть прошлый поток
+        if (this._tracks.total === 1 && this._audio.current) {
+
+            // Если фильтры совпадают
+            if (options.filters === this._audio.current.config.options.filters && !seek) {
+                // Перезапускаем поток
+                this._audio.current.refresh();
+                this.status = "player/playing";
+                return;
+            }
+        }
+
+        // Создаем класс для управления потоком
+        const stream = new AudioResource({path, options});
+
+        // Если стрим можно прочитать
+        if (stream.readable) {
+            this._audio.current = stream;
+            this.status = "player/playing";
+            this.waitStream = false;
+        }
+
+        else {
+            // Подключаем события для отслеживания работы потока (временные)
+            stream
+                // Если возникнет ошибка во время загрузки потока
+                .once("error", (error) => {
+                    // Уничтожаем поток
+                    stream.destroy();
+
+                    this.waitStream = false;
+                    // Отправляем данные событию для отображения ошибки
+                    throw error;
+                })
+                // Если уже можно читать поток
+                .once("readable", () => {
+                    this.waitStream = false;
+                    this._audio.current = stream;
+                    this.status = "player/playing";
+                });
+        }
+    };
+
+    /**
+     * @description Пред загрузка трека, если конечно это возможно
+     * @param position - Позиция трека
+     */
+    protected _preloadTrack = async (position: number): Promise<false | string | Error> => {
+        const track = this.tracks.get(position);
+
+        // Если нет трека в очереди
+        if (!track) return false;
+
+        // Получаем данные
+        const path = await track?.resource;
+
+        // Если получена ошибка вместо исходника
+        if (path instanceof Error) {
+            this.emit("player/error", this, `Critical error in track.resource!\n\n${path.name}\n- ${path.message}`, { skip: true, position });
+            return Error(`Critical error in track.resource!\n\n${path.name}\n- ${path.message}`);
+        }
+
+        // Если нет исходника
+        else if (!path) {
+            this.emit("player/error", this, "Fail to get audio link", { skip: true, position });
+            return new Error("Fail to get audio link");
+        }
+
+        // Если получить трек удалось
+        return path;
+    };
+
+    /**
      * @description Функция отвечает за циклическое проигрывание, если хотим воспроизвести следующий трек надо избавится от текущего
      * @param seek  - Время трека для пропуска аудио дорожки
+     * @param timeout - Время через которое надо включить трек
      * @param position - Позиция нового трека
      * @public
      */
-    public play = async (seek: number = 0, position: number = null): Promise<void> => {
+    public play = async (seek: number = 0, timeout: number = null, position: number = null): Promise<void> => {
         const track = this._tracks?.track;
 
         // Если больше нет треков
         if (!track) return;
 
         // Позиция трека
-        const positionIndex = position ?? this.tracks.indexOf(track);
-
-        // Функция выполнения ошибки
-        const handleError = (message: string) => {
-            this.emit("player/error", this, message, { skip: true, position: positionIndex });
-        };
-
-        // Функция выполнения отправки сообщения
-        const emitPlaying = () => {
-            if (seek !== 0) return;
-
-            const queue = db.queues.get(this.id);
-            // Отправляем сообщение, если можно
-            db.events.emitter.emit("message/playing", queue);
-        };
-
-        const options = {
-            seek, filters: this._filters.compress(track.time.total)
-        };
+        const positionIndex = position || this.tracks.indexOf(track);
 
         try {
-            // Если всего 1 трек в системе и есть прошлый поток
-            if (this.tracks.total === 1 && this.audio.current) {
-
-                // Если фильтры совпадают
-                if (options.filters === this.audio.current.config.options.filters && !seek) {
-                    // Перезапускаем поток
-                    this.audio.current.refresh();
-                    this.status = "player/playing";
-                    return;
-                }
-            }
-
-            // Получаем данные
-            const path = await track?.resource;
+            const resource = await this._preloadTrack(positionIndex);
 
             // Если получена ошибка вместо исходника
-            if (path instanceof Error) return handleError(`Critical error in track.resource!\n\n${path.name}\n- ${path.message}`);
+            if (resource instanceof Error || !resource) return;
 
-            // Если нет исходника
-            else if (!path) return handleError("Fail to get audio link");
-
-            // Создаем класс для управления потоком
-            const stream = new AudioResource({path, options});
-
-            // Если стрим можно прочитать
-            if (stream.readable) {
-                this.audio.current = stream;
-                this.status = "player/playing";
-
-                // Если включается именно новый трек
-                emitPlaying();
-            }
-
-            else {
-                // Подключаем события для отслеживания работы потока (временные)
-                stream
-                    // Если возникнет ошибка во время загрузки потока
-                    .once("error", (error) => {
-                        // Отправляем данные событию для отображения ошибки
-                        handleError(`${error}`);
-
-                        // Уничтожаем поток
-                        stream.destroy();
-                    })
-                    // Если уже можно читать поток
-                    .once("readable", () => {
-                        // Если включается именно новый трек
-                        emitPlaying();
-
-                        this.audio.current = stream;
-                        this.status = "player/playing";
-                    });
-            }
+            if (timeout) setTimeout(() => this._readStream(resource, track.time.total, seek), timeout);
+            else return this._readStream(resource, track.time.total, seek);
         } catch (err) {
-            handleError(`${err}`);
+            this.emit("player/error", this, `${err}`, { skip: true, position: positionIndex });
 
             // Сообщаем об ошибке
             Logger.log("ERROR", `[Player/${this.id}] ${err}`);
+        } finally {
+            if (seek === 0) {
+                const queue = db.queues.get(this.id);
+
+                // Отправляем сообщение, если можно
+                db.events.emitter.emit("message/playing", queue);
+            }
         }
     };
 

@@ -280,6 +280,11 @@
     "en-US": "Music is not playing!"
   },
 
+  "player.stream.wait": {
+    "ru": "Плеер ожидает ответа от аудио потока! Пожалуйста проявите терпение!",
+    "en-US": "The player is waiting for a response from the audio stream! Please be patient!"
+  },
+
   "player.current.playing": {
     "ru": "Сейчас играет:",
     "en-US": "Current:"
