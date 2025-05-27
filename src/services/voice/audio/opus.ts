@@ -21,7 +21,8 @@ export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
  * @public
  */
 export class OpusEncoder extends Writable {
-    private _buffer: Buffer = Buffer.alloc(0);
+    // Unsafe является безопасным поскольку, является пустышкой
+    private _buffer: Buffer = Buffer.allocUnsafe(0);
 
     /**
      * @description Функция для работы чтения

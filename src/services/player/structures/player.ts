@@ -7,7 +7,7 @@ import {db} from "@app/db";
 import {PlayerProgress} from "../modules/progress";
 import {PlayerVoice} from "../modules/voice";
 import {PlayerAudio} from "../modules/audio";
-import {RepeatType} from "../modules/tracks";
+import {RepeatType} from "@service/player";
 
 /**
  * @author SNIPPIK
@@ -248,6 +248,8 @@ export class AudioPlayer extends BasePlayer {
      * @param seek - Время пропуска, трек начнется с указанного времени
      */
     private _readStream = (path: string, time: number = 0, seek: number = 0) => {
+        Logger.log("DEBUG", `[Player/${this.id}] has read stream`);
+
         // Если аудио уже загружается
         if (this.waitStream) return;
 
@@ -302,6 +304,8 @@ export class AudioPlayer extends BasePlayer {
      * @param position - Позиция трека
      */
     protected _preloadTrack = async (position: number): Promise<false | string | Error> => {
+        Logger.log("DEBUG", `[Player/${this.id}] has preload track`);
+
         const track = this.tracks.get(position);
 
         // Если нет трека в очереди
@@ -321,6 +325,8 @@ export class AudioPlayer extends BasePlayer {
             this.emit("player/error", this, "Fail to get audio link", { skip: true, position });
             return new Error("Fail to get audio link");
         }
+
+        Logger.log("DEBUG", `[Player/${this.id}] has preload track: success`);
 
         // Если получить трек удалось
         return path;

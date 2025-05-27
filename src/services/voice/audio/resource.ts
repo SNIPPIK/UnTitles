@@ -114,11 +114,21 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
     /**
      * @description Выдаем фрагмент потока или пустышку
+     * @help (время пакета 20ms)
      * @return Buffer
      * @public
      */
     public get packet(): Buffer {
         return this._buffer.packet;
+    };
+
+    /**
+     * @description Оставшееся кол-во пакетов
+     * @help (время пакета 20ms)
+     * @public
+     */
+    public get packets(): number {
+        return this._buffer.size - this._buffer.position;
     };
 
     /**
@@ -231,12 +241,13 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
                 "-af", options.filters,
 
                 // Указываем формат аудио (ogg/opus)
-                "-c:a", "libopus",
-                "-f", "opus",
-                "-application", "audio",
-
+                "-acodec", "libopus",
+                "-b:a", "96k",             // Битрейт (если надо ограничить)
+                "-compression_level", "10",
+                "-application", "audio",   // Оптимизация под речь/музыку
                 "-ar", "48000",
                 "-ac", "2",
+                "-f", "opus",
 
                 "pipe:"
             ])

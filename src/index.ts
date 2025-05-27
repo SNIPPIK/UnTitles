@@ -4,75 +4,96 @@ import { db, initDatabase} from "@app/db";
 import { Logger } from "@utils";
 import { env } from "@app/env";
 
+// Точка входа
+void main();
+
 /**
  * @author SNIPPIK
  * @description Запуск всего проекта в async режиме
  */
-(() => {
-    // Если при запуске многопоточных элементов произойдет случайный запуск осколка
+async function main() {
     if (!isMainThread) throw new Error("Not implemented.");
 
-    // Проверяем на наличие аргумента запуска менеджера осколков
-    switch (process["argv"].includes("--ShardManager")) {
-        /**
-         * @author SNIPPIK
-         * @description Если требуется запустить менеджер осколков
-         */
-        case true: {
-            Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
-            // Создаем менеджер осколков
-            new ShardManager(__filename, env.get("token.discord"));
-            return;
-        }
+    const isManager = process.argv.includes("--ShardManager");
 
-        /**
-         * @author SNIPPIK
-         * @description Если требуется запустить осколок
-         */
-        default: {
-            Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
-
-            // Создаем класс осколка
-            const client = new DiscordClient();
-            const id = client.shardID;
-
-            initDatabase(client);
-
-            // Подключаем осколок к discord
-            client.login(env.get("token.discord"))
-                // Что делаем после подключения к discord api
-                .finally(async () => {
-                    // Загруженные кнопки
-                    db.buttons.register();
-                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
-
-                    // Загружаем платформы
-                    await db.api.startWorker();
-                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow.length} APIs`)}`);
-
-                    // Загружаем события
-                    db.events.register(client);
-                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.size} events`)}`);
-
-                    // Загружаем команды
-                    db.commands.register(client);
-                    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
-                });
-
-            // Создаем webhook клиент
-            return initProcessEvents();
-        }
-    }
-})();
+    if (isManager) return runShardManager();
+    else return runShard();
+}
 
 /**
  * @author SNIPPIK
- * @description Инициализирует события процесса
+ * @description Если требуется запустить менеджер осколков
  */
-function initProcessEvents() {
-    // Отлавливаем все ошибки внутри процесса
+function runShardManager() {
+    Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
+    new ShardManager(__filename, env.get("token.discord"));
+}
+
+/**
+ * @author SNIPPIK
+ * @description Если требуется запустить осколок
+ */
+async function runShard() {
+    Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
+
+    const client = new DiscordClient();
+    const id = client.shardID;
+
+    initDatabase(client);
+
+    await client.login(env.get("token.discord"));
+
+    // Регистрируем всё остальное
+    db.buttons.register();
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
+
+    await db.api.startWorker();
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow.length} APIs`)}`);
+
+    db.events.register(client);
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.size} events`)}`);
+
+    db.commands.register(client);
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
+
+    initProcessEvents();
+}
+
+/**
+ * @author SNIPPIK
+ * @description Инициализирует события процесса (ошибки, сигналы)
+ */
+export function initProcessEvents() {
+    // Необработанная ошибка (внутри синхронного кода)
     process.on("uncaughtException", (err, origin) => {
-        //Выводим ошибку
-        Logger.log("ERROR", `Caught exception\n┌ Name:    ${err.name}\n├ Message: ${err.message}\n├ Origin:  ${origin}\n└ Stack:   ${err.stack}`);
+        Logger.log(
+            "ERROR",
+            `Uncaught Exception\n` +
+            `┌ Name:    ${err.name}\n` +
+            `├ Message: ${err.message}\n` +
+            `├ Origin:  ${origin}\n` +
+            `└ Stack:   ${err.stack}`
+        );
+    });
+
+    // Необработанный промис
+    process.on("unhandledRejection", (reason: any) => {
+        Logger.log(
+            "ERROR",
+            `Unhandled Rejection\n` +
+            `┌ Reason:  ${reason instanceof Error ? reason.message : String(reason)}\n` +
+            `└ Stack:   ${reason instanceof Error ? reason.stack : "N/A"}`
+        );
+    });
+
+    // Возможность завершить процесс корректно
+    process.on("SIGINT", () => {
+        Logger.log("WARN", "Received SIGINT. Shutting down...");
+        process.exit(0);
+    });
+
+    process.on("SIGTERM", () => {
+        Logger.log("WARN", "Received SIGTERM. Shutting down...");
+        process.exit(0);
     });
 }

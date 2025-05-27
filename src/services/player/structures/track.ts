@@ -205,16 +205,14 @@ export class Track extends BaseTrack {
     public get resource(): Promise<string | Error> {
         return new Promise(async (resolve) => {
             for (let i = 0; i < 3; i++) {
-                if (i >= 3) return resolve(Error(`The platform does not provide a link`));
-
                 const resource = await this.prepareResource();
 
                 // Если произошла ошибка при получении ресурса
-                if (resource instanceof Error || !resource) {
-                    if (resource) console.error(resource);
+                if (!(resource instanceof Error) && resource) {
+                    return resolve(resource);
+                } else {
                     this.link = null;
-
-                    if (i >= 3) return resolve(resource);
+                    if (i === 3) return resolve(resource);
                 }
             }
 
@@ -240,7 +238,7 @@ export class Track extends BaseTrack {
 
             let api = await Promise.race([await new httpsClient(
                 {
-                    url: `https://lrclib.net/api/get?artist_name=${this.artist.title.split(" ").join("+")}&track_name=${this.name.split(" ").join("+")}\``,
+                    url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(this.artist.title)}&track_name=${encodeURIComponent(this.name)}`,
                     userAgent: "UnTitles 0.3.0, Music bot, github.com/SNIPPIK/UnTitles"
                 }
             ).send(), timeoutPromise]) as json | Error;

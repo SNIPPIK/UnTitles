@@ -59,7 +59,7 @@ export class Process {
             if (isNaN(seek) || seek === 0) args.splice(index_seek, 2);
         }
 
-        args.unshift("-vn", "-loglevel", "panic");
+        args.unshift("-vn", "-loglevel", "error", "-hide_banner");
         this._process = spawn(name, args);
 
         for (let event of ["end", "error", "exit"]) {

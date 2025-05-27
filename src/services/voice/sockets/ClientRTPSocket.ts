@@ -74,7 +74,7 @@ export class ClientRTPSocket {
         this._nonce++;
 
         // Если нет пакета или номер пакет превышен максимальный, то его надо сбросить
-        if (this._nonce > MAX_NONCE_SIZE) this._nonce = 0;
+        if (this._nonce >= MAX_NONCE_SIZE) this._nonce = 0;
         this._nonceBuffer.writeUInt32BE(this._nonce, 0);
 
         return this._nonceBuffer;
@@ -85,7 +85,8 @@ export class ClientRTPSocket {
      * @public
      */
     private get rtp_packet() {
-        const rtp_packet = Buffer.alloc(12);
+        // Unsafe является безопасным поскольку данные будут перезаписаны
+        const rtp_packet = Buffer.allocUnsafe(12);
         // Version + Flags, Payload Type
         [rtp_packet[0], rtp_packet[1]] = [0x80, 0x78];
 

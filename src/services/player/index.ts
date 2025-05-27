@@ -51,15 +51,18 @@ export class Queues<T extends Queue> extends Collection<T> {
 
         // На все сервера отправляем сообщение о перезапуске
         for (const queue of this.array) {
+            // Если аудио не играет
+            if (!queue.player.playing || !queue.player.audio?.current) continue;
+
             // Если плеер запущен
             if (this.cycles.players.has(queue.player)) {
-                const time = queue.tracks.track.time.total * 1e3
+                const remaining = queue.player.audio.current.packets * 20;
 
                 // Если время ожидания меньше чем в очереди
-                if (timeout < time) timeout = time;
+                if (timeout < remaining) timeout = remaining;
             }
 
-            // Сообщение о перезапуске
+            // Уведомляем пользователей об окончании, для каждого сервера
             queue.message.send({
                 withResponse: false,
                 embeds: [
@@ -74,6 +77,7 @@ export class Queues<T extends Queue> extends Collection<T> {
             this.remove(queue.guild.id, true);
         }
 
+        Logger.log("DEBUG", `[Queues] has getting max timeout: ${timeout} ms`);
         return timeout;
     };
 

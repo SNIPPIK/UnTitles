@@ -7,7 +7,7 @@ import { isIPv4 } from "node:net";
  * @description Интервал в миллисекундах, с которым отправляются датаграммы поддержания активности
  * @private
  */
-const ALIVE_INTERVAL = 10e3;
+const ALIVE_INTERVAL = 20e3;
 
 /**
  * @author SNIPPIK
@@ -37,24 +37,37 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     private readonly socket = createSocket({ type: "udp4" });
 
     /**
-     * @description Интервал для предотвращения разрыва
-     * @readonly
+     * @description Данные для поддержания udp соединения
      * @private
      */
-    private readonly keepAliveInterval: NodeJS.Timeout;
+    private readonly keepAlive = {
+        /**
+         * @description Интервал для предотвращения разрыва
+         * @readonly
+         * @private
+         */
+        interval: null as NodeJS.Timeout,
 
-    /**
-     * @description Буфер, используемый для записи счетчика активности
-     * @readonly
-     * @private
-     */
-    private readonly keepAliveBuffer: Buffer = Buffer.alloc(4);
+        /**
+         * @description Таймер по истечению которого будет запущен интервал
+         * @readonly
+         * @private
+         */
+        timeout: null as NodeJS.Timeout,
 
-    /**
-     * @description Счетчика активности
-     * @private
-     */
-    private keepAliveCounter = 0;
+        /**
+         * @description Буфер, используемый для записи счетчика активности
+         * @readonly
+         * @private
+         */
+        buffer: Buffer.alloc(4),
+
+        /**
+         * @description Счетчика активности
+         * @private
+         */
+        counter: 0
+    };
 
     /**
      * @description Данные подключения
@@ -73,6 +86,8 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         this.socket.send(packet, 0, packet.length, this.options.port, this.options.ip, (err) => {
             if (err) this.emit("error", err);
         });
+
+        this.resetKeepAliveInterval();
     };
 
     /**
@@ -102,14 +117,36 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         });
 
         this.socket.bind(); // обязательный вызов для активации сокета
+        this.manageKeepAlive();
+    };
 
-        // Запускаем интервал
-        this.keepAliveInterval = setInterval(() => {
-            if (this.keepAliveCounter > MAX_SIZE_VALUE) this.keepAliveCounter = 0;
+    /**
+     * @description Функция для запуска интервала для поддержания соединения
+     * @private
+     */
+    private manageKeepAlive = () => {
+        if (this.keepAlive.interval) clearInterval(this.keepAlive.interval);
+        if (this.keepAlive.timeout) clearTimeout(this.keepAlive.timeout);
 
-            this.keepAliveBuffer.writeUInt32BE(this.keepAliveCounter++, 0);
-            this.packet = this.keepAliveBuffer;
+        // Запускаем интервал (по-умолчанию)
+        this.keepAlive.interval = setInterval(() => {
+            if (this.keepAlive.counter > MAX_SIZE_VALUE) this.keepAlive.counter = 0;
+
+            this.keepAlive.buffer.writeUInt32BE(this.keepAlive.counter++, 0);
+            this.packet = this.keepAlive.buffer;
         }, ALIVE_INTERVAL);
+    };
+
+    /**
+     * @description Сброс таймера для поддерживания KeepAlive
+     * @private
+     */
+    private resetKeepAliveInterval = () => {
+        if (this.keepAlive.interval) clearInterval(this.keepAlive.interval);
+        if (this.keepAlive.timeout) clearTimeout(this.keepAlive.timeout);
+
+        // Выставляем таймер возобновления KeepAlive
+        this.keepAlive.timeout = setTimeout(() => this.manageKeepAlive(), 2e3);
     };
 
     /**
@@ -159,7 +196,8 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         this.destroyed = true;
 
         // Уничтожаем интервал активности
-        clearInterval(this.keepAliveInterval);
+        clearInterval(this.keepAlive.interval);
+        clearTimeout(this.keepAlive.timeout);
 
         try {
             this.socket.close();

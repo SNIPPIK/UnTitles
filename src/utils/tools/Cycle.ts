@@ -1,3 +1,5 @@
+import { performance } from "perf_hooks";
+
 /**
  * @author SNIPPIK
  * @description Базовый класс цикла
@@ -29,15 +31,31 @@ abstract class BaseCycle<T = unknown> {
      * @private
      */
     protected _stepCheckTimeCycle = (duration: number) => {
-        // Если запущен стандартный цикл.
         // Высчитываем время для выполнения
         this.time += duration;
 
-        // Записываем время в переменную для проверки
-        let time = Math.max(0, this.time - Date.now());
+        const now = performance.now();
+        let delay = this.time - now;
 
-        // Выполняем функцию через ~time ms
-        setTimeout(this._stepCycle, time);
+        if (delay < 0) {
+            // Цикл отстал, подтягиваем time вперёд,
+            // но не сбрасываем в 0, а смещаем на целое число интервалов duration,
+            // чтобы сохранить непрерывность времени
+
+            // Считаем сколько интервалов duration "пропущено"
+            const intervalsMissed = Math.floor(-delay / duration) + 1;
+
+            this.time += intervalsMissed * duration;
+            delay = this.time - now;
+        }
+
+        if (delay <= 0) {
+            // Если пора сразу, запускаем следующий шаг максимально быстро
+            setImmediate(this._stepCycle);
+        } else {
+            // Иначе ждем нужное время
+            setTimeout(this._stepCycle, delay);
+        }
     };
 
     /**
@@ -52,7 +70,7 @@ abstract class BaseCycle<T = unknown> {
 
         // Запускаем цикл
         if (this.array.length === 1 && this.time === 0) {
-            this.time = Date.now();
+            this.time = performance.now();
             setImmediate(this._stepCycle);
         }
     };
@@ -76,15 +94,6 @@ abstract class BaseCycle<T = unknown> {
         if (index === -1) return;
 
         this.array.splice(index, 1);
-    };
-
-    /**
-     * @description Очищает весь массив
-     * @protected
-     */
-    protected clear(): void {
-        this.array.splice(0, this.array.length);
-        this.time = 0;
     };
 }
 
