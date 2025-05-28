@@ -1,5 +1,5 @@
 import type {LocalizationMap} from "discord-api-types/v10";
-import {db} from "@app/db";
+import {db} from "#app/db";
 
 /**
  * @author SNIPPIK

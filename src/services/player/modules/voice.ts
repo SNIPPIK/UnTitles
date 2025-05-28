@@ -1,4 +1,4 @@
-import {VoiceConnection} from "@service/voice";
+import {VoiceConnection} from "#service/voice";
 /**
  * @author SNIPPIK
  * @description Класс для управления голосовыми подключениями, хранит в себе все данные голосового подключения

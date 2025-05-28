@@ -1,4 +1,4 @@
-import {Track} from "@service/player";
+import {Track} from "#service/player";
 
 /**
  * @author SNIPPIK

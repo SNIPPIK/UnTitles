@@ -1,5 +1,3 @@
-import { performance } from "perf_hooks";
-
 /**
  * @author SNIPPIK
  * @description Базовый класс цикла
@@ -34,7 +32,7 @@ abstract class BaseCycle<T = unknown> {
         // Высчитываем время для выполнения
         this.time += duration;
 
-        const now = performance.now();
+        const now = Date.now();
         let delay = this.time - now;
 
         if (delay < 0) {
@@ -49,13 +47,11 @@ abstract class BaseCycle<T = unknown> {
             delay = this.time - now;
         }
 
-        if (delay <= 0) {
-            // Если пора сразу, запускаем следующий шаг максимально быстро
-            setImmediate(this._stepCycle);
-        } else {
-            // Иначе ждем нужное время
-            setTimeout(this._stepCycle, delay);
-        }
+        // Если пора сразу, запускаем следующий шаг максимально быстро
+        if (delay <= 0) setImmediate(this._stepCycle);
+
+        // Иначе ждем нужное время
+        else setTimeout(this._stepCycle, delay);
     };
 
     /**
@@ -70,7 +66,7 @@ abstract class BaseCycle<T = unknown> {
 
         // Запускаем цикл
         if (this.array.length === 1 && this.time === 0) {
-            this.time = performance.now();
+            this.time = Date.now();
             setImmediate(this._stepCycle);
         }
     };

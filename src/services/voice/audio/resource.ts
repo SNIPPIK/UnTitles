@@ -1,5 +1,5 @@
 import {OpusEncoder, SILENT_FRAME} from "./opus";
-import {Logger, TypedEmitter} from "@utils";
+import {Logger, TypedEmitter} from "#utils";
 import {Process} from "./process";
 
 /**
@@ -62,7 +62,7 @@ class AudioBuffer {
     public get packet() {
         if (this.position >= this.size) return null;
         const frame = this._chunks[this._position++];
-        return frame ?? null;
+        return frame ?? SILENT_FRAME;
     };
 
     /**
@@ -242,11 +242,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
                 // Указываем формат аудио (ogg/opus)
                 "-acodec", "libopus",
-                "-b:a", "96k",             // Битрейт (если надо ограничить)
                 "-compression_level", "10",
-                "-application", "audio",   // Оптимизация под речь/музыку
-                "-ar", "48000",
-                "-ac", "2",
                 "-f", "opus",
 
                 "pipe:"

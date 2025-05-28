@@ -7,14 +7,14 @@ import {
     Colors,
     Events
 } from "discord.js"
-import {QueueMessage} from "@service/player/structures/message";
-import {CommandInteraction} from "@structures";
-import {Command} from "@handler/commands";
-import {locale} from "@service/locale";
-import {Event} from "@handler/events";
-import {Assign, Logger} from "@utils";
-import {env} from "@app/env";
-import {db} from "@app/db";
+import {QueueMessage} from "#service/player/structures/message";
+import {CommandInteraction} from "#structures";
+import {Command} from "#handler/commands";
+import {locale} from "#service/locale";
+import {Event} from "#handler/events";
+import {Assign, Logger} from "#utils";
+import {env} from "#app/env";
+import {db} from "#app/db";
 
 /**
  * @author SNIPPIK

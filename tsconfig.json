@@ -5,30 +5,14 @@
     "target": "ESNext",
     "moduleResolution": "node",
 
-    "baseUrl": "src",
-    "outDir": "build",
+    "rootDir": "./",
+    "baseUrl": "./",
+    "outDir": "./build",
 
-    "paths": {
-      "@handler": ["./handlers/index"],
-      "@handler/*": ["./handlers/*"],
-      "@worker/*": ["./workers/*"],
-
-      "@structures/*": ["./structures/*"],
-      "@structures": ["./structures/index"],
-
-      "@utils": ["./utils/index"],
-      "@service/*": ["./services/*"],
-
-      "@app": ["./index"],
-      "@app/db": ["./database"],
-      "@app/env": ["./environment"]
-    },
     "removeComments": true,
-
     "alwaysStrict": true,
     "sourceMap": false,
     "resolveJsonModule": true,
-    "declaration": false,
     "forceConsistentCasingInFileNames": true,
 
     "strict": true,
@@ -44,10 +28,24 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "skipLibCheck": true,
-    "noErrorTruncation": true,
-    "stripInternal": true
+
+    "paths": {
+      "#handler": ["./src/handlers/index"],
+      "#handler/*": ["./src/handlers/*"],
+      "#worker/*": ["./src/workers/*"],
+
+      "#structures/*": ["./src/structures/*"],
+      "#structures": ["./src/structures/index"],
+
+      "#utils": ["./src/utils/index"],
+      "#service/*": ["./src/services/*"],
+
+      "#app": ["./src/index"],
+      "#app/db": ["./src/database"],
+      "#app/env": ["./src/environment"]
+    }
   },
 
-  "include": ["package.json", "tsconfig.json", "src"],
+  "include": ["package.json", "tsconfig.json", "src", ".env.example"],
   "exclude": ["node_modules"]
 }

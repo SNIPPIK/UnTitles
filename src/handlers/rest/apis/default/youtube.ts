@@ -1,10 +1,10 @@
-import {Youtube_decoder_native} from "@worker/YouTubeSignatureExtractor";
-import type {RestServerSide} from "@handler/rest/apis";
-import {httpsClient} from "@handler/rest";
-import {locale} from "@service/locale";
-import {Track} from "@service/player";
-import {Assign} from "@utils";
-import {db} from "@app/db";
+import {Youtube_decoder_native} from "#worker/YouTubeSignatureExtractor";
+import type {RestServerSide} from "#handler/rest/apis";
+import {httpsClient} from "#handler/rest";
+import {locale} from "#service/locale";
+import {Track} from "#service/player";
+import {Assign} from "#utils";
+import {db} from "#app/db";
 import fs from "node:fs";
 
 /**

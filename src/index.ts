@@ -1,8 +1,8 @@
-import { DiscordClient, ShardManager } from "@structures";
+import { DiscordClient, ShardManager } from "#structures";
 import { isMainThread } from "node:worker_threads";
-import { db, initDatabase} from "@app/db";
-import { Logger } from "@utils";
-import { env } from "@app/env";
+import { db, initDatabase } from "#app/db";
+import { Logger } from "#utils";
+import { env } from "#app/env";
 
 // Точка входа
 void main();

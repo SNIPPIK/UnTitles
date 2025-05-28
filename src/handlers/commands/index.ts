@@ -1,11 +1,11 @@
 import {ApplicationCommandOption, Client, Routes, PermissionsString} from "discord.js";
 import type {LocalizationMap, Locale, Permissions} from "discord-api-types/v10";
-import {CommandInteraction, CompeteInteraction} from "@structures";
-import filters from "@service/player/filters.json";
-import {AudioFilter} from "@service/player";
-import {handler} from "@handler";
-import {Logger} from "@utils";
-import {env} from "@app/env";
+import {CommandInteraction, CompeteInteraction} from "#structures";
+import filters from "#service/player/filters.json";
+import {AudioFilter} from "#service/player";
+import {handler} from "#handler";
+import {Logger} from "#utils";
+import {env} from "#app/env";
 
 /**
  * @author SNIPPIK

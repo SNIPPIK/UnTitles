@@ -1,7 +1,7 @@
 import { Worker } from "node:worker_threads";
-import { Track } from "@service/player";
+import { Track } from "#service/player";
 import path from "node:path";
-import { db } from "@app/db";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

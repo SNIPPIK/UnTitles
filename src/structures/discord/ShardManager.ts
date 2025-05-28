@@ -1,5 +1,5 @@
 import {ShardingManager} from "discord.js";
-import {Logger} from "@utils";
+import {Logger} from "#utils";
 
 /**
  * @author SNIPPIK

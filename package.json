@@ -2,6 +2,10 @@
   "name": "untitles",
   "version": "0.3.0",
   "homepage": "https://github.com/SNIPPIK/UnTitles",
+  "author": {
+    "name": "SNIPPIK",
+    "url": "https://github.com/SNIPPIK"
+  },
   "license": "BSD-3-Clause",
   "preferGlobal": true,
   "engineStrict": true,
@@ -21,7 +25,7 @@
   },
   "scripts": {
     "start": "cd build && node -r tsconfig-paths/register src --ShardManager",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc",
     "auto": "npm run build && npm run start"
   }
 }

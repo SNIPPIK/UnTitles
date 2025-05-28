@@ -12,21 +12,6 @@ export * from "./emitter";
  * Использовать с умом, если попадут не те данные то могут быть ошибки
  */
 const prototypes: { type: any, name: string, value: any}[] = [
-    // Array
-    {
-        type: Array.prototype, name: "ArraySort",
-        value: function (count = 5, cb: (v: number, i: number) => any, sep = "\n\n") {
-            const out: string[] = [];
-
-            for (let i = 0; i < (this as any).length; i += count) {
-                const chunk = (this as any).slice(i, i + count).map(cb).join(sep);
-                if (chunk) out.push(chunk);
-            }
-
-            return out;
-        }
-    },
-
     // String
     {
         type: String.prototype, name: "duration",
@@ -61,15 +46,6 @@ const prototypes: { type: any, name: string, value: any}[] = [
         value: function (min = 0) {
             return Math.floor(Math.random() * ((this as any) - min) + min);
         }
-    },
-    {
-        type: Number.prototype,
-        name: "bytes",
-        value: function() {
-            const sizes = ["Bytes", "KB", "MB", "GB"];
-            const i = Math.floor(Math.log((this as any)) / Math.log(1024));
-            return `${((this as any) / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
-        }
     }
 ];
 
@@ -91,16 +67,6 @@ declare global {
     interface json {
         [key: string]: any
     }
-    interface Array<T> {
-        /**
-         * @prototype Array
-         * @description Превращаем Array в Array<Array>
-         * @param number {number} Сколько блоков будет в Array
-         * @param callback {Function} Как фильтровать
-         * @param joined {string} Что добавить в конце
-         */
-        ArraySort(number: number, callback: (value: T, index?: number) => string, joined?: string): string[];
-    }
     interface String {
         /**
          * @prototype String
@@ -110,13 +76,6 @@ declare global {
         duration(): number;
     }
     interface Number {
-        /**
-         * @prototype Number
-         * @description превращаем число в байты
-         * @return string
-         */
-        bytes(): string;
-
         /**
          * @prototype Number
          * @description Превращаем число в 00:00

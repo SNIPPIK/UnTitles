@@ -7,6 +7,28 @@ import { VoiceOpcodes } from "discord-api-types/voice";
 
 /**
  * @author SNIPPIK
+ * @description Статусы подключения голосового соединения
+ * @enum VoiceConnectionStatus
+ */
+enum VoiceConnectionStatus {
+    // Полностью готов
+    ready = "ready",
+
+    // Отключен
+    disconnected = "disconnected",
+
+    // Подключен
+    connected = "connected",
+
+    // Получение данных для подключения UDP
+    identify = "identify",
+
+    // Получение данных для подключения RTP
+    SessionDescription = "sessionDescription",
+}
+
+/**
+ * @author SNIPPIK
  * @description Подключение к голосовому серверу для воспроизведения аудио в голосовых каналах
  * @class VoiceConnection
  * @public
@@ -58,6 +80,20 @@ export class VoiceConnection {
     };
 
     /**
+     * @description Текущий статус подключения
+     * @private
+     */
+    private _status: VoiceConnectionStatus;
+
+    /**
+     * @description Получаем текущий статус подключения
+     * @public
+     */
+    public get status() {
+        return this._status;
+    };
+
+    /**
      * @description Подготавливает аудио пакет и немедленно отправляет его.
      * @param packet - Пакет Opus для воспроизведения
      * @public
@@ -76,7 +112,7 @@ export class VoiceConnection {
      * @public
      */
     public get ready(): boolean {
-        return !!this.rtpClient && !!this.udpClient && !!this.websocket && this.websocket.ready;
+        return !!this.rtpClient && !!this.udpClient && !!this.websocket && this.websocket.ready && this._status === VoiceConnectionStatus.ready;
     };
 
     /**
@@ -215,6 +251,7 @@ export class VoiceConnection {
             switch (op) {
                 // Подключаем UDP
                 case VoiceOpcodes.SessionDescription: {
+                    this._status = VoiceConnectionStatus.SessionDescription;
                     this.speaking = false;
 
                     this.ClientRTP = d;
@@ -223,6 +260,7 @@ export class VoiceConnection {
 
                 // Получаем данные для отправки пакетов
                 case VoiceOpcodes.Ready: {
+                    this._status = VoiceConnectionStatus.ready;
                     this.ClientUDP = d;
 
                     // После установки UDP и RTP, включаем speaking
@@ -234,6 +272,8 @@ export class VoiceConnection {
 
         // Подключаемся к websocket'у discord'а
         this.websocket.on("connect", () => {
+            this._status = VoiceConnectionStatus.identify;
+
             this.websocket.packet = {
                 op: VoiceOpcodes.Identify,
                 d: {
@@ -302,6 +342,8 @@ export class VoiceConnection {
 
         // Инициализируем подключение
         this.adapter.sendPayload(this.configuration);
+
+        this._status = VoiceConnectionStatus.connected;
     };
 
     /**
@@ -310,6 +352,8 @@ export class VoiceConnection {
      */
     public disconnect = () => {
         this.configuration.channel_id = null;
+
+        this._status = VoiceConnectionStatus.disconnected;
 
         // Отправляем в discord сообщение об отключении бота
         return this.adapter.sendPayload(this.configuration);
@@ -337,6 +381,8 @@ export class VoiceConnection {
             this.websocket?.destroy();
             this.udpClient?.destroy();
         }
+
+        this._status = VoiceConnectionStatus.disconnected;
 
         this.rtpClient = null;
         this.websocket = null;

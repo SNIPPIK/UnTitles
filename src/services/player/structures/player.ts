@@ -1,13 +1,13 @@
-import {AudioPlayerEvents, PlayerTracks, PlayerAudioFilters} from "@service/player";
-import {AudioResource, SILENT_FRAME} from "@service/voice";
-import {Logger, TypedEmitter} from "@utils";
-import {db} from "@app/db";
+import {AudioPlayerEvents, PlayerTracks, PlayerAudioFilters} from "#service/player";
+import {AudioResource, SILENT_FRAME} from "#service/voice";
+import {Logger, TypedEmitter} from "#utils";
+import {db} from "#app/db";
 
 // Local modules
 import {PlayerProgress} from "../modules/progress";
 import {PlayerVoice} from "../modules/voice";
 import {PlayerAudio} from "../modules/audio";
-import {RepeatType} from "@service/player";
+import {RepeatType} from "#service/player";
 
 /**
  * @author SNIPPIK

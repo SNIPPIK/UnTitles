@@ -62,9 +62,7 @@ export class OpusEncoder extends Writable {
             if (offset + fullPageLength > this._buffer.length) break;
 
             const payload = this._buffer.subarray(offset + headerLength, offset + fullPageLength);
-
             this.extractPackets(segmentTable, payload);
-
             offset += fullPageLength;
         }
 

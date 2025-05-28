@@ -1,6 +1,6 @@
-import {httpsClient} from "@handler/rest";
+import { httpsClient } from "#handler/rest";
 import querystring from "node:querystring";
-import {Script} from "node:vm";
+import { Script } from "node:vm";
 
 /**
  * @author SNIPPIK

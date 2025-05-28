@@ -1,8 +1,8 @@
-import {locale} from "@service/locale";
-import {Button} from "@handler/modals";
+import {locale} from "#service/locale";
+import {Button} from "#handler/modals";
 import {Colors} from "discord.js";
-import {Assign} from "@utils";
-import {db} from "@app/db";
+import {Assign} from "#utils";
+import {db} from "#app/db";
 
 class ButtonPlayToggle extends Assign<Button> {
     public constructor() {

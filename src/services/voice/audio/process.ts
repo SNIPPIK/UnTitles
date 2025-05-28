@@ -1,6 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process"
 import { spawn, spawnSync } from "node:child_process";
-import { env } from "@app/env";
+import { env } from "#app/env";
 import path from "node:path";
 
 /**

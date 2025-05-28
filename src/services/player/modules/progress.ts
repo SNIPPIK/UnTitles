@@ -1,5 +1,5 @@
-import {RestServerSide} from "@handler/rest/apis";
-import {env} from "@app/env";
+import {RestServerSide} from "#handler/rest/apis";
+import {env} from "#app/env";
 
 /**
  * @author SNIPPIK

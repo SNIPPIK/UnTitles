@@ -1,5 +1,5 @@
-import {buttonInteraction} from "@structures";
-import {handler} from "@handler";
+import {buttonInteraction} from "#structures";
+import {handler} from "#handler";
 
 /**
  * @author SNIPPIK

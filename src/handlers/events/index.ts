@@ -1,7 +1,7 @@
-import {AudioPlayerEvents, QueuesEvents} from "@service/player";
+import {AudioPlayerEvents, QueuesEvents} from "#service/player";
 import {ClientEvents, Client} from "discord.js";
-import {TypedEmitter} from "@utils";
-import {handler} from "@handler";
+import {TypedEmitter} from "#utils";
+import {handler} from "#handler";
 
 /**
  * @author SNIPPIK

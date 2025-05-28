@@ -1,7 +1,7 @@
-import {Button} from "@handler/modals";
-import {locale} from "@service/locale"
-import {Assign} from "@utils";
-import {db} from "@app/db";
+import {Button} from "#handler/modals";
+import {locale} from "#service/locale"
+import {Assign} from "#utils";
+import {db} from "#app/db";
 
 class ButtonQueue extends Assign<Button> {
     public constructor() {

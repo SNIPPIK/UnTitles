@@ -1,12 +1,12 @@
 import {StringSelectMenuBuilder, ActionRowBuilder} from "discord.js";
-import {AudioPlayer, RepeatType} from "@service/player";
-import filters from "@service/player/filters.json";
-import {CommandInteraction} from "@structures";
+import {AudioPlayer, RepeatType} from "#service/player";
+import filters from "#service/player/filters.json";
+import {CommandInteraction} from "#structures";
 import {QueueMessage} from "./message";
-import {Logger} from "@utils";
+import {Logger} from "#utils";
 import {Track} from "./track";
-import {env} from "@app/env";
-import {db} from "@app/db";
+import {env} from "#app/env";
+import {db} from "#app/db";
 
 /**
  * @author SNIPPIK
