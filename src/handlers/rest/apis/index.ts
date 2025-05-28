@@ -46,7 +46,11 @@ export class RestObject {
     public constructor() {
         this.worker = new Worker(path.resolve("src/workers/RestAPIServerThread"), {
             execArgv: ["-r", "tsconfig-paths/register"],
-            workerData: { rest: true }
+            workerData: { rest: true },
+            resourceLimits: {
+                maxOldGenerationSizeMb: 32, // Лимит на старую область кучи
+                maxYoungGenerationSizeMb: 10,
+            }
         });
 
         // Если возникнет ошибка
