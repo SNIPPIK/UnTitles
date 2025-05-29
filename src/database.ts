@@ -1,5 +1,6 @@
-import { DiscordClient, DiscordGatewayAdapterCreator, Collection } from "#structures";
+import type { DiscordGatewayAdapterCreator } from "#service/voice/adapter";
 import { CacheUtility } from "#service/player/utils/cache";
+import { DiscordClient, Collection } from "#structures";
 import { Components } from "#handler/components";
 import { VoiceConnection } from "#service/voice";
 import { Queues, Queue } from "#service/player";
