@@ -1,6 +1,6 @@
-import {Event} from "#handler/events";
-import {Assign, Logger} from "#utils";
-import {Events} from "discord.js";
+import { Assign, Logger } from "#structures";
+import { Event } from "#handler/events";
+import { Events } from "discord.js";
 
 
 /**

@@ -1,7 +1,6 @@
-import { DiscordClient, ShardManager } from "#structures";
+import { DiscordClient, ShardManager, Logger } from "#structures";
 import { isMainThread } from "node:worker_threads";
 import { db, initDatabase } from "#app/db";
-import { Logger } from "#utils";
 import { env } from "#app/env";
 
 // Точка входа
@@ -44,8 +43,8 @@ async function runShard() {
     await client.login(env.get("token.discord"));
 
     // Регистрируем всё остальное
-    db.buttons.register();
-    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.buttons.size} buttons`)}`);
+    db.components.register();
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.components.size} components`)}`);
 
     await db.api.startWorker();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow.length} APIs`)}`);
@@ -63,7 +62,7 @@ async function runShard() {
  * @author SNIPPIK
  * @description Инициализирует события процесса (ошибки, сигналы)
  */
-export function initProcessEvents() {
+function initProcessEvents() {
     // Необработанная ошибка (внутри синхронного кода)
     process.on("uncaughtException", (err, origin) => {
         Logger.log(

@@ -1,5 +1,5 @@
 import { VoiceOpcodes } from "discord-api-types/voice";
-import { TypedEmitter } from "#utils";
+import { TypedEmitter } from "#structures/emitter";
 import { WebSocket, Data } from "ws";
 
 /**

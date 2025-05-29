@@ -1,12 +1,11 @@
-import {StringSelectMenuBuilder, ActionRowBuilder} from "discord.js";
-import {AudioPlayer, RepeatType} from "#service/player";
+import { StringSelectMenuBuilder, ActionRowBuilder } from "discord.js";
+import { AudioPlayer, RepeatType } from "#service/player";
 import filters from "#service/player/filters.json";
-import {CommandInteraction} from "#structures";
-import {QueueMessage} from "./message";
-import {Logger} from "#utils";
-import {Track} from "./track";
-import {env} from "#app/env";
-import {db} from "#app/db";
+import { CommandInteraction, Logger } from "#structures";
+import { QueueMessage } from "./message";
+import { Track } from "./track";
+import { env } from "#app/env";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -143,12 +142,12 @@ abstract class BaseQueue {
         const config = {
             self_deaf: true,
             self_mute: false,
-            guild_id: this.guild.id,
+            guild_id: voice.guild.id,
             channel_id: voice.channel.id
         };
 
         // Задаем новое голосовое подключение
-        this.player.voice.connection = db.voice.join(config, this.guild.voiceAdapterCreator);
+        this.player.voice.connection = db.voice.join(config, this.message.client.adapter.voiceAdapterCreator(voice.guild.id));
     };
 
     /**

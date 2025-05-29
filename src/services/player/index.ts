@@ -1,11 +1,10 @@
-import {CommandInteraction, CycleInteraction} from "#structures";
-import {AudioPlayer, Queue, Track} from "#service/player";
-import {Collection, Logger, SyncCycle} from "#utils";
-import {RestClientSide} from "#handler/rest/apis";
-import {locale} from "#service/locale";
-import {Colors} from "discord.js";
-import {env} from "#app/env";
-import {db} from "#app/db";
+import { CommandInteraction, CycleInteraction, Collection, Logger, SyncCycle } from "#structures";
+import { AudioPlayer, Queue, Track } from "#service/player";
+import { RestClientSide } from "#handler/rest/apis";
+import { locale } from "#service/locale";
+import { Colors } from "discord.js";
+import { env } from "#app/env";
+import { db } from "#app/db";
 
 export * from "./structures/track";
 export * from "./structures/queue";

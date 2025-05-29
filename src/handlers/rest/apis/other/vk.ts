@@ -1,10 +1,10 @@
-import type {RestServerSide} from "#handler/rest/apis";
-import {httpsClient} from "#handler/rest";
-import {locale} from "#service/locale";
-import {Track} from "#service/player";
-import {Assign} from "#utils";
-import {env} from "#app/env";
-import {db} from "#app/db";
+import type { RestServerSide } from "#handler/rest/apis";
+import { httpsClient } from "#handler/rest";
+import { locale } from "#service/locale";
+import { Track } from "#service/player";
+import { Assign } from "#structures";
+import { env } from "#app/env";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

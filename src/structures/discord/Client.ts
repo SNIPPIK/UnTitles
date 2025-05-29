@@ -1,9 +1,9 @@
-import {Client, Partials, Options, SimpleShardingStrategy} from "discord.js";
-import {ActivityType} from "discord-api-types/v10"
-import {version} from "package.json";
-import {Logger} from "#utils";
-import {env} from "#app/env";
-import {db} from "#app/db";
+import { Client, Partials, Options, SimpleShardingStrategy } from "discord.js";
+import { ActivityType } from "discord-api-types/v10"
+import { Logger, VoiceManager } from "#structures";
+import { version } from "package.json";
+import { env } from "#app/env";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -11,6 +11,13 @@ import {db} from "#app/db";
  * @class DiscordClient
  */
 export class DiscordClient extends Client {
+    /**
+     * @description Класс для общения с websocket
+     * @readonly
+     * @public
+     */
+    public readonly adapter = new VoiceManager(this);
+
     /**
      * @description Номер осколка
      * @public

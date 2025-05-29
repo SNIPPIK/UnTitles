@@ -1,6 +1,6 @@
-import type {RestServerSide} from "#handler/rest/apis";
-import {httpsClient} from "#handler/rest";
-import {db} from "#app/db";
+import type { RestServerSide } from "#handler/rest/apis";
+import { httpsClient } from "#handler/rest";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

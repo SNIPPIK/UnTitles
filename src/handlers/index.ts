@@ -52,56 +52,70 @@ export abstract class handler<T = unknown> {
 
         const selfDir = path.resolve(this.directory);
 
-        // Если указанной директории нет
-        if (!fs.existsSync(selfDir)) {
-            throw new Error(`Directory not found: ${selfDir}`);
-        }
+        // Если нет такой директории
+        if (!fs.existsSync(selfDir)) throw new Error(`Directory not found: ${selfDir}`);
 
-        const directories = fs.readdirSync(selfDir);
-        for (const dir of directories) {
-            // Не загружаем index файлы (они являются загрузочными)
-            if (dir.startsWith("index")) continue;
+        // Загружаем директорию
+        this._loadRecursive(selfDir);
+    };
 
-            const isCodeFile = dir.endsWith(".ts") || dir.endsWith(".js");
-            // Если не найдена директория
-            if (isCodeFile) continue;
+    /**
+     * @description Поиск файлов загрузки
+     * @param dirPath - Путь до директории
+     */
+    private _loadRecursive = (dirPath: string) => {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
 
-            const fullDirPath = path.resolve(selfDir, dir);
-            const files = fs.readdirSync(fullDirPath);
+        for (const entry of entries) {
+            const fullPath = path.resolve(dirPath, entry.name);
 
-            for (const file of files) {
-                const resPath = path.resolve(fullDirPath, file);
+            // Если это еще одна директория
+            if (entry.isDirectory()) this._loadRecursive(fullPath);
 
-                // Удаляем кеш загружаемого файла
-                delete require.cache[require.resolve(resPath)];
+            // Если это файл
+            else if (entry.isFile()) {
+                // Если это не файл ts или js
+                if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) continue;
 
-                const imported = require(resPath);
+                // Не загружаем index файлы (они являются загрузочными)
+                if (entry.name.startsWith("index")) continue;
 
-                // Если нет импортируемых объектов
-                if (!imported?.default) {
-                    throw new Error(`Missing default export in ${resPath}`);
-                }
-
-                const default_export = imported.default;
-
-                // Если полученные данные являются списком
-                if (default_export instanceof Array) {
-                    for (const obj of default_export) {
-                        if (obj.prototype) this._files.push(new obj(null));
-                        else this._files.push(obj);
-                    }
-                    continue;
-                }
-
-                // Если загружаемый объект является классом
-                else if (default_export.prototype) {
-                    this._files.push(new default_export(null));
-                    continue;
-                }
-
-                // Добавляем файл в базу для дальнейшего экспорта
-                this._files.push(default_export);
+                this._push(fullPath);
             }
         }
+    };
+
+    /**
+     * @description Добавляем загруженный файл в коллекцию файлов
+     * @param path - Путь до файла
+     */
+    private _push = (path: string) => {
+        const imported = require(path);
+
+        // Удаляем кеш загружаемого файла
+        delete require.cache[require.resolve(path)];
+
+        // Если нет импортируемых объектов
+        if (!imported?.default) throw new Error(`Missing default export in ${path}`);
+
+        const default_export = imported.default;
+
+        // Если полученные данные являются списком
+        if (default_export instanceof Array) {
+            for (const obj of default_export) {
+                if (obj.prototype) this._files.push(new obj(null));
+                else this._files.push(obj);
+            }
+            return;
+        }
+
+        // Если загружаемый объект является классом
+        else if (default_export.prototype) {
+            this._files.push(new default_export(null));
+            return;
+        }
+
+        // Добавляем файл в базу для дальнейшего экспорта
+        this._files.push(default_export);
     };
 }

@@ -1,5 +1,5 @@
 import { EventEmitterAsyncResource } from "node:events";
-import {Logger} from "../logger";
+import { Logger } from "../logger";
 
 /**
  * @author SNIPPIK
@@ -24,10 +24,10 @@ export type DefaultListener = (...args: any[]) => void;
  * @abstract
  */
 export class TypedEmitter<L extends Record<string, any>> extends EventEmitterAsyncResource {
-    constructor() {
+    public constructor() {
         super();
         this.setMaxListeners(5);
-    }
+    };
 
     // overloads for on
     public on<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;

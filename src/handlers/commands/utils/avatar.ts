@@ -1,8 +1,8 @@
-import {SlashCommand, SlashCommandSubCommand, BaseCommand} from "#handler/commands";
-import {ApplicationCommandOptionType, MessageFlags, User} from "discord.js";
-import {locale} from "#service/locale";
-import {Assign} from "#utils";
-import {db} from "#app/db";
+import { SlashCommand, SlashCommandSubCommand, BaseCommand } from "#handler/commands";
+import { ApplicationCommandOptionType, MessageFlags, User } from "discord.js";
+import { locale } from "#service/locale";
+import { Assign } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

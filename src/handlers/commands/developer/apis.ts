@@ -1,9 +1,9 @@
-import {BaseCommand, SlashCommand, SlashCommandSubCommand} from "#handler/commands";
-import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {RestServerSide} from "#handler/rest/apis";
-import {locale} from "#service/locale";
-import {Assign} from "#utils";
-import {db} from "#app/db";
+import { BaseCommand, SlashCommand, SlashCommandSubCommand } from "#handler/commands";
+import { ApplicationCommandOptionType, Colors } from "discord.js";
+import { RestServerSide } from "#handler/rest/apis";
+import { locale } from "#service/locale";
+import { Assign } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

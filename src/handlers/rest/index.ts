@@ -1,8 +1,7 @@
-import { createGunzip, createBrotliDecompress, createInflate } from 'node:zlib';
-import { request as httpsRequest, RequestOptions } from 'node:https';
-import { request as httpRequest } from 'node:http';
-import type { IncomingMessage } from 'node:http';
-import { URL } from 'node:url';
+import { createGunzip, createBrotliDecompress, createInflate } from "node:zlib";
+import { request as httpRequest, type IncomingMessage } from "node:http";
+import { request as httpsRequest, RequestOptions } from "node:https";
+import { URL } from "node:url";
 import * as os from "node:os";
 
 /**

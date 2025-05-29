@@ -1,5 +1,5 @@
-import {CommandInteraction, CycleInteraction} from "#structures";
-import {EmbedData} from "discord.js";
+import {CommandInteraction, CycleInteraction, DiscordClient} from "#structures";
+import { EmbedData } from "discord.js";
 
 /**
  * @author SNIPPIK
@@ -44,7 +44,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public get client() {
-        return this._original.client;
+        return this._original.client as DiscordClient;
     };
 
     /**

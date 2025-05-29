@@ -18,6 +18,29 @@ abstract class BaseCycle<T = unknown> {
     protected time: number = 0;
 
     /**
+     * @description Тип таймера, задает точность таймера
+     * @protected
+     */
+    protected timer: "max" | "low";
+
+    /**
+     * @description Время для работы таймера
+     * @private
+     */
+    private get localTime() {
+        return this.timer === "max" ? performance.now() : Date.now();
+    };
+
+    /**
+     * @description Задаем параметр для создания класса
+     * @param duration - Время интервала для таймера, значение менее 1 сек, будут использовать более точный таймер
+     * @protected
+     */
+    protected constructor(duration: number) {
+        this.timer = duration < 1e3 ? "max" : "low";
+    };
+
+    /**
      * @description Выполняет шаг цикла с учётом точного времени следующего запуска
      * @protected
      */
@@ -32,7 +55,7 @@ abstract class BaseCycle<T = unknown> {
         // Высчитываем время для выполнения
         this.time += duration;
 
-        const now = Date.now();
+        const now = this.localTime;
         let delay = this.time - now;
 
         if (delay < 0) {
@@ -66,7 +89,7 @@ abstract class BaseCycle<T = unknown> {
 
         // Запускаем цикл
         if (this.array.length === 1 && this.time === 0) {
-            this.time = Date.now();
+            this.time = this.localTime;
             setImmediate(this._stepCycle);
         }
     };
@@ -107,7 +130,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @protected
      */
     protected constructor(public readonly options: SyncCycleConfig<T>) {
-        super();
+        super(options.duration);
     };
 
     /**
@@ -183,7 +206,7 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
      * @protected
      */
     protected constructor(public readonly options: AsyncCycleConfig<T>) {
-        super();
+        super(20e3);
     };
 
     /**

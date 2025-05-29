@@ -1,12 +1,10 @@
-import afs from "node:fs/promises";
-import path from "node:path";
-import fs from "node:fs";
-
-// @service modules
+import { AsyncCycle } from "#structures";
 import { Process } from "#service/voice";
 import { Track } from "#service/player";
-import { AsyncCycle } from "#utils";
+import afs from "node:fs/promises";
 import { env } from "#app/env";
+import path from "node:path";
+import fs from "node:fs";
 
 /**
  * @author SNIPPIK

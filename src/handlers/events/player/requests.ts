@@ -1,9 +1,9 @@
-import {locale} from "#service/locale";
-import {Event} from "#handler/events";
-import {Logger, Assign} from "#utils";
-import {Track} from "#service/player";
-import {Colors, Message} from "discord.js";
-import {db} from "#app/db";
+import { Colors, Message } from "discord.js";
+import { Logger, Assign } from "#structures";
+import { locale } from "#service/locale";
+import { Event } from "#handler/events";
+import { Track } from "#service/player";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

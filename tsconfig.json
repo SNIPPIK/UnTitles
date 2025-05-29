@@ -37,7 +37,6 @@
       "#structures/*": ["./src/structures/*"],
       "#structures": ["./src/structures/index"],
 
-      "#utils": ["./src/utils/index"],
       "#service/*": ["./src/services/*"],
 
       "#app": ["./src/index"],

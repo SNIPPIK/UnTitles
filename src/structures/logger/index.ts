@@ -56,10 +56,10 @@ export class Logger {
 
         // Получаем память в мегабайтах с двумя знаками после запятой
         const mem = process.memoryUsage();
-        const memUsedMB = (mem.rss / 1024 / 1024).toFixed(2);
+        const memUsedMB = (mem.heapTotal / 1024 / 1024).toFixed(2);
 
         // Отправляем лог
-        console.log(`\x1b[35m[RAM: ${memUsedMB} MB]\x1b[0m ${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}`);
+        process.stdout.write(`\x1b[35m[RAM ${memUsedMB} MB]\x1b[0m ${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}\n`)
         return;
     };
 

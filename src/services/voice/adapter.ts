@@ -1,5 +1,5 @@
-import {GatewayOpcodes, GatewayVoiceStateUpdateDispatchData, GatewayVoiceServerUpdateDispatchData} from "discord-api-types/v10";
-import {VoiceConnectionConfiguration} from "./connection";
+import { GatewayOpcodes, GatewayVoiceStateUpdateDispatchData, GatewayVoiceServerUpdateDispatchData } from "discord-api-types/v10";
+import { VoiceConnectionConfiguration } from "./connection";
 
 /**
  * @author SNIPPIK

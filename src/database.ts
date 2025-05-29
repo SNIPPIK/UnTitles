@@ -1,12 +1,11 @@
-import { DiscordClient, DiscordGatewayAdapterCreator } from "#structures";
+import { DiscordClient, DiscordGatewayAdapterCreator, Collection } from "#structures";
 import { CacheUtility } from "#service/player/utils/cache";
+import { Components } from "#handler/components";
 import { VoiceConnection } from "#service/voice";
 import { Queues, Queue } from "#service/player";
 import { RestObject } from "#handler/rest/apis";
 import { Commands } from "#handler/commands";
-import { Buttons } from "#handler/modals";
 import { Events } from "#handler/events";
-import { Collection } from "#utils";
 import { env } from "#app/env";
 
 /**
@@ -46,7 +45,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly buttons: Buttons;
+    public readonly components: Components;
 
     /**
      * @description Загружаем класс для хранения очередей, плееров, циклов
@@ -108,7 +107,7 @@ export class Database {
             this.queues = new Queues();
             this.voice = new db_voice_system();
             this.commands = new Commands();
-            this.buttons = new Buttons();
+            this.components = new Components();
             this.events = new Events();
 
             this.whitelist = {

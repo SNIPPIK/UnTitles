@@ -7,14 +7,13 @@ import {
     Colors,
     Events
 } from "discord.js"
-import {QueueMessage} from "#service/player/structures/message";
-import {CommandInteraction} from "#structures";
-import {Command} from "#handler/commands";
-import {locale} from "#service/locale";
-import {Event} from "#handler/events";
-import {Assign, Logger} from "#utils";
-import {env} from "#app/env";
-import {db} from "#app/db";
+import { QueueMessage } from "#service/player/structures/message";
+import { CommandInteraction, Assign, Logger } from "#structures";
+import { Command } from "#handler/commands";
+import { locale } from "#service/locale";
+import { Event } from "#handler/events";
+import { env } from "#app/env";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -388,7 +387,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @constructor
      */
     private readonly SelectButton = (ctx: ButtonInteraction<CacheType>) => {
-        const button = db.buttons.get(ctx.customId);
+        const button = db.components.get(ctx.customId);
         const queue = db.queues.get(ctx.guildId);
         const userChannel = ctx.member.voice.channel;
         const botChannel = ctx.guild.members.me.voice.channel;

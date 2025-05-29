@@ -1,6 +1,7 @@
-import {OpusEncoder, SILENT_FRAME} from "./opus";
-import {Logger, TypedEmitter} from "#utils";
-import {Process} from "./process";
+import { OpusEncoder, SILENT_FRAME } from "./opus";
+import { TypedEmitter } from "#structures/emitter";
+import { Logger } from "#structures/logger";
+import { Process } from "./process";
 
 /**
  * @author SNIPPIK

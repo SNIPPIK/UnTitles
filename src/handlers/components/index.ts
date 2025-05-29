@@ -1,14 +1,14 @@
-import {buttonInteraction} from "#structures";
-import {handler} from "#handler";
+import { buttonInteraction } from "#structures";
+import { handler } from "#handler";
 
 /**
  * @author SNIPPIK
- * @description Загружаем доступные кнопки
- * @class Buttons
+ * @description Загружаем динамические компоненты для работы с ними
+ * @class Components
  */
-export class Buttons extends handler<Button> {
+export class Components extends handler<Button> {
     public constructor() {
-        super("src/handlers/modals/buttons");
+        super("src/handlers/components");
     };
 
     /**

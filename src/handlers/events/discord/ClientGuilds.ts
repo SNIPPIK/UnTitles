@@ -1,7 +1,7 @@
-import {Event} from "#handler/events";
-import {Assign, Logger} from "#utils";
-import {Events} from "discord.js";
-import {db} from "../../../database";
+import { Assign, Logger } from "#structures";
+import { Event } from "#handler/events";
+import { Events } from "discord.js";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
