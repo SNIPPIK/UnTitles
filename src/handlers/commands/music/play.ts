@@ -165,13 +165,16 @@ class PlayCommand extends Assign< BaseCommand > {
                     if (Array.isArray(rest)) {
                         const tracks = rest.map((choice) => ({
                             value: choice.url,
-                            name: choice.name.slice(0, 120)
+                            name: `🎵 (${choice.time.split}) | ${choice.artist.title.slice(0, 20)} - ${choice.name.slice(0, 60)}`
                         }));
                         items.push(...tracks);
-                    } else {
-                        // Обработка одиночного трека или плейлиста
-                        items.push({ name: rest["title"] ?? rest["name"], value: rest.url });
                     }
+
+                    // Показываем плейлист
+                    else if ("items" in rest) items.push({ name: `🎶 [${rest.items.length}] - ${rest.title.slice(0, 70)}`, value: rest.url });
+
+                    // Показываем трек
+                    else items.push({ name: `🎵 (${rest.time.split}) | ${rest.artist.title.slice(0, 20)} - ${rest.name.slice(0, 60)}`, value: rest.url });
 
                     // Отправка ответа
                     await message.respond(items);
