@@ -281,6 +281,13 @@ export class AudioPlayer extends BasePlayer {
             this._audio.current = stream;
             this.status = "player/playing";
             this.waitStream = false;
+
+            if (seek === 0) {
+                const queue = db.queues.get(this.id);
+
+                // Отправляем сообщение, если можно
+                db.events.emitter.emit("message/playing", queue);
+            }
         }
 
         else {
@@ -300,6 +307,13 @@ export class AudioPlayer extends BasePlayer {
                     this.waitStream = false;
                     this._audio.current = stream;
                     this.status = "player/playing";
+
+                    if (seek === 0) {
+                        const queue = db.queues.get(this.id);
+
+                        // Отправляем сообщение, если можно
+                        db.events.emitter.emit("message/playing", queue);
+                    }
                 });
         }
     };
@@ -366,13 +380,6 @@ export class AudioPlayer extends BasePlayer {
 
             // Сообщаем об ошибке
             Logger.log("ERROR", `[Player/${this.id}] ${err}`);
-        } finally {
-            if (seek === 0) {
-                const queue = db.queues.get(this.id);
-
-                // Отправляем сообщение, если можно
-                db.events.emitter.emit("message/playing", queue);
-            }
         }
     };
 
