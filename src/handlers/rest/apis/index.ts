@@ -15,7 +15,7 @@ export class RestObject {
      * @readonly
      * @private
      */
-    private readonly worker: Worker;
+    private worker: Worker;
 
     /**
      * @description База с платформами
@@ -40,10 +40,10 @@ export class RestObject {
     };
 
     /**
-     * @description Загружаем класс вместе с дочерним
+     * @description Функция для инициализации worker
      * @public
      */
-    public constructor() {
+    public startWorker = () => {
         this.worker = new Worker(path.resolve("src/workers/RestAPIServerThread"), {
             execArgv: ["-r", "tsconfig-paths/register"],
             workerData: { rest: true },
@@ -53,16 +53,19 @@ export class RestObject {
             }
         });
 
-        // Если возникнет ошибка
-        this.worker.on("error", (err) => console.log(err));
-    };
+        // Если возникнет ошибка, пересоздадим worker
+        this.worker.on("error", (err) => {
+            this.worker.removeAllListeners();
+            this.worker = null;
 
-    /**
-     * @description Функция для инициализации worker
-     * @public
-     */
-    public startWorker = () => {
+            console.log(err);
+            return this.startWorker();
+        });
+
         return new Promise(resolve => {
+            // Если нет данных о платформах
+            if (this.platforms) return resolve(true);
+
             // Получаем данные о загруженных платформах
             this.worker.postMessage({data: true});
             this.worker.once("message", (data) => {
@@ -93,6 +96,7 @@ export class RestObject {
             url: platform.url,
             color: platform.color
         };
+
         return new Promise((resolve) => {
             // Передает данные запроса
             this.worker.postMessage({

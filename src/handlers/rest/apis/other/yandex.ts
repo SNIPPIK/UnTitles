@@ -107,8 +107,10 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                                     track["audio"] = link;
                                 }
 
-                                // Сохраняем кеш в системе
-                                if (!cache) await db.cache.set(track, RestYandexAPI._platform.url);
+                                setImmediate(async () => {
+                                    // Сохраняем кеш в системе
+                                    if (!cache) await db.cache.set(track, RestYandexAPI._platform.url);
+                                });
 
                                 return resolve(track);
                             } catch (e) {

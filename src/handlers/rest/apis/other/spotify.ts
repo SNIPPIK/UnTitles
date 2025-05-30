@@ -104,7 +104,10 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                                 if (api instanceof Error) return resolve(api);
                                 const track = RestSpotifyAPI.track(api);
 
-                                if (!cache) await db.cache.set(track, RestSpotifyAPI._platform.url);
+                                setImmediate(async () => {
+                                    // Сохраняем кеш в системе
+                                    if (!cache) await db.cache.set(track, RestSpotifyAPI._platform.url);
+                                });
 
                                 return resolve(track);
                             } catch (e) {
@@ -258,7 +261,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
             }
 
             // Нужно обновить токен
-            if (!this.authorization.token || this.authorization.time < Date.now()) await getToken();
+            if (!this.authorization.token || this.authorization.time <= Date.now()) await getToken();
 
             new httpsClient({
                 url: `${this.authorization.urls.api}/${method}`,
@@ -290,12 +293,10 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
             id: track.id,
             title: track.name,
             url: track["external_urls"]["spotify"],
-            //@ts-ignore
             artist: {
                 title: track["artists"][0].name,
                 url: track["artists"][0]["external_urls"]["spotify"]
             },
-            //@ts-ignore
             time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
             image: track.album.images.sort((item1: any, item2: any) => item1.width > item2.width)[0],
         };

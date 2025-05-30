@@ -164,7 +164,7 @@ export class httpsClient {
 
             req.end();
         });
-    }
+    };
 
     /**
      * @description Берем данные из XML страницы
