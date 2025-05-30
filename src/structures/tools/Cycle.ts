@@ -1,21 +1,29 @@
+import {SetArray} from "#structures";
+import * as console from "node:console";
+
+/**
+ * @author SNIPPIK
+ * @description Максимальное кол-во пропусков таймеров
+ */
+const MAX_IMMEDIATE_STEPS = 5;
+
 /**
  * @author SNIPPIK
  * @description Базовый класс цикла
  * @class BaseCycle
  */
-abstract class BaseCycle<T = unknown> {
-    /**
-     * @description База с объектами
-     * @protected
-     * @readonly
-     */
-    public readonly array = new Array<T>();
-
+abstract class BaseCycle<T = unknown> extends SetArray<T> {
     /**
      * @description Следующее запланированное время запуска (в ms, с плавающей точкой)
      * @private
      */
     protected time: number = 0;
+
+    /**
+     * @description Кол-во пропущенных прогонов таймера
+     * @protected
+     */
+    protected missCounter: number = 0;
 
     /**
      * @description Тип таймера, задает точность таймера
@@ -37,6 +45,7 @@ abstract class BaseCycle<T = unknown> {
      * @protected
      */
     protected constructor(duration: number) {
+        super();
         this.timer = duration < 1e3 ? "max" : "low";
     };
 
@@ -58,23 +67,27 @@ abstract class BaseCycle<T = unknown> {
         const now = this.localTime;
         let delay = this.time - now;
 
-        if (delay < 0) {
+        if (delay <= 0) {
             // Цикл отстал, подтягиваем time вперёд,
             // но не сбрасываем в 0, а смещаем на целое число интервалов duration,
             // чтобы сохранить непрерывность времени
+            if (++this.missCounter > MAX_IMMEDIATE_STEPS) {
+                delay = duration; // Принудительная стабилизация
+                this.missCounter = 0;
 
-            // Считаем сколько интервалов duration "пропущено"
-            const intervalsMissed = Math.floor(-delay / duration) + 1;
+                // Ждем нужное время
+                setTimeout(this._stepCycle, delay);
+            }
 
-            this.time += intervalsMissed * duration;
-            delay = this.time - now;
+            // Если пора сразу, запускаем следующий шаг максимально быстро
+            else setImmediate(this._stepCycle);
         }
 
-        // Если пора сразу, запускаем следующий шаг максимально быстро
-        if (delay <= 0) setImmediate(this._stepCycle);
-
         // Иначе ждем нужное время
-        else setTimeout(this._stepCycle, delay);
+        else {
+            this.missCounter = 0;
+            setTimeout(this._stepCycle, delay);
+        }
     };
 
     /**
@@ -82,37 +95,18 @@ abstract class BaseCycle<T = unknown> {
      * @param item - Объект T
      * @public
      */
-    public add(item: T): void {
-        const existing = this.array.includes(item);
-        if (existing) this.remove(item);
-        this.array.push(item);
+    public add(item: T) {
+        const existing = this.has(item);
+        if (existing) this.delete(item);
+        super.add(item);
 
         // Запускаем цикл
-        if (this.array.length === 1 && this.time === 0) {
+        if (this.size === 1 && this.time === 0) {
             this.time = this.localTime;
             setImmediate(this._stepCycle);
         }
-    };
 
-    /**
-     * @description Проверяет, существует ли элемент
-     * @param item Элемент типа T
-     * @public
-     */
-    public has(item: T): boolean {
-        return this.array.includes(item);
-    };
-
-    /**
-     * @description Удаляем элемент из очереди
-     * @param item - Объект T
-     * @public
-     */
-    public remove(item: T): void {
-        const index = this.array.indexOf(item);
-        if (index === -1) return;
-
-        this.array.splice(index, 1);
+        return this;
     };
 }
 
@@ -140,9 +134,10 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      */
     public add = (item: T) => {
         if (this.options.custom?.push) this.options.custom?.push(item);
-        else if (this.array.includes(item)) this.remove(item);
+        else if (this.has(item)) this.delete(item);
 
         super.add(item);
+        return this;
     };
 
     /**
@@ -150,14 +145,16 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @param item - Объект T
      * @public
      */
-    public remove = (item: T) => {
-        const index = this.array.indexOf(item);
+    public delete = (item: T) => {
+        const index = this.has(item);
 
         // Если есть объект в базе
-        if (index !== -1) {
+        if (index) {
             if (this.options.custom?.remove) this.options.custom.remove(item);
-            this.array.splice(index, 1);
+            super.delete(item);
         }
+
+        return true;
     };
 
     /**
@@ -167,22 +164,20 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      */
     protected _stepCycle = () => {
         // Если нет объектов
-        if (this.array?.length === 0) {
+        if (this?.size === 0) {
             this.time = 0;
             return;
         }
 
         // Запускаем цикл
-        for (let i = this.array.length; i > 0; i--) {
-            const item = this.array[i - 1];
-
+        for (const item of this) {
             // Если объект не готов
             if (!this.options.filter(item)) continue;
 
             try {
                 this.options.execute(item);
             } catch (error) {
-                this.remove(item);
+                this.delete(item);
                 console.log(error);
             }
         }
@@ -216,9 +211,10 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
      */
     public add = (item: T) => {
         if (this.options.custom?.push) this.options.custom?.push(item);
-        else if (this.array.includes(item)) this.remove(item);
+        else if (this.has(item)) this.delete(item);
 
         super.add(item);
+        return this;
     };
 
     /**
@@ -226,14 +222,16 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
      * @param item - Объект T
      * @public
      */
-    public remove = (item: T) => {
-        const index = this.array.indexOf(item);
+    public delete = (item: T) => {
+        const index = this.has(item);
 
         // Если есть объект в базе
-        if (index !== -1) {
+        if (index) {
             if (this.options.custom?.remove) this.options.custom.remove(item);
-            this.array.splice(index, 1);
+            super.delete(item);
         }
+
+        return true;
     };
 
     /**
@@ -243,15 +241,12 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
      */
     protected _stepCycle = async () => {
         // Если нет объектов
-        if (this.array?.length === 0) {
+        if (this.size === 0) {
             this.time = 0;
             return;
         }
 
-        // Запускаем цикл
-        for (let i = this.array.length; i > 0; i--) {
-            const item = this.array[i - 1];
-
+        for (const item of this) {
             // Если объект не готов
             if (!this.options.filter(item)) continue;
 
@@ -259,9 +254,9 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
                 const bool  = await this.options.execute(item);
 
                 // Если ответ был получен
-                if (!bool) this.remove(item);
+                if (!bool) this.delete(item);
             } catch (error) {
-                this.remove(item);
+                this.delete(item);
                 console.log(error);
             }
         }

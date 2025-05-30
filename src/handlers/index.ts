@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import fs from "node:fs";
+import {SetArray} from "#structures";
 
 /**
  * @author SNIPPIK
@@ -14,7 +15,7 @@ export abstract class handler<T = unknown> {
      * @readonly
      * @private
      */
-    private readonly _files: T[] = [];
+    private readonly _files = new SetArray<T>();
 
     /**
      * @description Выдаем все загруженные файлы
@@ -29,7 +30,7 @@ export abstract class handler<T = unknown> {
      * @public
      */
     public get size() {
-        return this._files.length;
+        return this._files.size;
     };
 
     /**
@@ -47,7 +48,7 @@ export abstract class handler<T = unknown> {
         // Если есть загруженные файлы
         if (this.size > 0) {
             // Удаляем все загруженные файлы
-            this.files.splice(0, this.files.length);
+            this.files.clear();
         }
 
         const selfDir = path.resolve(this.directory);
@@ -103,19 +104,19 @@ export abstract class handler<T = unknown> {
         // Если полученные данные являются списком
         if (default_export instanceof Array) {
             for (const obj of default_export) {
-                if (obj.prototype) this._files.push(new obj(null));
-                else this._files.push(obj);
+                if (obj.prototype) this._files.add(new obj(null));
+                else this._files.add(obj);
             }
             return;
         }
 
         // Если загружаемый объект является классом
         else if (default_export.prototype) {
-            this._files.push(new default_export(null));
+            this._files.add(new default_export(null));
             return;
         }
 
         // Добавляем файл в базу для дальнейшего экспорта
-        this._files.push(default_export);
+        this._files.add(default_export);
     };
 }

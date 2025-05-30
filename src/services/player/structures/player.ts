@@ -264,6 +264,8 @@ export class AudioPlayer extends BasePlayer {
                 // Перезапускаем поток
                 this._audio.current.refresh();
                 this.status = "player/playing";
+
+                this.waitStream = false;
                 return;
             }
         }
@@ -437,7 +439,7 @@ export class AudioPlayer extends BasePlayer {
         if (this.filters.enabled.length > 0) this.filters.enabled.splice(0, this.filters.enabled.length);
 
         // Отключаем от цикла плеер
-        db.queues.cycles.players.remove(this);
+        db.queues.cycles.players.delete(this);
 
         // Удаляем текущий поток, поскольку он больше не нужен
         this.audio.current = null;

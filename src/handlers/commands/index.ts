@@ -113,7 +113,7 @@ export class Commands extends handler<Command> {
         this.load();
 
         // Если команды не были загружены
-        if (!this.files.length) throw new Error("Not loaded commands");
+        if (!this.files.size) throw new Error("Not loaded commands");
 
         // Загрузка глобальных команд
         client.application.commands.set(this.public as any)

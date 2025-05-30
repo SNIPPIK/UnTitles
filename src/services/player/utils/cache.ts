@@ -163,8 +163,8 @@ class CacheAudio extends AsyncCycle<Track> {
                 push: (track) => {
                     // Защита от повторного добавления
                     setImmediate(async () => {
-                        const find = this.array.filter((item) => track.url === item.url);
-                        if (find.length > 1) this.remove(find[0]);
+                        const find = this.filter((item) => track.url === item.url);
+                        if (find.length > 1) this.delete(find[0]);
                     });
                 }
             },
@@ -173,7 +173,7 @@ class CacheAudio extends AsyncCycle<Track> {
 
                 // Если такой трек уже есть в системе кеширования
                 if (names.status === "ended" || item.time.total > 1000) {
-                    this.remove(item);
+                    this.delete(item);
                     return false;
                 }
 
@@ -199,7 +199,7 @@ class CacheAudio extends AsyncCycle<Track> {
 
                     // Если была получена ошибка
                     ffmpeg.stdout.once("error", () => {
-                        this.remove(track);
+                        this.delete(track);
                         return resolve(false);
                     });
 
@@ -208,11 +208,11 @@ class CacheAudio extends AsyncCycle<Track> {
                         const isValid = await this.validateFile(`${status.path}.opus`);
                         if (!isValid) {
                             fs.unlinkSync(`${status.path}.opus`);
-                            this.remove(track);
+                            this.delete(track);
                             return resolve(false);
                         }
 
-                        this.remove(track);
+                        this.delete(track);
                         return resolve(true);
                     });
                 });

@@ -83,11 +83,11 @@ abstract class BaseQueue {
         // Если введено новое сообщение
         if (this.message && this.message.guild && message !== this.message) {
             // Удаляем старое сообщение, если оно есть
-            const message = db.queues.cycles.messages.array.find((msg) => {
+            const message = db.queues.cycles.messages.find((msg) => {
                 return msg.guildId === this.message.guild.id;
             });
 
-            if (message) db.queues.cycles.messages.remove(message);
+            if (message) db.queues.cycles.messages.delete(message);
         }
 
         this._message = message;
@@ -182,12 +182,12 @@ abstract class BaseQueue {
         if (this.player) this.player.cleanup();
 
         // Удаляем старое сообщение, если оно есть
-        const message = db.queues.cycles.messages.array.find((msg) => {
+        const message = db.queues.cycles.messages.find((msg) => {
             return msg.guild.id === this.guild.id;
         });
 
         if (message) {
-            db.queues.cycles.messages.remove(message);
+            db.queues.cycles.messages.delete(message);
 
             Logger.log("LOG", `[Queue/${this.guild.id}] has cleanup`);
         }

@@ -123,18 +123,24 @@ class message_playing extends Assign<Event<"message/playing">> {
             name: "message/playing",
             type: "player",
             once: false,
-            execute: async (queue) => {
-                // Отправляем сообщение
-                const message = await queue.message.send({embeds: [queue.componentEmbed], components: queue.components, withResponse: true});
+            execute: (queue) => {
+                setImmediate(async () => {
+                    // Отправляем сообщение
+                    const message = await queue.message.send({
+                        embeds: [queue.componentEmbed],
+                        components: queue.components,
+                        withResponse: true
+                    });
 
-                // Если есть ответ от отправленного сообщения
-                if (message) {
-                    // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
-                    if (!db.queues.cycles.messages.has(message)) {
-                        // Добавляем сообщение в базу для обновления
-                        db.queues.cycles.messages.add(message);
+                    // Если есть ответ от отправленного сообщения
+                    if (message) {
+                        // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
+                        if (!db.queues.cycles.messages.has(message)) {
+                            // Добавляем сообщение в базу для обновления
+                            db.queues.cycles.messages.add(message);
+                        }
                     }
-                }
+                });
             }
         });
     };

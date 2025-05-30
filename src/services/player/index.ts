@@ -193,9 +193,9 @@ class AudioCycles {
                         }
                     },
                     push: (item) => {
-                        const old = this.array.find(msg => msg.guild.id === item.guild.id);
+                        const old = this.find(msg => msg.guild.id === item.guild.id);
                         // Удаляем прошлое сообщение
-                        if (old) this.remove(old);
+                        if (old) this.delete(old);
                     }
                 },
                 filter: (message) => message["editable"],
@@ -203,20 +203,23 @@ class AudioCycles {
                     const queue = db.queues.get(message.guild.id);
 
                     // Если нет очереди
-                    if (!queue) this.remove(message);
+                    if (!queue) this.delete(message);
 
                     // Если есть поток в плеере
                     else if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
                         const embed = queue.componentEmbed;
 
                         // Если не получен embed
-                        if (!embed) return this.remove(message);
+                        if (!embed) {
+                            this.delete(message);
+                            return;
+                        }
 
                         try {
                             await message.edit({embeds: [embed], components: queue.components});
                         } catch {
                             // Если при обновлении произошла ошибка
-                            this.remove(message);
+                            this.delete(message);
                         }
                     }
                 }

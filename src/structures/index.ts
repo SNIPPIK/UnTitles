@@ -9,6 +9,7 @@ export * from "./logger";
 export * from "./emitter";
 export * from "./tools/Assign";
 export * from "./tools/Collection";
+export * from "./tools/SetArray";
 export * from "./tools/Cycle";
 
 export * from "./discord/Client";
