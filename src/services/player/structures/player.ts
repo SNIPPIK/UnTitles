@@ -256,11 +256,13 @@ export class AudioPlayer extends BasePlayer {
         this.waitStream = true;
         const options = { seek, filters: this._filters.compress(time) };
 
-        // Если всего 1 трек в системе и есть прошлый поток
-        if (this._tracks.total === 1 && this._audio.current) {
+        /*
+        Пока отключено на доработку
 
+        // Если включается повторно тот же трек
+        if (path === this._tracks.track["_track"]["audio"] && !!this._audio.current && !seek) {
             // Если фильтры совпадают
-            if (options.filters === this._audio.current.config.options.filters && !seek) {
+            if (options.filters === this._audio.current.config.options.filters) {
                 // Перезапускаем поток
                 this._audio.current.refresh();
                 this.status = "player/playing";
@@ -269,6 +271,7 @@ export class AudioPlayer extends BasePlayer {
                 return;
             }
         }
+         */
 
         // Создаем класс для управления потоком
         const stream = new AudioResource({path, options});
