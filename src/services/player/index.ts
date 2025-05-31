@@ -72,6 +72,9 @@ export class Queues<T extends Queue> extends Collection<T> {
                 ]
             }).then((msg) => setTimeout(() => msg.delete().catch(() => null), 10e3));
 
+            // Отключаем события плеера
+            queue.player.removeAllListeners();
+
             // Тихо удаляем очередь
             this.remove(queue.guild.id, true);
         }

@@ -1,5 +1,5 @@
-import {SetArray} from "#structures";
-import * as console from "node:console";
+import { SetArray } from "#structures";
+import { hrtime } from "node:process";
 
 /**
  * @author SNIPPIK
@@ -29,14 +29,15 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @description Тип таймера, задает точность таймера
      * @protected
      */
-    protected timer: "max" | "low";
+    private readonly timer: "max" | "low";
 
     /**
-     * @description Время для работы таймера
+     * @description Получение текущего времени для вычитания и получения точного времени
      * @private
      */
     private get localTime() {
-        return this.timer === "max" ? performance.now() : Date.now();
+        if (this.timer === "low") return Date.now();
+        return Number(hrtime.bigint()) / 1e6;
     };
 
     /**
@@ -46,7 +47,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      */
     protected constructor(duration: number) {
         super();
-        this.timer = duration < 1e3 ? "max" : "low";
+        this.timer = duration < 100 ? "max" : "low";
     };
 
     /**

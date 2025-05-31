@@ -55,14 +55,15 @@ async function runShard() {
     db.commands.register(client);
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
 
-    initProcessEvents();
+    initProcessEvents(client);
 }
 
 /**
  * @author SNIPPIK
  * @description Инициализирует события процесса (ошибки, сигналы)
+ * @param client - Класс клиента
  */
-function initProcessEvents() {
+function initProcessEvents(client: DiscordClient) {
     // Необработанная ошибка (внутри синхронного кода)
     process.on("uncaughtException", (err, origin) => {
         Logger.log(
@@ -87,12 +88,43 @@ function initProcessEvents() {
 
     // Возможность завершить процесс корректно
     process.on("SIGINT", () => {
+        if (ProcessQueues(client)) return;
+
         Logger.log("WARN", "Received SIGINT. Shutting down...");
         process.exit(0);
     });
 
     process.on("SIGTERM", () => {
+        if (ProcessQueues(client)) return;
+
         Logger.log("WARN", "Received SIGTERM. Shutting down...");
         process.exit(0);
     });
+}
+
+/**
+ * @author SNIPPIK
+ * @description Функция проверяющая состояние очередей, для безопасного выключения
+ * @param client - Класс клиента
+ * @constructor
+ */
+function ProcessQueues(client: DiscordClient): boolean {
+    if (db.queues.size > 0) {
+        // Отключаем все события от клиента, для предотвращения включения или создания еще очередей
+        client.removeAllListeners();
+
+        // Время самого долгого трека из всех очередей
+        const timeout = db.queues.waitReboot + 1e3;
+
+        // Если плееры играют и есть остаток от аудио
+        if (timeout) {
+            // Ожидаем выключения музыки на других серверах
+            setTimeout(async () => { process.exit(0); }, timeout);
+
+            Logger.log("WARN", `[Queues/${db.queues.size}] Wait other queues. Timeout to restart ${(timeout / 1e3).duration()}`);
+            return true;
+        }
+    }
+
+    return false;
 }

@@ -5,13 +5,10 @@ import crypto from "crypto";
  * @description Поддерживаемые типы шифрования
  * @private
  */
-const EncryptionModes: EncryptionModes[] = [];
-
-/**
- * @author SNIPPIK
- * @description Поддерживающие размеры начальных пакетов
- */
-const EncryptionNonce: Buffer[] = [];
+const Encryption: {name: EncryptionModes, nonce: Buffer} = {
+    name: null,
+    nonce: null
+};
 
 /**
  * @author SNIPPIK
@@ -38,7 +35,7 @@ export class ClientRTPSocket {
      * @description Пустой буфер
      * @private
      */
-    private readonly _nonceBuffer: Buffer = EncryptionNonce[0];
+    private readonly _nonceBuffer: Buffer = Encryption.nonce;
 
     /**
      * @description Порядковый номер пустого буфера
@@ -62,8 +59,8 @@ export class ClientRTPSocket {
      * @description Задаем единственный актуальный вариант шифрования
      * @public
      */
-    public static get mode(): EncryptionModes {
-        return EncryptionModes[0];
+    public static get mode() {
+        return Encryption.name;
     };
 
     /**
@@ -160,7 +157,10 @@ export class ClientRTPSocket {
      * @param bits - Количество бит
      * @private
      */
-    private randomNBit = (bits: number) => crypto.randomBytes(Math.ceil(bits / 8)).readUIntBE(0, Math.ceil(bits / 8)) % (2 ** bits);
+    private randomNBit = (bits: number) => {
+        const size = Math.ceil(bits / 8);
+        return crypto.randomBytes(Math.ceil(size)).readUIntBE(0, Math.ceil(size)) % (2 ** bits);
+    };
 }
 
 /**
@@ -177,8 +177,8 @@ let loaded_lib: Methods.current = {};
 (async () => {
     // Если поддерживается нативная расшифровка
     if (crypto.getCiphers().includes("aes-256-gcm")) {
-        EncryptionModes.push("aead_aes256_gcm_rtpsize");
-        EncryptionNonce.push(Buffer.alloc(12));
+        Encryption.name = "aead_aes256_gcm_rtpsize";
+        Encryption.nonce = Buffer.alloc(12);
         return;
     }
 
@@ -216,8 +216,8 @@ let loaded_lib: Methods.current = {};
         }, names = Object.keys(support_libs);
 
         // Добавляем тип шифрования
-        EncryptionModes.push("aead_xchacha20_poly1305_rtpsize");
-        EncryptionNonce.push(Buffer.alloc(24));
+        Encryption.name = "aead_xchacha20_poly1305_rtpsize";
+        Encryption.nonce = Buffer.alloc(24);
 
         // Делаем проверку всех доступных библиотек
         for (const name of names) {

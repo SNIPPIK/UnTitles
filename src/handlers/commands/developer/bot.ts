@@ -100,14 +100,8 @@ class WorkBotCommand extends Assign< BaseCommand > {
 
                     // Перезагрузка бота, правильно работает только с ShardManager
                     case "bot": {
-                        // Время самого долгого трека из всех очередей
-                        const timeout = db.queues.waitReboot + 1e3;
-
-                        // Ожидаем выключения музыки на других серверах
-                        setTimeout(async () => {
-                            // Уничтожаем процесс
-                            process.exit(0);
-                        }, timeout);
+                        // Запускаем перезапуск, по истечению времени последнего плеера будет включение нового процесса
+                        process.emit("SIGINT");
 
                         return message.reply({
                             embeds: [

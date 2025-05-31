@@ -137,6 +137,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         this._client = new WebSocket(this.endpoint, {
             handshakeTimeout: 7e3,
+            sessionTimeout: 5e3,
             headers: {
                 "User-Agent": "VoiceClient (https://github.com/SNIPPIK/UnTitles/tree/beta/src/services/voice)"
             }
