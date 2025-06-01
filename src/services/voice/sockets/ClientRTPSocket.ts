@@ -114,26 +114,16 @@ export class ClientRTPSocket {
      * @public
      */
     public packet = (packet: Buffer) => {
-        this.sequence++;
-        this.timestamp += TIMESTAMP_INC;
+        this.sequence = (this.sequence + 1) & 0xFFFF;
+        this.timestamp = (this.timestamp + TIMESTAMP_INC) >>> 0;
 
         if (this.sequence >= 2 ** 16) this.sequence = 0;
         if (this.timestamp >= 2 ** 32) this.timestamp = 0;
 
-        return this.crypto(packet);
-    };
-
-    /**
-     * @description Подготавливаем пакет к отправке, выставляем правильную очередность
-     * @param packet - Пакет Opus для шифрования
-     * @private
-     */
-    private crypto = (packet: Buffer): Buffer => {
-        const nonceBuffer = this._nonceBuffer.subarray(0, 4);
-
         const mode = ClientRTPSocket.mode;
+        const nonce = this.nonce;
         const rtp = this.rtp_packet;
-        const nonce = this.nonce
+        const nonceBuffer = nonce.subarray(0, 4);
 
         // Шифровка aead_aes256_gcm (support rtpsize)
         if (mode === "aead_aes256_gcm_rtpsize") {

@@ -9,6 +9,7 @@
 [![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
 [![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
 [![Donate](https://img.shields.io/badge/Donate-DonationAlerts-orange?style=for-the-badge&logo=donationalerts)](https://www.donationalerts.com/r/snippik)
+![](https://codecov.io/gh/SNIPPIK/Untitles)
 
 > [!TIP]
 > Сделано с душой, не забывайте указывать авторство от этого зависит разработка!!!
@@ -21,7 +22,7 @@
 # 🎧 Основные возможности
 #### Голосовой движок
 - Собственная реализация [Voice Gateway Version 8](https://discord.com/developers/docs/topics/voice-connections) (WebSocket + UDP + RTP + Opus)
-- Строгая циклическая система для отправки audio (20ms) не зависимая от Event loop!
+- Адаптивная система отправки пакетов, можно выбрать сколько пакетов отправлять!
 - Поддержка плавного перехода между треками с `audiofade`
 - Горячая смена аудио без прерываний
 - Поддержка 14+ фильтров с возможностью добавлять свои
@@ -35,11 +36,10 @@
 
 ---
 
-## 🎛 Пользовательский опыт (UX)
-- 🖱 UI
-  - Полностью динамические кнопки, адаптирующиеся к текущему состоянию плеера (например, фильтры, пауза/продолжить, скип и т.д.)
-  - Поддержка прогресса трека (визуальная шкала и временные метки)
-  - Обратная связь мгновенна и понятна: не нужны slash команды повторно, всё доступно в одном сообщении
+## 🎛 UI
+- Полностью динамические кнопки, адаптирующиеся к текущему состоянию плеера (например, фильтры, пауза/продолжить, скип и т.д.)
+- Поддержка прогресса трека (визуальная шкала и временные метки)
+- Обратная связь мгновенна и понятна: не нужны slash команды повторно, всё доступно в одном сообщении
 
 #### Команды
 | Команда | Autocomplete | Аргументы                               | Описание                                       | 
@@ -54,12 +54,6 @@
 | /avatar | ✅            | {user}                                  | Просмотр аватара пользователя                  |
 | /voice  | ❌            | (join, leave, tribune: (join, request)) | Голосовое взаимодействие                       |
 ---
-![TypeScript](https://img.shields.io/badge/typescript-5.8.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
-![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
-![Discord.js](https://img.shields.io/badge/discord.js-14.9.3-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
-![ws](https://img.shields.io/badge/ws-8.18.2-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
----
-
 ## 🚀 Быстрый старт
 - Требуется `Node.js`, `FFmpeg`
 - Настраиваем `.env` файл по пути `build/.env`
@@ -75,10 +69,14 @@ npm run build && npm run start
 
 # 🔩 Требования к железу
 - При 10 guilds (серверы)
-- Достаточно 2 ядер (2.5 ГГц)
 - (ShardManager 20-40 Мб), (Shard - Worker + Main Process 70-90 мб)
 - За каждую очередь, плеер, голосовое подключение (5-7 мб). Без учета добавленных треков
 
+---
+![TypeScript](https://img.shields.io/badge/typescript-5.8.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
+![Discord.js](https://img.shields.io/badge/discord.js-14.9.3-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
+![ws](https://img.shields.io/badge/ws-8.18.2-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
 ---
 
 # 📊 Диаграмма всего проекта

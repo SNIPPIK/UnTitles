@@ -99,9 +99,9 @@ export class VoiceConnection {
      * @public
      */
     public set packet(packet: Buffer) {
-        if (this.udpClient && this.rtpClient) {
+        // Если есть аудио фрейм
+        if (packet !== null && this.udpClient && this.rtpClient) {
             this.speaking = true;
-
             this.udpClient.packet = this.rtpClient.packet(packet);
             this.resetSpeakingTimeout();
         }

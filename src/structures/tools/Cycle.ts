@@ -1,11 +1,10 @@
 import { SetArray } from "#structures";
-import { hrtime } from "node:process";
 
 /**
  * @author SNIPPIK
  * @description Максимальное кол-во пропусков таймеров
  */
-const MAX_IMMEDIATE_STEPS = 5;
+const MAX_IMMEDIATE_STEPS = 2;
 
 /**
  * @author SNIPPIK
@@ -17,7 +16,13 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @description Следующее запланированное время запуска (в ms, с плавающей точкой)
      * @private
      */
-    protected time: number = 0;
+    private startTime: number = 0;
+
+    /**
+     * @description Время для высчитывания
+     * @private
+     */
+    private time: number = 0;
 
     /**
      * @description Кол-во пропущенных прогонов таймера
@@ -37,7 +42,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      */
     private get localTime() {
         if (this.timer === "low") return Date.now();
-        return Number(hrtime.bigint()) / 1e6;
+        return performance.now(); //parseInt((Number(hrtime.bigint()) / 1e6).toFixed(2));
     };
 
     /**
@@ -62,19 +67,30 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @private
      */
     protected _stepCheckTimeCycle = (duration: number) => {
-        // Высчитываем время для выполнения
-        this.time += duration;
+        // Если нет объектов
+        if (this.size === 0) {
+            this.startTime = 0;
+            return;
+        }
 
         const now = this.localTime;
-        let delay = this.time - now;
+
+        // Высчитываем время для выполнения
+        this.time += duration //- 0.002;
+
+        // Цельный целевой интервал + остаток от предыдущих циклов
+        let delay = (this.startTime + this.time) - now;
 
         if (delay <= 0) {
             // Цикл отстал, подтягиваем time вперёд,
             // но не сбрасываем в 0, а смещаем на целое число интервалов duration,
             // чтобы сохранить непрерывность времени
             if (++this.missCounter > MAX_IMMEDIATE_STEPS) {
-                delay = duration; // Принудительная стабилизация
                 this.missCounter = 0;
+
+                // Принудительная стабилизация
+                delay = duration;
+                this.time = 0;
 
                 // Ждем нужное время
                 setTimeout(this._stepCycle, delay);
@@ -85,10 +101,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         }
 
         // Иначе ждем нужное время
-        else {
-            this.missCounter = 0;
-            setTimeout(this._stepCycle, delay);
-        }
+        else setTimeout(this._stepCycle, delay);
     };
 
     /**
@@ -102,8 +115,8 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         super.add(item);
 
         // Запускаем цикл
-        if (this.size === 1 && this.time === 0) {
-            this.time = this.localTime;
+        if (this.size === 1 && this.startTime === 0) {
+            this.startTime = this.localTime;
             setImmediate(this._stepCycle);
         }
 
@@ -164,12 +177,6 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @private
      */
     protected _stepCycle = () => {
-        // Если нет объектов
-        if (this?.size === 0) {
-            this.time = 0;
-            return;
-        }
-
         // Запускаем цикл
         for (const item of this) {
             // Если объект не готов
@@ -241,12 +248,6 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
      * @private
      */
     protected _stepCycle = async () => {
-        // Если нет объектов
-        if (this.size === 0) {
-            this.time = 0;
-            return;
-        }
-
         for (const item of this) {
             // Если объект не готов
             if (!this.options.filter(item)) continue;

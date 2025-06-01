@@ -1,6 +1,7 @@
 import { CommandInteraction, CycleInteraction, Collection, Logger, SyncCycle } from "#structures";
 import { AudioPlayer, Queue, Track } from "#service/player";
 import { RestClientSide } from "#handler/rest/apis";
+import { OPUS_FRAME_SIZE } from "#service/voice";
 import { locale } from "#service/locale";
 import { Colors } from "discord.js";
 import { env } from "#app/env";
@@ -24,13 +25,6 @@ export * from "./modules/tracks";
  */
 export class Queues<T extends Queue> extends Collection<T> {
     /**
-     * @description Хранилище циклов для работы музыки
-     * @readonly
-     * @public
-     */
-    public readonly cycles = new AudioCycles();
-
-    /**
      * @description Здесь хранятся модификаторы аудио
      * @readonly
      * @public
@@ -40,6 +34,13 @@ export class Queues<T extends Queue> extends Collection<T> {
         volume: parseInt(env.get("audio.volume")),
         fade: parseInt(env.get("audio.fade"))
     };
+
+    /**
+     * @description Хранилище циклов для работы музыки
+     * @readonly
+     * @public
+     */
+    public readonly cycles = new AudioCycles();
 
     /**
      * @description отправляем сообщение о перезапуске бота
@@ -164,13 +165,15 @@ class AudioCycles {
     public readonly players = new class AudioPlayers<T extends AudioPlayer> extends SyncCycle<T> {
         public constructor() {
             super({
-                duration: 20,
+                duration: OPUS_FRAME_SIZE * parseInt(env.get("player.preferred", "1")),
                 filter: (item) => item.playing,
                 execute: (player) => {
                     const connection = player.voice.connection;
 
                     // Отправляем пакет в голосовой канал
-                    connection.packet = player.audio.current.packet;
+                    for (let i = 0; i < this.options.duration / OPUS_FRAME_SIZE; i++) {
+                        connection.packet = player.audio.current.packet;
+                    }
                 }
             });
         };
@@ -220,7 +223,8 @@ class AudioCycles {
 
                         try {
                             await message.edit({embeds: [embed], components: queue.components});
-                        } catch {
+                        } catch (error) {
+                            Logger.log("ERROR", `Failed to edit message in cycle: ${error instanceof Error ? error.message : error}`);
                             // Если при обновлении произошла ошибка
                             this.delete(message);
                         }

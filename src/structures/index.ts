@@ -113,12 +113,5 @@ declare global {
          * @return string | number
          */
         toSplit(): string | number;
-
-        /**
-         * @prototype Number
-         * @description Получаем случайное число
-         * @param min {number} Мин число
-         */
-        random(min?: number): number;
     }
 }

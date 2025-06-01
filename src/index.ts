@@ -114,12 +114,12 @@ function ProcessQueues(client: DiscordClient): boolean {
         client.removeAllListeners();
 
         // Время самого долгого трека из всех очередей
-        const timeout = db.queues.waitReboot + 1e3;
+        const timeout = db.queues.waitReboot;
 
         // Если плееры играют и есть остаток от аудио
         if (timeout) {
             // Ожидаем выключения музыки на других серверах
-            setTimeout(async () => { process.exit(0); }, timeout);
+            setTimeout(async () => { process.exit(0); }, timeout + 1e3);
 
             Logger.log("WARN", `[Queues/${db.queues.size}] Wait other queues. Timeout to restart ${(timeout / 1e3).duration()}`);
             return true;
