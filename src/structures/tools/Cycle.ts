@@ -42,7 +42,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      */
     private get localTime() {
         if (this.timer === "low") return Date.now();
-        return performance.now(); //parseInt((Number(hrtime.bigint()) / 1e6).toFixed(2));
+        return performance.now();
     };
 
     /**
@@ -70,6 +70,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Если нет объектов
         if (this.size === 0) {
             this.startTime = 0;
+            this.time = 0;
             return;
         }
 
