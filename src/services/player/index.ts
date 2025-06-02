@@ -14,6 +14,15 @@ export * from "./modules/filters";
 export * from "./modules/tracks";
 
 
+/**
+ * @author SNIPPIK
+ * @description Безопасное время для буферизации трека
+ * @const PLAYER_BUFFERED_TIME
+ */
+export const PLAYER_BUFFERED_TIME = 500;
+
+
+
 
 /**
  * @author SNIPPIK

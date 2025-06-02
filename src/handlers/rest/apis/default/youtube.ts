@@ -188,14 +188,18 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
 
                                     const data = api["streamingData"];
 
-                                    // Если нет форматов
-                                    if (!data["formats"]) return resolve(locale.err("api.request.audio.fail", [RestYouTubeAPI._platform.name]));
+                                    // dashManifestUrl, hlsManifestUrl
+                                    if (data["hlsManifestUrl"]) track.audio = data["hlsManifestUrl"];
+                                    else {
+                                        // Если нет форматов
+                                        if (!data["formats"]) return resolve(locale.err("api.request.audio.fail", [RestYouTubeAPI._platform.name]));
 
-                                    // Расшифровываем аудио формат
-                                    const format = await RestYouTubeAPI.extractFormat(data, api.html, url);
+                                        // Расшифровываем аудио формат
+                                        const format = await RestYouTubeAPI.extractFormat(data, api.html, url);
 
-                                    // Если есть расшифровка ссылки видео
-                                    if (format) track.audio = format["url"];
+                                        // Если есть расшифровка ссылки видео
+                                        if (format) track.audio = format["url"];
+                                    }
                                 }
 
                                 return resolve(track);

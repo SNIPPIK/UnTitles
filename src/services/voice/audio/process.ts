@@ -48,7 +48,7 @@ export class Process {
             const isLink = args.at(index_resource + 1)?.startsWith("http");
 
             // Если указана ссылка
-            if (isLink) args.unshift("-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5");
+            if (isLink) args.unshift("-reconnect", "1", "-reconnect_delay_max", "5");
         }
 
         // Проверяем на наличие пропуска времени
@@ -56,7 +56,7 @@ export class Process {
             const seek = parseInt(args.at(index_seek + 1));
 
             // Если указано не число
-            if (isNaN(seek) || seek === 0) args.splice(index_seek, 2);
+            if (isNaN(seek) || !seek) args.splice(index_seek, 2);
         }
 
         args.unshift("-vn", "-loglevel", "error", "-hide_banner");

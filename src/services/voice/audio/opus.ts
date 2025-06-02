@@ -1,4 +1,5 @@
-import { Writable } from "node:stream";
+import { Writable, Transform, TransformOptions, WritableOptions } from "node:stream";
+import {TypedEmitter} from "#structures";
 
 /**
  * @author SNIPPIK
@@ -15,41 +16,40 @@ export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
 
 /**
  * @author SNIPPIK
- * @description Длительность opus фрейма
+ * @description Длительность opus фрейма в ms
  */
 export const OPUS_FRAME_SIZE = 20;
 
 /**
  * @author SNIPPIK
- * @description Пустой фрейм для правильного поиска opus
+ * @description Пустой фрейм для предотвращения чтения null
  */
-const emptyFrame =  Buffer.alloc(0);
+const EMPTY_FRAME =  Buffer.alloc(0);
+
+
+
 
 /**
  * @author SNIPPIK
- * @description Создаем кодировщик в opus из OGG
- * @class OpusEncoder
- * @extends Writable
- * @public
+ * @description Базовый класс декодера, ищет opus фрагменты в ogg потоке
+ * @class BaseEncoder
+ * @extends TypedEmitter<EncoderEvents>
+ * @private
  */
-export class OpusEncoder extends Writable {
-    private _buffer: Buffer = emptyFrame;
-
+class BaseEncoder extends TypedEmitter<EncoderEvents> {
     /**
-     * @description Функция для работы чтения
-     * @protected
+     * @description Временный буфер, для общения между функциями
+     * @private
      */
-    public _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
-        this._buffer = Buffer.concat([this._buffer, chunk]);
-        this.parseAvailablePages();
-        return callback();
-    };
+    public _buffer: Buffer = EMPTY_FRAME;
 
     /**
      * @description Функция ищущая актуальный для взятия фрагмент
      * @private
      */
-    private parseAvailablePages = () => {
+    public parseAvailablePages = (chunk: Buffer) => {
+        this._buffer = Buffer.concat([this._buffer, chunk]);
+
         const size = this._buffer.length;
         let offset = 0;
 
@@ -103,11 +103,114 @@ export class OpusEncoder extends Writable {
 
                 const packetHeader = packet.subarray(0, 8).toString();
 
-                // Пропустить служебные данные
-                if (packetHeader === "OpusHead" || packetHeader === "OpusTags") continue
+                // Если найден заголовок
+                if (packetHeader === "OpusHead") this.emit("head", segment);
 
-                this.emit("frame", packet);
+                // Если найден тег
+                else if (packetHeader === "OpusTags") this.emit("tags", segment);
+
+                // Если получен обычный frame
+                else this.emit("frame", packet);
             }
         }
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Создаем кодировщик в opus из OGG
+ * @usage Только для коротких треков
+ * @class BufferedEncoder
+ * @extends Writable
+ * @public
+ */
+export class BufferedEncoder extends Writable {
+    /**
+     * @description Базовый класс декодера
+     * @private
+     */
+    public encoder = new BaseEncoder();
+
+    /**
+     * @description Создаем класс
+     * @public
+     */
+    public constructor(options: WritableOptions = { autoDestroy: true }) {
+        super(options);
+        this.encoder.on("frame", (data) => this.emit("frame", data));
+    };
+
+    /**
+     * @description Функция для работы чтения
+     * @protected
+     */
+    public _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
+        this.encoder.parseAvailablePages(chunk);
+        return callback();
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Создаем кодировщик в opus из OGG
+ * @usage Для длительных треков или полноценного стрима
+ * @class PipeEncoder
+ * @extends Transform
+ * @public
+ */
+export class PipeEncoder extends Transform {
+    /**
+     * @description Базовый класс декодера
+     * @private
+     */
+    private encoder = new BaseEncoder();
+
+    /**
+     * @description Создаем класс
+     * @public
+     */
+    public constructor(options: TransformOptions = { autoDestroy: true }) {
+        super(Object.assign(options, { readableObjectMode: true }));
+
+        this.encoder.on("head", (data) => this.emit("head", data));
+        this.encoder.on("tags", (data) => this.emit("tags", data));
+        this.encoder.on("frame", (data) => this.push(data));
+    };
+
+    /**
+     * @description При получении данных через pipe или write, модифицируем их для одобрения со стороны discord
+     * @public
+     */
+    public _transform = (chunk: Buffer, _: any, done: () => any) => {
+        this.encoder.parseAvailablePages(chunk);
+        return done();
+    };
+}
+
+
+
+
+/**
+ * @author SNIPPIK
+ * @description События для типизации декодера
+ * @interface EncoderEvents
+ */
+interface EncoderEvents {
+    /**
+     * @description Получение opus фрейма заголовка
+     * @param frame - head фрагмент
+     */
+    "head": (frame: Buffer) => void;
+
+    /**
+     * @description Получение opus фрейма тега
+     * @param frame - tag фрагмент
+     */
+    "tags": (frame: Buffer) => void;
+
+    /**
+     * @description Получение основного opus фрейма
+     * @param frame - Основной фрагмент opus потока
+     */
+    "frame": (frame: Buffer) => void;
 }

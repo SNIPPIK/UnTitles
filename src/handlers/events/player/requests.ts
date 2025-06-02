@@ -82,12 +82,6 @@ class rest_request extends Assign<Event<"rest/request">> {
                         }
                     }
 
-                    // Если был получен потоковый трек с временем 0
-                    else if ("time" in rest && rest.time.total === 0) {
-                        db.events.emitter.emit("rest/error", message, locale._(message.locale, "track.live", [platform.platform, "track"]));
-                        return;
-                    }
-
                     // Добавляем в очередь
                     db.queues.create(message, rest);
                 } catch (err) {

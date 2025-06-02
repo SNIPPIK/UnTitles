@@ -1,6 +1,6 @@
+import { PLAYER_BUFFERED_TIME, Track } from "#service/player";
 import { AsyncCycle } from "#structures";
 import { Process } from "#service/voice";
-import { Track } from "#service/player";
 import afs from "node:fs/promises";
 import { env } from "#app/env";
 import path from "node:path";
@@ -172,7 +172,7 @@ class CacheAudio extends AsyncCycle<Track> {
                 const names = this.status(item);
 
                 // Если такой трек уже есть в системе кеширования
-                if (names.status === "ended" || item.time.total > 1000) {
+                if (names.status === "ended" || item.time.total > PLAYER_BUFFERED_TIME || item.time.total === 0) {
                     this.delete(item);
                     return false;
                 }

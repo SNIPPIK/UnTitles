@@ -70,12 +70,15 @@ export class PlayerProgress {
      */
     public bar = ({duration, platform}: PlayerProgressInput): string => {
         const {current, total} = duration;
-        const filled = Math.round(this.size * (isNaN(current) ? 0 : current / total));
         const button = emoji[`bottom_${platform.toLowerCase()}`] || emoji.bottom;
+
+        // Если live трек
+        if (total === 0) return emoji.upped.left + button + emoji.empty.center.repeat(this.size) + emoji.empty.right;
 
         const left = current > 0 ? emoji.upped.left : emoji.empty.left;
         const right = current >= total ? emoji.upped.right : emoji.empty.right;
 
+        const filled = Math.round(this.size * (isNaN(current) ? 0 : current / (total)));
         const middle =
             current === 0 ?
                 emoji.upped.center.repeat(filled) + emoji.empty.center.repeat(this.size + 1 - filled) :

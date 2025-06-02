@@ -31,8 +31,11 @@ export class PlayerAudioFilters<T extends AudioFilter> {
         const { volume, fade, optimization } = db.queues.options;
         const filters: string[] = [`volume=${volume / 150}`];
 
+        // Если трек live
+        if (time === 0) return filters.join(",");
+
         // Если есть приглушение аудио
-        if (fade) {
+        else if (fade) {
             filters.push(`afade=t=in:st=0:d=${fade + 2}`);
 
             // Если есть время трека

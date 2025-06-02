@@ -1,4 +1,4 @@
-import { AudioResource } from "#service/voice";
+import { BufferedAudioResource, PipeAudioResource } from "#service/voice";
 
 /**
  * @author SNIPPIK
@@ -6,7 +6,7 @@ import { AudioResource } from "#service/voice";
  * @class PlayerAudio
  * @public
  */
-export class PlayerAudio<T extends AudioResource> {
+export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
     /**
      * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
      * @private
@@ -24,7 +24,8 @@ export class PlayerAudio<T extends AudioResource> {
 
     /**
      * @description Подключаем новый поток
-     * @param stream
+     * @param stream - Аудио поток
+     * @public
      */
     public set current(stream) {
         const oldStream = this._audio;

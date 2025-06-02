@@ -29,11 +29,6 @@
     "en-US": "Where did you get this button? I don't have it!"
   },
 
-  "track.live": {
-    "ru": "**{ARGUMENT}.{ARGUMENT}**\n\n**❯** **Потоковые треки пока не поддерживаются**",
-    "en-US": "**{ARGUMENT}.{ARGUMENT}**\n\n**❯** **Live track is not supported**"
-  },
-
   "queue.need": {
     "ru": "{ARGUMENT}, музыка сейчас не играет!",
     "en-US": "{ARGUMENT}, music not playing!"
