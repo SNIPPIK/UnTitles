@@ -40,7 +40,7 @@ class RemoveTrackCommand extends Assign< BaseCommand<number> > {
             permissions: {
                 client: ["SendMessages", "ViewChannel"]
             },
-            rules: ["voice", "another_voice", "queue", "player-not-playing"],
+            middlewares: ["voice", "another_voice", "queue", "player-not-playing"],
             autocomplete: ({message, args}) => {
                 const number = args[0];
                 const queue = db.queues.get(message.guildId);

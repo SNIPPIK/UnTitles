@@ -1,0 +1,45 @@
+import { Assign, CommandInteraction } from "#structures";
+import { middleware } from "#handler/middlewares";
+import { locale } from "#service/locale";
+import { Colors } from "discord.js";
+import { db } from "#app/db";
+
+/**
+ * @author SNIPPIK
+ * @description Middleware для проверки есть ли очередь
+ * @usage Для команд, где требуется очередь
+ * @class ExistQueue
+ * @extends Assign
+ */
+class ExistQueue extends Assign<middleware<CommandInteraction>> {
+    public constructor() {
+        super({
+            name: "queue",
+            callback: async (ctx) => {
+                const queue = db.queues.get(ctx.guild.id);
+
+                // Если нет очереди
+                if (!queue) {
+                    await ctx.reply({
+                        flags: "Ephemeral",
+                        embeds: [
+                            {
+                                description: locale._(ctx.locale, "queue.need", [ctx.member]),
+                                color: Colors.Yellow
+                            }
+                        ],
+                    });
+                    return false;
+                }
+
+                return true;
+            }
+        });
+    };
+}
+
+/**
+ * @export default
+ * @description Не даем классам или объектам быть доступными везде в проекте
+ */
+export default [ExistQueue];

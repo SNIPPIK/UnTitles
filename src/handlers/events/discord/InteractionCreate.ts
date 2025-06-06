@@ -2,14 +2,12 @@ import {
     AnySelectMenuInteraction,
     AutocompleteInteraction,
     ButtonInteraction,
-    CacheType, ChannelType,
+    ChannelType,
     ChatInputCommandInteraction,
     Colors,
     Events
 } from "discord.js"
-import { QueueMessage } from "#service/player/structures/message";
 import { CommandInteraction, Assign, Logger } from "#structures";
-import { Command } from "#handler/commands";
 import { locale } from "#service/locale";
 import { Event } from "#handler/events";
 import { env } from "#app/env";
@@ -23,163 +21,6 @@ import { db } from "#app/db";
  * @public
  */
 class Interaction extends Assign<Event<Events.InteractionCreate>> {
-    /**
-     * @author SNIPPIK
-     * @description Функции правил проверки, возвращает true или false
-     * @true - Разрешено
-     * @false - Запрещено
-     */
-    private intends: { name: Command["rules"][number], callback: (message: CommandInteraction) => Promise<boolean> }[] = [
-        {
-            name: "voice",
-            callback: async (message) => {
-                const VoiceChannel = message.member.voice.channel;
-
-                // Если нет голосового подключения
-                if (!VoiceChannel) {
-                    await message.reply({
-                        flags: "Ephemeral",
-                        embeds: [
-                            {
-                                description: locale._(message.locale, "voice.need", [message.member]),
-                                color: Colors.Yellow
-                            }
-                        ],
-                    })
-                    return false;
-                }
-
-                return true;
-            }
-        },
-        {
-            name: "queue",
-            callback: async (message) => {
-                const queue = db.queues.get(message.guild.id);
-
-                // Если нет очереди
-                if (!queue) {
-                    await message.reply({
-                        flags: "Ephemeral",
-                        embeds: [
-                            {
-                                description: locale._(message.locale, "queue.need", [message.member]),
-                                color: Colors.Yellow
-                            }
-                        ],
-                    });
-                    return false;
-                }
-
-                return true;
-            }
-        },
-        {
-            name: "player-not-playing",
-            callback: async (message) => {
-                const queue = db.queues.get(message.guild.id);
-
-                // Если музыку нельзя пропустить из-за плеера
-                if (!queue && !queue.player.playing) {
-                    await message.reply({
-                        flags: "Ephemeral",
-                        embeds: [
-                            {
-                                description: locale._(message.locale, "player.playing.off"),
-                                color: Colors.DarkRed
-                            }
-                        ],
-                    });
-                    return false;
-                }
-
-                return true;
-            }
-        },
-        {
-            name: "player-wait-stream",
-            callback: async (message) => {
-                const queue = db.queues.get(message.guild.id);
-
-                // Если музыку нельзя пропустить из-за плеера
-                if (queue && queue.player.waitStream) {
-                    await message.reply({
-                        flags: "Ephemeral",
-                        embeds: [
-                            {
-                                description: locale._(message.locale, "player.stream.wait"),
-                                color: Colors.DarkRed
-                            }
-                        ],
-                    });
-                    return false;
-                }
-
-                return true;
-            }
-        },
-        {
-            name: "another_voice",
-            callback: async (message) => {
-                const VoiceChannelMe = message.guild?.members?.me?.voice?.channel;
-                const VoiceChannel = message.member?.voice?.channel;
-
-                // Если бот в голосовом канале и пользователь
-                if (VoiceChannelMe && VoiceChannel) {
-                    // Если пользователь и бот в разных голосовых каналах
-                    if (VoiceChannelMe.id !== VoiceChannel.id) {
-                        const queue = db.queues.get(message.guild.id);
-
-                        // Если нет музыкальной очереди
-                        if (!queue) {
-                            const connection = db.voice.get(message.guild.id);
-
-                            // Отключаемся от голосового канала
-                            if (connection) connection.disconnect();
-                        }
-
-                        // Если есть музыкальная очередь
-                        else {
-                            const users = VoiceChannelMe.members.filter((user) => !user.user.bot);
-
-                            // Если нет пользователей в голосовом канале очереди
-                            if (users.size === 0) {
-                                queue.message = new QueueMessage(message);
-                                queue.voice = message.member.voice;
-
-                                // Сообщаем о подключении к другому каналу
-                                message.channel.send({
-                                    embeds: [
-                                        {
-                                            description: locale._(message.locale, "voice.new", [VoiceChannel]),
-                                            color: Colors.Yellow
-                                        }
-                                    ]
-                                }).then((msg) => setTimeout(() => msg.delete().catch(() => null), 5e3));
-                                return true;
-                            }
-
-                            else {
-                                await message.reply({
-                                    flags: "Ephemeral",
-                                    embeds: [
-                                        {
-                                            description: locale._(message.locale, "voice.alt", [VoiceChannelMe]),
-                                            color: Colors.Yellow
-                                        }
-                                    ]
-                                });
-                                return false;
-                            }
-                        }
-                    }
-                }
-
-                return true;
-            }
-        }
-    ];
-
     /**
      * @author SNIPPIK
      * @description База данных для системы ожидания
@@ -299,10 +140,11 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
     /**
      * @description Функция выполняющая действия SelectCommand
-     * @param ctx
-     * @constructor
+     * @param ctx - Данные для запуска функций
+     * @readonly
+     * @private
      */
-    private readonly SelectCommand = async (ctx: ChatInputCommandInteraction<CacheType>) => {
+    private readonly SelectCommand = async (ctx: ChatInputCommandInteraction) => {
         const command = db.commands.get(ctx.commandName);
         const permissions = command.permissions;
 
@@ -323,8 +165,8 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         }
 
         // Если права не соответствуют правде
-        else if (command.rules && command.rules?.length > 0) {
-            const rules = this.intends.filter((rule) => command.rules.includes(rule.name));
+        else if (command.middlewares && command.middlewares?.length > 0) {
+            const rules = db.middlewares.filter((rule) => command.middlewares.includes(rule.name));
 
             for (const rule of rules) {
                 if (!(await rule.callback(ctx))) return null;
@@ -360,10 +202,11 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
     /**
      * @description Функция выполняющая действия SelectAutocomplete
-     * @param ctx
-     * @constructor
+     * @param ctx - Данные для запуска функций
+     * @readonly
+     * @private
      */
-    private readonly SelectAutocomplete = (ctx: AutocompleteInteraction<CacheType>) => {
+    private readonly SelectAutocomplete = (ctx: AutocompleteInteraction) => {
         const command = db.commands.get(ctx.commandName);
 
         // Если есть команда
@@ -383,10 +226,11 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
     /**
      * @description Функция выполняющая действия SelectButton
-     * @param ctx
-     * @constructor
+     * @param ctx - Данные для запуска функций
+     * @readonly
+     * @private
      */
-    private readonly SelectButton = (ctx: ButtonInteraction<CacheType>) => {
+    private readonly SelectButton = (ctx: ButtonInteraction) => {
         const button = db.components.get(ctx.customId);
         const queue = db.queues.get(ctx.guildId);
         const userChannel = ctx.member.voice.channel;
@@ -404,10 +248,11 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
     /**
      * @description Функция выполняющая действия SelectMenu
-     * @param ctx
-     * @constructor
+     * @param ctx - Данные для запуска функций
+     * @readonly
+     * @private
      */
-    private readonly SelectMenuCallback = async (ctx: AnySelectMenuInteraction<CacheType>) => {
+    private readonly SelectMenuCallback = async (ctx: AnySelectMenuInteraction) => {
         const id = ctx["customId"] as string;
 
         if (id === "filter_select") {
@@ -424,8 +269,8 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             if (!command) return;
 
             // Если права не соответствуют правде
-            if (command.rules && command.rules?.length > 0) {
-                const rules = this.intends.filter((rule) => command.rules.includes(rule.name));
+            if (command.middlewares && command.middlewares?.length > 0) {
+                const rules = db.middlewares.filter((rule) => command.middlewares.includes(rule.name));
 
                 for (const rule of rules) {
                     if (!(await rule.callback(ctx as any))) return null;
@@ -444,6 +289,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 /**
  * @author SNIPPIK
  * @description Получаем тип канала, для работы все сервера
+ * @function isBased
  */
 function isBased(ctx: CommandInteraction) {
     // Проверяем на наличие типа канала

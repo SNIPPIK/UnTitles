@@ -66,15 +66,30 @@ interface ClientWebSocketEvents {
 
 /**
  * @author SNIPPIK
+ * @description Статусы подключений websocket
+ * @enum WebSocketStatuses
+ */
+enum WebSocketStatuses {
+    // Если подключение полностью готово
+    ready = "ready",
+
+    // Если производится подключение
+    connecting = "connecting",
+
+    // Если подключение разорвано
+    close = "close"
+}
+
+/**
+ * @author SNIPPIK
  * @description Клиент для подключения к WebSocket
  * @class ClientWebSocket
+ * @extends TypedEmitter
+ * @public
  */
 export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
-    /**
-     * @description WebSocket клиент для общения с точкой подключения
-     * @private
-     */
-    private _client: WebSocket;
+    private _status = WebSocketStatuses.connecting;
+    private ws: WebSocket;
 
     /**
      * @description Данные для проверки жизни websocket
@@ -97,11 +112,11 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public lastAsk: number = 0;
 
     /**
-     * @description Статус готовности подключения
+     * @description Получаем статус websocket
      * @public
      */
-    public get ready() {
-        return !!this._client && this._client?.readyState === WebSocket.OPEN;
+    public get status() {
+        return this._status;
     };
 
     /**
@@ -110,9 +125,9 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public set packet(payload: opcode.extract) {
-        if (this._client?.readyState && this._client?.readyState === WebSocket.OPEN) {
+        if (this.status === WebSocketStatuses.ready) {
             try {
-                this._client.send(JSON.stringify(payload));
+                this.ws.send(JSON.stringify(payload));
             } catch (e) {
                 this.emit("error", new Error(`${e}`));
             }
@@ -133,19 +148,30 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public connect = () => {
         // Если есть прошлый WS
-        if (this._client) this.destroyWs();
+        if (this.ws) this.destroyWs();
 
-        this._client = new WebSocket(this.endpoint, {
+        this.ws = new WebSocket(this.endpoint, {
             handshakeTimeout: 7e3,
             sessionTimeout: 5e3,
             headers: {
                 "User-Agent": "VoiceClient (https://github.com/SNIPPIK/UnTitles/tree/beta/src/services/voice)"
             }
         });
-        this._client.on("open",   () => this.emit("connect"));
-        this._client.on("message", this.onMessage);
-        this._client.on("close",  this.onClose);
-        this._client.on("error",  err  => this.emit("error", err));
+
+        // Сообщение от ws
+        this.ws.on("message", this.onEventMessage);
+
+        // Закрытие ws
+        this.ws.on("close",  this.onEventClose);
+
+        // Ошибка ws
+        this.ws.on("error",  err  => this.emit("error", err));
+
+        // Запуск ws
+        this.ws.on("open",   () => {
+            this._status = WebSocketStatuses.ready;
+            this.emit("connect");
+        });
     };
 
     /**
@@ -153,7 +179,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @param data - Получаемые данные в buffer
      * @private
      */
-    private onMessage = (data: Data) => {
+    private onEventMessage = (data: Data) => {
         let payload: opcode.extract;
         try {
             payload = JSON.parse(data.toString());
@@ -213,35 +239,25 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @param code - Код закрытия
      * @param reason - Причина закрытия
      */
-    private onClose = (code: WebSocketCloseCodes, reason: string) => {
-        const reconnectCodes: WebSocketCloseCodes[] = [4001];
+    private onEventClose = (code: WebSocketCloseCodes, reason: string) => {
         const recreateCodes: WebSocketCloseCodes[] = [1006];
-        const exitCodes: WebSocketCloseCodes[] = [1000, 1001, 4006];
-        const ignoreCodes: WebSocketCloseCodes[] = [4014];
 
-        this.emit("debug", `Close: ${code} - ${reason}`);
+        this.emit("debug", `WS Close: ${code} - ${reason}`);
 
-        // Коды выхода не поддерживающие переподключение
-        if (recreateCodes.includes(code)) {
-            this.attemptReconnect(true);
-            return;
+        // Если ws был подключен до отключения
+        if (this._status === WebSocketStatuses.ready) {
+            // Если заново подключится не выйдет
+            if (recreateCodes.includes(code)) {
+                this.attemptReconnect(true);
+                return;
+            }
+
+            // Если можно подключится заново создавая новой ws
+            else if (code < 4000 || code === 4015) {
+                this.attemptReconnect();
+                return;
+            }
         }
-
-        // Коды выхода поддерживающие переподключение
-        else if (reconnectCodes.includes(code)) {
-            this.attemptReconnect();
-            return;
-        }
-
-        // Коды выхода
-        else if (exitCodes.includes(code)) {
-            this.emit("close", 1000, reason);
-            this.destroy();
-            return;
-        }
-
-        // Игнорируемые коды
-        else if (ignoreCodes.includes(code)) return;
 
         // Отправляем данные в TypedEmitter
         this.emit("close", code, reason);
@@ -329,16 +345,16 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @private
      */
     private destroyWs = () => {
-        this._client?.removeAllListeners();
+        this.ws?.removeAllListeners();
 
         // Проверяем на готовность
-        if (this.ready) {
-            this._client?.close(1000);
+        if (this.ws && this.ws?.readyState === WebSocket.OPEN) {
+            this.ws?.close(1000);
             this.emit("close", 1000, "Normal closing");
         }
 
-        this._client?.terminate();
-        this._client = null;
+        this.ws?.terminate();
+        this.ws = null;
     };
 
     /**

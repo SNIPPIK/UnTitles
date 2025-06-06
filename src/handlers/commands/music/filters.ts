@@ -100,7 +100,7 @@ import { db } from "#app/db";
 class AudioFiltersCommand extends Assign< BaseCommand > {
     public constructor() {
         super({
-            rules: ["queue", "voice", "another_voice", "player-not-playing"],
+            middlewares: ["queue", "voice", "another_voice", "player-not-playing"],
             permissions: {
                 client: ["SendMessages", "ViewChannel"]
             },

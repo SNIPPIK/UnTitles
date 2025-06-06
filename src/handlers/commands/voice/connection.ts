@@ -1,7 +1,7 @@
 import { BaseCommand, SlashCommand, SlashCommandSubCommand } from "#handler/commands";
-import { ApplicationCommandOptionType, Colors, GuildMember } from "discord.js";
+import {ApplicationCommandOptionType, Colors, VoiceChannel} from "discord.js";
 import { locale } from "#service/locale";
-import { Assign } from "#structures";
+import {Assign, DiscordClient} from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -28,9 +28,48 @@ import { db } from "#app/db";
     },
     descriptions: {
         "en-US": "Connecting to voice channel!",
-        "ru": "Подключение к голосовому каналу!"
+        "ru": "Подключение к голосовому каналу или же переподключение к другому!"
     },
-    type: ApplicationCommandOptionType.Subcommand
+    type: ApplicationCommandOptionType.Subcommand,
+    options: [
+        {
+            names: {
+                "en-US": "channel",
+                "ru": "канал"
+            },
+            descriptions: {
+                "en-US": "Options for interacting with the stands!",
+                "ru": "Выбор голосового канала"
+            },
+            required: true,
+            type: ApplicationCommandOptionType.Channel,
+        }
+    ]
+})
+@SlashCommandSubCommand({
+    names: {
+        "en-US": "swap",
+        "ru": "смена"
+    },
+    descriptions: {
+        "en-US": "Connecting to voice channel!",
+        "ru": "Смена голосового канала или же переподключение к другому!"
+    },
+    type: ApplicationCommandOptionType.Subcommand,
+    options: [
+        {
+            names: {
+                "en-US": "channel",
+                "ru": "канал"
+            },
+            descriptions: {
+                "en-US": "Options for interacting with the stands!",
+                "ru": "Выбор голосового канала"
+            },
+            required: true,
+            type: ApplicationCommandOptionType.Channel,
+        }
+    ]
 })
 @SlashCommandSubCommand({
     names: {
@@ -84,38 +123,49 @@ import { db } from "#app/db";
         }
     ]
 })
-class Command_Voice extends Assign< BaseCommand > {
+class Command_Voice extends Assign< BaseCommand<VoiceChannel | string> > {
     public constructor() {
         super({
             permissions: {
                 client: ["Connect", "ViewChannel", "SendMessages"]
             },
-            rules: ["voice", "another_voice"],
+            middlewares: ["voice", "another_voice"],
             execute: async ({message, type, args}) => {
                 const { guild } = message;
-                const VoiceChannel = (message.member as GuildMember).voice.channel;
+
                 const voiceConnection = db.voice.get(guild.id);
                 const queue = db.queues.get(guild.id);
 
                 switch (type) {
                     // Подключение к голосовому каналу
+                    case "swap":
                     case "join": {
+                        const VoiceChannel = args[0];
+
+                        // Если указан не голосовой канал
+                        if (typeof VoiceChannel === "string" || VoiceChannel?.type !== 2) return null;
+
                         // Если производится попытка подключится к тому же голосовому каналу
-                        if (voiceConnection && voiceConnection.configuration.channel_id === VoiceChannel.id) {
-                            return message.reply({
-                                embeds: [
-                                    {
-                                        color: Colors.Green,
-                                        description: locale._(message.locale, "voice.rejoin", [VoiceChannel])
-                                    }
-                                ],
-                                flags: "Ephemeral"
-                            });
+                        if (voiceConnection) {
+                            if (voiceConnection.configuration.channel_id === VoiceChannel.id) {
+                                return message.reply({
+                                    embeds: [
+                                        {
+                                            color: Colors.Green,
+                                            description: locale._(message.locale, "voice.rejoin", [VoiceChannel])
+                                        }
+                                    ],
+                                    flags: "Ephemeral"
+                                });
+                            }
+
+                            // Смена канала
+                            voiceConnection.swapChannel(VoiceChannel.id);
                         }
 
                         // Подключаемся к голосовому каналу без очереди
                         else if (!queue) {
-                            db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, guild.voiceAdapterCreator);
+                            db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, (message.client as DiscordClient).adapter.voiceAdapterCreator(guild.id));
                         }
 
                         // Отправляем сообщение о подключении к каналу

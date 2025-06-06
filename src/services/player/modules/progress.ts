@@ -78,7 +78,7 @@ export class PlayerProgress {
         const left = current > 0 ? emoji.upped.left : emoji.empty.left;
         const right = current >= total ? emoji.upped.right : emoji.empty.right;
 
-        const filled = Math.round(this.size * (isNaN(current) ? 0 : current / (total)));
+        const filled = Math.round(this.size * (isNaN(current) ? 0 : current / total));
         const middle =
             current === 0 ?
                 emoji.upped.center.repeat(filled) + emoji.empty.center.repeat(this.size + 1 - filled) :

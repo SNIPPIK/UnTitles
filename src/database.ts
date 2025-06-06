@@ -1,13 +1,15 @@
-import type { DiscordGatewayAdapterCreator } from "#service/voice/adapter";
 import { CacheUtility } from "#service/player/utils/cache";
-import { DiscordClient, Collection } from "#structures";
-import { Components } from "#handler/components";
-import { VoiceConnection } from "#service/voice";
 import { Queues, Queue } from "#service/player";
+import { DiscordClient } from "#structures";
+import { env } from "#app/env";
+
+// Database modules
+import { Middlewares } from "#handler/middlewares";
+import { Components } from "#handler/components";
 import { RestObject } from "#handler/rest/apis";
 import { Commands } from "#handler/commands";
 import { Events } from "#handler/events";
-import { env } from "#app/env";
+import { Voices } from "#service/voice";
 
 /**
  * @author SNIPPIK
@@ -49,6 +51,15 @@ export class Database {
     public readonly components: Components;
 
     /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения кнопок бота
+     * @description Класс хранящий в себе все кнопки для бота
+     * @readonly
+     * @public
+     */
+    public readonly middlewares: Middlewares;
+
+    /**
      * @description Загружаем класс для хранения очередей, плееров, циклов
      * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
      * @readonly
@@ -61,7 +72,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly voice: db_voice_system;
+    public readonly voice: Voices;
 
     /**
      * @description Класс для кеширования аудио и данных о треках
@@ -106,10 +117,11 @@ export class Database {
         if (client) {
             this.api = new RestObject();
             this.queues = new Queues();
-            this.voice = new db_voice_system();
+            this.voice = new Voices();
             this.commands = new Commands();
             this.components = new Components();
             this.events = new Events();
+            this.middlewares = new Middlewares();
 
             this.whitelist = {
                 toggle: env.get<boolean>("whitelist", false),
@@ -134,40 +146,6 @@ export class Database {
         }
 
         this.cache = new CacheUtility();
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Класс для хранения голосовых подключений
- * @class db_voice_system
- */
-class db_voice_system extends Collection<VoiceConnection> {
-    /**
-     * @description Подключение к голосовому каналу
-     * @param config - Данные для подключения
-     * @param adapterCreator - Функции для получения данных из VOICE_STATE_SERVER, VOICE_STATE_UPDATE
-     * @public
-     */
-    public join = (config: VoiceConnection["configuration"], adapterCreator: DiscordGatewayAdapterCreator) => {
-        let connection = this.get(config.guild_id);
-
-        // Если нет голосового подключения
-        if (!connection) {
-            // Если нет голосового подключения, то создаем
-            connection = new VoiceConnection(config, adapterCreator);
-            this.set(config.guild_id, connection);
-        }
-
-        // Если голосовое соединение не может принимать пакеты
-        else if (!connection.ready) {
-            this.remove(config.guild_id);
-            connection = new VoiceConnection(config, adapterCreator);
-            this.set(config.guild_id, connection);
-        }
-
-        // Отдаем голосовое подключение
-        return connection;
     };
 }
 

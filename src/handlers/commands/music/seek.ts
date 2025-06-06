@@ -39,7 +39,7 @@ class SeekTrackCommand extends Assign< BaseCommand > {
             permissions: {
                 client: ["ViewChannel", "SendMessages"]
             },
-            rules: ["queue", "voice", "another_voice", "player-not-playing"],
+            middlewares: ["queue", "voice", "another_voice", "player-not-playing"],
             execute: async ({message, args}) => {
                 const queue = db.queues.get(message.guild.id);
                 const duration = args[0]?.duration();

@@ -163,7 +163,7 @@ export interface BaseCommand<Argument = string> {
      * @readonly
      * @public
      */
-    readonly rules?: ("voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream")[]
+    readonly middlewares?: ("voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream")[]
 
     /**
      * @description Выполнение команды

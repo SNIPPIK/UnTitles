@@ -7,7 +7,7 @@ import { isIPv4 } from "node:net";
  * @description Интервал в миллисекундах, с которым отправляются датаграммы поддержания активности
  * @private
  */
-const ALIVE_INTERVAL = 20e3;
+const ALIVE_INTERVAL = 10e3;
 
 /**
  * @author SNIPPIK
@@ -98,7 +98,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     public constructor(private options: UDPConnection) {
         super();
         // Если подключение возвращает ошибки
-        this.socket.on("error", async (err) => {
+        this.socket.on("error", (err) => {
             this.emit("error", err);
         });
 
@@ -112,7 +112,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         });
 
         // Если подключение оборвалось
-        this.socket.on("close", async () => {
+        this.socket.on("close", () => {
             this.emit("close");
         });
 

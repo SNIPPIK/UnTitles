@@ -10,7 +10,7 @@ void main();
  * @author SNIPPIK
  * @description Запуск всего проекта в async режиме
  */
-async function main() {
+function main() {
     if (!isMainThread) throw new Error("Not implemented.");
 
     const isManager = process.argv.includes("--ShardManager");
@@ -48,6 +48,9 @@ async function runShard() {
 
     await db.api.startWorker();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow.length} APIs`)}`);
+
+    db.middlewares.register();
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.middlewares.size} middlewares`)}`);
 
     db.events.register(client);
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.size} events`)}`);

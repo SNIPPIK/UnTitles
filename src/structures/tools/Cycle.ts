@@ -1,10 +1,4 @@
-import { SetArray } from "#structures";
-
-/**
- * @author SNIPPIK
- * @description Максимальное кол-во пропусков таймеров
- */
-const MAX_IMMEDIATE_STEPS = 2;
+import {Logger, SetArray} from "#structures";
 
 /**
  * @author SNIPPIK
@@ -22,13 +16,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @description Время для высчитывания
      * @private
      */
-    private time: number = 0;
-
-    /**
-     * @description Кол-во пропущенных прогонов таймера
-     * @protected
-     */
-    protected missCounter: number = 0;
+    private loop: number = 0;
 
     /**
      * @description Тип таймера, задает точность таймера
@@ -56,6 +44,25 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     };
 
     /**
+     * @description Добавляем элемент в очередь
+     * @param item - Объект T
+     * @public
+     */
+    public add(item) {
+        const existing = this.has(item);
+        if (existing) this.delete(item);
+        super.add(item);
+
+        // Запускаем цикл
+        if (this.size === 1 && this.startTime === 0) {
+            this.startTime = this.localTime;
+            setImmediate(this._stepCycle);
+        }
+
+        return this;
+    };
+
+    /**
      * @description Выполняет шаг цикла с учётом точного времени следующего запуска
      * @protected
      */
@@ -70,58 +77,40 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Если нет объектов
         if (this.size === 0) {
             this.startTime = 0;
-            this.time = 0;
+            this.loop = 0;
             return;
         }
 
-        const now = this.localTime;
+        // Номер прогона цикла
+        this.loop += 1;
 
-        // Высчитываем время для выполнения
-        this.time += duration //- 0.002;
+        const nextTime = this.startTime + this.loop * duration;            // Следующее время для определения
+        const delay = Math.max(0, nextTime - this.localTime);     // Цельный целевой интервал + остаток от предыдущих циклов
 
-        // Цельный целевой интервал + остаток от предыдущих циклов
-        let delay = (this.startTime + this.time) - now;
-
+        // Цикл отстал, подтягиваем loop вперёд,
         if (delay <= 0) {
-            // Цикл отстал, подтягиваем time вперёд,
-            // но не сбрасываем в 0, а смещаем на целое число интервалов duration,
-            // чтобы сохранить непрерывность времени
-            if (++this.missCounter > MAX_IMMEDIATE_STEPS) {
-                this.missCounter = 0;
+            // Принудительная стабилизация
+            this.startTime = this.localTime;
+            this.loop = 0;
 
-                // Принудительная стабилизация
-                delay = duration;
-                this.time = 0;
-
-                // Ждем нужное время
-                setTimeout(this._stepCycle, delay);
-            }
-
-            // Если пора сразу, запускаем следующий шаг максимально быстро
-            else setImmediate(this._stepCycle);
+            setImmediate(this._stepCycle);
+            return;
         }
 
         // Иначе ждем нужное время
-        else setTimeout(this._stepCycle, delay);
-    };
+        setTimeout(() => {
+            if (this.timer === "max") {
+                const actualTime = this.localTime;
+                const drift = actualTime - nextTime;
 
-    /**
-     * @description Добавляем элемент в очередь
-     * @param item - Объект T
-     * @public
-     */
-    public add(item: T) {
-        const existing = this.has(item);
-        if (existing) this.delete(item);
-        super.add(item);
+                // Опционально логгируем задержку:
+                if (drift > 5) {
+                    Logger.log("WARN", `⚠️ Drift: +${drift.toFixed(2)}ms`);
+                }
+            }
 
-        // Запускаем цикл
-        if (this.size === 1 && this.startTime === 0) {
-            this.startTime = this.localTime;
-            setImmediate(this._stepCycle);
-        }
-
-        return this;
+            return this._stepCycle();
+        }, delay);
     };
 }
 
@@ -147,7 +136,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @param item - Объект T
      * @public
      */
-    public add = (item: T) => {
+    public add = (item) => {
         if (this.options.custom?.push) this.options.custom?.push(item);
         else if (this.has(item)) this.delete(item);
 
@@ -160,7 +149,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @param item - Объект T
      * @public
      */
-    public delete = (item: T) => {
+    public delete = (item) => {
         const index = this.has(item);
 
         // Если есть объект в базе
@@ -177,9 +166,9 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @readonly
      * @private
      */
-    protected _stepCycle = () => {
+    protected _stepCycle = async () => {
         // Запускаем цикл
-        for (const item of this) {
+        for await (const item of this) {
             // Если объект не готов
             if (!this.options.filter(item)) continue;
 

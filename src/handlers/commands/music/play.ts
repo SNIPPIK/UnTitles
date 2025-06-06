@@ -134,7 +134,7 @@ import { db } from "#app/db";
 class PlayCommand extends Assign< BaseCommand > {
     public constructor() {
         super({
-            rules: ["voice", "another_voice"],
+            middlewares: ["voice", "another_voice"],
             permissions: {
                 client: ["Connect", "SendMessages", "Speak", "ViewChannel"]
             },

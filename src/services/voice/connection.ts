@@ -112,7 +112,7 @@ export class VoiceConnection {
      * @public
      */
     public get ready(): boolean {
-        return !!this.rtpClient && !!this.udpClient && !!this.websocket && this.websocket.ready && this._status === VoiceConnectionStatus.ready;
+        return this.rtpClient && this.udpClient && this.websocket && this.websocket.status === "ready" && this._status === VoiceConnectionStatus.ready;
     };
 
     /**
@@ -214,8 +214,24 @@ export class VoiceConnection {
         // Подключаемся к UDP серверу
         this.udpClient.on("connected", select_protocol);
 
+        // Если UDP подключение разорвет соединение принудительно
+        this.udpClient.on("close", () => {
+            if (this.status === VoiceConnectionStatus.disconnected) return;
+
+            this.ClientUDP = d;
+            this.websocket.emit("warn", `UDP Close. Reinitializing UDP socket...`);
+        });
+
         // Отлавливаем ошибки при отправке пакетов
         this.udpClient.on("error", (error) => {
+            // Если произведена попытка подключения к закрытому каналу
+            if (`${error}`.match(/Not found IPv4 address/)) {
+                this.disconnect();
+                this.destroy();
+                return;
+            }
+
+
             this.websocket.emit("warn", `UDP Error: ${error.message}. Reinitializing UDP socket...`);
         });
 
@@ -243,7 +259,7 @@ export class VoiceConnection {
         //this.websocket.on("warn", console.log);
 
         this.websocket.on("error", (err) => {
-            this.websocket.emit("close", 4000 as any, err.name);
+            this.websocket.emit("close", 1006, err.name);
         });
 
         // Обрабатываем общий пакет данных
@@ -301,10 +317,19 @@ export class VoiceConnection {
 
         // Если Websocket завершил свою работу
         this.websocket.on("close", (code, reason) => {
-            if (code === 1000) return this.destroy();
+            if (code > 1000 && code < 1002) return this.destroy();
 
-            this.websocket.emit("debug", `[${code}] ${reason}. Reconstruct...`);
-            this.ClientWS = this.serverState.endpoint;
+            // Подключения больше не существует
+            else if (code === 4006) {
+                this.serverState.endpoint = null;
+                this.voiceState.session_id = null;
+                this.adapter.sendPayload(this.configuration);
+            }
+
+            setTimeout(() => {
+                this.websocket.emit("debug", `[${code}] ${reason}. Voice Connection reconstruct ws...`);
+                this.ClientWS = this.serverState.endpoint;
+            }, 500);
         });
     };
 
@@ -342,8 +367,16 @@ export class VoiceConnection {
 
         // Инициализируем подключение
         this.adapter.sendPayload(this.configuration);
-
         this._status = VoiceConnectionStatus.connected;
+    };
+
+    /**
+     * @description Смена голосового канала
+     * @param ID - уникальный код канала
+     */
+    public swapChannel = (ID: string) => {
+        this.configuration = {...this.configuration, channel_id: ID};
+        this.adapter.sendPayload(this.configuration);
     };
 
     /**
@@ -357,17 +390,6 @@ export class VoiceConnection {
 
         // Отправляем в discord сообщение об отключении бота
         return this.adapter.sendPayload(this.configuration);
-    };
-
-    /**
-     * @description Сброс таймера отключения Speaking
-     * @private
-     */
-    private resetSpeakingTimeout = () => {
-        if (this.speakingTimeout) clearTimeout(this.speakingTimeout);
-
-        // Выставляем таймер смены на false
-        this.speakingTimeout = setTimeout(() => {  this.speaking = false; }, 2e3);
     };
 
     /**
@@ -390,6 +412,17 @@ export class VoiceConnection {
 
         this.speakingTimeout = null;
         this._speaking = false;
+    };
+
+    /**
+     * @description Сброс таймера отключения Speaking
+     * @private
+     */
+    private resetSpeakingTimeout = () => {
+        if (this.speakingTimeout) clearTimeout(this.speakingTimeout);
+
+        // Выставляем таймер смены на false
+        this.speakingTimeout = setTimeout(() => { this.speaking = false; }, 2e3);
     };
 }
 

@@ -99,18 +99,23 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
             if (segmentLength < 255) {
                 const packet = Buffer.concat(currentPacket);
+                const packetHeader = packet.subarray(0, 8).toString();
                 currentPacket = [];
 
-                const packetHeader = packet.subarray(0, 8).toString();
-
                 // Если найден заголовок
-                if (packetHeader === "OpusHead") this.emit("head", segment);
+                if (packetHeader === "OpusHead") {
+                    this.emit("head", segment);
+                    continue;
+                }
 
                 // Если найден тег
-                else if (packetHeader === "OpusTags") this.emit("tags", segment);
+                else if (packetHeader === "OpusTags") {
+                    this.emit("tags", segment);
+                    continue;
+                }
 
                 // Если получен обычный frame
-                else this.emit("frame", packet);
+                this.emit("frame", packet);
             }
         }
     };
@@ -137,6 +142,9 @@ export class BufferedEncoder extends Writable {
      */
     public constructor(options: WritableOptions = { autoDestroy: true }) {
         super(options);
+
+        this.encoder.on("head", (data) => this.emit("head", data));
+        this.encoder.on("tags", (data) => this.emit("tags", data));
         this.encoder.on("frame", (data) => this.emit("frame", data));
     };
 

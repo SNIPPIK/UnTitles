@@ -80,7 +80,11 @@ export class Queues<T extends Queue> extends Collection<T> {
                         color: Colors.Yellow
                     }
                 ]
-            }).then((msg) => setTimeout(() => msg.delete().catch(() => null), 10e3));
+            }).then((msg) => {
+                setTimeout(() => {
+                    if (msg.deletable) msg.delete().catch(() => null);
+                }, 20e3);
+            });
 
             // Отключаем события плеера
             queue.player.removeAllListeners();

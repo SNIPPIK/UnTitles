@@ -13,13 +13,13 @@
     "node": ">=23.0.0"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.10",
+    "discord-api-types": "^0.38.11",
     "discord.js": "^14.19.3",
     "ws": "^8.18.2"
   },
   "devDependencies": {
     "tsconfig-paths": "^4.2.0",
-    "@types/node": "^22.15.29",
+    "@types/node": "^22.15.30",
     "@types/ws": "^8.18.1",
     "typescript": "^5.8.3"
   },
