@@ -143,10 +143,20 @@ class Command_Voice extends Assign< BaseCommand<VoiceChannel | string> > {
                         const VoiceChannel = args[0];
 
                         // Если указан не голосовой канал
-                        if (typeof VoiceChannel === "string" || VoiceChannel?.type !== 2) return null;
+                        if (typeof VoiceChannel === "string" || VoiceChannel?.type !== 2) {
+                            return message.reply({
+                                embeds: [
+                                    {
+                                        color: Colors.Green,
+                                        description: locale._(message.locale, "voice.tribune.join.fail")
+                                    }
+                                ],
+                                flags: "Ephemeral"
+                            });
+                        }
 
                         // Если производится попытка подключится к тому же голосовому каналу
-                        if (voiceConnection) {
+                        else if (voiceConnection) {
                             if (voiceConnection.configuration.channel_id === VoiceChannel.id) {
                                 return message.reply({
                                     embeds: [
