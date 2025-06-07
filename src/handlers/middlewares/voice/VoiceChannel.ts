@@ -58,11 +58,11 @@ class OtherVoiceChannel extends Assign<middleware<CommandInteraction>> {
                 if (VoiceChannelMe && VoiceChannel) {
                     // Если пользователь и бот в разных голосовых каналах
                     if (VoiceChannelMe.id !== VoiceChannel.id) {
-                        const queue = db.queues.get(ctx.guild.id);
+                        const queue = db.queues.get(ctx.guildId);
 
                         // Если нет музыкальной очереди
                         if (!queue) {
-                            const connection = db.voice.get(ctx.guild.id);
+                            const connection = db.voice.get(ctx.guildId);
 
                             // Отключаемся от голосового канала
                             if (connection) connection.disconnect();
@@ -75,7 +75,7 @@ class OtherVoiceChannel extends Assign<middleware<CommandInteraction>> {
                             // Если нет пользователей в голосовом канале очереди
                             if (users.size === 0) {
                                 queue.message = new QueueMessage(ctx);
-                                queue.voice = ctx.member.voice;
+                                queue.voice.join(queue.message.client, queue.message.voice);
 
                                 // Сообщаем о подключении к другому каналу
                                 ctx.channel.send({

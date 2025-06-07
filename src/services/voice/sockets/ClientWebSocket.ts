@@ -148,7 +148,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public connect = () => {
         // Если есть прошлый WS
-        if (this.ws) this.destroyWs();
+        if (this.ws) this.cleanupWebSocket();
 
         this.ws = new WebSocket(this.endpoint, {
             handshakeTimeout: 7e3,
@@ -172,6 +172,35 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this._status = WebSocketStatuses.ready;
             this.emit("connect");
         });
+    };
+
+    /**
+     * @description Уничтожаем подключение
+     * @public
+     */
+    public destroy = () => {
+        this.cleanupWebSocket();
+        this.removeAllListeners();
+
+        if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
+        if (this.heartbeat.interval) clearTimeout(this.heartbeat.interval);
+    };
+
+    /**
+     * @description Функция уничтожения подключения
+     * @private
+     */
+    private cleanupWebSocket = () => {
+        this.ws?.removeAllListeners();
+
+        // Проверяем на готовность
+        if (this.ws && this.ws?.readyState === WebSocket.OPEN) {
+            this.ws?.close(1000);
+            this.emit("close", 1000, "Normal closing");
+        }
+
+        this.ws?.terminate();
+        this.ws = null;
     };
 
     /**
@@ -338,35 +367,6 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             clearTimeout(this.heartbeat.timeout);
             this.heartbeat.timeout = null;
         }
-    };
-
-    /**
-     * @description Функция уничтожения подключения
-     * @private
-     */
-    private destroyWs = () => {
-        this.ws?.removeAllListeners();
-
-        // Проверяем на готовность
-        if (this.ws && this.ws?.readyState === WebSocket.OPEN) {
-            this.ws?.close(1000);
-            this.emit("close", 1000, "Normal closing");
-        }
-
-        this.ws?.terminate();
-        this.ws = null;
-    };
-
-    /**
-     * @description Уничтожаем подключение
-     * @public
-     */
-    public destroy = () => {
-        this.destroyWs();
-        this.removeAllListeners();
-
-        if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
-        if (this.heartbeat.interval) clearTimeout(this.heartbeat.interval);
     };
 }
 

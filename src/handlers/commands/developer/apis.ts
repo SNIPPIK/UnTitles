@@ -9,6 +9,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Управление доступом к api системе
  * @class APISCommand
+ * @extends Assign
  * @public
  */
 @SlashCommand({

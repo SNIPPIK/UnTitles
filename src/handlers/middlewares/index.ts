@@ -7,6 +7,7 @@ import { handler } from "#handler";
  * @description Все доступные middlewares, присутствующие в системе динамической загрузки
  * @class Middlewares
  * @extends handler
+ * @public
  */
 export class Middlewares<T = middleware<CommandInteraction>> extends handler<T> {
     /**
@@ -37,6 +38,7 @@ export class Middlewares<T = middleware<CommandInteraction>> extends handler<T> 
  * @author SNIPPIK
  * @description Стандартный middleware, без наворотов!
  * @interface middleware
+ * @public
  */
 export interface middleware<T> {
     name: Command["middlewares"][number],

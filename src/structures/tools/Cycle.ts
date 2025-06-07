@@ -1,4 +1,4 @@
-import {Logger, SetArray} from "#structures";
+import { SetArray } from "#structures";
 
 /**
  * @author SNIPPIK
@@ -17,6 +17,12 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @private
      */
     private loop: number = 0;
+
+    /**
+     * @description Кол-во пропусков цикла
+     * @private
+     */
+    private missCounter = 0;
 
     /**
      * @description Тип таймера, задает точность таймера
@@ -48,7 +54,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @param item - Объект T
      * @public
      */
-    public add(item) {
+    public add(item: T) {
         const existing = this.has(item);
         if (existing) this.delete(item);
         super.add(item);
@@ -89,28 +95,20 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Цикл отстал, подтягиваем loop вперёд,
         if (delay <= 0) {
-            // Принудительная стабилизация
-            this.startTime = this.localTime;
-            this.loop = 0;
+            if (this.missCounter > 5) {
+                // Принудительная стабилизация
+                this.startTime = this.localTime;
+                this.loop = 0;
+                this.missCounter = 0;
+            }
 
+            this.missCounter++;
             setImmediate(this._stepCycle);
             return;
         }
 
         // Иначе ждем нужное время
-        setTimeout(() => {
-            if (this.timer === "max") {
-                const actualTime = this.localTime;
-                const drift = actualTime - nextTime;
-
-                // Опционально логгируем задержку:
-                if (drift > 5) {
-                    Logger.log("WARN", `⚠️ Drift: +${drift.toFixed(2)}ms`);
-                }
-            }
-
-            return this._stepCycle();
-        }, delay);
+        setTimeout(this._stepCycle, delay);
     };
 }
 

@@ -10,6 +10,8 @@ import { env } from "#app/env";
  * @author SNIPPIK
  * @description Класс для взаимодействия с командами
  * @class Commands
+ * @extends handler
+ * @public
  */
 export class Commands extends handler<Command> {
     /**

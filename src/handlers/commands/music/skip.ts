@@ -8,6 +8,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Пропуск треков до указанного трека!
  * @class SkipUtilityCommand
+ * @extends Assign
  * @public
  */
 @SlashCommand({
@@ -161,7 +162,7 @@ class SkipUtilityCommand extends Assign< BaseCommand<number> > {
             },
             execute: async ({message, args, type}) => {
                 const number = args[0];
-                const {player, tracks} = db.queues.get(message.guild.id);
+                const {player, tracks} = db.queues.get(message.guildId);
                 const track = tracks.get(number);
 
                 // Если указан трек которого нет

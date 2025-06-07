@@ -16,7 +16,7 @@ class ExistQueue extends Assign<middleware<CommandInteraction>> {
         super({
             name: "queue",
             callback: async (ctx) => {
-                const queue = db.queues.get(ctx.guild.id);
+                const queue = db.queues.get(ctx.guildId);
 
                 // Если нет очереди
                 if (!queue) {

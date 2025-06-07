@@ -8,6 +8,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Управление голосовыми подключениями
  * @class Command_Voice
+ * @extends Assign
  * @public
  */
 @SlashCommand({
@@ -131,10 +132,10 @@ class Command_Voice extends Assign< BaseCommand<VoiceChannel | string> > {
             },
             middlewares: ["voice", "another_voice"],
             execute: async ({message, type, args}) => {
-                const { guild } = message;
+                const { guild, guildId } = message;
 
-                const voiceConnection = db.voice.get(guild.id);
-                const queue = db.queues.get(guild.id);
+                const voiceConnection = db.voice.get(guildId);
+                const queue = db.queues.get(guildId);
 
                 switch (type) {
                     // Подключение к голосовому каналу
@@ -175,7 +176,7 @@ class Command_Voice extends Assign< BaseCommand<VoiceChannel | string> > {
 
                         // Подключаемся к голосовому каналу без очереди
                         else if (!queue) {
-                            db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, (message.client as DiscordClient).adapter.voiceAdapterCreator(guild.id));
+                            db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, (message.client as DiscordClient).adapter.voiceAdapterCreator(guildId));
                         }
 
                         // Отправляем сообщение о подключении к каналу

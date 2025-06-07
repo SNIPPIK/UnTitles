@@ -210,7 +210,7 @@ let loaded_lib: Methods.current = {};
         Encryption.nonce = Buffer.alloc(24);
 
         // Делаем проверку всех доступных библиотек
-        for (const name of names) {
+        for await (const name of names) {
             try {
                 const library = await import(name);
                 if (typeof library?.ready?.then === "function") await library.ready;

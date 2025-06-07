@@ -7,6 +7,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Класс события GuildCreate
  * @class GuildCreate
+ * @extends Assign
  * @event Events.GuildCreate
  * @public
  */
@@ -29,6 +30,7 @@ class GuildCreate extends Assign<Event<Events.GuildCreate>> {
  * @author SNIPPIK
  * @description Класс события GuildDelete
  * @class GuildDelete
+ * @extends Assign
  * @event Events.GuildDelete
  * @public
  */

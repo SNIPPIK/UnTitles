@@ -79,7 +79,7 @@ export class RestObject {
      * @description Получаем платформу
      * @param name - Имя платформы
      */
-    private platform = (name: RestServerSide.API["name"] | string) => {
+    private platform = (name: RestServerSide.API["name"]) => {
         const platform = this.platforms.supported[name];
         if (platform) return platform;
 
@@ -141,7 +141,7 @@ export class RestObject {
      * @return APIRequest
      * @public
      */
-    public request = (name: RestServerSide.API["name"] | string): RestClientSide.Request | null => {
+    public request = (name: RestServerSide.API["name"]): RestClientSide.Request | null => {
         const platform = this.platform(name);
         return platform ? new RestClientSide.Request(platform) : null;
     };
@@ -342,7 +342,7 @@ export namespace RestServerSide {
          * @readonly
          * @public
          */
-        readonly name: "YOUTUBE" | "SPOTIFY" | "VK" | "YANDEX";
+        readonly name: "YOUTUBE" | "SPOTIFY" | "VK" | "YANDEX" | "SOUNDCLOUD" | string;
 
         /**
          * @description Ссылка для работы фильтра

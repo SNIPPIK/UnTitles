@@ -149,6 +149,7 @@ export class CacheUtility {
  * @description Класс для сохранения аудио файлов
  * @support ogg/opus
  * @class CacheAudio
+ * @extends AsyncCycle
  * @private
  */
 class CacheAudio extends AsyncCycle<Track> {

@@ -1,7 +1,10 @@
 import { StringSelectMenuBuilder, ActionRowBuilder } from "discord.js";
+import { ControllerTracks } from "#service/player/controllers/tracks";
+import { ControllerVoice } from "#service/player/controllers/voice";
 import { AudioPlayer, RepeatType } from "#service/player";
-import filters from "#service/player/filters.json";
 import { CommandInteraction, Logger } from "#structures";
+import filters from "#service/player/filters.json";
+import { VoiceConnection } from "#service/voice";
 import { QueueMessage } from "./message";
 import { Track } from "./track";
 import { env } from "#app/env";
@@ -11,21 +14,15 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Базовый класс очереди, содержит в себе все необходимые данные для создания очереди
  * @class BaseQueue
- * @protected
+ * @abstract
  */
 abstract class BaseQueue {
     /**
      * @description Время включения очереди или же проигрывания музыки
-     * @readonly
      * @protected
+     * @readonly
      */
     protected readonly _timestamp = new Date();
-
-    /**
-     * @description Плеер для проигрывания музыки
-     * @protected
-     */
-    protected _player: AudioPlayer;
 
     /**
      * @description Сообщение пользователя
@@ -34,33 +31,33 @@ abstract class BaseQueue {
     protected _message: QueueMessage<CommandInteraction>;
 
     /**
-     * @description Время включения музыки текущей очереди
-     * @public
+     * @description Плеер для проигрывания музыки
+     * @protected
      */
-    public get timestamp() {
-        return this._timestamp;
-    };
-
+    protected _player: AudioPlayer;
 
     /**
-     * @description Получаем доступ к трекам
-     * @public
+     * @description Хранилище треков, с умной системой управления
+     * @protected
      */
-    public get tracks() {
-        // Если плеер уже не доступен
-        if (!this.player) return null;
-        return this.player.tracks;
-    };
-
+    protected _tracks: ControllerTracks<Track> = new ControllerTracks();
 
     /**
-     * @description Выдаем сервер к которому привязана очередь
-     * @return Guild
+     * @description Голосовое подключение
+     * @protected
+     */
+    protected _voice: ControllerVoice<VoiceConnection> = new ControllerVoice();
+
+    /*=== TEXT CHANNEL ===*/
+
+    /**
+     * @description Записываем сообщение в базу для дальнейшего использования
+     * @param message - Сохраняемое сообщение
      * @public
      */
-    public get guild() {
-        if (!this.message) return null;
-        return this.message.guild;
+    public set message(message) {
+        this._cleanupOldMessage();
+        this._message = message;
     };
 
     /**
@@ -75,24 +72,17 @@ abstract class BaseQueue {
     };
 
     /**
-     * @description Записываем сообщение в базу для дальнейшего использования
-     * @param message - Сохраняемое сообщение
+     * @description Выдаем сервер к которому привязана очередь
+     * @return Guild
      * @public
      */
-    public set message(message) {
-        // Если введено новое сообщение
-        if (this.message && this.message.guild && message !== this.message) {
-            // Удаляем старое сообщение, если оно есть
-            const message = db.queues.cycles.messages.find((msg) => {
-                return msg.guildId === this.message.guild.id;
-            });
-
-            if (message) db.queues.cycles.messages.delete(message);
-        }
-
-        this._message = message;
+    public get guild() {
+        if (!this.message) return null;
+        return this.message.guild;
     };
 
+    /*=== TEXT CHANNEL ===*/
+    /*=== AudioPlayer ===*/
 
     /**
      * @description Выдаем плеер привязанный к очереди
@@ -111,16 +101,11 @@ abstract class BaseQueue {
      * @public
      */
     public set player(player) {
-        // Если плеер уже есть
-        if (this._player) {
-            this._player.cleanup();
-            this._player.destroy();
-        }
-
-        // Записываем новый плеер
         this._player = player;
     };
 
+    /*=== AudioPlayer ===*/
+    /*=== Voice Connection ===*/
 
     /**
      * @description Выдаем голосовой канал
@@ -128,9 +113,7 @@ abstract class BaseQueue {
      * @public
      */
     public get voice() {
-        // Если сообщение с сервера уже не доступно
-        if (!this.message) return null;
-        return this.message.voice;
+        return this._voice;
     };
 
     /**
@@ -139,16 +122,21 @@ abstract class BaseQueue {
      * @public
      */
     public set voice(voice) {
-        const config = {
-            self_deaf: true,
-            self_mute: false,
-            guild_id: voice.guild.id,
-            channel_id: voice.channel.id
-        };
-
-        // Задаем новое голосовое подключение
-        this.player.voice.connection = db.voice.join(config, this.message.client.adapter.voiceAdapterCreator(voice.guild.id));
+        this._voice = voice;
     };
+
+    /*=== Voice Connection ===*/
+    /*=== Tracks ===*/
+
+    /**
+     * @description Получаем доступ к трекам
+     * @public
+     */
+    public get tracks() {
+        return this._tracks;
+    };
+
+    /*=== Tracks ===*/
 
     /**
      * @description Создаем очередь для дальнейшей работы, все подключение находятся здесь
@@ -157,14 +145,16 @@ abstract class BaseQueue {
      */
     protected constructor(message: CommandInteraction) {
         const queue_message = new QueueMessage(message);
-        const ID = message.guild.id;
+        const ID = queue_message.guildID;
 
         // Создаем плеер
-        this.player = new AudioPlayer(ID);
+        this.player = new AudioPlayer(ID, this._tracks, this._voice);
 
         // Добавляем данные в класс
         this.message = queue_message;
-        this.voice = message.member.voice;
+
+        // Подключаемся к голосовому каналу
+        this.voice.join(queue_message.client, queue_message.voice);
 
         // В конце функции выполнить запуск проигрывания (полезно если треков в плеере еще нет)
         setImmediate(this.player.play);
@@ -178,19 +168,13 @@ abstract class BaseQueue {
      * @public
      */
     public cleanup = () => {
+        Logger.log("DEBUG", `[Queue/${this.message.guildID}] has cleanup`);
+
         // Останавливаем плеер
         if (this.player) this.player.cleanup();
 
-        // Удаляем старое сообщение, если оно есть
-        const message = db.queues.cycles.messages.find((msg) => {
-            return msg.guild.id === this.guild.id;
-        });
-
-        if (message) {
-            db.queues.cycles.messages.delete(message);
-
-            Logger.log("LOG", `[Queue/${this.guild.id}] has cleanup`);
-        }
+        // Для удаления динамического сообщения
+        this._cleanupOldMessage();
     };
 
     /**
@@ -199,10 +183,27 @@ abstract class BaseQueue {
      * @readonly
      */
     protected destroy = () => {
-        Logger.log("LOG", `[Queue/${this.guild.id}] has destroyed`);
+        Logger.log("LOG", `[Queue/${this.message.guildID}] has destroyed`);
 
         // Удаляем плеер
         if (this.player) this.player.destroy();
+        this._tracks.clear();
+    };
+
+    /**
+     * @description Удаление динамического сообщения из системы
+     * @param message - сообщение
+     */
+    private _cleanupOldMessage = () => {
+        // Если введено новое сообщение
+        if (this._message && this._message.guild) {
+            // Удаляем старое сообщение, если оно есть
+            const message = db.queues.cycles.messages.find((msg) => {
+                return msg.guildId === this._message.guildID;
+            });
+
+            if (message) db.queues.cycles.messages.delete(message);
+        }
     };
 }
 
@@ -257,7 +258,7 @@ export class Queue extends BaseQueue {
                 ]
             };
         } catch (error) {
-            Logger.log("ERROR", `[Queue/${this.guild.id}]: ${error}`);
+            Logger.log("ERROR", `[Queue/${this.message.guildID}]: ${error}`);
             return null;
         }
     };

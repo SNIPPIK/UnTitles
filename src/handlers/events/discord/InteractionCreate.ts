@@ -17,6 +17,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Класс для взаимодействия бота с slash commands, buttons
  * @class InteractionCreate
+ * @extends Assign
  * @event Events.InteractionCreate
  * @public
  */
@@ -239,7 +240,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         // Если была не найдена кнопка
         // Если пользователь не подключен к голосовым каналам и нет очереди
         // Если есть очередь и пользователь не подключен к тому же голосовому каналу
-        const isValid = button && userChannel && botChannel && queue && userChannel.id === queue.voice.channel.id;
+        const isValid = button && userChannel && botChannel && queue && userChannel.id === queue.message.voice.channel.id;
         if (!isValid) return;
 
         // Если кнопка была найдена

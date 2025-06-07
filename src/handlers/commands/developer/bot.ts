@@ -8,6 +8,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Управление системами бота
  * @class WorkBotCommand
+ * @extends Assign
  * @public
  */
 @SlashCommand({
@@ -125,6 +126,7 @@ class WorkBotCommand extends Assign< BaseCommand > {
  * @author SNIPPIK
  * @description Управление профилем бота
  * @class ManageBotCommand
+ * @extends Assign
  * @public
  */
 @SlashCommand({
@@ -162,7 +164,7 @@ class WorkBotCommand extends Assign< BaseCommand > {
         }
     ]
 })
-class ManageBotCommand extends Assign<BaseCommand> {
+class ManageBotCommand extends Assign< BaseCommand > {
     public constructor() {
         super({
             owner: true,

@@ -19,6 +19,7 @@ const timeout = 15;
  * @author SNIPPIK
  * @description Класс события VoiceStateUpdate
  * @class VoiceStateUpdate
+ * @extends Assign
  * @event Events.VoiceStateUpdate
  * @public
  */
@@ -31,32 +32,34 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
             execute: (oldState, newState) => {
                 setImmediate(() => {
                     const guild = oldState.guild || newState.guild;
-                    const voice = db.voice.get(guild.id);
-                    const queue = db.queues.get(guild.id);
-                    const temp = temple_db.get(guild.id);
+                    const guildID = guild.id;
+
+                    const voice = db.voice.get(guildID);
+                    const queue = db.queues.get(guildID);
+                    const temp = temple_db.get(guildID);
 
                     // Если нет гс и очереди, то не продолжаем
                     if (!voice && !queue) return;
 
                     // Если бота нет в голосовом канале, но есть очередь
-                    else if (!voice && queue) db.queues.remove(guild.id);
+                    else if (!voice && queue) db.queues.remove(guildID);
 
                     // Если есть гс, но нет очереди
                     else if (voice && !queue) {
                         const members = guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
 
                         // Если есть пользователи
-                        if (members == 0) db.voice.remove(guild.id);
+                        if (members == 0) db.voice.remove(guildID);
                     }
 
                     // Если есть гс и очередь
                     else {
-                        const meVoice = !!guild.members.me.voice.channel?.members?.find(member => member.id ===guild.members.me.id);
+                        const meVoice = !!guild.members.me.voice.channel?.members?.find(member => member.id === guild.members.me.id);
 
                         // Если бота выгнали из голосового канала
                         if (!meVoice) {
-                            db.voice.remove(guild.id);
-                            db.queues.remove(guild.id);
+                            db.voice.remove(guildID);
+                            db.queues.remove(guildID);
                         }
 
                         const members = guild.members.me.voice.channel?.members?.filter(member => !member.user.bot).size ?? 0;
@@ -66,7 +69,7 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
                             // Если есть таймер для удаления очереди
                             if (temp) {
                                 clearTimeout(temp);
-                                temple_db.delete(guild.id);
+                                temple_db.delete(guildID);
 
                                 // Снимаем плеер с паузы, если она есть!
                                 if (queue.player.status === "player/pause") queue.player.resume();
@@ -80,9 +83,9 @@ class VoiceStateUpdate extends Assign<Event<Events.VoiceStateUpdate>> {
                                 // Ставим плеер на паузу
                                 if (queue.player.status === "player/playing") queue.player.pause();
 
-                                temple_db.set(guild.id, setTimeout(() => {
-                                    if (queue) db.queues.remove(guild.id);
-                                    if (voice) db.voice.remove(guild.id);
+                                temple_db.set(guildID, setTimeout(() => {
+                                    if (queue) db.queues.remove(guildID);
+                                    if (voice) db.voice.remove(guildID);
                                 }, timeout * 1e3));
                             }
                         }

@@ -10,6 +10,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Управление модификаторами аудио треков
  * @class AudioFiltersCommand
+ * @extends Assign
  * @public
  */
 @SlashCommand({

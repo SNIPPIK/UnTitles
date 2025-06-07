@@ -4,10 +4,10 @@ import { db } from "#app/db";
 /**
  * @author SNIPPIK
  * @description Управление фильтрами, хранит и конвертирует в string для FFmpeg
- * @class PlayerAudioFilters
+ * @class ControllerFilters
  * @public
  */
-export class PlayerAudioFilters<T extends AudioFilter> {
+export class ControllerFilters<T extends AudioFilter> {
     /**
      * @description Включенные фильтры
      * @readonly

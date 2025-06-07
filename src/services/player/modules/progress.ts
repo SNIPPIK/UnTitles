@@ -68,23 +68,33 @@ export class PlayerProgress {
      * @description Получаем готовый прогресс бар
      * @public
      */
-    public bar = ({duration, platform}: PlayerProgressInput): string => {
-        const {current, total} = duration;
+    public bar = ({ duration, platform }: PlayerProgressInput): string => {
+        const { current, total } = duration;
         const button = emoji[`bottom_${platform.toLowerCase()}`] || emoji.bottom;
 
-        // Если live трек
-        if (total === 0) return emoji.upped.left + button + emoji.empty.center.repeat(this.size) + emoji.empty.right;
+        // Если live-трек
+        if (total === 0) {
+            return emoji.upped.left + button + emoji.empty.center.repeat(this.size) + emoji.empty.right;
+        }
+
+        const clamped = Math.min(Math.max(current / total, 0), 1);
+        const filled = Math.floor(this.size * clamped);
 
         const left = current > 0 ? emoji.upped.left : emoji.empty.left;
-        const right = current >= total ? emoji.upped.right : emoji.empty.right;
+        const right = filled >= this.size ? emoji.upped.right : emoji.empty.right;
 
-        const filled = Math.round(this.size * (isNaN(current) ? 0 : current / total));
-        const middle =
-            current === 0 ?
-                emoji.upped.center.repeat(filled) + emoji.empty.center.repeat(this.size + 1 - filled) :
-                current >= total ?
-                    emoji.upped.center.repeat(this.size) :
-                    emoji.upped.center.repeat(filled) + button + emoji.empty.center.repeat(this.size - filled);
+        // Если в самом начале — просто пустой бар без кнопки
+        if (current === 0 || filled === 0) {
+            return left + emoji.empty.center.repeat(this.size) + right;
+        }
+
+        // Если в самом конце — полностью заполненный бар
+        if (filled >= this.size || current >= total) {
+            return left + emoji.upped.center.repeat(this.size) + right;
+        }
+
+        // Стандартный случай: середина с кнопкой
+        const middle = emoji.upped.center.repeat(filled) + button + emoji.empty.center.repeat(this.size - filled - 1); // -1 под кнопку
 
         return left + middle + right;
     };

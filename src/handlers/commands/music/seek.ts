@@ -8,6 +8,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Управление временем, дает возможность пропускать время в треке
  * @class SeekTrackCommand
+ * @extends Assign
  * @public
  */
 @SlashCommand({
@@ -41,7 +42,7 @@ class SeekTrackCommand extends Assign< BaseCommand > {
             },
             middlewares: ["queue", "voice", "another_voice", "player-not-playing"],
             execute: async ({message, args}) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
                 const duration = args[0]?.duration();
 
                 // Если пользователь написал что-то не так
@@ -71,7 +72,7 @@ class SeekTrackCommand extends Assign< BaseCommand > {
                 }
 
                 // Начинаем проигрывание трека с <пользователем указанного тайм кода>
-                queue.player.play(duration);
+                await queue.player.play(duration);
 
                 // Отправляем сообщение о пропуске времени
                 return message.reply({

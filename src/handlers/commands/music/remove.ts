@@ -8,6 +8,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Удаление трека из очереди
  * @class RemoveTrackCommand
+ * @extends Assign
  * @public
  */
 @SlashCommand({
@@ -81,7 +82,7 @@ class RemoveTrackCommand extends Assign< BaseCommand<number> > {
                 return message.respond(results);
             },
             execute: async ({message, args}) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
                 const number = args[0];
                 const track = queue.tracks.get(number);
 

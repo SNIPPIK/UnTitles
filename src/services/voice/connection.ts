@@ -9,6 +9,7 @@ import { VoiceOpcodes } from "discord-api-types/voice";
  * @author SNIPPIK
  * @description Статусы подключения голосового соединения
  * @enum VoiceConnectionStatus
+ * @private
  */
 enum VoiceConnectionStatus {
     // Полностью готов
@@ -327,7 +328,7 @@ export class VoiceConnection {
             }
 
             setTimeout(() => {
-                this.websocket.emit("debug", `[${code}] ${reason}. Voice Connection reconstruct ws...`);
+                this.websocket?.emit("debug", `[${code}] ${reason}. Voice Connection reconstruct ws...`);
                 this.ClientWS = this.serverState.endpoint;
             }, 500);
         });
@@ -430,7 +431,7 @@ export class VoiceConnection {
  * @author SNIPPIK
  * @description Параметры для создания голосового соединения
  * @interface VoiceConnectionConfiguration
- * @private
+ * @public
  */
 export interface VoiceConnectionConfiguration {
     /**

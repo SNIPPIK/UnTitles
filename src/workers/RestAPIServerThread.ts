@@ -8,6 +8,7 @@ import { env } from "#app/env";
  * @author SNIPPIK
  * @description Коллекция для взаимодействия с APIs
  * @class RestServer
+ * @extends handler
  * @private
  */
 class RestServer extends handler<RestServerSide.API> {

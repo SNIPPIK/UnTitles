@@ -15,10 +15,10 @@ class PlayerNotPlaying extends Assign<middleware<CommandInteraction>> {
         super({
             name: "player-not-playing",
             callback: async (ctx) => {
-                const queue = db.queues.get(ctx.guild.id);
+                const queue = db.queues.get(ctx.guildId);
 
                 // Если музыку нельзя пропустить из-за плеера
-                if (!queue && !queue.player.playing && db.voice.get(ctx.guild.id)) {
+                if (!queue && !queue.player.playing && db.voice.get(ctx.guildId)) {
                     await ctx.reply({
                         flags: "Ephemeral",
                         embeds: [
@@ -48,7 +48,7 @@ class PlayerWait extends Assign<middleware<CommandInteraction>> {
         super({
             name: "player-wait-stream",
             callback: async (ctx) => {
-                const queue = db.queues.get(ctx.guild.id);
+                const queue = db.queues.get(ctx.guildId);
 
                 // Если музыку нельзя пропустить из-за плеера
                 if (queue && queue.player.waitStream) {

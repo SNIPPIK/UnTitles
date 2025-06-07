@@ -7,6 +7,7 @@ import { Events } from "discord.js";
  * @author SNIPPIK
  * @description Класс события ClientReady
  * @class ClientReady
+ * @extends Assign
  * @event Events.ClientReady
  * @public
  */

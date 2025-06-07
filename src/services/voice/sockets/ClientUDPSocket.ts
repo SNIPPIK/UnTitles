@@ -121,6 +121,66 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     };
 
     /**
+     * @description Подключаемся к серверу через UDP подключение
+     * @public
+     */
+    public discovery = (ssrc: number) => {
+        this.packet = this.discoveryBuffer(ssrc);
+
+        this.socket.once("message", (message) => {
+            if (message.readUInt16BE(0) === 2) {
+                const packet = Buffer.from(message);
+                const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
+                const port = packet.readUInt16BE(packet.length - 2);
+
+                // Если провайдер не предоставляет или нет пути IPV4
+                if (!isIPv4(ip)) {
+                    this.emit("error", Error("Not found IPv4 address"));
+                    return;
+                }
+
+                this._discovery = { ip, port }
+                this.emit("connected", { ip, port });
+            }
+        });
+    };
+
+    /**
+     * @description Закрывает сокет, экземпляр не сможет быть повторно использован.
+     * @public
+     */
+    public destroy = () => {
+        if (this.destroyed) return;
+        this.destroyed = true;
+
+        // Уничтожаем интервал активности
+        clearInterval(this.keepAlive.interval);
+        clearTimeout(this.keepAlive.timeout);
+
+        try {
+            this.socket.close();
+        } catch (err) {
+            if (err instanceof Error && err.message.includes("Not running")) return;
+        }
+
+        this.socket.removeAllListeners();
+        this.removeAllListeners();
+    };
+
+    /**
+     * @description Пакет для создания UDP соединения
+     * @public
+     */
+    private discoveryBuffer = (ssrc: number) => {
+        const packet = Buffer.alloc(74);
+        packet.writeUInt16BE(1, 0);
+        packet.writeUInt16BE(70, 2);
+        packet.writeUInt32BE(ssrc, 4);
+
+        return packet;
+    };
+
+    /**
      * @description Функция для запуска интервала для поддержания соединения
      * @private
      */
@@ -147,66 +207,6 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
         // Выставляем таймер возобновления KeepAlive
         this.keepAlive.timeout = setTimeout(() => this.manageKeepAlive(), 2e3);
-    };
-
-    /**
-     * @description Подключаемся к серверу через UDP подключение
-     * @public
-     */
-    public discovery = (ssrc: number) => {
-        this.packet = this.discoveryBuffer(ssrc);
-
-        this.socket.once("message", (message) => {
-            if (message.readUInt16BE(0) === 2) {
-                const packet = Buffer.from(message);
-                const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
-                const port = packet.readUInt16BE(packet.length - 2);
-
-                // Если провайдер не предоставляет или нет пути IPV4
-                if (!isIPv4(ip)) {
-                    this.emit("error", Error("Not found IPv4 address"));
-                    return;
-                }
-
-                this._discovery = { ip, port }
-                this.emit("connected", { ip, port });
-            }
-        });
-    };
-
-    /**
-     * @description Пакет для создания UDP соединения
-     * @public
-     */
-    private discoveryBuffer = (ssrc: number) => {
-        const packet = Buffer.alloc(74);
-        packet.writeUInt16BE(1, 0);
-        packet.writeUInt16BE(70, 2);
-        packet.writeUInt32BE(ssrc, 4);
-
-        return packet;
-    };
-
-    /**
-     * @description Закрывает сокет, экземпляр не сможет быть повторно использован.
-     * @public
-     */
-    public destroy = () => {
-        if (this.destroyed) return;
-        this.destroyed = true;
-
-        // Уничтожаем интервал активности
-        clearInterval(this.keepAlive.interval);
-        clearTimeout(this.keepAlive.timeout);
-
-        try {
-            this.socket.close();
-        } catch (err) {
-            if (err instanceof Error && err.message.includes("Not running")) return;
-        }
-
-        this.socket.removeAllListeners();
-        this.removeAllListeners();
     };
 }
 

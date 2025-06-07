@@ -8,6 +8,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Просмотр аватара пользователя
  * @class AvatarCommand
+ * @extends Assign
  * @public
  */
 @SlashCommand({

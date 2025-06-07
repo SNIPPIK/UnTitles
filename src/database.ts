@@ -1,5 +1,5 @@
 import { CacheUtility } from "#service/player/utils/cache";
-import { Queues, Queue } from "#service/player";
+import { ControllerQueues, Queue } from "#service/player";
 import { DiscordClient } from "#structures";
 import { env } from "#app/env";
 
@@ -65,7 +65,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly queues: Queues<Queue>;
+    public readonly queues: ControllerQueues<Queue>;
 
     /**
      * @description Загружаем класс для хранения голосовых подключений
@@ -116,7 +116,7 @@ export class Database {
     public constructor(client?: DiscordClient) {
         if (client) {
             this.api = new RestObject();
-            this.queues = new Queues();
+            this.queues = new ControllerQueues();
             this.voice = new Voices();
             this.commands = new Commands();
             this.components = new Components();

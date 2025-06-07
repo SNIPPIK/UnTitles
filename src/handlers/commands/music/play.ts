@@ -8,6 +8,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Включение музыки
  * @class PlayCommand
+ * @extends Assign
  * @public
  */
 @SlashCommand({

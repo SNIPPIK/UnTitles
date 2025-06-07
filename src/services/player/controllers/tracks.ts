@@ -2,42 +2,42 @@ import { Track } from "#service/player";
 
 /**
  * @author SNIPPIK
- * @description Все треки для проигрывания в плеере, хранит в себе все данные треков
- * @class PlayerTracks
+ * @description Класс для управления и хранения треков
+ * @class ControllerTracks
  * @public
  */
-export class PlayerTracks<T extends Track> {
+export class ControllerTracks<T extends Track> {
     /**
      * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
      * @readonly
      * @private
      */
-    protected _current: T[] = [];
+    private _current: T[] = [];
 
     /**
      * @description Хранилище треков в оригинальном порядке, необходимо для правильной работы shuffle
      * @readonly
      * @private
      */
-    protected _original: T[] = [];
+    private _original: T[] = [];
 
     /**
      * @description Текущая позиция в списке
      * @private
      */
-    protected _position = 0;
+    private _position = 0;
 
     /**
      * @description Тип повтора
      * @private
      */
-    protected _repeat = RepeatType.None;
+    private _repeat = RepeatType.None;
 
     /**
      * @description Смешивание треков
      * @private
      */
-    protected _shuffle = false;
+    private _shuffle = false;
 
     /**
      * @description Новая позиция трека в списке
@@ -99,18 +99,121 @@ export class PlayerTracks<T extends Track> {
         return this._current.length;
     };
 
+    /**
+     * @description Получаем данные перетасовки
+     * @public
+     */
+    public get shuffle(): boolean {
+        return this._shuffle;
+    };
+
+    /**
+     * @description Сохраняем тип повтора
+     * @param type - Тип повтора
+     * @public
+     */
+    public set repeat(type) {
+        this._repeat = type;
+    };
+
+    /**
+     * @description Получаем тип повтора
+     * @public
+     */
+    public get repeat() {
+        return this._repeat;
+    };
+
+    /**
+     * @description Общее время треков
+     * @public
+     */
+    public get time() {
+        return this._current.reduce((total, track) => total + (track.time?.total || 0), 0).duration();
+    };
+
+    /**
+     * @description Добавляем трек в очередь
+     * @param track - Сам трек
+     */
+    public push = (track: T) => {
+        // Если включена перетасовка, то добавляем треки в оригинальную очередь
+        if (this._shuffle) this._original.push(track);
+
+        // Добавляем трек в текущую очередь
+        this._current.push(track);
+    };
+
+    /**
+     * @description Получаем прошлый трек или текущий в зависимости от позиции
+     * @param position - позиция трека, номер в очереди
+     */
+    public get = (position: number ) => {
+        return this._current[position];
+    };
+
+    /**
+     * @description Удаляем из очереди неугодный трек
+     * @param position - позиция трека, номер в очереди
+     */
+    public remove = (position: number) => {
+        // Если трек удаляем из виртуально очереди, то и из оригинальной
+        if (this._shuffle) {
+            const index = this._original.indexOf(this._current[position]);
+            if (index > -1) this._original.splice(index, 1);
+        }
+
+        // Удаляем из очереди
+        this._current.splice(position, 1);
+
+        // Корректируем позицию, если она больше длины или не равна нулю
+        if (this._position > position) {
+            this._position--;
+        } else if (this._position >= this._current.length) {
+            this._position = this._current.length - 1;
+        }
+
+        if (this._position < 0) this._position = 0;
+    };
+
+    /**
+     * @description Ищем позицию в базе
+     * @param track - Искомый трек
+     */
+    public indexOf = (track: T) => {
+        return this._current.indexOf(track);
+    };
+
+    /**
+     * @description Получаем <указанное> кол-во треков
+     * @param size - При -5 будут выданы выданные последние до текущего трека, при +5 будут выданы следующие треки
+     * @param sorting - При включении треки перейдут в string[]
+     */
+    public array(size: number, sorting?: boolean): T[];
+    public array(size: number, sorting: true): string[];
+    public array(size: number, sorting: boolean = false): (string | T)[] {
+        const startIndex = size < 0 ? this._position + size : this._position + 1;
+        const endIndex = size < 0 ? this._position : this._position + 1 + size;
+
+        const slice = this._current.slice(startIndex, endIndex);
+
+        if (!sorting) return slice;
+
+        // Форматируем треки в строки с номерами
+        return slice.map((track, idx) => `\`${idx + 1}\` - ${track.name_replace}`);
+    };
 
     /**
      * @description Перетасовка треков, так-же есть поддержка полного восстановления
      * @public
      */
-    public set shuffle(bol: boolean) {
+    public shuffleTracks = (bol: boolean) => {
         // Если перетасовка выключена
         if (!this._shuffle) {
             let currentIndex = this.size;
 
             // Записываем треки до перетасовки
-            this._original.push(...this._current);
+            this._original = this._current.slice();
 
             // Хотя еще остались элементы, которые нужно перетасовать...
             while (currentIndex != 0) {
@@ -139,110 +242,15 @@ export class PlayerTracks<T extends Track> {
     };
 
     /**
-     * @description Получаем данные перетасовки
+     * @description Очищаем текущий класс от треков и прочих параметров
      * @public
      */
-    public get shuffle(): boolean {
-        return this._shuffle;
-    };
-
-
-    /**
-     * @description Сохраняем тип повтора
-     * @param type - Тип повтора
-     * @public
-     */
-    public set repeat(type) {
-        this._repeat = type;
-    };
-
-    /**
-     * @description Получаем тип повтора
-     * @public
-     */
-    public get repeat() {
-        return this._repeat;
-    };
-
-
-    /**
-     * @description Добавляем трек в очередь
-     * @param track - Сам трек
-     */
-    public push = (track: T) => {
-        // Если включена перетасовка, то добавляем треки в оригинальную очередь
-        if (this._shuffle) this._original.push(track);
-
-        // Добавляем трек в текущую очередь
-        this._current.push(track);
-    };
-
-    /**
-     * @description Удаляем из очереди неугодный трек
-     * @param position - позиция трека, номер в очереди
-     */
-    public remove = (position: number) => {
-        // Если трек удаляем из виртуально очереди, то и из оригинальной
-        if (this._shuffle) {
-            const index = this._original.indexOf(this._current[position]);
-            if (index > -1) this._original.splice(index, 1);
-        }
-
-        // Удаляем из очереди
-        this._current.splice(position, 1);
-
-        // Корректируем позицию, если она больше длины или не равна нулю
-        if (this._position > position) {
-            this._position--;
-        } else if (this._position >= this._current.length) {
-            this._position = this._current.length - 1;
-        }
-
-        if (this._position < 0) this._position = 0;
-    };
-
-    /**
-     * @description Получаем прошлый трек или текущий в зависимости от позиции
-     * @param position - позиция трека, номер в очереди
-     */
-    public get = (position: number ) => {
-        return this._current[position];
-    };
-
-    /**
-     * @description Ищем позицию в базе
-     * @param track - Искомый трек
-     */
-    public indexOf = (track: T) => {
-        return this._current.indexOf(track);
-    };
-
-
-    /**
-     * @description Получаем <указанное> кол-во треков
-     * @param size - При -5 будут выданы выданные последние до текущего трека, при +5 будут выданы следующие треки
-     * @param sorting - При включении треки перейдут в string[]
-     */
-    public array(size: number, sorting?: any): T[];
-    public array(size: number, sorting: true): string[];
-    public array(size: number, sorting: boolean = false): (string | T)[] {
-        const startIndex = size < 0 ? this._position + size : this._position + 1;
-        const endIndex = size < 0 ? this._position : this._position + 1 + size;
-
-        const slice = this._current.slice(startIndex, endIndex);
-
-        if (!sorting) return slice;
-
-        // Форматируем треки в строки с номерами
-        return slice.map((track, idx) => `\`${idx + 1}\` - ${track.name_replace}`);
-    };
-
-    /**
-     * @description Общее время треков
-     * @public
-     */
-    public get time() {
-        return this._current.reduce((total, track) => total + (track.time?.total || 0), 0).duration();
+    public clear = () => {
+        this._current = null;
+        this._original = null;
+        this._position = null;
+        this._repeat = null;
+        this._shuffle = null;
     };
 }
 

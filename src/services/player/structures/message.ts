@@ -5,8 +5,13 @@ import { EmbedData } from "discord.js";
  * @author SNIPPIK
  * @description Прослойка для правильной работы очереди
  * @class QueueMessage
+ * @public
  */
 export class QueueMessage<T extends CommandInteraction> {
+    private _guildID: string;
+    private _channelID: string;
+    private _voiceID: string;
+
     /**
      * @description Язык сообщения
      * @public
@@ -24,6 +29,14 @@ export class QueueMessage<T extends CommandInteraction> {
     };
 
     /**
+     * @description Получение ID сервера
+     * @public
+     */
+    public get guildID() {
+        return this._guildID;
+    };
+
+    /**
      * @description Получение текущего текстового канала
      * @public
      */
@@ -32,11 +45,27 @@ export class QueueMessage<T extends CommandInteraction> {
     };
 
     /**
+     * @description Получение ID текстового канала
+     * @public
+     */
+    public get channelID() {
+        return this._channelID;
+    };
+
+    /**
      * @description Получение текущего голосового соединения пользователя
      * @public
      */
     public get voice() {
         return this._original.member.voice;
+    };
+
+    /**
+     * @description Получение ID голосового канала
+     * @public
+     */
+    public get voiceID() {
+        return this._voiceID;
     };
 
     /**
@@ -69,7 +98,12 @@ export class QueueMessage<T extends CommandInteraction> {
      * @param _original - Класс сообщения
      * @public
      */
-    public constructor(private readonly _original: T) {};
+    public constructor(private readonly _original: T) {
+        this._channelID = _original.channel.id;
+        this._guildID = _original.guild.id;
+        this._voiceID = _original.member.voice.channel.id;
+
+    };
 
     /**
      * @description Авто отправка сообщения

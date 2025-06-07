@@ -9,6 +9,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Сообщение об ошибке
  * @class message_error
+ * @extends Assign
  * @event message/error
  * @public
  */
@@ -60,6 +61,7 @@ class message_error extends Assign<Event<"message/error">> {
  * @author SNIPPIK
  * @description Сообщение о добавленном треке или плейлисте
  * @class message_push
+ * @extends Assign
  * @event message/push
  * @public
  */
@@ -114,6 +116,7 @@ class message_push extends Assign<Event<"message/push">> {
  * @author SNIPPIK
  * @description Сообщение о том что сейчас играет
  * @class message_playing
+ * @extends Assign
  * @event message/playing
  * @public
  */

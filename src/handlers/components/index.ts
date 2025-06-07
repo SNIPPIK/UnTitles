@@ -5,6 +5,8 @@ import { handler } from "#handler";
  * @author SNIPPIK
  * @description Загружаем динамические компоненты для работы с ними
  * @class Components
+ * @extends handler
+ * @public
  */
 export class Components extends handler<Button> {
     public constructor() {

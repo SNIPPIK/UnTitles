@@ -7,6 +7,8 @@ import { db } from "#app/db";
 
 /**
  * @description Кнопка stop, отвечает за остановку проигрывания
+ * @class ButtonStop
+ * @extends Assign
  * @loadeble
  */
 class ButtonStop extends Assign<Button> {
@@ -35,6 +37,8 @@ class ButtonStop extends Assign<Button> {
 
 /**
  * @description Кнопка skip, отвечает за пропуск текущего трека
+ * @class ButtonSkip
+ * @extends Assign
  * @loadeble
  */
 class ButtonSkip extends Assign<Button> {
@@ -64,6 +68,8 @@ class ButtonSkip extends Assign<Button> {
 
 /**
  * @description Кнопка back, отвечает за возврат к прошлому треку
+ * @class ButtonBack
+ * @extends Assign
  * @loadeble
  */
 class ButtonBack extends Assign<Button> {
@@ -100,6 +106,8 @@ class ButtonBack extends Assign<Button> {
 
 /**
  * @description Кнопка filters, отвечает за отображение включенных фильтров
+ * @class ButtonFilters
+ * @extends Assign
  * @loadeble
  */
 class ButtonFilters extends Assign<Button> {
@@ -156,6 +164,8 @@ class ButtonFilters extends Assign<Button> {
 
 /**
  * @description Кнопка lyrics, отвечает за показ текста песни
+ * @class ButtonLyrics
+ * @extends Assign
  * @loadeble
  */
 class ButtonLyrics extends Assign<Button> {
@@ -219,6 +229,8 @@ class ButtonLyrics extends Assign<Button> {
 
 /**
  * @description Кнопка pause/resume, отвечает за остановку проигрывания или возобновление
+ * @class ButtonPlayToggle
+ * @extends Assign
  * @loadeble
  */
 class ButtonPlayToggle extends Assign<Button> {
@@ -269,6 +281,8 @@ class ButtonPlayToggle extends Assign<Button> {
 
 /**
  * @description Кнопка queue, отвечает за показ текущих треков
+ * @class ButtonQueue
+ * @extends Assign
  * @loadeble
  */
 class ButtonQueue extends Assign<Button> {
@@ -397,6 +411,8 @@ class ButtonQueue extends Assign<Button> {
 
 /**
  * @description Кнопка repeat, отвечает за переключение режима повтора
+ * @class ButtonRepeat
+ * @extends Assign
  * @loadeble
  */
 class ButtonRepeat extends Assign<Button> {
@@ -454,6 +470,8 @@ class ButtonRepeat extends Assign<Button> {
 
 /**
  * @description Кнопка replay, отвечает за проигрывание заново
+ * @class ButtonReplay
+ * @extends Assign
  * @loadeble
  */
 class ButtonReplay extends Assign<Button> {
@@ -483,6 +501,8 @@ class ButtonReplay extends Assign<Button> {
 
 /**
  * @description Кнопка shuffle, отвечает за перетасовку треков
+ * @class ButtonShuffle
+ * @extends Assign
  * @loadeble
  */
 class ButtonShuffle extends Assign<Button> {
@@ -506,7 +526,7 @@ class ButtonShuffle extends Assign<Button> {
                 }
 
                 // Включение тасовки очереди
-                queue.tracks.shuffle = !queue.tracks.shuffle;
+                queue.tracks.shuffleTracks(!queue.tracks.shuffle);
 
                 // Отправляем сообщение о включении или выключении тасовки
                 return message.reply({

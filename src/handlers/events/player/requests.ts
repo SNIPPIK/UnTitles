@@ -9,6 +9,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Выполнение запроса пользователя через внутреннее API
  * @class rest_request
+ * @extends Assign
  * @event rest/request
  * @public
  */
@@ -97,6 +98,7 @@ class rest_request extends Assign<Event<"rest/request">> {
  * @author SNIPPIK
  * @description Если при выполнении запроса пользователя произошла ошибка
  * @class rest_error
+ * @extends Assign
  * @event rest/error
  * @public
  */
