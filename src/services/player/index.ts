@@ -112,7 +112,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @private
      */
     public create = (message: CommandInteraction, item?: Track.list | Track) => {
-        let queue = this.get(message.guild.id);
+        let queue = this.get(message.guildId);
 
         // Проверяем есть ли очередь в списке, если нет то создаем
         if (!queue) queue = new Queue(message) as T;
@@ -138,7 +138,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
         if (item) {
             // Отправляем сообщение о том что было добавлено
             if ("items" in item || queue.tracks.total > 0) {
-                db.events.emitter.emit("message/push", message, item);
+                db.events.emitter.emit("message/push", queue, message.member, item);
             }
 
             // Добавляем треки в очередь
@@ -201,10 +201,11 @@ export interface AudioPlayerEvents {
 export interface QueueEvents {
     /**
      * @description Событие при котором коллекция будет отправлять информацию о добавленном треке или плейлисте, альбоме
-     * @param message - Сообщение с сервера
-     * @param items   - Трек или плейлист, альбом
+     * @param queue     - Очередь сервера
+     * @param user       - Пользователь включивший трек
+     * @param items     - Трек или плейлист, альбом
      */
-    readonly "message/push": (message: CommandInteraction, items: Track | Track.list) => void;
+    readonly "message/push": (queue: Queue, user: CommandInteraction["member"], items: Track | Track.list) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять сообщение о текущем треке

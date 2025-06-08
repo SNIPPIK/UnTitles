@@ -71,26 +71,27 @@ class message_push extends Assign<Event<"message/push">> {
             name: "message/push",
             type: "player",
             once: false,
-            execute: async (message, obj) => {
+            execute: async (queue, user, obj) => {
                 const {artist, image} = obj;
 
                 // Отправляем сообщение, о том что было добавлено в очередь
-                const msg = await message.channel.send({
+                const msg = await queue.message.send({
+                    withResponse: true,
                     embeds: [{
                         color: obj["api"] ? obj["api"]["color"] : Colors.Blue,
                         thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
                         footer: {
-                            icon_url: message.member.avatarURL(),
-                            text: `${message.member.displayName}`
+                            iconURL: user.avatarURL(),
+                            text: `${user.displayName}`
                         },
                         author: {
                             name: artist?.title,
                             url: artist?.url,
-                            icon_url: db.images.disk
+                            iconURL: db.images.disk
                         },
                         fields: [
                             {
-                                name: locale._(message.locale, "player.queue.push"),
+                                name: locale._(queue.message.locale, "player.queue.push"),
                                 value: obj instanceof Track ?
                                     // Если один трек в списке
                                     `\`\`\`[${obj.time.split}] - ${obj.name}\`\`\`` :
@@ -98,7 +99,7 @@ class message_push extends Assign<Event<"message/push">> {
                                     // Если добавляется список треков (альбом или плейлист)
                                     `${obj.items.slice(0, 5).map((track, index) => {
                                         return `\`${index + 1}\` ${track.name_replace}`;
-                                    }).join("\n")}${obj.items.length > 5 ? locale._(message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}
+                                    }).join("\n")}${obj.items.length > 5 ? locale._(queue.message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}
                                     `
                             }
                         ]
