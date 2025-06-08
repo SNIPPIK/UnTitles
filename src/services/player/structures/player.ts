@@ -416,6 +416,7 @@ export class AudioPlayer extends BasePlayer {
             this._audio.current = stream;
             this.status = "player/playing";
 
+            // Если трек включен в 1 раз
             if (seek === 0) {
                 const queue = db.queues.get(this.id);
                 db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно

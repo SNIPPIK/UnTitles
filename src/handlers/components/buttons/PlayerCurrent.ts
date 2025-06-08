@@ -16,7 +16,7 @@ class ButtonStop extends Assign<Button> {
         super({
             name: "stop",
             callback: (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
 
                 // Если есть очередь, то удаляем ее
                 if (queue) queue.cleanup();
@@ -46,7 +46,7 @@ class ButtonSkip extends Assign<Button> {
         super({
             name: "skip",
             callback: (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
 
                 // Меняем позицию трека в очереди
                 queue.player.stop(queue.tracks.position + 1);
@@ -77,7 +77,7 @@ class ButtonBack extends Assign<Button> {
         super({
             name: "back",
             callback: (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
                 const repeat = queue.tracks.repeat;
 
                 // Делаем повтор временным
@@ -115,7 +115,7 @@ class ButtonFilters extends Assign<Button> {
         super({
             name: "filters",
             callback: (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
                 const filters = queue.player.filters.enabled;
 
                 // Если нет фильтров
@@ -173,7 +173,7 @@ class ButtonLyrics extends Assign<Button> {
         super({
             name: "lyrics",
             callback: (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
                 const track = queue.tracks.track;
 
                 // Получаем текст песни
@@ -238,7 +238,7 @@ class ButtonPlayToggle extends Assign<Button> {
         super({
             name: "resume_pause",
             callback: (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
 
                 // Если плеер уже проигрывает трек
                 if (queue.player.status === "player/playing") {
@@ -290,7 +290,7 @@ class ButtonQueue extends Assign<Button> {
         super({
             name: "queue",
             callback: async (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
                 let page = parseInt((queue.tracks.position / 5).toFixed(0));
                 const pages = queue.tracks.array(5, true) as string[];
                 const lang = message.locale;
@@ -420,7 +420,7 @@ class ButtonRepeat extends Assign<Button> {
         super({
             name: "repeat",
             callback: (message) => {
-                const queue = db.queues.get(message.guild.id), loop = queue.tracks.repeat;
+                const queue = db.queues.get(message.guildId), loop = queue.tracks.repeat;
 
                 // Включение всех треков
                 if (loop === RepeatType.None) {
@@ -479,7 +479,7 @@ class ButtonReplay extends Assign<Button> {
         super({
             name: "replay",
             callback: async (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
 
                 // Запускаем проигрывание текущего трека
                 await queue.player.play(0, queue.player.tracks.position);
@@ -510,7 +510,7 @@ class ButtonShuffle extends Assign<Button> {
         super({
             name: "shuffle",
             callback: (message) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
 
                 // Если в очереди менее 2 треков
                 if (queue.tracks.size < 2) {

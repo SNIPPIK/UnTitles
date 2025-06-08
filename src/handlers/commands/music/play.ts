@@ -221,7 +221,7 @@ class PlayCommand extends Assign< BaseCommand > {
 
                     // Принудительное завершение проигрывания музыки
                     case "stop": {
-                        const queue = db.queues.get(message.guild.id);
+                        const queue = db.queues.get(message.guildId);
 
                         // Если нет очереди, то и нечего не делаем
                         if (!queue) {
@@ -236,11 +236,8 @@ class PlayCommand extends Assign< BaseCommand > {
                             });
                         }
 
-                        // Очищаем очередь
-                        queue.cleanup();
-
                         // Удаляем очередь
-                        queue["destroy"]();
+                        db.queues.remove(message.guildId);
                         return message.reply({
                             embeds: [
                                 {

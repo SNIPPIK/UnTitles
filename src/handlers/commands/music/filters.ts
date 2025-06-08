@@ -106,7 +106,7 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
                 client: ["SendMessages", "ViewChannel"]
             },
             execute: async ({message, args, type}) => {
-                const queue = db.queues.get(message.guild.id);
+                const queue = db.queues.get(message.guildId);
                 const player = queue.player;
 
                 const seek: number = player.audio.current?.duration ?? 0;
