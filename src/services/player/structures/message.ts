@@ -110,18 +110,6 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public send = (options: {embeds: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
-        // Если можно дать ответ на сообщение
-        if (!this.deferred && !this.replied) return this._original.reply(options as any) as any;
-
-        // Если можно просто отредактировать сообщение
-        else if (this.deferred && !this.replied) return this._original.editReply(options as any) as any;
-
-        // Если бот уже ответил на сообщение
-        else if (this.replied) return this._original.followUp(options as any) as any;
-
-
-
-        /*
         // Если бот уже ответил на сообщение
         if (this.replied && !this.deferred) return this._original.followUp(options as any) as any;
 
@@ -130,8 +118,6 @@ export class QueueMessage<T extends CommandInteraction> {
 
         // Если можно дать ответ на сообщение
         else if (!this.deferred && !this.replied) return this._original.reply(options as any) as any;
-
-         */
 
         // Отправляем обычное сообщение
         return this._original.channel.send(options as any);
