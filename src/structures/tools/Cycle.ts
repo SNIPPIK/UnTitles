@@ -94,12 +94,14 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         const delay = Math.max(0, nextTime - this.localTime);     // Цельный целевой интервал + остаток от предыдущих циклов
 
         // Цикл отстал, подтягиваем loop вперёд,
-        if (delay <= 0) {
+        if (delay <= 0 || this.missCounter > 5) {
             if (this.missCounter > 5) {
                 // Принудительная стабилизация
                 this.startTime = this.localTime;
                 this.loop = 0;
                 this.missCounter = 0;
+
+                console.log(`Cycle has stabilized`);
             }
 
             this.missCounter++;
@@ -108,7 +110,17 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         }
 
         // Иначе ждем нужное время
-        setTimeout(this._stepCycle, delay);
+        setTimeout(() => {
+            if (this.timer === "max") {
+                const actualTime = this.localTime;
+                const drift = actualTime - nextTime;
+
+                // Если отставание более 5 ms
+                if (drift > 5) this.missCounter++;
+            }
+
+            return this._stepCycle();
+        }, delay);
     };
 }
 

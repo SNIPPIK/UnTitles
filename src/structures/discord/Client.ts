@@ -9,6 +9,7 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Класс клиента
  * @class DiscordClient
+ * @extends Client
  */
 export class DiscordClient extends Client {
     /**

@@ -5,6 +5,7 @@ import { Logger } from "#structures";
  * @author SNIPPIK
  * @description Класс менеджера осколков
  * @class ShardManager
+ * @extends ShardingManager
  */
 export class ShardManager extends ShardingManager {
     public constructor(file: string, token: string) {

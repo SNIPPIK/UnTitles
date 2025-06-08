@@ -1,5 +1,5 @@
 import { PipeEncoder, BufferedEncoder, SILENT_FRAME, OPUS_FRAME_SIZE } from "./opus";
-import { TypedEmitter } from "#structures/emitter";
+import { TypedEmitter } from "#structures";
 import { Logger } from "#structures/logger";
 import { Process } from "./process";
 
@@ -369,7 +369,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @description Реал тайм декодер opus фрагментов
      * @private
      */
-    private readonly encoder = new PipeEncoder({
+    private encoder = new PipeEncoder({
         highWaterMark: 512
     });
 
@@ -478,8 +478,10 @@ export class PipeAudioResource extends BaseAudioResource {
      * @public
      */
     public destroy = () => {
+        this.played = null;
+        this.encoder = null;
+
         this._destroy();
-        this.played = 0;
     };
 }
 
@@ -560,5 +562,9 @@ interface AudioResourceInput<T> {
         path?: string
     };
 
+    /**
+     * @description Как начать передавать данные из потока
+     * @readonly
+     */
     readonly decode: (input: T) => void;
 }

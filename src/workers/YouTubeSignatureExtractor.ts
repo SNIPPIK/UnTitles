@@ -1,5 +1,5 @@
-import { httpsClient } from "#handler/rest";
 import querystring from "node:querystring";
+import { httpsClient } from "#structures";
 import { Script } from "node:vm";
 
 /**

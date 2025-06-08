@@ -4,6 +4,7 @@ import { handler } from "#handler";
 /**
  * @author SNIPPIK
  * @description Загружаем динамические компоненты для работы с ними
+ * @support Buttons
  * @class Components
  * @extends handler
  * @public

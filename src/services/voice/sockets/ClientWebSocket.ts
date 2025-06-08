@@ -1,5 +1,5 @@
 import { VoiceOpcodes } from "discord-api-types/voice";
-import { TypedEmitter } from "#structures/emitter";
+import { TypedEmitter } from "#structures";
 import { WebSocket, Data } from "ws";
 
 /**
@@ -184,6 +184,15 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
         if (this.heartbeat.interval) clearTimeout(this.heartbeat.interval);
+
+        this.ws = null;
+        this.heartbeat.miss = null;
+        this.heartbeat.timeout = null;
+        this.heartbeat.interval = null;
+        this.heartbeat.intervalMs = null;
+        this.heartbeat.reconnects = null;
+        this.lastAsk = null;
+        this._status = null;
     };
 
     /**
@@ -196,10 +205,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         // Проверяем на готовность
         if (this.ws && this.ws?.readyState === WebSocket.OPEN) {
             this.ws?.close(1000);
+            this.ws?.terminate();
             this.emit("close", 1000, "Normal closing");
         }
 
-        this.ws?.terminate();
         this.ws = null;
     };
 

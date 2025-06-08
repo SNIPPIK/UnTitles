@@ -119,6 +119,15 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             }
         }
     };
+
+    /**
+     * @description Удаляем неиспользуемые данные
+     * @public
+     */
+    public emitDestroy() {
+        this._buffer = null;
+        super.emitDestroy();
+    };
 }
 
 /**
@@ -156,6 +165,16 @@ export class BufferedEncoder extends Writable {
         this.encoder.parseAvailablePages(chunk);
         return callback();
     };
+
+    /**
+     * @description Удаляем неиспользуемые данные
+     * @param error - Ошибка
+     * @param callback - Вызов ошибки
+     */
+    public _destroy(error: Error, callback: { (error?: Error): void }) {
+        this.encoder = null;
+        super._destroy(error, callback);
+    };
 }
 
 /**
@@ -192,6 +211,16 @@ export class PipeEncoder extends Transform {
     public _transform = (chunk: Buffer, _: any, done: () => any) => {
         this.encoder.parseAvailablePages(chunk);
         return done();
+    };
+
+    /**
+     * @description Удаляем неиспользуемые данные
+     * @param error - Ошибка
+     * @param callback - Вызов ошибки
+     */
+    public _destroy(error: Error, callback: { (error?: Error): void }) {
+        this.encoder = null;
+        super._destroy(error, callback);
     };
 }
 

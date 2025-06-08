@@ -1,6 +1,6 @@
 import { CommandInteraction, Collection, Logger } from "#structures";
 import { AudioPlayer, Queue, Track } from "#service/player";
-import { RestClientSide } from "#handler/rest/apis";
+import { RestClientSide } from "#handler/rest";
 import { locale } from "#service/locale";
 import { Colors } from "discord.js";
 import { env } from "#app/env";

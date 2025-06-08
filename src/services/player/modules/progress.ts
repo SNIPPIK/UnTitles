@@ -1,4 +1,4 @@
-import { RestServerSide } from "#handler/rest/apis";
+import { RestServerSide } from "#handler/rest";
 import { env } from "#app/env";
 
 /**
@@ -84,7 +84,7 @@ export class PlayerProgress {
         const right = filled >= this.size ? emoji.upped.right : emoji.empty.right;
 
         // Если в самом начале — просто пустой бар без кнопки
-        if (current === 0 || filled === 0) {
+        if (current === 0) {
             return left + emoji.empty.center.repeat(this.size) + right;
         }
 

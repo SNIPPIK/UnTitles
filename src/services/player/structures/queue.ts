@@ -192,7 +192,7 @@ abstract class BaseQueue {
 
     /**
      * @description Удаление динамического сообщения из системы
-     * @param message - сообщение
+     * @private
      */
     private _cleanupOldMessage = () => {
         // Если введено новое сообщение

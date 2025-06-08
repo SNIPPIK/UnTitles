@@ -1,4 +1,4 @@
-import { TypedEmitter } from "#structures/emitter";
+import { TypedEmitter } from "#structures";
 import { createSocket } from "node:dgram";
 import { isIPv4 } from "node:net";
 
@@ -34,13 +34,13 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @readonly
      * @private
      */
-    private readonly socket = createSocket({ type: "udp4" });
+    private socket = createSocket({ type: "udp4" });
 
     /**
      * @description Данные для поддержания udp соединения
      * @private
      */
-    private readonly keepAlive = {
+    private keepAlive = {
         /**
          * @description Интервал для предотвращения разрыва
          * @readonly
@@ -157,14 +157,19 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         clearInterval(this.keepAlive.interval);
         clearTimeout(this.keepAlive.timeout);
 
+        this.socket.removeAllListeners();
+        this.removeAllListeners();
+
         try {
+            this.socket.disconnect();
             this.socket.close();
+            this.socket = null;
         } catch (err) {
             if (err instanceof Error && err.message.includes("Not running")) return;
         }
 
-        this.socket.removeAllListeners();
-        this.removeAllListeners();
+        this.keepAlive = null;
+        this.destroyed = null;
     };
 
     /**

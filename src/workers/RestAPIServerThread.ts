@@ -1,5 +1,5 @@
 import { parentPort, workerData } from "node:worker_threads";
-import type { RestServerSide } from "#handler/rest/apis";
+import type { RestServerSide } from "#handler/rest";
 import { initDatabase } from "#app/db";
 import { handler } from "#handler";
 import { env } from "#app/env";
@@ -50,7 +50,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @public
      */
     public constructor() {
-        super("src/handlers/rest/apis");
+        super("src/handlers/rest");
         this.register();
     };
 

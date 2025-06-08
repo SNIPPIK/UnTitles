@@ -1,5 +1,5 @@
-import type { RestServerSide } from "#handler/rest/apis";
-import { httpsClient } from "#handler/rest";
+import type { RestServerSide } from "#handler/rest";
+import { httpsClient } from "#structures";
 import { db } from "#app/db";
 
 /**

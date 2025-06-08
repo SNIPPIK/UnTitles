@@ -32,10 +32,10 @@ export class VoiceManager<Client extends DiscordClient> {
     };
 
     /**
-     * @description Адаптер состояния голоса для этой гильдии, который можно использовать с `@discordjs/voice` для воспроизведения звука в голосовых и сценических каналах.
+     * @description Создание адаптера для голосового состояния бота
      * @public
      */
-    public voiceAdapterCreator = (guildID: string): DiscordGatewayAdapterCreator => {
+    public createVoiceAdapter = (guildID: string): DiscordGatewayAdapterCreator => {
         // Если нет ID осколка
         const id = this.client.shardID;
 

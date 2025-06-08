@@ -19,7 +19,7 @@ export class Environment {
     };
 
     /**
-     * @description Получаем значение
+     * @description Получаем значение из env файла
      * @param name - Имя параметра в env
      * @param safe - Этот параметр будет возращен если ничего нет
      * @public

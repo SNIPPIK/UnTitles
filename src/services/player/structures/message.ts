@@ -8,9 +8,9 @@ import { EmbedData } from "discord.js";
  * @public
  */
 export class QueueMessage<T extends CommandInteraction> {
-    private _guildID: string;
-    private _channelID: string;
-    private _voiceID: string;
+    private readonly _guildID: string;
+    private readonly _channelID: string;
+    private readonly _voiceID: string;
 
     /**
      * @description Язык сообщения
@@ -99,10 +99,9 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public constructor(private readonly _original: T) {
-        this._channelID = _original.channel.id;
-        this._guildID = _original.guild.id;
-        this._voiceID = _original.member.voice.channel.id;
-
+        this._voiceID = _original.member.voice.channelId;
+        this._channelID = _original.channelId;
+        this._guildID = _original.guildId;
     };
 
     /**

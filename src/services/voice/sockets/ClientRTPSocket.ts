@@ -35,7 +35,7 @@ export class ClientRTPSocket {
      * @description Пустой буфер
      * @private
      */
-    private readonly _nonceBuffer: Buffer = Encryption.nonce;
+    private _nonceBuffer: Buffer = Encryption.nonce;
 
     /**
      * @description Порядковый номер пустого буфера
@@ -150,6 +150,18 @@ export class ClientRTPSocket {
     private randomNBit = (bits: number) => {
         const size = Math.ceil(bits / 8);
         return crypto.randomBytes(Math.ceil(size)).readUIntBE(0, Math.ceil(size)) % (2 ** bits);
+    };
+
+    /**
+     * @description Удаляем неиспользуемые данные
+     * @public
+     */
+    public destroy = () => {
+        this._nonce = null;
+        this._nonceBuffer = null;
+        this.timestamp = null;
+        this.sequence = null;
+        this.options = null;
     };
 }
 

@@ -6,8 +6,8 @@ import { env } from "#app/env";
 // Database modules
 import { Middlewares } from "#handler/middlewares";
 import { Components } from "#handler/components";
-import { RestObject } from "#handler/rest/apis";
 import { Commands } from "#handler/commands";
+import { RestObject } from "#handler/rest";
 import { Events } from "#handler/events";
 import { Voices } from "#service/voice";
 

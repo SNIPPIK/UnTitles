@@ -274,7 +274,7 @@ class PlayCommand extends Assign< BaseCommand > {
                         break;
                     }
 
-                    // Если пользователя пытается сделать запрос к API
+                    // Если пользователь пытается сделать запрос к API
                     default: {
                         // Запрос к платформе
                         const platform = db.api.request(args[0] as any);

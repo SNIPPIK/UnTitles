@@ -232,7 +232,6 @@ export class VoiceConnection {
                 return;
             }
 
-
             this.websocket.emit("warn", `UDP Error: ${error.message}. Reinitializing UDP socket...`);
         });
 
@@ -318,7 +317,7 @@ export class VoiceConnection {
 
         // Если Websocket завершил свою работу
         this.websocket.on("close", (code, reason) => {
-            if (code > 1000 && code < 1002) return this.destroy();
+            if (code >= 1000 && code <= 1002) return this.destroy();
 
             // Подключения больше не существует
             else if (code === 4006) {
@@ -403,6 +402,7 @@ export class VoiceConnection {
         if (this.websocket && this.udpClient) {
             this.websocket?.destroy();
             this.udpClient?.destroy();
+            this.rtpClient?.destroy();
         }
 
         this._status = VoiceConnectionStatus.disconnected;
@@ -412,7 +412,7 @@ export class VoiceConnection {
         this.udpClient = null;
 
         this.speakingTimeout = null;
-        this._speaking = false;
+        this._speaking = null;
     };
 
     /**

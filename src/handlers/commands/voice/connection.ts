@@ -176,7 +176,7 @@ class Command_Voice extends Assign< BaseCommand<VoiceChannel | string> > {
 
                         // Подключаемся к голосовому каналу без очереди
                         else if (!queue) {
-                            db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, (message.client as DiscordClient).adapter.voiceAdapterCreator(guildId));
+                            db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: true }, (message.client as DiscordClient).adapter.createVoiceAdapter(guildId));
                         }
 
                         // Отправляем сообщение о подключении к каналу

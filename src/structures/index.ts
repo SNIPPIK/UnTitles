@@ -6,11 +6,12 @@ import {
 } from "discord.js";
 
 export * from "./logger";
-export * from "./emitter";
+export * from "./tools/TypedEmitter";
 export * from "./tools/Assign";
 export * from "./tools/Collection";
 export * from "./tools/SetArray";
 export * from "./tools/Cycle";
+export * from "./tools/httpsClient";
 
 export * from "./discord/Client";
 export * from "./discord/modules/VoiceManager";

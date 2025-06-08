@@ -50,6 +50,6 @@ export class ControllerVoice<T extends VoiceConnection> {
             self_mute: true,
             guild_id: ctx.guild.id,
             channel_id: ctx.channelId
-        }, client.adapter.voiceAdapterCreator(ctx.guild.id)) as T;
+        }, client.adapter.createVoiceAdapter(ctx.guild.id)) as T;
     };
 }

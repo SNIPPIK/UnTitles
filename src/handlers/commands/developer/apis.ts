@@ -1,6 +1,6 @@
 import { BaseCommand, SlashCommand, SlashCommandSubCommand } from "#handler/commands";
 import { ApplicationCommandOptionType, Colors } from "discord.js";
-import { RestServerSide } from "#handler/rest/apis";
+import { RestServerSide } from "#handler/rest";
 import { locale } from "#service/locale";
 import { Assign } from "#structures";
 import { db } from "#app/db";

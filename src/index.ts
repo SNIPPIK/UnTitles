@@ -80,7 +80,7 @@ function initProcessEvents(client: DiscordClient) {
     });
 
     // Необработанный промис
-    process.on("unhandledRejection", (reason: any) => {
+    process.on("unhandledRejection", (reason) => {
         Logger.log(
             "ERROR",
             `Unhandled Rejection\n` +
@@ -90,19 +90,14 @@ function initProcessEvents(client: DiscordClient) {
     });
 
     // Возможность завершить процесс корректно
-    process.on("SIGINT", () => {
-        if (ProcessQueues(client)) return;
+    for (const event of ["SIGINT", "SIGTERM"]) {
+        process.on(event, () => {
+            if (ProcessQueues(client)) return;
 
-        Logger.log("WARN", "Received SIGINT. Shutting down...");
-        process.exit(0);
-    });
-
-    process.on("SIGTERM", () => {
-        if (ProcessQueues(client)) return;
-
-        Logger.log("WARN", "Received SIGTERM. Shutting down...");
-        process.exit(0);
-    });
+            Logger.log("WARN", `Received ${event}. Shutting down...`);
+            process.exit(0);
+        });
+    }
 }
 
 /**
