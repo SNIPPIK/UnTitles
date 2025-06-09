@@ -97,6 +97,7 @@ export class DiscordClient extends Client {
         // Время обновления статуса
         const timeout = parseInt(env.get("client.presence.interval", "120"));
         const arrayUpdate = parseInt(env.get("client.presence.array.update", "3600")) * 1e3;
+        const clientID = this.shardID;
 
         let array = this.parseStatuses();
         let size = array.length - 1;
@@ -105,7 +106,7 @@ export class DiscordClient extends Client {
         // Если нет статусов
         if (!array.length) return;
         else {
-            Logger.log("LOG", `[Core/${this.shardID}] Success loading custom ${Logger.color(34, `${array.length} statuses`)}`);
+            Logger.log("LOG", `[Core/${clientID}] Success loading custom ${Logger.color(34, `${array.length} statuses`)}`);
         }
 
         // Интервал для обновления статуса
@@ -127,7 +128,7 @@ export class DiscordClient extends Client {
             this.user.setPresence({
                 status: env.get("client.status", "online"),
                 activities: [activity] as ActivityOptions[],
-                shardId: this.shard?.ids[0] ?? 0
+                shardId: clientID
             });
 
             i++;
@@ -146,9 +147,10 @@ export class DiscordClient extends Client {
 
         // Получаем пользовательские статусы
         try {
-            const envPresents = (JSON.parse(env.get("client.presence.array")) as ActivityOptions[]).map((status) => {
+            const presence = (JSON.parse(`[${env.get("client.presence.array")}]`) as ActivityOptions[]);
+            const envPresents = presence.map((status) => {
                 const edited = status.name
-                    .replace(/{shard}/g, `${this.shardID}`)
+                    .replace(/{shard}/g, `${this.shardID + 1}`)
                     .replace(/{queues}|{players}/g, `${db.queues.size}`)
                     .replace(/{version}/g, `${version}`)
                     .replace(/{guilds}/g, `${guilds}`)
