@@ -21,9 +21,11 @@
     "tsconfig-paths": "^4.2.0",
     "@types/node": "^22.15.30",
     "@types/ws": "^8.18.1",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },
   "scripts": {
+    "start-bun": "bun src",
     "start": "cd build && node -r tsconfig-paths/register src --ShardManager",
     "build": "tsc",
     "auto": "npm run build && npm run start"

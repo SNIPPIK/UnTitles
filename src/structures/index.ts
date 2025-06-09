@@ -80,7 +80,7 @@ const prototypes: { type: any, name: string, value: any}[] = [
  * @description Задаем функции для их использования в проекте
  */
 for (const {type, name, value} of prototypes) {
-    Object.defineProperty(type, name, {value});
+    Object.defineProperty(type, name, { value, writable: true, configurable: true });
 }
 
 /**

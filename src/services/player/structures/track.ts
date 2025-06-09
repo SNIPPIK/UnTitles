@@ -313,7 +313,7 @@ export class Track extends BaseTrack {
             else if (!link) return Error(`The platform does not provide a link`);
 
             this.link = link;
-            return link;
+            return this.prepareResource();
         } catch (err) {
             return Error(`This link track is not available... Fail update link!`);
         }

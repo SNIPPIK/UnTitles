@@ -1,3 +1,5 @@
+import fs from "node:fs";
+
 /**
  * @author SNIPPIK
  * @description Взаимодействуем с environment variables
@@ -11,6 +13,12 @@ export class Environment {
      */
     public constructor() {
         try {
+            if (fs.existsSync("node_modules/dotenv")) {
+                const dotenv = require('dotenv');
+                if (dotenv) dotenv.config();
+                return;
+            }
+
             process.loadEnvFile(".env");
         } catch (error) {
             const path = __dirname.split("/");

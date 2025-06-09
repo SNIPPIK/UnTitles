@@ -99,9 +99,9 @@ class RestVKAPI extends Assign<RestServerSide.API> {
                                 // Если нет ссылки на трек
                                 if (!track.audio) return resolve(locale.err( "api.request.fail"));
 
-                                setImmediate(async () => {
+                                setImmediate(() => {
                                     // Сохраняем кеш в системе
-                                    if (!cache) await db.cache.set(track, RestVKAPI._platform.url);
+                                    if (!cache) db.cache.set(track, RestVKAPI._platform.url);
                                 });
 
                                 return resolve(track);

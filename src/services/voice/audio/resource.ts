@@ -395,6 +395,15 @@ export class PipeAudioResource extends BaseAudioResource {
     };
 
     /**
+     * @description Оставшееся кол-во пакетов
+     * @help (время пакета 20ms)
+     * @public
+     */
+    public get packets(): number {
+        return this.encoder.writableLength / OPUS_FRAME_SIZE;
+    };
+
+    /**
      * @description Получаем время, время зависит от прослушанных пакетов
      * @public
      */

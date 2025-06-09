@@ -103,9 +103,9 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                                 if (api instanceof Error) return resolve(api);
                                 const track = RestSpotifyAPI.track(api);
 
-                                setImmediate(async () => {
+                                setImmediate(() => {
                                     // Сохраняем кеш в системе
-                                    if (!cache) await db.cache.set(track, RestSpotifyAPI._platform.url);
+                                    if (!cache) db.cache.set(track, RestSpotifyAPI._platform.url);
                                 });
 
                                 return resolve(track);

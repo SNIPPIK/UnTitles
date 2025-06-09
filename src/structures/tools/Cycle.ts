@@ -84,6 +84,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         if (this.size === 0) {
             this.startTime = 0;
             this.loop = 0;
+            this.missCounter = 0;
             return;
         }
 
@@ -95,16 +96,15 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Цикл отстал, подтягиваем loop вперёд,
         if (delay <= 0 || this.missCounter > 5) {
+            this.missCounter++;
+
             if (this.missCounter > 5) {
                 // Принудительная стабилизация
                 this.startTime = this.localTime;
                 this.loop = 0;
                 this.missCounter = 0;
-
-                console.log(`Cycle has stabilized`);
             }
 
-            this.missCounter++;
             setImmediate(this._stepCycle);
             return;
         }
@@ -112,8 +112,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Иначе ждем нужное время
         setTimeout(() => {
             if (this.timer === "max") {
-                const actualTime = this.localTime;
-                const drift = actualTime - nextTime;
+                const drift = this.localTime - nextTime;
 
                 // Если отставание более 5 ms
                 if (drift > 5) this.missCounter++;
@@ -146,7 +145,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @param item - Объект T
      * @public
      */
-    public add = (item) => {
+    public add = (item: T) => {
         if (this.options.custom?.push) this.options.custom?.push(item);
         else if (this.has(item)) this.delete(item);
 
@@ -159,7 +158,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @param item - Объект T
      * @public
      */
-    public delete = (item) => {
+    public delete = (item: T) => {
         const index = this.has(item);
 
         // Если есть объект в базе

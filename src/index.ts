@@ -38,23 +38,29 @@ async function runShard() {
     const client = new DiscordClient();
     const id = client.shardID;
 
+    // Инициализируем базу данных
     initDatabase(client);
 
+    // Запускаем бота
     await client.login(env.get("token.discord"));
 
-    // Регистрируем всё остальное
+    // Загружаем components
     db.components.register();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.components.size} components`)}`);
 
+    // Загружаем API
     await db.api.startWorker();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow.length} APIs`)}`);
 
+    // Загружаем middlewares
     db.middlewares.register();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.middlewares.size} middlewares`)}`);
 
+    // Загружаем events
     db.events.register(client);
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.size} events`)}`);
 
+    // Загружаем commands
     db.commands.register(client);
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
 

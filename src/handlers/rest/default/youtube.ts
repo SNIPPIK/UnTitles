@@ -172,9 +172,9 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                                 // Класс трека
                                 const track = RestYouTubeAPI.track(api["videoDetails"]);
 
-                                setImmediate(async () => {
+                                setImmediate(() => {
                                     // Сохраняем кеш в системе
-                                    if (!cache) await db.cache.set(track, RestYouTubeAPI._platform.url);
+                                    if (!cache) db.cache.set(track, RestYouTubeAPI._platform.url);
                                 });
 
                                 // Если указано получение аудио
