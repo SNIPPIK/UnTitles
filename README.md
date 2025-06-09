@@ -67,6 +67,7 @@ npm run build && npm run start
 
 # Запускаем через Bun
 # Настраиваем `.env` файл в текущей директории
+# bun install dotenv
 npm run start-bun
 ```
 ---
