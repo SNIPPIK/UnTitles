@@ -302,7 +302,7 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                 if (!url) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio url"]));
 
                 // Расшифровываем xml страницу на фрагменты
-                new httpsClient(url["downloadInfoUrl"]).toXML.then((xml) => {
+                new httpsClient({url: url["downloadInfoUrl"]}).toXML.then((xml) => {
                     if (xml instanceof Error) return resolve(xml);
 
                     const path = xml[1];

@@ -38,8 +38,8 @@ function generateUserAgent(): string {
  */
 export class httpsClient {
     public constructor(private data: RequestData) {
-        this.data.method = this.data.method || 'GET';
-        this.data.headers = this.data.headers || {};
+        this.data.method = this.data?.method || 'GET';
+        this.data.headers = this.data?.headers || {};
         this.data.maxRedirects = this.data.maxRedirects ?? 5;
 
         // Установим User-Agent, если передан
