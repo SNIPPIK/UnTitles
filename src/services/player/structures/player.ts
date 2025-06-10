@@ -39,6 +39,12 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
     protected _status: keyof AudioPlayerEvents = "player/wait";
 
     /**
+     * @description Время когда плеер поставили на паузу
+     * @protected
+     */
+    protected _pauseTimestamp: number = null;
+
+    /**
      * @description Хранилище аудио фильтров
      * @readonly
      * @private
@@ -308,7 +314,7 @@ export class AudioPlayer extends BasePlayer {
      * @description Приостанавливает воспроизведение плеера
      * @public
      */
-    public pause(): void {
+    public pause = (): void => {
         // Проверяем, что плеер действительно играет
         if (this.status !== "player/playing") return;
 
@@ -317,22 +323,37 @@ export class AudioPlayer extends BasePlayer {
 
         // Отправляем silent frame в голосовое соединение для паузы звука
         this.voice.connection.packet = SILENT_FRAME;
+
+        // Устанавливаем время паузы
+        this._pauseTimestamp = Date.now();
     }
 
     /**
      * @description Возобновляет воспроизведение плеера
      * @public
      */
-    public resume(): void {
+    public resume = (): void => {
         // Проверяем, что плеер в состоянии паузы
         if (this.status !== "player/pause") return;
 
-        // Для возобновления отправляем silent frame, чтобы обновить состояние пакета
-        this.voice.connection.packet = SILENT_FRAME;
+        const pauseTime = this._pauseTimestamp - Date.now() + 2500 || 1;
 
-        // Переключаем статус обратно в "playing"
-        this.status = "player/playing";
-    }
+        // Если pause/resume сменяются слишком быстро
+        if (pauseTime <= 1) {
+            // Для возобновления отправляем silent frame, чтобы обновить состояние пакета
+            this.voice.connection.packet = SILENT_FRAME;
+
+            // Переключаем статус обратно в "playing"
+            this.status = "player/playing";
+
+            // Удаляем время проигрывания
+            this._pauseTimestamp = null;
+            return;
+        }
+
+        // Возобновляем через время
+        setTimeout(this.resume, pauseTime);
+    };
 
     /**
      * @description Останавливаем воспроизведение текущего трека
