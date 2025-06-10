@@ -244,6 +244,7 @@ export class Youtube_decoder_native {
             delete format.signatureCipher;
             delete format.cipher;
         } catch (err) {
+            throw err;
         }
     };
 

@@ -1,4 +1,4 @@
-import { BaseCommand, SlashCommand, SlashCommandSubCommand } from "#handler/commands";
+import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType, Colors } from "discord.js";
 import filters from "#service/player/filters.json"
 import type { AudioFilter } from "#service/player";
@@ -13,7 +13,7 @@ import { db } from "#app/db";
  * @extends Assign
  * @public
  */
-@SlashCommand({
+@CommandDeclare({
     names: {
         "en-US": "filter",
         "ru": "фильтр"
@@ -24,7 +24,7 @@ import { db } from "#app/db";
     },
     integration_types: ["GUILD_INSTALL"]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "off",
         "ru": "выкл"
@@ -35,7 +35,7 @@ import { db } from "#app/db";
     },
     type: ApplicationCommandOptionType.Subcommand
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "push",
         "ru": "добавить"
@@ -72,7 +72,7 @@ import { db } from "#app/db";
         }
     ]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "disable",
         "ru": "отключить"

@@ -1,4 +1,4 @@
-import { BaseCommand, SlashCommand, SlashCommandSubCommand } from "#handler/commands";
+import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import {ApplicationCommandOptionType, Colors, VoiceChannel} from "discord.js";
 import { locale } from "#service/locale";
 import {Assign, DiscordClient} from "#structures";
@@ -11,7 +11,7 @@ import { db } from "#app/db";
  * @extends Assign
  * @public
  */
-@SlashCommand({
+@CommandDeclare({
     names: {
         "en-US": "voice",
         "ru": "голос"
@@ -22,7 +22,7 @@ import { db } from "#app/db";
     },
     integration_types: ["GUILD_INSTALL"]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "join",
         "ru": "подключение"
@@ -47,7 +47,7 @@ import { db } from "#app/db";
         }
     ]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "swap",
         "ru": "смена"
@@ -72,7 +72,7 @@ import { db } from "#app/db";
         }
     ]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "leave",
         "ru": "отключение"
@@ -83,7 +83,7 @@ import { db } from "#app/db";
     },
     type: ApplicationCommandOptionType.Subcommand
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "tribune",
         "ru": "трибуна"

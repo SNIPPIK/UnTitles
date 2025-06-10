@@ -283,7 +283,7 @@ export interface Command extends BaseCommand {
  * @constructor
  * @decorator
  */
-export function SlashCommand(options: SlashCommand.Options) {
+export function CommandDeclare(options: SlashCommand.Options) {
     const name_key = Object.keys(options.names)[0] as Locale
     const name = options.names[name_key];
     const name_localizations = options.names;
@@ -309,7 +309,7 @@ export function SlashCommand(options: SlashCommand.Options) {
  * @constructor
  * @decorator
  */
-export function SlashCommandSubCommand(component: SlashCommand.Component) {
+export function CommandOptions(component: SlashCommand.Component) {
     const transformed: SlashCommand.Component = {
         ...component,
         name: component.names[Object.keys(component.names)[0] as Locale],

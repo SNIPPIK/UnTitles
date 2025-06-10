@@ -1,5 +1,5 @@
+import {httpsClient, httpsStatusCode} from "#structures";
 import type { RestServerSide } from "#handler/rest";
-import { httpsClient } from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -204,15 +204,20 @@ export class Track extends BaseTrack {
      */
     public get resource(): Promise<string | Error> {
         return new Promise(async (resolve) => {
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i <= 2; i++) {
                 const resource = await this.prepareResource();
 
                 // Если произошла ошибка при получении ресурса
-                if (!(resource instanceof Error) && resource) {
-                    return resolve(resource);
-                } else {
+                if (resource instanceof Error || !resource) {
                     this.link = null;
-                    if (i === 3) return resolve(resource);
+
+                    // Если уже нельзя повторить
+                    if (i === 2) return resolve(resource);
+                }
+
+                else {
+                    this.link = resource;
+                    break;
                 }
             }
 
@@ -279,22 +284,16 @@ export class Track extends BaseTrack {
             if (this.link.startsWith("http")) {
                 try {
                     const status = await new httpsClient({url: this.link, method: "HEAD"}).head();
+                    const error = httpsStatusCode.parse(status);
 
-                    // Если статус = good
-                    if (status.statusCode < 300 && status.statusCode >= 200) {
-                        // Добавляем трек в кеширование
-                        if (db.cache.audio) db.cache.audio.add(this);
-                        return this.link;
-                    }
+                    // Если получена ошибка
+                    if (error) return error;
 
-                    // Если статус код 400-500
-                    else if (status.statusCode >= 400 && status.statusCode < 500) {
-                        return Error(`This link track is not available... Status code 404`);
-                    }
-
-                    return null;
+                    // Добавляем трек в кеширование
+                    if (db.cache.audio) db.cache.audio.add(this);
+                    return this.link;
                 } catch (err) { // Если произошла ошибка при проверке статуса
-                    return Error(`This link track is not available... Fail check link!`);
+                    return Error(`Unknown error, ${err}`);
                 }
             }
 

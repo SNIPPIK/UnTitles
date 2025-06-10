@@ -1,4 +1,4 @@
-import { BaseCommand, SlashCommand, SlashCommandSubCommand } from "#handler/commands";
+import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType, Colors } from "discord.js";
 import { locale } from "#service/locale";
 import { Assign } from "#structures";
@@ -11,7 +11,7 @@ import { db } from "#app/db";
  * @extends Assign
  * @public
  */
-@SlashCommand({
+@CommandDeclare({
     names: {
         "en-US": "play",
         "ru": "играть"
@@ -22,7 +22,7 @@ import { db } from "#app/db";
     },
     integration_types: ["GUILD_INSTALL"]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "api",
         "ru": "платформа"
@@ -66,7 +66,7 @@ import { db } from "#app/db";
         }
     ],
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     type: ApplicationCommandOptionType.Subcommand,
     names: {
         "en-US": "replay",
@@ -77,7 +77,7 @@ import { db } from "#app/db";
         "ru": "Перезапуск очереди!!! Необходимо для повторного включения если проигрывание было завершено!"
     },
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     type: ApplicationCommandOptionType.Subcommand,
     names: {
         "en-US": "stop",
@@ -88,7 +88,7 @@ import { db } from "#app/db";
         "ru": "Принудительное завершение проигрывания музыки!"
     },
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     type: ApplicationCommandOptionType.Subcommand,
     names: {
         "en-US": "wave",

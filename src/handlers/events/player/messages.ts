@@ -37,7 +37,7 @@ class message_error extends Assign<Event<"message/error">> {
                             },
                             {
                                 name: locale._(queue.message.locale, "player.current.error"),
-                                value: `\`\`\`js\n${error}...\`\`\``
+                                value: `\`\`\`js\n${error}\`\`\``
                             }
                         ],
                         author: {name: artist.title, url: artist.url, iconURL: artist.image.url},

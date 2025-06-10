@@ -1,4 +1,4 @@
-import { SlashCommand, SlashCommandSubCommand, BaseCommand } from "#handler/commands";
+import { CommandDeclare, CommandOptions, BaseCommand } from "#handler/commands";
 import { ApplicationCommandOptionType, MessageFlags, User } from "discord.js";
 import { locale } from "#service/locale";
 import { Assign } from "#structures";
@@ -11,7 +11,7 @@ import { db } from "#app/db";
  * @extends Assign
  * @public
  */
-@SlashCommand({
+@CommandDeclare({
     names: {
         "en-US": "avatar",
         "ru": "аватар"
@@ -23,7 +23,7 @@ import { db } from "#app/db";
     integration_types: ["GUILD_INSTALL", "USER_INSTALL"],
     contexts: ["GUILD", "BOT_DM", "PRIVATE_CHANNEL"]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "user",
         "ru": "пользователь"

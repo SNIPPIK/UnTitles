@@ -1,4 +1,4 @@
-import { BaseCommand, SlashCommand, SlashCommandSubCommand } from "#handler/commands";
+import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType, Colors } from "discord.js";
 import { RestServerSide } from "#handler/rest";
 import { locale } from "#service/locale";
@@ -12,7 +12,7 @@ import { db } from "#app/db";
  * @extends Assign
  * @public
  */
-@SlashCommand({
+@CommandDeclare({
     names: {
         "en-US": "api",
         "ru": "api"
@@ -23,7 +23,7 @@ import { db } from "#app/db";
     },
     integration_types: ["GUILD_INSTALL"]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "access",
         "ru": "доступ"

@@ -114,14 +114,10 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
         const path = await track?.resource;
 
         // Если получена ошибка вместо исходника
-        if (path instanceof Error) {
-            return Error(`Critical error in track.resource!\n\n${path.name}\n- ${path.message}`);
-        }
+        if (path instanceof Error) return path;
 
         // Если нет исходника
-        else if (!path) {
-            return new Error("Fail to get audio link");
-        }
+        else if (!path) return new Error("AudioError\n - Do not getting audio link!");
 
         // Если получить трек удалось
         return path;

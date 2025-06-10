@@ -1,5 +1,5 @@
 import { TypedEmitter } from "#structures";
-import { createSocket } from "node:dgram";
+import { createSocket, type Socket } from "node:dgram";
 import { isIPv4 } from "node:net";
 
 /**
@@ -34,7 +34,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @readonly
      * @private
      */
-    private socket = createSocket({ type: "udp4" });
+    private socket: Socket;
 
     /**
      * @description Данные для поддержания udp соединения
@@ -97,6 +97,11 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      */
     public constructor(private options: UDPConnection) {
         super();
+
+        // Проверяем через какое соединение подключатся
+        if (isIPv4(options.ip)) this.socket = createSocket("udp4");
+        else this.socket = createSocket("udp6");
+
         // Если подключение возвращает ошибки
         this.socket.on("error", (err) => {
             this.emit("error", err);

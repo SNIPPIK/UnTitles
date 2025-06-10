@@ -21,6 +21,17 @@ export interface RequestData {
 
 /**
  * @author SNIPPIK
+ * @description Данные поступающие при head запросе
+ * @interface httpsClient_head
+ */
+interface httpsClient_head {
+    statusCode: number,
+    statusMessage: string,
+    headers: RequestData["headers"] & IncomingMessage | RequestData["headers"] | {},
+}
+
+/**
+ * @author SNIPPIK
  * @description Генерация User-Agent строки, эмулирующей браузер
  * @private
  */
@@ -47,6 +58,24 @@ export class httpsClient {
             if (typeof this.data.userAgent === "string") this.data.headers['User-Agent'] = this.data.userAgent;
             else this.data.headers['User-Agent'] = generateUserAgent();
         }
+    };
+
+    /**
+     * @description Берем данные из XML страницы
+     * @public
+     */
+    public get toXML(): Promise<Error | string[]> {
+        return new Promise(async (resolve) => {
+            const body = await this.send() as string | Error;
+
+            // Если была получена ошибка
+            if (body instanceof Error) return resolve(Error("Not found XML data!"));
+
+            // Ищем данные в XML странице для дальнейшего вывода
+            const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
+            const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
+            return resolve(filtered.filter((text) => text.trim() !== ""));
+        });
     };
 
     /**
@@ -87,12 +116,13 @@ export class httpsClient {
      * @description Метод HEAD-запроса, возвращающий только заголовки и статус
      * @public
      */
-    public async head(): Promise<{ statusCode: number; headers: IncomingMessage['headers'] }> {
+    public async head(): Promise<httpsClient_head> {
         this.data.method = "HEAD";
-        const response = await this.send();
+        const response = await this.send() as httpsClient_head;
 
         return {
             statusCode: (response && response.statusCode) || 0,
+            statusMessage: response.statusMessage || "",
             headers: response && response.headers || {},
         };
     };
@@ -129,7 +159,7 @@ export class httpsClient {
                 if (!this.isStatusValid(res.statusCode || 0)) return reject(new Error(`Invalid response status: ${res.statusCode}`));
 
                 // HEAD-запрос — сразу вернуть результат без чтения тела
-                if (method === 'HEAD') return resolve({ statusCode: res.statusCode, headers: res.headers });
+                if (method === 'HEAD') return resolve({ statusCode: res.statusCode, headers: res.headers, statusMessage: res.statusMessage });
 
                 let stream: IncomingMessage | ReturnType<typeof createGunzip> = res;
 
@@ -165,22 +195,36 @@ export class httpsClient {
             req.end();
         });
     };
+}
 
+/**
+ * @author SNIPPIK
+ * @description Класс с утилитами для работы с HTTP/HTTPS
+ * @class httpsStatusCode
+ */
+export class httpsStatusCode {
     /**
-     * @description Берем данные из XML страницы
+     * @description Парсинг статус кода
+     * @static
      * @public
      */
-    public get toXML(): Promise<Error | string[]> {
-        return new Promise(async (resolve) => {
-            const body = await this.send() as string | Error;
+    public static parse = ({statusCode, statusMessage}: httpsClient_head) => {
+        // Допустимый статус код
+        if (statusCode < 300 && statusCode >= 200) return null;
 
-            // Если была получена ошибка
-            if (body instanceof Error) return resolve(Error("Not found XML data!"));
+        // Статус коды
+        switch (statusCode) {
+            case 400:
+                return Error(`[400]: The server could not understand the request due to incorrect syntax`);
+            case 401:
+                return Error(`[401]: Authentication required, but data provided is incorrect or missing`);
+            case 402:
+                return Error(`[402]: Payment is required to access the requested resource`);
+            case 403:
+                return Error(`[403]: Access forbidden due to restrictions`);
+        }
 
-            // Ищем данные в XML странице для дальнейшего вывода
-            const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
-            const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
-            return resolve(filtered.filter((text) => text.trim() !== ""));
-        });
+        // Если неизвестный статус код
+        return Error(`[${statusCode}]: ${statusMessage}`);
     };
 }

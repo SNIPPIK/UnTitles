@@ -24,7 +24,7 @@ export class RestObject {
     public platforms: RestServerSide.Data;
 
     /**
-     * @description Исключаем платформы из общего списка
+     * @description Платформы с доступом к запросам
      * @public
      */
     public get allow() {
@@ -32,7 +32,15 @@ export class RestObject {
     };
 
     /**
-     * @description Исключаем платформы из общего списка
+     * @description Платформы с доступом к аудио
+     * @public
+     */
+    public get audioSupport() {
+        return Object.values(this.platforms.supported).filter(api => api.auth && api.audio);
+    };
+
+    /**
+     * @description Платформы с доступом к потоку
      * @public
      */
     public get allowWave() {
@@ -158,32 +166,57 @@ export class RestObject {
                 return song instanceof Error ? song : song.link;
             }
 
-            // Поиск платформы с аудио и запросами
-            const platform = this.allow.find(plt => plt.requests.length >= 2 && plt.audio);
-            if (!platform) return new Error("No suitable platform found");
+            let link: string = null, lastError: Error;
 
-            const platformAPI = this.request(platform.name);
+            for (const platform of this.audioSupport) {
+                if (platform.requests.length < 2) continue;
 
-            // Поиск трека
-            const searchQuery = `${artist.title} - ${name} (Lyric)`;
-            const tracks = await platformAPI.request<"search">(searchQuery).request();
+                const platformAPI = this.request(platform.name);
 
-            if (tracks instanceof Error) return tracks;
-            else if (!tracks.length) return new Error("No tracks found");
+                // Поиск трека
+                const searchQuery = `${artist.title} - ${name} "(Lyric)"`;
+                const tracks = await platformAPI.request<"search">(searchQuery).request();
 
-            const findTrack = tracks.find((song) => {
-                return Math.abs(song.time.total - track.time.total) <= 20;
-            });
+                if (tracks instanceof Error) {
+                    lastError = tracks;
+                    continue;
+                }
 
-            // Если отфильтровать треки не удалось
-            if (!findTrack) return new Error("Fail filter tracks");
+                else if (!tracks.length) {
+                    lastError = Error(`[APIs/${platform.name}] Couldn't find any tracks similar to this one`);
+                    continue;
+                }
 
-            // Получение исходника
-            const song = await platformAPI.request<"track">(findTrack?.url, { audio: true }).request();
-            return song instanceof Error ? song : song.link ?? new Error("Link not found");
+                const findTrack = tracks.find((song) => {
+                    return Math.abs(song.time.total - track.time.total) <= 20;
+                });
 
+                // Если отфильтровать треки не удалось
+                if (!findTrack) {
+                    lastError = Error(`[APIs/${platform.name}] The tracks found do not match the description of this`);
+                    continue;
+                }
+
+                // Получение исходника
+                const song = await platformAPI.request<"track">(findTrack?.url, { audio: true }).request();
+
+                if (song instanceof Error) {
+                    lastError = song;
+                    continue;
+                }
+
+                link = song.link;
+                break;
+            }
+
+            // Если во время поиска произошла ошибка
+            if (lastError && !link) return lastError;
+
+            else if (!lastError && !link) return Error(`[APIs] Audio link not found`);
+
+            return link;
         } catch (err) {
-            return err instanceof Error ? err : new Error("Unexpected error");
+            return err instanceof Error ? err : Error(`[APIs] Unexpected error`);
         }
     };
 }

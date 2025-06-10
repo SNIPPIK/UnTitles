@@ -1,4 +1,4 @@
-import { BaseCommand, SlashCommand, SlashCommandSubCommand } from "#handler/commands";
+import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType, Colors } from "discord.js";
 import { locale } from "#service/locale";
 import { Assign } from "#structures";
@@ -11,7 +11,7 @@ import { db } from "#app/db";
  * @extends Assign
  * @public
  */
-@SlashCommand({
+@CommandDeclare({
     names: {
         "en-US": "bot",
         "ru": "бот"
@@ -22,7 +22,7 @@ import { db } from "#app/db";
     },
     integration_types: ["GUILD_INSTALL"]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "restart",
         "ru": "перезагрузка"
@@ -129,7 +129,7 @@ class WorkBotCommand extends Assign< BaseCommand > {
  * @extends Assign
  * @public
  */
-@SlashCommand({
+@CommandDeclare({
     names: {
         "en-US": "bot-profile",
         "ru": "бот-профиль"
@@ -139,7 +139,7 @@ class WorkBotCommand extends Assign< BaseCommand > {
         "ru": "Управление профилем бота!"
     }
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "avatar",
         "ru": "аватар"

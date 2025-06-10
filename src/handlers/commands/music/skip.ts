@@ -1,4 +1,4 @@
-import { BaseCommand, SlashCommand, SlashCommandSubCommand } from "#handler/commands";
+import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType } from "discord.js";
 import { locale } from "#service/locale";
 import { Assign } from "#structures";
@@ -11,7 +11,7 @@ import { db } from "#app/db";
  * @extends Assign
  * @public
  */
-@SlashCommand({
+@CommandDeclare({
     names: {
         "en-US": "skip",
         "ru": "пропуск"
@@ -22,7 +22,7 @@ import { db } from "#app/db";
     },
     integration_types: ["GUILD_INSTALL"]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "back",
         "ru": "назад"
@@ -48,7 +48,7 @@ import { db } from "#app/db";
         }
     ]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "to",
         "ru": "на"
@@ -74,7 +74,7 @@ import { db } from "#app/db";
         }
     ]
 })
-@SlashCommandSubCommand({
+@CommandOptions({
     names: {
         "en-US": "next",
         "ru": "вперед"
