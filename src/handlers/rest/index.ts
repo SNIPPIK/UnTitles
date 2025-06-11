@@ -2,6 +2,7 @@ import { Worker } from "node:worker_threads";
 import { Track } from "#service/player";
 import path from "node:path";
 import { db } from "#app/db";
+import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -36,7 +37,7 @@ export class RestObject {
      * @public
      */
     public get audioSupport() {
-        return Object.values(this.platforms.supported).filter(api => api.auth && api.audio);
+        return Object.values(this.platforms.supported).filter(api => api.auth && api.audio && !this.platforms.block.includes(api.name));
     };
 
     /**
@@ -174,7 +175,7 @@ export class RestObject {
                 const platformAPI = this.request(platform.name);
 
                 // Поиск трека
-                const searchQuery = `${artist.title} - ${name} "(Lyric)"`;
+                const searchQuery = `${name} - ${artist.title}`;
                 const tracks = await platformAPI.request<"search">(searchQuery).request();
 
                 if (tracks instanceof Error) {
@@ -188,7 +189,7 @@ export class RestObject {
                 }
 
                 const findTrack = tracks.find((song) => {
-                    return Math.abs(song.time.total - track.time.total) <= 20;
+                    return Math.abs(song.time.total - track.time.total) <= 20 && !!song.name.match(track.name);
                 });
 
                 // Если отфильтровать треки не удалось

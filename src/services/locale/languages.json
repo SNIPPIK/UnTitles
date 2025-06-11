@@ -129,13 +129,13 @@
   },
 
   "player.button.resume": {
-    "ru": "Возобновление проигрывания!",
-    "en-US": "Resume playing!"
+    "ru": "Возобновление проигрывания!\n\n**❯** **{ARGUMENT}**",
+    "en-US": "Resume playing!\n\n**❯** **{ARGUMENT}**"
   },
 
   "player.button.pause": {
-    "ru": "Приостановка проигрывания!",
-    "en-US": "Pause playing!"
+    "ru": "Приостановка проигрывания!\n\n**❯** **{ARGUMENT}**",
+    "en-US": "Pause playing!\n\n**❯** **{ARGUMENT}**"
   },
 
   "player.button.skip": {

@@ -239,6 +239,12 @@ class ButtonPlayToggle extends Assign<Button> {
             name: "resume_pause",
             callback: (message) => {
                 const queue = db.queues.get(message.guildId);
+                const track = queue.tracks.track;
+
+                // Если указан трек которого нет
+                if (!track) return null;
+
+                const {name, url} = track;
 
                 // Если плеер уже проигрывает трек
                 if (queue.player.status === "player/playing") {
@@ -250,7 +256,7 @@ class ButtonPlayToggle extends Assign<Button> {
                         flags: "Ephemeral",
                         embeds: [
                             {
-                                description: locale._(message.locale, "player.button.pause"),
+                                description: locale._(message.locale, "player.button.pause", [`[${name}](${url})`]),
                                 color: Colors.Green
                             }
                         ]
@@ -267,7 +273,7 @@ class ButtonPlayToggle extends Assign<Button> {
                         flags: "Ephemeral",
                         embeds: [
                             {
-                                description: locale._(message.locale, "player.button.resume"),
+                                description: locale._(message.locale, "player.button.resume", [`[${name}](${url})`]),
                                 color: Colors.Green
                             }
                         ]
