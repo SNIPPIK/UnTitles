@@ -1,5 +1,5 @@
-import { TypedEmitter } from "#structures";
 import { createSocket, type Socket } from "node:dgram";
+import { TypedEmitter } from "#structures";
 import { isIPv4 } from "node:net";
 
 /**

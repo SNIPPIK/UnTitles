@@ -1,84 +1,7 @@
 import { VoiceOpcodes } from "discord-api-types/voice";
+import { VoiceConnection } from "#service/voice";
 import { TypedEmitter } from "#structures";
 import { WebSocket, Data } from "ws";
-
-/**
- * @author SNIPPIK
- * @description События выдаваемые голосовым подключением
- */
-interface ClientWebSocketEvents {
-    /**
-     * @description Если произошла ошибка
-     * @param err - Сама ошибка
-     */
-    "error": (err: Error) => void;
-
-    /**
-     * @description Если получен код выключения от discord
-     * @param code - Код отключения
-     * @param reason - Причина отключения
-     */
-    "close": (code: WebSocketCloseCodes, reason: string) => void;
-
-    /**
-     * @description Если клиент был отключен из-за отключения бота от голосового канала
-     * @param code - Код отключения
-     * @param reason - Причина отключения
-     */
-    "disconnect": (code: number, reason: string) => void;
-
-    /**
-     * @description Событие для opcodes, приходят не все
-     * @param opcodes - Не полный список получаемых opcodes
-     */
-    "packet": (opcodes: opcode.exported) => void;
-
-    /**
-     * @description Успешное подключение WebSocket
-     * @usage
-     * ```
-     * op: VoiceOpcodes.Identify,
-     *     d: {
-     *          server_id: this.configuration.guild_id,
-     *          session_id: this.voiceState.session_id,
-     *          user_id: this.voiceState.user_id,
-     *          token: this.serverState.token
-     * }
-     * ```
-     */
-    "connect": () => void;
-
-    /**
-     * @description Требуется для переподключения WebSocket
-     * @usage
-     * ```
-     * op: VoiceOpcodes.Resume,
-     *    d: {
-     *          server_id: this.configuration.guild_id,
-     *          session_id: this.voiceState.session_id,
-     *          token: this.serverState.token,
-     *          seq_ack: this.websocket.lastAsk
-     * }
-     * ```
-     */
-    "request_resume": () => void;
-}
-
-/**
- * @author SNIPPIK
- * @description Статусы подключений websocket
- * @enum WebSocketStatuses
- */
-enum WebSocketStatuses {
-    // Если подключение полностью готово
-    ready = "ready",
-
-    // Если производится подключение
-    connecting = "connecting",
-
-    // Если подключение разорвано
-    close = "close"
-}
 
 /**
  * @author SNIPPIK
@@ -88,9 +11,6 @@ enum WebSocketStatuses {
  * @public
  */
 export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
-    private _status = WebSocketStatuses.connecting;
-    private ws: WebSocket;
-
     /**
      * @description Данные для проверки жизни websocket
      * @private
@@ -106,17 +26,23 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     };
 
     /**
+     * @description Клиент ws
+     * @private
+     */
+    private ws: WebSocket;
+
+    /**
      * @description Номер последнего принятого пакета
      * @public
      */
     public lastAsk: number = 0;
 
     /**
-     * @description Получаем статус websocket
+     * @description Подключен ли websocket к endpoint
      * @public
      */
-    public get status() {
-        return this._status;
+    public get connected() {
+        return this.ws && this.ws.readyState !== WebSocket.CLOSED;
     };
 
     /**
@@ -125,7 +51,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public set packet(payload: opcode.extract) {
-        if (this.status === WebSocketStatuses.ready) {
+        if (this.connected) {
             try {
                 this.ws.send(JSON.stringify(payload));
             } catch (e) {
@@ -134,12 +60,34 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
     };
 
+
     /**
      * @description Создаем класс
      * @param endpoint - Путь подключения
+     * @param connection - Класс голосового подключения
      */
-    public constructor(private readonly endpoint: string) {
+    public constructor(
+        private readonly endpoint: string,
+        private readonly connection: VoiceConnection,
+    ) {
         super();
+    };
+
+    /**
+     * @description Отключение текущего websocket подключения
+     * @public
+     */
+    public reset = () => {
+        this.emit("debug", "[WS] reset requested");
+
+        // Если есть websocket клиент
+        if (this.ws) {
+            if (this.ws.readyState !== WebSocket.CLOSED) this.ws.close();
+            this.ws = null;
+        }
+
+        this.lastAsk = 0;
+        this.clearHeartbeat();
     };
 
     /**
@@ -148,68 +96,39 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public connect = () => {
         // Если есть прошлый WS
-        if (this.ws) this.cleanupWebSocket();
+        if (this.ws) this.reset();
 
         this.ws = new WebSocket(this.endpoint, {
-            handshakeTimeout: 7e3,
             sessionTimeout: 5e3,
             headers: {
                 "User-Agent": "VoiceClient (https://github.com/SNIPPIK/UnTitles/tree/beta/src/services/voice)"
             }
         });
 
-        // Сообщение от ws
+        // Сообщение от websocket соединения
         this.ws.on("message", this.onEventMessage);
 
-        // Закрытие ws
+        // Закрытие websocket соединения
         this.ws.on("close",  this.onEventClose);
 
-        // Ошибка ws
+        // Ошибка websocket соединения
         this.ws.on("error",  err  => this.emit("error", err));
 
-        // Запуск ws
-        this.ws.on("open",   () => {
-            this._status = WebSocketStatuses.ready;
-            this.emit("connect");
-        });
-    };
+        // Запуск websocket соединения
+        this.ws.on("open", () => {
+                this.packet = {
+                    op: VoiceOpcodes.Identify,
+                    d: {
+                        server_id: this.connection.configuration.guild_id,
+                        session_id: this.connection.voiceState.session_id,
+                        user_id: this.connection.voiceState.user_id,
+                        token: this.connection.serverState.token
+                    }
+                };
 
-    /**
-     * @description Уничтожаем подключение
-     * @public
-     */
-    public destroy = () => {
-        this.cleanupWebSocket();
-        this.removeAllListeners();
-
-        if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
-        if (this.heartbeat.interval) clearTimeout(this.heartbeat.interval);
-
-        this.ws = null;
-        this.heartbeat.miss = null;
-        this.heartbeat.timeout = null;
-        this.heartbeat.interval = null;
-        this.heartbeat.intervalMs = null;
-        this.heartbeat.reconnects = null;
-        this.lastAsk = null;
-        this._status = null;
-    };
-
-    /**
-     * @description Функция уничтожения подключения
-     * @private
-     */
-    private cleanupWebSocket = () => {
-        this.ws?.removeAllListeners();
-
-        // Проверяем на готовность
-        if (this.ws && this.ws?.readyState === WebSocket.OPEN) {
-            this.ws?.close(1000);
-            this.ws?.terminate();
-            this.emit("close", 1000, "Normal closing");
-        }
-
-        this.ws = null;
+                this.emit("open");
+            }
+        );
     };
 
     /**
@@ -233,7 +152,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         switch (op) {
             // Получение heartbeat_interval
             case VoiceOpcodes.Hello: {
-                this.manageHeartbeat(d.heartbeat_interval);
+                this.setHeartbeat(d.heartbeat_interval);
                 this.heartbeat.intervalMs = d.heartbeat_interval;
                 break;
             }
@@ -248,7 +167,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Проверка переподключения
             case VoiceOpcodes.Resumed: {
                 this.heartbeat.reconnects = 0;
-                this.manageHeartbeat();
+                this.setHeartbeat();
                 break;
             }
 
@@ -260,12 +179,16 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Получение статуса готовности
             case VoiceOpcodes.Ready: {
-                this.emit("packet", payload);
+                this.emit("ready", payload);
                 this.heartbeat.reconnects = 0; // Сбросить счётчик при успешном подключении
                 break;
             }
 
-            default: this.emit("packet", payload);
+            // Получение статуса о данных сессии
+            case VoiceOpcodes.SessionDescription: {
+                this.emit("sessionDescription", payload);
+                break;
+            }
         }
 
         // Для отладки
@@ -283,7 +206,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.emit("debug", `WS Close: ${code} - ${reason}`);
 
         // Если ws был подключен до отключения
-        if (this._status === WebSocketStatuses.ready) {
+        if (this.connected) {
             // Если заново подключится не выйдет
             if (recreateCodes.includes(code)) {
                 this.attemptReconnect(true);
@@ -320,8 +243,30 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         setTimeout(() => {
             this.emit("debug", `Reconnecting... Attempt ${this.heartbeat.reconnects}`);
-            this.emit("request_resume");
+            this.emit("resumed");
         }, delay);
+    };
+
+    /**
+     * @description Управление состоянием heartbeat websocket'а
+     * @param intervalMs - Время в мс
+     * @private
+     */
+    private setHeartbeat = (intervalMs?: number) => {
+        if (this.heartbeat.interval) clearInterval(this.heartbeat.interval);
+        if (intervalMs !== 0) this.heartbeat.intervalMs = intervalMs;
+
+        this.heartbeat.interval = setInterval(() => {
+            this.packet = {
+                op: VoiceOpcodes.Heartbeat,
+                d: {
+                    t: Date.now(),
+                    seq_ack: this.lastAsk
+                }
+            };
+
+            this.startHeartbeatTimeout();
+        }, this.heartbeat.intervalMs);
     };
 
     /**
@@ -342,25 +287,17 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     };
 
     /**
-     * @description Управление состоянием heartbeat websocket'а
-     * @param intervalMs - Время в мс
+     * @description Очищает heartbeat интервал
      * @private
      */
-    private manageHeartbeat(intervalMs?: number) {
-        if (this.heartbeat.interval) clearInterval(this.heartbeat.interval);
-        if (intervalMs !== 0) this.heartbeat.intervalMs = intervalMs;
+    private clearHeartbeat = () => {
+        if (!this.heartbeat.interval) {
+            this.emit('warn', 'Tried to clear a heartbeat interval that does not exist');
+            return;
+        }
 
-        this.heartbeat.interval = setInterval(() => {
-            this.packet = {
-                op: VoiceOpcodes.Heartbeat,
-                d: {
-                    t: Date.now(),
-                    seq_ack: this.lastAsk
-                }
-            };
-
-            this.startHeartbeatTimeout();
-        }, this.heartbeat.intervalMs);
+        clearInterval(this.heartbeat.interval);
+        this.heartbeat.interval = null;
     };
 
     /**
@@ -377,8 +314,95 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this.heartbeat.timeout = null;
         }
     };
+
+    /**
+     * @description Уничтожаем подключение
+     * @public
+     */
+    public destroy = () => {
+        this.reset();
+        this.removeAllListeners();
+
+        if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
+        if (this.heartbeat.interval) clearTimeout(this.heartbeat.interval);
+
+        this.heartbeat.miss = null;
+        this.heartbeat.timeout = null;
+        this.heartbeat.interval = null;
+        this.heartbeat.intervalMs = null;
+        this.heartbeat.reconnects = null;
+        this.lastAsk = null;
+    };
 }
 
+/**
+ * @author SNIPPIK
+ * @description События выдаваемые голосовым подключением
+ * @interface ClientWebSocketEvents
+ */
+interface ClientWebSocketEvents {
+    /**
+     * @description Если произошла ошибка
+     * @param err - Сама ошибка
+     */
+    "error": (err: Error) => void;
+
+    /**
+     * @description Если получен код выключения от discord
+     * @param code - Код отключения
+     * @param reason - Причина отключения
+     */
+    "close": (code: WebSocketCloseCodes, reason: string) => void;
+
+    /**
+     * @description Если клиент был отключен из-за отключения бота от голосового канала
+     * @param code - Код отключения
+     * @param reason - Причина отключения
+     */
+    "disconnect": (code: number, reason: string) => void;
+
+    /**
+     * @description Событие для opcodes, приходят не все
+     * @param opcodes - Не полный список получаемых opcodes
+     */
+    "ready": (opcodes: opcode.ready) => void;
+
+    /**
+     * @description Событие для opcodes, приходят не все
+     * @param opcodes - Не полный список получаемых opcodes
+     */
+    "sessionDescription": (opcodes: opcode.session) => void;
+
+    /**
+     * @description Успешное подключение WebSocket
+     * @usage
+     * ```
+     * op: VoiceOpcodes.Identify,
+     *     d: {
+     *          server_id: this.configuration.guild_id,
+     *          session_id: this.voiceState.session_id,
+     *          user_id: this.voiceState.user_id,
+     *          token: this.serverState.token
+     * }
+     * ```
+     */
+    "open": () => void;
+
+    /**
+     * @description Требуется для переподключения WebSocket
+     * @usage
+     * ```
+     * op: VoiceOpcodes.Resume,
+     *    d: {
+     *          server_id: this.configuration.guild_id,
+     *          session_id: this.voiceState.session_id,
+     *          token: this.serverState.token,
+     *          seq_ack: this.websocket.lastAsk
+     * }
+     * ```
+     */
+    "resumed": () => void;
+}
 
 /**
  * @author SNIPPIK
@@ -391,11 +415,6 @@ export namespace opcode {
      * @type extract
      */
     export type extract = identify | select_protocol | ready | heartbeat | session | speaking | heartbeat_ask | resume | hello | resumed | disconnect;
-
-    /**
-     * @description Opcodes, эти коды выходят из события packet
-     */
-    export type exported = identify | select_protocol | ready | heartbeat | session | speaking | resume;
 
     /**
      * @description Данные для подключения именно к голосовому каналу
