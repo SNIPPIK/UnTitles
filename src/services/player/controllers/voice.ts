@@ -22,8 +22,7 @@ export class ControllerVoice<T extends VoiceConnection> {
      */
     public set connection(connection: T) {
         if (this.connection) {
-            this._connection.disconnect();
-            this._connection.destroy();
+            if (this._connection.disconnect) this._connection.destroy();
         }
 
         this._connection = connection;
@@ -47,7 +46,7 @@ export class ControllerVoice<T extends VoiceConnection> {
     public join = (client: DiscordClient, ctx: QueueMessage<CommandInteraction>["voice"]) => {
         this.connection = db.voice.join({
             self_deaf: true,
-            self_mute: true,
+            self_mute: false,
             guild_id: ctx.guild.id,
             channel_id: ctx.channelId
         }, client.adapter.createVoiceAdapter(ctx.guild.id)) as T;

@@ -171,7 +171,7 @@ class Command_Voice extends Assign< BaseCommand<VoiceChannel | string> > {
                             }
 
                             // Смена канала
-                            voiceConnection.swapChannel(VoiceChannel.id);
+                            voiceConnection.swapChannel = VoiceChannel.id;
                         }
 
                         // Подключаемся к голосовому каналу без очереди
@@ -197,7 +197,7 @@ class Command_Voice extends Assign< BaseCommand<VoiceChannel | string> > {
                         if (queue) queue.cleanup();
 
                         // Отключаемся от голосового канала
-                        voiceConnection.disconnect();
+                        if (!voiceConnection.disconnect) return null;
 
                         return message.reply({
                             embeds: [

@@ -11,6 +11,8 @@ import { WebSocket, Data } from "ws";
  * @public
  */
 export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
+    private endpoint: string;
+
     /**
      * @description Данные для проверки жизни websocket
      * @private
@@ -63,42 +65,25 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
     /**
      * @description Создаем класс
-     * @param endpoint - Путь подключения
      * @param connection - Класс голосового подключения
      */
     public constructor(
-        private readonly endpoint: string,
         private readonly connection: VoiceConnection,
     ) {
         super();
     };
 
     /**
-     * @description Отключение текущего websocket подключения
-     * @public
-     */
-    public reset = () => {
-        this.emit("debug", "[WS] reset requested");
-
-        // Если есть websocket клиент
-        if (this.ws) {
-            if (this.ws.readyState !== WebSocket.CLOSED) this.ws.close();
-            this.ws = null;
-        }
-
-        this.lastAsk = 0;
-        this.clearHeartbeat();
-    };
-
-    /**
      * @description Создаем подключение, websocket по ранее указанному пути
+     * @param endpoint - Путь подключения
      * @public
      */
-    public connect = () => {
+    public connect = (endpoint: string) => {
         // Если есть прошлый WS
         if (this.ws) this.reset();
 
-        this.ws = new WebSocket(this.endpoint, {
+        this.endpoint = endpoint;
+        this.ws = new WebSocket(endpoint, {
             sessionTimeout: 5e3,
             headers: {
                 "User-Agent": "VoiceClient (https://github.com/SNIPPIK/UnTitles/tree/beta/src/services/voice)"
@@ -201,20 +186,17 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @param reason - Причина закрытия
      */
     private onEventClose = (code: WebSocketCloseCodes, reason: string) => {
-        const recreateCodes: WebSocketCloseCodes[] = [1006];
+        const ignoreCodes: WebSocketCloseCodes[] = [4014, 4022];
 
         this.emit("debug", `WS Close: ${code} - ${reason}`);
 
+        // Если получен игнорируемый код
+        if (ignoreCodes.includes(code)) return;
+
         // Если ws был подключен до отключения
         if (this.connected) {
-            // Если заново подключится не выйдет
-            if (recreateCodes.includes(code)) {
-                this.attemptReconnect(true);
-                return;
-            }
-
             // Если можно подключится заново создавая новой ws
-            else if (code < 4000 || code === 4015) {
+            if (code < 4000 || code === 4015) {
                 this.attemptReconnect();
                 return;
             }
@@ -234,7 +216,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         if (reconnect || this.heartbeat.reconnects >= 3) {
             this.emit("debug", `Reconnecting...`);
-            this.connect();
+            this.connect(this.endpoint);
             return;
         }
 
@@ -313,6 +295,24 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             clearTimeout(this.heartbeat.timeout);
             this.heartbeat.timeout = null;
         }
+    };
+
+    /**
+     * @description Отключение текущего websocket подключения
+     * @public
+     */
+    public reset = () => {
+        this.emit("debug", "[WS] reset requested");
+
+        // Если есть websocket клиент
+        if (this.ws) {
+            if (this.ws.readyState !== WebSocket.CLOSED) this.ws.close();
+            this.removeAllListeners();
+            this.ws = null;
+        }
+
+        this.lastAsk = 0;
+        this.clearHeartbeat();
     };
 
     /**
@@ -624,4 +624,7 @@ export enum WebSocketCloseCodes {
 
     /** 4016 - Плохой запрос  */
     BAD_REQUEST = 4020,
+
+    /** 4022 - Сессия устарела  */
+    Session_Expired = 4022
 }

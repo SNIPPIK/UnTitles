@@ -65,7 +65,7 @@ class OtherVoiceChannel extends Assign<middleware<CommandInteraction>> {
                             const connection = db.voice.get(ctx.guildId);
 
                             // Отключаемся от голосового канала
-                            if (connection) connection.disconnect();
+                            if (connection) connection.disconnect;
                         }
 
                         // Если есть музыкальная очередь

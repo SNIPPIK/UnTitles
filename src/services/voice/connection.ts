@@ -23,7 +23,7 @@ export class VoiceConnection {
      * @description Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway
      * @private
      */
-    private websocket: ClientWebSocket;
+    private websocket: ClientWebSocket = new ClientWebSocket(this);
 
     /**
      * @description Клиент UDP соединения, ключевой класс для отправки пакетов
@@ -119,6 +119,27 @@ export class VoiceConnection {
     };
 
     /**
+     * @description Отключаемся от голосового канала
+     * @public
+     */
+    public get disconnect() {
+        this._status = VoiceConnectionStatus.disconnected;
+        this.configuration.channel_id = null;
+
+        // Отправляем в discord сообщение об отключении бота
+        return this.adapter.sendPayload(this.configuration);
+    };
+
+    /**
+     * @description Смена голосового канала
+     * @param ID - уникальный код канала
+     */
+    public set swapChannel(ID: string) {
+        this.configuration = {...this.configuration, channel_id: ID};
+        this.adapter.sendPayload(this.configuration);
+    };
+
+    /**
      * @description Данные из VOICE_STATE_UPDATE
      * @private
      */
@@ -177,15 +198,8 @@ export class VoiceConnection {
      * @private
      */
     private createWebSocket = (endpoint: string) => {
-        // Если есть прошлый websocket
-        if (this.websocket) {
-            this.websocket.reset();
-            this.websocket.removeAllListeners();
-        }
-
-        // Создаем websocket
-        this.websocket = new ClientWebSocket(`wss://${endpoint}?v=8`, this);
-        this.websocket.connect(); // Подключаемся к endpoint
+        // Подключаемся к endpoint
+        this.websocket.connect(`wss://${endpoint}?v=8`);
 
         // Если включен debug режим
         if (Logger.debug) {
@@ -311,8 +325,7 @@ export class VoiceConnection {
         this.udpClient.on("error", (error) => {
             // Если произведена попытка подключения к закрытому каналу
             if (`${error}`.match(/Not found IPv4 address/)) {
-                this.disconnect();
-                this.destroy();
+                if (this.disconnect) this.destroy();
                 return;
             }
 
@@ -321,27 +334,6 @@ export class VoiceConnection {
 
         // Сохраняем номер ssrc, для повторного использования
         this._attention.ssrc = d.ssrc;
-    };
-
-    /**
-     * @description Смена голосового канала
-     * @param ID - уникальный код канала
-     */
-    public swapChannel = (ID: string) => {
-        this.configuration = {...this.configuration, channel_id: ID};
-        this.adapter.sendPayload(this.configuration);
-    };
-
-    /**
-     * @description Отключаемся от голосового канала
-     * @public
-     */
-    public disconnect = () => {
-        this._status = VoiceConnectionStatus.disconnected;
-        this.configuration.channel_id = null;
-
-        // Отправляем в discord сообщение об отключении бота
-        return this.adapter.sendPayload(this.configuration);
     };
 
     /**
