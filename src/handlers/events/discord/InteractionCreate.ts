@@ -38,7 +38,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             name: Events.InteractionCreate,
             type: "client",
             once: false,
-            execute: async (ctx) => {
+            execute: (ctx) => {
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
@@ -169,7 +169,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         else if (command.middlewares && command.middlewares?.length > 0) {
             const rules = db.middlewares.filter((rule) => command.middlewares.includes(rule.name));
 
-            for (const rule of rules) {
+            for await (const rule of rules) {
                 if (!(await rule.callback(ctx))) return null;
             }
         }
@@ -273,7 +273,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             if (command.middlewares && command.middlewares?.length > 0) {
                 const rules = db.middlewares.filter((rule) => command.middlewares.includes(rule.name));
 
-                for (const rule of rules) {
+                for await (const rule of rules) {
                     if (!(await rule.callback(ctx as any))) return null;
                 }
             }

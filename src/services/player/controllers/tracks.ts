@@ -200,7 +200,7 @@ export class ControllerTracks<T extends Track> {
         if (!sorting) return slice;
 
         // Форматируем треки в строки с номерами
-        return slice.map((track, idx) => `\`${idx + 1}\` - ${track.name_replace}`);
+        return slice.map((track) => `\`${startIndex + 1}\` - ${track.name_replace}`);
     };
 
     /**

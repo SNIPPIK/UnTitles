@@ -230,11 +230,12 @@ export class Queue extends BaseQueue {
     public get componentEmbed() {
         try {
             const {api, artist, image, name, user} = this.tracks.track;
+            const position = this.tracks.position;
             return {
                 color: api.color, thumbnail: image,
                 author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
                 footer: {
-                    text: `${user.username} ${this.tracks.total > 1 ? `| 🎵 ${this.player.tracks.position + 1} - ${this.player.tracks.total} 🎶` : ""}`,
+                    text: `${user.username} ${this.tracks.total > 1 ? `| 🎵 ${position + 1} - ${this.tracks.total} 🎶` : ""}`,
                     iconURL: user.avatar
                 },
                 fields: [
@@ -247,7 +248,7 @@ export class Queue extends BaseQueue {
                     // Следующий трек или треки
                     this.tracks.size > 0 ? (() => {
                         const tracks = (this.tracks.array(+3) as Track[]).map((track, index) => {
-                            return `${index + 2} - ${track.name_replace}`;
+                            return `${position + index + 2} - ${track.name_replace}`;
                         });
 
                         return {

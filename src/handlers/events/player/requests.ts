@@ -42,8 +42,8 @@ class rest_request extends Assign<Event<"rest/request">> {
                             color: platform.color
                         }]
                     });
-                } catch (e) {
-                    console.error(e);
+                } catch (err) {
+                    console.error(err);
                 }
 
                 // Получаем данные в системе rest/API
@@ -56,8 +56,12 @@ class rest_request extends Assign<Event<"rest/request">> {
                     // Дожидаемся выполнения запроса
                     let rest = await Promise.race([api.request(), timeoutPromise]) as Track.list | Track[] | Track | Error;
 
-                    // Удаляем сообщение после выполнения запроса
-                    if (followUpPromise) setTimeout(() => followUpPromise.deletable ? followUpPromise.delete().catch(() => null) : {}, timeout);
+                    try {
+                        // Удаляем сообщение после выполнения запроса
+                        if (followUpPromise) setTimeout(() => followUpPromise.deletable ? followUpPromise.delete().catch(() => null) : {}, timeout);
+                    } catch (err) {
+                        console.error(err);
+                    }
 
                     // Обработка ошибки если что-то пошло не так
                     if (rest instanceof Error) {
@@ -87,7 +91,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                     db.queues.create(message, rest);
                 } catch (err) {
                     console.error(err);
-                    db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.type}**\\n**❯** **${err}**`);
+                    db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.type}**\n**❯** **${err}**`);
                 }
             }
         });

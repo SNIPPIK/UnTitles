@@ -205,7 +205,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
     protected static getFormat = (formats: any[], ClientID: string): Promise<string> => {
         return new Promise<string>(async (resolve) => {
             const FilterFormats = formats.filter((d) => d.format.protocol === "progressive").pop() ?? formats[0];
-            const EndFormat = await new httpsClient({url: `${FilterFormats.url}?client_id=${ClientID}`}).send() as json;
+            const EndFormat = await new httpsClient({url: `${FilterFormats.url}?client_id=${ClientID}`, userAgent: true}).send() as json;
 
             return resolve(EndFormat.url);
         });
