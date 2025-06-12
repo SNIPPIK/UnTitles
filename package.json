@@ -18,13 +18,15 @@
     "ws": "^8.18.2"
   },
   "devDependencies": {
-    "@types/node": "^22.15.30",
+    "@types/node": "^24.0.0",
     "@types/ws": "^8.18.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },
   "scripts": {
     "start-bun": "bun src",
+    "build-bun": "bun build --compile --minify --sourcemap src/index.ts --outfile untitles",
+
     "start": "cd build && node -r tsconfig-paths/register src --ShardManager",
     "build": "tsc",
     "auto": "npm run build && npm run start"

@@ -174,6 +174,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     protected _destroy = () => {
         Logger.log("DEBUG", `[AudioResource] has destroyed`);
+
         // Чистим все потоки от мусора
         this.emit("close");
 

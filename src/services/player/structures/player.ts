@@ -33,6 +33,13 @@ export const PLAYER_BUFFERED_TIME = 500;
  */
 abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
     /**
+     * @description Уникальный идентификатор плеера
+     * @protected
+     * @abstract
+     */
+    protected abstract id: string;
+
+    /**
      * @description Текущий статус плеера, при создании он должен быть в ожидании
      * @private
      */
@@ -104,6 +111,50 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     protected constructor(protected _tracks: ControllerTracks<Track>, protected _voice: ControllerVoice<VoiceConnection>) {
         super();
+    };
+
+    /**
+     * @description Функция отвечает за циклическое проигрывание, если хотим воспроизвести следующий трек надо избавится от текущего
+     * @abstract
+     * @public
+     */
+    public abstract play: () => void | Promise<void>;
+
+    /**
+     * @description Запуск чтения потока
+     * @param path - Путь до файла или ссылка на аудио
+     * @param time - Длительность трека
+     * @param seek - Время пропуска, трек начнется с указанного времени
+     */
+    protected readonly _readStream = (path: string, time: number = 0, seek: number = 0) => {
+        Logger.log("DEBUG", `[Player/${this.id}] has read stream`);
+
+        // Если другой аудио поток загружается, то запрещаем включение
+        if (this.waitStream) return null;
+
+        // Если нет других аудио потоков, задаем запрет на изменение
+        this.waitStream = true;
+
+        // Выбираем и создаем класс для предоставления аудио потока
+        const stream = new (time > PLAYER_BUFFERED_TIME || time === 0 ? PipeAudioResource : BufferedAudioResource)(
+            {
+                path,
+                options: { seek,
+                    filters: this._filters.compress(time)
+                }
+            }
+        );
+
+        // Отслеживаем аудио поток на ошибки
+        (stream as BufferedAudioResource).once("error", () => {
+            // Разрешаем вводить новые аудио потоки
+            this.waitStream = false;
+
+            // Уничтожаем новый аудио поток
+            stream.destroy();
+        });
+
+        return stream;
     };
 
     /**
@@ -207,7 +258,11 @@ export class AudioPlayer extends BasePlayer {
      * @param tracks - Ссылка на треки из очереди
      * @param voice - Ссылка на класс голосового подключения
      */
-    public constructor(public id: string, tracks: ControllerTracks<Track>, voice: ControllerVoice<VoiceConnection>) {
+    public constructor(
+        public id: string,
+        tracks: ControllerTracks<Track>,
+        voice: ControllerVoice<VoiceConnection>
+    ) {
         super(tracks, voice);
 
         // Добавляем плеер в базу для отправки пакетов
@@ -295,13 +350,46 @@ export class AudioPlayer extends BasePlayer {
 
             // Если получена ошибка вместо исходника
             if (!resource) return;
+
+            // Если при получении ссылки или пути на аудио произошла ошибка
             else if (resource instanceof Error) {
                 this.emit("player/error", this, `${resource}`, {skip: true, position: positionIndex});
                 return
             }
 
-            if (timeout) setTimeout(() => this._readStream(resource, track.time.total, seek), timeout);
-            else return this._readStream(resource, track.time.total, seek);
+            // Создаем аудио поток
+            const stream = this._readStream(resource, track.time.total, seek);
+
+            // Если нельзя создать аудио поток, поскольку создается другой
+            if (!stream) return;
+
+            // Действия при готовности
+            const handleReady = () => {
+                this.waitStream = false;
+                this._audio.current = stream;
+                this.status = "player/playing";
+
+                // Если трек включен в 1 раз
+                if (seek === 0) {
+                    const queue = db.queues.get(this.id);
+                    db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно
+                }
+            };
+
+            // Подключаем события для отслеживания работы потока (временные)
+            (stream as BufferedAudioResource)
+
+                // Если чтение возможно
+                .once("readable", () => {
+                    if (timeout) setTimeout(handleReady, timeout);
+                    else handleReady();
+                })
+
+                // Если была получена ошибка при чтении
+                .once("error", (error: Error) => {
+                    // Отправляем данные событию для отображения ошибки
+                    this.emit("player/error", this, `${error}`, { skip: true, position: positionIndex });
+                });
         } catch (err) {
             this.emit("player/error", this, `${err}`, { skip: true, position: positionIndex });
 
@@ -411,50 +499,6 @@ export class AudioPlayer extends BasePlayer {
     public destroy = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has destroyed`);
         this.removeAllListeners();
-    };
-
-    /**
-     * @description Запуск чтения потока
-     * @param path - Путь до файла или ссылка на аудио
-     * @param time - Длительность трека
-     * @param seek - Время пропуска, трек начнется с указанного времени
-     */
-    private readonly _readStream = (path: string, time: number = 0, seek: number = 0) => {
-        Logger.log("DEBUG", `[Player/${this.id}] has read stream`);
-
-        // Если аудио уже загружается
-        if (this.waitStream) return;
-        this.waitStream = true;
-
-        const options = { seek, filters: this._filters.compress(time) };
-        const stream = new (time > PLAYER_BUFFERED_TIME || time === 0 ? PipeAudioResource : BufferedAudioResource)({path, options}); // Создаем класс для управления потоком
-        const handleReady = () => {
-            this.waitStream = false;
-            this._audio.current = stream;
-            this.status = "player/playing";
-
-            // Если трек включен в 1 раз
-            if (seek === 0) {
-                const queue = db.queues.get(this.id);
-                db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно
-            }
-        };
-
-        // Если стрим можно прочитать
-        if (stream.readable) handleReady();
-
-        else {
-            // Подключаем события для отслеживания работы потока (временные)
-            (stream as BufferedAudioResource)
-                .once("readable", handleReady)
-                .once("error", (error: Error) => {
-                    stream.destroy(); // Уничтожаем поток
-                    this.waitStream = false;
-
-                    // Отправляем данные событию для отображения ошибки
-                    throw error;
-                });
-        }
     };
 }
 

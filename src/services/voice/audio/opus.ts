@@ -127,6 +127,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
     public emitDestroy() {
         this._buffer = null;
         super.emitDestroy();
+        this.removeAllListeners();
     };
 }
 
@@ -172,8 +173,11 @@ export class BufferedEncoder extends Writable {
      * @param callback - Вызов ошибки
      */
     public _destroy(error: Error, callback: { (error?: Error): void }) {
+        this.encoder.emitDestroy();
         this.encoder = null;
+
         super._destroy(error, callback);
+        this.removeAllListeners();
     };
 }
 
@@ -219,8 +223,11 @@ export class PipeEncoder extends Transform {
      * @param callback - Вызов ошибки
      */
     public _destroy(error: Error, callback: { (error?: Error): void }) {
+        this.encoder.emitDestroy();
         this.encoder = null;
+
         super._destroy(error, callback);
+        this.removeAllListeners();
     };
 }
 

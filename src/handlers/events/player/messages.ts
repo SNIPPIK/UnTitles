@@ -26,7 +26,7 @@ class message_error extends Assign<Event<"message/error">> {
                 // Данные трека
                 const {api, artist, image, user, name} = position ? queue.tracks.get(position) : queue.tracks.track;
 
-
+                // Создаем сообщение
                 const message = await queue.message.send({
                     embeds: [{
                         color: api.color, thumbnail: image, timestamp: new Date(),
