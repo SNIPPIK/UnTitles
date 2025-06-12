@@ -106,7 +106,7 @@ class SkipUtilityCommand extends Assign< BaseCommand<number> > {
             permissions: {
                 client: ["ViewChannel", "SendMessages"]
             },
-            middlewares: ["voice", "another_voice", "queue", "player-not-playing"],
+            middlewares: ["voice", "another_voice", "queue", "player-not-playing", "player-wait-stream"],
             autocomplete: ({message, args, type}) => {
                 const number = args[0];
                 const queue = db.queues.get(message.guildId);

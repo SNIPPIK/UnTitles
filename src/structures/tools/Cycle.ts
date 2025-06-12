@@ -50,16 +50,25 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     };
 
     /**
+     * @description Выполняет шаг цикла с учётом точного времени следующего запуска
+     * @protected
+     */
+    protected abstract _stepCycle: () => void;
+
+    /**
      * @description Добавляем элемент в очередь
      * @param item - Объект T
      * @public
      */
     public add(item: T) {
         const existing = this.has(item);
+
+        // Если добавляется уже существующий объект
         if (existing) this.delete(item);
+
         super.add(item);
 
-        // Запускаем цикл
+        // Запускаем цикл, если добавлен первый объект
         if (this.size === 1 && this.startTime === 0) {
             this.startTime = this.localTime;
             setImmediate(this._stepCycle);
@@ -67,12 +76,6 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         return this;
     };
-
-    /**
-     * @description Выполняет шаг цикла с учётом точного времени следующего запуска
-     * @protected
-     */
-    protected _stepCycle: () => void;
 
     /**
      * @description Проверяем время для запуска цикла повторно
@@ -88,34 +91,39 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
             return;
         }
 
+        const nextTime = this.startTime + (this.loop * duration);              // Следующее время для определения
+        const delay = Math.max(0, nextTime - this.localTime);         // Цельный целевой интервал + остаток от предыдущих циклов
+
         // Номер прогона цикла
-        this.loop += 1;
+        this.loop++;
 
-        const nextTime = this.startTime + this.loop * duration;            // Следующее время для определения
-        const delay = Math.max(0, nextTime - this.localTime);     // Цельный целевой интервал + остаток от предыдущих циклов
-
-        // Цикл отстал, подтягиваем loop вперёд,
-        if (delay <= 0 || this.missCounter > 5) {
-            this.missCounter++;
-
-            if (this.missCounter > 5) {
-                // Принудительная стабилизация
-                this.startTime = this.localTime;
-                this.loop = 0;
-                this.missCounter = 0;
-            }
-
+        // Цикл отстал, подтягиваем loop вперёд
+        if (delay <= 0) {
             setImmediate(this._stepCycle);
+            return;
+        }
+
+        // Принудительная стабилизация
+        else if (this.missCounter > 5) {
+            this.startTime = this.localTime;
+            this.loop = 0;
+            this.missCounter = 0;
+
+            setTimeout(this._stepCycle, duration);
             return;
         }
 
         // Иначе ждем нужное время
         setTimeout(() => {
+            // Если цикл высокоточный, высчитываем дрифт цикла
             if (this.timer === "max") {
                 const drift = this.localTime - nextTime;
 
                 // Если отставание более 5 ms
-                if (drift > 5) this.missCounter++;
+                if (drift > 5) {
+                    //console.log(`Drift: ${drift}ms`);
+                    this.missCounter++;
+                }
             }
 
             return this._stepCycle();

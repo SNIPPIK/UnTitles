@@ -18,7 +18,7 @@ class PlayerNotPlaying extends Assign<middleware<CommandInteraction>> {
                 const queue = db.queues.get(ctx.guildId);
 
                 // Если музыку нельзя пропустить из-за плеера
-                if (!queue && !queue?.player?.playing && db.voice.get(ctx.guildId)) {
+                if ((!queue || !queue?.player?.playing) && db.voice.get(ctx.guildId)) {
                     await ctx.reply({
                         flags: "Ephemeral",
                         embeds: [
