@@ -117,9 +117,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         });
 
         // Если подключение оборвалось
-        this.socket.on("close", () => {
-            this.emit("close");
-        });
+        this.socket.on("close", this.emit.bind(this, "close"));
 
         this.socket.bind(); // обязательный вызов для активации сокета
         this.manageKeepAlive();

@@ -62,7 +62,7 @@ export class ControllerCycles {
                         if (old) this.delete(old);
                     }
                 },
-                filter: (message) => message["editable"],
+                filter: (message) => message["editable"] && (message.editedTimestamp ?? message.createdTimestamp) < Date.now() + 12e3,
                 execute: async (message) => {
                     const queue = db.queues.get(message.guild.id);
 

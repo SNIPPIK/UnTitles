@@ -53,13 +53,18 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public set packet(payload: opcode.extract) {
+        // Если ws подключен и работает
         if (this.connected) {
             try {
                 this.ws.send(JSON.stringify(payload));
             } catch (e) {
                 this.emit("error", new Error(`${e}`));
             }
+
+            return;
         }
+
+        this.emit("warn", `Failed send packet\n - ${payload}`);
     };
 
 
@@ -84,10 +89,16 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         this.endpoint = endpoint;
         this.ws = new WebSocket(endpoint, {
+            handshakeTimeout: 2e3,
             sessionTimeout: 5e3,
             headers: {
                 "User-Agent": "VoiceClient (https://github.com/SNIPPIK/UnTitles/tree/beta/src/services/voice)"
             }
+        });
+
+        // Если был получен ответ от подключения
+        this.ws.on("pong", () => {
+            if (this.connected) this.ws.resume();
         });
 
         // Сообщение от websocket соединения
@@ -97,7 +108,16 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.ws.on("close",  this.onEventClose);
 
         // Ошибка websocket соединения
-        this.ws.on("error",  err  => this.emit("error", err));
+        this.ws.on("error", (err) => {
+            // Если ws разорвал соединение из-за отсутствия интернета
+            if (`${err}`.match(/handshake has timed out/)) {
+                if (this.connected) this.ws.pause();
+                else this.destroy();
+                return;
+            }
+
+            this.emit("error", err);
+        });
 
         // Запуск websocket соединения
         this.ws.on("open", () => {

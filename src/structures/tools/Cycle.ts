@@ -22,7 +22,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @description Кол-во пропусков цикла
      * @private
      */
-    private missCounter = 0;
+    private missCounter: number = 0;
 
     /**
      * @description Тип таймера, задает точность таймера
@@ -34,7 +34,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @description Получение текущего времени для вычитания и получения точного времени
      * @private
      */
-    private get localTime() {
+    private get time() {
         if (this.timer === "low") return Date.now();
         return performance.now();
     };
@@ -70,7 +70,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Запускаем цикл, если добавлен первый объект
         if (this.size === 1 && this.startTime === 0) {
-            this.startTime = this.localTime;
+            this.startTime = this.time;
             setImmediate(this._stepCycle);
         }
 
@@ -92,7 +92,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         }
 
         const nextTime = this.startTime + (this.loop * duration);              // Следующее время для определения
-        const delay = Math.max(0, nextTime - this.localTime);         // Цельный целевой интервал + остаток от предыдущих циклов
+        const delay = Math.max(0, nextTime - this.time);         // Цельный целевой интервал + остаток от предыдущих циклов
 
         // Номер прогона цикла
         this.loop++;
@@ -105,7 +105,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Принудительная стабилизация
         else if (this.missCounter > 5) {
-            this.startTime = this.localTime;
+            this.startTime = this.time;
             this.loop = 0;
             this.missCounter = 0;
 
@@ -117,7 +117,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         setTimeout(() => {
             // Если цикл высокоточный, высчитываем дрифт цикла
             if (this.timer === "max") {
-                const drift = this.localTime - nextTime;
+                const drift = this.time - nextTime;
 
                 // Если отставание более 5 ms
                 if (drift > 5) {

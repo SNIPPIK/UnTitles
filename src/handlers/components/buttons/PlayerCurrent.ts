@@ -298,7 +298,7 @@ class ButtonQueue extends Assign<Button> {
             callback: async (message) => {
                 const queue = db.queues.get(message.guildId);
                 let page = parseInt((queue.tracks.position / 5).toFixed(0));
-                const pages = queue.tracks.array(5, true) as string[];
+                const pages = queue.tracks.array(5, true);
                 const lang = message.locale;
                 const components = [
                     // Кнопки

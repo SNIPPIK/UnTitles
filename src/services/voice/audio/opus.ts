@@ -153,9 +153,9 @@ export class BufferedEncoder extends Writable {
     public constructor(options: WritableOptions = { autoDestroy: true }) {
         super(options);
 
-        this.encoder.on("head", (data) => this.emit("head", data));
-        this.encoder.on("tags", (data) => this.emit("tags", data));
-        this.encoder.on("frame", (data) => this.emit("frame", data));
+        this.encoder.on("head", this.emit.bind(this, "head"));
+        this.encoder.on("tags", this.emit.bind(this, "tags"));
+        this.encoder.on("frame", this.emit.bind(this, "frame"));
     };
 
     /**
@@ -203,9 +203,9 @@ export class PipeEncoder extends Transform {
     public constructor(options: TransformOptions = { autoDestroy: true }) {
         super(Object.assign(options, { readableObjectMode: true }));
 
-        this.encoder.on("head", (data) => this.emit("head", data));
-        this.encoder.on("tags", (data) => this.emit("tags", data));
-        this.encoder.on("frame", (data) => this.push(data));
+        this.encoder.on("head", this.emit.bind(this, "head"));
+        this.encoder.on("tags", this.emit.bind(this, "tags"));
+        this.encoder.on("frame", this.push.bind(this));
     };
 
     /**

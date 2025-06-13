@@ -135,6 +135,21 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если нет других аудио потоков, задаем запрет на изменение
         this.waitStream = true;
 
+        /* Пока сыровато
+        const filters = this._filters.compress(time);
+
+        // Если текущий поток является переиспользуемым
+        if (this._audio.current && this._audio.current instanceof BufferedAudioResource) {
+            const {config} = this._audio.current
+
+            // Если данные все еще те, то используем заново!
+            if (config.path === path && config.options.filters === filters) {
+                this._audio.current.refresh();
+                return this._audio.current;
+            }
+        }
+         */
+
         // Выбираем и создаем класс для предоставления аудио потока
         const stream = new (time > PLAYER_BUFFERED_TIME || time === 0 ? PipeAudioResource : BufferedAudioResource)(
             {
@@ -214,28 +229,6 @@ export class AudioPlayer extends BasePlayer {
     };
 
     /**
-     * @description Проверяем играет ли плеер
-     * @return boolean
-     * @public
-     */
-    public get playing() {
-        // Если текущий статус не позволяет проигрывать музыку
-        if (this.status === "player/wait" || this.status === "player/pause") return false;
-
-        // Если голосовое состояние не позволяет отправлять пакеты
-        else if (!this.voice.connection && !this.voice.connection.ready) return false;
-
-        // Если поток не читается, переходим в состояние ожидания
-        else if (!this.audio.current || !this.audio.current?.readable) {
-            this.audio.current = null;
-            this.status = "player/wait";
-            return false;
-        }
-
-        return true;
-    };
-
-    /**
      * @description Строка состояния трека
      * @public
      */
@@ -250,6 +243,28 @@ export class AudioPlayer extends BasePlayer {
         const bar =  Progress.bar({ platform: api.name, duration: { current, total: time.total } });
 
         return `\n\`\`${current.duration()}\`\` ${bar} \`\`${time.split}\`\``;
+    };
+
+    /**
+     * @description Проверяем играет ли плеер
+     * @return boolean
+     * @public
+     */
+    public get playing() {
+        // Если текущий статус не позволяет проигрывать музыку
+        if (this._status === "player/wait" || this._status === "player/pause") return false;
+
+        // Если голосовое состояние не позволяет отправлять пакеты
+        else if (!this._voice.connection && !this._voice.connection.ready) return false;
+
+        // Если поток не читается, переходим в состояние ожидания
+        else if (!this._audio.current || !this._audio.current?.readable) {
+            this._audio.current = null;
+            this.status = "player/wait";
+            return false;
+        }
+
+        return true;
     };
 
     /**

@@ -161,9 +161,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
         }
 
         // Разовая функция для удаления потока
-        this.once("close", () => {
-            options.events.destroy_callback(options.input);
-        });
+        this.once("close", options.events.destroy_callback.bind(this, options.input));
 
         return options.decode(options.input);
     };
@@ -244,7 +242,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      *
      * @example <path> or <url>
      */
-    public constructor(config: AudioResourceOptions) {
+    public constructor(public config: AudioResourceOptions) {
         super(config);
 
         const {path, options} = config;

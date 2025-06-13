@@ -272,7 +272,7 @@ export class VoiceConnection {
 
         // Если возникла ошибка
         this.websocket.on("error", (err) => {
-            this.websocket.emit("close", 1006, err.name);
+            this.websocket.emit("close", 4006, err.name);
             this._status = VoiceConnectionStatus.disconnected;
         });
     };

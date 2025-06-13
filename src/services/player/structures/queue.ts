@@ -308,7 +308,7 @@ class QueueButtons {
                 .setPlaceholder("Select audio filter")
                 .setOptions(filters.filter((filter) => !filter.args).map((filter) => {
                     return {
-                        label: filter.name,
+                        label: filter.name.toUpperCase(),
                         value: filter.name,
                         description: filter.locale["en-US"],
                     }
