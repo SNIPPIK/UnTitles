@@ -1,7 +1,7 @@
 import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
-import {ApplicationCommandOptionType, Colors, VoiceChannel} from "discord.js";
+import { ApplicationCommandOptionType, Colors, VoiceChannel } from "discord.js";
+import { Assign, DiscordClient } from "#structures";
 import { locale } from "#service/locale";
-import {Assign, DiscordClient} from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -136,13 +136,12 @@ class Command_Voice extends Assign< BaseCommand<VoiceChannel | string> > {
 
                 const voiceConnection = db.voice.get(guildId);
                 const queue = db.queues.get(guildId);
+                const VoiceChannel = args[0] ?? message.member.voice.channel;
 
                 switch (type) {
                     // Подключение к голосовому каналу
                     case "swap":
                     case "join": {
-                        const VoiceChannel = args[0];
-
                         // Если указан не голосовой канал
                         if (typeof VoiceChannel === "string" || VoiceChannel?.type !== 2) {
                             return message.reply({
