@@ -48,7 +48,12 @@ const emoji = {
     /**
      * @description Разделение прогресс бара, поддерживает платформы
      */
-    bottom_spotify: env.get("progress.bottom.spotify")
+    bottom_spotify: env.get("progress.bottom.spotify"),
+
+    /**
+     * @description Разделение прогресс бара, поддерживает платформы
+     */
+    bottom_soundcloud: env.get("progress.bottom.soundcloud"),
 }
 
 /**
