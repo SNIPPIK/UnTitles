@@ -179,6 +179,7 @@ abstract class BaseQueue {
 
     /**
      * @description Эта функция полностью удаляет очередь и все сопутствующие данные, используется в другом классе
+     * @warn Автоматически удаляется через событие VoiceStateUpdate
      * @protected
      * @readonly
      */
@@ -229,25 +230,25 @@ export class Queue extends BaseQueue {
      */
     public get componentEmbed() {
         try {
-            const {api, artist, image, name, user} = this.tracks.track;
-            const position = this.tracks.position;
+            const {api, artist, image, name, user} = this._tracks.track;
+            const position = this._tracks.position;
             return {
                 color: api.color, thumbnail: image,
                 author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
                 footer: {
-                    text: `${user.username} ${this.tracks.total > 1 ? `| 🎵 ${position + 1} - ${this.tracks.total} 🎶` : ""}`,
+                    text: `${user.username} ${this._tracks.total > 1 ? `| 🎵 ${position + 1} - ${this._tracks.total} 🎶` : ""}`,
                     iconURL: user.avatar
                 },
                 fields: [
                     // Текущий трек
                     {
                         name: "",
-                        value: `\`\`\`${name}\`\`\`` + this.player.progress
+                        value: `\`\`\`${name}\`\`\`` + this._player.progress
                     },
 
                     // Следующий трек или треки
-                    this.tracks.size > 0 ? (() => {
-                        const tracks = (this.tracks.array(+3) as Track[]).map((track, index) => {
+                    this._tracks.size > 0 ? (() => {
+                        const tracks = (this._tracks.array(+3) as Track[]).map((track, index) => {
                             return `${position + index + 2} - ${track.name_replace}`;
                         });
 
@@ -259,7 +260,7 @@ export class Queue extends BaseQueue {
                 ]
             };
         } catch (error) {
-            Logger.log("ERROR", `[Queue/${this.message.guildID}]: ${error}`);
+            Logger.log("ERROR", `[Queue/${this._message.guildID}]: ${error}`);
             return null;
         }
     };
@@ -308,7 +309,7 @@ class QueueButtons {
                 .setPlaceholder("Select audio filter")
                 .setOptions(filters.filter((filter) => !filter.args).map((filter) => {
                     return {
-                        label: filter.name.charAt(0).toUpperCase() + filter.name.slice(1), //filter.name.toUpperCase(),
+                        label: filter.name.charAt(0).toUpperCase() + filter.name.slice(1).replace("_", " "), //filter.name.toUpperCase(),
                         value: filter.name,
                         description: filter.locale["en-US"],
                     }
@@ -374,7 +375,7 @@ class QueueButtons {
      * @param options - Параметры для создания кнопки
      * @private
      */
-    public static createButton(options) {
+    public static createButton(options: any) {
         let button = {
             type: 2,
             style: options.style ?? 2,

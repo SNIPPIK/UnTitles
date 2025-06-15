@@ -351,6 +351,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
             return (result.requested_formats).find((format) => !format.fps)
         }
 
+        // adaptiveFormats, formats
         const formats = await Youtube_decoder_native.decipherFormats(data["formats"], html);
         return formats[0];
     };

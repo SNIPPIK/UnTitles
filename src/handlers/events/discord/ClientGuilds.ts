@@ -44,8 +44,10 @@ class GuildRemove extends Assign<Event<Events.GuildDelete>> {
                 const id = guild.client.shard?.ids[0] ?? 0;
                 Logger.log("LOG", `[Core/${id}] has ${Logger.color(31, `remove a guild ${guild.id}`)}`);
 
-                // Если бота отключили при включенной музыке
+                // Получаем очередь
                 const queue = db.queues.get(guild.id);
+
+                // Если есть очередь
                 if (queue) db.queues.remove(guild.id);
             }
         });

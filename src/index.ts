@@ -15,8 +15,11 @@ function main() {
 
     const isManager = process.argv.includes("--ShardManager");
 
+    // Если включен менеджер осколков
     if (isManager) return runShardManager();
-    else return runShard();
+
+    // Запускаем осколок
+    return runShard();
 }
 
 /**
@@ -64,6 +67,7 @@ async function runShard() {
     db.commands.register(client);
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
 
+    // Запускаем отслеживание событий процесса
     initProcessEvents(client);
 }
 
