@@ -148,8 +148,18 @@ export class ClientRTPSocket {
      * @private
      */
     private randomNBit = (bits: number) => {
+        const max = 2 ** bits;
         const size = Math.ceil(bits / 8);
-        return crypto.randomBytes(Math.ceil(size)).readUIntBE(0, Math.ceil(size)) % (2 ** bits);
+        const maxGenerated = 2 ** (size * 8);
+        const threshold = maxGenerated - (maxGenerated % max);
+
+        let rand: number;
+
+        do {
+            rand = crypto.randomBytes(size).readUIntBE(0, size);
+        } while (rand >= threshold);
+
+        return rand % max;
     };
 
     /**

@@ -44,7 +44,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public get connected() {
-        return this.ws && this.ws.readyState !== WebSocket.CLOSED;
+        return this.ws?.readyState !== WebSocket.CLOSED;
     };
 
     /**
@@ -53,18 +53,17 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public set packet(payload: opcode.extract) {
-        // Если ws подключен и работает
-        if (this.connected) {
-            try {
-                this.ws.send(JSON.stringify(payload));
-            } catch (e) {
-                this.emit("error", new Error(`${e}`));
-            }
-
+        // Если ws не подключен
+        if (!this.connected) {
+            this.emit("warn", `Failed send packet\n - ${payload}`);
             return;
         }
 
-        this.emit("warn", `Failed send packet\n - ${payload}`);
+        try {
+            this.ws.send(JSON.stringify(payload));
+        } catch (e) {
+            this.emit("error", e instanceof Error ? e : new Error(String(e)));
+        }
     };
 
 
@@ -109,13 +108,18 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         // Ошибка websocket соединения
         this.ws.on("error", (err) => {
+            if (++this.heartbeat.miss > 3) {
+                this.destroy();
+                this.emit("close", 4006, "WebSocket has destroyed: Max missed limit");
+                return;
+            }
+
             // Если ws разорвал соединение из-за отсутствия интернета
-            if (`${err}`.match(/handshake has timed out/)) {
+            else if (`${err}`.match(/handshake has timed out/)) {
                 if (this.connected) this.ws.pause();
                 else this.destroy();
                 return;
             }
-
             this.emit("error", err);
         });
 

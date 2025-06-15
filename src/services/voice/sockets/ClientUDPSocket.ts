@@ -163,16 +163,17 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         this.socket.removeAllListeners();
         this.removeAllListeners();
 
+        this.keepAlive = null;
+        this.destroyed = null;
+
         try {
-            this.socket.disconnect();
-            this.socket.close();
-            this.socket = null;
+            this.socket.disconnect?.();
+            this.socket.close?.();
         } catch (err) {
             if (err instanceof Error && err.message.includes("Not running")) return;
         }
 
-        this.keepAlive = null;
-        this.destroyed = null;
+        this.socket = null;
     };
 
     /**
