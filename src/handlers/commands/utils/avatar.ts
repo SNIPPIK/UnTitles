@@ -48,7 +48,7 @@ class AvatarCommand extends Assign< BaseCommand<User> > {
 
                 // Отправляем сообщение в текстовый канал
                 return message.reply({
-                    components:[
+                    components: [
                         {
                             type: 1,
                             components: [
