@@ -214,7 +214,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      */
     public get duration() {
         if (!this._buffer.position) return 0;
-        return Math.abs(((this._seek - this._buffer.position) * OPUS_FRAME_SIZE) / 1e3);
+        return Math.abs((((this._buffer.position + this._seek) * OPUS_FRAME_SIZE) / 1e3));
     };
 
     /**
