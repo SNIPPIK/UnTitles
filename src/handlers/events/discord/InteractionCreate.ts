@@ -166,7 +166,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         }
 
         // Если права не соответствуют правде
-        else if (command.middlewares && command.middlewares?.length > 0) {
+        if (command.middlewares && command.middlewares?.length > 0) {
             const rules = db.middlewares.filter((rule) => command.middlewares.includes(rule.name));
 
             for (const rule of rules) {
@@ -293,13 +293,15 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
  * @function isBased
  */
 function isBased(ctx: CommandInteraction) {
+    const type = ctx.channel?.type;
+
     // Проверяем на наличие типа канала
-    if (ctx.channel?.type !== undefined) {
+    if (type !== undefined) {
         // Если используется на сервере
-        if (ctx.channel?.type === ChannelType.GuildText || ctx.channel?.type === ChannelType.GuildAnnouncement || ctx.channel?.type === ChannelType.GuildStageVoice || ctx.channel?.type === ChannelType.GuildVoice) return "guild";
+        if (type === ChannelType.GuildText || type === ChannelType.GuildAnnouncement || type === ChannelType.GuildStageVoice || type === ChannelType.GuildVoice) return "guild";
 
         // Если используется в личном чате
-        else if (ctx.channel?.type === ChannelType.PrivateThread) return "private";
+        else if (type === ChannelType.PrivateThread) return "private";
     }
 
     // Если используется на стороннем сервере
