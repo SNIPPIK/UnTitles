@@ -46,6 +46,7 @@ function generateUserAgent(): string {
  * @author SNIPPIK
  * @description Класс HttpClient отправляет HTTP/HTTPS-запрос с автоматической обработкой ответа
  * @class httpsClient
+ * @public
  */
 export class httpsClient {
     public constructor(private data: RequestData) {

@@ -2,6 +2,8 @@
  * @author SNIPPIK
  * @description Реализация функция из Array в Set
  * @class SetArray
+ * @extends Set
+ * @public
  */
 export class SetArray<T> extends Set<T> {
     /**
@@ -15,6 +17,7 @@ export class SetArray<T> extends Set<T> {
     /**
      * @description Производим фильтрацию по функции
      * @param predicate - Функция поиска
+     * @public
      */
     public filter(predicate: (item: T) => boolean): T[] {
         return this.array.filter(predicate);
@@ -23,6 +26,7 @@ export class SetArray<T> extends Set<T> {
     /**
      * @description Производим поиск объекта по функции
      * @param predicate - Функция поиска
+     * @public
      */
     public find(predicate: (item: T) => boolean): T {
         return this.array.find(predicate);
