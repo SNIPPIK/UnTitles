@@ -14,19 +14,17 @@
   },
   "dependencies": {
     "discord-api-types": "^0.38.11",
-    "discord.js": "^14.19.3",
+    "discord.js": "^14.20.0",
     "ws": "^8.18.2"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.0.3",
     "@types/ws": "^8.18.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },
   "scripts": {
     "start-bun": "bun src",
-    "build-bun": "bun build --compile --minify --sourcemap src/index.ts --outfile untitles",
-
     "start": "cd build && node -r tsconfig-paths/register src --ShardManager",
     "build": "tsc",
     "auto": "npm run build && npm run start"
