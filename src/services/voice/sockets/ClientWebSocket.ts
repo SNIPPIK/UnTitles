@@ -44,7 +44,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public get connected() {
-        return this.ws?.readyState !== WebSocket.CLOSED;
+        return this.ws?.readyState !== WebSocket.CLOSED && this.ws?.readyState !== WebSocket.CLOSING;
     };
 
     /**
@@ -330,7 +330,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         // Если есть websocket клиент
         if (this.ws) {
-            if (this.ws.readyState !== WebSocket.CLOSED) this.ws.close();
+            if (this.connected) this.ws.close();
             this.removeAllListeners();
             this.ws = null;
         }
