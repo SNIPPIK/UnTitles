@@ -12,9 +12,9 @@ import { handler } from "#handler";
  */
 export class Events extends handler<Event<keyof ClientEvents>> {
     /**
-     * @description События привязанные к плееру и очереди
+     * @description Вспомогательный класс для событий, по умолчанию используется для players, queues
      * @readonly
-     * @private
+     * @public
      */
     public readonly emitter = new class extends TypedEmitter<QueueEvents & AudioPlayerEvents> {};
 

@@ -23,6 +23,13 @@ export * from "./controllers/tracks";
  */
 export class ControllerQueues<T extends Queue> extends Collection<T> {
     /**
+     * @description Хранилище циклов для работы музыки
+     * @readonly
+     * @public
+     */
+    public readonly cycles = new ControllerCycles();
+
+    /**
      * @description Здесь хранятся модификаторы аудио
      * @readonly
      * @public
@@ -32,13 +39,6 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
         volume: parseInt(env.get("audio.volume")),
         fade: parseInt(env.get("audio.fade"))
     };
-
-    /**
-     * @description Хранилище циклов для работы музыки
-     * @readonly
-     * @public
-     */
-    public readonly cycles = new ControllerCycles();
 
     /**
      * @description отправляем сообщение о перезапуске бота

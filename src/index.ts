@@ -1,5 +1,4 @@
 import { DiscordClient, ShardManager, Logger } from "#structures";
-import { isMainThread } from "node:worker_threads";
 import { db, initDatabase } from "#app/db";
 import { env } from "#app/env";
 
@@ -11,8 +10,6 @@ void main();
  * @description Запуск всего проекта в async режиме
  */
 function main() {
-    if (!isMainThread) throw new Error("Not implemented.");
-
     const isManager = process.argv.includes("--ShardManager");
 
     // Если включен менеджер осколков

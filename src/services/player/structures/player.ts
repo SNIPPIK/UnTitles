@@ -222,7 +222,7 @@ export class AudioPlayer extends BasePlayer {
      */
     public set status(status: keyof AudioPlayerEvents) {
         // Если был введен новый статус
-        if (status !== this.status) {
+        if (status !== this._status) {
             // Запускаем событие
             this.emit(status, this);
         }

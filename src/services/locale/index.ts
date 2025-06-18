@@ -24,6 +24,8 @@ type locale_text = keyof typeof locales;
 export class locale {
     /**
      * @description Язык по-умолчанию, использовать только тот, где есть перевод на 100%
+     * @static
+     * @public
      */
     public static get language(): languages {
         return "en-US";
@@ -34,6 +36,8 @@ export class locale {
      * @param language - Тип locale для перевода
      * @param locale - Имя перевода
      * @param args - Аргументы будут подставлены автоматически вместо "{ARGUMENT}" в порядке очереди
+     * @static
+     * @public
      */
     public static _ = (language: languages, locale: locale_text, args?: any[]) => {
         let translate = locales[locale][language] as string;
@@ -58,6 +62,8 @@ export class locale {
      * @description Перевод ошибки на язык по-умолчанию
      * @param locale - Имя перевода
      * @param args - Аргументы будут подставлены автоматически вместо "{ARGUMENT}" в порядке очереди
+     * @static
+     * @public
      */
     public static err = (locale: locale_text, args?: any[]) => {
         return Error(this._(this.language, locale, args));

@@ -77,8 +77,8 @@ abstract class BaseQueue {
      * @public
      */
     public get guild() {
-        if (!this.message) return null;
-        return this.message.guild;
+        if (!this._message) return null;
+        return this._message.guild;
     };
 
     /*=== TEXT CHANNEL ===*/

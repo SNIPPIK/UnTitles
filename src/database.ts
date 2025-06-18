@@ -86,28 +86,28 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly whitelist: {toggle: boolean; ids: string[]};
+    public readonly whitelist: { toggle: boolean; ids: string[] };
 
     /**
      * @description Для управления черным списком пользователей
      * @readonly
      * @public
      */
-    public readonly blacklist: {toggle: boolean; ids: string[]};
+    public readonly blacklist: { toggle: boolean; ids: string[] };
 
     /**
      * @description Для работы с командами для разработчика
      * @readonly
      * @public
      */
-    public readonly owner: {ids: string[]; guildID: string};
+    public readonly owner: { ids: string[]; guildID: string };
 
     /**
      * @description Для отображения в embed сообщениях
      * @readonly
      * @public
      */
-    public readonly images: {disk: string; no_image: string; loading: string};
+    public readonly images: { disk: string; no_image: string; loading: string };
 
     /**
      * @description Создаем класс с ограничениями не для главного потока
