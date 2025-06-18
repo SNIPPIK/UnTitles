@@ -154,16 +154,17 @@ abstract class BaseQueue {
         this.message = queue_message;
 
         // Подключаемся к голосовому каналу
-        this.voice.join(queue_message.client, queue_message.voice);
+        this._voice.join(queue_message.client, queue_message.voice);
 
         // В конце функции выполнить запуск проигрывания (полезно если треков в плеере еще нет)
-        setImmediate(this.player.play);
+        setImmediate(this._player.play);
 
         Logger.log("LOG", `[Queue/${ID}] has create`);
     };
 
     /**
      * @description Эта функция частично удаляет очередь
+     * @warn Автоматически выполняется при удалении через db
      * @readonly
      * @public
      */
@@ -171,7 +172,7 @@ abstract class BaseQueue {
         Logger.log("DEBUG", `[Queue/${this.message.guildID}] has cleanup`);
 
         // Останавливаем плеер
-        if (this.player) this.player.cleanup();
+        if (this._player) this._player.cleanup();
 
         // Для удаления динамического сообщения
         this._cleanupOldMessage();
@@ -187,7 +188,7 @@ abstract class BaseQueue {
         Logger.log("LOG", `[Queue/${this.message.guildID}] has destroyed`);
 
         // Удаляем плеер
-        if (this.player) this.player.destroy();
+        if (this._player) this._player.destroy();
         this._tracks.clear();
     };
 

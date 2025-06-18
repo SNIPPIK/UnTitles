@@ -169,7 +169,9 @@ export class RestObject {
 
             let link: string = null, lastError: Error;
 
+            // Ищем нужную платформу
             for (const platform of this.audioSupport) {
+                // Если у платформы нет даже 2 запросов
                 if (platform.requests.length < 2) continue;
 
                 const platformAPI = this.request(platform.name);
@@ -178,16 +180,19 @@ export class RestObject {
                 const searchQuery = `${name} - ${artist.title}`;
                 const tracks = await platformAPI.request<"search">(searchQuery).request();
 
+                // Если при получении треков произошла ошибка
                 if (tracks instanceof Error) {
                     lastError = tracks;
                     continue;
                 }
 
+                // Если треков не найдено
                 else if (!tracks.length) {
                     lastError = Error(`[APIs/${platform.name}] Couldn't find any tracks similar to this one`);
                     continue;
                 }
 
+                // Ищем нужный трек
                 const findTrack = tracks.find((song) => {
                     return Math.abs(song.time.total - track.time.total) <= 20 && !!song.name.match(track.name);
                 });
@@ -201,6 +206,7 @@ export class RestObject {
                 // Получение исходника
                 const song = await platformAPI.request<"track">(findTrack?.url, { audio: true }).request();
 
+                // Если при получении трека произошла ошибка
                 if (song instanceof Error) {
                     lastError = song;
                     continue;
@@ -213,6 +219,7 @@ export class RestObject {
             // Если во время поиска произошла ошибка
             if (lastError && !link) return lastError;
 
+            // Если нет ошибки и ссылки
             else if (!lastError && !link) return Error(`[APIs] Audio link not found`);
 
             return link;
@@ -253,35 +260,45 @@ export namespace RestClientSide {
          * @return API.platform
          * @public
          */
-        public get platform() { return this._api.name; };
+        public get platform() {
+            return this._api.name;
+        };
 
         /**
          * @description Выдаем bool, Недоступна ли платформа
          * @return boolean
          * @public
          */
-        public get block() { return db.api.platforms.block.includes(this.platform); };
+        public get block() {
+            return db.api.platforms.block.includes(this._api.name);
+        };
 
         /**
          * @description Выдаем bool, есть ли доступ к платформе
          * @return boolean
          * @public
          */
-        public get auth() { return this._api.auth };
+        public get auth() {
+            return this._api.auth
+        };
 
         /**
          * @description Выдаем bool, есть ли доступ к получению аудио у платформы
          * @return boolean
          * @public
          */
-        public get audio() { return this._api.audio; };
+        public get audio() {
+            return this._api.audio;
+        };
 
         /**
          * @description Выдаем int, цвет платформы
          * @return number
          * @public
          */
-        public get color() { return this._api.color; };
+        public get color() {
+            return this._api.color;
+        };
 
         /**
          * @description Ищем платформу из доступных
@@ -297,6 +314,7 @@ export namespace RestClientSide {
          */
         public request<T extends (RestServerSide.APIs.track | RestServerSide.APIs.playlist | RestServerSide.APIs.album | RestServerSide.APIs.artist | RestServerSide.APIs.search | RestServerSide.APIs.wave)["name"]>(payload: string | json, options?: {audio: boolean}) {
             return {
+                // Получение типа запроса
                 type: this._api.requests.find((item) => {
                     // Если производится прямой запрос по названию
                     if (item.name === payload) return item;
@@ -313,6 +331,8 @@ export namespace RestClientSide {
                     // Скорее всего надо произвести поиск
                     return item.name === "search";
                 })?.name as RestClientSide.ResultType<T>,
+
+                // Функция запроса на Worker для получения данных
                 request: () => db.api["worker_request"](this._api, payload as any, options) as Promise<RestClientSide.ResultData<T>>
             }
         };

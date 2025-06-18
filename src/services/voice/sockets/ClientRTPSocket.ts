@@ -3,6 +3,7 @@ import crypto from "crypto";
 /**
  * @author SNIPPIK
  * @description Поддерживаемые типы шифрования
+ * @const Encryption
  * @private
  */
 const Encryption: {name: EncryptionModes, nonce: Buffer} = {
@@ -13,6 +14,7 @@ const Encryption: {name: EncryptionModes, nonce: Buffer} = {
 /**
  * @author SNIPPIK
  * @description Максимальный размер пакета
+ * @const MAX_NONCE_SIZE
  * @private
  */
 const MAX_NONCE_SIZE = 2 ** 32 - 1;
@@ -20,6 +22,7 @@ const MAX_NONCE_SIZE = 2 ** 32 - 1;
 /**
  * @author SNIPPIK
  * @description Время до следующей проверки жизни
+ * @const TIMESTAMP_INC
  * @private
  */
 const TIMESTAMP_INC = 960;

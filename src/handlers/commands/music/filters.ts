@@ -108,7 +108,6 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
             execute: async ({message, args, type}) => {
                 const queue = db.queues.get(message.guildId);
                 const player = queue.player;
-
                 const seek: number = player.audio.current?.duration ?? 0;
                 const name = args && args?.length > 0 ? args[0] : null;
                 const argument = args && args?.length > 1 ? Number(args[1]) : null;

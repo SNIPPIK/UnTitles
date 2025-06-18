@@ -83,6 +83,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @param packet - Отправляемый пакет
      */
     public set packet(packet: Buffer) {
+        // Отправляем (RTP+OPUS) пакет
         this.socket.send(packet, 0, packet.length, this.options.port, this.options.ip, (err) => {
             if (err) this.emit("error", err);
         });
@@ -130,6 +131,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     public discovery = (ssrc: number) => {
         this.packet = this.discoveryBuffer(ssrc);
 
+        // Ждем получения сообщения после отправки код, для подключения UDP
         this.socket.once("message", (message) => {
             if (message.readUInt16BE(0) === 2) {
                 const packet = Buffer.from(message);

@@ -31,7 +31,7 @@ export class Process {
      * @public
      */
     public get stdout() {
-        return this?.process?.stdout ?? null;
+        return this?._process?.stdout ?? null;
     };
 
     /**
@@ -63,7 +63,7 @@ export class Process {
         this._process = spawn(name, args);
 
         for (let event of ["end", "error", "exit"]) {
-            this.process.once(event, this.destroy);
+            this._process.once(event, this.destroy);
         }
     };
 
@@ -78,8 +78,8 @@ export class Process {
                 std.destroy();
             }
 
-            this.process.ref();
-            this.process.removeAllListeners();
+            this._process.ref();
+            this._process.removeAllListeners();
             this._process.kill("SIGKILL");
             this._process = null;
         }

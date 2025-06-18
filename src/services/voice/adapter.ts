@@ -9,7 +9,7 @@ import { VoiceConnectionConfiguration } from "./connection";
  */
 export class VoiceAdapter {
     /**
-     * @description
+     * @description Внутренний интерфейс адаптера
      * @public
      */
     public adapter: DiscordGatewayAdapterImplementerMethods;
@@ -21,13 +21,13 @@ export class VoiceAdapter {
     public packet = {
         /**
          * @description Пакет состояния на сервере
-         * @private
+         * @public
          */
         server: undefined as GatewayVoiceServerUpdateDispatchData,
 
         /**
-         * @description Пакет текущего состояния
-         * @private
+         * @description Пакет текущего голосового состояния
+         * @public
          */
         state: undefined  as GatewayVoiceStateUpdateDispatchData
     };
@@ -53,17 +53,19 @@ export class VoiceAdapter {
  */
 export interface DiscordGatewayAdapterLibraryMethods {
     /**
-     * @description Call this when the adapter can no longer be used (e.g. due to a disconnect from the main gateway)
+     * @description Вызываем эту функцию, когда адаптер больше не может использоваться (например, из-за отключения от основного шлюза).
      */
     destroy(): void;
+
     /**
-     * @description Call this when you receive a VOICE_SERVER_UPDATE payload that is relevant to the adapter.
-     * @param data - The inner data of the VOICE_SERVER_UPDATE payload
+     * @description Вызываем этот метод при получении полезной нагрузки VOICE_SERVER_UPDATE, относящейся к адаптеру.
+     * @param data - Внутренние данные полезной нагрузки VOICE_SERVER_UPDATE
      */
     onVoiceServerUpdate(data: GatewayVoiceServerUpdateDispatchData): void;
+
     /**
-     * @description Call this when you receive a VOICE_STATE_UPDATE payload that is relevant to the adapter.
-     * @param data - The inner data of the VOICE_STATE_UPDATE payload
+     * @description Вызываем этот метод при получении полезной нагрузки VOICE_STATE_UPDATE, относящейся к адаптеру.
+     * @param data - Внутренние данные полезной нагрузки VOICE_STATE_UPDATE
      */
     onVoiceStateUpdate(data: GatewayVoiceStateUpdateDispatchData): void;
 }
@@ -77,6 +79,7 @@ export interface DiscordGatewayAdapterImplementerMethods {
      * @description Это будет вызвано voice, когда адаптер можно будет безопасно уничтожить, поскольку он больше не будет использоваться.
      */
     destroy(): void;
+
     /**
      * @description Реализуйте этот метод таким образом, чтобы данная полезная нагрузка отправлялась на основное соединение Discord gateway.
      * @param payload - Полезная нагрузка для отправки на основное соединение Discord gateway

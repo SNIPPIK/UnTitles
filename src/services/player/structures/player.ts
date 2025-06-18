@@ -22,6 +22,7 @@ const Progress = new PlayerProgress();
  * @author SNIPPIK
  * @description Безопасное время для буферизации трека
  * @const PLAYER_BUFFERED_TIME
+ * @public
  */
 export const PLAYER_BUFFERED_TIME = 500;
 
@@ -29,6 +30,7 @@ export const PLAYER_BUFFERED_TIME = 500;
  * @author SNIPPIK
  * @description Базовый плеер, хранит в себе все данные плеера
  * @class BasePlayer
+ * @extends TypedEmitter
  * @protected
  */
 abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
@@ -177,7 +179,7 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
      * @param position - Позиция трека
      */
     protected readonly _preloadTrack = async (position: number): Promise<false | string | Error> => {
-        const track = this.tracks.get(position);
+        const track = this._tracks.get(position);
 
         // Если нет трека в очереди
         if (!track) return false;
@@ -200,6 +202,7 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
  * @author SNIPPIK
  * @description Плеер для проигрывания музыки на серверах
  * @class AudioPlayer
+ * @extends BasePlayer
  * @public
  */
 export class AudioPlayer extends BasePlayer {
@@ -233,8 +236,8 @@ export class AudioPlayer extends BasePlayer {
      * @public
      */
     public get progress() {
-        const {api, time} = this.tracks.track;
-        let current = this.audio?.current?.duration;
+        const {api, time} = this._tracks.track;
+        let current = this._audio?.current?.duration;
 
         // Скорее всего трек играет следующий трек
         if (time.total > 0 && current > time.total || !this.playing) current = 0;
@@ -358,7 +361,7 @@ export class AudioPlayer extends BasePlayer {
         if (!track) return;
 
         // Позиция трека
-        const positionIndex = position || this.tracks.indexOf(track);
+        const positionIndex = position || this._tracks.indexOf(track);
 
         try {
             const resource = await this._preloadTrack(positionIndex);
@@ -419,13 +422,13 @@ export class AudioPlayer extends BasePlayer {
      */
     public pause = (): void => {
         // Проверяем, что плеер действительно играет
-        if (this.status !== "player/playing") return;
+        if (this._status !== "player/playing") return;
 
         // Переключаем статус на паузу
         this.status = "player/pause";
 
         // Отправляем silent frame в голосовое соединение для паузы звука
-        this.voice.connection.packet = SILENT_FRAME;
+        this._voice.connection.packet = SILENT_FRAME;
 
         // Устанавливаем время паузы
         this._pauseTimestamp = Date.now();
@@ -437,14 +440,14 @@ export class AudioPlayer extends BasePlayer {
      */
     public resume = (): void => {
         // Проверяем, что плеер в состоянии паузы
-        if (this.status !== "player/pause") return;
+        if (this._status !== "player/pause") return;
 
         const pauseTime = this._pauseTimestamp - Date.now() + 2500 || 1;
 
         // Если pause/resume сменяются слишком быстро
         if (pauseTime <= 1) {
             // Для возобновления отправляем silent frame, чтобы обновить состояние пакета
-            this.voice.connection.packet = SILENT_FRAME;
+            this._voice.connection.packet = SILENT_FRAME;
 
             // Переключаем статус обратно в "playing"
             this.status = "player/playing";
@@ -466,41 +469,40 @@ export class AudioPlayer extends BasePlayer {
     public stop = (position?: number): Promise<void> | void => {
         // Если есть позиция трека, для плавного перехода
         if (typeof position === "number") {
-            const duration = this.tracks.track.time.total - db.queues.options.optimization;
+            const duration = this._tracks.track.time.total - db.queues.options.optimization;
 
             // Если можно сделать плавный переход
-            if (this.audio.current && duration > this.audio.current.duration) {
-                this.tracks.position = position;
+            if (this._audio.current && duration > this._audio.current.duration) {
+                this._tracks.position = position;
                 return this.play(0, position);
             }
         }
 
-        if (this.status === "player/wait") return;
+        if (this._status === "player/wait") return;
         this.status = "player/wait";
 
         // Отправляем silent frame в голосовое соединение для паузы звука
-        this.voice.connection.packet = SILENT_FRAME;
+        this._voice.connection.packet = SILENT_FRAME;
     };
 
     /**
      * @description Эта функция частично удаляет плеер и некоторые сопутствующие данные
-     * @readonly
-     * @protected
+     * @public
      */
     public cleanup = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has cleanup`);
 
         // Отключаем фильтры при очистке
-        if (this.filters.enabled.length > 0) this.filters.enabled.splice(0, this.filters.enabled.length);
+        if (this._filters.enabled.length > 0) this._filters.enabled.splice(0, this._filters.enabled.length);
 
         // Отключаем от цикла плеер
         db.queues.cycles.players.delete(this);
 
         // Удаляем текущий поток, поскольку он больше не нужен
-        this.audio.current = null;
+        this._audio.current = null;
 
         // Отправляем пустышку
-        this.voice.connection.packet = SILENT_FRAME;
+        this._voice.connection.packet = SILENT_FRAME;
 
         // Переводим плеер в режим ожидания
         this._status = "player/wait";
@@ -508,8 +510,7 @@ export class AudioPlayer extends BasePlayer {
 
     /**
      * @description Эта функция полностью удаляет плеер и все сопутствующие данные
-     * @readonly
-     * @protected
+     * @public
      */
     public destroy = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has destroyed`);

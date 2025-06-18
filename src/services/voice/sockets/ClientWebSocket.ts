@@ -5,6 +5,14 @@ import { WebSocket, Data } from "ws";
 
 /**
  * @author SNIPPIK
+ * @description Время ожидания получения ask кода до переподключения
+ * @const timeoutWS
+ * @private
+ */
+const timeoutWS = 5e3;
+
+/**
+ * @author SNIPPIK
  * @description Клиент для подключения к WebSocket
  * @class ClientWebSocket
  * @extends TypedEmitter
@@ -21,7 +29,6 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         interval: null as NodeJS.Timeout,
         timeout: null as NodeJS.Timeout,
         intervalMs: null as number,
-        timeoutMs: 5e3,
         reconnects: 0,
 
         miss: 0
@@ -37,7 +44,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @description Номер последнего принятого пакета
      * @public
      */
-    public lastAsk: number = 0;
+    public lastAsk: number = -1;
 
     /**
      * @description Подключен ли websocket к endpoint
@@ -108,6 +115,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         // Ошибка websocket соединения
         this.ws.on("error", (err) => {
+            // Если превышен лимит подключений
             if (++this.heartbeat.miss > 3) {
                 this.destroy();
                 this.emit("close", 4006, "WebSocket has destroyed: Max missed limit");
@@ -120,6 +128,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 else this.destroy();
                 return;
             }
+
             this.emit("error", err);
         });
 
@@ -238,6 +247,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         if (this.heartbeat.interval) clearInterval(this.heartbeat.interval);
         if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
 
+        // Переподключемся минуя посредика в виде VoiceConnection
         if (reconnect || this.heartbeat.reconnects >= 3) {
             this.emit("debug", `Reconnecting...`);
             this.connect(this.endpoint);
@@ -247,6 +257,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.heartbeat.reconnects++;
         const delay = Math.min(1000 * this.heartbeat.reconnects, 5000);
 
+        // Переподключемся через код resume
         setTimeout(() => {
             this.emit("debug", `Reconnecting... Attempt ${this.heartbeat.reconnects}`);
             this.emit("resumed");
@@ -262,6 +273,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         if (this.heartbeat.interval) clearInterval(this.heartbeat.interval);
         if (intervalMs !== 0) this.heartbeat.intervalMs = intervalMs;
 
+        // Запускаем интервал с отправкой heart кодов
         this.heartbeat.interval = setInterval(() => {
             this.packet = {
                 op: VoiceOpcodes.Heartbeat,
@@ -289,7 +301,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             this.emit("warn", "HEARTBEAT_ACK not received within timeout");
             this.heartbeat.miss++;
-        }, this.heartbeat.timeoutMs);
+        }, timeoutWS);
     };
 
     /**
@@ -315,6 +327,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.emit("debug", `HEARTBEAT_ACK received. Latency: ${Date.now() - ackData} ms`);
         this.heartbeat.miss = 0;
 
+        // Удаляем таймер если он есть
         if (this.heartbeat.timeout) {
             clearTimeout(this.heartbeat.timeout);
             this.heartbeat.timeout = null;
@@ -335,7 +348,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this.ws = null;
         }
 
-        this.lastAsk = 0;
+        this.lastAsk = -1;
         this.clearHeartbeat();
     };
 
@@ -602,7 +615,7 @@ export enum WebSocketCloseCodes {
     /** 1000 - Нормальное завершение соединения. */
     NORMAL_CLOSURE = 1000,
 
-    /** 1001 - Соединение закрыто, т.к. сервер или клиент отключается. */
+    /** 1001 - Соединение закрыто, т.к, сервер или клиент отключается. */
     GOING_AWAY = 1001,
 
     /** 1006 - Аномальное закрытие, соединение было закрыто без фрейма закрытия. */
