@@ -332,6 +332,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     private handleHeartbeatAck = (ackData: number) => {
         this.emit("debug", `HEARTBEAT_ACK received. Latency: ${Date.now() - ackData} ms`);
         this.heartbeat.miss = 0;
+        this.ws.ping();
 
         // Удаляем таймер если он есть
         if (this.heartbeat.timeout) {
