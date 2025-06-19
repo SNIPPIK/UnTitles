@@ -122,6 +122,11 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 return;
             }
 
+            // Если ws уже разорвал соединение
+            else if (`${err}`.match(/cloused before the connection/)) {
+                return;
+            }
+
             // Если ws разорвал соединение из-за отсутствия интернета
             else if (`${err}`.match(/handshake has timed out/)) {
                 if (this.connected) this.ws.pause();
@@ -343,8 +348,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         // Если есть websocket клиент
         if (this.ws) {
-            if (this.connected) this.ws.close();
             this.removeAllListeners();
+            this.ws.removeAllListeners();
+
+            if (this.connected) this.ws.close();
             this.ws = null;
         }
 
@@ -357,8 +364,8 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public destroy = () => {
-        this.reset();
         this.removeAllListeners();
+        this.reset();
 
         if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
         if (this.heartbeat.interval) clearTimeout(this.heartbeat.interval);
