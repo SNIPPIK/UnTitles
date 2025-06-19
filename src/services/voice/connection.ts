@@ -4,7 +4,6 @@ import { ClientWebSocket, opcode } from "./sockets/ClientWebSocket";
 import { ClientUDPSocket } from "./sockets/ClientUDPSocket";
 import { ClientRTPSocket } from "./sockets/ClientRTPSocket";
 import { VoiceOpcodes } from "discord-api-types/voice";
-import { Logger } from "#structures";
 
 /**
  * @author SNIPPIK
@@ -202,10 +201,8 @@ export class VoiceConnection {
         this.websocket.connect(`wss://${endpoint}?v=8`);
 
         // Если включен debug режим
-        if (Logger.debug) {
-            this.websocket.on("debug", console.log);
-            this.websocket.on("warn", console.log);
-        }
+        this.websocket.on("debug", console.log);
+        this.websocket.on("warn", console.log);
 
         // Если websocket требует возобновления подключения
         this.websocket.on("resumed", () => {
@@ -271,9 +268,10 @@ export class VoiceConnection {
         });
 
         // Если возникла ошибка
-        this.websocket.on("error", (err) => {
-            this.websocket.emit("close", 4006, err.name);
+        this.websocket.on("error", () => {
             this._status = VoiceConnectionStatus.disconnected;
+            this.disconnect;
+            this.destroy();
         });
     };
 

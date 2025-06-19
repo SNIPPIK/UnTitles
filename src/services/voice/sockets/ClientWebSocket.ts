@@ -67,9 +67,16 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         try {
-            this.ws.send(JSON.stringify(payload));
-        } catch (e) {
-            this.emit("error", e instanceof Error ? e : new Error(String(e)));
+           this.ws.send(JSON.stringify(payload));
+        } catch (err) {
+            // Если ws упал
+            if (`${err}`.match(/Cannot read properties of null/)) {
+                // Пробуем подключится заново
+                this.connect(this.endpoint);
+                return;
+            }
+
+            this.emit("error", err instanceof Error ? err : new Error(String(err)));
         }
     };
 
@@ -95,7 +102,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         this.endpoint = endpoint;
         this.ws = new WebSocket(endpoint, {
-            handshakeTimeout: 2e3,
+            handshakeTimeout: 5e3,
             sessionTimeout: 5e3,
             headers: {
                 "User-Agent": "VoiceClient (https://github.com/SNIPPIK/UnTitles/tree/beta/src/services/voice)"
@@ -115,22 +122,17 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         // Ошибка websocket соединения
         this.ws.on("error", (err) => {
-            // Если превышен лимит подключений
-            if (++this.heartbeat.miss > 3) {
-                this.destroy();
-                this.emit("close", 4006, "WebSocket has destroyed: Max missed limit");
-                return;
-            }
+            this.emit("warn", err);
 
             // Если ws уже разорвал соединение
-            else if (`${err}`.match(/cloused before the connection/)) {
+            if (`${err}`.match(/cloused before the connection/)) {
+                this.emit("close", 4006, "WebSocket has over destroyed: Repeat!");
                 return;
             }
 
-            // Если ws разорвал соединение из-за отсутствия интернета
+            // Если ws разорвал соединение из-за слишком долгого ответа от рукопожатия
             else if (`${err}`.match(/handshake has timed out/)) {
-                if (this.connected) this.ws.pause();
-                else this.destroy();
+                this.destroy();
                 return;
             }
 
@@ -150,8 +152,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 };
 
                 this.emit("open");
-            }
-        );
+            });
     };
 
     /**
@@ -351,7 +352,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this.removeAllListeners();
             this.ws.removeAllListeners();
 
-            if (this.connected) this.ws.close();
+            if (this.connected) this.ws.close(1_000);
             this.ws = null;
         }
 

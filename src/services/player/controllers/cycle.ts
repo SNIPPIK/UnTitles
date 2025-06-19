@@ -82,6 +82,9 @@ export class ControllerCycles {
                         try {
                             await message.edit({embeds: [embed], components: queue.components});
                         } catch (error) {
+                            // Если разорвано соединение с discord, пропускаем
+                            if (`${error}`.match(/getaddrinfo ENOTFOUND/)) return;
+
                             Logger.log("ERROR", `Failed to edit message in cycle: ${error instanceof Error ? error.message : error}`);
                             // Если при обновлении произошла ошибка
                             this.delete(message);
