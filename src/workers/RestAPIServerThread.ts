@@ -89,35 +89,36 @@ if (parentPort && workerData.rest) {
         if (message.platform) {
             try {
                 const { platform, payload, options } = message;
-
                 const readPlatform: RestServerSide.API = rest.platforms.supported[platform];
-
                 const callback = readPlatform.requests.find((p) => {
-                        // Если производится прямой запрос по названию
-                        if (p.name === payload) return p;
+                    // Если производится прямой запрос по названию
+                    if (p.name === payload) return p;
 
-                        // Если указана ссылка
-                        else if (typeof payload === "string" && payload.startsWith("http")) {
-                            try {
-                                if (p["filter"].exec(payload) || payload.match(p["filter"])) return p;
-                            } catch {
-                                return null;
-                            }
+                    // Если указана ссылка
+                    else if (typeof payload === "string" && payload.startsWith("http")) {
+                        try {
+                            if (p["filter"].exec(payload) || payload.match(p["filter"])) return p;
+                        } catch {
+                            return null;
                         }
-
-                        // Скорее всего надо произвести поиск
-                        return p.name === "search";
                     }
-                );
 
-                if (!callback) throw new Error(`Callback not found for platform: ${platform}`);
+                    // Скорее всего надо произвести поиск
+                    return p.name === "search";
+                });
 
+                // Если не найдена функция вызова
+                if (!callback) {
+                    return parentPort.postMessage({status: "error", result: Error(`Callback not found for platform: ${platform}`)});
+                }
+
+                // Получаем результат запроса
                 const result = await callback.execute(payload, {
                     audio: options?.audio !== undefined ? options.audio : true,
                     limit: rest.limits[callback.name]
                 });
 
-                parentPort.postMessage({ status: "success", result, type: callback.name });
+                return parentPort.postMessage({ status: "success", result, type: callback.name });
             } catch (err) {
                 parentPort.postMessage({status: "error", result: err});
                 throw new Error(`${err}`);

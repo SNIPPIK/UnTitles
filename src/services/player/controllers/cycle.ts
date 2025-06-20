@@ -22,8 +22,13 @@ export class ControllerCycles {
     public readonly players = new class AudioPlayers<T extends AudioPlayer> extends SyncCycle<T> {
         public constructor() {
             super({
+                // Время до следующего прогона цикла
                 duration: OPUS_FRAME_SIZE * parseInt(env.get("player.preferred", "1")),
+
+                // Функция проверки
                 filter: (item) => item.playing,
+
+                // Функция отправки аудио фрейма
                 execute: (player) => {
                     const connection = player.voice.connection;
 
@@ -47,7 +52,10 @@ export class ControllerCycles {
     public readonly messages = new class Messages<T extends CycleInteraction> extends SyncCycle<T> {
         public constructor() {
             super({
+                // Время до следующего прогона цикла
                 duration: 20e3,
+
+                // Кастомные функции (если хочется немного изменить логику выполнения)
                 custom: {
                     remove: async (item) => {
                         try {
@@ -62,7 +70,11 @@ export class ControllerCycles {
                         if (old) this.delete(old);
                     }
                 },
+
+                // Функция проверки
                 filter: (message) => message["editable"] && (message.editedTimestamp ?? message.createdTimestamp) < Date.now() + 12e3,
+
+                // Функция обновления сообщения
                 execute: async (message) => {
                     const queue = db.queues.get(message.guild.id);
 
@@ -82,10 +94,8 @@ export class ControllerCycles {
                         try {
                             await message.edit({embeds: [embed], components: queue.components});
                         } catch (error) {
-                            // Если разорвано соединение с discord, пропускаем
-                            if (`${error}`.match(/getaddrinfo ENOTFOUND/)) return;
-
                             Logger.log("ERROR", `Failed to edit message in cycle: ${error instanceof Error ? error.message : error}`);
+
                             // Если при обновлении произошла ошибка
                             this.delete(message);
                         }
