@@ -14,7 +14,7 @@ export class Environment {
     public constructor() {
         try {
             if (fs.existsSync("node_modules/dotenv")) {
-                const dotenv = require('dotenv');
+                const dotenv = require("dotenv");
                 if (dotenv) dotenv.config();
                 return;
             }

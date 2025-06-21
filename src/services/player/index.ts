@@ -37,11 +37,12 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
     public readonly options = {
         optimization: parseInt(env.get("duration.optimization")),
         volume: parseInt(env.get("audio.volume")),
+        swapFade: parseInt(env.get("audio.swap.fade")),
         fade: parseInt(env.get("audio.fade"))
     };
 
     /**
-     * @description отправляем сообщение о перезапуске бота
+     * @description Получаем время перезапуска и отправляем сообщения на сервера, где играет музыка!
      * @public
      */
     public get waitReboot() {

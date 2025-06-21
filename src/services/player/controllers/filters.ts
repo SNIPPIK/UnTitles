@@ -27,16 +27,17 @@ export class ControllerFilters<T extends AudioFilter> {
      * @description Сжимаем фильтры для работы ffmpeg
      * @public
      */
-    public compress = (time?: number) => {
-        const { volume, fade, optimization } = db.queues.options;
+    public compress = (time?: number, isSwap = false) => {
+        const { volume, fade, optimization, swapFade } = db.queues.options;
         const filters: string[] = [`volume=${volume / 150}`];
+        const fade_int = isSwap ? swapFade : fade;
 
         // Если трек live
         if (time === 0) return filters.join(",");
 
         // Если есть приглушение аудио
-        else if (fade) {
-            filters.push(`afade=t=in:st=0:d=${fade + 2}`);
+        else if (fade_int) {
+            filters.push(`afade=t=in:st=0:d=${fade_int}`);
 
             // Если есть время трека
             if (typeof time === "number" && time >= optimization) {

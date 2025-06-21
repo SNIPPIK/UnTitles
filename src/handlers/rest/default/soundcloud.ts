@@ -31,9 +31,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
          * @description Ссылки для работы API
          * @protected
          */
-        urls: {
-            api: "https://api-v2.soundcloud.com",
-        },
+        api: "https://api-v2.soundcloud.com",
 
         /**
          * @description Данные для авторизации
@@ -183,7 +181,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
     protected static API = (url: string): Promise<{api: json, ClientID: string} | Error> => {
         return new Promise(async (resolve) => {
             const result = await new httpsClient({
-                url: `${this.authorization.urls.api}/${url}&client_id=${this.authorization.token}`,
+                url: `${this.authorization.api}/${url}&client_id=${this.authorization.token}`,
                 userAgent: true,
             }).send() as json;
 

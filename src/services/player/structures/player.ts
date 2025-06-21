@@ -157,7 +157,7 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
             {
                 path,
                 options: { seek,
-                    filters: this._filters.compress(time)
+                    filters: this._filters.compress(time, this._audio.current && this._audio.current?.packets > 0)
                 }
             }
         );

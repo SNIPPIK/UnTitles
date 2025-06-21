@@ -27,14 +27,8 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
      * @protected
      */
     protected static authorization = {
-        /**
-         * @description Ссылки для работы API
-         * @protected
-         */
-        urls: {
-            api: "https://api.spotify.com/v1",
-            account: "https://accounts.spotify.com/api",
-        },
+        api: "https://api.spotify.com/v1",
+        account: "https://accounts.spotify.com/api",
 
         /**
          * @description Данные для авторизации
@@ -242,7 +236,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
         return new Promise(async (resolve) => {
             const getToken = async () => {
                 const token = await new httpsClient({
-                    url: `${this.authorization.urls.account}/token`,
+                    url: `${this.authorization.account}/token`,
                     headers: {
                         "Authorization": `Basic ${Buffer.from(`${this.authorization.auth}`).toString('base64')}`,
                         "Content-Type": "application/x-www-form-urlencoded"
@@ -263,7 +257,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
             if (!this.authorization.token || this.authorization.time <= Date.now()) await getToken();
 
             new httpsClient({
-                url: `${this.authorization.urls.api}/${method}`,
+                url: `${this.authorization.api}/${method}`,
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                     "Authorization": "Bearer " + this.authorization.token
