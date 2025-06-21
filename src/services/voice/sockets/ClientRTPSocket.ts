@@ -60,6 +60,7 @@ export class ClientRTPSocket {
 
     /**
      * @description Задаем единственный актуальный вариант шифрования
+     * @static
      * @public
      */
     public static get mode() {
@@ -154,13 +155,11 @@ export class ClientRTPSocket {
         const max = 2 ** bits;
         const size = Math.ceil(bits / 8);
         const maxGenerated = 2 ** (size * 8);
-        const threshold = maxGenerated - (maxGenerated % max);
-
         let rand: number;
 
         do {
             rand = crypto.randomBytes(size).readUIntBE(0, size);
-        } while (rand >= threshold);
+        } while (rand >= maxGenerated - (maxGenerated % max));
 
         return rand % max;
     };

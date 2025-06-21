@@ -107,7 +107,7 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly images: { disk: string; no_image: string; loading: string };
+    public readonly images: { disk: string; no_image: string; loading: string; banner: string; disk_emoji: string };
 
     /**
      * @description Создаем класс с ограничениями не для главного потока
@@ -139,9 +139,11 @@ export class Database {
             };
 
             this.images = {
+                banner: env.get("image.banner"),
                 disk: env.get("image.currentPlay"),
                 no_image: env.get("image.not"),
-                loading: env.get("loading.emoji")
+                loading: env.get("loading.emoji"),
+                disk_emoji: env.get("disk.emoji")
             };
         }
 

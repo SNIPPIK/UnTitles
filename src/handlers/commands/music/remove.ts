@@ -54,30 +54,20 @@ class RemoveTrackCommand extends Assign< BaseCommand<number> > {
                 if (index < 0 || index >= total) return null;
 
                 const half = Math.floor(maxSuggestions / 2);
-                let start = index - half;
-                let end = index + half;
+                let startIndex = Math.max(0, index - half);
 
-                if (start < 0) {
-                    end += Math.abs(start);
-                    start = 0;
-                }
-                if (end >= total) {
-                    const overshoot = end - (total - 1);
-                    start = Math.max(0, start - overshoot);
-                    end = total - 1;
+                // Корректируем старт, чтобы не выходить за пределы массива
+                if (startIndex + maxSuggestions > total) {
+                    startIndex = Math.max(0, total - maxSuggestions);
                 }
 
-                const results = [];
-                for (let i = start; i <= end; i++) {
-                    const track = queue.tracks.get(i);
-                    if (!track) continue;
+                const tracks = queue.tracks.array(maxSuggestions, startIndex);
+                const highlightIndex = index - startIndex;
 
-                    const isTarget = i === index;
-                    results.push({
-                        name: `${i + 1}. ${isTarget ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
-                        value: i
-                    });
-                }
+                const results = tracks.map((track, i) => ({
+                    name: `${startIndex + i + 1}. ${i === highlightIndex ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
+                    value: startIndex + i
+                }));
 
                 return message.respond(results);
             },

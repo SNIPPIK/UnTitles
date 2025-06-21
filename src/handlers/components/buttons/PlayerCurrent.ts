@@ -296,68 +296,116 @@ class ButtonQueue extends Assign<Button> {
         super({
             name: "queue",
             callback: async (message) => {
+                const lang = message.locale;
                 const queue = db.queues.get(message.guildId);
                 let page = parseInt((queue.tracks.position / 5).toFixed(0));
-                const pages = queue.tracks.array(5, true);
-                const lang = message.locale;
-                const components = [
-                    // Кнопки
-                    {
-                        type: 1,
-                        components: [
+                const pages = parseInt((queue.tracks.total / 5).toFixed(0)) ?? 1;
+
+                // Получаем контейнер на 2 версии компонентов
+                const getContainer = (position: number) => {
+                    const components = [];
+
+                    // Переводим треки в новый стиль!
+                    for (const track of queue.tracks.array(5, position * 5)) {
+                        components.push(
                             {
-                                type: 2,
-                                style: 2,
-                                emoji: {
-                                    name: "⬅"
-                                },
-                                custom_id: "menu_back",
+                                "type": 9,
+                                "components": [
+                                    {
+                                        "type": 10,
+                                        "content": `### ${db.images.disk_emoji} [${track.name}](${track.url})`
+                                    },
+                                    {
+                                        "type": 10,
+                                        "content": `- [${track.artist.title}](${track.artist.url})\n- ${track.time.split}`
+                                    }
+                                ],
+                                "accessory": {
+                                    "type": 11,
+                                    "media": {
+                                        "url": track.image.url
+                                    }
+                                }
                             },
                             {
-                                type: 2,
-                                style: 4,
-                                emoji: {
-                                    name: "🗑️"
-                                },
-                                custom_id: "menu_cancel"
+                                "type": 14, // Separator
+                                "divider": true,
+                                "spacing": 1
                             },
-                            {
-                                type: 2,
-                                style: 2,
-                                emoji: {
-                                    name: "➡"
+                        );
+                    }
+
+                    return [
+                        {
+                            "type": 17, // Container
+                            "accent_color": Colors.White,
+                            "components": [
+                                {
+                                    "type": 12, // Media
+                                    items: [
+                                        {
+                                            "media": {
+                                                "url": db.images.banner
+                                            }
+                                        }
+                                    ]
                                 },
-                                custom_id: "menu_next"
-                            }
-                        ]
-                    },
-                ];
 
+                                {
+                                    "type": 10, // Text
+                                    "content": `# ${locale._(lang, "queue")} - ${message.guild.name}`
+                                },
+                                ...components,
+                                {
+                                    "type": 10, // Text
+                                    "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages, queue.tracks.total, queue.tracks.time])
+                                },
 
-                return message.reply({
-                    flags: "IsComponentsV2",
-                    components: [
-                        {
-                            "type": 10,
-                            "content": `# ${locale._(lang, "queue")} - ${message.guild.name}\n${pages[0]}\n`
-                        },
-                        {
-                            "type": 14,
-                            "divider": true,
-                            "spacing": 1
-                        },
-                        {
-                            "type": 10,
-                            "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages.length, queue.tracks.total, queue.tracks.time])
-                        },
-                        ...components
-                    ],
-                    withResponse: true
-                }).then((msg) => {
-                    const message = msg.resource.message;
+                                // Кнопки
+                                {
+                                    type: 1,
+                                    components: [
+                                        {
+                                            type: 2,
+                                            style: 2,
+                                            emoji: {
+                                                name: "⬅"
+                                            },
+                                            custom_id: "menu_back",
+                                        },
+                                        {
+                                            type: 2,
+                                            style: 4,
+                                            emoji: {
+                                                name: "🗑️"
+                                            },
+                                            custom_id: "menu_cancel"
+                                        },
+                                        {
+                                            type: 2,
+                                            style: 2,
+                                            emoji: {
+                                                name: "➡"
+                                            },
+                                            custom_id: "menu_next"
+                                        }
+                                    ]
+                                },
+                            ]
+                        }
+                    ];
+                };
+
+                try {
+                    // Отправляем сообщение
+                    const msg = await message.reply({ flags: "IsComponentsV2", components: getContainer(0), withResponse: true });
+                    const resource = msg?.resource?.message;
+
+                    // Если нет ответа от API
+                    if (!resource) return;
 
                     // Создаем сборщик
-                    const collector = message.createMessageComponentCollector({
+                    const collector = resource.createMessageComponentCollector({
                         time: 60e3, componentType: 2,
                         filter: (click) => click.user.id !== msg.client.user.id
                     });
@@ -367,49 +415,33 @@ class ButtonQueue extends Assign<Button> {
                         // Кнопка переключения на предыдущую страницу
                         if (i.customId === "menu_back") {
                             // Делаем перелистывание на последнею страницу
-                            if (page === 0) page = pages.length - 1;
-                            else if (pages.length === 1) return null;
+                            if (page === 0) page = pages - 1;
+                            else if (pages === 1) return null;
                             else page--;
                         }
 
                         // Кнопка переключения на предыдущую страницу
                         else if (i.customId === "menu_next") {
                             // Делаем перелистывание на первую страницу
-                            if (page === pages.length) page = 0;
-                            else if (pages.length === 1) return null;
+                            if (page >= pages) page = 0;
+                            else if (pages === 1) return null;
                             else page++;
                         }
 
                         // Кнопка отмены
                         else if (i.customId === "menu_cancel") {
-                            try { return message.delete(); } catch { return null; }
+                            try { return resource.delete(); } catch { return null; }
                         }
 
-                        return message.edit({
-                            components: [
-                                {
-                                    "type": 10,
-                                    "content": `# ${locale._(lang, "queue")} - ${message.guild.name}\n${pages[page]}\n`
-                                },
-                                {
-                                    "type": 14,
-                                    "divider": true,
-                                    "spacing": 1
-                                },
-                                {
-                                    "type": 10,
-                                    "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages.length, queue.tracks.total, queue.tracks.time])
-                                },
-                                ...components
-                            ]
-                        })
+                        // Редактируем сообщение
+                        return resource.edit({ components: getContainer(page) });
                     });
 
                     // Таймер для удаления сообщения
-                    setTimeout(() => {
-                        message.delete().catch(() => null);
-                    }, 60e3);
-                })
+                    setTimeout(() => resource.deletable ? resource.delete().catch(() => null) : null, 60e3);
+                } catch (error) {
+                    Logger.log("ERROR", `[Failed send message/queue]: ${error}`);
+                }
             }
         });
     };

@@ -83,16 +83,16 @@ export class ControllerCycles {
 
                     // Если есть поток в плеере
                     else if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
-                        const embed = queue.componentEmbed;
+                        const component = queue.components;
 
                         // Если не получен embed
-                        if (!embed) {
+                        if (!component) {
                             this.delete(message);
                             return;
                         }
 
                         try {
-                            await message.edit({embeds: [embed], components: queue.components});
+                            await message.edit({components: component});
                         } catch (error) {
                             Logger.log("ERROR", `Failed to edit message in cycle: ${error instanceof Error ? error.message : error}`);
 

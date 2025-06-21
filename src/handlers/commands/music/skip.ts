@@ -116,47 +116,40 @@ class SkipUtilityCommand extends Assign< BaseCommand<number> > {
                 const position = queue.tracks.position;
                 const maxSuggestions = 5;
 
-                let startIndex: number | null = null;
+                let startIndex: number;
                 let icon: string;
+                let highlightIndex: number;
 
                 if (type === "back") {
                     if (position === 0) return null;
                     startIndex = Math.max(0, position - number);
                     icon = "⬅️";
+                    highlightIndex = 0;
                 } else if (type === "next") {
                     startIndex = Math.min(total - 1, position + number);
                     icon = "➡️";
+                    highlightIndex = 0;
                 } else {
-                    startIndex = number - 1;
-                    if (startIndex < 0 || startIndex >= total) return null;
+                    const index = number - 1;
+                    if (index < 0 || index >= total) return null;
+
+                    const half = Math.floor(maxSuggestions / 2);
+                    startIndex = Math.max(0, index - half);
+                    if (startIndex + maxSuggestions > total) {
+                        startIndex = Math.max(0, total - maxSuggestions);
+                    }
+
                     icon = "🎵";
+                    highlightIndex = index - startIndex;
                 }
 
-                // Окно подсказок с центровкой вокруг startIndex
-                const half = Math.floor(maxSuggestions / 2);
-                let start = startIndex - half;
-                let end = startIndex + half;
+                const tracks = queue.tracks.array(maxSuggestions, startIndex);
+                if (!tracks.length) return null;
 
-                if (start < 0) {
-                    end += Math.abs(start);
-                    start = 0;
-                }
-                if (end >= total) {
-                    const overshoot = end - (total - 1);
-                    start = Math.max(0, start - overshoot);
-                    end = total - 1;
-                }
-
-                const results = [];
-                for (let i = start; i <= end; i++) {
-                    const track = queue.tracks.get(i);
-                    if (!track) continue;
-
-                    results.push({
-                        name: `${i + 1}. ${i === startIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
-                        value: i
-                    });
-                }
+                const results = tracks.map((track, i) => ({
+                    name: `${startIndex + i + 1}. ${i === highlightIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
+                    value: startIndex + i
+                }));
 
                 return message.respond(results);
             },

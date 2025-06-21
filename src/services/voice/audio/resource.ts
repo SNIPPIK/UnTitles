@@ -455,6 +455,7 @@ export class PipeAudioResource extends BaseAudioResource {
 
                 // Подключаем фильтры
                 "-af", options.filters,
+
                 // Указываем формат аудио (ogg/opus)
                 "-acodec", "libopus",
                 "-compression_level", "10",

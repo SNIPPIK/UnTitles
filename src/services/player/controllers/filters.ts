@@ -31,21 +31,22 @@ export class ControllerFilters<T extends AudioFilter> {
         const { volume, fade, optimization, swapFade } = db.queues.options;
         const filters: string[] = [`volume=${volume / 150}`];
         const fade_int = isSwap ? swapFade : fade;
-
-        // Если трек live
-        if (time === 0) return filters.join(",");
+        const live = time === 0;
 
         // Если есть приглушение аудио
-        else if (fade_int) {
+        if (fade_int) {
             filters.push(`afade=t=in:st=0:d=${fade_int}`);
 
             // Если есть время трека
-            if (typeof time === "number" && time >= optimization) {
+            if (typeof time === "number" && time >= optimization && !live) {
                 const start = time - (fade + 5);
 
                 if (start > 0) filters.push(`afade=t=out:st=${start}:d=${fade + 5}`);
             }
         }
+
+        // Если трек live
+        if (live) return filters.join(",");
 
         // Берем данные из всех фильтров
         for (const { filter, args, argument } of this.enabled) {

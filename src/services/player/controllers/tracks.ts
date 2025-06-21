@@ -1,4 +1,4 @@
-import { Track } from "#service/player";
+import {Track} from "#service/player";
 
 /**
  * @author SNIPPIK
@@ -186,21 +186,15 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Получаем <указанное> кол-во треков
-     * @param size - При -5 будут выданы выданные последние до текущего трека, при +5 будут выданы следующие треки
-     * @param sorting - При включении треки перейдут в string[]
+     * @param size - При -5 будут выданы выданные последние от текущей позиции, при +5 будут выданы следующие треки
+     * @param position - Позиция с которой будет начат отсчет
      */
-    public array(size: number, sorting?: boolean): T[];
-    public array(size: number, sorting: true): string[];
-    public array(size: number, sorting: boolean = false): (string | T)[] {
-        const startIndex = size < 0 ? this._position + size : this._position + 1;
-        const endIndex = size < 0 ? this._position : this._position + 1 + size;
+    public array(size: number, position?: number): T[] {
+        const realPosition = position ?? this._position;
+        const startIndex = size < 0 ? realPosition + size : realPosition;
+        const endIndex = size < 0 ? realPosition : realPosition + size;
 
-        const slice = this._current.slice(startIndex, endIndex);
-
-        if (!sorting) return slice;
-
-        // Форматируем треки в строки с номерами
-        return slice.map((track) => `\`${startIndex + 1}\` - ${track.name_replace}`);
+        return this._current.slice(startIndex, endIndex);
     };
 
     /**

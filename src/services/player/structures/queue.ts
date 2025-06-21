@@ -218,52 +218,56 @@ abstract class BaseQueue {
  */
 export class Queue extends BaseQueue {
     /**
-     * @description Проверка и выдача кнопок
+     * @description Выдача компонентов сообщения, такие как кнопки и текст
      * @public
      */
     public get components() {
-        return QueueButtons.component(this.player);
-    };
+        const buttons = QueueButtons.component(this._player);
 
-    /**
-     * @description Embed данные о текущем треке
-     * @public
-     */
-    public get componentEmbed() {
         try {
-            const {api, artist, image, name, user} = this._tracks.track;
+            const {api, artist, name, user, image, url} = this._tracks.track;
             const position = this._tracks.position;
-            return {
-                color: api.color, thumbnail: image,
-                author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
-                footer: {
-                    text: `${user.username} ${this._tracks.total > 1 ? `| 🎵 ${position + 1} - ${this._tracks.total} 🎶` : ""}`,
-                    iconURL: user.avatar
-                },
-                fields: [
-                    // Текущий трек
+
+            return [{
+                "type": 17, // Container
+                "accent_color": api.color,
+                "components": [
                     {
-                        name: "",
-                        value: `\`\`\`${name}\`\`\`` + this._player.progress
+                        "type": 9,
+                        "components": [
+                            {
+                                "type": 10,
+                                "content": `## ${db.images.disk_emoji} [${artist.title}](${artist.url})`
+                            },
+                            {
+                                "type": 10,
+                                "content": `### **❯** [${name}](${url})\n**❯** ${user.username}`
+                            }
+                        ],
+                        "accessory": {
+                            "type": 11,
+                            "media": {
+                                "url": image.url
+                            }
+                        }
                     },
-
-                    // Следующий трек или треки
-                    this._tracks.size > 0 ? (() => {
-                        const tracks = (this._tracks.array(+3) as Track[]).map((track, index) => {
-                            return `${position + index + 2} - ${track.name_replace}`;
-                        });
-
-                        return {
-                            name: "",
-                            value: tracks.join("\n")
-                        };
-                    })() : null
+                    {
+                        "type": 14, // Separator
+                        "divider": true,
+                        "spacing": 1
+                    },
+                    {
+                        "type": 10, // Text
+                        "content": `${this._tracks.total > 1 ? `-# ${position + 1}/${this._tracks.total} | ${this._tracks.time}` : ""}` + this._player.progress
+                    },
+                    ...buttons
                 ]
-            };
+            }];
         } catch (error) {
-            Logger.log("ERROR", `[Queue/${this._message.guildID}]: ${error}`);
-            return null;
+            console.log(error);
         }
+
+        return null;
     };
 
     /**

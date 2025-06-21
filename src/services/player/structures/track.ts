@@ -72,7 +72,7 @@ abstract class BaseTrack {
 
         // Удаляем мусорные названия из текста
         if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic/gi, "");
-        _track.title = `${_track.title}`.replace(/\(Lyrics Video\)/gi, "");
+        _track.title = `${_track.title}`.replace(/Lyrics Video|[\/()\[\]"]/gi, "");
     };
 }
 
@@ -113,9 +113,9 @@ export class Track extends BaseTrack {
      */
     public get name_replace() {
         // Удаляем лишнее скобки
-        const title = `[${this.name.replace(/[()\[\]"]/g, "").substring(0, 45)}](${this.url})`;
+        const title = `[${this._track.title.substring(0, 45)}](${this.url})`;
 
-        if (this.api.name === "YOUTUBE") return `\`\`${this._duration.split}\`\` ${title}`;
+        if (this._api.name === "YOUTUBE") return `\`\`${this._duration.split}\`\` ${title}`;
         return `\`\`${this._duration.split}\`\` [${this.artist.title}](${this.artist.url}) - ${title}`;
     };
 
@@ -234,7 +234,7 @@ export class Track extends BaseTrack {
     public get lyrics(): Promise<string | Error> {
         return new Promise(async (resolve) => {
             // Выдаем повторно текст песни
-            if (this._lyrics) return resolve(this._lyrics);
+            if (this._lyrics || this._duration.total === 0) return resolve(this._lyrics);
 
             // Если ответ не был получен от сервера
             const timeoutPromise = new Promise((_, reject) =>

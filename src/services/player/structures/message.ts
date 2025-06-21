@@ -109,7 +109,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @param options - Параметры сообщения
      * @public
      */
-    public send = (options: {embeds: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
+    public send = (options: {embeds?: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
         try {
             // Если бот уже ответил на сообщение
             if (this.replied && !this.deferred) return this._original.followUp(options as any) as any;

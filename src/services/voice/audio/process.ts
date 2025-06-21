@@ -38,6 +38,7 @@ export class Process {
      * @description Задаем параметры и запускаем процесс
      * @param args {string[]} Аргументы для запуска
      * @param name {string} Имя процесса
+     * @public
      */
     public constructor(args: string[], name: string = ffmpeg_path) {
         const index_resource = args.indexOf("-i");

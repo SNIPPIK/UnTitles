@@ -50,8 +50,7 @@ class message_error extends Assign<Event<"message/error">> {
                 });
 
                 // Если есть ответ от отправленного сообщения
-                if (message) setTimeout(() => message.delete().catch(() => {
-                }), 20e3);
+                if (message) setTimeout(() => message.deletable ? message.delete().catch(() => null) : null, 20e3);
             }
         });
     }
@@ -107,7 +106,7 @@ class message_push extends Assign<Event<"message/push">> {
                 });
 
                 // Если есть ответ от отправленного сообщения
-                if (msg) setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : {}, 12e3);
+                if (msg) setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 12e3);
             }
         });
     };
@@ -131,9 +130,9 @@ class message_playing extends Assign<Event<"message/playing">> {
                 setImmediate(async () => {
                     // Отправляем сообщение
                     const message = await queue.message.send({
-                        embeds: [queue.componentEmbed],
                         components: queue.components,
-                        withResponse: true
+                        withResponse: true,
+                        flags: "IsComponentsV2"
                     });
 
                     // Если есть ответ от отправленного сообщения

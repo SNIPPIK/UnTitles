@@ -41,7 +41,7 @@ class GuildCreate extends Assign<Event<Events.GuildCreate>> {
                                         items: [
                                             {
                                                 "media": {
-                                                    "url": `https://github.com/SNIPPIK/WatKLOK/blob/nightly/.github/resource/Icons/BG.png?raw=true`
+                                                    "url": db.images.banner
                                                 }
                                             }
                                         ]

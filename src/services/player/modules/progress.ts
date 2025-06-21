@@ -67,7 +67,7 @@ export class PlayerProgress {
      * @description Создаем класс для отображения прогресс бара
      * @param size - Размер
      */
-    public constructor(private readonly size: number = 12) {};
+    public constructor(private readonly size: number = 15) {};
 
     /**
      * @description Получаем готовый прогресс бар
