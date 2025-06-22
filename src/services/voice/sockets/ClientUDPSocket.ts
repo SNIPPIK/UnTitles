@@ -1,13 +1,7 @@
 import { createSocket, type Socket } from "node:dgram";
 import { TypedEmitter } from "#structures";
+import { opcode } from "#service/voice";
 import { isIPv4 } from "node:net";
-
-/**
- * @author SNIPPIK
- * @description Интервал в миллисекундах, с которым отправляются датаграммы поддержания активности
- * @private
- */
-const ALIVE_INTERVAL = 10e3;
 
 /**
  * @author SNIPPIK
@@ -23,6 +17,9 @@ const MAX_SIZE_VALUE = 2 ** 32 - 1;
  * @public
  */
 export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
+    /** Параметр подключения */
+    private isConnected = false;
+
     /**
      * @description Уничтожен ли класс
      * @private
@@ -49,6 +46,13 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         interval: null as NodeJS.Timeout,
 
         /**
+         * @description Интервал для предотвращения разрыва в милисекундах
+         * @readonly
+         * @private
+         */
+        intervalMs: 0,
+
+        /**
          * @description Таймер по истечению которого будет запущен интервал
          * @readonly
          * @private
@@ -70,13 +74,10 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     };
 
     /**
-     * @description Данные подключения
+     * @description Данные подключения, полные данные пакета ready.d
      * @public
      */
-    public _discovery = {
-        ip: null as string,
-        port: 0
-    };
+    public options: opcode.ready["d"];
 
     /**
      * @description Отправка данных на сервер
@@ -92,12 +93,29 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     };
 
     /**
-     * @description Создает новый голосовой UDP-сокет.
+     * @description Подключен ли UDP к серверу
+     * @public
+     */
+    public get connected() {
+        return this.isConnected;
+    };
+
+    /**
+     * @description Подключаемся по UDP подключению
      * @param options - Данные для подключения
      * @public
      */
-    public constructor(private options: UDPConnection) {
-        super();
+    public connect = (options: opcode.ready["d"]) => {
+        this.keepAlive.intervalMs = options.heartbeat_interval; // Меняем интервал
+
+        // Не имеет смысла создавать заново если все данные совпадают
+        if (this.options !== undefined) {
+            if (options.ip === this.options.ip && options.port === this.options.port && options.ssrc === this.options.ssrc) return;
+            else this.discovery(options.ssrc); // Отправляем пакет данных для получения реального ip, port
+        }
+
+        // Меняем данные
+        this.options = options;
 
         // Проверяем через какое соединение подключатся
         if (isIPv4(options.ip)) this.socket = createSocket("udp4");
@@ -118,10 +136,16 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         });
 
         // Если подключение оборвалось
-        this.socket.on("close", this.emit.bind(this, "close"));
+        this.socket.on("close", () => {
+            this.isConnected = false;
+            this.emit.bind(this, "close");
+        });
 
         this.socket.bind(); // обязательный вызов для активации сокета
         this.manageKeepAlive();
+
+        // Отправляем пакет данных для получения реального ip, port
+        this.discovery(options.ssrc);
     };
 
     /**
@@ -144,7 +168,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
                     return;
                 }
 
-                this._discovery = { ip, port }
+                this.isConnected = true;
                 this.emit("connected", { ip, port });
             }
         });
@@ -183,7 +207,8 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     private discoveryBuffer = (ssrc: number) => {
-        const packet = Buffer.alloc(74);
+        /** Безопасен поскольку данные будут сразу перезаписаны */
+        const packet = Buffer.allocUnsafe(74);
         packet.writeUInt16BE(1, 0);
         packet.writeUInt16BE(70, 2);
         packet.writeUInt32BE(ssrc, 4);
@@ -205,7 +230,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
             this.keepAlive.buffer.writeUInt32BE(this.keepAlive.counter++, 0);
             this.packet = this.keepAlive.buffer;
-        }, ALIVE_INTERVAL);
+        }, this.keepAlive.intervalMs);
     };
 
     /**
@@ -221,25 +246,6 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     };
 }
 
-/**
- * @author SNIPPIK
- * @description Параметры подключения UDP
- * @interface UDPConnection
- * @private
- */
-interface UDPConnection {
-    /**
-     * @description Прямой ip сервера
-     * @private
-     */
-    ip: string,
-
-    /**
-     * @description Порт сервера
-     * @private
-     */
-    port: number
-}
 /**
  * @author SNIPPIK
  * @description События для UDP

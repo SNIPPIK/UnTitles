@@ -26,7 +26,7 @@ export class ControllerCycles {
                 duration: OPUS_FRAME_SIZE * parseInt(env.get("player.preferred", "1")),
 
                 // Функция проверки
-                filter: (item) => item.playing,
+                filter: (item) => item.playing && item.voice.connection.ready,
 
                 // Функция отправки аудио фрейма
                 execute: (player) => {

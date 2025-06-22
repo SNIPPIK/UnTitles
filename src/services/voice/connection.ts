@@ -22,13 +22,13 @@ export class VoiceConnection {
      * @description Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway
      * @private
      */
-    private websocket: ClientWebSocket = new ClientWebSocket(this);
+    private websocket: ClientWebSocket = new ClientWebSocket();
 
     /**
      * @description Клиент UDP соединения, ключевой класс для отправки пакетов
      * @private
      */
-    private udpClient: ClientUDPSocket;
+    private udpClient: ClientUDPSocket = new ClientUDPSocket();
 
     /**
      * @description Клиент RTP, ключевой класс для шифрования пакетов для отправки через UDP
@@ -77,8 +77,7 @@ export class VoiceConnection {
      * @public
      */
     public set packet(packet: Buffer) {
-        // Если есть аудио фрейм
-        if (packet !== null && this.udpClient && this.rtpClient) {
+        if (this._status === VoiceConnectionStatus.ready) {
             this.speaking = true;
             this.udpClient.packet = this.rtpClient.packet(packet);
             this.resetSpeakingTimeout();
@@ -90,7 +89,14 @@ export class VoiceConnection {
      * @public
      */
     public get ready(): boolean {
-        return this.rtpClient && this.udpClient && this.websocket && this.websocket.connected && this._status === VoiceConnectionStatus.ready;
+        // Если статус не готовности
+        if (this._status !== VoiceConnectionStatus.ready) return false;
+
+        // Если нет клиентов для передачи аудио
+        else if (!this.rtpClient && !this.udpClient) return false;
+
+        // Если основных данных нет
+        return this.udpClient.connected && this.websocket && this.websocket.connected;
     };
 
     /**
@@ -197,37 +203,46 @@ export class VoiceConnection {
      * @private
      */
     private createWebSocket = (endpoint: string) => {
-        // Подключаемся к endpoint
-        this.websocket.connect(`wss://${endpoint}?v=8`);
+        this.websocket.connect(`wss://${endpoint}?v=8`); // Подключаемся к endpoint
 
         // Если включен debug режим
         this.websocket.on("debug", console.log);
         this.websocket.on("warn", console.log);
 
-        // Если websocket требует возобновления подключения
-        this.websocket.on("resumed", () => {
-            this.speaking = false;
+        /**
+         * @description Отправляем Identify данные, для регистарции голосового подключения
+         * @status Identify
+         * @code 0
+         */
+        this.websocket.on("open", () => {
             this.websocket.packet = {
-                op: VoiceOpcodes.Resume,
+                op: VoiceOpcodes.Identify,
                 d: {
                     server_id: this.configuration.guild_id,
                     session_id: this.voiceState.session_id,
-                    token: this.serverState.token,
-                    seq_ack: this.websocket.lastAsk
+                    user_id: this.voiceState.user_id,
+                    token: this.serverState.token
                 }
             };
         });
 
-        // Поднимаем UDP соединение
+        /**
+         * @description Если голосовое подключение готово, подключаемся по UDP
+         * @status Ready
+         * @code 2
+         */
         this.websocket.on("ready", ({d}) => {
-            this._status = VoiceConnectionStatus.ready;
             this.createUDPSocket(d);
 
             // После установки UDP и RTP, включаем speaking
             this.resetSpeakingTimeout();
         });
 
-        // Поднимаем RTP соединение
+        /**
+         * @description Если голосовое подключение готово, и получены данные для шифрования пакетов
+         * @status SessionDescription
+         * @code 4
+         */
         this.websocket.on("sessionDescription", ({d}) => {
             this._status = VoiceConnectionStatus.SessionDescription;
             this.speaking = false;
@@ -246,19 +261,44 @@ export class VoiceConnection {
                 ssrc: this._attention.ssrc
             });
 
+            this._status = VoiceConnectionStatus.ready;
+
             // Сохраняем ключ, для повторного использования
             this._attention.secret_key = d.secret_key;
         });
 
-        // Если Websocket завершил свою работу
+        /**
+         * @description Если websocket требует возобновления подключения
+         * @status Resume
+         * @code 7
+         */
+        this.websocket.on("resumed", () => {
+            this.speaking = false;
+            this.websocket.packet = {
+                op: VoiceOpcodes.Resume,
+                d: {
+                    server_id: this.configuration.guild_id,
+                    session_id: this.voiceState.session_id,
+                    token: this.serverState.token,
+                    seq_ack: this.websocket.lastAsk
+                }
+            };
+        });
+
+        /**
+         * @description Если websocket закрывается, пытаемся его поднять или перезапустить
+         * @status WS Close
+         * @code 1000-4022
+         */
         this.websocket.on("close", (code, reason) => {
             if (code >= 1000 && code <= 1002) return this.destroy();
 
             // Подключения больше не существует
-            else if (code === 4006) {
+            else if (code === 4006 || code === 4003) {
                 this.serverState.endpoint = null;
                 this.voiceState.session_id = null;
                 this.adapter.sendPayload(this.configuration);
+                return; // Здесь происходит пересоздание ws подключения
             }
 
             setTimeout(() => {
@@ -267,7 +307,10 @@ export class VoiceConnection {
             }, 500);
         });
 
-        // Если возникла ошибка
+        /**
+         * @description Если websocket получил не предвиденную ошибку, то отключаемся
+         * @status WS Error
+         */
         this.websocket.on("error", () => {
             this._status = VoiceConnectionStatus.disconnected;
             this.disconnect;
@@ -280,24 +323,14 @@ export class VoiceConnection {
      * @param d - Пакет opcode.ready
      */
     private createUDPSocket = (d: opcode.ready["d"]) => {
-        // Если есть UDP подключение
-        if (this.udpClient) {
-            this._speaking = false;
+        this.udpClient.connect(d); // Подключаемся по UDP к серверу
 
-            // Сверяем данные
-            if (d.ssrc === this._attention?.ssrc) return;
-
-            this.udpClient.destroy();
-            this.udpClient = null;
-        }
-
-        this.udpClient = new ClientUDPSocket(d);
-        this.udpClient.discovery(d.ssrc);
-
-        // Подключаемся к UDP серверу
-        this.udpClient.on("connected", () => {
-            const {ip, port} = this.udpClient._discovery
-
+        /**
+         * @description Передаем реальный ip, port для общения с discord
+         * @status SelectProtocol
+         * @code 1
+         */
+        this.udpClient.on("connected", ({ip, port}) => {
             this.websocket.packet = {
                 op: VoiceOpcodes.SelectProtocol,
                 d: {
@@ -313,9 +346,13 @@ export class VoiceConnection {
 
         // Если UDP подключение разорвет соединение принудительно
         this.udpClient.on("close", () => {
-            if (this.status === VoiceConnectionStatus.disconnected) return;
+            // Если голосовое подключение полностью отключено
+            if (this._status === VoiceConnectionStatus.disconnected) return;
 
+            // Пересоздаем подключение
             this.createUDPSocket(d);
+
+            // Debug
             this.websocket.emit("warn", `UDP Close. Reinitializing UDP socket...`);
         });
 
@@ -327,10 +364,9 @@ export class VoiceConnection {
                 return;
             }
 
-            this.websocket.emit("warn", `UDP Error: ${error.message}. Reinitializing UDP socket...`);
+            this.websocket.emit("warn", `UDP Error: ${error.message}. Closed voice connection!`);
         });
 
-        // Сохраняем номер ssrc, для повторного использования
         this._attention.ssrc = d.ssrc;
     };
 

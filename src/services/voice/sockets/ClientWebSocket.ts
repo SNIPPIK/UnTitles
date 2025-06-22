@@ -1,15 +1,7 @@
+import { HeartbeatManager } from "../managers/heartbeat";
 import { VoiceOpcodes } from "discord-api-types/voice";
-import { VoiceConnection } from "#service/voice";
 import { TypedEmitter } from "#structures";
 import { WebSocket, Data } from "ws";
-
-/**
- * @author SNIPPIK
- * @description Время ожидания получения ask кода до переподключения
- * @const timeoutWS
- * @private
- */
-const timeoutWS = 5e3;
 
 /**
  * @author SNIPPIK
@@ -19,31 +11,19 @@ const timeoutWS = 5e3;
  * @public
  */
 export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
+    /** Конечная точко подключения */
     private endpoint: string;
 
-    /**
-     * @description Данные для проверки жизни websocket
-     * @private
-     */
-    private readonly heartbeat = {
-        interval: null as NodeJS.Timeout,
-        timeout: null as NodeJS.Timeout,
-        intervalMs: null as number,
-        reconnects: 0,
+    /** Параметр подключения */
+    private isConnecting: boolean;
 
-        miss: 0
-    };
+    /** Менеджер жизни подключения, необходим для работы подключения */
+    private heartbeat: HeartbeatManager;
 
-    /**
-     * @description Клиент ws
-     * @private
-     */
+    /** Клиент WebSocket */
     private ws: WebSocket;
 
-    /**
-     * @description Номер последнего принятого пакета
-     * @public
-     */
+    /** Номер последнего принятого пакета */
     public lastAsk: number = -1;
 
     /**
@@ -51,7 +31,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public get connected() {
-        return this.ws?.readyState !== WebSocket.CLOSED && this.ws?.readyState !== WebSocket.CLOSING;
+        return this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING;
     };
 
     /**
@@ -80,16 +60,43 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
     };
 
-
     /**
-     * @description Создаем класс
-     * @param connection - Класс голосового подключения
+     * @description Реализуем внутренние системы класса для подключения
+     * @public
      */
-    public constructor(
-        private readonly connection: VoiceConnection,
-    ) {
+    public constructor() {
         super();
-    };
+
+        this.heartbeat = new HeartbeatManager({
+            // Отправка heartbeat
+            send: () => {
+                this.packet = {
+                    op: VoiceOpcodes.Heartbeat,
+                    d: {
+                        t: Date.now(),
+                        seq_ack: this.lastAsk
+                    }
+                };
+            },
+
+            // Если не получен HEARTBEAT_ACK вовремя
+            onTimeout: () => {
+                if (this.heartbeat.missed >= 2) {
+                    this.emit("warn", "HEARTBEAT_ACK timeout x2, reconnecting...");
+                    this.attemptReconnect();
+                } else {
+                    this.emit("warn", "HEARTBEAT_ACK not received in time");
+                }
+            },
+
+            // Получен HEARTBEAT_ACK
+            onAck: (latency) => {
+                this.lastAsk++;
+                this.emit("debug", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
+                if (this.ws?.readyState === WebSocket.OPEN) this.ws.ping();
+            }
+        });
+    }
 
     /**
      * @description Создаем подключение, websocket по ранее указанному пути
@@ -97,6 +104,9 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public connect = (endpoint: string) => {
+        if (this.isConnecting) return;
+        this.isConnecting = true;
+
         // Если есть прошлый WS
         if (this.ws) this.reset();
 
@@ -109,19 +119,24 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             }
         });
 
-        // Если был получен ответ от подключения
-        this.ws.on("pong", () => {
-            if (this.connected) this.ws.resume();
-        });
-
         // Сообщение от websocket соединения
         this.ws.on("message", this.onEventMessage);
 
+        // Запуск websocket соединения
+        this.ws.on("open", () => {
+            this.isConnecting = false;
+            this.emit("open");
+        });
+
         // Закрытие websocket соединения
-        this.ws.on("close",  this.onEventClose);
+        this.ws.on("close", (code, reason) => {
+            this.isConnecting = false;
+            this.onEventClose(code, reason as any);
+        });
 
         // Ошибка websocket соединения
-        this.ws.on("error", (err) => {
+        this.ws.once("error", (err) => {
+            this.isConnecting = false;
             this.emit("warn", err);
 
             // Если ws уже разорвал соединение
@@ -138,21 +153,6 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             this.emit("error", err);
         });
-
-        // Запуск websocket соединения
-        this.ws.on("open", () => {
-                this.packet = {
-                    op: VoiceOpcodes.Identify,
-                    d: {
-                        server_id: this.connection.configuration.guild_id,
-                        session_id: this.connection.voiceState.session_id,
-                        user_id: this.connection.voiceState.user_id,
-                        token: this.connection.serverState.token
-                    }
-                };
-
-                this.emit("open");
-            });
     };
 
     /**
@@ -176,22 +176,19 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         switch (op) {
             // Получение heartbeat_interval
             case VoiceOpcodes.Hello: {
-                this.setHeartbeat(d.heartbeat_interval);
-                this.heartbeat.intervalMs = d.heartbeat_interval;
+                this.heartbeat.start(d.heartbeat_interval);
                 break;
             }
 
             // Проверка HeartbeatAck
             case VoiceOpcodes.HeartbeatAck: {
-                this.lastAsk++;
-                this.handleHeartbeatAck(d.t);
+                this.heartbeat.ack();
                 break;
             }
 
             // Проверка переподключения
             case VoiceOpcodes.Resumed: {
-                this.heartbeat.reconnects = 0;
-                this.setHeartbeat();
+                this.heartbeat.start();
                 break;
             }
 
@@ -204,7 +201,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Получение статуса готовности
             case VoiceOpcodes.Ready: {
                 this.emit("ready", payload);
-                this.heartbeat.reconnects = 0; // Сбросить счётчик при успешном подключении
+                this.heartbeat.resetReconnects(); // Сбросить счётчик при успешном подключении
                 break;
             }
 
@@ -250,97 +247,23 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @private
      */
     private attemptReconnect = (reconnect?: boolean) => {
-        if (this.heartbeat.interval) clearInterval(this.heartbeat.interval);
-        if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
+        this.heartbeat.stop();
 
         // Переподключемся минуя посредика в виде VoiceConnection
-        if (reconnect || this.heartbeat.reconnects >= 3) {
+        if (reconnect || this.heartbeat.reconnectAttempts >= 3) {
             this.emit("debug", `Reconnecting...`);
             this.connect(this.endpoint);
             return;
         }
 
-        this.heartbeat.reconnects++;
-        const delay = Math.min(1000 * this.heartbeat.reconnects, 5000);
+        this.heartbeat.increaseReconnect();
+        const delay = Math.min(1000 * this.heartbeat.reconnectAttempts, 5000);
 
         // Переподключемся через код resume
         setTimeout(() => {
-            this.emit("debug", `Reconnecting... Attempt ${this.heartbeat.reconnects}`);
+            this.emit("debug", `Reconnecting... Attempt ${this.heartbeat.reconnectAttempts}`);
             this.emit("resumed");
         }, delay);
-    };
-
-    /**
-     * @description Управление состоянием heartbeat websocket'а
-     * @param intervalMs - Время в мс
-     * @private
-     */
-    private setHeartbeat = (intervalMs?: number) => {
-        if (this.heartbeat.interval) clearInterval(this.heartbeat.interval);
-        if (intervalMs !== 0) this.heartbeat.intervalMs = intervalMs;
-
-        // Запускаем интервал с отправкой heart кодов
-        this.heartbeat.interval = setInterval(() => {
-            this.packet = {
-                op: VoiceOpcodes.Heartbeat,
-                d: {
-                    t: Date.now(),
-                    seq_ack: this.lastAsk
-                }
-            };
-
-            this.startHeartbeatTimeout();
-        }, this.heartbeat.intervalMs);
-    };
-
-    /**
-     * @description Если ответ от websocket не получен то пересоздадим подключение
-     * @private
-     */
-    private startHeartbeatTimeout = () => {
-        if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
-
-        // Запускаем таймер
-        this.heartbeat.timeout = setTimeout(() => {
-            // Если кол-во пропущенных ответ >=2, то подключаемся заново
-            if (this.heartbeat.miss >= 2) this.attemptReconnect(false);
-
-            this.emit("warn", "HEARTBEAT_ACK not received within timeout");
-            this.heartbeat.miss++;
-        }, timeoutWS);
-    };
-
-    /**
-     * @description Очищает heartbeat интервал
-     * @private
-     */
-    private clearHeartbeat = () => {
-        if (!this.heartbeat.interval) {
-            this.emit('warn', 'Tried to clear a heartbeat interval that does not exist');
-            return;
-        }
-
-        clearInterval(this.heartbeat.interval);
-        this.heartbeat.interval = null;
-    };
-
-    /**
-     * @description Если получен ответ от циклической системы discord
-     * @param ackData - Полученное время
-     * @private
-     */
-    private handleHeartbeatAck = (ackData: number) => {
-        this.emit("debug", `HEARTBEAT_ACK received. Latency: ${Date.now() - ackData} ms`);
-        this.heartbeat.miss = 0;
-
-        // Удаляем таймер если он есть
-        if (this.heartbeat.timeout) {
-            clearTimeout(this.heartbeat.timeout);
-            this.heartbeat.timeout = null;
-        }
-
-        // Пингуем подключение
-        this.ws.ping();
     };
 
     /**
@@ -360,7 +283,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         this.lastAsk = -1;
-        this.clearHeartbeat();
+        this.heartbeat.stop();
     };
 
     /**
@@ -371,14 +294,6 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.removeAllListeners();
         this.reset();
 
-        if (this.heartbeat.timeout) clearTimeout(this.heartbeat.timeout);
-        if (this.heartbeat.interval) clearTimeout(this.heartbeat.interval);
-
-        this.heartbeat.miss = null;
-        this.heartbeat.timeout = null;
-        this.heartbeat.interval = null;
-        this.heartbeat.intervalMs = null;
-        this.heartbeat.reconnects = null;
         this.lastAsk = null;
     };
 }
@@ -532,8 +447,8 @@ export namespace opcode {
      * @code 4
      */
     export interface session {
-        op: VoiceOpcodes.SessionDescription;
-        d: {
+        "op": VoiceOpcodes.SessionDescription;
+        "d": {
             mode: string;         // Выбранный режим шифрования, например "xsalsa20_poly1305"
             secret_key: number[]; // Массив байтов (uint8) для шифрования RTP-пакетов
         };
@@ -599,8 +514,8 @@ export namespace opcode {
      * @code 9
      */
     export interface resumed {
-        op: VoiceOpcodes.Resumed;
-        d: {};
+        "op": VoiceOpcodes.Resumed;
+        "d": {};
     }
 
     /**
