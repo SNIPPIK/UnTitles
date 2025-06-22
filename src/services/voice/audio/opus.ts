@@ -61,7 +61,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             // Если не находим OGGs_HEAD в буфере
             if (!magic.equals(OGG_MAGIC)) {
                 this.emit("error", Error(`capture_pattern is not ${OGG_MAGIC}`));
-                continue;
+                break;
             }
 
             const pageSegments = this._buffer.readUInt8(offset + 26);
@@ -101,17 +101,16 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
             if (segmentLength < 255) {
                 const packet = Buffer.concat(currentPacket);
-                const packetHeader = packet.subarray(0, 8).toString();
                 currentPacket = [];
 
                 // Если найден заголовок
-                if (packetHeader === "OpusHead") {
+                if (isOpusHead(packet)) {
                     this.emit("head", segment);
                     continue;
                 }
 
                 // Если найден тег
-                else if (packetHeader === "OpusTags") {
+                else if (isOpusTags(packet)) {
                     this.emit("tags", segment);
                     continue;
                 }
@@ -233,8 +232,37 @@ export class PipeEncoder extends Transform {
     };
 }
 
+/**
+ * @author SNIPPIK
+ * @description Построковый расчет opusHead
+ * @param packet
+ */
+function isOpusHead(packet: Buffer): boolean {
+    // "OpusHead" в ASCII: 0x4F 0x70 0x75 0x73 0x48 0x65 0x61 0x64
+    return (
+        packet.length >= 8 &&
+        packet[4] === 0x48 && // 'H'
+        packet[5] === 0x65 && // 'e'
+        packet[6] === 0x61 && // 'a'
+        packet[7] === 0x64    // 'd'
+    );
+}
 
-
+/**
+ * @author SNIPPIK
+ * @description Построковый расчет opusTags
+ * @param packet
+ */
+function isOpusTags(packet: Buffer): boolean {
+    // "OpusTags" в ASCII: 0x4F 0x70 0x75 0x73 0x54 0x61 0x67 0x73
+    return (
+        packet.length >= 8 &&
+        packet[4] === 0x54 && // 'T'
+        packet[5] === 0x61 && // 'a'
+        packet[6] === 0x67 && // 'g'
+        packet[7] === 0x73    // 's'
+    );
+}
 
 /**
  * @author SNIPPIK

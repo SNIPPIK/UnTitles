@@ -121,6 +121,9 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         if (isIPv4(options.ip)) this.socket = createSocket("udp4");
         else this.socket = createSocket("udp6");
 
+        // Отправляем пакет данных для получения реального ip, port
+        this.discovery(options.ssrc);
+
         // Если подключение возвращает ошибки
         this.socket.on("error", (err) => {
             this.emit("error", err);
@@ -141,11 +144,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
             this.emit.bind(this, "close");
         });
 
-        this.socket.bind(); // обязательный вызов для активации сокета
         this.manageKeepAlive();
-
-        // Отправляем пакет данных для получения реального ip, port
-        this.discovery(options.ssrc);
     };
 
     /**

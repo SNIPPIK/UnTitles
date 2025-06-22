@@ -310,6 +310,7 @@ export class BufferedAudioResource extends BaseAudioResource {
 
                 // Указываем формат аудио (ogg/opus)
                 "-acodec", "libopus",
+                "-frame_duration", "20",
                 "-compression_level", "10",
                 "-f", "opus",
 
@@ -369,7 +370,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @private
      */
     private encoder = new PipeEncoder({
-        highWaterMark: 512
+        highWaterMark: 512 * 5
     });
 
     /**
@@ -407,7 +408,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @public
      */
     public get duration() {
-        return (this.played * OPUS_FRAME_SIZE) / 1e3;
+        return (this._seek + this.played * OPUS_FRAME_SIZE) / 1e3;
     };
 
     /**
@@ -458,6 +459,7 @@ export class PipeAudioResource extends BaseAudioResource {
 
                 // Указываем формат аудио (ogg/opus)
                 "-acodec", "libopus",
+                "-frame_duration", "20",
                 "-compression_level", "10",
                 "-f", "opus",
 
