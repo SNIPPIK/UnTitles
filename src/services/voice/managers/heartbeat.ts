@@ -28,7 +28,7 @@ export class HeartbeatManager {
     /** Количество пропущенных ACK */
     private misses = 0;
 
-    /** Количество переподключений подряд */t
+    /** Количество переподключений подряд */
     private reconnects = 0;
 
     /** Интервал между heartbeat-сообщениями */
