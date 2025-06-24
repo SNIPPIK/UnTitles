@@ -1,12 +1,82 @@
 [
   {
-    "name": "loudnorm",
+    "name": "stable",
     "locale": {
-      "en-US": "Makes the sound more uniform",
-      "ru": "Делает звук более равномерным"
+      "en-US": "Stabilization of audio stream by volume",
+      "ru": "Стабилизация аудио поток по громкости"
     },
     "unsupported": [],
     "filter": "loudnorm",
+    "args": false
+  },
+  {
+    "name": "nightcore",
+    "locale": {
+      "en-US": "Increases track speed by 20% and changes some tones!",
+      "ru": "Увеличивает скорость трека на 20% и изменяет некоторые тона!"
+    },
+    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl"],
+    "filter": "asetrate=48000*1.20,aresample=128000",
+    "args": false
+  },
+  {
+    "name": "vaporwave",
+    "locale": {
+      "en-US": "Micro genre of electronic music",
+      "ru": "Микро жанр электронной музыки"
+    },
+    "unsupported": ["nightcore", "demonic", "speed", "treble", "reverse", "vinyl"],
+    "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1",
+    "args": false
+  },
+  {
+    "name": "demonic",
+    "locale": {
+      "en-US": "Will turn any track into a demonic one",
+      "ru": "Превратит любой трек в демонический"
+    },
+    "unsupported": ["stable", "nightcore", "vaporwave", "bass", "speed", "vinyl"],
+    "filter": "loudnorm=I=-16:TP=-1.5:LRA=11,asetrate=48000*1.20,aresample=128000,bass=g=5,aecho=0.8:0.9:1000:0.3",
+    "args": false
+  },
+  {
+    "name": "vinyl",
+    "locale": {
+      "en-US": "Adds vinyl record noise and crackle",
+      "ru": "Добавляет шум и потрескивание виниловой пластинки"
+    },
+    "unsupported": ["nightcore", "demonic", "vaporwave"],
+    "filter": "acrusher=bits=8:mode=log:mix=0.7,highpass=f=200,lowpass=f=5000",
+    "args": false
+  },
+  {
+    "name": "speed",
+    "locale": {
+      "en-US": "The speed of music playback",
+      "ru": "Скорость проигрывания музыки"
+    },
+    "unsupported": [],
+    "filter": "atempo=",
+    "args": [1, 3]
+  },
+  {
+    "name": "bass",
+    "locale": {
+      "en-US": "This is the lower limit of the sound spectrum",
+      "ru": "Это нижняя граница звукового спектра"
+    },
+    "unsupported": ["demonic"],
+    "filter": "bass=g=",
+    "args": [1, 30]
+  },
+  {
+    "name": "sub_boost",
+    "locale": {
+      "en-US": "Something similar to bass but sounds deeper",
+      "ru": "Что-то похожее на bass но звучит более глубже"
+    },
+    "unsupported": ["demonic"],
+    "filter": "asubboost",
     "args": false
   },
   {
@@ -55,17 +125,8 @@
       "en-US": "Haas effect, otherwise known as the «precedence» effect",
       "ru": "Эффект Хааса, иначе называемый эффектом «предшествования»"
     },
+    "unsupported": ["mono"],
     "filter": "haas",
-    "args": false
-  },
-  {
-    "name": "nightcore",
-    "locale": {
-      "en-US": "Increases track speed by 20% and changes some tones!",
-      "ru": "Увеличивает скорость трека на 20% и изменяет некоторые тона!"
-    },
-    "unsupported": ["vaporwave"],
-    "filter": "asetrate=48000*1.20,aresample=128000,bass=g=5",
     "args": false
   },
   {
@@ -84,38 +145,8 @@
       "en-US": "Spatial Reverb and Mixing",
       "ru": "Пространственная реверберация и микширование"
     },
-    "unsupported": [],
+    "unsupported": ["mono"],
     "filter": "apulsator=hz=0.09",
-    "args": false
-  },
-  {
-    "name": "speed",
-    "locale": {
-      "en-US": "The speed of music playback",
-      "ru": "Скорость проигрывания музыки"
-    },
-    "unsupported": [],
-    "filter": "atempo=",
-    "args": [1, 3]
-  },
-  {
-    "name": "bass",
-    "locale": {
-      "en-US": "This is the lower limit of the sound spectrum",
-      "ru": "Это нижняя граница звукового спектра"
-    },
-    "unsupported": [],
-    "filter": "bass=g=",
-    "args": [1, 30]
-  },
-  {
-    "name": "sub_boost",
-    "locale": {
-      "en-US": "Something similar to bass but sounds deeper",
-      "ru": "Что-то похожее на bass но звучит более глубже"
-    },
-    "unsupported": [],
-    "filter": "asubboost",
     "args": false
   },
   {
@@ -126,16 +157,6 @@
     },
     "unsupported": [],
     "filter": "aphaser=in_gain=0.4",
-    "args": false
-  },
-  {
-    "name": "vaporwave",
-    "locale": {
-      "en-US": "Micro genre of electronic music",
-      "ru": "Микро жанр электронной музыки"
-    },
-    "unsupported": ["nightcore"],
-    "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1",
     "args": false
   }
 ]

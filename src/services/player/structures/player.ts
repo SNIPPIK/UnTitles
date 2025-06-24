@@ -330,14 +330,17 @@ export class AudioPlayer extends BasePlayer {
             // Заставляем плеер пропустить этот трек
             if (skip) {
                 setImmediate(() => {
-                    player.tracks.remove(skip.position);
+                    // Если плеер не играет и есть новый поток
+                    if (!player.playing && player.waitStream) {
+                        player.tracks.remove(skip.position);
 
-                    if (player.tracks.size === 0) queue.cleanup();
-                    else {
-                        // Переключаем позицию назад, плеер сам переключит на следующий трек
-                        player.tracks.position = current + 1;
+                        if (player.tracks.size === 0) queue.cleanup();
+                        else {
+                            // Переключаем позицию назад, плеер сам переключит на следующий трек
+                            player.tracks.position = current + 1;
 
-                        if (skip.position === current) player.emit("player/wait", player);
+                            if (skip.position === current) player.emit("player/wait", player);
+                        }
                     }
                 });
             }

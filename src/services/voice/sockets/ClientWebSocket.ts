@@ -81,8 +81,8 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Если не получен HEARTBEAT_ACK вовремя
             onTimeout: () => {
-                if (this.heartbeat.missed >= 2) {
-                    this.emit("warn", "HEARTBEAT_ACK timeout x2, reconnecting...");
+                if (this.heartbeat.missed >= 3) {
+                    this.emit("warn", "HEARTBEAT_ACK timeout x3, reconnecting...");
                     this.attemptReconnect();
                 } else {
                     this.emit("warn", "HEARTBEAT_ACK not received in time");
