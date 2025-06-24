@@ -258,13 +258,7 @@ export class BufferedAudioResource extends BaseAudioResource {
                 destroy: ["end", "close", "error"],
                 destroy_callback: (input) => {
                     // Если поток еще существует
-                    if (input) {
-                        input.destroy();
-
-                        // Добавляем пустышку для интерпретатора opus
-                        this._buffer.packet = SILENT_FRAME;
-                    }
-
+                    if (input) input.destroy();
                     this.emit("end");
                 }
             },
@@ -284,10 +278,6 @@ export class BufferedAudioResource extends BaseAudioResource {
                     if (this._buffer.size === 0) {
                         clearTimeout(timeout);
                         this.emit("readable");
-
-                        // Если поток включается в первый раз.
-                        // Добавляем пустышку для интерпретатора opus
-                        if (!this._seek) this._buffer.packet = SILENT_FRAME;
                     }
 
                     this._buffer.packet = packet;
@@ -437,7 +427,16 @@ export class PipeAudioResource extends BaseAudioResource {
 
             // Начало кодирования
             decode: (input) => {
+                // Если поток нельзя читать, возможно что он еще грузится
+                const timeout = setTimeout(() => {
+                    // Отправляем данные событию для отображения ошибки
+                    this.emit("error", new Error("Timeout: the stream has been exceeded!"));
+                    // Начинаем уничтожение потока
+                    this.emit("close");
+                }, 15e3);
+
                 input.once("readable", () => {
+                    clearTimeout(timeout);
                     this._readable = true;
                     this.emit("readable");
                 });

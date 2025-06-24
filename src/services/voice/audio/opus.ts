@@ -40,6 +40,24 @@ const EMPTY_FRAME =  Buffer.alloc(0);
  */
 class BaseEncoder extends TypedEmitter<EncoderEvents> {
     /**
+     * @description Найден ли head заголовок
+     * @private
+     */
+    private _head_found = false;
+
+    /**
+     * @description НАйден ли тег заголосовок
+     * @private
+     */
+    private _tags_found = false;
+
+    /**
+     * @description Отправлен ли 1 аудио пакет
+     * @private
+     */
+    private _first = true;
+
+    /**
      * @description Временный буфер, для общения между функциями
      * @private
      */
@@ -94,6 +112,13 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
         let payloadOffset = 0;
         let currentPacket: Buffer[] = [];
 
+        // Отправляем пустышку первой
+        if (this._first) {
+            // Если получен обычный frame
+            this.emit("frame", SILENT_FRAME);
+            this._first = false;
+        }
+
         for (const segmentLength of segmentTable) {
             const segment = payload.subarray(payloadOffset, payloadOffset + segmentLength);
             currentPacket.push(segment);
@@ -103,16 +128,26 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
-                // Если найден заголовок
-                if (isOpusHead(packet)) {
-                    this.emit("head", segment);
-                    continue;
+                // Если еще не найден заглосовок head
+                if (!this._head_found) {
+                    // Если найден заголовок
+                    if (isOpusHead(packet)) {
+                        this.emit("head", segment);
+                        continue;
+                    }
+
+                    this._head_found = true;
                 }
 
-                // Если найден тег
-                else if (isOpusTags(packet)) {
-                    this.emit("tags", segment);
-                    continue;
+                // Если еще не найден заглосовок tags
+                else if (!this._tags_found) {
+                    // Если найден тег
+                    if (isOpusTags(packet)) {
+                        this.emit("tags", segment);
+                        continue;
+                    }
+
+                    this._tags_found = true;
                 }
 
                 // Если получен обычный frame
@@ -126,8 +161,15 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @public
      */
     public emitDestroy() {
-        this._buffer = null;
+        // Отправляем пустой пакет последним
+        this.emit("frame", SILENT_FRAME);
         super.emitDestroy();
+
+        this._first = null;
+        this._buffer = null;
+        this._head_found = null;
+        this._tags_found = null;
+
         this.removeAllListeners();
     };
 }
