@@ -13,16 +13,28 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     private startTime: number = 0;
 
     /**
-     * @description Время для высчитывания
-     * @private
-     */
-    private loop: number = 0;
-
-    /**
      * @description Кол-во пропусков цикла
      * @private
      */
     private missCounter: number = 0;
+
+    /**
+     * @description Временное число отспавания цикла в милисекундах
+     * @private
+     */
+    private drift: number = 0;
+
+    /**
+     * @description История дрифтов, нееобходима для высокоточного цикла
+     * @private
+     */
+    private driftHistory: number[] = [];
+
+    /**
+     * @description Время для высчитывания
+     * @private
+     */
+    private loop: number = 0;
 
     /**
      * @description Тип таймера, задает точность таймера
@@ -36,7 +48,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      */
     private get time() {
         if (this.timer === "low") return Date.now();
-        return performance.now();
+        return performance.now() - this.drift;
     };
 
     /**
@@ -87,43 +99,47 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         if (this.size === 0) {
             this.startTime = 0;
             this.loop = 0;
-            this.missCounter = 0;
             return;
         }
 
         const nextTime = this.startTime + (this.loop * duration);              // Следующее время для определения
-        const delay = Math.max(0, nextTime - this.time);         // Цельный целевой интервал + остаток от предыдущих циклов
+        const delay = parseInt(Math.max(0, nextTime - this.time).toFixed(0));              // Цельный целевой интервал + остаток от предыдущих циклов
 
         // Номер прогона цикла
         this.loop++;
 
-        // Цикл отстал, подтягиваем loop вперёд
-        if (delay <= 0) {
-            setImmediate(this._stepCycle);
-            return;
-        }
+        // Цикл отстал, подтягиваем _stepCycle вперёд
+        if (delay <= 0) return this._stepCycle();
 
-        // Принудительная стабилизация
-        else if (this.missCounter > 5) {
-            this.startTime = this.time;
-            this.loop = 0;
-            this.missCounter = 0;
+        // Если кол-во дрифта более 1
+        else if (this.driftHistory.length > 1) {
+            // Принудительная стабилизация
+            if (this.missCounter > 15) {
+                //console.log("Max miss");
 
-            setTimeout(this._stepCycle, duration);
-            return;
+                this.missCounter = 0;
+                this.drift = 0;
+                this.driftHistory.splice(0, this.driftHistory.length);
+
+                setTimeout(this._stepCycle, duration);
+                return;
+            }
+
+            //console.log("Drift create");
+
+            // Считаем среднее значение дрифта
+            this.drift = this.driftHistory.reduce((a, b) => a + b, 0) / this.driftHistory.length;
+            this.missCounter++;
         }
 
         // Иначе ждем нужное время
         setTimeout(() => {
             // Если цикл высокоточный, высчитываем дрифт цикла
             if (this.timer === "max") {
-                const drift = this.time - nextTime;
+                const diff = this.time - nextTime;
 
-                // Если отставание более 5 ms
-                if (drift > 5) {
-                    //console.log(`Drift: ${drift}ms`);
-                    this.missCounter++;
-                }
+                // Если отставание более или равно 5 ms
+                if (diff > 1) this.driftHistory.push(diff);
             }
 
             return this._stepCycle();
