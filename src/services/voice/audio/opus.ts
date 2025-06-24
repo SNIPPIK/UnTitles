@@ -112,13 +112,6 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
         let payloadOffset = 0;
         let currentPacket: Buffer[] = [];
 
-        // Отправляем пустышку первой
-        if (this._first) {
-            // Если получен обычный frame
-            this.emit("frame", SILENT_FRAME);
-            this._first = false;
-        }
-
         for (const segmentLength of segmentTable) {
             const segment = payload.subarray(payloadOffset, payloadOffset + segmentLength);
             currentPacket.push(segment);
@@ -127,6 +120,13 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             if (segmentLength < 255) {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
+
+                // Отправляем пустышку первой
+                if (this._first) {
+                    // Если получен обычный frame
+                    this.emit("frame", SILENT_FRAME);
+                    this._first = false;
+                }
 
                 // Если еще не найден заглосовок head
                 if (!this._head_found) {
