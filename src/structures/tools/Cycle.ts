@@ -13,6 +13,13 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     private startTime: number = 0;
 
     /**
+     * @description Кол-во пропусков цикла
+     * @private
+     */
+    private missCounter: number = 0;
+
+
+    /**
      * @description Временное число отспавания цикла в милисекундах
      * @private
      */
@@ -103,14 +110,26 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
             return;
         }
 
-        // Иначе ждем нужное время
+        // Принудительный сброс через 10 дрифтов
+        else if (this.missCounter > 10) {
+            this.missCounter = 0;
+            this.drift = 0;
+
+            setTimeout(this._stepCycle, duration);
+            return;
+        }
+
+        // Ждем нужное время
         setTimeout(() => {
             // Если цикл высокоточный, высчитываем дрифт цикла
             if (this.timer === "max") {
                 const drift = this.time - nextTime;
 
-                // Стабиблизация таймера
-                if (drift > 0) this.drift = this.drift - drift;
+                // Стабилизация таймера
+                if (drift > 0) {
+                    this.missCounter++;
+                    this.drift = this.drift - drift;
+                }
             }
 
             return this._stepCycle();
