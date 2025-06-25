@@ -77,7 +77,7 @@ export class VoiceConnection {
      * @public
      */
     public set packet(packet: Buffer) {
-        if (this._status === VoiceConnectionStatus.ready) {
+        if (this._status === VoiceConnectionStatus.ready && packet) {
             this.speaking = true;
             this.udpClient.packet = this.rtpClient.packet(packet);
             this.resetSpeakingTimeout();
@@ -206,8 +206,8 @@ export class VoiceConnection {
         this.websocket.connect(`wss://${endpoint}?v=8`); // Подключаемся к endpoint
 
         // Если включен debug режим
-        this.websocket.on("debug", console.log);
-        this.websocket.on("warn", console.log);
+        //this.websocket.on("debug", console.log);
+        //this.websocket.on("warn", console.log);
 
         /**
          * @description Отправляем Identify данные, для регистарции голосового подключения

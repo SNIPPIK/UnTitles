@@ -83,14 +83,17 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             }
 
             const pageSegments = this._buffer.readUInt8(offset + 26);
-            const headerLength = 27 + pageSegments;
+            const headerLength = pageSegments + 27;
 
+            // Если заголовок больше размера фрейма
             if (offset + headerLength > size) break;
 
-            const segmentTable = this._buffer.subarray(offset + 27, offset + 27 + pageSegments);
+            const segmentOffset = offset + 27;
+            const segmentTable = this._buffer.subarray(segmentOffset, segmentOffset + pageSegments);
             const totalSegmentLength = segmentTable.reduce((sum, val) => sum + val, 0);
             const fullPageLength = headerLength + totalSegmentLength;
 
+            // Если вся страница больше фрейма
             if (offset + fullPageLength > size) break;
 
             const payload = this._buffer.subarray(offset + headerLength, offset + fullPageLength);
@@ -109,45 +112,44 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @private
      */
     private extractPackets = (segmentTable: Buffer, payload: Buffer) => {
-        let payloadOffset = 0;
-        let currentPacket: Buffer[] = [];
+        let currentPacket: Buffer[] = [], payloadOffset = 0;
 
+        // Проверяем все фреймы
         for (const segmentLength of segmentTable) {
             const segment = payload.subarray(payloadOffset, payloadOffset + segmentLength);
             currentPacket.push(segment);
             payloadOffset += segmentLength;
 
             if (segmentLength < 255) {
-                const packet = Buffer.concat(currentPacket);
-                currentPacket = [];
-
-                // Отправляем пустышку первой
+                // Если еще не отправлен 1 пустой фрейм
                 if (this._first) {
-                    // Если получен обычный frame
                     this.emit("frame", SILENT_FRAME);
                     this._first = false;
                 }
+
+                const packet = Buffer.concat(currentPacket);
+                currentPacket = [];
 
                 // Если еще не найден заглосовок head
                 if (!this._head_found) {
                     // Если найден заголовок
                     if (isOpusHead(packet)) {
-                        this.emit("head", segment);
+                        this._head_found = true;
+
+                        this.emit("head", packet);
                         continue;
                     }
-
-                    this._head_found = true;
                 }
 
                 // Если еще не найден заглосовок tags
                 else if (!this._tags_found) {
                     // Если найден тег
                     if (isOpusTags(packet)) {
-                        this.emit("tags", segment);
+                        this._tags_found = true;
+
+                        this.emit("tags", packet);
                         continue;
                     }
-
-                    this._tags_found = true;
                 }
 
                 // Если получен обычный frame
@@ -163,13 +165,13 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
     public emitDestroy() {
         // Отправляем пустой пакет последним
         this.emit("frame", SILENT_FRAME);
-        super.emitDestroy();
 
         this._first = null;
         this._buffer = null;
         this._head_found = null;
         this._tags_found = null;
 
+        super.emitDestroy();
         this.removeAllListeners();
     };
 }

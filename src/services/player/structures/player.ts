@@ -331,7 +331,7 @@ export class AudioPlayer extends BasePlayer {
             if (skip) {
                 setImmediate(() => {
                     // Если плеер не играет и есть новый поток
-                    if (!player.audio.current?.readable && player.waitStream) {
+                    if (!player.playing || skip.position !== current) {
                         player.tracks.remove(skip.position);
 
                         if (player.tracks.size === 0) queue.cleanup();
