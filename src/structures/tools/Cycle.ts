@@ -82,10 +82,8 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Запускаем цикл, если добавлен первый объект
         if (this.size === 1 && this.startTime === 0) {
-            setImmediate(() => {
-                this.startTime = this.time;
-                this._stepCycle();
-            });
+            this.startTime = this.time;
+            setImmediate(this._stepCycle);
         }
 
         return this;
@@ -120,7 +118,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         else if (this.driftHistory.length > 1) {
             // Принудительная стабилизация
             if (this.missCounter > 15) {
-                console.log("Max miss");
+                //console.log("Max miss");
 
                 this.missCounter = 0;
                 this.drift = 0;
@@ -130,7 +128,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
                 return;
             }
 
-            console.log("Drift create");
+            //console.log("Drift create");
 
             // Считаем среднее значение дрифта
             this.drift = this.driftHistory.reduce((a, b) => a + b, 0) / this.driftHistory.length;
@@ -143,8 +141,8 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
             if (this.timer === "max") {
                 const diff = this.time - nextTime;
 
-                // Если отставание более или равно 3 ms
-                if (diff > 3) this.driftHistory.push(diff);
+                // Если отставание более 1 ms
+                if (diff > 0) this.driftHistory.push(diff);
             }
 
             return this._stepCycle();
