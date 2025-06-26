@@ -109,26 +109,26 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             payloadOffset += segmentLength;
 
             if (segmentLength < 255) {
-                // Если еще не отправлен 1 пустой фрейм
-                if (this._first) {
-                    this.emit("frame", SILENT_FRAME);
-                    this._first = false;
-                }
-
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
                 // Если найден заголовок
                 if (isOpusHead(packet)) {
-                    this.emit("head", packet);
+                    this.emit("head", segment);
                     continue;
                 }
 
                 // Если еще не найден заглосовок tags
                 // Если найден тег
                 if (isOpusTags(packet)) {
-                    this.emit("tags", packet);
+                    this.emit("tags", segment);
                     continue;
+                }
+
+                // Если еще не отправлен 1 пустой фрейм
+                if (this._first) {
+                    this.emit("frame", SILENT_FRAME);
+                    this._first = false;
                 }
 
                 // Если получен обычный frame
