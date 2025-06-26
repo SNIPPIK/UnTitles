@@ -18,7 +18,6 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      */
     private missCounter: number = 0;
 
-
     /**
      * @description Временное число отспавания цикла в милисекундах
      * @private
@@ -125,8 +124,8 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
             if (this.timer === "max") {
                 const drift = this.time - nextTime;
 
-                // Стабилизация таймера
-                if (drift > 0) {
+                // Стабилизация таймера при дрифте в 3 ms
+                if (drift > 3) {
                     this.missCounter++;
                     this.drift = this.drift - drift;
                 }
