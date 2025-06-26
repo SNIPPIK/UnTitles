@@ -66,7 +66,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
                 withResponse: false,
                 embeds: [
                     {
-                        description: locale._(queue.message.locale, `bot.reboot.message`),
+                        description: locale._(queue.message.locale, `self.reboot`),
                         color: Colors.Yellow
                     }
                 ]

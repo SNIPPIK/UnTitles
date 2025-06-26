@@ -24,7 +24,7 @@ class ExistQueue extends Assign<middleware<CommandInteraction>> {
                         flags: "Ephemeral",
                         embeds: [
                             {
-                                description: locale._(ctx.locale, "queue.need", [ctx.member]),
+                                description: locale._(ctx.locale, "middlewares.player.queue.need", [ctx.member]),
                                 color: Colors.Yellow
                             }
                         ],

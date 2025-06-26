@@ -1,101 +1,132 @@
 {
   "user": {
-    "ru": "Пользователь",
-    "en-US": "User"
-  },
-
-  "cancel": {
-    "ru": "Отмена",
-    "en-US": "Cancel"
+    "en-US": "User",
+    "ru": "Пользователь"
   },
 
   "queue": {
-    "ru": "Очередь",
-    "en-US": "Queue"
+    "en-US": "Queue",
+    "ru": "Очередь"
   },
 
   "filters": {
-    "ru": "Фильтры",
-    "en-US": "Filters"
-  },
-
-  "command.fail": {
-    "ru": "Я не нахожу этой команды",
-    "en-US": "I not found this command"
-  },
-
-  "button.fail": {
-    "ru": "Откуда ты взял эту кнопку. У меня ее нет!",
-    "en-US": "Where did you get this button? I don't have it!"
-  },
-
-  "queue.need": {
-    "ru": "{ARGUMENT}, музыка сейчас не играет!",
-    "en-US": "{ARGUMENT}, music not playing!"
-  },
-
-  "attachment.audio.fail": {
-    "ru": "Я не нахожу здесь аудио дорожки!",
-    "en-US": "I not found in track audio!"
-  },
-
-  "cooldown.message": {
-    "ru": "{ARGUMENT} Ты слишком часто отправляешь сообщение, охлади свой пыл!\nОсталось: <t:{ARGUMENT}> ({ARGUMENT}) секунд",
-    "en-US": "{ARGUMENT} You send messages too often, cool your ardor!\nRemaining: <t:{ARGUMENT}> ({ARGUMENT}) seconds"
-  },
-
-  "whitelist.message": {
-    "ru": "{ARGUMENT} Ты не внесен в белый лист, так-что неа!",
-    "en-US": "{ARGUMENT} You're not on the white list, so nope!"
-  },
-
-  "blacklist.message": {
-    "ru": "{ARGUMENT} Ты внесен в черный лист, так-что неа!",
-    "en-US": "{ARGUMENT} You're blacklisted, so nope!"
-  },
-
-  "owner.message": {
-    "ru": "{ARGUMENT} Ты не являешься разработчиком, так-что неа!",
-    "en-US": "{ARGUMENT} You are not a developer, so nope!"
-  },
-
-
-  "permission.user": {
-    "ru": "{ARGUMENT} У вас нет прав для выполнения этой команды.",
-    "en-US": "{ARGUMENT} You are not a developer, so nope!"
-  },
-
-  "permission.client": {
-    "ru": "{ARGUMENT} У меня нет прав для выполнения этой команды.",
-    "en-US": "{ARGUMENT} You are not a developer, so nope!"
+    "en-US": "Filters",
+    "ru": "Фильтры"
   },
 
 
 
-  "commands.reload": {
-    "ru": "{ARGUMENT} были перезагружены!",
-    "en-US": "{ARGUMENT} has reload!"
+
+
+
+
+
+
+
+
+  "interaction.command.fail": {
+    "en-US": "I not found this command",
+    "ru": "Я не нахожу этой команды"
   },
 
-  "apis.reload": {
-    "ru": "{ARGUMENT} были перезагружены!",
-    "en-US": "{ARGUMENT} has reload!"
+  "interaction.button.fail": {
+    "en-US": "Where did you get this button? I don't have it!",
+    "ru": "Откуда ты взял эту кнопку. У меня ее нет!"
   },
 
-  "events.reload": {
-    "ru": "{ARGUMENT} были перезагружены!",
-    "en-US": "{ARGUMENT} has reload!"
+  "interaction.cooldown": {
+    "en-US": "{ARGUMENT} You send messages too often, cool your ardor!\nRemaining: <t:{ARGUMENT}> ({ARGUMENT}) seconds",
+    "ru": "{ARGUMENT} Ты слишком часто отправляешь сообщение, охлади свой пыл!\nОсталось: <t:{ARGUMENT}> ({ARGUMENT}) секунд"
   },
 
-  "bot.reload": {
-    "ru": "{ARGUMENT} Сейчас буду перезагружаться!",
-    "en-US": "{ARGUMENT} i'm going to reboot now!"
+  "interaction.whitelist": {
+    "en-US": "{ARGUMENT} You're not on the white list, so nope!",
+    "ru": "{ARGUMENT} Ты не внесен в белый лист, так-что неа!"
+  },
+
+  "interaction.blacklist": {
+    "en-US": "{ARGUMENT} You're blacklisted, so nope!",
+    "ru": "{ARGUMENT} Ты внесен в черный лист, так-что неа!"
+  },
+
+  "interaction.owner": {
+    "en-US": "{ARGUMENT} You are not a developer, so nope!",
+    "ru": "{ARGUMENT} Ты не являешься разработчиком, так-что неа!"
+  },
+
+  "interaction.permission.user": {
+    "en-US": "{ARGUMENT} You do not have permission to execute this command",
+    "ru": "{ARGUMENT} У вас нет прав для выполнения этой команды"
+  },
+
+  "interaction.permission.client": {
+    "en-US": "{ARGUMENT} I do not have permission to execute this command",
+    "ru": "{ARGUMENT} У меня нет прав для выполнения этой команды"
   },
 
 
-  "bot.reboot.message": {
-    "ru": "Внимание запланирован перезапуск, текущий трек будет доигран до конца!!",
-    "en-US": "Attention, a restart is planned, the current track will be played to the end!!"
+
+
+
+
+
+
+
+
+
+  "middlewares.player.wait": {
+    "en-US": "The player is waiting for a response from the audio stream! Please be patient!",
+    "ru": "Плеер ожидает ответа от аудио потока! Пожалуйста проявите терпение!"
+  },
+
+  "middlewares.player.queue.need": {
+    "en-US": "{ARGUMENT}, music not playing!",
+    "ru": "{ARGUMENT}, музыка сейчас не играет!"
+  },
+
+  "middlewares.player.not.playing": {
+    "en-US": "Music is not playing!",
+    "ru": "Музыка сейчас не играет!"
+  },
+
+  "middlewares.voice.need": {
+    "en-US": "{ARGUMENT}, needed to join voice channel!",
+    "ru": "{ARGUMENT}, необходимо подключится к голосовому каналу!"
+  },
+
+  "middlewares.voice.alt": {
+    "en-US": "Music playing in alternative voice channel, i not join in your voice channel {ARGUMENT}!",
+    "ru": "Музыка играет в другом голосовом канале, я не могу подключится сейчас к {ARGUMENT}!"
+  },
+
+  "middlewares.voice.new": {
+    "en-US": "{ARGUMENT}\nThere is no one in that voice channel, I’m connecting!\n - A message about the current track will be created with the next track!",
+    "ru": "{ARGUMENT}\nВ том голосовом канале никого нет, провожу подключение!\n - Сообщение о текущем треке будет создано со следующим треком!"
+  },
+
+
+
+
+
+
+
+
+
+
+
+  "has.reload": {
+    "en-US": "{ARGUMENT} has reload!",
+    "ru": "{ARGUMENT} были перезагружены!"
+  },
+
+  "self.reload": {
+    "en-US": "{ARGUMENT} i'm going to reboot now!",
+    "ru": "{ARGUMENT} Сейчас буду перезагружаться!"
+  },
+
+  "self.reboot": {
+    "en-US": "Attention, a restart is planned, the current track will be played to the end!!",
+    "ru": "Внимание запланирован перезапуск, текущий трек будет доигран до конца!!"
   },
 
 
@@ -109,84 +140,84 @@
 
 
   "player.button.shuffle.on": {
-    "ru": "Очередь была перетасована!",
-    "en-US": "The queue has been shuffled!"
+    "en-US": "The queue has been shuffled!",
+    "ru": "Очередь была перетасована!"
   },
 
   "player.button.shuffle.off": {
-    "ru": "Возврат перетасованных треков к оригиналу!",
-    "en-US": "Return shuffled tracks to the original!"
+    "en-US": "Return shuffled tracks to the original!",
+    "ru": "Возврат перетасованных треков к оригиналу!"
   },
 
   "player.button.shuffle.fail": {
-    "ru": "В очереди менее 2 треков!",
-    "en-US": "In queue <2 tracks!"
+    "en-US": "In queue <2 tracks!",
+    "ru": "В очереди менее 2 треков!"
   },
 
   "player.button.last": {
-    "ru": "Переход к прошлому треку!",
-    "en-US": "Go to the previous track!"
+    "en-US": "Go to the previous track!",
+    "ru": "Переход к прошлому треку!"
   },
 
   "player.button.resume": {
-    "ru": "Возобновление проигрывания!\n\n**❯** **{ARGUMENT}**",
-    "en-US": "Resume playing!\n\n**❯** **{ARGUMENT}**"
+    "en-US": "Resume playing!\n\n**❯** **{ARGUMENT}**",
+    "ru": "Возобновление проигрывания!\n\n**❯** **{ARGUMENT}**"
   },
 
   "player.button.pause": {
-    "ru": "Приостановка проигрывания!\n\n**❯** **{ARGUMENT}**",
-    "en-US": "Pause playing!\n\n**❯** **{ARGUMENT}**"
+    "en-US": "Pause playing!\n\n**❯** **{ARGUMENT}**",
+    "ru": "Приостановка проигрывания!\n\n**❯** **{ARGUMENT}**"
   },
 
   "player.button.skip": {
-    "ru": "Переход к следующему треку!",
-    "en-US": "Skip to next track!"
+    "en-US": "Skip to next track!",
+    "ru": "Переход к следующему треку!"
   },
 
   "player.button.repeat.songs": {
-    "ru": "Включен повтор треков!",
-    "en-US": "Enable repeat tracks!"
+    "en-US": "Enable repeat tracks!",
+    "ru": "Включен повтор треков!"
   },
 
   "player.button.repeat.song": {
-    "ru": "Включен повтор текущего трека!",
-    "en-US": "Enable repeat current track!"
+    "en-US": "Enable repeat current track!",
+    "ru": "Включен повтор текущего трека!"
   },
 
   "player.button.repeat.off": {
-    "ru": "Повтор выключен!",
-    "en-US": "Disable repeat!"
+    "en-US": "Disable repeat!",
+    "ru": "Повтор выключен!"
   },
 
   "player.button.replay": {
-    "ru": "**Повтор трека:**\n\n**❯** **{ARGUMENT}**",
-    "en-US": "**Replay track:**\n\n**❯** **{ARGUMENT}**"
+    "en-US": "**Replay track:**\n\n**❯** **{ARGUMENT}**",
+    "ru": "**Повтор трека:**\n\n**❯** **{ARGUMENT}**"
   },
 
   "player.button.stop": {
-    "ru": "Выключение музыки! Очередь все еще существует!",
-    "en-US": "Disable music! The queue still exists!"
+    "en-US": "Disable music! The queue still exists!",
+    "ru": "Выключение музыки! Очередь все еще существует!"
   },
 
   "player.button.queue.footer": {
-    "ru": "{ARGUMENT} | Лист {ARGUMENT} из {ARGUMENT} | Треков: {ARGUMENT} / {ARGUMENT}",
-    "en-US": "{ARGUMENT} | Page {ARGUMENT} of {ARGUMENT} | Songs: {ARGUMENT} / {ARGUMENT}"
+    "en-US": "{ARGUMENT} | Page {ARGUMENT} of {ARGUMENT} | Songs: {ARGUMENT} / {ARGUMENT}",
+    "ru": "{ARGUMENT} | Лист {ARGUMENT} из {ARGUMENT} | Треков: {ARGUMENT} / {ARGUMENT}"
   },
 
 
   "player.button.filter.zero": {
-    "ru": "В данный момент нет включенных аудио фильтров",
-    "en-US": "There are currently no audio filters enabled"
+    "en-US": "There are currently no audio filters enabled",
+    "ru": "В данный момент нет включенных аудио фильтров"
   },
 
   "player.button.filter": {
-    "ru": "Включенные фильтры:",
-    "en-US": "Enabled filters:"
+    "en-US": "Enabled filters:",
+    "ru": "Включенные фильтры:"
   },
 
   "player.button.lyrics.fail": {
-    "ru": "Текст песни не был найден!",
-    "en-US": "The song lyrics were not found!"
+    "en-US": "The song lyrics were not found!",
+    "ru": "Текст песни не был найден!"
   },
 
 
@@ -201,63 +232,38 @@
 
 
   "voice.tribune.join": {
-    "ru": "Произведено подключение",
-    "en-US": "Join success"
+    "en-US": "Join success",
+    "ru": "Произведено подключение"
   },
 
   "voice.tribune.join.fail": {
-    "ru": "При подключении произошла ошибка!",
-    "en-US": "The in joining to channel getting error!"
+    "en-US": "The in joining to channel getting error!",
+    "ru": "При подключении произошла ошибка!"
   },
 
   "voice.tribune.join.request": {
-    "ru": "Был отправлен запрос",
-    "en-US": "Request send"
+    "en-US": "Request send",
+    "ru": "Был отправлен запрос"
   },
 
   "voice.tribune.join.request.fail": {
-    "ru": "При отправке запроса произошла ошибка",
-    "en-US": "There was an error sending your request"
+    "en-US": "There was an error sending your request",
+    "ru": "При отправке запроса произошла ошибка"
   },
 
   "voice.leave": {
-    "ru": "{ARGUMENT} | Я покинул голосовой канал",
-    "en-US": "{ARGUMENT} | Success to leave voice channel!"
+    "en-US": "{ARGUMENT} | Success to leave voice channel!",
+    "ru": "{ARGUMENT} | Я покинул голосовой канал"
   },
 
   "voice.join": {
-    "ru": "{ARGUMENT} | Произведено подключение",
-    "en-US": "{ARGUMENT} | Join success"
+    "en-US": "{ARGUMENT} | Join success",
+    "ru": "{ARGUMENT} | Произведено подключение"
   },
 
   "voice.rejoin": {
-    "ru": "{ARGUMENT}\n - Невозможно подключится к голосовому каналу, я уже подключен к нему!",
-    "en-US": "{ARGUMENT}\n - Unable to connect to voice channel, I am already connected to it"
-  },
-
-  "voice.rtc": {
-    "ru": "Смена RTC региона",
-    "en-US": "Change RTC region!"
-  },
-
-  "voice.rtc.fail": {
-    "ru": "Не удалось поменять RTC регион!",
-    "en-US": "Fail change RTC region!"
-  },
-
-  "voice.need": {
-    "ru": "{ARGUMENT}, необходимо подключится к голосовому каналу!",
-    "en-US": "{ARGUMENT}, needed to join voice channel!"
-  },
-
-  "voice.alt": {
-    "ru": "Музыка играет в другом голосовом канале, я не могу подключится сейчас к {ARGUMENT}!",
-    "en-US": "Music playing in alternative voice channel, i not join in your voice channel {ARGUMENT}!"
-  },
-
-  "voice.new": {
-    "ru": "{ARGUMENT}\nВ том голосовом канале никого нет, провожу подключение!\n - Сообщение о текущем треке будет создано со следующим треком!",
-    "en-US": "{ARGUMENT}\nThere is no one in that voice channel, I’m connecting!\n - A message about the current track will be created with the next track!"
+    "en-US": "{ARGUMENT}\n - Unable to connect to voice channel, I am already connected to it",
+    "ru": "{ARGUMENT}\n - Невозможно подключится к голосовому каналу, я уже подключен к нему!"
   },
 
 
@@ -269,45 +275,30 @@
 
 
 
-
-  "player.playing.off": {
-    "ru": "Музыка сейчас не играет!",
-    "en-US": "Music is not playing!"
-  },
-
-  "player.stream.wait": {
-    "ru": "Плеер ожидает ответа от аудио потока! Пожалуйста проявите терпение!",
-    "en-US": "The player is waiting for a response from the audio stream! Please be patient!"
-  },
 
   "player.current.playing": {
-    "ru": "Сейчас играет:",
-    "en-US": "Current:"
-  },
-
-  "player.current.link": {
-    "ru": "**[ссылка на трек]({ARGUMENT})**",
-    "en-US": "**[link to track]({ARGUMENT})**"
+    "en-US": "Current:",
+    "ru": "Сейчас играет:"
   },
 
   "player.current.error": {
-    "ru": "**Error:**",
-    "en-US": "**Error:**"
+    "en-US": "**Error:**",
+    "ru": "**Error:**"
   },
 
   "player.queue.push": {
-    "ru": "Добавлено в очередь:",
-    "en-US": "Added in queue:"
+    "en-US": "Added in queue:",
+    "ru": "Добавлено в очередь:"
   },
 
   "player.queue.push.more": {
-    "ru": "\nТак-же {ARGUMENT} трек(ов)...",
-    "en-US": "\nAnd {ARGUMENT} tracks..."
+    "en-US": "\nAnd {ARGUMENT} tracks...",
+    "ru": "\nТак-же {ARGUMENT} трек(ов)..."
   },
 
   "player.search.fail": {
-    "ru": "Не удалось что то найти, попробуй другое название!",
-    "en-US": "Not found tracks!"
+    "en-US": "Not found tracks!",
+    "ru": "Не удалось что то найти, попробуй другое название!"
   },
 
 
@@ -321,94 +312,94 @@
 
 
   "api.error": {
-    "ru": "API error",
-    "en-US": "API error"
+    "en-US": "API error",
+    "ru": "API error"
   },
 
   "api.platform.block": {
-    "ru": "Блокировка API: эта платформа в настоящее время заблокирована разработчиком",
-    "en-US": "API block: This platform has currently been blocked by the developer"
+    "en-US": "API block: This platform has currently been blocked by the developer",
+    "ru": "Блокировка API: эта платформа в настоящее время заблокирована разработчиком"
   },
 
   "api.platform.auth": {
-    "ru": "Авторизация API: Проблема с данными авторизации, обратитесь к разработчику",
-    "en-US": "API authorization: Problem with authorization data, contact the developer"
+    "en-US": "API authorization: Problem with authorization data, contact the developer",
+    "ru": "Авторизация API: Проблема с данными авторизации, обратитесь к разработчику"
   },
 
   "api.platform.support": {
-    "ru": "Ошибка API: у меня нет поддержки для этого типа запроса",
-    "en-US": "API error: I don't have support for this type of request"
+    "en-US": "API error: I don't have support for this type of request",
+    "ru": "Ошибка API: у меня нет поддержки для этого типа запроса"
   },
 
   "api.platform.request": {
-    "ru": "{ARGUMENT} Ожидание ответа от сервера...",
-    "en-US": "{ARGUMENT} Waiting for response from server..."
+    "en-US": "{ARGUMENT} Waiting for response from server...",
+    "ru": "{ARGUMENT} Ожидание ответа от сервера..."
   },
 
   "api.platform.request.long": {
-    "ru": "{ARGUMENT} Ожидание ответа от сервера...\n\n**{ARGUMENT}** не может отдавать аудио данные!!!",
-    "en-US": "{ARGUMENT} Waiting for response from server...\n\n**{ARGUMENT}** cannot return audio data!!!"
+    "en-US": "{ARGUMENT} Waiting for response from server...\n\n**{ARGUMENT}** cannot return audio data!!!",
+    "ru": "{ARGUMENT} Ожидание ответа от сервера...\n\n**{ARGUMENT}** не может отдавать аудио данные!!!"
   },
 
   "api.platform.timeout": {
-    "ru": "Истекло время ожидания сервера: сервер отказался передавать данные",
-    "en-US": "Timeout server: The server refused to transmit data"
+    "en-US": "Timeout server: The server refused to transmit data",
+    "ru": "Истекло время ожидания сервера: сервер отказался передавать данные"
   },
 
   "api.platform.error": {
-    "ru": "**Критическая ошибка:** {ARGUMENT}",
-    "en-US": "**Critical Error:** {ARGUMENT}"
+    "en-US": "**Critical Error:** {ARGUMENT}",
+    "ru": "**Критическая ошибка:** {ARGUMENT}"
   },
 
 
   "api.request.login": {
-    "ru": "[Авторизация API]: Данное контент невозможно включить из-за проблем с авторизацией!",
-    "en-US": "[API authorization]: This content cannot be included due to authorization problems!"
+    "en-US": "[API authorization]: This content cannot be included due to authorization problems!",
+    "ru": "[Авторизация API]: Данное контент невозможно включить из-за проблем с авторизацией!"
   },
 
   "api.request.login.session-expired": {
-    "ru": "[Авторизация API]: Токен не действителен!",
-    "en-US": "[API authorization]: The token is not valid!"
+    "en-US": "[API authorization]: The token is not valid!",
+    "ru": "[Авторизация API]: Токен не действителен!"
   },
 
   "api.request.login.not-allowed": {
-    "ru": "[Авторизация API]: Токен не был допущен! Необходимо обновить!",
-    "en-US": "[API authorization]: The token was not accepted! Need to update!"
+    "en-US": "[API authorization]: The token was not accepted! Need to update!",
+    "ru": "[Авторизация API]: Токен не был допущен! Необходимо обновить!"
   },
 
   "api.request.fail": {
-    "ru": "[Ошибка API]: Не удалось получить данные!",
-    "en-US": "[API error]: Fail getting data!"
+    "en-US": "[API error]: Fail getting data!",
+    "ru": "[Ошибка API]: Не удалось получить данные!"
   },
 
   "api.request.fail.msg": {
-    "ru": "[Ошибка API]: Не удалось получить данные! Причина: {ARGUMENT}",
-    "en-US": "[API error]: Fail getting data! Reason: {ARGUMENT}"
+    "en-US": "[API error]: Fail getting data! Reason: {ARGUMENT}",
+    "ru": "[Ошибка API]: Не удалось получить данные! Причина: {ARGUMENT}"
   },
 
   "api.request.id.track": {
-    "ru": "[Ошибка API]: Не удалось получить ID трека!",
-    "en-US": "[API error]: Failed to get track ID!"
+    "en-US": "[API error]: Failed to get track ID!",
+    "ru": "[Ошибка API]: Не удалось получить ID трека!"
   },
 
   "api.request.id.playlist": {
-    "ru": "[Ошибка API]: Не удалось получить ID плейлиста!",
-    "en-US": "[API error]: Failed to get playlist ID!"
+    "en-US": "[API error]: Failed to get playlist ID!",
+    "ru": "[Ошибка API]: Не удалось получить ID плейлиста!"
   },
 
   "api.request.id.album": {
-    "ru": "[Ошибка API]: Не удалось получить ID альбома!",
-    "en-US": "[API error]: Failed to get album ID!"
+    "en-US": "[API error]: Failed to get album ID!",
+    "ru": "[Ошибка API]: Не удалось получить ID альбома!"
   },
 
   "api.request.id.author": {
-    "ru": "[Ошибка API]: Не удалось получить ID автора!",
-    "en-US": "[API error]: Failed to get author ID!"
+    "en-US": "[API error]: Failed to get author ID!",
+    "ru": "[Ошибка API]: Не удалось получить ID автора!"
   },
 
   "api.request.audio.fail": {
-    "ru": "[Ошибка API]: {ARGUMENT} не предоставляет аудио ссылку!",
-    "en-US": "[API error]: {ARGUMENT} don't give audio link!"
+    "en-US": "[API error]: {ARGUMENT} don't give audio link!",
+    "ru": "[Ошибка API]: {ARGUMENT} не предоставляет аудио ссылку!"
   },
 
 
@@ -421,38 +412,38 @@
 
 
   "command.seek.duration.nan": {
-    "ru": "Аргумент не является числом",
-    "en-US": "The argument is not a number"
+    "en-US": "The argument is not a number",
+    "ru": "Аргумент не является числом"
   },
 
   "command.seek.duration.big": {
-    "ru": "Аргумент слишком большой или слишком маленький!",
-    "en-US": "The argument is too big or too small!"
+    "en-US": "The argument is too big or too small!",
+    "ru": "Аргумент слишком большой или слишком маленький!"
   },
 
   "command.seek": {
-    "ru": "Пропуск до {ARGUMENT}",
-    "en-US": "Seeked {ARGUMENT}"
+    "en-US": "Seeked {ARGUMENT}",
+    "ru": "Пропуск до {ARGUMENT}"
   },
 
   "command.position": {
-    "ru": "Переход к позиции {ARGUMENT}\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**",
-    "en-US": "Jump to position {ARGUMENT}\n\n**Will be played:**\n**❯** **{ARGUMENT}**"
+    "en-US": "Jump to position {ARGUMENT}\n\n**Will be played:**\n**❯** **{ARGUMENT}**",
+    "ru": "Переход к позиции {ARGUMENT}\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**"
   },
 
   "command.skip.arg.track": {
-    "ru": "Были пропущены все треки до {ARGUMENT}\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**",
-    "en-US": "All tracks up to {ARGUMENT} were skipped\n\n**Will be played:**\n**❯** **{ARGUMENT}**"
+    "en-US": "All tracks up to {ARGUMENT} were skipped\n\n**Will be played:**\n**❯** **{ARGUMENT}**",
+    "ru": "Были пропущены все треки до {ARGUMENT}\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**"
   },
 
   "command.skip.one.track": {
-    "ru": "Был пропущен текущий трек\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**",
-    "en-US": "The current track was skipped\n\n**Will be played:**\n**❯** **{ARGUMENT}**"
+    "en-US": "The current track was skipped\n\n**Will be played:**\n**❯** **{ARGUMENT}**",
+    "ru": "Был пропущен текущий трек\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**"
   },
 
   "command.go.track": {
-    "ru": "Был выполнен переход\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**",
-    "en-US": "The transition was completed\n\n**Will be played:**\n**❯** **{ARGUMENT}**"
+    "en-US": "The transition was completed\n\n**Will be played:**\n**❯** **{ARGUMENT}**",
+    "ru": "Был выполнен переход\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**"
   },
 
 
@@ -493,85 +484,85 @@
 
 
   "command.remove.track": {
-    "ru": "Был удален из очереди трек\n\n**❯** **{ARGUMENT}**",
-    "en-US": "A track has been removed from the queue\n\n**❯** **{ARGUMENT}**"
+    "en-US": "A track has been removed from the queue\n\n**❯** **{ARGUMENT}**",
+    "ru": "Был удален из очереди трек\n\n**❯** **{ARGUMENT}**"
   },
 
 
   "command.filter.push.two": {
-    "ru": "Данный фильтр уже включен!",
-    "en-US": "Current filter has enabled!"
+    "en-US": "Current filter has enabled!",
+    "ru": "Данный фильтр уже включен!"
   },
 
   "command.filter.push.argument": {
-    "ru": "Необходимо указать аргумент в диапазоне от {ARGUMENT} до {ARGUMENT}!",
-    "en-US": "An argument must be in the range from {ARGUMENT} to {ARGUMENT}!"
+    "en-US": "An argument must be in the range from {ARGUMENT} to {ARGUMENT}!",
+    "ru": "Необходимо указать аргумент в диапазоне от {ARGUMENT} до {ARGUMENT}!"
   },
 
   "command.filter.push.unsupported": {
-    "ru": "Этот фильтр {ARGUMENT} не совместим с {ARGUMENT}, его необходимо необходимо отключить!",
-    "en-US": "This filter {ARGUMENT} is not compatible with {ARGUMENT}, it must be disabled!"
+    "en-US": "This filter {ARGUMENT} is not compatible with {ARGUMENT}, it must be disabled!",
+    "ru": "Этот фильтр {ARGUMENT} не совместим с {ARGUMENT}, его необходимо необходимо отключить!"
   },
 
   "command.filter.push.before": {
-    "ru": "Добавлен аудио фильтр, он будет включен немедленно!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
-    "en-US": "Added audio filter, it will be enabled immediately!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
+    "en-US": "Added audio filter, it will be enabled immediately!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "ru": "Добавлен аудио фильтр, он будет включен немедленно!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
   },
 
   "command.filter.push.after": {
-    "ru": "Добавлен аудио фильтр, он будет включен со следующим треком!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
-    "en-US": "Added audio filter, it will be enabled with the next track!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
+    "en-US": "Added audio filter, it will be enabled with the next track!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "ru": "Добавлен аудио фильтр, он будет включен со следующим треком!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
   },
 
 
   "command.filter.remove.two": {
-    "ru": "Данный фильтр не включен!",
-    "en-US": "This filter is not enabled!"
+    "en-US": "This filter is not enabled!",
+    "ru": "Данный фильтр не включен!"
   },
 
   "command.filter.remove.before": {
-    "ru": "Удален аудио фильтр, он будет выключен со следующим треком!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
-    "en-US": "Audio filter removed, will be disabled with next track!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
+    "en-US": "Audio filter removed, will be disabled with next track!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "ru": "Удален аудио фильтр, он будет выключен со следующим треком!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
   },
 
   "command.filter.remove.after": {
-    "ru": "Удален аудио фильтр, он будет выключен немедленно!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
-    "en-US": "Audio filter removed, will be disabled immediately!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
+    "en-US": "Audio filter removed, will be disabled immediately!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**",
+    "ru": "Удален аудио фильтр, он будет выключен немедленно!\n **❯** **{ARGUMENT}**\n **❯** **{ARGUMENT}**"
   },
 
 
   "command.filter.off.null": {
-    "ru": "Список включенных фильтров пуст!",
-    "en-US": "The list of enabled filters is empty!"
+    "en-US": "The list of enabled filters is empty!",
+    "ru": "Список включенных фильтров пуст!"
   },
 
   "command.filter.off.before": {
-    "ru": "Все фильтры будут выключены со следующим треком!",
-    "en-US": "All filters will be turned off with the next track!"
+    "en-US": "All filters will be turned off with the next track!",
+    "ru": "Все фильтры будут выключены со следующим треком!"
   },
 
   "command.filter.off.after": {
-    "ru": "Все фильтры будут выключены сейчас!",
-    "en-US": "All filters will be turned off now!"
+    "en-US": "All filters will be turned off now!",
+    "ru": "Все фильтры будут выключены сейчас!"
   },
 
 
   "command.play.replay.queue": {
-    "ru": "{ARGUMENT} | Я не могу перезапустить воспроизведение треков, очереди нет!",
-    "en-US": "{ARGUMENT} | I can't restart playing tracks, there is no queue!"
+    "en-US": "{ARGUMENT} | I can't restart playing tracks, there is no queue!",
+    "ru": "{ARGUMENT} | Я не могу перезапустить воспроизведение треков, очереди нет!"
   },
   "command.play.replay": {
-    "ru": "{ARGUMENT} | Перезапуск воспроизведенных треков!",
-    "en-US": "{ARGUMENT} | Restarting played tracks!"
+    "en-US": "{ARGUMENT} | Restarting played tracks!",
+    "ru": "{ARGUMENT} | Перезапуск воспроизведенных треков!"
   },
 
   "command.play.stop.queue": {
-    "ru": "{ARGUMENT} | Я не могу выключить музыку, очереди нет!",
-    "en-US": "{ARGUMENT} | I can't turn off the music, there is no queue!"
+    "en-US": "{ARGUMENT} | I can't turn off the music, there is no queue!",
+    "ru": "{ARGUMENT} | Я не могу выключить музыку, очереди нет!"
   },
 
   "command.play.stop": {
-    "ru": "{ARGUMENT} | Выключение музыки!",
-    "en-US": "{ARGUMENT} | Turn off music!"
+    "en-US": "{ARGUMENT} | Turn off music!",
+    "ru": "{ARGUMENT} | Выключение музыки!"
   }
 }

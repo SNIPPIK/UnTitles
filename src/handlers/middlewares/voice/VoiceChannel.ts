@@ -25,7 +25,7 @@ class VoiceChannel extends Assign<middleware<CommandInteraction>> {
                         flags: "Ephemeral",
                         embeds: [
                             {
-                                description: locale._(ctx.locale, "voice.need", [ctx.member]),
+                                description: locale._(ctx.locale, "middlewares.voice.need", [ctx.member]),
                                 color: Colors.Yellow
                             }
                         ],
@@ -81,7 +81,7 @@ class OtherVoiceChannel extends Assign<middleware<CommandInteraction>> {
                                 ctx.channel.send({
                                     embeds: [
                                         {
-                                            description: locale._(ctx.locale, "voice.new", [VoiceChannel]),
+                                            description: locale._(ctx.locale, "middlewares.voice.new", [VoiceChannel]),
                                             color: Colors.Yellow
                                         }
                                     ]
@@ -94,7 +94,7 @@ class OtherVoiceChannel extends Assign<middleware<CommandInteraction>> {
                                     flags: "Ephemeral",
                                     embeds: [
                                         {
-                                            description: locale._(ctx.locale, "voice.alt", [VoiceChannelMe]),
+                                            description: locale._(ctx.locale, "middlewares.voice.alt", [VoiceChannelMe]),
                                             color: Colors.Yellow
                                         }
                                     ]

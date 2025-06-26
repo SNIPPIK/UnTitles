@@ -32,6 +32,18 @@ export class locale {
     };
 
     /**
+     * @description Переименование однотипных языков
+     * @param language - Тип locale для перевода
+     */
+    private static universalLang = (language: languages): languages => {
+        if (["en-GB"].includes(language)) return "en-US";
+        else if (["es-419"].includes(language)) return "es-ES";
+        else if (["zh-TW"].includes(language)) return "zh-CN";
+
+        return language;
+    };
+
+    /**
      * @description Перевод на другие языки, перевод берется из базы
      * @param language - Тип locale для перевода
      * @param locale - Имя перевода
@@ -40,7 +52,8 @@ export class locale {
      * @public
      */
     public static _ = (language: languages, locale: locale_text, args?: any[]) => {
-        let translate = locales[locale][language] as string;
+        const lang = this.universalLang(language);
+        let translate = locales[locale][lang] as string;
 
         // Если нет такой строки
         if (!translate) {

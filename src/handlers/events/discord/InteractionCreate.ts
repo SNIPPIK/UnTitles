@@ -49,7 +49,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                             flags: "Ephemeral",
                             embeds: [
                                 {
-                                    description: locale._(ctx.locale, "whitelist.message", [ctx.member]),
+                                    description: locale._(ctx.locale, "interaction.whitelist", [ctx.member]),
                                     color: Colors.Yellow
                                 }
                             ]
@@ -67,7 +67,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                             flags: "Ephemeral",
                             embeds: [
                                 {
-                                    description: locale._(ctx.locale, "blacklist.message", [ctx.member]),
+                                    description: locale._(ctx.locale, "interaction.blacklist", [ctx.member]),
                                     color: Colors.Yellow
                                 }
                             ]
@@ -105,7 +105,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                                     flags: "Ephemeral",
                                     embeds: [
                                         {
-                                            description: locale._(ctx.locale, "cooldown.message", [ctx.member, (user / 1000).toFixed(0), 5]),
+                                            description: locale._(ctx.locale, "interaction.cooldown", [ctx.member, (user / 1000).toFixed(0), 5]),
                                             color: Colors.Yellow
                                         }
                                     ]
@@ -158,7 +158,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 flags: "Ephemeral",
                 embeds: [
                     {
-                        description: locale._(ctx.locale, "command.fail"),
+                        description: locale._(ctx.locale, "interaction.command.fail"),
                         color: Colors.DarkRed
                     }
                 ]
@@ -178,13 +178,13 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             // Проверка прав пользователя
             const userPermissions = ctx.member?.permissions;
             if (permissions.user && !permissions.user.every(perm => userPermissions?.has(perm))) {
-                return ctx.reply(locale._(ctx.locale, "permission.user", [ctx.member]));
+                return ctx.reply(locale._(ctx.locale, "interaction.permission.user", [ctx.member]));
             }
 
             // Проверка прав бота
             const botPermissions = ctx.guild?.members.me?.permissionsIn(ctx.channel);
             if (permissions.client && !permissions.client.every(perm => botPermissions?.has(perm))) {
-                return ctx.reply(locale._(ctx.locale, "permission.client", [ctx.member]));
+                return ctx.reply(locale._(ctx.locale, "interaction.permission.client", [ctx.member]));
             }
         }
 
@@ -209,17 +209,21 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      */
     private readonly SelectAutocomplete = (ctx: AutocompleteInteraction) => {
         const command = db.commands.get(ctx.commandName);
-
         // Если есть команда
         if (command && command.autocomplete) {
+            const args: any[] = ctx.options?.["_hoistedOptions"]?.map((f) => {
+                const value = f[f.name];
+
+                if (value) return value;
+                return f.value;
+            });
+
+            // Если аргумент пустой
+            if (!args && args[0] === "" || !args[1] && args[1] === "") return null;
+
             return command.autocomplete({
                 message: ctx,
-                args: ctx.options?.["_hoistedOptions"]?.map((f) => {
-                    const value = f[f.name];
-
-                    if (value) return value;
-                    return f.value;
-                }),
+                args: args,
                 type: ctx.options?.["_subcommand"]
             })
         }

@@ -2,7 +2,6 @@ import { Worker } from "node:worker_threads";
 import { Track } from "#service/player";
 import path from "node:path";
 import { db } from "#app/db";
-import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -220,11 +219,14 @@ export class RestObject {
             if (lastError && !link) return lastError;
 
             // Если нет ошибки и ссылки
-            else if (!lastError && !link) return Error(`[APIs] Audio link not found`);
+            else if (!lastError && !link) return Error(`[APIs] There were no errors and there are no audio links to the resource`);
+
+            // Если нет ссылки
+            else if (!link) return Error(`[APIs] Unable to get audio link on alternative platforms!`);
 
             return link;
         } catch (err) {
-            return err instanceof Error ? err : Error(`[APIs] Unexpected error`);
+            return err instanceof Error ? err : Error(`[APIs] Unexpected error ${err}`);
         }
     };
 }

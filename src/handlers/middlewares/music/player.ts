@@ -23,7 +23,7 @@ class PlayerNotPlaying extends Assign<middleware<CommandInteraction>> {
                         flags: "Ephemeral",
                         embeds: [
                             {
-                                description: locale._(ctx.locale, "player.playing.off"),
+                                description: locale._(ctx.locale, "middlewares.player.not.playing"),
                                 color: Colors.DarkRed
                             }
                         ],
@@ -56,7 +56,7 @@ class PlayerWait extends Assign<middleware<CommandInteraction>> {
                         flags: "Ephemeral",
                         embeds: [
                             {
-                                description: locale._(ctx.locale, "player.stream.wait"),
+                                description: locale._(ctx.locale, "middlewares.player.wait"),
                                 color: Colors.DarkRed
                             }
                         ],

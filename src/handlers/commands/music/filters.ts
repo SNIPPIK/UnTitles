@@ -89,12 +89,12 @@ import { db } from "#app/db";
                 "ru": "фильтры"
             },
             descriptions: {
-                "en-US": "You need to select a filter! [names] - <not required> - description",
-                "ru": "Необходимо выбрать фильтр! [названия] - <не требуется> - описание"
+                "en-US": "You need to select a filter!",
+                "ru": "Необходимо выбрать фильтр!"
             },
-            type: ApplicationCommandOptionType["String"],
             required: true,
-            choices: db.commands.filters_choices
+            type: ApplicationCommandOptionType["String"],
+            autocomplete: true
         }
     ]
 })
@@ -317,7 +317,31 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
                     }
                 }
                 return null;
-            }
+            },
+            autocomplete: ({message, args}) => {
+                const queue = db.queues.get(message.guildId);
+
+                // Если нет очереди
+                if (!queue) return null;
+
+                const filters = queue.player.filters.enabled;
+
+                // Если нет включенных фильтров
+                if (!filters) return null;
+
+                const items = filters.filter(filter => filter.name.match(args[0])).map((filter) => {
+                    return {
+                        name: filter.name,
+                        value: filter.name
+                    }
+                });
+
+                // Если не найдено таких фильтров
+                if (!items) return null;
+
+                // Отправка ответа
+                return message.respond(items);
+            },
         });
     };
 }

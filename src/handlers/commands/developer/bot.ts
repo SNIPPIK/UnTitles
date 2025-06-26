@@ -76,7 +76,7 @@ class WorkBotCommand extends Assign< BaseCommand > {
                         return message.reply({
                             embeds: [
                                 {
-                                    description: locale._(message.locale, `commands.reload`, [db.commands.size]),
+                                    description: locale._(message.locale, `has.reload`, [db.commands.size]),
                                     color: Colors.Green
                                 }
                             ],
@@ -91,7 +91,7 @@ class WorkBotCommand extends Assign< BaseCommand > {
                         return message.reply({
                             embeds: [
                                 {
-                                    description: locale._(message.locale, `events.reload`, [db.events.size]),
+                                    description: locale._(message.locale, `has.reload`, [db.events.size]),
                                     color: Colors.Green
                                 }
                             ],
@@ -107,7 +107,7 @@ class WorkBotCommand extends Assign< BaseCommand > {
                         return message.reply({
                             embeds: [
                                 {
-                                    description: locale._(message.locale, `bot.reload`, [message.member]),
+                                    description: locale._(message.locale, `self.reload`, [message.member]),
                                     color: Colors.Green
                                 }
                             ],

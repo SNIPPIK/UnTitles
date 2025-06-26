@@ -25,6 +25,7 @@ export type CycleInteraction = Message<true>;
 
 /**
  * @description Изменяем параметры discord.js
+ * @module discord.js
  */
 declare module "discord.js" {
     //@ts-ignore

@@ -3,6 +3,7 @@ import { ApplicationCommandOptionType, Colors } from "discord.js";
 import { locale } from "#service/locale";
 import { Assign } from "#structures";
 import { db } from "#app/db";
+import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -139,51 +140,6 @@ class PlayCommand extends Assign< BaseCommand > {
             permissions: {
                 client: ["Connect", "SendMessages", "Speak", "ViewChannel"]
             },
-            autocomplete: async ({message, args}) => {
-                // Если ничего не было указано или указана ссылка
-                if (!args[1] || args[1] === "") return;
-
-                // Запрос к платформе
-                const platform = db.api.request(args[0] as any);
-
-                // Если платформа заблокирована
-                if (platform.block || !platform.auth) return;
-
-                // Получаем функцию запроса данных с платформы
-                const api = platform.request(args[1], {audio: false});
-
-                if (!api.type) return;
-
-                try {
-                    // Получаем данные в системе rest/API
-                    const rest = await api.request();
-                    const items: { value: string; name: string }[] = [];
-
-                    // Если получена ошибка или нет данных
-                    if (rest instanceof Error || !rest) return;
-
-                    // Обработка массива данных
-                    if (Array.isArray(rest)) {
-                        const tracks = rest.map((choice) => ({
-                            value: choice.url,
-                            name: `🎵 (${choice.time.split}) | ${choice.artist.title.slice(0, 20)} - ${choice.name.slice(0, 60)}`
-                        }));
-                        items.push(...tracks);
-                    }
-
-                    // Показываем плейлист
-                    else if ("items" in rest) items.push({ name: `🎶 [${rest.items.length}] - ${rest.title.slice(0, 70)}`, value: rest.url });
-
-                    // Показываем трек
-                    else items.push({ name: `🎵 (${rest.time.split}) | ${rest.artist.title.slice(0, 20)} - ${rest.name.slice(0, 60)}`, value: rest.url });
-
-                    // Отправка ответа
-                    await message.respond(items);
-                } catch (err) {
-                    console.error(err);
-                    return null;
-                }
-            },
             execute: async ({message, args, type}) => {
                 switch (type) {
                     // Если надо перезапустить проигрывание
@@ -295,6 +251,48 @@ class PlayCommand extends Assign< BaseCommand > {
                     }
                 }
                 return null;
+            },
+            autocomplete: async ({message, args}) => {
+                // Запрос к платформе
+                const platform = db.api.request(args[0] as any);
+
+                // Если платформа заблокирована
+                if (platform.block || !platform.auth) return;
+
+                // Получаем функцию запроса данных с платформы
+                const api = platform.request(args[1], {audio: false});
+
+                if (!api.type) return;
+
+                try {
+                    // Получаем данные в системе rest/API
+                    const rest = await api.request();
+                    const items: { value: string; name: string }[] = [];
+
+                    // Если получена ошибка или нет данных
+                    if (rest instanceof Error || !rest) return;
+
+                    // Обработка массива данных
+                    if (Array.isArray(rest)) {
+                        const tracks = rest.map((choice) => ({
+                            value: choice.url,
+                            name: `🎵 (${choice.time.split}) | ${choice.artist.title.slice(0, 20)} - ${choice.name.slice(0, 60)}`
+                        }));
+                        items.push(...tracks);
+                    }
+
+                    // Показываем плейлист
+                    else if ("items" in rest) items.push({ name: `🎶 [${rest.items.length}] - ${rest.title.slice(0, 70)}`, value: rest.url });
+
+                    // Показываем трек
+                    else items.push({ name: `🎵 (${rest.time.split}) | ${rest.artist.title.slice(0, 20)} - ${rest.name.slice(0, 60)}`, value: rest.url });
+
+                    // Отправка ответа
+                    await message.respond(items);
+                } catch (err) {
+                    console.error(err);
+                    return null;
+                }
             }
         });
     };
