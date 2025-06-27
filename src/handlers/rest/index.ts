@@ -176,7 +176,7 @@ export class RestObject {
                 const platformAPI = this.request(platform.name);
 
                 // Поиск трека
-                const searchQuery = `${name} - ${artist.title}`;
+                const searchQuery = `${artist.title} - ${name}`;
                 const tracks = await platformAPI.request<"search">(searchQuery).request();
 
                 // Если при получении треков произошла ошибка
@@ -193,7 +193,7 @@ export class RestObject {
 
                 // Ищем нужный трек
                 const findTrack = tracks.find((song) => {
-                    return Math.abs(song.time.total - track.time.total) <= 20 && !!song.name.match(track.name);
+                    return Math.abs(song.time.total - track.time.total) <= 20 //&& !!song.name.match(track.name);
                 });
 
                 // Если отфильтровать треки не удалось

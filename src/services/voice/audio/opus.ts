@@ -40,6 +40,18 @@ const EMPTY_FRAME =  Buffer.alloc(0);
  */
 class BaseEncoder extends TypedEmitter<EncoderEvents> {
     /**
+     * @description Найден ли head заголовок
+     * @private
+     */
+    private _head_found = false;
+
+    /**
+     * @description НАйден ли тег заголосовок
+     * @private
+     */
+    private _tags_found = false;
+
+    /**
      * @description Отправлен ли 1 аудио пакет
      * @private
      */
@@ -112,17 +124,26 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
-                // Если найден заголовок
-                if (isOpusHead(packet)) {
-                    this.emit("head", segment);
-                    continue;
+                // Если еще не найден заглосовок head
+                if (!this._head_found) {
+                    // Если найден заголовок
+                    if (isOpusHead(packet)) {
+                        this._head_found = true;
+
+                        this.emit("head", segment);
+                        continue;
+                    }
                 }
 
                 // Если еще не найден заглосовок tags
-                // Если найден тег
-                if (isOpusTags(packet)) {
-                    this.emit("tags", segment);
-                    continue;
+                else if (!this._tags_found) {
+                    // Если найден тег
+                    if (isOpusTags(packet)) {
+                        this._tags_found = true;
+
+                        this.emit("tags", segment);
+                        continue;
+                    }
                 }
 
                 // Если еще не отправлен 1 пустой фрейм

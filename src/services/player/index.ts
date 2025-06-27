@@ -73,7 +73,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
             }).then((msg) => {
                 setTimeout(() => {
                     if (msg.deletable) msg.delete().catch(() => null);
-                }, 20e3);
+                }, timeout ?? 1e3);
             });
 
             // Отключаем события плеера
