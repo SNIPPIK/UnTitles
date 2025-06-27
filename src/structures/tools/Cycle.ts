@@ -13,22 +13,16 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     private startTime: number = 0;
 
     /**
-     * @description Кол-во пропусков цикла
-     * @private
-     */
-    private missCounter: number = 0;
-
-    /**
-     * @description Временное число отспавания цикла в милисекундах
-     * @private
-     */
-    private drift: number = 0;
-
-    /**
      * @description Время для высчитывания
      * @private
      */
     private loop: number = 0;
+
+    /**
+     * @description Кол-во пропусков цикла
+     * @private
+     */
+    private missCounter: number = 0;
 
     /**
      * @description Тип таймера, задает точность таймера
@@ -42,7 +36,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      */
     private get time() {
         if (this.timer === "low") return Date.now();
-        return performance.now() - this.drift;
+        return performance.now();
     };
 
     /**
@@ -92,8 +86,8 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Если нет объектов
         if (this.size === 0) {
             this.startTime = 0;
-            this.drift = 0;
             this.loop = 0;
+            this.missCounter = 0;
             return;
         }
 
@@ -109,25 +103,24 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
             return;
         }
 
-        // Принудительный сброс через 10 дрифтов
-        else if (this.missCounter > 10) {
+        // Принудительная стабилизация
+        else if (this.missCounter > 5) {
             this.missCounter = 0;
-            this.drift = 0;
 
             setTimeout(this._stepCycle, duration);
             return;
         }
 
-        // Ждем нужное время
+        // Иначе ждем нужное время
         setTimeout(() => {
             // Если цикл высокоточный, высчитываем дрифт цикла
             if (this.timer === "max") {
                 const drift = this.time - nextTime;
 
-                // Стабилизация таймера при дрифте в 3 ms
-                if (drift > 3) {
+                // Если отставание более 5 ms
+                if (drift > 5) {
+                    //console.log(`Drift: ${drift}ms`);
                     this.missCounter++;
-                    this.drift = this.drift - drift;
                 }
             }
 
