@@ -29,6 +29,22 @@ const TIMESTAMP_INC = 960;
 
 /**
  * @author SNIPPIK
+ * @description Максимальное значение int 16 bit
+ * @const MAX_16BIT
+ * @private
+ */
+const MAX_16BIT = 2 ** 16;
+
+/**
+ * @author SNIPPIK
+ * @description Максимальное значение int 32 bit
+ * @const MAX_32BIT
+ * @private
+ */
+const MAX_32BIT = 2 ** 32;
+
+/**
+ * @author SNIPPIK
  * @description Класс для шифрования данных через библиотеки sodium или нативным способом
  * @class ClientRTPSocket
  * @public
@@ -118,16 +134,16 @@ export class ClientRTPSocket {
      * @public
      */
     public packet = (packet: Buffer) => {
-        this.sequence = (this.sequence + 1) & 0xFFFF;
-        this.timestamp = (this.timestamp + TIMESTAMP_INC) >>> 0;
-
-        if (this.sequence >= 2 ** 16) this.sequence = 0;
-        if (this.timestamp >= 2 ** 32) this.timestamp = 0;
+        if (this.sequence > MAX_16BIT) this.sequence = 0;
+        if (this.timestamp > MAX_32BIT) this.timestamp = 0;
 
         const mode = ClientRTPSocket.mode;
         const nonce = this.nonce;
         const rtp = this.rtp_packet;
         const nonceBuffer = nonce.subarray(0, 4);
+
+        this.sequence = (this.sequence + 1) & 0xFFFF;
+        this.timestamp = (this.timestamp + TIMESTAMP_INC) >>> 0;
 
         // Шифровка aead_aes256_gcm (support rtpsize)
         if (mode === "aead_aes256_gcm_rtpsize") {

@@ -18,13 +18,6 @@ import { db } from "#app/db";
  */
 abstract class BaseQueue {
     /**
-     * @description Время включения очереди или же проигрывания музыки
-     * @protected
-     * @readonly
-     */
-    protected readonly _timestamp = new Date();
-
-    /**
      * @description Сообщение пользователя
      * @protected
      */
@@ -47,6 +40,14 @@ abstract class BaseQueue {
      * @protected
      */
     protected _voice: ControllerVoice<VoiceConnection> = new ControllerVoice();
+
+    /**
+     * @description Время создания очереди
+     * @public
+     */
+    public get timestamp() {
+        return this._message._timestamp;
+    };
 
     /*=== TEXT CHANNEL ===*/
 

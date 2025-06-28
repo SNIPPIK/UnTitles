@@ -137,7 +137,7 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если нет других аудио потоков, задаем запрет на изменение
         this.waitStream = true;
 
-        /* Пока сыровато
+        /* Пока сыровато, местами не работает, я не шучу!!!
         const filters = this._filters.compress(time);
 
         // Если текущий поток является переиспользуемым

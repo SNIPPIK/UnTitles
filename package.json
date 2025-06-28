@@ -14,11 +14,11 @@
   },
   "dependencies": {
     "discord-api-types": "^0.38.13",
-    "discord.js": "^14.20.0",
-    "ws": "^8.18.2"
+    "discord.js": "^14.21.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@types/node": "^24.0.4",
+    "@types/node": "^24.0.7",
     "@types/ws": "^8.18.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"

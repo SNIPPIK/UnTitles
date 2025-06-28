@@ -299,7 +299,7 @@ class ButtonQueue extends Assign<Button> {
                 const lang = message.locale;
                 const queue = db.queues.get(message.guildId);
                 let page = parseInt((queue.tracks.position / 5).toFixed(0));
-                const pages = parseInt((queue.tracks.total / 5).toFixed(0)) ?? 1;
+                const pages = parseInt((queue.tracks.total / 5).toFixed(0));
 
                 // Получаем контейнер на 2 версии компонентов
                 const getContainer = (position: number) => {
@@ -313,11 +313,11 @@ class ButtonQueue extends Assign<Button> {
                                 "components": [
                                     {
                                         "type": 10,
-                                        "content": `### ${db.images.disk_emoji} [${track.name}](${track.url})`
+                                        "content": `### ${db.images.disk_emoji} **[${track.artist.title}](${track.artist.url})**`
                                     },
                                     {
                                         "type": 10,
-                                        "content": `- [${track.artist.title}](${track.artist.url})\n- ${track.time.split}`
+                                        "content": `### **[${track.name}](${track.url})**\n-# ${track.time.split} - ${track.api.name.toLowerCase()}`
                                     }
                                 ],
                                 "accessory": {
@@ -356,6 +356,10 @@ class ButtonQueue extends Assign<Button> {
                                     "content": `# ${locale._(lang, "queue")} - ${message.guild.name}`
                                 },
                                 ...components,
+                                {
+                                    "type": 10, // Text
+                                    "content": `-# <t:${queue.timestamp}>`
+                                },
                                 {
                                     "type": 10, // Text
                                     "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages, queue.tracks.total, queue.tracks.time])

@@ -193,7 +193,10 @@ export class RestObject {
 
                 // Ищем нужный трек
                 const findTrack = tracks.find((song) => {
-                    return Math.abs(song.time.total - track.time.total) <= 20 //&& !!song.name.match(track.name);
+                    const name = song.name.toLowerCase().includes(track.name.toLowerCase());
+                    const time = Math.abs(song.time.total - track.time.total) <= 20;
+
+                    return time && name;
                 });
 
                 // Если отфильтровать треки не удалось
