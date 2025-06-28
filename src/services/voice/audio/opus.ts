@@ -1,5 +1,5 @@
 import { Writable, Transform, TransformOptions, WritableOptions } from "node:stream";
-import {TypedEmitter} from "#structures";
+import { TypedEmitter } from "#structures";
 
 /**
  * @author SNIPPIK

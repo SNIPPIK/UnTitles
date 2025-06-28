@@ -28,13 +28,13 @@
 - Адаптивная система отправки пакетов, можно выбрать сколько пакетов отправлять!
 - Поддержка плавного перехода между треками с `audiofade`
 - Горячая смена аудио без прерываний
-- Поддержка 14+ фильтров с возможностью добавлять свои
+- Поддержка 16+ фильтров с возможностью добавлять свои
 - Кэширование в памяти или в файлы для оптимизации
 - Есть поддержка длинных видео, Live видео!
 #### Мультиплатформенность и масштабируемость
 - Поддержка YouTube, Spotify, VK, Yandex-Music, SoundCloud
 - Платформы работают в отдельных воркерах для производительности
-- Легкое расширение и добавление новых платформ через API
+- Легкое расширение и добавление новых платформ через `Dynamic Loader - Handler`
 #### Локализация
 - Доступные языки: `English`, `Русский` ([файл с языками](src/services/locale/languages.json)).
 
@@ -85,8 +85,8 @@ npm run start-bun
 ![TypeScript](https://img.shields.io/badge/typescript-5.8.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
 ![Bun](https://img.shields.io/badge/bun-1.2.15-6DA55F?style=for-the-badge&logo=bun&logoColor=white)
 ![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
-![Discord.js](https://img.shields.io/badge/discord.js-14.20-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
-![ws](https://img.shields.io/badge/ws-8.18.2-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
+![Discord.js](https://img.shields.io/badge/discord.js-14.21-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
+![ws](https://img.shields.io/badge/ws-8.18.3-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)
 ---
 
 # 📊 Диаграмма всего проекта

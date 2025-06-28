@@ -524,7 +524,7 @@ class ButtonReplay extends Assign<Button> {
                 const queue = db.queues.get(message.guildId);
 
                 // Запускаем проигрывание текущего трека
-                await queue.player.play(0, queue.player.tracks.position);
+                await queue.player.play(0, 0, queue.player.tracks.position);
 
                 // Сообщаем о том что музыка начата с начала
                 return message.reply({

@@ -401,10 +401,7 @@ export class AudioPlayer extends BasePlayer {
             (stream as BufferedAudioResource)
 
                 // Если чтение возможно
-                .once("readable", () => {
-                    if (timeout) setTimeout(handleReady, timeout);
-                    else handleReady();
-                })
+                .once("readable", () => timeout ? setTimeout(handleReady, timeout) : handleReady())
 
                 // Если была получена ошибка при чтении
                 .once("error", (error: Error) => {
@@ -477,7 +474,7 @@ export class AudioPlayer extends BasePlayer {
             // Если можно сделать плавный переход
             if (this._audio.current && duration > this._audio.current.duration) {
                 this._tracks.position = position;
-                return this.play(0, position);
+                return this.play(0, 0, position);
             }
         }
 

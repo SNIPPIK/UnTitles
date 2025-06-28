@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 /**
  * @author SNIPPIK
@@ -6,18 +6,10 @@ import crypto from "crypto";
  * @const Encryption
  * @private
  */
-const Encryption: {name: EncryptionModes, nonce: Buffer} = {
+const Encryption: { name: EncryptionModes, nonce: Buffer } = {
     name: null,
     nonce: null
 };
-
-/**
- * @author SNIPPIK
- * @description Максимальный размер пакета
- * @const MAX_NONCE_SIZE
- * @private
- */
-const MAX_NONCE_SIZE = 2 ** 32 - 1;
 
 /**
  * @author SNIPPIK
@@ -29,7 +21,7 @@ const TIMESTAMP_INC = 960;
 
 /**
  * @author SNIPPIK
- * @description Максимальное значение int 16 bit
+ * @description Максимальное значение int 16
  * @const MAX_16BIT
  * @private
  */
@@ -37,7 +29,7 @@ const MAX_16BIT = 2 ** 16;
 
 /**
  * @author SNIPPIK
- * @description Максимальное значение int 32 bit
+ * @description Максимальное значение int 32
  * @const MAX_32BIT
  * @private
  */
@@ -46,10 +38,10 @@ const MAX_32BIT = 2 ** 32;
 /**
  * @author SNIPPIK
  * @description Класс для шифрования данных через библиотеки sodium или нативным способом
- * @class ClientRTPSocket
+ * @class ClientSRTPSocket
  * @public
  */
-export class ClientRTPSocket {
+export class ClientSRTPSocket {
     /**
      * @description Пустой буфер
      * @private
@@ -88,23 +80,24 @@ export class ClientRTPSocket {
      * @public
      */
     public get nonce() {
-        this._nonce++;
-
         // Если нет пакета или номер пакет превышен максимальный, то его надо сбросить
-        if (this._nonce >= MAX_NONCE_SIZE) this._nonce = 0;
+        if (this._nonce >= MAX_32BIT) this._nonce = 0;
         this._nonceBuffer.writeUInt32BE(this._nonce, 0);
+
+        // Добавляем к размеру
+        this._nonce++;
 
         return this._nonceBuffer;
     };
 
     /**
      * @description Пустой пакет для внесения данных по стандарту "Voice Packet Structure"
-     * @public
+     * @private
      */
-    private get rtp_packet() {
+    private get header() {
         // Unsafe является безопасным поскольку данные будут перезаписаны
         const rtp_packet = Buffer.allocUnsafe(12);
-        // Version + Flags, Payload Type
+        // Version + Flags, Payload Type 120 (Opus)
         [rtp_packet[0], rtp_packet[1]] = [0x80, 0x78];
 
         // Последовательность
@@ -116,12 +109,19 @@ export class ClientRTPSocket {
         // SSRC
         rtp_packet.writeUInt32BE(this.options.ssrc, 8);
 
+        this.sequence = (this.sequence + 1) & 0xFFFF;
+        this.timestamp = (this.timestamp + TIMESTAMP_INC) >>> 0;
+
+        if (this.sequence > MAX_16BIT) this.sequence = 0;
+        if (this.timestamp > MAX_32BIT) this.timestamp = 0;
+
         return rtp_packet;
     };
 
     /**
      * @description Создаем класс
      * @param options
+     * @public
      */
     public constructor(private options: EncryptorOptions) {
         this.sequence = this.randomNBit(16);
@@ -134,20 +134,14 @@ export class ClientRTPSocket {
      * @public
      */
     public packet = (packet: Buffer) => {
-        if (this.sequence > MAX_16BIT) this.sequence = 0;
-        if (this.timestamp > MAX_32BIT) this.timestamp = 0;
-
-        const mode = ClientRTPSocket.mode;
+        const mode = ClientSRTPSocket.mode;
+        const rtp = this.header;
         const nonce = this.nonce;
-        const rtp = this.rtp_packet;
         const nonceBuffer = nonce.subarray(0, 4);
 
-        this.sequence = (this.sequence + 1) & 0xFFFF;
-        this.timestamp = (this.timestamp + TIMESTAMP_INC) >>> 0;
-
-        // Шифровка aead_aes256_gcm (support rtpsize)
+        // Шифровка aead_aes256_gcm
         if (mode === "aead_aes256_gcm_rtpsize") {
-            const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce);
+            const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce, { authTagLength: 16 });
             cipher.setAAD(rtp);
             return Buffer.concat([rtp, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
         }

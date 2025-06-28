@@ -2,7 +2,7 @@ import { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchDa
 import { VoiceAdapter, DiscordGatewayAdapterCreator } from "./adapter";
 import { ClientWebSocket, opcode } from "./sockets/ClientWebSocket";
 import { ClientUDPSocket } from "./sockets/ClientUDPSocket";
-import { ClientRTPSocket } from "./sockets/ClientRTPSocket";
+import { ClientSRTPSocket } from "./sockets/ClientSRTPSocket";
 import { VoiceOpcodes } from "discord-api-types/voice";
 
 /**
@@ -34,7 +34,7 @@ export class VoiceConnection {
      * @description Клиент RTP, ключевой класс для шифрования пакетов для отправки через UDP
      * @private
      */
-    private rtpClient: ClientRTPSocket;
+    private rtpClient: ClientSRTPSocket;
 
     /**
      * @description Таймер для автоматического отключения Speaking
@@ -256,7 +256,7 @@ export class VoiceConnection {
             }
 
             // Создаем подключение RTP
-            this.rtpClient = new ClientRTPSocket({
+            this.rtpClient = new ClientSRTPSocket({
                 key: new Uint8Array(d.secret_key),
                 ssrc: this._attention.ssrc
             });
@@ -338,7 +338,7 @@ export class VoiceConnection {
                     data: {
                         address: ip,
                         port: port,
-                        mode: ClientRTPSocket.mode
+                        mode: ClientSRTPSocket.mode
                     }
                 }
             };

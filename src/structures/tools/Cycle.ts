@@ -25,35 +25,19 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     private missCounter: number = 0;
 
     /**
-     * @description Тип таймера, задает точность таймера
-     * @protected
-     */
-    private readonly timer: "max" | "low";
-
-    /**
-     * @description Получение текущего времени для вычитания и получения точного времени
-     * @private
-     */
-    private get time() {
-        if (this.timer === "low") return Date.now();
-        return performance.now();
-    };
-
-    /**
-     * @description Задаем параметр для создания класса
-     * @param duration - Время интервала для таймера, значение менее 100 ms, будет использоватся более точный таймер
-     * @protected
-     */
-    protected constructor(duration: number) {
-        super();
-        this.timer = duration < 100 ? "max" : "low";
-    };
-
-    /**
      * @description Выполняет шаг цикла с учётом точного времени следующего запуска
      * @protected
      */
     protected abstract _stepCycle: () => void;
+
+    /**
+     * @description Метод получения времени для обновления времени цикла
+     * @protected
+     * @default Date.now
+     */
+    protected get time(): number {
+        return Date.now();
+    };
 
     /**
      * @description Добавляем элемент в очередь
@@ -107,14 +91,17 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         else if (this.missCounter > 5) {
             this.missCounter = 0;
 
-            setTimeout(this._stepCycle, duration);
+            console.log(`Misses has max, ${duration / delay}ms step`);
+
+            setTimeout(this._stepCycle, duration / delay);
             return;
         }
 
         // Иначе ждем нужное время
         setTimeout(() => {
-            // Если цикл высокоточный, высчитываем дрифт цикла
-            if (this.timer === "max") {
+            this._stepCycle();
+
+            if (duration < 100) {
                 const drift = this.time - nextTime;
 
                 // Если отставание более 5 ms
@@ -123,8 +110,6 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
                     this.missCounter++;
                 }
             }
-
-            return this._stepCycle();
         }, delay);
     };
 }
@@ -143,7 +128,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @protected
      */
     protected constructor(public readonly options: SyncCycleConfig<T>) {
-        super(options.duration);
+        super();
     };
 
     /**
@@ -214,7 +199,7 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
      * @protected
      */
     protected constructor(public readonly options: AsyncCycleConfig<T>) {
-        super(20e3);
+        super();
     };
 
     /**
@@ -269,7 +254,7 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
         }
 
         // Запускаем цикл повторно
-        return this._stepCheckTimeCycle(20e3);
+        return this._stepCheckTimeCycle(30e3);
     };
 }
 

@@ -5,7 +5,7 @@ import {Collection} from "#structures";
 // Voice Sockets
 export * from "./sockets/ClientWebSocket";
 export * from "./sockets/ClientUDPSocket";
-export * from "./sockets/ClientRTPSocket";
+export * from "./sockets/ClientSRTPSocket";
 
 // Audio
 export * from "./audio/resource";

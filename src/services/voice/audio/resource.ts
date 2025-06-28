@@ -62,7 +62,7 @@ class AudioBuffer {
      * @public
      */
     public get packet() {
-        if (this.position >= this.size) return null;
+        if (this._position >= this.size) return null;
         const frame = this._chunks[this._position++];
         return frame ?? SILENT_FRAME;
     };

@@ -1,4 +1,4 @@
-import { Client, Partials, Options, SimpleShardingStrategy } from "discord.js";
+import { Client, Options, Partials, SimpleShardingStrategy } from "discord.js";
 import { ActivityType } from "discord-api-types/v10"
 import { Logger, VoiceManager } from "#structures";
 import { version } from "package.json";
@@ -62,6 +62,7 @@ export class DiscordClient extends Client {
             partials: [
                 Partials.Channel,
                 Partials.GuildMember,
+                Partials.SoundboardSound,
                 Partials.Message,
                 Partials.Reaction,
                 Partials.User,
@@ -79,7 +80,8 @@ export class DiscordClient extends Client {
                 GuildInviteManager: 0,
                 GuildEmojiManager: 0,
                 GuildStickerManager: 0,
-                GuildTextThreadManager: 0
+                ThreadManager: 0,
+                ThreadMemberManager: 0,
             })
         });
 

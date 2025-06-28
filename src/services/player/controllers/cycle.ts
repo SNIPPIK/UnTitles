@@ -20,6 +20,14 @@ export class ControllerCycles {
      * @public
      */
     public readonly players = new class AudioPlayers<T extends AudioPlayer> extends SyncCycle<T> {
+        /**
+         * @description Указываем свое полученеие времени
+         * @protected
+         */
+        protected get time() {
+            return Number(process.hrtime.bigint()) / 1e6;
+        };
+
         public constructor() {
             super({
                 // Время до следующего прогона цикла
