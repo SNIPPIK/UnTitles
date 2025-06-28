@@ -49,7 +49,7 @@ export class ControllerFilters<T extends AudioFilter> {
         if (live) return filters.join(",");
 
         // Берем данные из всех фильтров
-        for (const { filter, args, argument } of this.enabled) {
+        for (const { filter, args, argument } of this._filters) {
             filters.push(args ? `${filter}${argument ?? ""}` : filter);
         }
 

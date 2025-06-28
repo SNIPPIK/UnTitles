@@ -78,7 +78,7 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public get track() {
-        return this._current[this.position];
+        return this._current[this._position];
     };
 
     /**
@@ -87,7 +87,7 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public get size() {
-        return this._current.length - this.position;
+        return this._current.length - this._position;
     };
 
     /**
@@ -215,7 +215,7 @@ export class ControllerTracks<T extends Track> {
                 currentIndex--;
 
                 // Текущий трек не трогаем
-                if (currentIndex !== this.position && randomIndex !== this.position) {
+                if (currentIndex !== this._position && randomIndex !== this._position) {
                     // И замените его текущим элементом.
                     [this._current[currentIndex], this._current[randomIndex]] = [this._current[randomIndex], this._current[currentIndex]];
                 }
