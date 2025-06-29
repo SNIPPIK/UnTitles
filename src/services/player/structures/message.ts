@@ -103,7 +103,7 @@ export class QueueMessage<T extends CommandInteraction> {
         this._voiceID = _original.member.voice.channelId;
         this._channelID = _original.channelId;
         this._guildID = _original.guildId;
-        this._timestamp = Math.round(_original.createdTimestamp / 1000);
+        this._timestamp = Date.now() / 1e3;
     };
 
     /**

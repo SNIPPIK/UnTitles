@@ -196,7 +196,7 @@ export class RestObject {
                     const name = song.name.toLowerCase().includes(track.name.toLowerCase());
                     const time = Math.abs(song.time.total - track.time.total) <= 20;
 
-                    return time && name;
+                    return time || name;
                 });
 
                 // Если отфильтровать треки не удалось

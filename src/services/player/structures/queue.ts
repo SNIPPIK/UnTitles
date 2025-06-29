@@ -434,10 +434,10 @@ class QueueButtons {
 
         // Обновление кнопки повтора
         const loopEmoji = currentRepeatType === RepeatType.Song ? this.button.loop_one : (currentRepeatType === RepeatType.Songs ? this.button.loop : this.button.loop);
-        this.updateButton(firstRow, 4, { emoji: loopEmoji, style: currentRepeatType === RepeatType.Songs ? 3 : 2 });
+        this.updateButton(firstRow, 4, { emoji: loopEmoji, style: currentRepeatType === RepeatType.None ? 2 : 3 });
 
         // Обновление кнопки паузы/продолжить
-        this.updateButton(firstRow, 2, { emoji: isPaused ? this.button.resume : this.button.pause });
+        this.updateButton(firstRow, 2, { emoji: isPaused ? this.button.resume : this.button.pause, style: isPaused ? 3 : 1 });
 
         // Обновление кнопки фильтров
         this.updateButton(secondRow, 3, { disabled: !hasFilters });
