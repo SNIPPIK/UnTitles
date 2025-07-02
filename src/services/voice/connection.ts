@@ -129,7 +129,7 @@ export class VoiceConnection {
      */
     public get disconnect() {
         this._status = VoiceConnectionStatus.disconnected;
-        this.configuration.channel_id = null;
+        this.configuration.channel_id = null; // Удаляем id канала
 
         // Отправляем в discord сообщение об отключении бота
         return this.adapter.sendPayload(this.configuration);
@@ -140,6 +140,7 @@ export class VoiceConnection {
      * @param ID - уникальный код канала
      */
     public set swapChannel(ID: string) {
+        // Прописываем новый id канала
         this.configuration = {...this.configuration, channel_id: ID};
         this.adapter.sendPayload(this.configuration);
     };
@@ -291,7 +292,7 @@ export class VoiceConnection {
          * @code 1000-4022
          */
         this.websocket.on("close", (code, reason) => {
-            if (code >= 1000 && code <= 1002) return this.destroy();
+            if (code >= 1000 && code <= 1002 || this._status === VoiceConnectionStatus.reconnecting) return this.destroy();
 
             // Подключения больше не существует
             else if (code === 4006 || code === 4003) {
@@ -301,8 +302,10 @@ export class VoiceConnection {
                 return; // Здесь происходит пересоздание ws подключения
             }
 
+            this._status = VoiceConnectionStatus.reconnecting;
+
             setTimeout(() => {
-                this.websocket?.emit("debug", `[${code}] ${reason}. Voice Connection reconstruct ws...`);
+                this.websocket?.emit("debug", `[${code}/${reason}] Voice Connection reconstruct ws... 500 ms`);
                 this.createWebSocket(this.serverState.endpoint);
             }, 500);
         });
@@ -330,7 +333,7 @@ export class VoiceConnection {
          * @status SelectProtocol
          * @code 1
          */
-        this.udpClient.on("connected", ({ip, port}) => {
+        this.udpClient.once("connected", ({ip, port}) => {
             this.websocket.packet = {
                 op: VoiceOpcodes.SelectProtocol,
                 d: {
@@ -423,6 +426,9 @@ enum VoiceConnectionStatus {
 
     // Получение данных для подключения RTP
     SessionDescription = "sessionDescription",
+
+    // Если происходит переподключение
+    reconnecting = "reconnecting",
 }
 
 /**

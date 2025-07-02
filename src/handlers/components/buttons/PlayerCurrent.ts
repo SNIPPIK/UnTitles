@@ -172,9 +172,12 @@ class ButtonLyrics extends Assign<Button> {
     public constructor() {
         super({
             name: "lyrics",
-            callback: (message) => {
+            callback: async (message) => {
                 const queue = db.queues.get(message.guildId);
                 const track = queue.tracks.track;
+
+                // Ожидаем ответа от кода со стороны Discord
+                await message.deferReply().catch(() => {});
 
                 // Получаем текст песни
                 track.lyrics
@@ -182,7 +185,7 @@ class ButtonLyrics extends Assign<Button> {
                     // При успешном ответе
                     .then((item) => {
                         // Отправляем сообщение с текстом песни
-                        return message.reply({
+                        return message.followUp({
                             flags: "Ephemeral",
                             embeds: [
                                 {
@@ -205,7 +208,7 @@ class ButtonLyrics extends Assign<Button> {
                         Logger.log("ERROR", error);
 
                         // Отправляем сообщение с текстом песни
-                        return message.reply({
+                        return message.followUp({
                             flags: "Ephemeral",
                             embeds: [
                                 {

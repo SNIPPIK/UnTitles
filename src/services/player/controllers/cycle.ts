@@ -80,7 +80,7 @@ export class ControllerCycles {
                 },
 
                 // Функция проверки
-                filter: (message) => message["editable"] && (message.editedTimestamp ?? message.createdTimestamp) < Date.now() + 12e3,
+                filter: (message) => message["editable"] && (message.editedTimestamp ?? message.createdTimestamp) + 10e3 < Date.now(),
 
                 // Функция обновления сообщения
                 execute: async (message) => {

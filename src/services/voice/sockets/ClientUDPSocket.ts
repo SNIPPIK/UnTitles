@@ -111,7 +111,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         // Не имеет смысла создавать заново если все данные совпадают
         if (this.options !== undefined) {
             if (options.ip === this.options.ip && options.port === this.options.port && options.ssrc === this.options.ssrc) return;
-            else this.discovery(options.ssrc); // Отправляем пакет данных для получения реального ip, port
+            this.removeAllListeners();
         }
 
         // Меняем данные

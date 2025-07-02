@@ -66,7 +66,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public constructor() {
         super();
-
+        // Создаем менеджер жизни
         this.heartbeat = new HeartbeatManager({
             // Отправка heartbeat
             send: () => {

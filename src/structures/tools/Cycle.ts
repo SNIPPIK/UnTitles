@@ -4,6 +4,9 @@ import { SetArray } from "#structures";
  * @author SNIPPIK
  * @description Базовый класс цикла
  * @class BaseCycle
+ * @extends SetArray
+ * @abstract
+ * @private
  */
 abstract class BaseCycle<T = unknown> extends SetArray<T> {
     /**
@@ -19,16 +22,43 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     private loop: number = 0;
 
     /**
+     * @description Временное число отспавания цикла в милисекундах
+     * @public
+     */
+    public drift: number = 0;
+
+    /**
+     * @description История дрифтов, нееобходима для высокоточного цикла
+     * @private
+     */
+    private driftHistory: number[] = [];
+
+    /**
      * @description Кол-во пропусков цикла
      * @private
      */
     private missCounter: number = 0;
 
     /**
-     * @description Выполняет шаг цикла с учётом точного времени следующего запуска
-     * @protected
+     * @description Проверяем наличия данных в цикле
+     * @readonly
+     * @private
      */
-    protected abstract _stepCycle: () => void;
+    private get cleaned(): boolean {
+        // Если нет объектов
+        if (this.size === 0) {
+            this.startTime = 0;
+            this.loop = 0;
+
+            // Чистимся от drift состовляющих
+            this.drift = 0;
+            this.missCounter = 0;
+            this.driftHistory.splice(0, this.driftHistory.length);
+            return true;
+        }
+
+        return false;
+    };
 
     /**
      * @description Метод получения времени для обновления времени цикла
@@ -62,24 +92,26 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     };
 
     /**
-     * @description Проверяем время для запуска цикла повторно
+     * @description Выполняет шаг цикла с учётом точного времени следующего запуска
+     * @protected
+     * @abstract
+     */
+    protected abstract _stepCycle: () => void;
+
+    /**
+     * @description Проверяем время для запуска цикла повторно, без учета дрифта
      * @readonly
      * @private
      */
-    protected _stepCheckTimeCycle = (duration: number) => {
-        // Если нет объектов
-        if (this.size === 0) {
-            this.startTime = 0;
-            this.loop = 0;
-            this.missCounter = 0;
-            return;
-        }
-
-        const nextTime = this.startTime + (this.loop * duration);              // Следующее время для определения
-        const delay = Math.max(0, nextTime - this.time);         // Цельный целевой интервал + остаток от предыдущих циклов
+    protected readonly _stepCheckTimeCycle = (duration: number) => {
+        // Проверяем цикл на наличие объектов
+        if (this.cleaned) return;
 
         // Номер прогона цикла
         this.loop++;
+
+        const nextTime = this.startTime + (this.loop * duration);
+        const delay = Math.max(0, nextTime - this.time);
 
         // Цикл отстал, подтягиваем loop вперёд
         if (delay <= 0) {
@@ -87,29 +119,59 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
             return;
         }
 
-        // Принудительная стабилизация
-        else if (this.missCounter > 5) {
-            this.missCounter = 0;
+        // Иначе ждем нужное время
+        setTimeout(this._stepCycle, delay);
+    };
 
-            console.log(`Misses has max, ${duration / delay}ms step`);
+    /**
+     * @description Проверяем время для запуска цикла повторно с учетом дрифта цикла
+     * @readonly
+     * @private
+     */
+    protected readonly _stepCheckTimeCycleDrift = (duration: number) => {
+        // Проверяем цикл на наличие объектов
+        if (this.cleaned) return;
 
-            setTimeout(this._stepCycle, duration / delay);
+        const nextTime = (this.startTime + this.loop) - this.drift;
+        const delay = Math.max(0, nextTime - this.time);
+
+        // Номер прогона цикла
+        this.loop += duration;
+
+        // Цикл отстал, подтягиваем loop вперёд
+        if (delay <= 0) {
+            setImmediate(this._stepCycle);
             return;
+        }
+
+        // Если кол-во дрифта более 1
+        else if (this.driftHistory.length > 0) {
+            // Сброс drift, для стабилизации цикла
+            if (this.missCounter > 20) {
+                this.drift = 0;
+                this.missCounter = 0;
+                this.driftHistory.splice(0, this.driftHistory.length);
+
+                setTimeout(this._stepCycle, delay);
+                return;
+            }
+
+            // Считаем среднее значение дрифта
+            this.drift = this.driftHistory.reduce((a, b) => a + b, 0) / this.driftHistory.length;
+            this.missCounter++;
         }
 
         // Иначе ждем нужное время
         setTimeout(() => {
-            this._stepCycle();
+            const drift = (this.time - nextTime) - this.drift;
 
-            if (duration < 100) {
-                const drift = this.time - nextTime;
-
-                // Если отставание более 5 ms
-                if (drift > 5) {
-                    //console.log(`Drift: ${drift}ms`);
-                    this.missCounter++;
-                }
+            // Если отставание более 0.12 ms
+            if (drift > 0.12) {
+                this.driftHistory.push(drift);
+                if (this.driftHistory.length > 10) this.driftHistory.shift();
             }
+
+            return this._stepCycle();
         }, delay);
     };
 }
@@ -173,7 +235,7 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
             if (!this.options.filter(item)) continue;
 
             try {
-                this.options.execute(item);
+                await this.options.execute(item);
             } catch (error) {
                 this.delete(item);
                 console.log(error);
@@ -181,7 +243,8 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
         }
 
         // Запускаем цикл повторно
-        return this._stepCheckTimeCycle(this.options.duration);
+        if (this.options.drift) return this._stepCheckTimeCycle(this.options.duration);
+        return this._stepCheckTimeCycleDrift(this.options.duration);
     };
 }
 
@@ -254,7 +317,8 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
         }
 
         // Запускаем цикл повторно
-        return this._stepCheckTimeCycle(30e3);
+        if (this.options.drift) return this._stepCheckTimeCycle(30e3);
+        return this._stepCheckTimeCycleDrift(30e3);
     };
 }
 
@@ -279,7 +343,7 @@ interface BaseCycleConfig<T> {
      */
     readonly custom?: {
         /**
-         * @description Изменить логику добавления
+         * @description Данная функция расширяет функционал добавления, выполняется перед добавлением
          * @param item - объект
          * @readonly
          * @public
@@ -287,7 +351,7 @@ interface BaseCycleConfig<T> {
         readonly push?: (item: T) => void;
 
         /**
-         * @description Изменить логику удаления
+         * @description Данная функция расширяет функционал удаления, выполняется перед удалением
          * @param item - объект
          * @readonly
          * @public
@@ -307,7 +371,7 @@ interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
      * @readonly
      * @public
      */
-    readonly execute: (item: T) => void;
+    readonly execute: (item: T) => Promise<void> | void;
 
     /**
      * @description Время прогона цикла, через n времени будет запущен цикл по новой

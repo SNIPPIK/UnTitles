@@ -80,13 +80,13 @@ export class ClientSRTPSocket {
      * @public
      */
     public get nonce() {
-        // Если нет пакета или номер пакет превышен максимальный, то его надо сбросить
-        if (this._nonce >= MAX_32BIT) this._nonce = 0;
+        // Проверяем что-бы не было привышения int 32
+        if (this._nonce > MAX_32BIT) this._nonce = 0;
+
+        // Записываем в буффер
         this._nonceBuffer.writeUInt32BE(this._nonce, 0);
 
-        // Добавляем к размеру
-        this._nonce++;
-
+        this._nonce++; // Добавляем к размеру
         return this._nonceBuffer;
     };
 
@@ -134,22 +134,29 @@ export class ClientSRTPSocket {
      * @public
      */
     public packet = (packet: Buffer) => {
+        // Получаем тип шифрования
         const mode = ClientSRTPSocket.mode;
-        const rtp = this.header;
+
+        // Получаем заголовок RTP
+        const RTPHead = this.header;
+
+        // Получаем nonce буфер 12-24 бит
         const nonce = this.nonce;
+
+        // Получаем первые 4 байта из буфера
         const nonceBuffer = nonce.subarray(0, 4);
 
         // Шифровка aead_aes256_gcm
         if (mode === "aead_aes256_gcm_rtpsize") {
             const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce, { authTagLength: 16 });
-            cipher.setAAD(rtp);
-            return Buffer.concat([rtp, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
+            cipher.setAAD(RTPHead);
+            return Buffer.concat([RTPHead, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
         }
 
         // Шифровка через библиотеку
         else if (mode === "aead_xchacha20_poly1305_rtpsize") {
-            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, rtp, nonce, this.options.key);
-            return Buffer.concat([rtp, cryptoPacket, nonceBuffer]);
+            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, RTPHead, nonce, this.options.key);
+            return Buffer.concat([RTPHead, cryptoPacket, nonceBuffer]);
         }
 
         // Если нет больше вариантов шифровки

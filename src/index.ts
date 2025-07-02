@@ -124,7 +124,7 @@ function ProcessQueues(client: DiscordClient): boolean {
         // Если плееры играют и есть остаток от аудио
         if (timeout) {
             // Ожидаем выключения музыки на других серверах
-            setTimeout(async () => { process.exit(0); }, timeout + 1e3);
+            setTimeout(() => { process.exit(0); }, timeout + 1e3);
 
             Logger.log("WARN", `[Queues/${db.queues.size}] Wait other queues. Timeout to restart ${(timeout / 1e3).duration()}`);
             return true;

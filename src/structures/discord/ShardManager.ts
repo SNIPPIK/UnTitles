@@ -6,6 +6,7 @@ import { Logger } from "#structures";
  * @description Класс менеджера осколков
  * @class ShardManager
  * @extends ShardingManager
+ * @public
  */
 export class ShardManager extends ShardingManager {
     public constructor(file: string, token: string) {
