@@ -18,6 +18,12 @@ import { db } from "#app/db";
  */
 abstract class BaseQueue {
     /**
+     * @description Время создания очереди
+     * @private
+     */
+    private readonly _timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
+
+    /**
      * @description Сообщение пользователя
      * @protected
      */
@@ -46,7 +52,7 @@ abstract class BaseQueue {
      * @public
      */
     public get timestamp() {
-        return this._message._timestamp;
+        return this._timestamp;
     };
 
     /*=== TEXT CHANNEL ===*/

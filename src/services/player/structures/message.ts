@@ -11,7 +11,6 @@ export class QueueMessage<T extends CommandInteraction> {
     private readonly _guildID: string;
     private readonly _channelID: string;
     private readonly _voiceID: string;
-    public readonly _timestamp: number;
 
     /**
      * @description Язык сообщения
@@ -103,7 +102,6 @@ export class QueueMessage<T extends CommandInteraction> {
         this._voiceID = _original.member.voice.channelId;
         this._channelID = _original.channelId;
         this._guildID = _original.guildId;
-        this._timestamp = Date.now() / 1e3;
     };
 
     /**

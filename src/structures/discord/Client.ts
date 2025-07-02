@@ -1,5 +1,5 @@
 import { Client, Options, Partials, SimpleShardingStrategy } from "discord.js";
-import { ActivityType } from "discord-api-types/v10"
+import { ActivityType } from "discord-api-types/v10";
 import { Logger, VoiceManager } from "#structures";
 import { version } from "package.json";
 import { env } from "#app/env";
@@ -67,7 +67,7 @@ export class DiscordClient extends Client {
                 Partials.Reaction,
                 Partials.User,
                 Partials.GuildScheduledEvent,
-                Partials.ThreadMember
+                Partials.ThreadMember,
             ],
 
             // Задаем параметры кеша
@@ -84,6 +84,7 @@ export class DiscordClient extends Client {
                 ThreadMemberManager: 0,
             })
         });
+        this.setMaxListeners(10);
 
 
         // Запускаем статусы после инициализации клиента

@@ -76,84 +76,104 @@ class RestServer extends handler<RestServerSide.API> {
 
 /**
  * @author SNIPPIK
+ * @description Делаем класс RestServer глобальным
+ * @private
+ */
+let rest: RestServer;
+
+/**
+ * @author SNIPPIK
  * @description Не даем запустить без необходимости
  * @private
  */
 if (parentPort && workerData.rest) {
     initDatabase(null);
-    const rest = new RestServer();
+    rest = new RestServer();
 
     // Получаем ответ от основного потока
-    parentPort.on("message", async (message) => {
+    parentPort.on("message", async (message: RestServerSide.ServerOptions) => {
         // Если запрос к платформе
-        if (message.platform) {
-            try {
-                const { platform, payload, options } = message;
-                const readPlatform: RestServerSide.API = rest.platforms.supported[platform];
-                const callback = readPlatform.requests.find((p) => {
-                    // Если производится прямой запрос по названию
-                    if (p.name === payload) return p;
-
-                    // Если указана ссылка
-                    else if (typeof payload === "string" && payload.startsWith("http")) {
-                        try {
-                            if (p["filter"].exec(payload) || payload.match(p["filter"])) return p;
-                        } catch {
-                            return null;
-                        }
-                    }
-
-                    // Скорее всего надо произвести поиск
-                    return p.name === "search";
-                });
-
-                // Если не найдена функция вызова
-                if (!callback) {
-                    return parentPort.postMessage({status: "error", result: Error(`Callback not found for platform: ${platform}`)});
-                }
-
-                // Получаем результат запроса
-                const result = await callback.execute(payload, {
-                    audio: options?.audio !== undefined ? options.audio : true,
-                    limit: rest.limits[callback.name]
-                });
-
-                return parentPort.postMessage({ status: "success", result, type: callback.name });
-            } catch (err) {
-                parentPort.postMessage({status: "error", result: err});
-                throw new Error(`${err}`);
-            }
-        }
+        if (message.platform) return ExtractDataFromAPI(message);
 
         // Если надо выдать данные о загруженных платформах
-        else if (message.data) {
-            const fake = rest.allow;
-            const fakeReq = fake.map(api => ({
-                ...api,
-                requests: api.requests.map(request => {
-                    const sanitized = { ...request };
-                    Object.keys(sanitized).forEach(key => {
-                        if (typeof sanitized[key] === 'function') {
-                            delete sanitized[key];
-                        }
-                    });
-                    return sanitized;
-                })
-            }));
-
-            const data = {
-                supported: Object.fromEntries(fakeReq.map(api => [api.name, api])),
-                authorization: fakeReq.filter(api => !api.auth).map(api => api.name),
-                audio: fakeReq.filter(api => !api.audio).map(api => api.name),
-                block: []
-            };
-
-            parentPort?.postMessage(data);
-        }
+        else if (message.data) return ExtractData();
     });
 
     // Если возникнет непредвиденная ошибка
     process.on("unhandledRejection", (err) => {
         throw err;
     });
+}
+
+/**
+ * @author SNIPPIK
+ * @description Получения json данных из платформ
+ * @param api
+ */
+async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
+    try {
+        const { platform, payload, options } = api;
+        const readPlatform: RestServerSide.API = rest.platforms.supported[platform];
+        const callback = readPlatform.requests.find((p) => {
+            // Если производится прямой запрос по названию
+            if (p.name === payload) return p;
+
+            // Если указана ссылка
+            else if (typeof payload === "string" && payload.startsWith("http")) {
+                try {
+                    if (p["filter"].exec(payload) || payload.match(p["filter"])) return p;
+                } catch {
+                    return null;
+                }
+            }
+
+            // Скорее всего надо произвести поиск
+            return p.name === "search";
+        });
+
+        // Если не найдена функция вызова
+        if (!callback) {
+            return parentPort.postMessage({status: "error", result: Error(`Callback not found for platform: ${platform}`)});
+        }
+
+        // Получаем результат запроса
+        const result = await callback.execute(payload, {
+            audio: options?.audio !== undefined ? options.audio : true,
+            limit: rest.limits[callback.name]
+        });
+
+        return parentPort.postMessage({ status: "success", result, type: callback.name });
+    } catch (err) {
+        parentPort.postMessage({status: "error", result: err});
+        throw new Error(`${err}`);
+    }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Выдача найденных платформ без функций запроса
+ */
+async function ExtractData() {
+    const fake = rest.allow;
+    const fakeReq = fake.map(api => ({
+        ...api,
+        requests: api.requests.map(request => {
+            const sanitized = { ...request };
+            Object.keys(sanitized).forEach(key => {
+                if (typeof sanitized[key] === 'function') {
+                    delete sanitized[key];
+                }
+            });
+            return sanitized;
+        })
+    }));
+
+    const data = {
+        supported: Object.fromEntries(fakeReq.map(api => [api.name, api])),
+        authorization: fakeReq.filter(api => !api.auth).map(api => api.name),
+        audio: fakeReq.filter(api => !api.audio).map(api => api.name),
+        block: []
+    };
+
+    parentPort?.postMessage(data);
 }

@@ -13,11 +13,12 @@ export class VoiceManager<Client extends DiscordClient> {
      * @readonly
      * @private
      */
-    public readonly adapters = new Map<string, DiscordGatewayAdapterLibraryMethods>();
+    private readonly adapters = new Map<string, DiscordGatewayAdapterLibraryMethods>();
 
     /**
      * @description Создание класса
      * @param client - Класс клиента
+     * @public
      */
     public constructor(private client: Client) {
         //@ts-ignore
@@ -57,6 +58,7 @@ export class VoiceManager<Client extends DiscordClient> {
     /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_SERVER_UPDATE
      * @param payload - Данные голосового состояния
+     * @public
      */
     public onVoiceServer = (payload: GatewayVoiceServerUpdateDispatchData) => {
         this.adapters.get(payload.guild_id)?.onVoiceServerUpdate(payload);
@@ -65,6 +67,7 @@ export class VoiceManager<Client extends DiscordClient> {
     /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_STATE_UPDATE
      * @param payload - Данные голосового состояния
+     * @public
      */
     public onVoiceStateUpdate = (payload: GatewayVoiceStateUpdateDispatchData) => {
         this.adapters.get(payload.guild_id)?.onVoiceStateUpdate(payload);
