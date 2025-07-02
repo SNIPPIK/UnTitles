@@ -330,6 +330,13 @@ export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
  */
 interface BaseCycleConfig<T> {
     /**
+     * @description Допустим ли drift, если требуется учитывать дрифттинг для стабилизации цикла
+     * @readonly
+     * @public
+     */
+    readonly drift: boolean;
+
+    /**
      * @description Как фильтровать объекты, вдруг объект еще не готов
      * @readonly
      * @public

@@ -31,7 +31,8 @@ export class ControllerCycles {
         public constructor() {
             super({
                 // Время до следующего прогона цикла
-                duration: OPUS_FRAME_SIZE * parseInt(env.get("player.preferred", "1")),
+                duration: OPUS_FRAME_SIZE,
+                drift: false,
 
                 // Функция проверки
                 filter: (item) => item.playing && item.voice.connection.ready,
@@ -62,6 +63,7 @@ export class ControllerCycles {
             super({
                 // Время до следующего прогона цикла
                 duration: 20e3,
+                drift: true,
 
                 // Кастомные функции (если хочется немного изменить логику выполнения)
                 custom: {
