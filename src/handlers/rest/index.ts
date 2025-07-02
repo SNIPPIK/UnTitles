@@ -51,7 +51,15 @@ export class RestObject {
      * @description Функция для инициализации worker
      * @public
      */
-    public startWorker = () => {
+    public startWorker = async () => {
+        // Если уже есть worker
+        if (this.worker) {
+            this.worker.removeAllListeners();
+            await this.worker.terminate();
+            this.worker = null;
+        }
+
+        // Создаем Worker (распараллеливание запросов Rest/API)
         this.worker = new Worker(path.resolve("src/workers/RestAPIServerThread"), {
             execArgv: ["-r", "tsconfig-paths/register"],
             workerData: { rest: true }
@@ -77,77 +85,6 @@ export class RestObject {
                 return resolve(true);
             });
         });
-    };
-
-    /**
-     * @description Получаем платформу
-     * @param name - Имя платформы
-     */
-    private platform = (name: RestServerSide.API["name"]) => {
-        const platform = this.platforms.supported[name];
-        if (platform) return platform;
-
-        return this.allow.find((api) => api.filter.exec(name) !== null);
-    };
-
-    /**
-     * @description Создание класса для взаимодействия с платформой
-     * @public
-     */
-    protected worker_request = (platform: RestServerSide.API, payload: string, options?: {audio: boolean}): Promise<Track | Track[] | Track.list | Error> => {
-        const baseAPI: RestServerSide.APIBase = {
-            name: platform.name,
-            url: platform.url,
-            color: platform.color
-        };
-
-        return new Promise((resolve) => {
-            // Передает данные запроса
-            this.worker.postMessage({
-                platform: platform.name,
-                payload,
-                options
-            });
-
-            const handleMessage = (message: RestServerSide.Result) => {
-                // Отключаем эту функцию из-за ненадобности
-                this.worker.off("message", handleMessage);
-
-                // Если в результате ошибка
-                if (message.result instanceof Error) return resolve(message.result);
-
-                // Если статус удачный
-                if (message.status === "success") {
-                    const { result } = message;
-
-                    if (Array.isArray(result)) {
-                        return resolve(result.map((item) => new Track(item, baseAPI)));
-                    }
-
-                    else if (typeof result === "object" && "items" in result) {
-                        return resolve({
-                            ...result,
-                            items: result.items.map((item) => new Track(item, baseAPI)),
-                        });
-                    }
-
-                    return resolve(new Track(result, baseAPI));
-                }
-            };
-
-            // Ждем ответ от потока
-            this.worker.on("message", handleMessage);
-        });
-    };
-
-    /**
-     * @description Создание класса для взаимодействия с платформой
-     * @return APIRequest
-     * @public
-     */
-    public request = (name: RestServerSide.API["name"]): RestClientSide.Request | null => {
-        const platform = this.platform(name);
-        return platform ? new RestClientSide.Request(platform) : null;
     };
 
     /**
@@ -193,7 +130,7 @@ export class RestObject {
 
                 // Ищем нужный трек
                 const findTrack = tracks.find((song) => {
-                    const name = song.name.toLowerCase().includes(track.name.toLowerCase());
+                    const name = song.name.toLowerCase().match(track.name.toLowerCase());
                     const time = Math.abs(song.time.total - track.time.total) <= 20;
 
                     return time || name;
@@ -232,6 +169,84 @@ export class RestObject {
             return err instanceof Error ? err : Error(`[APIs] Unexpected error ${err}`);
         }
     };
+
+    /**
+     * @description Создание класса для взаимодействия с платформой
+     * @public
+     */
+    public request = (name: RestServerSide.API["name"]): RestClientSide.Request | null => {
+        const platform = this.platform(name);
+        return platform ? new RestClientSide.Request(platform) : null;
+    };
+
+    /**
+     * @description Получаем платформу
+     * @param name - Имя платформы
+     * @private
+     */
+    private platform = (name: RestServerSide.API["name"]) => {
+        const platform = this.platforms.supported[name];
+        if (platform) return platform;
+
+        return this.allow.find((api) => api.filter.exec(name) !== null);
+    };
+
+    /**
+     * @description Создание класса для взаимодействия с платформой
+     * @protected
+     * @readonly
+     */
+    protected readonly request_worker = ({platform, payload, options}: RestClientSide.ClientOptions): Promise<Track | Track[] | Track.list | Error> => {
+        const baseAPI: RestServerSide.APIBase = {
+            name: platform.name,
+            url: platform.url,
+            color: platform.color
+        };
+
+        return new Promise((resolve) => {
+            // Передает данные запроса в другой поток
+            this.worker.postMessage({
+                platform: platform.name,
+                payload,
+                options
+            });
+
+            const handleMessage = (message: RestServerSide.Result) => {
+                // Отключаем эту функцию из-за ненадобности
+                this.worker.off("message", handleMessage);
+
+                // Если в результате ошибка
+                if (message.result instanceof Error) return resolve(message.result);
+
+                // Если статус удачный
+                else if (message.status === "success") {
+                    const { result } = message;
+
+                    // Если получен список
+                    if (Array.isArray(result)) {
+                        return resolve(result.map((item) => new Track(item, baseAPI)));
+                    }
+
+                    // Если получен плейлист или альбом
+                    else if (typeof result === "object" && "items" in result) {
+                        return resolve({
+                            ...result,
+                            items: result.items.map((item) => new Track(item, baseAPI)),
+                        });
+                    }
+
+                    // Если получен 1 объект
+                    return resolve(new Track(result, baseAPI));
+                }
+
+                // Если что-то не так
+                return null;
+            };
+
+            // Ждем ответ от потока
+            this.worker.on("message", handleMessage);
+        });
+    };
 }
 
 /**
@@ -241,6 +256,19 @@ export class RestObject {
  * @public
  */
 export namespace RestClientSide {
+    /**
+     * @author SNIPPIK
+     * @description Данные для валидного запроса паралельному процессу
+     * @interface ServerOptions
+     */
+    export interface ClientOptions {
+        platform: RestServerSide.API;
+        payload: string;
+        options?: {
+            audio: boolean
+        };
+    }
+
     /**
      * @description Авто тип, на полученные данные
      * @type ResultData
@@ -338,7 +366,13 @@ export namespace RestClientSide {
                 })?.name as RestClientSide.ResultType<T>,
 
                 // Функция запроса на Worker для получения данных
-                request: () => db.api["worker_request"](this._api, payload as any, options) as Promise<RestClientSide.ResultData<T>>
+                request: () => db.api["request_worker"](
+                    {
+                        platform: this._api,
+                        payload: payload as any,
+                        options
+                    }
+                ) as Promise<RestClientSide.ResultData<T>>
             }
         };
     }
@@ -372,18 +406,6 @@ export namespace RestServerSide {
         type: "artist" | "search" | "wave";
         result: Track.data[] | Error;
     }
-
-    /**
-     * @description Авто тип, на полученный тип запроса
-     * @type ResultAPIs
-     * @public
-     */
-    export type ResultAPIs<T> =
-        T extends "track" ? APIs.track :
-            T extends "album" ? APIs.album :
-                T extends "playlist" ? APIs.playlist :
-                    T extends "artist" ? APIs.artist :
-                        T extends "search" ? APIs.search : APIs.wave
 
     /**
      * @author SNIPPIK
@@ -541,6 +563,18 @@ export namespace RestServerSide {
             // Функция получения данных (не доступна в основном потоке)
             execute: (text: string, options: { limit: number }) => Promise<Track.data[] | Error>;
         }
+    }
+
+    /**
+     * @author SNIPPIK
+     * @description Данные для валидного запроса паралельному процессу
+     * @interface ServerOptions
+     */
+    //@ts-ignore
+    export interface ServerOptions extends RestClientSide.ClientOptions {
+        platform: API["name"];
+        // Для получения ответа с найденными платформами
+        data?: boolean;
     }
 
     /**
