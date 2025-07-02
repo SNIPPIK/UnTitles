@@ -160,6 +160,7 @@ class CacheAudio extends AsyncCycle<Track> {
      */
     public constructor(private readonly cache_dir: string) {
         super({
+            drift: true,
             custom: {
                 push: (track) => {
                     // Защита от повторного добавления
