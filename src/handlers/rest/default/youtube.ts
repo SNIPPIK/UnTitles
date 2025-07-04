@@ -362,8 +362,12 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
      * @param pattern - Условие получения ytInitialData
      */
     protected static extractInitialDataResponse = (input: string, pattern: number = 1): json | Error => {
+        // Если получена не страница
+        if (typeof input !== "string") return locale.err("api.request.fail");
+
+        // Если надо получить данные поностью
         if (pattern === 0) {
-            const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
+            const initialDataMatch = input?.match(/var ytInitialData = (.*?);<\/script>/);
             if (!initialDataMatch) return [];
 
             let initialData: Error | json;
@@ -376,7 +380,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
             return initialData;
         }
 
-        const startPattern: string = input.match("var ytInitialPlayerResponse = ") ? "var ytInitialPlayerResponse = " : "var ytInitialData = ";
+        const startPattern: string = input?.match("var ytInitialPlayerResponse = ") ? "var ytInitialPlayerResponse = " : "var ytInitialData = ";
         const startIndex = input.indexOf(startPattern);
         const endIndex = input.indexOf("};", startIndex + startPattern.length);
 

@@ -1,6 +1,6 @@
+import { WebSocketOpcodes } from "#service/voice";
 import { createSocket, type Socket } from "node:dgram";
 import { TypedEmitter } from "#structures";
-import { opcode } from "#service/voice";
 import { isIPv4 } from "node:net";
 
 /**
@@ -77,7 +77,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @description Данные подключения, полные данные пакета ready.d
      * @public
      */
-    public options: opcode.ready["d"];
+    public options: WebSocketOpcodes.ready["d"];
 
     /**
      * @description Отправка данных на сервер
@@ -105,7 +105,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @param options - Данные для подключения
      * @public
      */
-    public connect = (options: opcode.ready["d"]) => {
+    public connect = (options: WebSocketOpcodes.ready["d"]) => {
         this.keepAlive.intervalMs = options.heartbeat_interval; // Меняем интервал
 
         // Не имеет смысла создавать заново если все данные совпадают

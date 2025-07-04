@@ -1,5 +1,5 @@
 import { PLAYER_BUFFERED_TIME, Track } from "#service/player";
-import { AsyncCycle } from "#structures";
+import { PromiseCycle } from "#structures";
 import { Process } from "#service/voice";
 import afs from "node:fs/promises";
 import { env } from "#app/env";
@@ -149,10 +149,10 @@ export class CacheUtility {
  * @description Класс для сохранения аудио файлов
  * @support ogg/opus
  * @class CacheAudio
- * @extends AsyncCycle
+ * @extends PromiseCycle
  * @private
  */
-class CacheAudio extends AsyncCycle<Track> {
+class CacheAudio extends PromiseCycle<Track> {
     /**
      * @description Запускаем работу цикла
      * @constructor

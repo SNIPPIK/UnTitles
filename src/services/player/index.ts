@@ -1,11 +1,12 @@
-import { CommandInteraction, Collection, Logger } from "#structures";
+import { ControllerCycles } from "#service/player/controllers/cycle";
+import { Collection, CommandInteraction, Logger } from "#structures";
+import { QueueMessage } from "#service/player/structures/message";
 import { AudioPlayer, Queue, Track } from "#service/player";
 import { RestClientSide } from "#handler/rest";
 import { locale } from "#service/locale";
 import { Colors } from "discord.js";
 import { env } from "#app/env";
 import { db } from "#app/db";
-import {ControllerCycles} from "#service/player/controllers/cycle";
 
 export * from "./structures/track";
 export * from "./structures/queue";
@@ -45,7 +46,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @description Получаем время перезапуска и отправляем сообщения на сервера, где играет музыка!
      * @public
      */
-    public get waitReboot() {
+    public get timeout_reboot() {
         let timeout = 0;
 
         // На все сервера отправляем сообщение о перезапуске
@@ -92,7 +93,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @param player - Плеер
      * @public
      */
-    public set restartPlayer(player: AudioPlayer) {
+    public set restart_player(player: AudioPlayer) {
         // Если плеер удален из базы
         if (!this.cycles.players.has(player)) {
             // Добавляем плеер в базу цикла для отправки пакетов
@@ -130,7 +131,13 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
                     // Если добавлен плейлист
                     else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
 
-                    this.restartPlayer = queue.player;
+                    // Если разные текстовые каналы
+                    if (queue.message.channelID !== message.channelId) {
+                        // Меняем тектовый канал
+                        queue.message = new QueueMessage(message);
+                    }
+
+                    this.restart_player = queue.player;
                 });
             }
         }

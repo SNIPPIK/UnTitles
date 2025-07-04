@@ -8,6 +8,7 @@ void main();
 /**
  * @author SNIPPIK
  * @description Запуск всего проекта в async режиме
+ * @function main
  */
 function main() {
     const isManager = process.argv.includes("--ShardManager");
@@ -22,6 +23,7 @@ function main() {
 /**
  * @author SNIPPIK
  * @description Если требуется запустить менеджер осколков
+ * @function runShardManager
  */
 function runShardManager() {
     Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
@@ -31,6 +33,8 @@ function runShardManager() {
 /**
  * @author SNIPPIK
  * @description Если требуется запустить осколок
+ * @function runShard
+ * @async
  */
 async function runShard() {
     Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
@@ -66,12 +70,18 @@ async function runShard() {
 
     // Запускаем отслеживание событий процесса
     initProcessEvents(client);
+
+    // Запускаем Garbage Collector
+    setImmediate(() => {
+        if (global.gc) global.gc();
+    });
 }
 
 /**
  * @author SNIPPIK
  * @description Инициализирует события процесса (ошибки, сигналы)
  * @param client - Класс клиента
+ * @function initProcessEvents
  */
 function initProcessEvents(client: DiscordClient) {
     // Необработанная ошибка (внутри синхронного кода)
@@ -111,7 +121,7 @@ function initProcessEvents(client: DiscordClient) {
  * @author SNIPPIK
  * @description Функция проверяющая состояние очередей, для безопасного выключения
  * @param client - Класс клиента
- * @constructor
+ * @function ProcessQueues
  */
 function ProcessQueues(client: DiscordClient): boolean {
     if (db.queues.size > 0) {
@@ -119,7 +129,7 @@ function ProcessQueues(client: DiscordClient): boolean {
         client.removeAllListeners();
 
         // Время самого долгого трека из всех очередей
-        const timeout = db.queues.waitReboot;
+        const timeout = db.queues.timeout_reboot;
 
         // Если плееры играют и есть остаток от аудио
         if (timeout) {

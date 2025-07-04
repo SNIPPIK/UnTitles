@@ -2,7 +2,7 @@ import { Assign, Logger } from "#structures";
 import { Button } from "#handler/components";
 import { RepeatType } from "#service/player";
 import { locale } from "#service/locale";
-import { Colors } from "discord.js";
+import {Colors, Message} from "discord.js";
 import { db } from "#app/db";
 
 /**
@@ -178,14 +178,15 @@ class ButtonLyrics extends Assign<Button> {
 
                 // Ожидаем ответа от кода со стороны Discord
                 await message.deferReply().catch(() => {});
+                let msg: Message;
 
                 // Получаем текст песни
                 track.lyrics
 
                     // При успешном ответе
-                    .then((item) => {
+                    .then(async (item) => {
                         // Отправляем сообщение с текстом песни
-                        return message.followUp({
+                        msg = await message.followUp({
                             flags: "Ephemeral",
                             embeds: [
                                 {
@@ -204,11 +205,11 @@ class ButtonLyrics extends Assign<Button> {
                     })
 
                     // При ошибке, чтобы процесс нельзя было сломать
-                    .catch((error) => {
+                    .catch(async (error) => {
                         Logger.log("ERROR", error);
 
                         // Отправляем сообщение с текстом песни
-                        return message.followUp({
+                        msg = await message.followUp({
                             flags: "Ephemeral",
                             embeds: [
                                 {
@@ -225,6 +226,9 @@ class ButtonLyrics extends Assign<Button> {
                             ]
                         });
                     })
+
+
+                setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 40e3);
             }
         });
     };

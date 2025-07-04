@@ -95,27 +95,26 @@ export class ClientSRTPSocket {
      * @private
      */
     private get header() {
-        // Unsafe является безопасным поскольку данные будут перезаписаны
-        const rtp_packet = Buffer.allocUnsafe(12);
-        // Version + Flags, Payload Type 120 (Opus)
-        [rtp_packet[0], rtp_packet[1]] = [0x80, 0x78];
+        if (this.sequence > MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было привышения int 16
+        if (this.timestamp > MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было привышения int 32
 
-        // Последовательность
-        rtp_packet.writeUInt16BE(this.sequence, 2);
+        // Unsafe является безопасным поскольку данные будут перезаписаны
+        const RTPHead = Buffer.allocUnsafe(12);
+        // Version + Flags, Payload Type 120 (Opus)
+        [RTPHead[0], RTPHead[1]] = [0x80, 0x78];
+
+        // Записываем новую последовательность
+        RTPHead.writeUInt16BE(this.sequence, 2);
+        this.sequence = (this.sequence + 1) & 0xFFFF;
 
         // Временная метка
-        rtp_packet.writeUInt32BE(this.timestamp, 4);
-
-        // SSRC
-        rtp_packet.writeUInt32BE(this.options.ssrc, 8);
-
-        this.sequence = (this.sequence + 1) & 0xFFFF;
+        RTPHead.writeUInt32BE(this.timestamp, 4);
         this.timestamp = (this.timestamp + TIMESTAMP_INC) >>> 0;
 
-        if (this.sequence > MAX_16BIT) this.sequence = 0;
-        if (this.timestamp > MAX_32BIT) this.timestamp = 0;
+        // SSRC
+        RTPHead.writeUInt32BE(this.options.ssrc, 8);
 
-        return rtp_packet;
+        return RTPHead;
     };
 
     /**

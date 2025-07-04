@@ -92,6 +92,11 @@ if (parentPort && workerData.rest) {
 
     // Получаем ответ от основного потока
     parentPort.on("message", async (message: RestServerSide.ServerOptions) => {
+        // Запускаем Garbage Collector
+        setImmediate(() => {
+            if (global.gc) global.gc();
+        });
+
         // Если запрос к платформе
         if (message.platform) return ExtractDataFromAPI(message);
 

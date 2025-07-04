@@ -124,11 +124,8 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
-                // Отклоняем не валидные данные
-                if (packet.length < 5) continue;
-
                 // Если еще не найден заглосовок head
-                else if (!this._head_found) {
+                if (!this._head_found) {
                     // Если найден заголовок
                     if (isOpusHead(packet)) {
                         this._head_found = true;

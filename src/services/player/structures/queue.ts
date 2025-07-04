@@ -248,7 +248,7 @@ export class Queue extends BaseQueue {
                             },
                             {
                                 "type": 10,
-                                "content": `### **❯** [${name}](${url})\n**❯** ${user.username}`
+                                "content": `### ** _[${name}](${url})_ **\n-# ${user.username}`
                             }
                         ],
                         "accessory": {

@@ -42,10 +42,11 @@ export class DiscordClient extends Client {
                 }
             },
 
+            // Данный раздел не трогать, иначе вы нарушите лицензию BSD-3
             presence: {
                 afk: false,
                 status: env.get("client.status", "online"),
-                activities: [{name: " 🌟 ", type: ActivityType.Custom}]
+                activities: [{name: " 🌟 Creator: SNIPPIK", type: ActivityType.Custom}]
             },
 
             // Права бота

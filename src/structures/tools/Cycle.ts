@@ -1,4 +1,5 @@
 import { SetArray } from "#structures";
+import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -28,7 +29,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     public drift: number = 0;
 
     /**
-     * @description История дрифтов, нееобходима для высокоточного цикла
+     * @description История дрифтов, необходима для высокоточного цикла
      * @private
      */
     private driftHistory: number[] = [];
@@ -38,27 +39,6 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @private
      */
     private missCounter: number = 0;
-
-    /**
-     * @description Проверяем наличия данных в цикле
-     * @readonly
-     * @private
-     */
-    private get cleaned(): boolean {
-        // Если нет объектов
-        if (this.size === 0) {
-            this.startTime = 0;
-            this.loop = 0;
-
-            // Чистимся от drift состовляющих
-            this.drift = 0;
-            this.missCounter = 0;
-            this.driftHistory.splice(0, this.driftHistory.length);
-            return true;
-        }
-
-        return false;
-    };
 
     /**
      * @description Метод получения времени для обновления времени цикла
@@ -92,6 +72,23 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     };
 
     /**
+     * @description Чистка цикла от всего
+     * @public
+     */
+    public reset = (): void => {
+        // Удаляем все обьекты
+        for (const item of this) this.delete(item);
+
+        this.startTime = 0;
+        this.loop = 0;
+
+        // Чистимся от drift состовляющих
+        this.drift = 0;
+        this.missCounter = 0;
+        this.driftHistory.splice(0, this.driftHistory.length);
+    };
+
+    /**
      * @description Выполняет шаг цикла с учётом точного времени следующего запуска
      * @protected
      * @abstract
@@ -105,7 +102,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      */
     protected readonly _stepCheckTimeCycle = (duration: number) => {
         // Проверяем цикл на наличие объектов
-        if (this.cleaned) return;
+        if (this.size === 0) return this.reset();
 
         // Номер прогона цикла
         this.loop++;
@@ -130,7 +127,14 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      */
     protected readonly _stepCheckTimeCycleDrift = (duration: number) => {
         // Проверяем цикл на наличие объектов
-        if (this.cleaned) return;
+        if (this.size === 0) {
+            // Запускаем Garbage Collector
+            setImmediate(() => {
+                if (global.gc) global.gc();
+            });
+
+            return this.reset();
+        }
 
         const nextTime = (this.startTime + this.loop) - this.drift;
         const delay = Math.max(0, nextTime - this.time);
@@ -144,31 +148,31 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
             return;
         }
 
-        // Если кол-во дрифта более 1
-        else if (this.driftHistory.length > 0) {
-            // Сброс drift, для стабилизации цикла
-            if (this.missCounter > 20) {
-                this.drift = 0;
-                this.missCounter = 0;
-                this.driftHistory.splice(0, this.driftHistory.length);
+        // Сброс drift, для стабилизации цикла
+        else if (this.missCounter > 10) {
+            this.missCounter = 0;
+            this.driftHistory.splice(0, this.driftHistory.length);
 
-                setTimeout(this._stepCycle, delay);
+            if (Math.abs(delay - duration) > 1) {
+                setTimeout(this._stepCycle, duration);
                 return;
             }
-
-            // Считаем среднее значение дрифта
-            this.drift = this.driftHistory.reduce((a, b) => a + b, 0) / this.driftHistory.length;
-            this.missCounter++;
         }
 
         // Иначе ждем нужное время
         setTimeout(() => {
-            const drift = (this.time - nextTime) - this.drift;
+            const drift = this.time - (nextTime - this.drift);
 
-            // Если отставание более 0.12 ms
-            if (drift > 0.12) {
+            // Если отставание более 0 ms
+            if (drift > 0.15 && this.loop > duration) {
+                this.missCounter++;
                 this.driftHistory.push(drift);
+
+                // Удаляем старый drift
                 if (this.driftHistory.length > 10) this.driftHistory.shift();
+
+                // Считаем среднее значение дрифта
+                this.drift = this.driftHistory.reduce((a, b) => a + b, 0) / this.driftHistory.length;
             }
 
             return this._stepCycle();
@@ -179,17 +183,17 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 /**
  * @author SNIPPIK
  * @description Класс для удобного управления циклами
- * @class SyncCycle
+ * @class TaskCycle
  * @abstract
  * @public
  */
-export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
+export abstract class TaskCycle<T = unknown> extends BaseCycle<T> {
     /**
      * @description Создаем класс и добавляем параметры
      * @param options - Параметры для работы класса
      * @protected
      */
-    protected constructor(public readonly options: SyncCycleConfig<T>) {
+    protected constructor(public readonly options: TaskCycleConfig<T>) {
         super();
     };
 
@@ -229,8 +233,10 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
      * @private
      */
     protected _stepCycle = async () => {
+        await this.options?.custom?.step?.();
+
         // Запускаем цикл
-        for await (const item of this) {
+        for (const item of this) {
             // Если объект не готов
             if (!this.options.filter(item)) continue;
 
@@ -251,17 +257,17 @@ export abstract class SyncCycle<T = unknown> extends BaseCycle<T> {
 /**
  * @author SNIPPIK
  * @description Класс для удобного управления promise циклами
- * @class AsyncCycle
+ * @class PromiseCycle
  * @abstract
  * @public
  */
-export abstract class AsyncCycle<T = unknown> extends BaseCycle<T> {
+export abstract class PromiseCycle<T = unknown> extends BaseCycle<T> {
     /**
      * @description Создаем класс и добавляем параметры
      * @param options - Параметры для работы класса
      * @protected
      */
-    protected constructor(public readonly options: AsyncCycleConfig<T>) {
+    protected constructor(public readonly options: PromiseCycleConfig<T>) {
         super();
     };
 
@@ -364,6 +370,13 @@ interface BaseCycleConfig<T> {
          * @public
          */
         readonly remove?: (item: T) => void;
+
+        /**
+         * @description Данная функция расширяет функционал шага, выполняется перед шагом
+         * @readonly
+         * @public
+         */
+        readonly step?: () => Promise<void>;
     }
 }
 
@@ -372,7 +385,7 @@ interface BaseCycleConfig<T> {
  * @description Интерфейс для опций SyncCycle
  * @private
  */
-interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
+interface TaskCycleConfig<T> extends BaseCycleConfig<T> {
     /**
      * @description Функция для выполнения
      * @readonly
@@ -385,7 +398,7 @@ interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
      * @readonly
      * @public
      */
-    readonly duration: number;
+    duration: number;
 }
 
 /**
@@ -393,7 +406,7 @@ interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
  * @description Интерфейс для опций AsyncCycle
  * @private
  */
-interface AsyncCycleConfig<T> extends BaseCycleConfig<T> {
+interface PromiseCycleConfig<T> extends BaseCycleConfig<T> {
     /**
      * @description Функция для выполнения
      * @readonly

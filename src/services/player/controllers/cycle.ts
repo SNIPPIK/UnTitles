@@ -1,7 +1,6 @@
-import { CycleInteraction, Logger, SyncCycle } from "#structures";
+import { CycleInteraction, Logger, TaskCycle } from "#structures";
 import { OPUS_FRAME_SIZE } from "#service/voice";
 import { AudioPlayer } from "#service/player";
-import { env } from "#app/env";
 import { db } from "#app/db";
 
 /**
@@ -15,17 +14,24 @@ export class ControllerCycles {
      * @author SNIPPIK
      * @description Цикл для работы плеера, необходим для отправки пакетов
      * @class AudioPlayers
-     * @extends SyncCycle
+     * @extends TaskCycle
      * @readonly
      * @public
      */
-    public readonly players = new class AudioPlayers<T extends AudioPlayer> extends SyncCycle<T> {
+    public readonly players = new class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
+        /**
+         * @description Время последней смены времени цикла
+         * @private
+         */
+        private _stepTimestamp: number = 0;
+
         /**
          * @description Указываем свое полученеие времени
          * @protected
          */
         protected get time() {
             return Number(process.hrtime.bigint()) / 1e6;
+            //return performance.now();
         };
 
         public constructor() {
@@ -34,17 +40,58 @@ export class ControllerCycles {
                 duration: OPUS_FRAME_SIZE,
                 drift: false,
 
+                // Кастомные функции (если хочется немного изменить логику выполнения)
+                custom: {
+                    step: async () => {
+                        const drift = this.drift;
+
+                        // Если цикл уходит от оригинала, подстраиваем плееры
+                        // 1 - Много
+                        // 0.2 - 0.3 - Допустимо
+                        if (drift > 1) {
+                            const frames = (Math.ceil(drift / OPUS_FRAME_SIZE) + 1) * OPUS_FRAME_SIZE;
+
+                            // Если текущее не совпадает с новым
+                            if (frames !== this.options.duration) {
+                                // Устанавливаем время шага для поддержкания
+                                this._stepTimestamp = Date.now() + 700;
+
+                                // Меняем время цикла
+                                this.options.duration = frames;
+
+                                Logger.log("WARN", `[Cycle/Players]: Switch ${frames} ms timer`);
+                            }
+                        }
+
+                        // Сброс таймера
+                        else if (this.options.duration !== OPUS_FRAME_SIZE) {
+
+                            // Защищаемся от спама
+                            if (this._stepTimestamp < Date.now()) {
+                                setImmediate(() => {
+                                    this.options.duration = OPUS_FRAME_SIZE;
+
+                                    Logger.log("WARN", `[Cycle/Players]: Switch ${OPUS_FRAME_SIZE} ms timer`);
+                                });
+                            }
+                        }
+                    }
+                },
+
                 // Функция проверки
                 filter: (item) => item.playing && item.voice.connection.ready,
 
                 // Функция отправки аудио фрейма
                 execute: (player) => {
                     const connection = player.voice.connection;
+                    const size = this.options.duration / OPUS_FRAME_SIZE;
+                    let i = 0;
 
-                    // Отправляем пакет в голосовой канал
-                    for (let i = 0; i < this.options.duration / OPUS_FRAME_SIZE; i++) {
+                    // Отправляем пакет/ы в голосовой канал
+                    do {
                         connection.packet = player.audio.current.packet;
-                    }
+                        i++;
+                    } while (i < size);
                 }
             });
         };
@@ -54,17 +101,16 @@ export class ControllerCycles {
      * @author SNIPPIK
      * @description Цикл для обновления сообщений, необходим для красивого прогресс бара. :D
      * @class Messages
-     * @extends SyncCycle
+     * @extends TaskCycle
      * @readonly
      * @public
      */
-    public readonly messages = new class Messages<T extends CycleInteraction> extends SyncCycle<T> {
+    public readonly messages = new class Messages<T extends CycleInteraction> extends TaskCycle<T> {
         public constructor() {
             super({
                 // Время до следующего прогона цикла
                 duration: 20e3,
                 drift: true,
-
                 // Кастомные функции (если хочется немного изменить логику выполнения)
                 custom: {
                     remove: async (item) => {

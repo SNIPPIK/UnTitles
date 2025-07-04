@@ -51,20 +51,20 @@
 #### 🌍 Локализация
 - Доступные языки: `English`, `Русский` ([файл с языками](src/services/locale/languages.json))
 - Можно добавить любой язык поддерживаемый discord
----
-# 🔩 Прочий функционал
-#### Handler - загрузчик
-- Универсальный загрузчик: [`commands`](src/handlers/commands), [`events`](src/handlers/events), [`components`](src/handlers/components), [`middlewares`](src/handlers/middlewares), [`rest`](src/handlers/rest)
-- Поддержка "горячей" перезагрузки
 
+---
+
+# 🔩 Прочий функционал
 #### Своя система [handlers](src/handlers)
+- Универсальный загрузчик: [`commands`](src/handlers/commands), [`events`](src/handlers/events), [`components`](src/handlers/components), [`middlewares`](src/handlers/middlewares), [`rest`](src/handlers/rest)
 - Используются декораторы и интерфейсы, включая типизацию
-- Есть поддержка Options, Autocomplete
+- Поддержка "горячей" перезагрузки
 
 #### ⚙️ Внутренние инструменты
 - [`SetArray`](src/structures/tools/SetArray.ts) - Обьединение Array и Set в один класс
 - [`Cycle`](src/structures/tools/Cycle.ts) - Управляет системой обновления сообщений и отправкой аудио пакетов
 - [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - типизированный `EventEmitterAsyncResource`
+
 ---
 
 ## 🎛 Интерфейс

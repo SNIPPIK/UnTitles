@@ -1,8 +1,9 @@
 import { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData } from "discord-api-types/v10";
 import { VoiceAdapter, DiscordGatewayAdapterCreator } from "./adapter";
-import { ClientWebSocket, opcode } from "./sockets/ClientWebSocket";
-import { ClientUDPSocket } from "./sockets/ClientUDPSocket";
 import { ClientSRTPSocket } from "./sockets/ClientSRTPSocket";
+import { ClientWebSocket } from "./sockets/ClientWebSocket";
+import { ClientUDPSocket } from "./sockets/ClientUDPSocket";
+import { WebSocketOpcodes } from "#service/voice/index";
 import { VoiceOpcodes } from "discord-api-types/voice";
 
 /**
@@ -14,6 +15,7 @@ import { VoiceOpcodes } from "discord-api-types/voice";
 export class VoiceConnection {
     /**
      * @description Функции для общения с websocket клиента
+     * @readonly
      * @public
      */
     public readonly adapter: VoiceAdapter = new VoiceAdapter();
@@ -53,7 +55,7 @@ export class VoiceConnection {
      * @private
      */
     private _attention = {
-        ssrc: 0 as number,
+        ssrc: null as number,
         secret_key: null as number[],
     };
 
@@ -79,8 +81,12 @@ export class VoiceConnection {
     public set packet(packet: Buffer) {
         if (this._status === VoiceConnectionStatus.ready && packet) {
             this.speaking = true;
-            this.udpClient.packet = this.rtpClient.packet(packet);
             this.resetSpeakingTimeout();
+
+            // Если есть клиенты для шифрования и отправки
+            if (this.udpClient && this.rtpClient) {
+                this.udpClient.packet = this.rtpClient.packet(packet);
+            }
         }
     };
 
@@ -108,6 +114,7 @@ export class VoiceConnection {
         // Если нельзя по состоянию или уже бот говорит
         if (this._speaking === speaking) return;
 
+        // Меняем состояние спикера
         this._speaking = speaking;
         this.configuration.self_mute = !speaking;
 
@@ -138,6 +145,7 @@ export class VoiceConnection {
     /**
      * @description Смена голосового канала
      * @param ID - уникальный код канала
+     * @public
      */
     public set swapChannel(ID: string) {
         // Прописываем новый id канала
@@ -204,7 +212,7 @@ export class VoiceConnection {
      * @private
      */
     private createWebSocket = (endpoint: string) => {
-        this.websocket.connect(`wss://${endpoint}?v=8`); // Подключаемся к endpoint
+        this.websocket.connect(`wss://${endpoint}`); // Подключаемся к endpoint
 
         // Если включен debug режим
         //this.websocket.on("debug", console.log);
@@ -250,9 +258,7 @@ export class VoiceConnection {
 
             // Если уже есть активный RTP
             if (this.rtpClient) {
-                // Если текущие данные совпадают с прошлыми
-                if (d.secret_key === this._attention.secret_key) return;
-
+                this.rtpClient.destroy();
                 this.rtpClient = null;
             }
 
@@ -325,7 +331,7 @@ export class VoiceConnection {
      * @description Создание udp подключения
      * @param d - Пакет opcode.ready
      */
-    private createUDPSocket = (d: opcode.ready["d"]) => {
+    private createUDPSocket = (d: WebSocketOpcodes.ready["d"]) => {
         this.udpClient.connect(d); // Подключаемся по UDP к серверу
 
         /**
