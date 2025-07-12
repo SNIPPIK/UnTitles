@@ -300,6 +300,29 @@ export function CommandDeclare(options: SlashCommand.Options) {
         target.prototype["description_localizations"] = description_localizations;
         target.prototype["integration_types"] = options.integration_types ? options.integration_types.map((type) => type === "GUILD_INSTALL" ? 0 : 1) : [0];
         target.prototype["contexts"] = options.contexts ? options.contexts.map((type) => type === "GUILD" ? 0 : type === "BOT_DM" ? 1 : 2) : [0];
+
+
+        // Если надо создать простую команду
+        if (options.options?.length > 0) {
+            target.prototype["autocomplete"] = options.autocomplete;
+
+            // Если нет options — создаём массив
+            if (!Array.isArray(target.prototype.options)) {
+                target.prototype.options = [];
+            }
+
+            // Парсим данные для правильной работы api
+            const transformed = options.options.map(opt => ({
+                ...opt,
+                name: opt.names[Object.keys(opt.names)[0] as Locale],
+                nameLocalizations: opt.names,
+                description: opt.descriptions[Object.keys(opt.descriptions)[0] as Locale],
+                descriptionLocalizations: opt.descriptions,
+            }));
+
+            // Добавляем новый объект
+            target.prototype.options.push(...transformed);
+        }
     };
 }
 
@@ -368,6 +391,18 @@ export namespace SlashCommand {
          * @private
          */
         default_member_permissions?: Permissions | null | undefined;
+
+        /**
+         * @description Доп команды к команде или к подкоманде. Внимание нельзя нарушать структуру discord а то команды не будут приняты
+         * @public
+         */
+        options?: Component[];
+
+        /**
+         * @description Если ли возможность редактировать данные ввода
+         * @public
+         */
+        autocomplete?: boolean;
 
         /**
          * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.

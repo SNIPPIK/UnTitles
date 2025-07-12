@@ -21,7 +21,22 @@ import { db } from "#app/db";
         "en-US": "Turning on music, or searching for music!",
         "ru": "Включение музыки, или поиск музыки!"
     },
-    integration_types: ["GUILD_INSTALL"]
+    integration_types: ["GUILD_INSTALL"],
+    options: [
+        {
+            names: {
+                "en-US": "request",
+                "ru": "запрос"
+            },
+            descriptions: {
+                "en-US": "You must specify the link or the name of the track!",
+                "ru": "Необходимо указать ссылку или название трека!"
+            },
+            required: true,
+            type: ApplicationCommandOptionType["String"],
+            autocomplete: true
+        }
+    ]
 })
 class PlayCommand extends Assign< BaseCommand > {
     public constructor() {
