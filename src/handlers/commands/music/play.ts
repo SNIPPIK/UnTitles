@@ -1,13 +1,13 @@
 import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType, Colors } from "discord.js";
+import { RestClientSide, RestServerSide } from "#handler/rest";
+import { Assign, CompeteInteraction } from "#structures";
 import { locale } from "#service/locale";
-import { Assign } from "#structures";
 import { db } from "#app/db";
-import * as console from "node:console";
 
 /**
  * @author SNIPPIK
- * @description Включение музыки
+ * @description Базовое включение музыки
  * @class PlayCommand
  * @extends Assign
  * @public
@@ -23,10 +23,89 @@ import * as console from "node:console";
     },
     integration_types: ["GUILD_INSTALL"]
 })
+class PlayCommand extends Assign< BaseCommand > {
+    public constructor() {
+        super({
+            middlewares: ["voice", "another_voice"],
+            permissions: {
+                client: ["Connect", "SendMessages", "Speak", "ViewChannel"],
+            },
+            execute: async ({message, args}) => {
+                const platform = this.getPlatform(args);
+
+                if (!platform) return null;
+
+                // Если платформа заблокирована
+                if (platform.block) {
+                    db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.block"));
+                    return null;
+                }
+
+                // Если есть проблема с авторизацией на платформе
+                else if (!platform.auth) {
+                    db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.auth"));
+                    return null;
+                }
+
+                await message.deferReply().catch(() => {});
+                db.events.emitter.emit("rest/request", platform, message, args[0]);
+                return null;
+            },
+            autocomplete: async ({message, args}) => {
+                const platform = this.getPlatform(args);
+                return allAutoComplete(message, platform, args[0]);
+            }
+        });
+    };
+
+    /**
+     * @description Получение платформы из поиска
+     * @param args - Что запросил пользователь
+     */
+    private readonly getPlatform = (args: any[]) => {
+        let platform: RestClientSide.Request;
+
+        // Если ссылка
+        if (args[0].startsWith("http")) {
+            const api = db.api.allow.find((pl) => pl.filter.exec(args[0]));
+
+            // Если нет поддержки такой платформы
+            if (!api) return null;
+
+            platform = db.api.request(api.name);
+        }
+
+        // Если указан текст
+        else {
+            platform = db.api.request("YOUTUBE");
+        }
+
+        return platform;
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Расширенное включение музыки
+ * @class PlayControl
+ * @extends Assign
+ * @public
+ */
+@CommandDeclare({
+    names: {
+        "en-US": "playctl",
+        "ru": "playctl"
+    },
+    descriptions: {
+        "en-US": "Advanced control of music inclusion!",
+        "ru": "Расширенное управление включение музыки!"
+    },
+    integration_types: ["GUILD_INSTALL"]
+})
 @CommandOptions({
     names: {
-        "en-US": "api",
-        "ru": "платформа"
+        "en-US": "search",
+        "ru": "поиск"
     },
     descriptions: {
         "en-US": "Turn on music by link or title!",
@@ -66,28 +145,6 @@ import * as console from "node:console";
             autocomplete: true
         }
     ],
-})
-@CommandOptions({
-    type: ApplicationCommandOptionType.Subcommand,
-    names: {
-        "en-US": "replay",
-        "ru": "заново"
-    },
-    descriptions: {
-        "en-US": "Restart queue!!! Necessary for re-enabling if playback has been completed!",
-        "ru": "Перезапуск очереди!!! Необходимо для повторного включения если проигрывание было завершено!"
-    },
-})
-@CommandOptions({
-    type: ApplicationCommandOptionType.Subcommand,
-    names: {
-        "en-US": "stop",
-        "ru": "стоп"
-    },
-    descriptions: {
-        "en-US": "Forced termination of music playback!",
-        "ru": "Принудительное завершение проигрывания музыки!"
-    },
 })
 @CommandOptions({
     type: ApplicationCommandOptionType.Subcommand,
@@ -133,7 +190,29 @@ import * as console from "node:console";
         }
     ]
 })
-class PlayCommand extends Assign< BaseCommand > {
+@CommandOptions({
+    type: ApplicationCommandOptionType.Subcommand,
+    names: {
+        "en-US": "replay",
+        "ru": "заново"
+    },
+    descriptions: {
+        "en-US": "Restart queue!!! Necessary for re-enabling if playback has been completed!",
+        "ru": "Перезапуск очереди!!! Необходимо для повторного включения если проигрывание было завершено!"
+    },
+})
+@CommandOptions({
+    type: ApplicationCommandOptionType.Subcommand,
+    names: {
+        "en-US": "stop",
+        "ru": "стоп"
+    },
+    descriptions: {
+        "en-US": "Forced termination of music playback!",
+        "ru": "Принудительное завершение проигрывания музыки!"
+    },
+})
+class PlayControl extends Assign<BaseCommand<RestServerSide.APIBase["name"]>> {
     public constructor() {
         super({
             middlewares: ["voice", "another_voice"],
@@ -219,7 +298,7 @@ class PlayCommand extends Assign< BaseCommand > {
                         // Если есть проблема с авторизацией на платформе
                         else if (!platform.auth) {
                             db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.auth"));
-                            break
+                            break;
                         }
 
                         await message.deferReply().catch(() => {});
@@ -241,65 +320,79 @@ class PlayCommand extends Assign< BaseCommand > {
                         // Если есть проблема с авторизацией на платформе
                         else if (!platform.auth) {
                             db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.auth"));
-                            break
+                            break;
                         }
 
                         await message.deferReply().catch(() => {});
                         db.events.emitter.emit("rest/request", platform, message, args[1]);
-
                         break;
                     }
                 }
                 return null;
             },
             autocomplete: async ({message, args}) => {
-                // Запрос к платформе
                 const platform = db.api.request(args[0] as any);
-
-                // Если платформа заблокирована
-                if (platform.block || !platform.auth) return;
-
-                // Получаем функцию запроса данных с платформы
-                const api = platform.request(args[1], {audio: false});
-
-                if (!api.type) return;
-
-                try {
-                    // Получаем данные в системе rest/API
-                    const rest = await api.request();
-                    const items: { value: string; name: string }[] = [];
-
-                    // Если получена ошибка или нет данных
-                    if (rest instanceof Error || !rest) return;
-
-                    // Обработка массива данных
-                    if (Array.isArray(rest)) {
-                        const tracks = rest.map((choice) => ({
-                            value: choice.url,
-                            name: `🎵 (${choice.time.split}) | ${choice.artist.title.slice(0, 20)} - ${choice.name.slice(0, 60)}`
-                        }));
-                        items.push(...tracks);
-                    }
-
-                    // Показываем плейлист
-                    else if ("items" in rest) items.push({ name: `🎶 [${rest.items.length}] - ${rest.title.slice(0, 70)}`, value: rest.url });
-
-                    // Показываем трек
-                    else items.push({ name: `🎵 (${rest.time.split}) | ${rest.artist.title.slice(0, 20)} - ${rest.name.slice(0, 60)}`, value: rest.url });
-
-                    // Отправка ответа
-                    await message.respond(items);
-                } catch (err) {
-                    console.error(err);
-                    return null;
-                }
+                return allAutoComplete(message, platform, args[1]);
             }
         });
     };
 }
 
 /**
+ * @author SNIPPIK
+ * @description Отправка данных в зависимости от текста пользователя
+ * @param message - Сообщение
+ * @param platform - Платформа
+ * @param search - Текст или ссылка пользователя
+ */
+async function allAutoComplete(message: CompeteInteraction, platform: RestClientSide.Request, search: string) {
+    // Если платформа заблокирована
+    if (platform.block || !platform.auth) return;
+
+    // Получаем функцию запроса данных с платформы
+    const api = platform.request(search, {audio: false});
+
+    if (!api.type) return;
+
+    try {
+        // Получаем данные в системе rest/API
+        const rest = await api.request();
+        const items: { value: string; name: string }[] = [];
+
+        // Если получена ошибка или нет данных
+        if (rest instanceof Error || !rest) return;
+
+        // Обработка массива данных
+        if (Array.isArray(rest)) {
+            const tracks = rest.map((choice) => ({
+                value: choice.url,
+                name: `🎵 (${choice.time.split}) | ${choice.artist.title.slice(0, 20)} - ${choice.name.slice(0, 60)}`
+            }));
+            items.push(...tracks);
+        }
+
+        // Показываем плейлист
+        else if ("items" in rest) items.push({
+            name: `🎶 [${rest.items.length}] - ${rest.title.slice(0, 70)}`,
+            value: rest.url
+        });
+
+        // Показываем трек
+        else items.push({
+                name: `🎵 (${rest.time.split}) | ${rest.artist.title.slice(0, 20)} - ${rest.name.slice(0, 60)}`,
+                value: rest.url
+            });
+
+        // Отправка ответа
+        await message.respond(items);
+    } catch (err) {
+        console.error(err);
+        return null;
+    }
+}
+
+/**
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default [ PlayCommand ];
+export default [ PlayCommand, PlayControl ];

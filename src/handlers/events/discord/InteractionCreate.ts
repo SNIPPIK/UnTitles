@@ -219,7 +219,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             });
 
             // Если аргумент пустой
-            if (!args && args[0] === "" || !args[1] && args[1] === "") return null;
+            if (!args || args[0] === "" || !args[1] || args[1] === "") return null;
 
             return command.autocomplete({
                 message: ctx,
