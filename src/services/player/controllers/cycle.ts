@@ -1,5 +1,6 @@
-import { CycleInteraction, Logger, TaskCycle } from "#structures";
+import { CycleInteraction } from "#structures/discord";
 import { OPUS_FRAME_SIZE } from "#service/voice";
+import { Logger, TaskCycle } from "#structures";
 import { AudioPlayer } from "#service/player";
 import { db } from "#app/db";
 
