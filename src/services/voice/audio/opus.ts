@@ -243,8 +243,8 @@ export class PipeEncoder extends Transform {
      * @description Создаем класс
      * @public
      */
-    public constructor(options: TransformOptions = { autoDestroy: true, readableObjectMode: true }) {
-        super(options);
+    public constructor(options: TransformOptions = { autoDestroy: true }) {
+        super(Object.assign(options, { readableObjectMode: true }));
 
         this.encoder.on("head", this.emit.bind(this, "head"));
         this.encoder.on("tags", this.emit.bind(this, "tags"));
