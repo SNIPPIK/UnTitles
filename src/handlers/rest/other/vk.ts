@@ -50,7 +50,7 @@ class RestVKAPI extends Assign<RestServerSide.API> {
         super({...RestVKAPI._platform,
             audio: true,
             auth: !!RestVKAPI.authorization.token,
-            filter: /^(https?:\/\/)?(vk\.com)\/.+$/gi,
+            filter: /^(https?:\/\/)?(vk\.com)\/.+$/i,
 
             requests: [
                 /**
@@ -59,9 +59,9 @@ class RestVKAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "track",
-                    filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi,
+                    filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i,
                     execute: (url, options) => {
-                        const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/gi.exec(url).pop();
+                        const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i.exec(url).pop();
 
                         return new Promise(async (resolve) => {
                             //Если ID трека не удалось извлечь из ссылки

@@ -101,7 +101,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "playlist",
-                    filter: /sets\/[a-zA-Z0-9]+/gi, // https://soundcloud.com/neffexmusic/neffex-save-a-life-
+                    filter: /sets\/[a-zA-Z0-9]+/i, // https://soundcloud.com/neffexmusic/neffex-save-a-life-
                     execute: (url: string, {limit}) => {
                         const fixed = url.split("?")[0];
 

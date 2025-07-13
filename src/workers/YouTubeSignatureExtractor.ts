@@ -11,7 +11,7 @@ import { Script } from "node:vm";
 const mRegex = (pattern: string | RegExp, text: string): string | null => {
     const match = text.match(pattern);
     if (!match || match.length < 2) return null;
-    return match[1].replace(/\$/g, "\\$");
+    return match[1].replace(/\$/i, "\\$");
 };
 
 
@@ -79,7 +79,7 @@ export class Youtube_decoder_native {
 
                     const quotedFunctions = [reverseKey, sliceKey, spliceKey, swapKey]
                         .filter(Boolean)
-                        .map(key => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+                        .map(key => key.replace(/[.*+?^${}()|[\]\\]/i, '\\$&'));
 
                     if (quotedFunctions.length === 0) return null;
 

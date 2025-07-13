@@ -58,7 +58,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
         super({ ...RestSpotifyAPI._platform,
             audio: false,
             auth: !!RestSpotifyAPI.authorization.auth,
-            filter: /^(https?:\/\/)?(open\.)?(m\.)?(spotify\.com|spotify\.?ru)\/.+$/gi,
+            filter: /^(https?:\/\/)?(open\.)?(m\.)?(spotify\.com|spotify\.?ru)\/.+$/i,
 
             requests: [
                 /**
@@ -291,7 +291,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                 url: track["artists"][0]["external_urls"]["spotify"]
             },
             time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
-            image: track.album.images.sort((item1: any, item2: any) => item1.width > item2.width)[0],
+            image: (track.album?.images ?? track?.images).sort((item1: any, item2: any) => item1.width > item2.width)[0],
         };
     };
 }

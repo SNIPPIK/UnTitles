@@ -50,7 +50,7 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
         super({ ...RestYandexAPI._platform,
             audio: true,
             auth: !!RestYandexAPI.authorization.token,
-            filter: /^(https?:\/\/)?(music\.)?(yandex\.ru)\/.+$/gi,
+            filter: /^(https?:\/\/)?(music\.)?(yandex\.ru)\/.+$/i,
 
             requests: [
                 /**
@@ -59,7 +59,7 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "track",
-                    filter: /track\/[0-9]+/gi,
+                    filter: /track\/[0-9]+/i,
                     execute: (url, options) => {
                         const ID = /track\/[0-9]+/gi.exec(url)[0]?.split("track")?.at(1);
 
@@ -125,9 +125,9 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "album",
-                    filter: /(album)\/[0-9]+/gi,
+                    filter: /(album)\/[0-9]+/i,
                     execute: (url, {limit}) => {
-                        const ID = /[0-9]+/gi.exec(url)?.at(0)?.split("album")?.at(0);
+                        const ID = /[0-9]+/i.exec(url)?.at(0)?.split("album")?.at(0);
 
                         return new Promise(async (resolve) => {
                             // Если ID альбома не удалось извлечь из ссылки
@@ -159,9 +159,9 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "playlist",
-                    filter: /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/gi,
+                    filter: /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/i,
                     execute: (url, {limit}) => {
-                        const ID = /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/gi.exec(url);
+                        const ID = /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/i.exec(url);
 
                         return new Promise(async (resolve) => {
                             if (!ID[1]) return resolve(locale.err("api.request.id.author"));
@@ -199,9 +199,9 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "artist",
-                    filter: /(artist)\/[0-9]+/gi,
+                    filter: /(artist)\/[0-9]+/i,
                     execute: (url, {limit}) => {
-                        const ID = /(artist)\/[0-9]+/gi.exec(url)?.at(0)?.split("artist")?.at(0);
+                        const ID = /(artist)\/[0-9]+/i.exec(url)?.at(0)?.split("artist")?.at(0);
 
                         return new Promise(async (resolve) => {
                             // Если ID автора не удалось извлечь из ссылки
