@@ -2,6 +2,7 @@
   "name": "untitles",
   "version": "0.3.0-rc4",
   "homepage": "https://github.com/SNIPPIK/UnTitles",
+  "bugs": "https://github.com/SNIPPIK/UnTitles/issues",
   "author": {
     "name": "SNIPPIK",
     "url": "https://github.com/SNIPPIK"
@@ -9,6 +10,7 @@
   "license": "BSD-3-Clause",
   "preferGlobal": true,
   "engineStrict": true,
+  "types": "src/index.ts",
   "engines": {
     "node": ">=23.0.0"
   },
@@ -18,7 +20,7 @@
     "undici": "^7.11.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.10",
+    "@types/node": "^24.0.13",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },

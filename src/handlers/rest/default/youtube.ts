@@ -37,6 +37,64 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
 
             requests: [
                 /**
+                 * @description Запрос данных об плейлисте
+                 * @type "playlist"
+                 */
+                {
+                    name: "playlist",
+                    filter: /playlist\?list=[a-zA-Z0-9-_]+/i,
+                    execute: (url: string, {limit}) => {
+                        const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/i).pop();
+                        let artist = null;
+
+                        return new Promise(async (resolve) => {
+                            try {
+                                // Если ID плейлиста не удалось извлечь из ссылки
+                                if (!ID) return resolve(locale.err("api.request.id.playlist"));
+
+                                const api = await RestYouTubeAPI.API(`https://www.youtube.com/${ID}`)
+
+                                // Если при запросе была получена ошибка
+                                if (api instanceof Error) return resolve(api);
+
+                                // Данные о плейлисте
+                                const playlist = api["microformat"]["microformatDataRenderer"];
+
+                                // Необработанные видео
+                                const videos: any[] = api["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]
+                                    .content["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"];
+
+                                // Все доступные видео в плейлисте
+                                const items = videos.splice(0, limit).map(({playlistVideoRenderer}) => RestYouTubeAPI.track(playlistVideoRenderer));
+
+                                // Раздел с данными автора
+                                const author = api["sidebar"]["playlistSidebarRenderer"]["items"];
+
+                                // Если авторов в плейлисте больше 1
+                                if (author.length > 1) {
+                                    const authorData = author[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
+
+                                    // Получаем истинные данные об авторе плейлиста
+                                    artist = await RestYouTubeAPI.getChannel({
+                                        id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"],
+                                        name: authorData.title["runs"][0].text
+                                    });
+                                }
+
+                                return resolve({
+                                    url, items,
+                                    title: playlist.title,
+                                    image: playlist.thumbnail["thumbnails"].pop(),
+                                    artist: artist ?? items.at(-1).artist
+                                });
+                            } catch (e) {
+                                return resolve(new Error(`[APIs]: ${e}`))
+                            }
+                        });
+                    }
+                },
+
+                /**
                  * @description Запрос треков из волны, для выполнения требуется указать list=RD в ссылке
                  * @type "wave"
                  */
@@ -144,64 +202,6 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                                 }
 
                                 return resolve(track);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
-                            }
-                        });
-                    }
-                },
-
-                /**
-                 * @description Запрос данных об плейлисте
-                 * @type "playlist"
-                 */
-                {
-                    name: "playlist",
-                    filter: /playlist\?list=[a-zA-Z0-9-_]+/i,
-                    execute: (url: string, {limit}) => {
-                        const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/i).pop();
-                        let artist = null;
-
-                        return new Promise(async (resolve) => {
-                            try {
-                                // Если ID плейлиста не удалось извлечь из ссылки
-                                if (!ID) return resolve(locale.err("api.request.id.playlist"));
-
-                                const api = await RestYouTubeAPI.API(`https://www.youtube.com/${ID}`)
-
-                                // Если при запросе была получена ошибка
-                                if (api instanceof Error) return resolve(api);
-
-                                // Данные о плейлисте
-                                const playlist = api["microformat"]["microformatDataRenderer"];
-
-                                // Необработанные видео
-                                const videos: any[] = api["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]
-                                    .content["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"];
-
-                                // Все доступные видео в плейлисте
-                                const items = videos.splice(0, limit).map(({playlistVideoRenderer}) => RestYouTubeAPI.track(playlistVideoRenderer));
-
-                                // Раздел с данными автора
-                                const author = api["sidebar"]["playlistSidebarRenderer"]["items"];
-
-                                // Если авторов в плейлисте больше 1
-                                if (author.length > 1) {
-                                    const authorData = author[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
-
-                                    // Получаем истинные данные об авторе плейлиста
-                                    artist = await RestYouTubeAPI.getChannel({
-                                        id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"],
-                                        name: authorData.title["runs"][0].text
-                                    });
-                                }
-
-                                return resolve({
-                                    url, items,
-                                    title: playlist.title,
-                                    image: playlist.thumbnail["thumbnails"].pop(),
-                                    artist: artist ?? items.at(-1).artist
-                                });
                             } catch (e) {
                                 return resolve(new Error(`[APIs]: ${e}`))
                             }

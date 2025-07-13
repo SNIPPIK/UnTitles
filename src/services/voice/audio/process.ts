@@ -22,7 +22,7 @@ export class Process {
      * @public
      */
     public get process() {
-        return this._process!;
+        return this._process;
     };
 
     /**

@@ -1,10 +1,3 @@
-import {
-    ChatInputCommandInteraction,
-    AutocompleteInteraction,
-    CacheType,
-    ButtonInteraction, Message
-} from "discord.js";
-
 export * from "./logger";
 export * from "./tools/TypedEmitter";
 export * from "./tools/Assign";
@@ -12,33 +5,6 @@ export * from "./tools/Collection";
 export * from "./tools/SetArray";
 export * from "./tools/Cycle";
 export * from "./tools/httpsClient";
-
-export * from "./discord/Client";
-export * from "./discord/modules/VoiceManager";
-export * from "./discord/ShardManager";
-
-export type CommandInteraction = ChatInputCommandInteraction<CacheType>;
-export type CompeteInteraction = AutocompleteInteraction<CacheType>;
-export type buttonInteraction = ButtonInteraction<CacheType>;
-export type CycleInteraction = Message<true>;
-
-
-/**
- * @description Изменяем параметры discord.js
- * @module discord.js
- */
-declare module "discord.js" {
-    //@ts-ignore
-    export interface ChatInputCommandInteraction {
-        member: GuildMember;
-    }
-
-    //@ts-ignore
-    export interface ButtonInteraction {
-        member: GuildMember;
-    }
-}
-
 
 /**
  * @description Все prototype объектов

@@ -1,3 +1,5 @@
+import * as process from "node:process";
+
 /**
  * @author SNIPPIK
  * @description База данных
@@ -37,7 +39,7 @@ export class Logger {
      * @description Если включен режим отладки
      * @private
      */
-    public static debug = null;
+    public static debug = process.env["NODE_ENV"] === "development";
 
     /**
      * @description Отправляем лог в консоль

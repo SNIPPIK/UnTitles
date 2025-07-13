@@ -1,4 +1,4 @@
-import { buttonInteraction } from "#structures";
+import { buttonInteraction } from "#structures/discord";
 import { handler } from "#handler";
 
 /**

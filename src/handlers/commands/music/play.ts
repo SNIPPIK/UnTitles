@@ -1,8 +1,9 @@
 import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
-import { ApplicationCommandOptionType, Colors } from "discord.js";
-import { RestClientSide, RestServerSide } from "#handler/rest";
-import { Assign, CompeteInteraction } from "#structures";
+import { CompeteInteraction, Colors } from "#structures/discord";
+import { ApplicationCommandOptionType } from "discord.js";
+import { RestClientSide } from "#handler/rest";
 import { locale } from "#service/locale";
+import { Assign } from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -46,9 +47,13 @@ class PlayCommand extends Assign< BaseCommand > {
                 client: ["Connect", "SendMessages", "Speak", "ViewChannel"],
             },
             execute: async ({message, args}) => {
-                const platform = this.getPlatform(args);
+                const platform = this.getPlatform(args[0]);
 
-                if (!platform) return null;
+                // Если не нашлась платформа
+                if (!platform) {
+                    db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.support"));
+                    return null;
+                }
 
                 // Если платформа заблокирована
                 if (platform.block) {
@@ -62,12 +67,12 @@ class PlayCommand extends Assign< BaseCommand > {
                     return null;
                 }
 
-                await message.deferReply().catch(() => {});
+                await message.deferReply();
                 db.events.emitter.emit("rest/request", platform, message, args[0]);
                 return null;
             },
             autocomplete: async ({message, args}) => {
-                const platform = this.getPlatform(args);
+                const platform = this.getPlatform(args[0]);
                 return allAutoComplete(message, platform, args[0]);
             }
         });
@@ -75,27 +80,20 @@ class PlayCommand extends Assign< BaseCommand > {
 
     /**
      * @description Получение платформы из поиска
-     * @param args - Что запросил пользователь
+     * @param search - Что запросил пользователь
      */
-    private readonly getPlatform = (args: any[]) => {
-        let platform: RestClientSide.Request;
-
+    private readonly getPlatform = (search: string) => {
         // Если ссылка
-        if (args[0].startsWith("http")) {
-            const api = db.api.allow.find((pl) => pl.filter.exec(args[0]));
+        if (search.startsWith("http")) {
+            const api = db.api.allow.find((pl) => !!pl.filter.exec(search));
 
             // Если нет поддержки такой платформы
             if (!api) return null;
 
-            platform = db.api.request(api.name);
+            return db.api.request(api.name);
         }
 
-        // Если указан текст
-        else {
-            platform = db.api.request("YOUTUBE");
-        }
-
-        return platform;
+        return db.api.request("YOUTUBE");
     };
 }
 
@@ -108,8 +106,8 @@ class PlayCommand extends Assign< BaseCommand > {
  */
 @CommandDeclare({
     names: {
-        "en-US": "playctl",
-        "ru": "playctl"
+        "en-US": "plау",
+        "ru": "игрaть"
     },
     descriptions: {
         "en-US": "Advanced control of music inclusion!",
@@ -227,7 +225,7 @@ class PlayCommand extends Assign< BaseCommand > {
         "ru": "Принудительное завершение проигрывания музыки!"
     },
 })
-class PlayControl extends Assign<BaseCommand<RestServerSide.APIBase["name"]>> {
+class PlayControl extends Assign<BaseCommand> {
     public constructor() {
         super({
             middlewares: ["voice", "another_voice"],
@@ -316,7 +314,7 @@ class PlayControl extends Assign<BaseCommand<RestServerSide.APIBase["name"]>> {
                             break;
                         }
 
-                        await message.deferReply().catch(() => {});
+                        await message.deferReply();
                         db.events.emitter.emit("rest/request", platform, message, `${args[1]}&list=RD`);
                         break;
                     }
@@ -338,7 +336,7 @@ class PlayControl extends Assign<BaseCommand<RestServerSide.APIBase["name"]>> {
                             break;
                         }
 
-                        await message.deferReply().catch(() => {});
+                        await message.deferReply();
                         db.events.emitter.emit("rest/request", platform, message, args[1]);
                         break;
                     }
@@ -346,6 +344,8 @@ class PlayControl extends Assign<BaseCommand<RestServerSide.APIBase["name"]>> {
                 return null;
             },
             autocomplete: async ({message, args}) => {
+                if (!args[1] || args[1] === "") return null;
+
                 const platform = db.api.request(args[0] as any);
                 return allAutoComplete(message, platform, args[1]);
             }

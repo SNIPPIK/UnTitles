@@ -1,8 +1,8 @@
 import { QueueMessage } from "#service/player/structures/message";
-import { Assign, CommandInteraction } from "#structures";
+import { CommandInteraction, Colors } from "#structures/discord";
 import { middleware } from "#handler/middlewares";
 import { locale } from "#service/locale";
-import { Colors } from "discord.js";
+import { Assign } from "#structures";
 import { db } from "#app/db";
 
 /**

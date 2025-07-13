@@ -1,7 +1,8 @@
 import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
-import { ApplicationCommandOptionType, Colors, VoiceChannel } from "discord.js";
-import { Assign, DiscordClient } from "#structures";
+import { ApplicationCommandOptionType, VoiceChannel } from "discord.js";
+import { DiscordClient, Colors } from "#structures/discord";
 import { locale } from "#service/locale";
+import { Assign } from "#structures";
 import { db } from "#app/db";
 
 /**

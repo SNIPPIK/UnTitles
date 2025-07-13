@@ -1,8 +1,9 @@
+import { Colors } from "#structures/discord";
 import { Assign, Logger } from "#structures";
 import { Button } from "#handler/components";
 import { RepeatType } from "#service/player";
 import { locale } from "#service/locale";
-import {Colors, Message} from "discord.js";
+import { Message } from "discord.js";
 import { db } from "#app/db";
 
 /**

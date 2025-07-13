@@ -1,8 +1,8 @@
+import { Colors } from "#structures/discord";
 import { locale } from "#service/locale";
 import { Track } from "#service/player";
 import { Event } from "#handler/events";
 import { Assign } from "#structures";
-import { Colors } from "discord.js";
 import { db } from "#app/db";
 
 /**

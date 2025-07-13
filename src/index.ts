@@ -1,5 +1,6 @@
-import { DiscordClient, ShardManager, Logger } from "#structures";
+import { DiscordClient, ShardManager } from "#structures/discord";
 import { db, initDatabase } from "#app/db";
+import { Logger } from "#structures";
 import { env } from "#app/env";
 
 // Точка входа
@@ -73,8 +74,16 @@ async function runShard() {
 
     // Запускаем Garbage Collector
     setImmediate(() => {
-        if (global.gc) global.gc();
+        if (typeof global.gc === "function") global.gc();
     });
+
+    // Искуственная нагрузка, если вы видите это, значит хватит сюда смотреть 0_0
+    /*
+    setInterval(() => {
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {} // Блокируем Event Loop
+    }, 200);
+     */
 }
 
 /**
@@ -86,6 +95,9 @@ async function runShard() {
 function initProcessEvents(client: DiscordClient) {
     // Необработанная ошибка (внутри синхронного кода)
     process.on("uncaughtException", (err, origin) => {
+        // Скорее всего дело в Discord.js
+        if (err.name.match(/node_modules\/ws\/lib\/websocket/)) return;
+
         Logger.log(
             "ERROR",
             `Uncaught Exception\n` +

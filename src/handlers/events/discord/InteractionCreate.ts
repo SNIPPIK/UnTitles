@@ -4,10 +4,10 @@ import {
     ButtonInteraction,
     ChannelType,
     ChatInputCommandInteraction,
-    Colors,
     Events
 } from "discord.js"
-import { CommandInteraction, Assign, Logger } from "#structures";
+import { CommandInteraction, Colors } from "#structures/discord";
+import { Assign, Logger } from "#structures";
 import { locale } from "#service/locale";
 import { Event } from "#handler/events";
 import { env } from "#app/env";
@@ -210,7 +210,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
     private readonly SelectAutocomplete = (ctx: AutocompleteInteraction) => {
         const command = db.commands.get(ctx.commandName);
         // Если есть команда
-        if (command && command.autocomplete) {
+        if (command && typeof command.autocomplete === "function") {
             const args: any[] = ctx.options?.["_hoistedOptions"]?.map((f) => {
                 const value = f[f.name];
 
@@ -219,7 +219,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             });
 
             // Если аргумент пустой
-            if (!args || args[0] === "" || !args[1] || args[1] === "") return null;
+            if (!args || args[0] === "" || args[1] === "") return null;
 
             return command.autocomplete({
                 message: ctx,

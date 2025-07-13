@@ -1,5 +1,5 @@
-import { WebSocketOpcodes } from "#service/voice";
 import { createSocket, type Socket } from "node:dgram";
+import { WebSocketOpcodes } from "#service/voice";
 import { TypedEmitter } from "#structures";
 import { isIPv4 } from "node:net";
 
@@ -138,6 +138,10 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
             }
         });
 
+        this.socket.on("message", (msg) => {
+            this.emit("message", msg);
+        });
+
         // Если подключение оборвалось
         this.socket.on("close", () => {
             this.isConnected = false;
@@ -206,7 +210,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     private discoveryBuffer = (ssrc: number) => {
-        /** Безопасен поскольку данные будут сразу перезаписаны */
+        /** Безопасен, поскольку данные будут сразу перезаписаны */
         const packet = Buffer.allocUnsafe(74);
         packet.writeUInt16BE(1, 0);
         packet.writeUInt16BE(70, 2);

@@ -1,6 +1,7 @@
 import { AudioPlayerEvents, QueueEvents } from "#service/player";
+import { DiscordClient } from "#structures/discord";
+import { ClientEvents } from "discord.js";
 import { TypedEmitter } from "#structures";
-import { ClientEvents, Client } from "discord.js";
 import { handler } from "#handler";
 
 /**
@@ -30,7 +31,7 @@ export class Events extends handler<Event<keyof ClientEvents>> {
      * @description Регистрируем ивенты в эко системе бота
      * @public
      */
-    public register = (client: Client) => {
+    public register = (client: DiscordClient) => {
         if (this.size > 0) {
             this.emitter.removeAllListeners();
 

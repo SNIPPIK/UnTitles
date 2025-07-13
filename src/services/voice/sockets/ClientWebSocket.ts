@@ -25,7 +25,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     private ws: WebSocket;
 
     /** Номер последнего принятого пакета */
-    public lastAsk: number = -1;
+    public lastAsk: number = 0;
 
     /**
      * @description Подключен ли websocket к endpoint
@@ -93,7 +93,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Получен HEARTBEAT_ACK
             onAck: (latency) => {
                 this.lastAsk++;
-                this.emit("debug", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
+                this.emit("warn", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
             }
         });
     };
@@ -190,9 +190,21 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 break;
             }
 
+            // Проверка подключения клиента
+            case VoiceOpcodes.Speaking: {
+                this.emit("speaking", payload as any);
+                break;
+            }
+
+            // Проверка подключения клиента
+            case VoiceOpcodes.ClientsConnect: {
+                this.emit("ClientConnect", payload);
+                break;
+            }
+
             // Проверка отключения клиента
             case VoiceOpcodes.ClientDisconnect: {
-                this.emit("disconnect", d.code, d.reason);
+                this.emit("ClientDisconnect", payload);
                 break;
             }
 
@@ -312,6 +324,23 @@ interface ClientWebSocketEvents {
      * @param reason - Причина отключения
      */
     "close": (code: GatewayCloseCodes, reason: string) => void;
+
+    /**
+     * @description Если получен код голоса от discord, нужен для receiver
+     */
+    "speaking": (d: WebSocketOpcodes.speaking_get) => void;
+
+    /**
+     * @description Если получен код подключения нового клиента
+     * @constructor
+     */
+    "ClientConnect": (d: WebSocketOpcodes.connect) => void;
+
+    /**
+     * @description Если получен код отключения клиента
+     * @constructor
+     */
+    "ClientDisconnect": (d: WebSocketOpcodes.disconnect) => void;
 
     /**
      * @description Если клиент был отключен из-за отключения бота от голосового канала

@@ -1,6 +1,6 @@
 import { CacheUtility } from "#service/player/utils/cache";
 import { ControllerQueues, Queue } from "#service/player";
-import { DiscordClient } from "#structures";
+import { DiscordClient } from "#structures/discord";
 import { env } from "#app/env";
 
 // Database modules

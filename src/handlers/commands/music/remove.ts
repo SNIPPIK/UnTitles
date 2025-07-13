@@ -85,7 +85,7 @@ class RemoveTrackCommand extends Assign< BaseCommand<number> > {
                 queue.tracks.remove(number);
 
                 // Если выбран текущий трек
-                if (number === queue.tracks.position) {
+                if (number - 1 === queue.tracks.position) {
                     // Если треков нет в очереди
                     if (!queue.tracks.total) return queue.cleanup();
                     queue.player.stop(queue.tracks.position);

@@ -1,8 +1,9 @@
 import { ApplicationCommandOption, Client, Routes, PermissionsString } from "discord.js";
 import type { LocalizationMap, Locale, Permissions } from "discord-api-types/v10";
-import { CommandInteraction, CompeteInteraction, Logger } from "#structures";
+import { CommandInteraction, CompeteInteraction } from "#structures/discord";
 import filters from "#service/player/filters.json";
 import { AudioFilter } from "#service/player";
+import { Logger } from "#structures";
 import { handler } from "#handler";
 import { env } from "#app/env";
 
@@ -301,7 +302,6 @@ export function CommandDeclare(options: SlashCommand.Options) {
         target.prototype["integration_types"] = options.integration_types ? options.integration_types.map((type) => type === "GUILD_INSTALL" ? 0 : 1) : [0];
         target.prototype["contexts"] = options.contexts ? options.contexts.map((type) => type === "GUILD" ? 0 : type === "BOT_DM" ? 1 : 2) : [0];
 
-
         // Если надо создать простую команду
         if (options.options?.length > 0) {
             target.prototype["autocomplete"] = options.autocomplete;
@@ -311,7 +311,7 @@ export function CommandDeclare(options: SlashCommand.Options) {
                 target.prototype.options = [];
             }
 
-            // Парсим данные для правильной работы api
+            // Изменяем данные для правильной работы api
             const transformed = options.options.map(opt => ({
                 ...opt,
                 name: opt.names[Object.keys(opt.names)[0] as Locale],

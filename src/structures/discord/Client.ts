@@ -1,7 +1,8 @@
 import { Client, Options, Partials, SimpleShardingStrategy } from "discord.js";
 import { ActivityType } from "discord-api-types/v10";
-import { Logger, VoiceManager } from "#structures";
+import { VoiceManager } from "#structures/discord";
 import { version } from "package.json";
+import { Logger } from "#structures";
 import { env } from "#app/env";
 import { db } from "#app/db";
 

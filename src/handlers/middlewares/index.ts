@@ -1,4 +1,4 @@
-import { CommandInteraction } from "#structures";
+import { CommandInteraction } from "#structures/discord";
 import { Command } from "#handler/commands";
 import { handler } from "#handler";
 

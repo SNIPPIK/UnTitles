@@ -1,7 +1,8 @@
 import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
-import { ApplicationCommandOptionType, Colors } from "discord.js";
-import filters from "#service/player/filters.json"
+import { ApplicationCommandOptionType } from "discord.js";
+import filters from "#service/player/filters.json";
 import type { AudioFilter } from "#service/player";
+import { Colors } from "#structures/discord";
 import { locale } from "#service/locale";
 import { Assign } from "#structures";
 import { db } from "#app/db";

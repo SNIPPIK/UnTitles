@@ -43,25 +43,31 @@ const MAX_32BIT = 2 ** 32;
  */
 export class ClientSRTPSocket {
     /**
+     * @description Пустой заголовок RTP, для использования внутри класса
+     * @private
+     */
+    private _RTP_HEAD = Buffer.alloc(12);
+
+    /**
      * @description Пустой буфер
      * @private
      */
-    private _nonceBuffer: Buffer = Encryption.nonce;
+    private _nonce: Buffer = Encryption.nonce;
 
     /**
      * @description Порядковый номер пустого буфера
      * @private
      */
-    private _nonce = 0;
+    private _nonceSize = 0;
 
     /**
-     * @description
+     * @description Последовательность opus фреймов
      * @private
      */
     private sequence: number;
 
     /**
-     * @description Время прошлого аудио пакета
+     * @description Время проигрывания opus фреймов (+960)
      * @private
      */
     private timestamp: number;
@@ -79,15 +85,15 @@ export class ClientSRTPSocket {
      * @description Buffer для режима шифрования, нужен для правильно расстановки пакетов
      * @public
      */
-    public get nonce() {
+    public get nonceSize() {
         // Проверяем что-бы не было привышения int 32
-        if (this._nonce > MAX_32BIT) this._nonce = 0;
+        if (this._nonceSize > MAX_32BIT) this._nonceSize = 0;
 
         // Записываем в буффер
-        this._nonceBuffer.writeUInt32BE(this._nonce, 0);
+        this._nonce.writeUInt32BE(this._nonceSize, 0);
 
-        this._nonce++; // Добавляем к размеру
-        return this._nonceBuffer;
+        this._nonceSize++; // Добавляем к размеру
+        return this._nonce;
     };
 
     /**
@@ -98,10 +104,8 @@ export class ClientSRTPSocket {
         if (this.sequence > MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было привышения int 16
         if (this.timestamp > MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было привышения int 32
 
-        // Unsafe является безопасным поскольку данные будут перезаписаны
-        const RTPHead = Buffer.allocUnsafe(12);
-        // Version + Flags, Payload Type 120 (Opus)
-        [RTPHead[0], RTPHead[1]] = [0x80, 0x78];
+        /** Безопасен, поскольку данные будут сразу перезаписаны */
+        const RTPHead = this._RTP_HEAD;
 
         // Записываем новую последовательность
         RTPHead.writeUInt16BE(this.sequence, 2);
@@ -125,22 +129,39 @@ export class ClientSRTPSocket {
     public constructor(private options: EncryptorOptions) {
         this.sequence = this.randomNBit(16);
         this.timestamp = this.randomNBit(32);
+
+        // Version + Flags, Payload Type 120 (Opus)
+        [this._RTP_HEAD[0], this._RTP_HEAD[1]] = [0x80, 0x78];
     };
 
     /**
      * @description Задаем структуру пакета
-     * @param packet - Пакет Opus для шифрования
+     * @param packet - Аудио пакет OPUS
      * @public
      */
     public packet = (packet: Buffer) => {
-        // Получаем тип шифрования
-        const mode = ClientSRTPSocket.mode;
-
         // Получаем заголовок RTP
         const RTPHead = this.header;
 
         // Получаем nonce буфер 12-24 бит
-        const nonce = this.nonce;
+        const nonce = this.nonceSize;
+
+        return this.decodeAudioBuffer(RTPHead, packet, nonce);
+    };
+
+    /**
+     * @description Глубокая кодировка дает возможность шифровать из вне!
+     * @param RTPHead       - Заголовок
+     * @param packet        - Аудио пакет
+     * @param nonce         - Размер nonce
+     * @param authTag       - Если требуется указать свой тег авторизации
+     */
+    public decodeAudioBuffer = (RTPHead: Buffer, packet: Buffer, nonce?: Buffer, authTag?: Buffer) => {
+        // Получаем тип шифрования
+        const mode = ClientSRTPSocket.mode;
+
+        // Получаем nonce буфер 12-24 бит
+        if (!nonce) nonce = this.nonceSize;
 
         // Получаем первые 4 байта из буфера
         const nonceBuffer = nonce.subarray(0, 4);
@@ -149,11 +170,21 @@ export class ClientSRTPSocket {
         if (mode === "aead_aes256_gcm_rtpsize") {
             const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce, { authTagLength: 16 });
             cipher.setAAD(RTPHead);
+
+            if (authTag) {
+                cipher.setAAD(authTag);
+                return Buffer.concat([cipher.update(packet), cipher.final()]);
+            }
+
             return Buffer.concat([RTPHead, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
         }
 
         // Шифровка через библиотеку
         else if (mode === "aead_xchacha20_poly1305_rtpsize") {
+            if (authTag) {
+                return Buffer.from(loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(Buffer.concat([packet, authTag]), RTPHead, nonce, this.options.key));
+            }
+
             const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, RTPHead, nonce, this.options.key);
             return Buffer.concat([RTPHead, cryptoPacket, nonceBuffer]);
         }
@@ -185,11 +216,12 @@ export class ClientSRTPSocket {
      * @public
      */
     public destroy = () => {
+        this._nonceSize = null;
         this._nonce = null;
-        this._nonceBuffer = null;
         this.timestamp = null;
         this.sequence = null;
         this.options = null;
+        this._RTP_HEAD = null;
     };
 }
 

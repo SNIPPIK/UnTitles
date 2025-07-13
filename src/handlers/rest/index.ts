@@ -419,7 +419,7 @@ export namespace RestServerSide {
          * @readonly
          * @public
          */
-        readonly name: "YOUTUBE" | "SPOTIFY" | "VK" | "YANDEX" | "SOUNDCLOUD" | string;
+        readonly name: "YOUTUBE" | "SPOTIFY" | "VK" | "YANDEX" | "SOUNDCLOUD";
 
         /**
          * @description Ссылка для работы фильтра
@@ -567,7 +567,7 @@ export namespace RestServerSide {
 
     /**
      * @author SNIPPIK
-     * @description Данные для валидного запроса паралельному процессу
+     * @description Данные для валидного запроса параллельном процессу
      * @interface ServerOptions
      */
     //@ts-ignore

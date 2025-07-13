@@ -1,6 +1,6 @@
 import { PipeEncoder, BufferedEncoder, SILENT_FRAME, OPUS_FRAME_SIZE } from "./opus";
-import { TypedEmitter } from "#structures";
 import { Logger } from "#structures/logger";
+import { TypedEmitter } from "#structures";
 import { Process } from "./process";
 
 /**
@@ -73,7 +73,7 @@ class AudioBuffer {
      */
     public clear = () => {
         // Удаляем ссылки на буферы
-        this._chunks.length = 0;
+        this._chunks.splice(0, this._chunks.length);
         this._position = null;
     };
 }
@@ -218,7 +218,7 @@ export class BufferedAudioResource extends BaseAudioResource {
     };
 
     /**
-     * @description Выдаем фрагмент потока или пустышку
+     * @description Выдаем фрагмент потока
      * @help (время пакета 20ms)
      * @return Buffer
      * @public
@@ -371,7 +371,8 @@ export class PipeAudioResource extends BaseAudioResource {
     private played = 0;
 
     /**
-     * @description Выдаем фрагмент потока или пустышку
+     * @description Выдаем фрагмент потока
+     * @help (время пакета 20ms)
      * @return Buffer
      * @public
      */

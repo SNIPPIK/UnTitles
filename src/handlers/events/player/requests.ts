@@ -1,8 +1,9 @@
-import { Colors, Message } from "discord.js";
+import { Colors } from "#structures/discord";
 import { Logger, Assign } from "#structures";
 import { locale } from "#service/locale";
 import { Event } from "#handler/events";
 import { Track } from "#service/player";
+import { Message } from "discord.js";
 import { db } from "#app/db";
 
 /**

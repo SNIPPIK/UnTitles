@@ -62,7 +62,7 @@ export namespace WebSocketOpcodes {
      * @description Все opcode, для типизации websocket
      * @type extract
      */
-    export type extract = identify | select_protocol | ready | heartbeat | session | speaking | heartbeat_ask | resume | hello | resumed | disconnect;
+    export type extract = identify | select_protocol | ready | heartbeat | session | speaking_out | heartbeat_ask | resume | hello | resumed | disconnect | connect;
 
     /**
      * @description Данные для подключения именно к голосовому каналу
@@ -144,13 +144,28 @@ export namespace WebSocketOpcodes {
      * @usage only-send
      * @code 5
      */
-    export interface speaking {
+    export interface speaking_out {
         "op": VoiceOpcodes.Speaking,
         "seq": number;
         "d": {
             "speaking": number;
             "delay": number;
             "ssrc": number;
+        }
+    }
+
+    /**
+     * @description Данные для синхронизации состояния голоса
+     * @usage only-get
+     * @code 5
+     */
+    export interface speaking_get {
+        "op": VoiceOpcodes.Speaking,
+        "seq": number;
+        "d": {
+            user_id: string;
+            ssrc: number;
+            speaking: number;
         }
     }
 
@@ -204,15 +219,28 @@ export namespace WebSocketOpcodes {
     }
 
     /**
+     * @description Данные о подключенных клиентах
+     * @usage on-receiver
+     * @code 11
+     */
+    export interface connect {
+        "op": VoiceOpcodes.ClientsConnect;
+        "seq": number;
+        "d": {
+            user_ids: string[]
+        }
+    }
+
+    /**
      * @description Данные для отключения бота от голосового канала
      * @usage send/request
      * @code 13
      */
     export interface disconnect {
         "op": VoiceOpcodes.ClientDisconnect;
+        "seq": number;
         "d": {
-            "code": number;
-            "reason": string;
+            user_ids: string[]
         }
     }
 }

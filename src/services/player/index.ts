@@ -1,10 +1,10 @@
 import { ControllerCycles } from "#service/player/controllers/cycle";
-import { Collection, CommandInteraction, Logger } from "#structures";
 import { QueueMessage } from "#service/player/structures/message";
 import { AudioPlayer, Queue, Track } from "#service/player";
+import { CommandInteraction, Colors } from "#structures/discord";
+import { Collection, Logger } from "#structures";
 import { RestClientSide } from "#handler/rest";
 import { locale } from "#service/locale";
-import { Colors } from "discord.js";
 import { env } from "#app/env";
 import { db } from "#app/db";
 

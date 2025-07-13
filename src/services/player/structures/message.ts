@@ -1,4 +1,4 @@
-import { CommandInteraction, CycleInteraction, DiscordClient } from "#structures";
+import { CommandInteraction, CycleInteraction, DiscordClient } from "#structures/discord";
 import { EmbedData } from "discord.js";
 
 /**

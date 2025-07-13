@@ -45,6 +45,6 @@
     }
   },
 
-  "include": ["package.json", "tsconfig.json", "src", ".env.example"],
+  "include": ["package.json", "tsconfig.json", "src"],
   "exclude": ["node_modules"]
 }

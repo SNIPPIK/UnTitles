@@ -1,7 +1,7 @@
-import { Assign, CommandInteraction } from "#structures";
+import { Colors, CommandInteraction } from "#structures/discord";
 import { middleware } from "#handler/middlewares";
 import { locale } from "#service/locale";
-import { Colors } from "discord.js";
+import { Assign } from "#structures";
 import { db } from "#app/db";
 
 /**

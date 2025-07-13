@@ -1,7 +1,7 @@
-import {CommandInteraction, DiscordClient} from "#structures";
-import {QueueMessage} from "../structures/message";
-import {VoiceConnection} from "#service/voice";
-import {db} from "#app/db";
+import { CommandInteraction, DiscordClient } from "#structures/discord";
+import { QueueMessage } from "../structures/message";
+import { VoiceConnection } from "#service/voice";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
