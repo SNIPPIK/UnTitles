@@ -131,7 +131,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
 
-                                const tracks = api.tracks.items.map(RestSpotifyAPI.track)
+                                const tracks = api.tracks.items.map((track: any) => RestSpotifyAPI.track(track, api.images));
 
                                 return resolve({ url, title: api.name, image: api.images[0], items: tracks, artist: api?.["artists"][0] });
                             } catch (e) {
@@ -277,11 +277,13 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
 
     /**
      * @description Собираем трек в готовый образ
-     * @param track {any} Трек из Spotify API
+     * @param track - Трек из Spotify API
+     * @param images - Сторонние картинки
      * @protected
      * @static
      */
-    protected static track = (track: json) => {
+    protected static track = (track: json, images?: any[]) => {
+
         return {
             id: track.id,
             title: track.name,
@@ -291,7 +293,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                 url: track["artists"][0]["external_urls"]["spotify"]
             },
             time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
-            image: (track.album?.images ?? track?.images).sort((item1: any, item2: any) => item1.width > item2.width)[0],
+            image: (images ?? track.album?.images ?? track?.images).sort((item1: any, item2: any) => item1.width > item2.width)[0],
         };
     };
 }
@@ -300,4 +302,4 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
  * @export default
  * @description Делаем классы глобальными
  */
-export default [RestSpotifyAPI];
+export default [ RestSpotifyAPI ];
