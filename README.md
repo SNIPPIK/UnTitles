@@ -31,7 +31,7 @@
 # 🎧 Основные возможности
 #### 🔊 Голосовой движок
 - Реализация [Voice Gateway Version 8](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/services/voice)
-- [End-to-End Encryption (DAVE Protocol)](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol), пока не реализовано!
+- [End-to-End Encryption (DAVE Protocol)](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol), реализовано! Но пока не доступно!
 - Полная реализация SRTP: `aead_aes256_gcm`, `xchacha20_poly1305` (через библиотеки)
 - Адаптивная система отправки пакетов и система переиспользования, без полноценного WebRTP ничего толкового не сделать!
 - Работает с готовыми Ogg/Opus фреймами!
