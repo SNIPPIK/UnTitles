@@ -10,6 +10,7 @@ void main();
  * @author SNIPPIK
  * @description Запуск всего проекта в async режиме
  * @function main
+ * @returns void or Promise<void>
  */
 function main() {
     const isManager = process.argv.includes("--ShardManager");
@@ -25,6 +26,7 @@ function main() {
  * @author SNIPPIK
  * @description Если требуется запустить менеджер осколков
  * @function runShardManager
+ * @returns void
  */
 function runShardManager() {
     Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
@@ -35,6 +37,7 @@ function runShardManager() {
  * @author SNIPPIK
  * @description Если требуется запустить осколок
  * @function runShard
+ * @returns Promise<void>
  * @async
  */
 async function runShard() {
@@ -77,7 +80,7 @@ async function runShard() {
         if (typeof global.gc === "function") global.gc();
     });
 
-    // Искуственная нагрузка, если вы видите это, значит хватит сюда смотреть 0_0
+    // Искусственная нагрузка, если вы видите это, значит хватит сюда смотреть 0_0
     /*
     setInterval(() => {
         const startBlock = performance.now();
@@ -91,6 +94,7 @@ async function runShard() {
  * @description Инициализирует события процесса (ошибки, сигналы)
  * @param client - Класс клиента
  * @function initProcessEvents
+ * @returns void
  */
 function initProcessEvents(client: DiscordClient) {
     // Необработанная ошибка (внутри синхронного кода)
@@ -108,7 +112,7 @@ function initProcessEvents(client: DiscordClient) {
         );
     });
 
-    // Необработанный промис
+    // Необработанный обещание
     process.on("unhandledRejection", (reason) => {
         Logger.log(
             "ERROR",
@@ -134,6 +138,7 @@ function initProcessEvents(client: DiscordClient) {
  * @description Функция проверяющая состояние очередей, для безопасного выключения
  * @param client - Класс клиента
  * @function ProcessQueues
+ * @returns void
  */
 function ProcessQueues(client: DiscordClient): boolean {
     if (db.queues.size > 0) {

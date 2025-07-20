@@ -182,8 +182,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
         return new Promise(async (resolve) => {
             const result = await new httpsClient({
                 url: `${this.authorization.api}/${url}&client_id=${this.authorization.token}`,
-                userAgent: true,
-            }).send() as json;
+            }).toJson;
 
             // Если возникает ошибка при получении страницы
             if (result instanceof Error) return resolve(locale.err("api.request.fail"));
@@ -203,7 +202,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
     protected static getFormat = (formats: any[], ClientID: string): Promise<string> => {
         return new Promise<string>(async (resolve) => {
             const FilterFormats = formats.filter((d) => d.format.protocol === "progressive").pop() ?? formats[0];
-            const EndFormat = await new httpsClient({url: `${FilterFormats.url}?client_id=${ClientID}`, userAgent: true}).send() as json;
+            const EndFormat = await new httpsClient({url: `${FilterFormats.url}?client_id=${ClientID}`, userAgent: true}).toJson as json;
 
             return resolve(EndFormat.url);
         });

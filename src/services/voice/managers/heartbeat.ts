@@ -60,6 +60,7 @@ export class HeartbeatManager {
 
     /**
      * @param hooks - Объект с внешними методами: send, onTimeout, onAck
+     * @constructor
      * @public
      */
     public constructor(private readonly hooks: HeartbeatHooks) {}
@@ -67,9 +68,10 @@ export class HeartbeatManager {
     /**
      * @description Запускаем heartbeat с заданным интервалом
      * @param intervalMs - Время между heartbeat (в мс)
+     * @returns void
      * @public
      */
-    public start = (intervalMs?: number) => {
+    public start = (intervalMs?: number): void => {
         this.stop(); // останавливаем старый таймер если есть
         if (intervalMs) this.intervalMs = intervalMs;
 
@@ -84,6 +86,7 @@ export class HeartbeatManager {
     /**
      * @description Запускаем таймер ожидания ACK после каждого heartbeat
      * Если ACK не получен, вызывается onTimeout
+     * @returns void
      * @private
      */
     private setTimeout = () => {
@@ -92,14 +95,15 @@ export class HeartbeatManager {
         this.timeout = setTimeout(() => {
             this.misses++;
             this.hooks.onTimeout(); // вызываем внешний обработчик
-        }, timeout); // небольшой запас, чтобы не ложно триггерить
+        }, timeout); // небольшой запас, чтобы не ложно сработать
     };
 
     /**
      * @description Обработка получения ACK
+     * @returns void
      * @public
      */
-    public ack = () => {
+    public ack = (): void => {
         this.lastAckTime = Date.now();
         const latency = this.lastAckTime - this.lastSentTime;
 
@@ -111,6 +115,7 @@ export class HeartbeatManager {
 
     /**
      * @description Останавливаем все heartbeat процессы
+     * @returns void
      * @public
      */
     public stop = () => {
@@ -124,6 +129,7 @@ export class HeartbeatManager {
 
     /**
      * @description Сбросить счётчик reconnect'ов
+     * @returns void
      * @public
      */
     public resetReconnects = () => {
@@ -132,6 +138,7 @@ export class HeartbeatManager {
 
     /**
      * @description Увеличить счётчик reconnect'ов (на 1)
+     * @returns void
      * @public
      */
     public increaseReconnect = () => {

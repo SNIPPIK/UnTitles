@@ -21,6 +21,13 @@ const prototypes: { type: any, name: string, value: any}[] = [
         }
     },
 
+    {
+        type: Number.prototype, name: "random",
+        value: function (min = 0) {
+            return Math.floor(Math.random() * ((this as any) - min) + min);
+        }
+    },
+
     // Number
     {
         type: Number.prototype, name: "duration",
@@ -81,5 +88,12 @@ declare global {
          * @return string | number
          */
         toSplit(): string | number;
+
+        /**
+         * @prototype Number
+         * @description Получаем случайное число
+         * @param min {number} Мин число
+         */
+        random(min?: number): number;
     }
 }

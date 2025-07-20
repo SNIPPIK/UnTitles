@@ -1,7 +1,7 @@
 import { WebSocketOpcodes, GatewayCloseCodes } from "#service/voice";
-import { HeartbeatManager } from "../managers/heartbeat";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
-import { WebSocket, MessageEvent } from "undici";
+import { HeartbeatManager } from "../managers/heartbeat";
+import { WebSocket, MessageEvent } from "ws";
 import { TypedEmitter } from "#structures";
 
 /**
@@ -12,7 +12,7 @@ import { TypedEmitter } from "#structures";
  * @public
  */
 export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
-    /** Конечная точко подключения */
+    /** Конечная точка подключения */
     private endpoint: string;
 
     /** Параметр подключения */
@@ -25,10 +25,11 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     private ws: WebSocket;
 
     /** Номер последнего принятого пакета */
-    public lastAsk: number = 0;
+    public lastAsk: number = -1;
 
     /**
      * @description Подключен ли websocket к endpoint
+     * @returns boolean
      * @public
      */
     public get connected() {
@@ -40,7 +41,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @param payload - Данные Discord Voice Opcodes
      * @public
      */
-    public set packet(payload: WebSocketOpcodes.extract) {
+    public set packet(payload: WebSocketOpcodes.extract | WebSocketOpcodes.dave_opcodes | Buffer) {
         // Для отладки
         this.emit("debug", `[WebSocket/send:]`, payload);
 
@@ -48,7 +49,8 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         if (!this.connected) return;
 
         try {
-           this.ws.send(JSON.stringify(payload));
+            if (payload instanceof Buffer) this.ws.send(payload);
+            else this.ws.send(JSON.stringify(payload));
         } catch (err) {
             // Если ws упал
             if (`${err}`.match(/Cannot read properties of null/)) {
@@ -92,7 +94,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Получен HEARTBEAT_ACK
             onAck: (latency) => {
-                this.lastAsk++;
+                //this.lastAsk++;
                 this.emit("warn", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
             }
         });
@@ -101,9 +103,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     /**
      * @description Создаем подключение, websocket по ранее указанному пути
      * @param endpoint - Путь подключения
+     * @returns void
      * @public
      */
-    public connect = (endpoint: string) => {
+    public connect = (endpoint: string): void => {
         if (this.isConnecting) return;
         this.isConnecting = true;
 
@@ -156,28 +159,39 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     /**
      * @description Принимаем сообщение со стороны websocket
      * @param data - Получаемые данные в buffer
+     * @returns void
      * @private
      */
-    private onEventMessage = (data: MessageEvent) => {
-        let payload: WebSocketOpcodes.extract;
+    private onEventMessage = (data: MessageEvent): void => {
+        if (data.data instanceof Buffer || data.data instanceof ArrayBuffer) {
+            const buffer = data.data instanceof ArrayBuffer ? Buffer.from(data.data) : data.data;
+            const op = buffer.readUInt8(2) as any;
+            const payload = buffer.subarray(3);
+            const seq = buffer.readUInt16BE(0);
+
+            // Если есть последний seq
+            if (seq) this.lastAsk = seq;
+
+            this.emit("binary", { op, payload });
+            return;
+        }
+
+        let payload: WebSocketOpcodes.extract | WebSocketOpcodes.dave_opcodes;
         try {
-            payload = JSON.parse(data.data.toString());
+            payload = JSON.parse(data.data.toString()) as WebSocketOpcodes.extract | WebSocketOpcodes.dave_opcodes;
         } catch {
             this.emit("error", new Error('Invalid JSON'));
             return;
         }
+
+        // Если есть последний seq
+        if ("seq" in payload) this.lastAsk = payload.seq;
 
         // Данные из пакета
         const { op, d } = payload;
 
         // Внутрення обработка
         switch (op) {
-            // Получение heartbeat_interval
-            case VoiceOpcodes.Hello: {
-                this.heartbeat.start(d.heartbeat_interval);
-                break;
-            }
-
             // Проверка HeartbeatAck
             case VoiceOpcodes.HeartbeatAck: {
                 this.heartbeat.ack();
@@ -187,6 +201,12 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Проверка переподключения
             case VoiceOpcodes.Resumed: {
                 this.heartbeat.start();
+                break;
+            }
+
+            // Получение heartbeat_interval
+            case VoiceOpcodes.Hello: {
+                this.heartbeat.start(d["heartbeat_interval"]);
                 break;
             }
 
@@ -220,6 +240,22 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 this.emit("sessionDescription", payload);
                 break;
             }
+
+            // Dave
+            case VoiceOpcodes.DaveMlsCommitWelcome:
+            case VoiceOpcodes.DaveTransitionReady:
+            case VoiceOpcodes.DaveMlsWelcome:
+            case VoiceOpcodes.DavePrepareEpoch:
+            case VoiceOpcodes.DaveMlsKeyPackage:
+            case VoiceOpcodes.DaveMlsInvalidCommitWelcome:
+            case VoiceOpcodes.DaveMlsProposals:
+            case VoiceOpcodes.DaveMlsExternalSender:
+            case VoiceOpcodes.DaveExecuteTransition:
+            case VoiceOpcodes.DaveMlsAnnounceCommitTransition:
+            case VoiceOpcodes.DavePrepareTransition: {
+                this.emit("daveSession", payload);
+                break;
+            }
         }
 
         // Для отладки
@@ -230,9 +266,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @description Принимаем сообщение со стороны websocket
      * @param code - Код закрытия
      * @param reason - Причина закрытия
+     * @returns void
      * @private
      */
-    private onEventClose = (code: GatewayCloseCodes, reason: string) => {
+    private onEventClose = (code: GatewayCloseCodes, reason: string): void => {
         const ignoreCodes: GatewayCloseCodes[] = [4014, 4022];
         const notReconnect: GatewayCloseCodes[] = [4006, 1000, 1002];
 
@@ -256,9 +293,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
     /**
      * @description Проверяем кол-во переподключений
+     * @returns void
      * @private
      */
-    private attemptReconnect = (reconnect?: boolean) => {
+    private attemptReconnect = (reconnect?: boolean): void => {
         this.heartbeat.stop();
 
         // Переподключемся минуя посредика в виде VoiceConnection
@@ -280,9 +318,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
     /**
      * @description Отключение текущего websocket подключения
+     * @returns void
      * @public
      */
-    public reset = () => {
+    public reset = (): void => {
         // Если есть websocket клиент
         if (this.ws) {
             this.removeAllListeners();
@@ -291,17 +330,17 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         this.ws = null;
-        this.lastAsk = 0;
+        this.lastAsk = -1;
         this.heartbeat.stop();
     };
 
     /**
      * @description Уничтожаем подключение
+     * @returns void
      * @public
      */
-    public destroy = () => {
+    public destroy = (): void => {
         this.reset();
-
         this.lastAsk = null;
     };
 }
@@ -360,6 +399,18 @@ interface ClientWebSocketEvents {
      * @param opcodes - Не полный список получаемых opcodes
      */
     "sessionDescription": (opcodes: WebSocketOpcodes.session) => void;
+
+    /**
+     * @description Все события для работы с dave сессией
+     * @param opcodes - Полный список всех протоколов Dave
+     */
+    "daveSession": (opcodes: WebSocketOpcodes.dave_opcodes) => void;
+
+    /**
+     * @description Все события для работы с dave сессией
+     * @param opcodes - Полный список всех протоколов Dave
+     */
+    "binary": (data: {op: WebSocketOpcodes.dave_opcodes["op"], payload: Buffer}) => void;
 
     /**
      * @description Успешное подключение WebSocket

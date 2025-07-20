@@ -44,8 +44,9 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
     private _users: string[];
 
     /**
-     * @description
-     * @param voice
+     * @description Запуск класса слушателя, для прослушивания пользователей
+     * @param voice - Голосове подключение
+     * @constructor
      */
     public constructor(private readonly voice: VoiceConnection) {
         super();
@@ -62,13 +63,15 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
 
         // Если отключается пользователь
         voice["websocket"].on("ClientDisconnect", ({d}) => {
-            for (const user of d.user_ids) {
-                const index = this._users.indexOf(user);
+            const index = this._users.indexOf(d.user_id);
 
-                if (index > -1) this._users.splice(index, 1);
+            // Если есть пользователь
+            if (index !== -1) {
+                this._users.splice(index, 1);
             }
         });
 
+        // Слушаем UDP подключение
         voice["clientUDP"].on("message", (message) => {
             // Если сообщение меньше размера SSRC
             if (message.length <= 8) return;
@@ -87,8 +90,9 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
     };
 
     /**
-     * @description Парсим полученный аудио пакет по UDP
-     * @param buffer
+     * @description Обрабатываем полученный аудио пакет по UDP
+     * @param buffer - Полученный аудио фрейм
+     * @returns Buffer
      * @private
      */
     private parsePacket = (buffer: Buffer) => {

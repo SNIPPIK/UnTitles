@@ -11,25 +11,25 @@ import { db } from "#app/db";
 abstract class BaseTrack {
     /**
      * @description Здесь хранятся данные времени трека
-     * @readonly
-     * @private
+     * @protected
      */
     protected _duration: TrackDuration;
 
     /**
      * @description Параметр для сохранения lyrics
-     * @private
+     * @protected
      */
     protected _lyrics: string;
 
     /**
      * @description Пользователя включивший трек
-     * @private
+     * @protected
      */
     protected _user: Track.user;
 
     /**
      * @description Получаем данные времени трека
+     * @returns TrackDuration
      * @public
      */
     public get time() {
@@ -39,9 +39,9 @@ abstract class BaseTrack {
     /**
      * @description Проверяем время и подгоняем к необходимым типам
      * @param time - Данные о времени трека
-     * @protected
+     * @public
      */
-    protected set time(time) {
+    public set time(time) {
         // Если время в числовом формате
         if (typeof time?.total === "number") {
             this._duration = { split: (time?.total as number).duration(), total: time.total };
@@ -66,6 +66,7 @@ abstract class BaseTrack {
      * @description Создаем трек
      * @param _track - Данные трека с учетом <Song.track>
      * @param _api   - Данне о платформе
+     * @public
      */
     public constructor(protected _track: Track.data, protected _api: RestServerSide.APIBase) {
         this.time = _track.time as any;
@@ -85,6 +86,7 @@ abstract class BaseTrack {
 export class Track extends BaseTrack {
     /**
      * @description Идентификатор трека
+     * @returns string
      * @public
      */
     public get ID() {
@@ -93,14 +95,16 @@ export class Track extends BaseTrack {
 
     /**
      * @description Ссылки трека на его самого
+     * @returns string
      * @public
      */
     public get url() {
-        return this._track.url
+        return this._track.url;
     };
 
     /**
      * @description Наименование трека
+     * @returns string
      * @public
      */
     public get name() {
@@ -109,6 +113,7 @@ export class Track extends BaseTrack {
 
     /**
      * @description Получаем отредактированное название трека в формате time [author](author_url) - [title](track_url)
+     * @returns string
      * @public
      */
     public get name_replace() {
@@ -121,9 +126,10 @@ export class Track extends BaseTrack {
 
     /**
      * @description Получаем превью трека
+     * @returns { url: string }
      * @public
      */
-    public get image() {
+    public get image(): { url: string } {
         // Если нет картинки
         if (!this._track?.image?.url) return { url: db.images.no_image };
         return this._track.image;
@@ -145,6 +151,7 @@ export class Track extends BaseTrack {
 
     /**
      * @description Получаем пользователя который включил трек
+     * @returns Track.user
      * @public
      */
     public get user() {
@@ -154,6 +161,7 @@ export class Track extends BaseTrack {
     /**
      * @description Добавляем запросчика трека
      * @param author - Автор запроса
+     * @public
      */
     public set user(author) {
         const { username, id, avatar } = author;
@@ -174,6 +182,7 @@ export class Track extends BaseTrack {
 
     /**
      * @description Получаем ссылку на исходный файл
+     * @returns string
      * @public
      */
     public get link() {
@@ -183,6 +192,7 @@ export class Track extends BaseTrack {
     /**
      * @description Добавление ссылки на трек
      * @param url - Ссылка или путь
+     * @public
      */
     public set link(url: string) {
         this._track.audio = url;
@@ -190,6 +200,7 @@ export class Track extends BaseTrack {
 
     /**
      * @description Данные о платформе с которой был получен трек
+     * @returns RestServerSide.APIBase
      * @public
      */
     public get api() {
@@ -199,27 +210,22 @@ export class Track extends BaseTrack {
 
     /**
      * @description Проверяем ссылку на доступность и выдаем ее если ссылка имеет код !==200, то обновляем
-     * @return string | Promise<string | Error>
+     * @return Promise<string | Error>
      * @public
      */
     public get resource(): Promise<string | Error> {
         return new Promise(async (resolve) => {
-            for (let i = 0; i <= 2; i++) {
-                const resource = await this.prepareResource();
+            const resource = await this.prepareResource();
 
-                // Если произошла ошибка при получении ресурса
-                if (resource instanceof Error || !resource) {
-                    this.link = null;
+            // Если произошла ошибка при получении ресурса
+            if (resource instanceof Error || !resource) {
+                this.link = null;
 
-                    // Если уже нельзя повторить
-                    if (i === 2) return resolve(resource);
-                }
-
-                else {
-                    this.link = resource;
-                    break;
-                }
+                // Если уже нельзя повторить
+                return resolve(resource);
             }
+
+            else this.link = resource;
 
             // Отдаем ссылку или путь до файла
             return resolve(this.link);
@@ -246,7 +252,7 @@ export class Track extends BaseTrack {
                     url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(this.artist.title)}&track_name=${encodeURIComponent(this.name)}`,
                     userAgent: "UnTitles 0.3.0, Music bot, github.com/SNIPPIK/UnTitles"
                 }
-            ).send(), timeoutPromise]) as json | Error;
+            ).toJson, timeoutPromise]) as json | Error;
 
             // Если получаем вместо данных ошибку
             if (api instanceof Error) return resolve(api);
@@ -264,9 +270,10 @@ export class Track extends BaseTrack {
 
     /**
      * @description Функция подготавливающая путь до аудио, так же проверяющая его актуальность
+     * @returns Promise<string | Error>
      * @private
      */
-    private prepareResource = async (): Promise<any> => {
+    private prepareResource = async (): Promise<string | Error> => {
         // Если включено кеширование
         if (db.cache.audio) {
             const status = db.cache.audio.status(this);
@@ -283,7 +290,7 @@ export class Track extends BaseTrack {
             // Проверяем ссылку на актуальность
             if (this.link.startsWith("http")) {
                 try {
-                    const status = await new httpsClient({url: this.link, method: "HEAD"}).head();
+                    const status = await new httpsClient({url: this.link}).toHead;
                     const error = httpsStatusCode.parse(status);
 
                     // Если получена ошибка

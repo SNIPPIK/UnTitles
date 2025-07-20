@@ -66,11 +66,14 @@ export class PlayerProgress {
     /**
      * @description Создаем класс для отображения прогресс бара
      * @param size - Размер
+     * @constructor
+     * @public
      */
     public constructor(private readonly size: number = 15) {};
 
     /**
      * @description Получаем готовый прогресс бар
+     * @returns string
      * @public
      */
     public bar = ({ duration, platform }: PlayerProgressInput): string => {

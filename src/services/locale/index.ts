@@ -24,7 +24,7 @@ type locale_text = keyof typeof locales;
 export class locale {
     /**
      * @description Язык по-умолчанию, использовать только тот, где есть перевод на 100%
-     * @static
+     * @returns languages
      * @public
      */
     public static get language(): languages {
@@ -34,6 +34,8 @@ export class locale {
     /**
      * @description Переименование однотипных языков
      * @param language - Тип locale для перевода
+     * @returns languages
+     * @private
      */
     private static universalLang = (language: languages): languages => {
         if (["en-GB"].includes(language)) return "en-US";
@@ -48,7 +50,7 @@ export class locale {
      * @param language - Тип locale для перевода
      * @param locale - Имя перевода
      * @param args - Аргументы будут подставлены автоматически вместо "{ARGUMENT}" в порядке очереди
-     * @static
+     * @returns string
      * @public
      */
     public static _ = (language: languages, locale: locale_text, args?: any[]) => {
@@ -75,7 +77,7 @@ export class locale {
      * @description Перевод ошибки на язык по-умолчанию
      * @param locale - Имя перевода
      * @param args - Аргументы будут подставлены автоматически вместо "{ARGUMENT}" в порядке очереди
-     * @static
+     * @returns Error
      * @public
      */
     public static err = (locale: locale_text, args?: any[]) => {

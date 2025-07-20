@@ -135,6 +135,8 @@ export class ControllerTracks<T extends Track> {
     /**
      * @description Добавляем трек в очередь
      * @param track - Сам трек
+     * @returns void
+     * @public
      */
     public push = (track: T) => {
         // Если включена перетасовка, то добавляем треки в оригинальную очередь
@@ -147,6 +149,8 @@ export class ControllerTracks<T extends Track> {
     /**
      * @description Получаем прошлый трек или текущий в зависимости от позиции
      * @param position - позиция трека, номер в очереди
+     * @returns Track
+     * @public
      */
     public get = (position: number ) => {
         return this._current[position];
@@ -155,6 +159,8 @@ export class ControllerTracks<T extends Track> {
     /**
      * @description Удаляем из очереди неугодный трек
      * @param position - позиция трека, номер в очереди
+     * @returns void
+     * @public
      */
     public remove = (position: number) => {
         // Если трек удаляем из виртуально очереди, то и из оригинальной
@@ -179,6 +185,8 @@ export class ControllerTracks<T extends Track> {
     /**
      * @description Ищем позицию в базе
      * @param track - Искомый трек
+     * @returns number
+     * @public
      */
     public indexOf = (track: T) => {
         return this._current.indexOf(track);
@@ -188,6 +196,8 @@ export class ControllerTracks<T extends Track> {
      * @description Получаем <указанное> кол-во треков
      * @param size - При -5 будут выданы выданные последние от текущей позиции, при +5 будут выданы следующие треки
      * @param position - Позиция с которой будет начат отсчет
+     * @returns T[]
+     * @public
      */
     public array(size: number, position?: number): T[] {
         const realPosition = position ?? this._position;
@@ -199,6 +209,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Перетасовка треков, так-же есть поддержка полного восстановления
+     * @returns void
      * @public
      */
     public shuffleTracks = (bol: boolean) => {
@@ -237,6 +248,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Очищаем текущий класс от треков и прочих параметров
+     * @returns void
      * @public
      */
     public clear = () => {

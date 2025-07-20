@@ -17,6 +17,7 @@ export class ControllerFilters<T extends AudioFilter> {
 
     /**
      * @description Получаем список включенных фильтров
+     * @returns T[]
      * @public
      */
     public get enabled() {
@@ -25,6 +26,7 @@ export class ControllerFilters<T extends AudioFilter> {
 
     /**
      * @description Сжимаем фильтры для работы ffmpeg
+     * @returns string
      * @public
      */
     public compress = (time?: number, isSwap = false) => {

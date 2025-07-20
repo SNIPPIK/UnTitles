@@ -379,11 +379,12 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
 
         // Обработка массива данных
         if (Array.isArray(rest)) {
-            const tracks = rest.map((choice) => ({
-                value: choice.url,
-                name: `🎵 (${choice.time.split}) | ${choice.artist.title.slice(0, 20)} - ${choice.name.slice(0, 60)}`
-            }));
-            items.push(...tracks);
+            for (const track of rest) {
+                items.push({
+                    name: `🎵 (${track.time.split}) | ${track.artist.title.slice(0, 20)} - ${track.name.slice(0, 60)}`,
+                    value: track.url,
+                });
+            }
         }
 
         // Показываем плейлист
@@ -393,10 +394,12 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
         });
 
         // Показываем трек
-        else items.push({
+        else {
+            items.push({
                 name: `🎵 (${rest.time.split}) | ${rest.artist.title.slice(0, 20)} - ${rest.name.slice(0, 60)}`,
-                value: rest.url
+                value: search
             });
+        }
 
         // Отправка ответа
         await message.respond(items);

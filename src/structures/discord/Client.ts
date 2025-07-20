@@ -22,14 +22,16 @@ export class DiscordClient extends Client {
 
     /**
      * @description Номер осколка
+     * @returns number
      * @public
      */
-    public get shardID() {
+    public get shardID(): number {
         return this.shard?.ids[0] ?? 0;
     };
 
     /**
      * @description Создание стандартного осколка
+     * @constructor
      * @public
      */
     public constructor() {
@@ -47,7 +49,7 @@ export class DiscordClient extends Client {
             presence: {
                 afk: false,
                 status: env.get("client.status", "online"),
-                activities: [{name: " 🌟 Creator: SNIPPIK", type: ActivityType.Custom}]
+                activities: [{name: " 🌟 Startup...", type: ActivityType.Custom}]
             },
 
             // Права бота
@@ -95,10 +97,11 @@ export class DiscordClient extends Client {
 
     /**
      * @description Функция создания и управления статусом
+     * @returns void
      * @readonly
      * @private
      */
-    private readonly IntervalStatus = () => {
+    private readonly IntervalStatus = (): void => {
         // Время обновления статуса
         const timeout = parseInt(env.get("client.presence.interval", "120"));
         const arrayUpdate = parseInt(env.get("client.presence.array.update", "3600")) * 1e3;
@@ -142,10 +145,11 @@ export class DiscordClient extends Client {
 
     /**
      * @description Функция подготавливающая статусы
+     * @returns ActivityOptions[]
      * @readonly
      * @private
      */
-    private readonly parseStatuses = () => {
+    private readonly parseStatuses = (): ActivityOptions[] => {
         const statuses: ActivityOptions[] = [];
         const guilds = this.guilds.cache.size;
         const users = this.users.cache.size;

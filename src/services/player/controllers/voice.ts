@@ -18,6 +18,7 @@ export class ControllerVoice<T extends VoiceConnection> {
 
     /**
      * @description Производим подключение к голосовому каналу
+     * @param connection - Голосовой канал
      * @public
      */
     public set connection(connection: T) {
@@ -41,6 +42,7 @@ export class ControllerVoice<T extends VoiceConnection> {
      * @description Подключение к голосовому каналу
      * @param client - Класс клиента для подключения
      * @param ctx - Параметры подключения
+     * @returns void
      * @public
      */
     public join = (client: DiscordClient, ctx: QueueMessage<CommandInteraction>["voice"]) => {

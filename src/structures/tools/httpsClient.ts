@@ -1,20 +1,6 @@
-import { createGunzip, createBrotliDecompress, createInflate } from "node:zlib";
-import { request } from "undici";
-import * as os from "node:os";
-
-/**
- * @author SNIPPIK
- * @description Интерфейс с данными запроса
- * @interface RequestData
- */
-export interface RequestData {
-    url: string; // Полный URL
-    method?: string; // HTTP-метод, по умолчанию "GET"
-    headers?: Record<string, string>; // Заголовки
-    body?: any; // Тело запроса (если применимо)
-    validateStatus?: (statusCode: number) => boolean; // Проверка допустимости статус-кода
-    userAgent?: string | boolean; // Пользовательский User-Agent
-}
+import { BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip } from "node:zlib";
+import { request as httpsRequest, RequestOptions } from "node:https";
+import { IncomingMessage, request as httpRequest } from "node:http";
 
 /**
  * @author SNIPPIK
@@ -22,120 +8,245 @@ export interface RequestData {
  * @interface httpsClient_head
  */
 export interface httpsClient_head {
+    // Статус код
     statusCode: number;
+
+    // Статус сообщение
     statusMessage: string;
+
+    // Заголовки
     headers: Record<string, string | string[]>;
 }
 
 /**
  * @author SNIPPIK
- * @description Генерация User-Agent строки, эмулирующей браузер
- * @private
+ * @description Класс создающий запрос нативно
+ * @class Request
+ * @abstract
  */
-function generateUserAgent(): string {
-    const platform = os.platform();
-    const arch = os.arch();
-    const nodeVersion = process.version;
-    return `Mozilla/5.0 (${platform}; ${arch}) Node/${nodeVersion} httpsClient/2.0`;
+abstract class Request {
+    /**
+     * @description Данные для создания запроса
+     * @protected
+     */
+    protected readonly data: {
+        url?: string;
+
+        method?: "POST" | "GET" | "HEAD" | "PATCH";
+
+        // Headers запроса
+        headers?: RequestOptions["headers"];
+
+        // Если мы хотим что-то отправить серверу
+        body?: string;
+
+        // Пользовательский User-Agent
+        userAgent?: string | boolean;
+    } & RequestOptions = {
+        headers: {}
+    };
+
+    /**
+     * @description Получаем протокол ссылки
+     * @returns httpsRequest | httpRequest
+     * @private
+     */
+    private get protocol() {
+        const protocol = this.data.protocol?.split(":")[0];
+        return protocol === "https" ? httpsRequest : httpRequest;
+    };
+
+    /**
+     * @description Создаем запрос по ссылке, модифицируем по необходимости
+     * @return Promise<IncomingMessage | Error>
+     * @public
+     */
+    public get request(): Promise<IncomingMessage | Error> {
+        return new Promise((resolve) => {
+            const request = this.protocol(this.data, (res) => {
+
+                // Если есть редирект куда-то
+                if (res.headers?.location) {
+                    if ((res.statusCode >= 300 && res.statusCode < 400)) {
+                        this.data.path = res.headers.location;
+                        return resolve(this.request);
+                    }
+                }
+
+                return resolve(res);
+            });
+
+            // Если запрос POST, отправляем ответ на сервер
+            if (this.data.method === "POST" && this.data.body) request.write(this.data.body);
+
+            /**
+             * @description Если превышено время ожидания
+             */
+            request.once("timeout", () => {
+                return resolve(Error(`[httpsClient]: Connection Timeout Exceeded ${this.data.url}:443`))
+            });
+
+            /**
+             * @description Если получена ошибка
+             */
+            request.once("error", (err) => {
+                return resolve(Error(`[httpsClient]: Connection Error: ${err}`))
+            });
+
+            /**
+             * @description Если запрос завершен
+             */
+            request.once("end", () => {
+                request.removeAllListeners();
+            });
+
+            request.end();
+        });
+    };
+
+    /**
+     * @description Инициализируем класс
+     * @param options - Опции
+     * @constructor
+     * @public
+     */
+    public constructor(options: httpsClient["data"]) {
+        // Если ссылка является ссылкой
+        if (options.url.startsWith("http")) {
+            const {hostname, pathname, search, port, protocol} = new URL(options.url);
+
+            //Создаем стандартные настройки
+            Object.assign(this.data, {
+                port, hostname, path: pathname + search, protocol
+            });
+        }
+
+        // Надо ли генерировать user-agent
+        if (options?.userAgent !== undefined) {
+            // Если указан свой user-agent
+            if (typeof options?.userAgent === "string") {
+                Object.assign(this.data.headers, {
+                    "User-Agent": options.userAgent
+                });
+
+                // Генерируем новый
+            } else {
+                const revision = `${(140).random(120)}.0`;
+                const OS = ["(X11; Linux x86_64;", "(Windows NT 10.0; Win64; x64;"];
+
+                Object.assign(this.data.headers, {
+                    "User-Agent": `Mozilla/5.0 ${OS[(OS.length - 1).random(0)]} rv:${revision}) Gecko/20100101 Firefox/${revision}`,
+                    "Sec-Ch-Ua-Full-Version": `Firefox/${revision}`,
+                    "Sec-Ch-Ua-Bitness": `64`,
+                    "Sec-Ch-Ua-Arch": "x86",
+                    "Sec-Ch-Ua-Mobile": "?0"
+                });
+            }
+        }
+
+        options.url = null;
+        Object.assign(this.data, options);
+    };
 }
 
 /**
  * @author SNIPPIK
- * @description Класс для обработки HTTP/HTTPS-запросов с поддержкой undici
+ * @description Создаем http или https запрос
  * @class httpsClient
  * @public
  */
-export class httpsClient {
+export class httpsClient extends Request {
+    /**
+     * @description Выполняем HEAD-запрос — получаем только заголовки
+     * @returns Promise<httpsClient_head>
+     * @public
+     */
+    public get toHead(): Promise<httpsClient_head> {
+        return new Promise(async (resolve) => {
+            this.request.then((response) => {
+                if (response instanceof Error) {
+                    return resolve({
+                        statusCode: undefined,
+                        statusMessage: `${response}`,
+                        headers: {}
+                    });
+                }
+
+
+                return resolve({
+                    statusCode: response.statusCode === 400 && response.statusMessage === "Bad Request" ? 200 : response.statusCode,
+                    statusMessage: response.statusMessage,
+                    headers: response.headers,
+                });
+            });
+        });
+    };
+
+    /**
+     * @description Получаем страницу в формате string
+     * @returns Promise<string | Error>
+     * @public
+     */
+    public get toString(): Promise<string | Error> {
+        return new Promise((resolve) => {
+            this.request.then((res) => {
+                if (res instanceof Error) return resolve(res);
+
+                const encoding = res.headers["content-encoding"];
+                let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage = res, data = "";
+
+                if (encoding === "br") decoder = res.pipe(createBrotliDecompress()  as any);
+                else if (encoding === "gzip") decoder = res.pipe(createGunzip()     as any);
+                else if (encoding === "deflate") decoder = res.pipe(createDeflate() as any);
+
+                decoder.setEncoding("utf-8").on("data", (c) => data += c).once("end", () => {
+                    setImmediate(() => {
+                        data = null;
+                        decoder.removeAllListeners();
+                        decoder.destroy();
+                    });
+
+                    return resolve(data);
+                });
+            }).catch((err) => {
+                return resolve(err);
+            });
+        });
+    };
+
+    /**
+     * @description Получаем со страницы JSON (Работает только тогда когда все страница JSON)
+     * @returns Promise<json | Error>
+     * @public
+     */
+    public get toJson(): Promise<json | Error> {
+        return this.toString.then((body) => {
+            if (body instanceof Error) return body;
+
+            try {
+                return JSON.parse(body);
+            } catch {
+                return Error(`Invalid json response body at ${this.data.hostname}`);
+            }
+        });
+    };
+
     /**
      * @description Берем данные из XML страницы
+     * @returns Promise<string[] | Error>
      * @public
      */
     public get toXML(): Promise<Error | string[]> {
         return new Promise(async (resolve) => {
-            const body = await this.send() as string | Error;
+            const body = await this.toString;
 
-            // Если была получена ошибка
             if (body instanceof Error) return resolve(Error("Not found XML data!"));
 
-            // Ищем данные в XML странице для дальнейшего вывода
             const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
             const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
             return resolve(filtered.filter((text) => text.trim() !== ""));
-        });
+        })
     };
-
-    public constructor(private readonly data: RequestData) {
-        data.method = data?.method || "GET";
-        data.headers = data?.headers || {};
-
-        if (data.userAgent !== undefined) {
-            if (typeof data.userAgent === "string") data.headers["user-agent"] = data.userAgent;
-            else data.headers["user-agent"] = generateUserAgent();
-        }
-
-        this.data = data;
-    }
-
-    /**
-     * @description Выполняем HEAD-запрос — получаем только заголовки
-     * @public
-     */
-    public async head(): Promise<httpsClient_head> {
-        this.data.method = "HEAD";
-        const response = await this.send();
-
-        return {
-            statusCode: response.statusCode,
-            statusMessage: response.statusMessage,
-            headers: response.headers,
-        };
-    }
-
-    /**
-     * @description Отправка HTTP/HTTPS-запроса с поддержкой редиректов и автоматического парсинга ответа
-     * @returns Promise<any>
-     * @public
-     */
-    public async send(): Promise<any> {
-        const { url, method, headers, body } = this.data;
-
-        const res = await request(url, {
-            body: body ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
-            maxRedirections: 5,
-            method,
-            headers
-        });
-
-        const { statusCode, headers: resHeaders } = res;
-
-        // HEAD-запрос — сразу вернуть результат без чтения тела
-        if (method === "HEAD")  return { statusCode, headers: resHeaders, statusMessage: res?.["statusMessage"] };
-
-        if (this.data.validateStatus && !this.data.validateStatus(statusCode))
-            throw new Error(`Invalid response status: ${statusCode}`);
-
-        let stream = res.body as any;
-
-        // Распаковка, если ответ сжат
-        const encoding = resHeaders["content-encoding"];
-        if (encoding === "gzip") stream = stream.pipe(createGunzip());
-        else if (encoding === "br") stream = stream.pipe(createBrotliDecompress());
-        else if (encoding === "deflate") stream = stream.pipe(createInflate());
-
-        const chunks: Buffer[] = [];
-        for await (const chunk of stream) chunks.push(chunk);
-        const raw = Buffer.concat(chunks);
-
-        try {
-            const contentType = resHeaders["content-type"] || "";
-
-            if (contentType.includes("application/json")) return JSON.parse(raw.toString("utf-8"));
-            else if (contentType.includes("text/")) return raw.toString("utf-8");
-            else return raw;
-        } catch (err) {
-            throw new Error(`Error parsing response: ${err}`);
-        }
-    }
 }
 
 /**
@@ -146,7 +257,7 @@ export class httpsClient {
 export class httpsStatusCode {
     /**
      * @description Парсинг статус кода, возвращает Error или null
-     * @static
+     * @returns Error
      * @public
      */
     public static parse = ({ statusCode, statusMessage }: httpsClient_head): Error | null => {

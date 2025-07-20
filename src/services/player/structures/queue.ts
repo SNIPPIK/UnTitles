@@ -149,6 +149,7 @@ abstract class BaseQueue {
     /**
      * @description Создаем очередь для дальнейшей работы, все подключение находятся здесь
      * @param message - Опции для создания очереди
+     * @constructor
      * @public
      */
     protected constructor(message: CommandInteraction) {

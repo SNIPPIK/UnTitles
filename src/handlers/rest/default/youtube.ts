@@ -263,7 +263,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                         return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
-                                const details = await RestYouTubeAPI.API(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAQ%3D%3D`);
+                                const details = await RestYouTubeAPI.API(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`);
 
                                 // Если при получении данных возникла ошибка
                                 if (details instanceof Error) return resolve(details);
@@ -274,8 +274,8 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                                 // Проверяем на наличие видео
                                 if (vanilla_videos?.length === 0 || !vanilla_videos) return resolve(locale.err("api.request.fail"));
 
-                                let filtered_ = vanilla_videos?.filter((video: json) => video && video?.["videoRenderer"] && video?.["videoRenderer"]?.["videoId"])?.splice(0, limit);
-                                let videos: Track.data[] = filtered_.map(({ videoRenderer }: json) => RestYouTubeAPI.track(videoRenderer));
+                                const filtered_ = vanilla_videos?.filter((video: json) => video && video?.["videoRenderer"])?.splice(0, limit);
+                                const videos: Track.data[] = filtered_.map(({ videoRenderer }: json) => RestYouTubeAPI.track(videoRenderer));
 
                                 return resolve(videos);
                             } catch (e) {
@@ -307,7 +307,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 }
             })
                 // Получаем исходную страницу
-                .send()
+                .toString
 
                 // Получаем результат из Promise
                 .then((api) => {
@@ -365,7 +365,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
         // Если получена не страница
         if (typeof input !== "string") return locale.err("api.request.fail");
 
-        // Если надо получить данные поностью
+        // Если надо получить данные полностью
         if (pattern === 0) {
             const initialDataMatch = input?.match(/var ytInitialData = (.*?);<\/script>/);
             if (!initialDataMatch) return locale.err("api.request.fail");
@@ -417,7 +417,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                     "x-youtube-client-name": "1",
                     "x-youtube-client-version": "2.20201021.03.00"
                 }
-            }).send().then((channel) => {
+            }).toJson.then((channel) => {
                 if (channel instanceof Error) return resolve(null);
 
                 const data = channel[1]?.response ?? channel?.response ?? null as any;
@@ -442,10 +442,10 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
     protected static track = (track: json) => {
         const title = track.title?.simpleText ?? track.title?.["runs"]?.[0]?.text ?? track.title;
         const author = track["shortBylineText"]?.["runs"]?.[0]?.text ?? track.author;
+        const id = track?.["videoId"] ?? track?.["inlinePlaybackEndpoint"]?.["watchEndpoint"]?.["videoId"];
 
         try {
-            return { title,
-                id: track["videoId"],
+            return { title, id,
                 url: `https://youtu.be/${track["videoId"]}`,
                 artist: {
                     title: author,
@@ -458,8 +458,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 audio: track?.format?.url || undefined
             };
         } catch {
-            return { title,
-                id: track["videoId"],
+            return { title, id,
                 artist: {
                     title: author,
                     url: `https://www.youtube.com/channel/${track.channelId}`

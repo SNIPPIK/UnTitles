@@ -46,13 +46,13 @@ export class ClientSRTPSocket {
      * @description Пустой заголовок RTP, для использования внутри класса
      * @private
      */
-    private _RTP_HEAD = Buffer.alloc(12);
+    private _RTP_HEAD = Buffer.allocUnsafe(12);
 
     /**
      * @description Пустой буфер
      * @private
      */
-    private _nonce: Buffer = Encryption.nonce;
+    private _nonce: Buffer = Buffer.from(Encryption.nonce);
 
     /**
      * @description Порядковый номер пустого буфера
@@ -74,7 +74,7 @@ export class ClientSRTPSocket {
 
     /**
      * @description Задаем единственный актуальный вариант шифрования
-     * @static
+     * @returns EncryptionModes
      * @public
      */
     public static get mode() {
@@ -83,13 +83,14 @@ export class ClientSRTPSocket {
 
     /**
      * @description Buffer для режима шифрования, нужен для правильно расстановки пакетов
+     * @returns Buffer
      * @public
      */
     public get nonceSize() {
-        // Проверяем что-бы не было привышения int 32
+        // Проверяем что-бы не было превышения int 32
         if (this._nonceSize > MAX_32BIT) this._nonceSize = 0;
 
-        // Записываем в буффер
+        // Записываем в буфер
         this._nonce.writeUInt32BE(this._nonceSize, 0);
 
         this._nonceSize++; // Добавляем к размеру
@@ -98,11 +99,12 @@ export class ClientSRTPSocket {
 
     /**
      * @description Пустой пакет для внесения данных по стандарту "Voice Packet Structure"
+     * @returns Buffer
      * @private
      */
     private get header() {
-        if (this.sequence > MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было привышения int 16
-        if (this.timestamp > MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было привышения int 32
+        if (this.sequence > MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было превышения int 16
+        if (this.timestamp > MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было превышения int 32
 
         /** Безопасен, поскольку данные будут сразу перезаписаны */
         const RTPHead = this._RTP_HEAD;
@@ -136,17 +138,18 @@ export class ClientSRTPSocket {
 
     /**
      * @description Задаем структуру пакета
-     * @param packet - Аудио пакет OPUS
+     * @param frame - Аудио пакет OPUS
+     * @returns Buffer
      * @public
      */
-    public packet = (packet: Buffer) => {
+    public packet = (frame: Buffer) => {
         // Получаем заголовок RTP
         const RTPHead = this.header;
 
         // Получаем nonce буфер 12-24 бит
         const nonce = this.nonceSize;
 
-        return this.decodeAudioBuffer(RTPHead, packet, nonce);
+        return this.decodeAudioBuffer(RTPHead, frame, nonce);
     };
 
     /**
@@ -155,6 +158,8 @@ export class ClientSRTPSocket {
      * @param packet        - Аудио пакет
      * @param nonce         - Размер nonce
      * @param authTag       - Если требуется указать свой тег авторизации
+     * @returns Buffer
+     * @public
      */
     public decodeAudioBuffer = (RTPHead: Buffer, packet: Buffer, nonce?: Buffer, authTag?: Buffer) => {
         // Получаем тип шифрования
@@ -196,6 +201,7 @@ export class ClientSRTPSocket {
     /**
      * @description Возвращает случайное число, находящееся в диапазоне n бит
      * @param bits - Количество бит
+     * @returns number
      * @private
      */
     private randomNBit = (bits: number) => {
@@ -213,6 +219,7 @@ export class ClientSRTPSocket {
 
     /**
      * @description Удаляем неиспользуемые данные
+     * @returns void
      * @public
      */
     public destroy = () => {

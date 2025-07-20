@@ -8,6 +8,7 @@
 export class SetArray<T> extends Set<T> {
     /**
      * @description Выдаем коллекцию... Для дальнейшего использования
+     * @returns T[]
      * @public
      */
     public get array() {
@@ -17,18 +18,20 @@ export class SetArray<T> extends Set<T> {
     /**
      * @description Производим фильтрацию по функции
      * @param predicate - Функция поиска
+     * @returns T[]
      * @public
      */
-    public filter(predicate: (item: T) => boolean): T[] {
+    public filter = (predicate: (item: T) => boolean): T[] => {
         return this.array.filter(predicate);
     };
 
     /**
      * @description Производим поиск объекта по функции
      * @param predicate - Функция поиска
+     * @returns T[]
      * @public
      */
-    public find(predicate: (item: T) => boolean): T {
+    public find = (predicate: (item: T) => boolean): T => {
         return this.array.find(predicate);
     };
 }

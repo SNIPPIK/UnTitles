@@ -56,21 +56,24 @@ export class CacheUtility {
 
     /**
      * @description Выдаем класс для кеширования аудио
+     * @returns CacheAudio
      * @public
      */
-    public get audio(): null | CacheAudio {
+    public get audio(): CacheAudio {
         if (!this._options.inFile) return null;
         return this.data.audio;
     };
 
     /**
      * @description Путь до директории кеширования
+     * @returns string
      * @public
      */
     public get dirname() { return this._options.dirname; };
 
     /**
      * @description Можно ли сохранять кеш в файл
+     * @returns string
      * @public
      */
     public get inFile() { return this._options.inFile; };
@@ -79,6 +82,8 @@ export class CacheUtility {
      * @description Сохраняем данные в класс
      * @param track - Кешируемый трек
      * @param api - Ссылка на платформу
+     * @returns Promise<void>
+     * @public
      */
     public set = async (track: Track.data, api: string) => {
         if (this.inFile) {
@@ -87,17 +92,16 @@ export class CacheUtility {
             if (!fs.existsSync(filePath)) {
                 try {
                     const dirPath = path.dirname(filePath);
-                    await afs.mkdir(dirPath, {recursive: true});
-
-                    const data = {
-                        track: {
-                            ...track,
-                            audio: null
-                        }
-                    };
+                    await afs.mkdir(dirPath, { recursive: true });
 
                     // Записываем данные в файл
-                    await afs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+                    await afs.writeFile(filePath, JSON.stringify(
+                        {
+                            track: {
+                                ...track,
+                                audio: null
+                            }
+                        }, null, 2), "utf-8");
                 } catch (error) {
                     console.error("Failed to write track cache:", error);
                 }
@@ -115,8 +119,10 @@ export class CacheUtility {
     /**
      * @description Выдаем данные из класса
      * @param ID - Идентификатор трека
+     * @returns Track.data
+     * @public
      */
-    public get = (ID: string): Track.data | null => {
+    public get = (ID: string): Track.data => {
         if (this.inFile) {
             // Если есть трек в кеше
             if (fs.existsSync(`${this.dirname}/Data/${ID}.json`)) {
@@ -164,7 +170,7 @@ class CacheAudio extends PromiseCycle<Track> {
             custom: {
                 push: (track) => {
                     // Защита от повторного добавления
-                    setImmediate(async () => {
+                    setImmediate(() => {
                         const find = this.filter((item) => track.url === item.url);
                         if (find.length > 1) this.delete(find[0]);
                     });
@@ -202,18 +208,12 @@ class CacheAudio extends PromiseCycle<Track> {
                     // Если была получена ошибка
                     ffmpeg.stdout.once("error", () => {
                         this.delete(track);
+                        fs.unlinkSync(`${status.path}.opus`);
                         return resolve(false);
                     });
 
                     // Если запись была завершена
                     ffmpeg.stdout.once("end", async () => {
-                        const isValid = await this.validateFile(`${status.path}.opus`);
-                        if (!isValid) {
-                            fs.unlinkSync(`${status.path}.opus`);
-                            this.delete(track);
-                            return resolve(false);
-                        }
-
                         this.delete(track);
                         return resolve(true);
                     });
@@ -223,33 +223,9 @@ class CacheAudio extends PromiseCycle<Track> {
     };
 
     /**
-     * @description Проверяет, является ли файл корректным аудио
-     * @param filePath - Путь до файла
-     */
-    private async validateFile(filePath: string): Promise<boolean> {
-        try {
-            const stats = fs.statSync(filePath);
-            if (stats.size < 1024) return false;
-
-            const ffmpeg = new Process([
-                "-v", "error",
-                "-i", filePath,
-                "-f", "null",
-                "-"
-            ]);
-
-            return new Promise((resolve) => {
-                ffmpeg.stdout.once("end", () => resolve(true));
-                ffmpeg.stdout.once("error", () => resolve(false));
-            });
-        } catch (err) {
-            return false;
-        }
-    };
-
-    /**
      * @description Получаем статус скачивания и путь до файла
      * @param track
+     * @public
      */
     public status = (track: Track | string): { status: "not-ended" | "ended" | "download", path: string } => {
         let file: string;

@@ -104,7 +104,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
         if (player.status === "player/pause") player.resume();
 
         // Запускаем функцию воспроизведения треков
-        player.play();
+        (() => player.play())();
     };
 
     /**
@@ -133,7 +133,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
 
                     // Если разные текстовые каналы
                     if (queue.message.channelID !== message.channelId) {
-                        // Меняем тектовый канал
+                        // Меняем текстовый канал
                         queue.message = new QueueMessage(message);
                     }
 

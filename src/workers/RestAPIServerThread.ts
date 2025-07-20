@@ -41,12 +41,13 @@ class RestServer extends handler<RestServerSide.API> {
      * @description Исключаем платформы из общего списка
      * @public
      */
-    public get allow() {
+    public get allow(): RestServerSide.API[] {
         return Object.values(this.platforms.supported).filter(api => api.auth);
     };
 
     /**
      * @description Загружаем класс вместе с дочерним
+     * @constructor
      * @public
      */
     public constructor() {
@@ -55,7 +56,22 @@ class RestServer extends handler<RestServerSide.API> {
     };
 
     /**
+     * @description Получаем платформу
+     * @param name - Имя платформы
+     * @public
+     */
+    public platform = (name: RestServerSide.API["name"]) => {
+        const platform = this.platforms.supported[name];
+
+        // Если есть такая платформа по имени
+        if (platform) return platform;
+
+        return this.allow.find((api) => !!api.filter.exec(name));
+    };
+
+    /**
      * @description Функция загрузки api запросов
+     * @returns void
      * @public
      */
     public register = () => {
@@ -91,7 +107,7 @@ if (parentPort && workerData.rest) {
     rest = new RestServer();
 
     // Получаем ответ от основного потока
-    parentPort.on("message", async (message: RestServerSide.ServerOptions) => {
+    parentPort.on("message", (message: RestServerSide.ServerOptions): Promise<void> | void => {
         // Запускаем Garbage Collector
         setImmediate(() => {
             if (global.gc) global.gc();
@@ -113,12 +129,15 @@ if (parentPort && workerData.rest) {
 /**
  * @author SNIPPIK
  * @description Получения json данных из платформ
- * @param api
+ * @param api - Данные для успешного запроса
+ * @returns Promise<void>
+ * @function ExtractDataFromAPI
+ * @async
  */
 async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
     try {
         const { platform, payload, options } = api;
-        const readPlatform: RestServerSide.API = rest.platforms.supported[platform];
+        const readPlatform: RestServerSide.API = rest.platform(platform);
         const callback = readPlatform.requests.find((p) => {
             // Если производится прямой запрос по названию
             if (p.name === payload) return p;
@@ -157,6 +176,9 @@ async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
 /**
  * @author SNIPPIK
  * @description Выдача найденных платформ без функций запроса
+ * @returns Promise<void>
+ * @function ExtractData
+ * @async
  */
 async function ExtractData() {
     const fake = rest.allow;
@@ -165,7 +187,7 @@ async function ExtractData() {
         requests: api.requests.map(request => {
             const sanitized = { ...request };
             Object.keys(sanitized).forEach(key => {
-                if (typeof sanitized[key] === 'function') {
+                if (typeof sanitized[key] === "function") {
                     delete sanitized[key];
                 }
             });
@@ -176,7 +198,7 @@ async function ExtractData() {
     const data = {
         supported: Object.fromEntries(fakeReq.map(api => [api.name, api])),
         authorization: fakeReq.filter(api => !api.auth).map(api => api.name),
-        audio: fakeReq.filter(api => !api.audio).map(api => api.name),
+        audio: fakeReq.filter(api => api.audio === false).map(api => api.name),
         block: []
     };
 

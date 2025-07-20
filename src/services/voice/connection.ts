@@ -1,5 +1,5 @@
-import { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData } from "discord-api-types/v10";
-import { VoiceAdapter, DiscordGatewayAdapterCreator } from "./adapter";
+import { APIVoiceState, GatewayVoiceServerUpdateDispatchData } from "discord-api-types/v10";
+import { DiscordGatewayAdapterCreator, VoiceAdapter } from "./adapter";
 import { VoiceReceiver } from "#service/voice/managers/receiver";
 import { ClientSRTPSocket } from "./sockets/ClientSRTPSocket";
 import { ClientWebSocket } from "./sockets/ClientWebSocket";
@@ -170,17 +170,19 @@ export class VoiceConnection {
 
     /**
      * @description Данные из VOICE_STATE_UPDATE
+     * @returns APIVoiceState
      * @private
      */
-    public get voiceState() {
+    public get voiceState(): APIVoiceState {
         return this.adapter.packet.state;
     };
 
     /**
      * @description Данные из VOICE_SERVER_UPDATE
+     * @returns GatewayVoiceServerUpdateDispatchData
      * @private
      */
-    public get serverState() {
+    public get serverState(): GatewayVoiceServerUpdateDispatchData {
         return this.adapter.packet.server;
     };
 
@@ -188,6 +190,7 @@ export class VoiceConnection {
      * @description Создаем голосовое подключение
      * @param configuration - Данные для подключения
      * @param adapterCreator - Параметры для сервера
+     * @constructor
      * @public
      */
     public constructor(public configuration: VoiceConnectionConfiguration, adapterCreator: DiscordGatewayAdapterCreator) {
@@ -197,7 +200,7 @@ export class VoiceConnection {
              * новых данных, предоставленных в пакете.
              * @param packet - Полученный пакет `VOICE_SERVER_UPDATE`
              */
-            onVoiceServerUpdate: (packet: GatewayVoiceServerUpdateDispatchData) => {
+            onVoiceServerUpdate: (packet) => {
                 this.adapter.packet.server = packet;
 
                 // Если есть точка подключения
@@ -210,7 +213,7 @@ export class VoiceConnection {
              * @param packet - Полученный пакет `VOICE_STATE_UPDATE`
              * @private
              */
-            onVoiceStateUpdate: (packet: GatewayVoiceStateUpdateDispatchData) => {
+            onVoiceStateUpdate: (packet) => {
                 this.adapter.packet.state = packet;
             },
             destroy: this.destroy
@@ -220,7 +223,7 @@ export class VoiceConnection {
         this.adapter.sendPayload(this.configuration);
         this._status = VoiceConnectionStatus.connected;
 
-        // Если включен програмно звук
+        // Если включен программно звук
         if (!configuration.self_deaf) {
             this.receiver = new VoiceReceiver(this);
         }
@@ -239,7 +242,7 @@ export class VoiceConnection {
         //this.websocket.on("warn", console.log);
 
         /**
-         * @description Отправляем Identify данные, для регистарции голосового подключения
+         * @description Отправляем Identify данные, для регистрации голосового подключения
          * @status Identify
          * @code 0
          */
@@ -288,10 +291,11 @@ export class VoiceConnection {
                 ssrc: this._attention.ssrc
             });
 
-            this._status = VoiceConnectionStatus.ready;
-
             // Сохраняем ключ, для повторного использования
             this._attention.secret_key = d.secret_key;
+
+            // Смена статуса на готов
+            this._status = VoiceConnectionStatus.ready;
         });
 
         /**
@@ -318,7 +322,7 @@ export class VoiceConnection {
          * @code 1000-4022
          */
         this.websocket.on("close", (code, reason) => {
-            if (code >= 1000 && code <= 1002 || this._status === VoiceConnectionStatus.reconnecting) return this.destroy();
+            if (code >= 1000 && code <= 1002 || code === 4002 || this._status === VoiceConnectionStatus.reconnecting) return this.destroy();
 
             // Подключения больше не существует
             else if (code === 4006 || code === 4003) {
@@ -350,6 +354,7 @@ export class VoiceConnection {
     /**
      * @description Создание udp подключения
      * @param d - Пакет opcode.ready
+     * @private
      */
     private createUDPSocket = (d: WebSocketOpcodes.ready["d"]) => {
         this.clientUDP.connect(d); // Подключаемся по UDP к серверу
@@ -396,6 +401,7 @@ export class VoiceConnection {
             this.websocket.emit("warn", `UDP Error: ${error.message}. Closed voice connection!`);
         });
 
+        // Записываем последний SSRC
         this._attention.ssrc = d.ssrc;
     };
 
@@ -454,10 +460,7 @@ enum VoiceConnectionStatus {
     SessionDescription = "sessionDescription",
 
     // Если происходит переподключение
-    reconnecting = "reconnecting",
-
-    userSpeaking = "userSpeaking",
-    userMute = "userMute",
+    reconnecting = "reconnecting"
 }
 
 /**

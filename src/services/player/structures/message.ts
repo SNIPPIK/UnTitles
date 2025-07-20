@@ -14,6 +14,7 @@ export class QueueMessage<T extends CommandInteraction> {
 
     /**
      * @description Язык сообщения
+     * @returns Locale
      * @public
      */
     public get locale() {
@@ -22,6 +23,7 @@ export class QueueMessage<T extends CommandInteraction> {
 
     /**
      * @description Получение класса о сервере
+     * @returns Guild
      * @public
      */
     public get guild() {
@@ -30,6 +32,7 @@ export class QueueMessage<T extends CommandInteraction> {
 
     /**
      * @description Получение ID сервера
+     * @returns string
      * @public
      */
     public get guildID() {
@@ -38,6 +41,7 @@ export class QueueMessage<T extends CommandInteraction> {
 
     /**
      * @description Получение текущего текстового канала
+     * @returns TextChannel
      * @public
      */
     public get channel() {
@@ -46,6 +50,7 @@ export class QueueMessage<T extends CommandInteraction> {
 
     /**
      * @description Получение ID текстового канала
+     * @returns string
      * @public
      */
     public get channelID() {
@@ -54,6 +59,7 @@ export class QueueMessage<T extends CommandInteraction> {
 
     /**
      * @description Получение текущего голосового соединения пользователя
+     * @returns VoiceState
      * @public
      */
     public get voice() {
@@ -62,6 +68,7 @@ export class QueueMessage<T extends CommandInteraction> {
 
     /**
      * @description Получение ID голосового канала
+     * @returns string
      * @public
      */
     public get voiceID() {
@@ -96,6 +103,7 @@ export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description Создаем класс для общения с discord api
      * @param _original - Класс сообщения
+     * @constructor
      * @public
      */
     public constructor(private readonly _original: T) {

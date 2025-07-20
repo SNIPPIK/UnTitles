@@ -1,5 +1,6 @@
 import { Worker } from "node:worker_threads";
 import { Track } from "#service/player";
+import { Logger } from "#structures";
 import path from "node:path";
 import { db } from "#app/db";
 
@@ -25,33 +26,37 @@ export class RestObject {
 
     /**
      * @description Платформы с доступом к запросам
+     * @returns RestServerSide.API[]
      * @public
      */
-    public get allow() {
+    public get allow(): RestServerSide.API[] {
         return Object.values(this.platforms.supported).filter(api => api.auth);
     };
 
     /**
      * @description Платформы с доступом к аудио
+     * @returns RestServerSide.API[]
      * @public
      */
-    public get audioSupport() {
+    public get audioSupport(): RestServerSide.API[] {
         return Object.values(this.platforms.supported).filter(api => api.auth && api.audio && !this.platforms.block.includes(api.name));
     };
 
     /**
      * @description Платформы с доступом к потоку
+     * @returns RestServerSide.API[]
      * @public
      */
-    public get allowWave() {
+    public get allowWave(): RestServerSide.API[] {
         return Object.values(this.platforms.supported).filter(api => api.auth && api.requests.some((apis) => apis.name === "wave"));
     };
 
     /**
      * @description Функция для инициализации worker
+     * @returns Promise<boolean>
      * @public
      */
-    public startWorker = async () => {
+    public startWorker = async (): Promise<boolean> => {
         // Если уже есть worker
         if (this.worker) {
             this.worker.removeAllListeners();
@@ -80,7 +85,7 @@ export class RestObject {
 
             // Получаем данные о загруженных платформах
             this.worker.postMessage({data: true});
-            this.worker.once("message", (data) => {
+            this.worker.once("message", (data: RestServerSide.Data) => {
                 this.platforms = data;
                 return resolve(true);
             });
@@ -90,6 +95,7 @@ export class RestObject {
     /**
      * @description Если надо обновить ссылку на трек или аудио недоступно у платформы
      * @param track - Трек у которого надо получить ссылку на исходный файл
+     * @returns Promise<string | Error>
      * @public
      */
     public fetch = async (track: Track): Promise<string | Error | null> => {
@@ -97,7 +103,7 @@ export class RestObject {
             const { name, artist, url, api } = track;
             const { authorization, audio } = this.platforms;
 
-            // Если платформа поддерживает получение аудио
+            // Если платформа поддерживает получение аудио и может получать данные
             if (!authorization.includes(api.name) && !audio.includes(api.name)) {
                 const song = await this.request(api.name).request<"track">(url, { audio: true }).request();
                 return song instanceof Error ? song : song.link;
@@ -107,37 +113,40 @@ export class RestObject {
 
             // Ищем нужную платформу
             for (const platform of this.audioSupport) {
-                // Если у платформы нет даже 2 запросов
-                if (platform.requests.length < 2) continue;
+                // Если у платформы нет даже 2 запросов или это эта же платформа
+                if (platform.requests.length < 2 && platform.name === api.name) continue;
 
+                // Получаем класс для работы с Worker
                 const platformAPI = this.request(platform.name);
 
                 // Поиск трека
-                const searchQuery = `${artist.title} - ${name}`;
-                const tracks = await platformAPI.request<"search">(searchQuery).request();
+                const tracks = await platformAPI.request<"search">(`${name} ${artist.title}`).request();
 
                 // Если при получении треков произошла ошибка
                 if (tracks instanceof Error) {
+                    Logger.log("DEBUG", `${tracks}`);
                     lastError = tracks;
                     continue;
                 }
 
                 // Если треков не найдено
                 else if (!tracks.length) {
-                    lastError = Error(`[APIs/${platform.name}] Couldn't find any tracks similar to this one`);
+                    Logger.log("DEBUG", `[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
+                    lastError = Error(`[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
                     continue;
                 }
 
                 // Ищем нужный трек
                 const findTrack = tracks.find((song) => {
                     const name = song.name.toLowerCase().match(track.name.toLowerCase());
-                    const time = Math.abs(song.time.total - track.time.total) <= 20;
+                    const time = Math.abs(song.time.total - track.time.total);
 
-                    return time || name;
+                    return (time === 0 || time >= 15 || time <= 15) || name;
                 });
 
                 // Если отфильтровать треки не удалось
                 if (!findTrack) {
+                    Logger.log("DEBUG", `[APIs/${platform.name}/fetch] The tracks found do not match the description of this`);
                     lastError = Error(`[APIs/${platform.name}] The tracks found do not match the description of this`);
                     continue;
                 }
@@ -147,26 +156,40 @@ export class RestObject {
 
                 // Если при получении трека произошла ошибка
                 if (song instanceof Error) {
+                    Logger.log("DEBUG", `${song}`);
                     lastError = song;
                     continue;
                 }
 
-                link = song.link;
-                break;
+                // Если есть ссылка на аудио
+                if (song.link !== undefined) {
+                    try {
+                        // Меняем время трека на время найденного трека
+                        track.time = song.time;
+                    } catch {}
+
+                    // Выносим ссылку из цикла
+                    link = song.link;
+                    break;
+                }
             }
 
-            // Если во время поиска произошла ошибка
-            if (lastError && !link) return lastError;
+            // Если нет ссылки на исходный аудио файл
+            if (!link) {
+                // Если во время поиска произошла ошибка
+                if (lastError) return lastError;
 
-            // Если нет ошибки и ссылки
-            else if (!lastError && !link) return Error(`[APIs] There were no errors and there are no audio links to the resource`);
+                // Если нет ошибки и ссылки
+                else if (!lastError) return Error(`[APIs/fetch] There were no errors and there are no audio links to the resource`);
 
-            // Если нет ссылки
-            else if (!link) return Error(`[APIs] Unable to get audio link on alternative platforms!`);
+                // Если нет ссылки
+                return Error(`[APIs/fetch] Unable to get audio link on alternative platforms!`);
+            }
 
             return link;
         } catch (err) {
-            return err instanceof Error ? err : Error(`[APIs] Unexpected error ${err}`);
+            Logger.log("DEBUG", `[APIs/fetch] ${err}`);
+            return err instanceof Error ? err : Error(`[APIs/fetch] Unexpected error ${err}`);
         }
     };
 
@@ -186,9 +209,11 @@ export class RestObject {
      */
     private platform = (name: RestServerSide.API["name"]) => {
         const platform = this.platforms.supported[name];
+
+        // Если есть такая платформа по имени
         if (platform) return platform;
 
-        return this.allow.find((api) => api.filter.exec(name) !== null);
+        return this.allow.find((api) => !!api.filter.exec(name));
     };
 
     /**
@@ -258,7 +283,7 @@ export class RestObject {
 export namespace RestClientSide {
     /**
      * @author SNIPPIK
-     * @description Данные для валидного запроса паралельному процессу
+     * @description Данные для валидного запроса параллельному процессу
      * @interface ServerOptions
      */
     export interface ClientOptions {

@@ -46,7 +46,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         interval: null as NodeJS.Timeout,
 
         /**
-         * @description Интервал для предотвращения разрыва в милисекундах
+         * @description Интервал для предотвращения разрыва в миллисекундах
          * @readonly
          * @private
          */
@@ -82,6 +82,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /**
      * @description Отправка данных на сервер
      * @param packet - Отправляемый пакет
+     * @public
      */
     public set packet(packet: Buffer) {
         // Отправляем (RTP+OPUS) пакет
@@ -153,6 +154,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
     /**
      * @description Подключаемся к серверу через UDP подключение
+     * @returns void
      * @public
      */
     public discovery = (ssrc: number) => {
@@ -178,7 +180,8 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     };
 
     /**
-     * @description Закрывает сокет, экземпляр не сможет быть повторно использован.
+     * @description Закрывает сокет, экземпляр не сможет быть повторно использован
+     * @returns void
      * @public
      */
     public destroy = () => {
@@ -207,6 +210,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
     /**
      * @description Пакет для создания UDP соединения
+     * @returns Buffer
      * @public
      */
     private discoveryBuffer = (ssrc: number) => {
@@ -221,6 +225,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
     /**
      * @description Функция для запуска интервала для поддержания соединения
+     * @returns void
      * @private
      */
     private manageKeepAlive = () => {
@@ -238,6 +243,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
     /**
      * @description Сброс таймера для поддерживания KeepAlive
+     * @returns void
      * @private
      */
     private resetKeepAliveInterval = () => {

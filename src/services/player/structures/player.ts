@@ -109,9 +109,10 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Создаем обструкционный класс
      * @param _tracks - Ссылка на класс треков
      * @param _voice - Ссылка на класс голосового подключения
+     * @constructor
      * @protected
      */
-    protected constructor(protected _tracks: ControllerTracks<Track>, protected _voice: ControllerVoice<VoiceConnection>) {
+    protected constructor(protected readonly _tracks: ControllerTracks<Track>, protected readonly _voice: ControllerVoice<VoiceConnection>) {
         super();
     };
 
@@ -129,7 +130,7 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
      * @param seek - Время пропуска, трек начнется с указанного времени
      */
     protected readonly _readStream = (path: string, time: number = 0, seek: number = 0) => {
-        Logger.log("DEBUG", `[Player/${this.id}] has read stream`);
+        Logger.log("DEBUG", `[Player/${this.id}] has read stream ${path}`);
 
         // Если другой аудио поток загружается, то запрещаем включение
         if (this.waitStream) return null;
@@ -169,6 +170,16 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
 
             // Уничтожаем новый аудио поток
             stream.destroy();
+        });
+
+        // Отслеживаем событие окончания
+        (stream as BufferedAudioResource).once("end", () => {
+            this.waitStream = false;
+        });
+
+        // Отслеживание событие закрытия
+        (stream as BufferedAudioResource).once("close", () => {
+            this.waitStream = false;
         });
 
         return stream;
@@ -432,10 +443,11 @@ export class AudioPlayer extends BasePlayer {
 
         // Устанавливаем время паузы
         this._pauseTimestamp = Date.now();
-    }
+    };
 
     /**
      * @description Возобновляет воспроизведение плеера
+     * @returns void
      * @public
      */
     public resume = (): void => {
@@ -464,6 +476,7 @@ export class AudioPlayer extends BasePlayer {
     /**
      * @description Останавливаем воспроизведение текущего трека
      * @param position - Позиция нового трека
+     * @returns Promise<void> | void
      * @public
      */
     public stop = (position?: number): Promise<void> | void => {
@@ -487,6 +500,7 @@ export class AudioPlayer extends BasePlayer {
 
     /**
      * @description Эта функция частично удаляет плеер и некоторые сопутствующие данные
+     * @returns void
      * @public
      */
     public cleanup = () => {

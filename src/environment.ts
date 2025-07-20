@@ -72,6 +72,7 @@ export var env: Environment;
 /**
  * @author SNIPPIK
  * @description Инициализация .env файла
+ * @returns void
  * @private
  */
 (() => {

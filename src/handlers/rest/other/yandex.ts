@@ -265,7 +265,7 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                     "Authorization": "OAuth " + this.authorization.token
                 },
                 method: "GET",
-            }).send().then((req) => {
+            }).toJson.then((req) => {
                 // Если на этапе получение данных получена одна из ошибок
                 if (!req || req instanceof Error) return resolve(locale.err("api.request.fail"));
                 else if (req?.error?.name === "session-expired") return resolve(locale.err("api.request.login.session-expired"));

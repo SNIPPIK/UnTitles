@@ -27,6 +27,7 @@ export type DefaultListener = (...args: any[]) => void;
 export class TypedEmitter<L extends Record<string, any>> extends EventEmitterAsyncResource {
     /**
      * @description Инициализирует новый экземпляр TypedEmitter с максимальным количеством слушателей 5
+     * @constructor
      * @public
      */
     public constructor() {

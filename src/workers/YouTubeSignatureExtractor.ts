@@ -56,7 +56,7 @@ export class Youtube_decoder_native {
             callback: (body, _, code) => {
                 try {
                     const callerFunc = DECIPHER_FUNC_NAME + "(" + DECIPHER_ARGUMENT + ");";
-                    let resultFunc;
+                    let resultFunc: string;
 
                     const sigFunctionMatcher = body.match(new RegExp(TCE_SIGN_FUNCTION_REGEXP, 's'));
                     const sigFunctionActionsMatcher = body.match(new RegExp(TCE_SIGN_FUNCTION_ACTION_REGEXP, 's'));
@@ -85,7 +85,7 @@ export class Youtube_decoder_native {
 
                     let funcMatch = body.match(new RegExp(DECIPHER_REGEXP, "s"));
                     let isTce = false;
-                    let decipherFunc;
+                    let decipherFunc: string;
 
                     if (funcMatch) decipherFunc = funcMatch[0];
                     else {
@@ -254,7 +254,7 @@ export class Youtube_decoder_native {
      * @private
      */
     private static extractPage = async (html5: string) => {
-        const body = await new httpsClient({url: html5}).send();
+        const body = await new httpsClient({url: html5}).toString;
 
         if (body instanceof Error) return null;
 

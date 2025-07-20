@@ -11,9 +11,32 @@ import {DiscordClient} from "#structures/discord/Client";
 export * from "./Client";
 export * from "./modules/VoiceManager";
 
+/**
+ * @description Тип входящих данных для команд
+ * @type CommandInteraction
+ * @public
+ */
 export type CommandInteraction = ChatInputCommandInteraction<CacheType>;
+
+/**
+ * @description Тип входящих данных для дополнения к команде
+ * @type CompeteInteraction
+ * @public
+ */
 export type CompeteInteraction = AutocompleteInteraction<CacheType>;
+
+/**
+ * @description Тип входящих данных для кнопок
+ * @type buttonInteraction
+ * @public
+ */
 export type buttonInteraction = ButtonInteraction<CacheType>;
+
+/**
+ * @description Тип входящих данных для циклической системы
+ * @type buttonInteraction
+ * @public
+ */
 export type CycleInteraction = Message<true>;
 
 /**
@@ -76,6 +99,13 @@ declare module "discord.js" {
  * @public
  */
 export class ShardManager extends ShardingManager {
+    /**
+     * @description Создание менеджера осколков
+     * @param file - путь до файла запуска осколка
+     * @param token - токен бота
+     * @constructor
+     * @public
+     */
     public constructor(file: string, token: string) {
         super(file, {
             execArgv: ["-r", "tsconfig-paths/register", "--expose-gc", "--optimize_for_size"],

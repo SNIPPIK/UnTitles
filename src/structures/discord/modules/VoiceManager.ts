@@ -18,6 +18,7 @@ export class VoiceManager<Client extends DiscordClient> {
     /**
      * @description Создание класса
      * @param client - Класс клиента
+     * @constructor
      * @public
      */
     public constructor(private client: Client) {
@@ -34,6 +35,7 @@ export class VoiceManager<Client extends DiscordClient> {
 
     /**
      * @description Создание адаптера для голосового состояния бота
+     * @returns DiscordGatewayAdapterCreator
      * @public
      */
     public createVoiceAdapter = (guildID: string): DiscordGatewayAdapterCreator => {
@@ -58,6 +60,7 @@ export class VoiceManager<Client extends DiscordClient> {
     /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_SERVER_UPDATE
      * @param payload - Данные голосового состояния
+     * @returns void
      * @public
      */
     public onVoiceServer = (payload: GatewayVoiceServerUpdateDispatchData) => {
@@ -67,6 +70,7 @@ export class VoiceManager<Client extends DiscordClient> {
     /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_STATE_UPDATE
      * @param payload - Данные голосового состояния
+     * @returns void
      * @public
      */
     public onVoiceStateUpdate = (payload: GatewayVoiceStateUpdateDispatchData) => {

@@ -162,6 +162,7 @@ export var db: Database;
 /**
  * @author SNIPPIK
  * @description Инициализирует базу данных
+ * @returns void
  * @private
  */
 export function initDatabase(client: DiscordClient) {

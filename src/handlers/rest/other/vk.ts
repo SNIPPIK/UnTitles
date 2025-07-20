@@ -153,7 +153,7 @@ class RestVKAPI extends Assign<RestServerSide.API> {
 
             new httpsClient({
                 url
-            }).send().then((api: any) => {
+            }).toJson.then((api: any) => {
                 // Если на этапе получение данных получена одна из ошибок
                 if (!api || !api?.response) return resolve(locale.err( "api.request.fail"));
                 else if (api?.["error_code"] || api?.error) return resolve(locale.err( "api.request.fail.msg", [api?.["error_msg"]]));

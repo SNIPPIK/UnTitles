@@ -35,6 +35,7 @@ export class VoiceAdapter {
     /**
      * @description Отправка данных о голосовом состоянии в Discord
      * @param config - Данные для подключения
+     * @returns boolean
      * @public
      */
     public sendPayload = (config: VoiceConnectionConfiguration) => {

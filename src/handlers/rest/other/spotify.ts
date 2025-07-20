@@ -243,7 +243,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                     },
                     body: "grant_type=client_credentials",
                     method: "POST"
-                }).send();
+                }).toJson;
 
                 // Если при получении токена была получена ошибка
                 if (token instanceof Error) return resolve(token);
@@ -262,7 +262,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                     "Content-Type": "application/x-www-form-urlencoded",
                     "Authorization": "Bearer " + this.authorization.token
                 }
-            }).send().then((api) => {
+            }).toJson.then((api) => {
                 // Если на этапе получение данных получена одна из ошибок
                 if (!api) return resolve(locale.err("api.request.fail"));
                 else if (api instanceof Error) return resolve(api);

@@ -21,10 +21,10 @@ const db = {
      * @protected
      */
     status: {
-        "DEBUG": "\x1b[34mi\x1b[0m",
-        "WARN": "\x1b[33mi\x1b[0m",
-        "ERROR": "\x1b[31mi\x1b[0m",
-        "LOG": "\x1b[32mi\x1b[0m"
+        "DEBUG": "\x1b[34mD\x1b[0m",
+        "WARN": "\x1b[33mW\x1b[0m",
+        "ERROR": "\x1b[31mE\x1b[0m",
+        "LOG": "\x1b[32mI\x1b[0m"
     }
 };
 
@@ -37,16 +37,18 @@ const db = {
 export class Logger {
     /**
      * @description Если включен режим отладки
-     * @private
+     * @public
+     * @static
      */
     public static debug = process.env["NODE_ENV"] === "development";
 
     /**
      * @description Отправляем лог в консоль
+     * @returns void
      * @public
      * @static
      */
-    public static log = (status: keyof typeof db.status, text: string) => {
+    public static log = (status: keyof typeof db.status, text: string): void => {
         // Игнорируем debug сообщения
         if (status === "DEBUG" && !this.debug) return;
 
@@ -62,15 +64,17 @@ export class Logger {
 
         // Отправляем лог
         process.stdout.write(`\x1b[35m[RAM ${memUsedMB} MB]\x1b[0m ${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}\n`)
-        return;
     };
 
     /**
      * @description Добавляем цвет к тексту
      * @param color - Цвет текста, в number console
      * @param text - Текст
+     * @returns string
+     * @public
+     * @static
      */
-    public static color = (color: number, text: string) => {
+    public static color = (color: number, text: string): string => {
         return `\x1b[${color}m${text}\x1b[0m`
     };
 }

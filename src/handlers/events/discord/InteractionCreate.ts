@@ -77,13 +77,13 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
                 // Если используется функция ответа от бота
                 if (ctx.isAutocomplete()) {
-                    Logger.log("DEBUG", `User ${ctx.user.username} run autocomplete ${ctx?.commandName}`);
+                    Logger.log("DEBUG", `[${ctx.user.username}] run autocomplete ${ctx?.commandName}`);
                     return this.SelectAutocomplete(ctx);
                 }
 
                 // Если пользователь использует команду
                 else if (ctx.isChatInputCommand()) {
-                    Logger.log("DEBUG", `User ${ctx.user.username} run command ${ctx?.commandName}`);
+                    Logger.log("DEBUG", `[${ctx.user.username}] run command ${ctx?.commandName}`);
 
                     // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
                     if (!db.owner.ids.includes(ctx.user.id)) {
@@ -122,13 +122,13 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
 
                 // Действия выбора
                 else if (ctx.isAnySelectMenu && !ctx.isButton()) {
-                    Logger.log("DEBUG", `User ${ctx.user.username} run selector menu ${ctx?.["customId"]}`);
+                    Logger.log("DEBUG", `[${ctx.user.username}] run selector menu ${ctx?.["customId"]}`);
                     return this.SelectMenuCallback(ctx as any);
                 }
 
                 // Управление кнопками
                 else if (ctx.isButton()) {
-                    Logger.log("DEBUG", `User ${ctx.user.username} run button ${ctx?.customId}`);
+                    Logger.log("DEBUG", `[${ctx.user.username}] run button ${ctx?.customId}`);
                     return this.SelectButton(ctx);
                 }
 

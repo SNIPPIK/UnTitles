@@ -16,24 +16,26 @@ export abstract class Collection<K, T = string> {
      * @description Получаем случайный объект из MAP
      * @public
      */
-    public get array() {
-        return Array.from(this._map.values());
+    public get array(): K[] {
+        return this._map.values().toArray();
     };
 
     /**
      * @description Получаем кол-во объектов в списке
+     * @returns number
      * @public
      */
-    public get size() {
+    public get size(): number {
         return this._map.size;
     };
 
     /**
      * @description Получаем объект из ID
      * @param ID - ID объекта
+     * @returns K
      * @public
      */
-    public get = (ID: T) => {
+    public get = (ID: T): K => {
         return this._map.get(ID);
     };
 
@@ -42,9 +44,10 @@ export abstract class Collection<K, T = string> {
      * @param ID - ID объекта
      * @param value - Объект для добавления
      * @param promise - Если надо сделать действие с объектом
+     * @returns K
      * @public
      */
-    public set = (ID: T, value: K, promise?: (item: K) => void) => {
+    public set = (ID: T, value: K, promise?: (item: K) => void): K => {
         const item = this.get(ID);
 
         // Если нет объекта, то добавляем его
@@ -62,9 +65,10 @@ export abstract class Collection<K, T = string> {
      * @description Удаляем элемент из списка
      * @param ID - ID Сервера
      * @param silent - тихое удаление объекта
+     * @returns void
      * @public
      */
-    public remove = (ID: T, silent: boolean = false) => {
+    public remove = (ID: T, silent: boolean = false): void => {
         const item = this._map.get(ID);
 
         // Если не найден объект
