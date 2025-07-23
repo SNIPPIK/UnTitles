@@ -163,23 +163,30 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
             }
         );
 
+        // Если аудио поток не ответил в течении указанного времени
+        const timeout = setTimeout(() => {
+            // Отправляем данные событию для отображения ошибки
+            stream.emit("error", new Error("Timeout: the stream has been exceeded!"));
+        }, 5e3);
+
         // Отслеживаем аудио поток на ошибки
         (stream as BufferedAudioResource).once("error", () => {
             // Разрешаем вводить новые аудио потоки
             this.waitStream = false;
 
+            // Удаляем таймер
+            clearTimeout(timeout);
+
             // Уничтожаем новый аудио поток
             stream.destroy();
         });
 
-        // Отслеживаем событие окончания
-        (stream as BufferedAudioResource).once("end", () => {
+        (stream as BufferedAudioResource).once("readable", () => {
+            // Разрешаем вводить новые аудио потоки
             this.waitStream = false;
-        });
 
-        // Отслеживание событие закрытия
-        (stream as BufferedAudioResource).once("close", () => {
-            this.waitStream = false;
+            // Удаляем таймер
+            clearTimeout(timeout);
         });
 
         return stream;
@@ -397,7 +404,6 @@ export class AudioPlayer extends BasePlayer {
 
             // Действия при готовности
             const handleReady = () => {
-                this.waitStream = false;
                 this._audio.current = stream;
                 this.status = "player/playing";
 

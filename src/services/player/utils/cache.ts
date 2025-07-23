@@ -207,13 +207,15 @@ class CacheAudio extends PromiseCycle<Track> {
 
                     // Если была получена ошибка
                     ffmpeg.stdout.once("error", () => {
+                        ffmpeg.destroy();
                         this.delete(track);
                         fs.unlinkSync(`${status.path}.opus`);
                         return resolve(false);
                     });
 
                     // Если запись была завершена
-                    ffmpeg.stdout.once("end", async () => {
+                    ffmpeg.stdout.once("end", () => {
+                        ffmpeg.destroy();
                         this.delete(track);
                         return resolve(true);
                     });

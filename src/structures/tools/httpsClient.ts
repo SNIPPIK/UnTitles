@@ -43,7 +43,9 @@ abstract class Request {
         // Пользовательский User-Agent
         userAgent?: string | boolean;
     } & RequestOptions = {
-        headers: {}
+        headers: {},
+        minVersion: "TLSv1.3",
+        maxVersion: "TLSv1.3"
     };
 
     /**

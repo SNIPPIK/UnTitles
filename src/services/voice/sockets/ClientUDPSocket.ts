@@ -118,6 +118,9 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         // Меняем данные
         this.options = options;
 
+        // Если уже есть подключение
+        if (this.socket) this.reset();
+
         // Проверяем через какое соединение подключатся
         if (isIPv4(options.ip)) this.socket = createSocket("udp4");
         else this.socket = createSocket("udp6");
@@ -180,6 +183,23 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     };
 
     /**
+     * @description Удаляем UDP подключение
+     * @private
+     */
+    private reset = () => {
+        if (this.socket) {
+            try {
+                this.socket.disconnect?.();
+                this.socket.close?.();
+            } catch (err) {
+                if (err instanceof Error && err.message.includes("Not running")) return;
+            }
+        }
+
+        this.socket = null;
+    };
+
+    /**
      * @description Закрывает сокет, экземпляр не сможет быть повторно использован
      * @returns void
      * @public
@@ -198,14 +218,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         this.keepAlive = null;
         this.destroyed = null;
 
-        try {
-            this.socket.disconnect?.();
-            this.socket.close?.();
-        } catch (err) {
-            if (err instanceof Error && err.message.includes("Not running")) return;
-        }
-
-        this.socket = null;
+        this.reset();
     };
 
     /**

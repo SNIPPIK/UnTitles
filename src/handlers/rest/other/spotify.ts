@@ -283,6 +283,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
      * @static
      */
     protected static track = (track: json, images?: any[]) => {
+        const track_images = images?.length > 0 ? images : track?.album?.images || track?.images;
 
         return {
             id: track.id,
@@ -293,7 +294,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                 url: track["artists"][0]["external_urls"]["spotify"]
             },
             time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
-            image: (images ?? track.album?.images ?? track?.images).sort((item1: any, item2: any) => item1.width > item2.width)[0],
+            image: track_images.sort((item1: any, item2: any) => item1.width > item2.width)[0],
         };
     };
 }

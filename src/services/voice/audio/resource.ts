@@ -163,8 +163,9 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
         }
 
         // Разовая функция для удаления потока
-        this.once("close", options.events.destroy_callback.bind(this, options.input));
+        this.once("close", () => options.events.destroy_callback(options.input));
 
+        // Выполняем функцию декодирования
         return options.decode(options.input);
     };
 
@@ -200,7 +201,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @protected
      * @readonly
      */
-    private readonly _buffer = new AudioBuffer();
+    private _buffer = new AudioBuffer();
 
     /**
      * @description Если чтение возможно
@@ -268,18 +269,9 @@ export class BufferedAudioResource extends BaseAudioResource {
 
             // Начало кодирования
             decode: (input) => {
-                // Если поток нельзя читать, возможно что он еще грузится
-                const timeout = setTimeout(() => {
-                    // Отправляем данные событию для отображения ошибки
-                    this.emit("error", new Error("Timeout: the stream has been exceeded!"));
-                    // Начинаем уничтожение потока
-                    this.emit("close");
-                }, 15e3);
-
                 input.on("frame", (packet: Buffer) => {
                     // Сообщаем что поток можно начать читать
                     if (this._buffer.size === 0) {
-                        clearTimeout(timeout);
                         this.emit("readable");
                     }
 
@@ -344,6 +336,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      */
     public destroy = () => {
         this._buffer.clear();
+        this._buffer = null;
         this._destroy();
     };
 }
@@ -432,16 +425,7 @@ export class PipeAudioResource extends BaseAudioResource {
 
             // Начало кодирования
             decode: (input) => {
-                // Если поток нельзя читать, возможно что он еще грузится
-                const timeout = setTimeout(() => {
-                    // Отправляем данные событию для отображения ошибки
-                    this.emit("error", new Error("Timeout: the stream has been exceeded!"));
-                    // Начинаем уничтожение потока
-                    this.emit("close");
-                }, 15e3);
-
                 input.once("readable", () => {
-                    clearTimeout(timeout);
                     this._readable = true;
                     this.emit("readable");
                 });

@@ -11,6 +11,8 @@ import { db } from "#app/db";
  * @extends Assign
  * @event Events.GuildCreate
  * @public
+ *
+ * @license BSD-3-Clause + custom restriction | Эта команда защищена лицензией проекта, изменение или удаление строго запрещено!!!
  */
 class GuildCreate extends Assign<Event<Events.GuildCreate>> {
     public constructor() {
