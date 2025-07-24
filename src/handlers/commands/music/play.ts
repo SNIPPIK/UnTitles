@@ -379,12 +379,12 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
 
         // Обработка массива данных
         if (Array.isArray(rest)) {
-            for (const track of rest) {
-                items.push({
+            items.push(...rest.map((track) => {
+                return {
                     name: `🎵 (${track.time.split}) | ${track.artist.title.slice(0, 20)} - ${track.name.slice(0, 60)}`,
                     value: track.url,
-                });
-            }
+                }
+            }));
         }
 
         // Показываем плейлист
