@@ -27,14 +27,10 @@ export class ControllerCycles {
         private _stepTimestamp: number = 0;
 
         /**
-         * @description Указываем свое полученеие времени
-         * @protected
+         * @description Запускаем циклическую систему плееров, весь логический функционал здесь
+         * @constructor
+         * @public
          */
-        protected get time() {
-            return Number(process.hrtime.bigint()) / 1e6;
-            //return performance.now();
-        };
-
         public constructor() {
             super({
                 // Время до следующего прогона цикла
@@ -44,12 +40,13 @@ export class ControllerCycles {
                 // Кастомные функции (если хочется немного изменить логику выполнения)
                 custom: {
                     step: async () => {
-                        const drift = this.drift;
+                        const drift = this.drifting;
 
                         // Если цикл уходит от оригинала, подстраиваем плееры
-                        // 1 - Много
+                        // 1 - Очень много
+                        // 0.5 - То что надо
                         // 0.2 - 0.3 - Допустимо
-                        if (drift > 1) {
+                        if (drift > 0.5) {
                             const frames = (Math.ceil(drift / OPUS_FRAME_SIZE) + 1) * OPUS_FRAME_SIZE;
 
                             // Если текущее не совпадает с новым
@@ -59,8 +56,6 @@ export class ControllerCycles {
 
                                 // Меняем время цикла
                                 this.options.duration = frames;
-
-                                Logger.log("WARN", `[Cycle/Players]: Switch ${frames} ms timer`);
                             }
                         }
 
@@ -71,8 +66,6 @@ export class ControllerCycles {
                             if (this._stepTimestamp < Date.now()) {
                                 setImmediate(() => {
                                     this.options.duration = OPUS_FRAME_SIZE;
-
-                                    Logger.log("WARN", `[Cycle/Players]: Switch ${OPUS_FRAME_SIZE} ms timer`);
                                 });
                             }
                         }
@@ -107,6 +100,11 @@ export class ControllerCycles {
      * @public
      */
     public readonly messages = new class Messages<T extends CycleInteraction> extends TaskCycle<T> {
+        /**
+         * @description Запускаем циклическую систему сообщений
+         * @constructor
+         * @public
+         */
         public constructor() {
             super({
                 // Время до следующего прогона цикла
