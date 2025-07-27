@@ -48,9 +48,21 @@ class ButtonSkip extends Assign<Button> {
             name: "skip",
             callback: async (message) => {
                 const queue = db.queues.get(message.guildId);
+                const position = queue.tracks.position + 1;
 
-                // Меняем позицию трека в очереди
-                await queue.player.play(0, 0, queue.tracks.position + 1);
+                // Если позиция больше чем есть треков
+                if (position > queue.tracks.size) {
+                    // Переключаем на 0 позицию
+                    queue.tracks.position = 0;
+
+                    // Переключаемся на первый трек
+                    await queue.player.play(0, 0, queue.tracks.position);
+                }
+
+                else {
+                    // Переключаемся вперед
+                    await queue.player.play(0, 0, position);
+                }
 
                 // Уведомляем пользователя о пропущенном треке
                 return message.reply({
@@ -80,12 +92,24 @@ class ButtonBack extends Assign<Button> {
             callback: async (message) => {
                 const queue = db.queues.get(message.guildId);
                 const repeat = queue.tracks.repeat;
+                const position = queue.tracks.position;
 
                 // Делаем повтор временным
                 if (repeat === RepeatType.None) queue.tracks.repeat = RepeatType.Songs;
 
-                // Меняем позицию трека в очереди
-                await queue.player.play(0, 0, queue.tracks.position - 1);
+                // Если позиция меньше или равна 0
+                if (position <= 0) {
+                    // Переключаем на 0 позицию
+                    queue.tracks.position = queue.tracks.total - 1;
+
+                    // Переключаемся на последний трек
+                    await queue.player.play(0, 0, queue.tracks.position);
+                }
+
+                else {
+                    // Переключаемся на прошлый трек
+                    await queue.player.play(0, 0, position - 1);
+                }
 
                 // Возвращаем повтор
                 queue.tracks.repeat = repeat;
