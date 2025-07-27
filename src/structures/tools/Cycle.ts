@@ -20,7 +20,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @description Последний записанное значение performance.now(), нужно для улавливания event loop lags
      * @private
      */
-    private performance: number = 0;
+    private performance: number;
 
     /**
      * @description Последний сохраненный временной интервал
@@ -178,7 +178,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Коррекция event loop lag
         const performanceNow = performance.now();
         const eventLoopLag = this.performance
-            ? Math.max(0, (performanceNow - this.performance) - (tickTime + driftSteps))
+            ? Math.max(0, (performanceNow - this.performance) - (tickTime + (driftSteps / 0.5)))
             : duration;
         this.performance = performanceNow;
 
@@ -313,7 +313,7 @@ export abstract class TaskCycle<T = unknown> extends BaseCycle<T> {
             if (!this.options.filter(item)) continue;
 
             try {
-               this.options.execute(item);
+                this.options.execute(item);
             } catch (error) {
                 this.delete(item);
                 console.log(error);

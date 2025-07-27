@@ -58,7 +58,7 @@ export class ClientSRTPSocket {
      * @description Порядковый номер пустого буфера
      * @private
      */
-    private _nonceSize = 0;
+    private _nonceSize : number;
 
     /**
      * @description Последовательность opus фреймов
@@ -106,7 +106,7 @@ export class ClientSRTPSocket {
         if (this.sequence > MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было превышения int 16
         if (this.timestamp > MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было превышения int 32
 
-        /** Безопасен, поскольку данные будут сразу перезаписаны */
+        // Получаем текущий зашоловок
         const RTPHead = this._RTP_HEAD;
 
         // Записываем новую последовательность
@@ -131,6 +131,7 @@ export class ClientSRTPSocket {
     public constructor(private options: EncryptorOptions) {
         this.sequence = this.randomNBit(16);
         this.timestamp = this.randomNBit(32);
+        this._nonceSize = this.randomNBit(32);
 
         // Version + Flags, Payload Type 120 (Opus)
         [this._RTP_HEAD[0], this._RTP_HEAD[1]] = [0x80, 0x78];
@@ -157,11 +158,10 @@ export class ClientSRTPSocket {
      * @param RTPHead       - Заголовок
      * @param packet        - Аудио пакет
      * @param nonce         - Размер nonce
-     * @param authTag       - Если требуется указать свой тег авторизации
      * @returns Buffer
      * @public
      */
-    public decodeAudioBuffer = (RTPHead: Buffer, packet: Buffer, nonce?: Buffer, authTag?: Buffer) => {
+    public decodeAudioBuffer = (RTPHead: Buffer, packet: Buffer, nonce?: Buffer) => {
         // Получаем тип шифрования
         const mode = ClientSRTPSocket.mode;
 
@@ -175,21 +175,11 @@ export class ClientSRTPSocket {
         if (mode === "aead_aes256_gcm_rtpsize") {
             const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce, { authTagLength: 16 });
             cipher.setAAD(RTPHead);
-
-            if (authTag) {
-                cipher.setAAD(authTag);
-                return Buffer.concat([cipher.update(packet), cipher.final()]);
-            }
-
             return Buffer.concat([RTPHead, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
         }
 
         // Шифровка через библиотеку
         else if (mode === "aead_xchacha20_poly1305_rtpsize") {
-            if (authTag) {
-                return Buffer.from(loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(Buffer.concat([packet, authTag]), RTPHead, nonce, this.options.key));
-            }
-
             const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, RTPHead, nonce, this.options.key);
             return Buffer.concat([RTPHead, cryptoPacket, nonceBuffer]);
         }

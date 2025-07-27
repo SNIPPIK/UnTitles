@@ -116,14 +116,21 @@ class rest_error extends Assign<Event<"rest/error">> {
             execute: async (message, error) => {
                 Logger.log("ERROR", `[Rest/API] ${error}`);
 
+                const options = {
+                    embeds: [{
+                        title: locale._(message.locale, "api.error"),
+                        description: error,
+                        color: Colors.DarkRed
+                    }]
+                }
+
                 try {
-                    const msg = await message.channel.send({
-                        embeds: [{
-                            title: locale._(message.locale, "api.error"),
-                            description: error,
-                            color: Colors.DarkRed
-                        }]
-                    });
+                    let msg
+
+                    if (message.replied && !message.deferred) msg = await message.followUp(options as any);
+                    else if (message.deferred && !message.replied) msg = await message.editReply(options as any);
+                    else if (!message.deferred && !message.replied) msg = await message.reply(options as any);
+                    else message.channel.send(options as any);
 
                     if (msg.deletable) setTimeout(msg.delete, 15e3);
                 } catch (err) {

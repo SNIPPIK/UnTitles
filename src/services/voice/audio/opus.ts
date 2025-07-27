@@ -139,8 +139,10 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @private
      */
     private _choiceFrame = (frame: Buffer) => {
-        // Если еще не отправлен 1 пустой фрейм
+        // Если еще не отправлен 3 пустых фреймов
         if (this._first) {
+            this.emit("frame", SILENT_FRAME);
+            this.emit("frame", SILENT_FRAME);
             this.emit("frame", SILENT_FRAME);
             this._first = false;
         }

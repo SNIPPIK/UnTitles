@@ -60,7 +60,7 @@ class SeekTrackCommand extends Assign< BaseCommand > {
                 }
 
                 // Если пользователь указал времени больше чем в треке
-                else if (duration > queue.tracks.track.time.total) {
+                else if (duration > queue.tracks.track.time.total || duration <= 0) {
                     return message.reply({
                         embeds: [
                             {

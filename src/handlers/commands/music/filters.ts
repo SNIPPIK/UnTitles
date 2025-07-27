@@ -120,7 +120,7 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
                     // Если пользователь хочет выключить все аудио фильтры
                     case "off": {
                         // Если нет включенных фильтров
-                        if (player.filters.enabled.length === 0) {
+                        if (player.filters.enabled.size === 0) {
                             return message.reply({
                                 embeds: [
                                     {
@@ -165,7 +165,7 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
                         }
 
                         // Удаляем фильтры
-                        player.filters.enabled.splice(0, player.filters.enabled.length);
+                        player.filters.enabled.clear();
                         return null;
                     }
 
@@ -234,7 +234,7 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
                         }
 
                         // Добавляем фильтр
-                        player.filters.enabled.push(Filter);
+                        player.filters.enabled.add(Filter);
 
                         // Если можно включить фильтр или фильтры сейчас
                         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
@@ -283,8 +283,7 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
                         }
 
                         // Удаляем фильтр
-                        const index = player.filters.enabled.indexOf(findFilter as AudioFilter);
-                        player.filters.enabled.splice(index, 1);
+                        player.filters.enabled.delete(findFilter);
 
                         // Если можно выключить фильтр или фильтры сейчас
                         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
@@ -330,9 +329,9 @@ class AudioFiltersCommand extends Assign< BaseCommand > {
                 // Если нет включенных фильтров
                 if (!filters) return null;
 
-                const items = filters.filter(filter => filter.name.match(args[0])).map((filter) => {
+                const items = filters.filter(filter => !!filter.name.match(args[0])).map((filter) => {
                     return {
-                        name: filter.name,
+                        name: `🌀 ${filter.name}`,
                         value: filter.name
                     }
                 });

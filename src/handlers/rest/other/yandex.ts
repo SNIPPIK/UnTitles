@@ -237,7 +237,7 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
 
                                 // Обрабатываем ошибки
                                 if (api instanceof Error) return resolve(api);
-                                else if (!api.tracks) return resolve(locale.err("api.request.fail"));
+                                else if (!api.tracks) return resolve([]);
 
                                 const tracks = api.tracks["results"].splice(0, limit).map(RestYandexAPI.track);
                                 return resolve(tracks);

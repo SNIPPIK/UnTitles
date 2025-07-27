@@ -15,7 +15,7 @@
     "node": ">=23.0.0"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.16",
+    "discord-api-types": "^0.38.17",
     "discord.js": "^14.21.0",
     "ws": "^8.18.3"
   },
@@ -23,7 +23,7 @@
     "@snazzah/davey": "^0.1.6"
   },
   "devDependencies": {
-    "@types/node": "^24.0.14",
+    "@types/node": "^24.1.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },

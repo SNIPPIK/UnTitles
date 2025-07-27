@@ -21,10 +21,10 @@ const db = {
      * @protected
      */
     status: {
-        "DEBUG": "\x1b[34mD\x1b[0m",
-        "WARN": "\x1b[33mW\x1b[0m",
-        "ERROR": "\x1b[31mE\x1b[0m",
-        "LOG": "\x1b[32mI\x1b[0m"
+        "DEBUG": "\x1b[34md\x1b[0m",
+        "WARN": "\x1b[33mw\x1b[0m",
+        "ERROR": "\x1b[31me\x1b[0m",
+        "LOG": "\x1b[32mi\x1b[0m"
     }
 };
 

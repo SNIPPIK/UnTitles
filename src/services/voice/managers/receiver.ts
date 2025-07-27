@@ -79,7 +79,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
             const ssrc = message.readUInt32BE(8);
 
             if (this.ssrc === ssrc) {
-                // Copy the last 4 bytes of unpadded nonce to the padding of (12 - 4) or (24 - 4) bytes
+                // Копируем последние 4 байта незаполненного одноразового значения в заполнение (12 - 4) или (24 - 4) байтов.
                 message.copy(voice["clientSRTP"]["_nonceBuffer"], 0, message.length - UNPADDED_NONCE_LENGTH);
                 const audio = this.parsePacket(message);
 
@@ -100,23 +100,25 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
         const first = buffer.readUint8();
         if ((first >> 4) & 0x01) headerSize += 4;
 
-        // The unencrypted RTP header contains 12 bytes, HEADER_EXTENSION and the extension size
+        // Незашифрованный заголовок RTP содержит 12 байт, HEADER_EXTENSION и размер расширения
         const header = buffer.subarray(0, headerSize);
 
-        // Encrypted contains the extension, if any, the opus packet, and the auth tag
+        // Зашифрованный файл содержит расширение, если таковое имеется, пакет opus и тег аутентификации.
         const encrypted = buffer.subarray(headerSize, buffer.length - AUTH_TAG_LENGTH - UNPADDED_NONCE_LENGTH);
+        /*
         const authTag = buffer.subarray(
             buffer.length - AUTH_TAG_LENGTH - UNPADDED_NONCE_LENGTH,
             buffer.length - UNPADDED_NONCE_LENGTH,
         );
+         */
 
-        let packet = this.voice["clientSRTP"].decodeAudioBuffer(header, encrypted, this.voice["clientSRTP"]["_nonce"], authTag);
+        let packet = this.voice["clientSRTP"].decodeAudioBuffer(header, encrypted, this.voice["clientSRTP"]["_nonce"]);
 
         // Если нет аудио
         if (!packet) return null;
 
-        // Strip decrypted RTP Header Extension if present
-        // The header is only indicated in the original data, so compare with buffer first
+        // Удалить расшифрованное расширение заголовка RTP, если присутствует
+        // Заголовок указан только в исходных данных, поэтому сначала надо сравнить с буфером
         if (buffer.subarray(12, 14).compare(HEADER_EXTENSION_BYTE) === 0) {
             const headerExtensionLength = buffer.subarray(14).readUInt16BE();
             packet = packet.subarray(4 * headerExtensionLength);
@@ -132,5 +134,12 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
  * @interface VoiceReceiverEvents
  */
 interface VoiceReceiverEvents {
+    /**
+     * @description Событие когда говорит пользователь
+     * @param ids - IDs всех говорящих пользователей
+     * @param ssrc - SSRC сессии
+     * @param audio - Аудио пакет от пользователя
+     * @warn Аудио пока не работает!
+     */
     "speaking": (ids: string[], ssrc: number, audio: Buffer) => void;
 }

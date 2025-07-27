@@ -27,6 +27,12 @@ export class ControllerCycles {
         private _stepTimestamp: number = 0;
 
         /**
+         * @description Переключатель Jitter Buffer'а
+         * @private
+         */
+        private _switched: boolean = false;
+
+        /**
          * @description Запускаем циклическую систему плееров, весь логический функционал здесь
          * @constructor
          * @public
@@ -46,13 +52,13 @@ export class ControllerCycles {
                         // 1 - Очень много
                         // 0.5 - То что надо
                         // 0.2 - 0.3 - Допустимо
-                        if (drift > 0.5) {
+                        if (drift > 0.2) {
                             const frames = (Math.ceil(drift / OPUS_FRAME_SIZE) + 1) * OPUS_FRAME_SIZE;
 
                             // Если текущее не совпадает с новым
                             if (frames !== this.options.duration) {
-                                // Устанавливаем время шага для поддержкания
-                                this._stepTimestamp = Date.now() + 700;
+                                // Устанавливаем время шага для поддержания
+                                this._stepTimestamp = Date.now() + 1e3;
 
                                 // Меняем время цикла
                                 this.options.duration = frames;
@@ -60,11 +66,14 @@ export class ControllerCycles {
                         }
 
                         // Сброс таймера
-                        else if (this.options.duration !== OPUS_FRAME_SIZE) {
+                        else if (this.options.duration !== OPUS_FRAME_SIZE && !this._switched) {
 
                             // Защищаемся от спама
                             if (this._stepTimestamp < Date.now()) {
+                                this._switched = true;
+
                                 setImmediate(() => {
+                                    this._switched = false;
                                     this.options.duration = OPUS_FRAME_SIZE;
                                 });
                             }
@@ -77,13 +86,12 @@ export class ControllerCycles {
 
                 // Функция отправки аудио фрейма
                 execute: (player) => {
-                    const connection = player.voice.connection;
                     const size = this.options.duration / OPUS_FRAME_SIZE;
                     let i = 0;
 
                     // Отправляем пакет/ы в голосовой канал
                     do {
-                        connection.packet = player.audio.current.packet;
+                        player.voice.connection.packet = player.audio.current.packet;
                         i++;
                     } while (i < size);
                 }

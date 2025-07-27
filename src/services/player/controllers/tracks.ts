@@ -252,8 +252,11 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public clear = () => {
+        this._current.length = null;
+        this._original.length = null;
         this._current = null;
         this._original = null;
+
         this._position = null;
         this._repeat = null;
         this._shuffle = null;

@@ -164,7 +164,7 @@ class SkipUtilityCommand extends Assign< BaseCommand<number> > {
                 const {name, url, api} = track;
 
                 // Переходим к позиции
-                player.stop(number);
+                await player.play(0, 0, number);
 
                 switch (type) {
                     // Переключение текущий позиции назад

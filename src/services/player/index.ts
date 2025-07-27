@@ -94,12 +94,6 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @public
      */
     public set restart_player(player: AudioPlayer) {
-        // Если плеер удален из базы
-        if (!this.cycles.players.has(player)) {
-            // Добавляем плеер в базу цикла для отправки пакетов
-            this.cycles.players.add(player);
-        }
-
         // Если у плеера стоит пауза
         if (player.status === "player/pause") player.resume();
 
@@ -120,7 +114,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
         if (!queue) queue = new Queue(message) as T;
         else {
             // Значит что плеера нет в циклах
-            if (!this.cycles.players.has(queue.player)) {
+            if (!this.cycles.players.has(queue.player) && queue.player.status !== "player/pause") {
                 setImmediate(() => {
                     // Если добавлен трек
                     if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
@@ -234,7 +228,7 @@ export interface QueueEvents {
      * @param message  - Сообщение с сервера
      * @param url      - Ссылка на допустимый объект или текст для поиска
      */
-    readonly "rest/request": (api: RestClientSide.Request, message: CommandInteraction, url: string | json) => void;
+    readonly "rest/request": (api: RestClientSide.Request, message: CommandInteraction, url: string) => void;
 
     /**
      * @description Событие при котором будут отправляться ошибки из системы API

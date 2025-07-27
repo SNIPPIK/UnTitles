@@ -71,7 +71,7 @@ export class RestObject {
         });
 
         // Если возникнет ошибка, пересоздадим worker
-        this.worker.on("error", (err) => {
+        this.worker.once("error", (err) => {
             this.worker.removeAllListeners();
             this.worker = null;
 
@@ -86,7 +86,10 @@ export class RestObject {
             // Получаем данные о загруженных платформах
             this.worker.postMessage({data: true});
             this.worker.once("message", (data: RestServerSide.Data) => {
-                this.platforms = data;
+                this.platforms = {
+                    ...data,
+                    supported: Object.fromEntries(data.supported as any) as any
+                };
                 return resolve(true);
             });
         });
@@ -111,6 +114,9 @@ export class RestObject {
 
             let link: string = null, lastError: Error;
 
+            // Оригинальный трек по словам
+            const original = track.name.toLowerCase().replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim().split(" ");
+
             // Ищем нужную платформу
             for (const platform of this.audioSupport) {
                 // Если у платформы нет даже 2 запросов или это эта же платформа
@@ -118,6 +124,9 @@ export class RestObject {
 
                 // Получаем класс для работы с Worker
                 const platformAPI = this.request(platform.name);
+
+                // Если нет такой платформы
+                if (!platformAPI) continue;
 
                 // Поиск трека
                 const tracks = await platformAPI.request<"search">(`${name} ${artist.title}`).request();
@@ -137,12 +146,14 @@ export class RestObject {
                 }
 
                 // Ищем нужный трек
-                const findTrack = tracks.find((song) => {
-                    const name = song.name.toLowerCase().match(track.name.toLowerCase());
-                    const time = Math.abs(song.time.total - track.time.total);
+                // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
+                const findTrack = tracks.filter((song) => {
+                    const title = song.name.toLowerCase().replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").split(" ")
+                        .map((x) => original.includes(x));
+                    const time = track.time.total - song.time.total;
 
-                    return (time === 0 || time >= 15 || time <= 15) || name;
-                });
+                    return (time >= -15 && time <= 15 || time === 0) && title.length > 0;
+                })?.at(0);
 
                 // Если отфильтровать треки не удалось
                 if (!findTrack) {
@@ -152,7 +163,7 @@ export class RestObject {
                 }
 
                 // Получение исходника
-                const song = await platformAPI.request<"track">(findTrack?.url, { audio: true }).request();
+                const song = await platformAPI.request<"track">(findTrack["url"], { audio: true }).request();
 
                 // Если при получении трека произошла ошибка
                 if (song instanceof Error) {
@@ -162,7 +173,7 @@ export class RestObject {
                 }
 
                 // Если есть ссылка на аудио
-                if (song.link !== undefined) {
+                if (song !== undefined) {
                     try {
                         // Меняем время трека на время найденного трека
                         track.time = song.time;
@@ -222,24 +233,18 @@ export class RestObject {
      * @readonly
      */
     protected readonly request_worker = ({platform, payload, options}: RestClientSide.ClientOptions): Promise<Track | Track[] | Track.list | Error> => {
-        const baseAPI: RestServerSide.APIBase = {
-            name: platform.name,
-            url: platform.url,
-            color: platform.color
-        };
-
         return new Promise((resolve) => {
+            const baseAPI: RestServerSide.APIBase = {
+                name: platform.name,
+                url: platform.url,
+                color: platform.color
+            };
+
             // Передает данные запроса в другой поток
-            this.worker.postMessage({
-                platform: platform.name,
-                payload,
-                options
-            });
+            this.worker.postMessage({ platform: baseAPI.name, payload, options });
 
-            const handleMessage = (message: RestServerSide.Result) => {
-                // Отключаем эту функцию из-за ненадобности
-                this.worker.off("message", handleMessage);
-
+            // Ждем ответ от потока
+            this.worker.once("message", (message: RestServerSide.Result) => {
                 // Если в результате ошибка
                 if (message.result instanceof Error) return resolve(message.result);
 
@@ -266,10 +271,7 @@ export class RestObject {
 
                 // Если что-то не так
                 return null;
-            };
-
-            // Ждем ответ от потока
-            this.worker.on("message", handleMessage);
+            });
         });
     };
 }
@@ -370,7 +372,7 @@ export namespace RestClientSide {
          * @param payload - Данные для отправки
          * @param options - Параметры для отправки
          */
-        public request<T extends (RestServerSide.APIs.track | RestServerSide.APIs.playlist | RestServerSide.APIs.album | RestServerSide.APIs.artist | RestServerSide.APIs.search | RestServerSide.APIs.wave)["name"]>(payload: string | json, options?: {audio: boolean}) {
+        public request<T extends (RestServerSide.APIs.track | RestServerSide.APIs.playlist | RestServerSide.APIs.album | RestServerSide.APIs.artist | RestServerSide.APIs.search | RestServerSide.APIs.wave)["name"]>(payload: string, options?: {audio: boolean}) {
             return {
                 // Получение типа запроса
                 type: this._api.requests.find((item) => {
@@ -379,11 +381,7 @@ export namespace RestClientSide {
 
                     // Если указана ссылка
                     else if (typeof payload === "string" && payload.startsWith("http")) {
-                        try {
-                            if (item["filter"].exec(payload) || payload.match(item["filter"])) return item;
-                        } catch {
-                            return null;
-                        }
+                        if (item.name === "track" && item.filter?.test(payload)) return item;
                     }
 
                     // Скорее всего надо произвести поиск

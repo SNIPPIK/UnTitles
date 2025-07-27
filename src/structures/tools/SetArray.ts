@@ -12,7 +12,7 @@ export class SetArray<T> extends Set<T> {
      * @public
      */
     public get array() {
-      return this.values().toArray();
+        return Array.from(this.values());
     };
 
     /**

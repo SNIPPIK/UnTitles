@@ -60,7 +60,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @param name - Имя платформы
      * @public
      */
-    public platform = (name: RestServerSide.API["name"]) => {
+    public platform = (name: RestServerSide.API["name"] | string) => {
         const platform = this.platforms.supported[name];
 
         // Если есть такая платформа по имени
@@ -137,7 +137,7 @@ if (parentPort && workerData.rest) {
 async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
     try {
         const { platform, payload, options } = api;
-        const readPlatform: RestServerSide.API = rest.platform(platform);
+        const readPlatform: RestServerSide.API = rest.platform( payload?.startsWith("http") ? payload : platform );
         const callback = readPlatform.requests.find((p) => {
             // Если производится прямой запрос по названию
             if (p.name === payload) return p;
@@ -181,26 +181,26 @@ async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
  * @async
  */
 async function ExtractData() {
-    const fake = rest.allow;
-    const fakeReq = fake.map(api => ({
-        ...api,
+    const fakeReq = rest.allow.map(api => ({...api,
         requests: api.requests.map(request => {
             const sanitized = { ...request };
+
+            // Удаляем функции
             Object.keys(sanitized).forEach(key => {
                 if (typeof sanitized[key] === "function") {
                     delete sanitized[key];
                 }
             });
+
+
             return sanitized;
         })
     }));
 
-    const data = {
-        supported: Object.fromEntries(fakeReq.map(api => [api.name, api])),
+    parentPort?.postMessage({
+        supported: fakeReq.map(api => [api.name, api]),
         authorization: fakeReq.filter(api => !api.auth).map(api => api.name),
         audio: fakeReq.filter(api => api.audio === false).map(api => api.name),
         block: []
-    };
-
-    parentPort?.postMessage(data);
+    });
 }

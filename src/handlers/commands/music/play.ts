@@ -365,7 +365,7 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
     if (platform.block || !platform.auth) return;
 
     // Получаем функцию запроса данных с платформы
-    const api = platform.request(search, {audio: false});
+    const api = platform.request(search, { audio: false });
 
     if (!api.type) return;
 
@@ -390,7 +390,7 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
         // Показываем плейлист
         else if ("items" in rest) items.push({
             name: `🎶 [${rest.items.length}] - ${rest.title.slice(0, 70)}`,
-            value: rest.url
+            value: search
         });
 
         // Показываем трек
@@ -402,7 +402,7 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
         }
 
         // Отправка ответа
-        await message.respond(items);
+        return message.respond(items);
     } catch (err) {
         console.error(err);
         return null;

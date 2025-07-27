@@ -22,7 +22,7 @@ abstract class BaseQueue {
      * @description Время создания очереди
      * @private
      */
-    private readonly _timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
+    private _timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
 
     /**
      * @description Сообщение пользователя
@@ -165,9 +165,6 @@ abstract class BaseQueue {
         // Подключаемся к голосовому каналу
         this._voice.join(queue_message.client, queue_message.voice);
 
-        // В конце функции выполнить запуск проигрывания (полезно если треков в плеере еще нет)
-        setImmediate(this._player.play);
-
         Logger.log("LOG", `[Queue/${ID}] has create`);
     };
 
@@ -199,6 +196,12 @@ abstract class BaseQueue {
         // Удаляем плеер
         if (this._player) this._player.destroy();
         this._tracks.clear();
+
+        this._tracks = null;
+        this._message = null;
+        this._timestamp = null;
+        this._voice = null;
+        this._player = null;
     };
 
     /**
@@ -433,7 +436,7 @@ class QueueButtons {
         const isShuffled = player.tracks.shuffle;
         const isPaused = player.status === "player/pause";
         const currentRepeatType = player.tracks.repeat;
-        const hasFilters = player.filters.enabled.length > 0;
+        const hasFilters = player.filters.enabled.size > 0;
 
         // Обновление кнопок очереди и навигации
         this.updateButton(firstRow, 0, { disabled: !isMultipleTracks, style: isShuffled ? 3 : 2 });

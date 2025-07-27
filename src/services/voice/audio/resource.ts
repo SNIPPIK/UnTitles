@@ -208,7 +208,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get readable() {
-        return this._buffer.position !== this._buffer.size;
+        return this._buffer?.position !== this._buffer?.size;
     };
 
     /**
@@ -216,8 +216,8 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get duration() {
-        if (!this._buffer.position) return 0;
-        return Math.abs((((this._buffer.position + this._seek) * OPUS_FRAME_SIZE) / 1e3));
+        if (!this._buffer?.position) return 0;
+        return Math.abs((((this._buffer?.position + this._seek) * OPUS_FRAME_SIZE) / 1e3));
     };
 
     /**
@@ -227,7 +227,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get packet(): Buffer {
-        return this._buffer.packet;
+        return this._buffer?.packet;
     };
 
     /**
@@ -236,7 +236,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get packets(): number {
-        return this._buffer.size - this._buffer.position;
+        return this._buffer?.size - this._buffer?.position;
     };
 
     /**
@@ -249,7 +249,7 @@ export class BufferedAudioResource extends BaseAudioResource {
 
         const { path, options } = config;
         const decoder = new BufferedEncoder({
-            //highWaterMark: 512 * 5
+            highWaterMark: 512 * 5
         });
 
         // Расшифровщик
@@ -271,10 +271,7 @@ export class BufferedAudioResource extends BaseAudioResource {
             decode: (input) => {
                 input.on("frame", (packet: Buffer) => {
                     // Сообщаем что поток можно начать читать
-                    if (this._buffer.size === 0) {
-                        this.emit("readable");
-                    }
-
+                    if (this._buffer?.size === 0) this.emit("readable");
                     this._buffer.packet = packet;
                 });
             }

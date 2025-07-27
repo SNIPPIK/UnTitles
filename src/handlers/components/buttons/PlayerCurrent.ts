@@ -46,11 +46,11 @@ class ButtonSkip extends Assign<Button> {
     public constructor() {
         super({
             name: "skip",
-            callback: (message) => {
+            callback: async (message) => {
                 const queue = db.queues.get(message.guildId);
 
                 // Меняем позицию трека в очереди
-                queue.player.stop(queue.tracks.position + 1);
+                await queue.player.play(0, 0, queue.tracks.position + 1);
 
                 // Уведомляем пользователя о пропущенном треке
                 return message.reply({
@@ -77,7 +77,7 @@ class ButtonBack extends Assign<Button> {
     public constructor() {
         super({
             name: "back",
-            callback: (message) => {
+            callback: async (message) => {
                 const queue = db.queues.get(message.guildId);
                 const repeat = queue.tracks.repeat;
 
@@ -85,7 +85,7 @@ class ButtonBack extends Assign<Button> {
                 if (repeat === RepeatType.None) queue.tracks.repeat = RepeatType.Songs;
 
                 // Меняем позицию трека в очереди
-                queue.player.stop(queue.tracks.position - 1);
+                await queue.player.play(0, 0, queue.tracks.position - 1);
 
                 // Возвращаем повтор
                 queue.tracks.repeat = repeat;
@@ -120,7 +120,7 @@ class ButtonFilters extends Assign<Button> {
                 const filters = queue.player.filters.enabled;
 
                 // Если нет фильтров
-                if (filters.length === 0) {
+                if (filters.size === 0) {
                     return message.reply({
                         flags: "Ephemeral",
                         embeds: [
@@ -147,7 +147,7 @@ class ButtonFilters extends Assign<Button> {
                                 url: message.guild.iconURL()
                             },
 
-                            fields: filters.map((item) => {
+                            fields: filters.array.map((item) => {
                                 return {
                                     name: item.name,
                                     value: item.locale[message.locale] ?? item.locale["en-US"],

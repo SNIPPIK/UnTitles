@@ -40,7 +40,7 @@ export class VoiceAdapter {
      */
     public sendPayload = (config: VoiceConnectionConfiguration) => {
         try {
-            return this.adapter.sendPayload({op: GatewayOpcodes.VoiceStateUpdate, d: config });
+            return this.adapter?.sendPayload({op: GatewayOpcodes.VoiceStateUpdate, d: config });
         } catch (e) {
             console.error("hook error in adapter", e);
             return false;

@@ -1,5 +1,6 @@
 import type { LocalizationMap } from "discord-api-types/v10";
 import { db } from "#app/db";
+import {SetArray} from "#structures";
 
 /**
  * @author SNIPPIK
@@ -13,7 +14,7 @@ export class ControllerFilters<T extends AudioFilter> {
      * @readonly
      * @private
      */
-    private readonly _filters: T[] = [];
+    private readonly _filters = new SetArray<T>();
 
     /**
      * @description Получаем список включенных фильтров

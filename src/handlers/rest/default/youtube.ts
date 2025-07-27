@@ -106,7 +106,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                             const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
 
                             try {
-                                const api = await RestYouTubeAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`, 0);
+                                const api = await RestYouTubeAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
 
                                 // Если при получении данных возникла ошибка
                                 if (api instanceof Error) return resolve(api);
@@ -291,11 +291,10 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
     /**
      * @description Получаем страницу и ищем на ней данные
      * @param url - Ссылка на видео или ID видео
-     * @param pattern - Условие получения ytInitialData
      * @protected
      * @static
      */
-    protected static API = (url: string, pattern = 1): Promise<Error | json> => {
+    protected static API = (url: string): Promise<Error | json> => {
         return new Promise((resolve) => {
             // Если не надо использовать ключ, то используем систему поиска данных по странице
             new httpsClient({
@@ -315,7 +314,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                     if (api instanceof Error) return resolve(locale.err("api.request.fail"));
 
                     // Ищем данные на странице
-                    const data = this.extractInitialDataResponse(api, pattern);
+                    const data = this.extractInitialDataResponse(api);
 
                     // Если возникает ошибка при поиске на странице
                     if (data instanceof Error) return resolve(data);
@@ -359,47 +358,43 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
     /**
      * @description Получаем данные из страницы
      * @param input - Страница
-     * @param pattern - Условие получения ytInitialData
      */
-    protected static extractInitialDataResponse = (input: string, pattern: number = 1): json | Error => {
+    protected static extractInitialDataResponse = (input: string): json | Error => {
         // Если получена не страница
         if (typeof input !== "string") return locale.err("api.request.fail");
 
-        // Если надо получить данные полностью
-        if (pattern === 0) {
-            const initialDataMatch = input?.match(/var ytInitialData = (.*?);<\/script>/);
-            if (!initialDataMatch) return locale.err("api.request.fail");
+        // Данные о странице в формате json
+        let endData: json = {};
 
-            let initialData: Error | json;
+        const initialDataMatch = input?.match(/var ytInitialData = (.*?);<\/script>/);
+
+        // Если есть init данные
+        if (initialDataMatch) {
             try {
-                initialData = JSON.parse(initialDataMatch[1]);
-            } catch (e) {
-                return locale.err("api.request.fail");
-            }
-
-            return initialData;
+                Object.assign(endData, JSON.parse(initialDataMatch[1]));
+            } catch {}
         }
 
-        const startPattern: string = input?.match("var ytInitialPlayerResponse = ") ? "var ytInitialPlayerResponse = " : "var ytInitialData = ";
+        const startPattern = input?.match("var ytInitialPlayerResponse = ") ? "var ytInitialPlayerResponse = " : "var ytInitialData = ";
         const startIndex = input.indexOf(startPattern);
         const endIndex = input.indexOf("};", startIndex + startPattern.length);
 
         // Если нет данных
         if (startIndex === -1 && endIndex === -1) return locale.err("api.request.fail");
 
-        const data = JSON.parse(input.substring(startIndex + startPattern.length, endIndex + 1));
+        Object.assign(endData, JSON.parse(input.substring(startIndex + startPattern.length, endIndex + 1)));
 
         // Если при получении данных происходит что-то не так
-        if (!data) return locale.err("api.request.fail");
+        if (!endData) return locale.err("api.request.fail");
 
         // Если есть статус, то проверяем
-        if (data["playabilityStatus"]?.status) {
-            if (data["playabilityStatus"]?.status === "LOGIN_REQUIRED") return Error(locale._(locale.language, "api.request.login"));
-            else if (data["playabilityStatus"]?.status !== "OK") return Error(locale._(locale.language, "api.request.fail.msg", [data["playabilityStatus"]?.reason]));
+        if (endData["playabilityStatus"]?.status) {
+            if (endData["playabilityStatus"]?.status === "LOGIN_REQUIRED") return Error(locale._(locale.language, "api.request.login"));
+            else if (endData["playabilityStatus"]?.status !== "OK") return Error(locale._(locale.language, "api.request.fail.msg", [endData["playabilityStatus"]?.reason]));
         }
 
         // Выдаем данные
-        return data;
+        return endData;
     };
 
     /**

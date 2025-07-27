@@ -44,7 +44,6 @@ abstract class Request {
         userAgent?: string | boolean;
     } & RequestOptions = {
         headers: {},
-        minVersion: "TLSv1.3",
         maxVersion: "TLSv1.3"
     };
 
@@ -133,15 +132,11 @@ abstract class Request {
 
                 // Генерируем новый
             } else {
-                const revision = `${(140).random(120)}.0`;
+                const revision = `${(140).random(130)}.0`;
                 const OS = ["(X11; Linux x86_64;", "(Windows NT 10.0; Win64; x64;"];
 
                 Object.assign(this.data.headers, {
-                    "User-Agent": `Mozilla/5.0 ${OS[(OS.length - 1).random(0)]} rv:${revision}) Gecko/20100101 Firefox/${revision}`,
-                    "Sec-Ch-Ua-Full-Version": `Firefox/${revision}`,
-                    "Sec-Ch-Ua-Bitness": `64`,
-                    "Sec-Ch-Ua-Arch": "x86",
-                    "Sec-Ch-Ua-Mobile": "?0"
+                    "User-Agent": `Mozilla/5.0 ${OS[(OS.length - 1).random(0)]} rv:${revision}) Gecko/20100101 Firefox/${revision}`
                 });
             }
         }
@@ -164,8 +159,10 @@ export class httpsClient extends Request {
      * @public
      */
     public get toHead(): Promise<httpsClient_head> {
-        return new Promise(async (resolve) => {
+        return new Promise((resolve) => {
             this.request.then((response) => {
+
+                // Если получена ошибка
                 if (response instanceof Error) {
                     return resolve({
                         statusCode: undefined,
@@ -173,7 +170,6 @@ export class httpsClient extends Request {
                         headers: {}
                     });
                 }
-
 
                 return resolve({
                     statusCode: response.statusCode === 400 && response.statusMessage === "Bad Request" ? 200 : response.statusCode,
@@ -201,15 +197,17 @@ export class httpsClient extends Request {
                 else if (encoding === "gzip") decoder = res.pipe(createGunzip()     as any);
                 else if (encoding === "deflate") decoder = res.pipe(createDeflate() as any);
 
-                decoder.setEncoding("utf-8").on("data", (c) => data += c).once("end", () => {
-                    setImmediate(() => {
-                        data = null;
-                        decoder.removeAllListeners();
-                        decoder.destroy();
-                    });
+                decoder.setEncoding("utf-8")
+                    .on("data", (c) => data += c)
+                    .once("end", () => {
+                        setImmediate(() => {
+                            data = null;
+                            decoder.removeAllListeners();
+                            decoder.destroy();
+                        });
 
-                    return resolve(data);
-                });
+                        return resolve(data);
+                    });
             }).catch((err) => {
                 return resolve(err);
             });
@@ -240,14 +238,26 @@ export class httpsClient extends Request {
      */
     public get toXML(): Promise<Error | string[]> {
         return new Promise(async (resolve) => {
-            const body = await this.toString;
+            try {
+                const body = await this.toString;
 
-            if (body instanceof Error) return resolve(Error("Not found XML data!"));
+                // Если при получении страници произошла ошибка
+                if (body instanceof Error) return new Error("Not found XML data!");
 
-            const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/g);
-            const filtered = items.map((tag) => tag.replace(/<\/?[^<>]+>/g, ""));
-            return resolve(filtered.filter((text) => text.trim() !== ""));
-        })
+                const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/gi);
+
+                // Если нет данных xml в странице
+                if (!items) return resolve([]);
+
+                const filtered = items
+                    .map(tag => tag.replace(/<\/?[^<>]+>/gi, "").trim())
+                    .filter(text => text !== "");
+
+                return resolve(filtered);
+            } catch (error) {
+                return new Error("Unexpected error occurred");
+            }
+        });
     };
 }
 

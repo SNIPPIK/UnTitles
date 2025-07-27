@@ -70,7 +70,7 @@ declare global {
         /**
          * @prototype String
          * @description Превращаем 00:00 в число
-         * @return number
+         * @returns number
          */
         duration(): number;
     }
@@ -78,14 +78,14 @@ declare global {
         /**
          * @prototype Number
          * @description Превращаем число в 00:00
-         * @return string
+         * @returns string
          */
         duration(): string;
 
         /**
          * @prototype Number
          * @description Добавляем 0 к числу. Пример: 01:10
-         * @return string | number
+         * @returns string | number
          */
         toSplit(): string | number;
 

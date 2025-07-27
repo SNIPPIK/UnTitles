@@ -58,14 +58,14 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
      * @readonly
      * @private
      */
-    protected readonly _filters = new ControllerFilters<AudioFilter>();
+    protected _filters = new ControllerFilters<AudioFilter>();
 
     /**
      * @description Управление потоковым вещанием
      * @readonly
      * @private
      */
-    protected readonly _audio = new PlayerAudio<AudioPlayerStream>();
+    protected _audio = new PlayerAudio<AudioPlayerStream>();
 
     /**
      * @description Параметр отвечающий за загрузку потока
@@ -112,7 +112,7 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
      * @constructor
      * @protected
      */
-    protected constructor(protected readonly _tracks: ControllerTracks<Track>, protected readonly _voice: ControllerVoice<VoiceConnection>) {
+    protected constructor(protected _tracks: ControllerTracks<Track>, protected _voice: ControllerVoice<VoiceConnection>) {
         super();
     };
 
@@ -130,7 +130,7 @@ abstract class BasePlayer extends TypedEmitter<AudioPlayerEvents> {
      * @param seek - Время пропуска, трек начнется с указанного времени
      */
     protected readonly _readStream = (path: string, time: number = 0, seek: number = 0) => {
-        Logger.log("DEBUG", `[Player/${this.id}] has read stream ${path}`);
+        Logger.log("DEBUG", `[AudioPlayer/${this.id}] has read stream ${path}`);
 
         // Если другой аудио поток загружается, то запрещаем включение
         if (this.waitStream) return null;
@@ -282,6 +282,7 @@ export class AudioPlayer extends BasePlayer {
         else if (!this._audio.current || !this._audio.current?.readable) {
             this._audio.current = null;
             this.status = "player/wait";
+            this.disableCycle();
             return false;
         }
 
@@ -301,8 +302,8 @@ export class AudioPlayer extends BasePlayer {
     ) {
         super(tracks, voice);
 
-        // Добавляем плеер в базу для отправки пакетов
-        db.queues.cycles.players.add(this);
+        // Запускаем проигрывание аудио после создания плеера
+        setImmediate(this.play);
 
         /**
          * @description Событие смены позиции плеера
@@ -345,27 +346,56 @@ export class AudioPlayer extends BasePlayer {
             const queue = db.queues.get(player.id);
             const current = player.tracks.position;
 
+            console.log(skip, current);
+
             // Заставляем плеер пропустить этот трек
             if (skip) {
                 setImmediate(() => {
-                    // Если плеер не играет и есть новый поток
-                    if (!player.playing || skip.position !== current || player.waitStream) {
-                        player.tracks.remove(skip.position);
-
-                        if (player.tracks.size === 0) queue.cleanup();
-                        else {
-                            // Переключаем позицию назад, плеер сам переключит на следующий трек
-                            player.tracks.position = current + 1;
-
-                            if (skip.position === current) player.emit("player/wait", player);
-                        }
+                    // Если надо пропустить текущую позицию
+                    if (skip.position === current) {
+                        // Если плеер играет, то не пропускаем
+                        if (player.playing) return;
                     }
+
+                    // Если следующих треков нет
+                    else if (player.tracks.size === 0) return queue.cleanup();
+
+                    player.tracks.remove(skip.position);
                 });
             }
 
+            // Позиция трека для сообщения
+            const position = skip.position !== undefined ? skip.position : current;
+
             // Выводим сообщение об ошибке
-            db.events.emitter.emit("message/error", queue, error);
+            db.events.emitter.emit("message/error", queue, error, position);
         });
+    };
+
+    /**
+     * @description Включение плеера в цикл
+     * @private
+     */
+    private enableCycle = () => {
+        // Если нет плеера в цикле
+        if (!db.queues.cycles.players.has(this)) {
+            db.queues.cycles.players.add(this);
+
+            Logger.log("DEBUG", `[AudioPlayer/${this.id}] pushed in cycle`);
+        }
+    };
+
+    /**
+     * @description Отключение плеера от цикла
+     * @private
+     */
+    private disableCycle = () => {
+        // Если есть плеер в цикле
+        if (db.queues.cycles.players.has(this)) {
+            db.queues.cycles.players.delete(this);
+
+            Logger.log("DEBUG", `[AudioPlayer/${this.id}] removed from cycle`);
+        }
     };
 
     /**
@@ -376,24 +406,36 @@ export class AudioPlayer extends BasePlayer {
      * @public
      */
     public play = async (seek: number = 0, timeout: number = null, position: number = null): Promise<void> => {
-        const track = this._tracks?.track;
+        const track = typeof position === "number" ? this._tracks.get(position) : this._tracks.track;
 
-        // Если больше нет треков
+        // Если нет такого трека
         if (!track) return;
 
+        /*
+        // Проверка времени трека
+        const duration = this._tracks.track.time.total - db.queues.options.optimization;
+
+        // Если времени не хватит на включение следующего аудио потока
+        if (this._audio.current && duration < this._audio.current.duration && !this.waitStream) {
+            // Переключаемся на другой трек
+            this.emit("player/wait", this);
+            return;
+        }
+         */
+
         // Позиция трека
-        const positionIndex = position || this._tracks.indexOf(track);
+        const index = position ?? this._tracks.indexOf(track);
 
         try {
-            const resource = await this._preloadTrack(positionIndex);
+            const resource = await this._preloadTrack(index);
 
             // Если получена ошибка вместо исходника
             if (!resource) return;
 
             // Если при получении ссылки или пути на аудио произошла ошибка
             else if (resource instanceof Error) {
-                this.emit("player/error", this, `${resource}`, {skip: true, position: positionIndex});
-                return
+                this.emit("player/error", this, `${resource}`, { skip: true, position: index });
+                return;
             }
 
             // Создаем аудио поток
@@ -407,11 +449,17 @@ export class AudioPlayer extends BasePlayer {
                 this._audio.current = stream;
                 this.status = "player/playing";
 
+                // Меняем позицию если удачно
+                this._tracks.position = index;
+
                 // Если трек включен в 1 раз
                 if (seek === 0) {
                     const queue = db.queues.get(this.id);
                     db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно
                 }
+
+                // Заставляем плеер запускаться самостоятельно
+                setImmediate(this.enableCycle);
             };
 
             // Подключаем события для отслеживания работы потока (временные)
@@ -423,13 +471,13 @@ export class AudioPlayer extends BasePlayer {
                 // Если была получена ошибка при чтении
                 .once("error", (error: Error) => {
                     // Отправляем данные событию для отображения ошибки
-                    this.emit("player/error", this, `${error}`, { skip: true, position: positionIndex });
+                    this.emit("player/error", this, `${error}`, { skip: true, position: index });
                 });
-        } catch (err) {
-            this.emit("player/error", this, `${err}`, { skip: true, position: positionIndex });
+        } catch (error) {
+            this.emit("player/error", this, `${error}`, { skip: true, position: index });
 
             // Сообщаем об ошибке
-            Logger.log("ERROR", `[Player/${this.id}] ${err}`);
+            Logger.log("ERROR", `[Player/${this.id}] ${error}`);
         }
     };
 
@@ -449,6 +497,9 @@ export class AudioPlayer extends BasePlayer {
 
         // Устанавливаем время паузы
         this._pauseTimestamp = Date.now();
+
+        // Отключаем плеер от цикла
+        this.disableCycle();
     };
 
     /**
@@ -472,6 +523,9 @@ export class AudioPlayer extends BasePlayer {
 
             // Удаляем время проигрывания
             this._pauseTimestamp = null;
+
+            // Подключаем плеер к циклу
+            this.enableCycle();
             return;
         }
 
@@ -481,22 +535,10 @@ export class AudioPlayer extends BasePlayer {
 
     /**
      * @description Останавливаем воспроизведение текущего трека
-     * @param position - Позиция нового трека
      * @returns Promise<void> | void
      * @public
      */
-    public stop = (position?: number): Promise<void> | void => {
-        // Если есть позиция трека, для плавного перехода
-        if (typeof position === "number") {
-            const duration = this._tracks.track.time.total - db.queues.options.optimization;
-
-            // Если можно сделать плавный переход
-            if (this._audio.current && duration > this._audio.current.duration) {
-                this._tracks.position = position;
-                return this.play(0, 0, position);
-            }
-        }
-
+    public stop = (): Promise<void> | void => {
         if (this._status === "player/wait") return;
         this.status = "player/wait";
 
@@ -513,10 +555,10 @@ export class AudioPlayer extends BasePlayer {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has cleanup`);
 
         // Отключаем фильтры при очистке
-        if (this._filters.enabled.length > 0) this._filters.enabled.splice(0, this._filters.enabled.length);
+        if (this._filters.enabled.size > 0) this._filters.enabled.clear();
 
-        // Отключаем от цикла плеер
-        db.queues.cycles.players.delete(this);
+        // Отключаем плеер от цикла
+        this.disableCycle();
 
         // Удаляем текущий поток, поскольку он больше не нужен
         this._audio.current = null;
@@ -535,6 +577,12 @@ export class AudioPlayer extends BasePlayer {
     public destroy = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has destroyed`);
         this.removeAllListeners();
+
+        this.id = null;
+        this._audio = null;
+        this._filters = null;
+        this.waitStream = null;
+        this._pauseTimestamp = null;
     };
 }
 
