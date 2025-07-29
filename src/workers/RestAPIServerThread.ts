@@ -66,7 +66,7 @@ class RestServer extends handler<RestServerSide.API> {
         // Если есть такая платформа по имени
         if (platform) return platform;
 
-        return this.allow.find((api) => !!api.filter.exec(name));
+        return this.allow.find((api) => !!api.filter.exec(name) || name === api.name);
     };
 
     /**

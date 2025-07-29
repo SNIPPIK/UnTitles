@@ -1,6 +1,20 @@
-import querystring from "node:querystring";
+import { isMainThread, parentPort } from "node:worker_threads";
 import { httpsClient } from "#structures";
+import querystring from "node:querystring";
 import { Script } from "node:vm";
+
+
+/**
+ * @author SNIPPIK
+ * @description Если запускается фрагмент кода в другом процессе
+ */
+if (!isMainThread) {
+    // Разовое событие
+    parentPort.once("message", async (message) => {
+        const formats = await Youtube_decoder_native.decipherFormats(message.formats, message.html);
+        return parentPort.postMessage(formats[0]);
+    });
+}
 
 /**
  * @author SNIPPIK
@@ -22,7 +36,7 @@ const mRegex = (pattern: string | RegExp, text: string): string | null => {
  */
 const extractTceFunc = (body: string) => {
     try {
-        const matcher = body.match(new RegExp(NEW_TCE_GLOBAL_VARS_REGEXP, "m"));
+        const matcher = body.match(NEW_TCE_GLOBAL_VARS_REGEXP);
         if (!matcher?.groups?.varname || !matcher.groups.code) return null;
 
         return {
@@ -42,7 +56,7 @@ const extractTceFunc = (body: string) => {
  * @class Youtube_decoder
  * @private
  */
-export class Youtube_decoder_native {
+class Youtube_decoder_native {
     /**
      * @author SNIPPIK
      * @description Функции для расшифровки
@@ -58,15 +72,15 @@ export class Youtube_decoder_native {
                     const callerFunc = DECIPHER_FUNC_NAME + "(" + DECIPHER_ARGUMENT + ");";
                     let resultFunc: string;
 
-                    const sigFunctionMatcher = body.match(new RegExp(TCE_SIGN_FUNCTION_REGEXP, 's'));
-                    const sigFunctionActionsMatcher = body.match(new RegExp(TCE_SIGN_FUNCTION_ACTION_REGEXP, 's'));
+                    const sigFunctionMatcher = body.match(TCE_SIGN_FUNCTION_REGEXP);
+                    const sigFunctionActionsMatcher = body.match(TCE_SIGN_FUNCTION_ACTION_REGEXP);
 
                     if (sigFunctionMatcher && sigFunctionActionsMatcher && code) {
                         resultFunc = "var " + DECIPHER_FUNC_NAME + "=" + sigFunctionMatcher[0] + sigFunctionActionsMatcher[0] + code + ";\n";
                         return resultFunc + callerFunc;
                     }
 
-                    const helperMatch = body.match(new RegExp(HELPER_REGEXP, "s"));
+                    const helperMatch = body.match(HELPER_REGEXP);
                     if (!helperMatch) return null;
 
                     const helperObject = helperMatch[0];
@@ -83,13 +97,13 @@ export class Youtube_decoder_native {
 
                     if (quotedFunctions.length === 0) return null;
 
-                    let funcMatch = body.match(new RegExp(DECIPHER_REGEXP, "s"));
+                    let funcMatch = body.match(DECIPHER_REGEXP);
                     let isTce = false;
                     let decipherFunc: string;
 
                     if (funcMatch) decipherFunc = funcMatch[0];
                     else {
-                        const tceFuncMatch = body.match(new RegExp(FUNCTION_TCE_REGEXP, "s"));
+                        const tceFuncMatch = body.match(FUNCTION_TCE_REGEXP);
                         if (!tceFuncMatch) return null;
 
                         decipherFunc = tceFuncMatch[0];
@@ -98,7 +112,7 @@ export class Youtube_decoder_native {
 
                     let tceVars = "";
                     if (isTce) {
-                        const tceVarsMatch = body.match(new RegExp(TCE_GLOBAL_VARS_REGEXP, "m"));
+                        const tceVarsMatch = body.match(TCE_GLOBAL_VARS_REGEXP);
                         if (tceVarsMatch) tceVars = tceVarsMatch[1] + ";\n";
                     }
 
@@ -122,7 +136,7 @@ export class Youtube_decoder_native {
                     let resultFunc = "";
                     let nFunction = "";
 
-                    const nFunctionMatcher = body.match(new RegExp(TCE_N_FUNCTION_REGEXP, 's'));
+                    const nFunctionMatcher = body.match(TCE_N_FUNCTION_REGEXP);
 
                     if (nFunctionMatcher && name && code) {
                         nFunction = nFunctionMatcher[0];
@@ -142,13 +156,13 @@ export class Youtube_decoder_native {
                         return resultFunc + callerFunc;
                     }
 
-                    let nMatch = body.match(new RegExp(N_TRANSFORM_REGEXP, "s"));
+                    let nMatch = body.match(N_TRANSFORM_REGEXP);
                     let isTce = false;
 
                     if (nMatch) nFunction = nMatch[0];
                     else {
 
-                        const nTceMatch = body.match(new RegExp(N_TRANSFORM_TCE_REGEXP, "s"));
+                        const nTceMatch = body.match(N_TRANSFORM_TCE_REGEXP);
                         if (!nTceMatch) return null;
 
                         nFunction = nTceMatch[0];
@@ -167,7 +181,7 @@ export class Youtube_decoder_native {
 
                     let tceVars = "";
                     if (isTce) {
-                        const tceVarsMatch = body.match(new RegExp(TCE_GLOBAL_VARS_REGEXP, "m"));
+                        const tceVarsMatch = body.match(TCE_GLOBAL_VARS_REGEXP);
                         if (tceVarsMatch) tceVars = tceVarsMatch[1] + ";\n";
                     }
 
@@ -358,43 +372,43 @@ const SPLICE_PART = ":function\\(\\w,\\w\\)\\{\\w\\.splice\\(0,\\w\\)\\}";
 const SWAP_PART = ":function\\(\\w,\\w\\)\\{" +
     "var \\w=\\w\\[0\\];\\w\\[0\\]=\\w\\[\\w%\\w\\.length\\];\\w\\[\\w(?:%\\w.length|)\\]=\\w(?:;return \\w)?\\}";
 
-const DECIPHER_REGEXP =
+const DECIPHER_REGEXP = new RegExp(
     "function(?: " + VARIABLE_PART + ")?\\(([a-zA-Z])\\)\\{" +
     "\\1=\\1\\.split\\(\"\"\\);\\s*" +
     "((?:(?:\\1=)?" + VARIABLE_PART + VARIABLE_PART_ACCESS + "\\(\\1,\\d+\\);)+)" +
     "return \\1\\.join\\(\"\"\\)" +
-    "\\}";
+    "\\}", "s");
 
-const HELPER_REGEXP =
+const HELPER_REGEXP = new RegExp(
     "var (" + VARIABLE_PART + ")=\\{((?:(?:" +
     VARIABLE_PART_DEFINE + REVERSE_PART + "|" +
     VARIABLE_PART_DEFINE + SLICE_PART + "|" +
     VARIABLE_PART_DEFINE + SPLICE_PART + "|" +
     VARIABLE_PART_DEFINE + SWAP_PART +
-    "),?\\n?)+)\\};";
+    "),?\\n?)+)\\};", "s");
 
-const FUNCTION_TCE_REGEXP =
+const FUNCTION_TCE_REGEXP = new RegExp(
     "function(?:\\s+[a-zA-Z_\\$][a-zA-Z0-9_\\$]*)?\\(\\w\\)\\{" +
     "\\w=\\w\\.split\\((?:\"\"|[a-zA-Z0-9_$]*\\[\\d+])\\);" +
     "\\s*((?:(?:\\w=)?[a-zA-Z_\\$][a-zA-Z0-9_\\$]*(?:\\[\\\"|\\.)[a-zA-Z_\\$][a-zA-Z0-9_\\$]*(?:\\\"\\]|)\\(\\w,\\d+\\);)+)" +
-    "return \\w\\.join\\((?:\"\"|[a-zA-Z0-9_$]*\\[\\d+])\\)}";
+    "return \\w\\.join\\((?:\"\"|[a-zA-Z0-9_$]*\\[\\d+])\\)}", "s");
 
-const N_TRANSFORM_REGEXP =
+const N_TRANSFORM_REGEXP = new RegExp(
     "function\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
     "var\\s*(\\w+)=(?:\\1\\.split\\(.*?\\)|String\\.prototype\\.split\\.call\\(\\1,.*?\\))," +
     "\\s*(\\w+)=(\\[.*?]);\\s*\\3\\[\\d+]" +
     "(.*?try)(\\{.*?})catch\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
     '\\s*return"[\\w-]+([A-z0-9-]+)"\\s*\\+\\s*\\1\\s*}' +
-    '\\s*return\\s*(\\2\\.join\\(""\\)|Array\\.prototype\\.join\\.call\\(\\2,.*?\\))};';
+    '\\s*return\\s*(\\2\\.join\\(""\\)|Array\\.prototype\\.join\\.call\\(\\2,.*?\\))};', "s");
 
-const N_TRANSFORM_TCE_REGEXP =
+const N_TRANSFORM_TCE_REGEXP = new RegExp(
     "function\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
     "\\s*var\\s*(\\w+)=\\1\\.split\\(\\1\\.slice\\(0,0\\)\\),\\s*(\\w+)=\\[.*?];" +
     ".*?catch\\(\\s*(\\w+)\\s*\\)\\s*\\{" +
     "\\s*return(?:\"[^\"]+\"|\\s*[a-zA-Z_0-9$]*\\[\\d+])\\s*\\+\\s*\\1\\s*}" +
-    "\\s*return\\s*\\2\\.join\\((?:\"\"|[a-zA-Z_0-9$]*\\[\\d+])\\)};";
+    "\\s*return\\s*\\2\\.join\\((?:\"\"|[a-zA-Z_0-9$]*\\[\\d+])\\)};", "s");
 
-const TCE_GLOBAL_VARS_REGEXP =
+const TCE_GLOBAL_VARS_REGEXP = new RegExp(
     "(?:^|[;,])\\s*(var\\s+([\\w$]+)\\s*=\\s*" +
     "(?:" +
     "([\"'])(?:\\\\.|[^\\\\])*?\\3" +
@@ -403,9 +417,9 @@ const TCE_GLOBAL_VARS_REGEXP =
     "\\))" +
     "|" +
     "\\[\\s*(?:([\"'])(?:\\\\.|[^\\\\])*?\\6\\s*,?\\s*)+\\]" +
-    "))(?=\\s*[,;])";
+    "))(?=\\s*[,;])", "s");
 
-const NEW_TCE_GLOBAL_VARS_REGEXP =
+const NEW_TCE_GLOBAL_VARS_REGEXP = new RegExp(
     "('use\\s*strict';)?" +
     "(?<code>var\\s*" +
     "(?<varname>[a-zA-Z0-9_$]+)\\s*=\\s*" +
@@ -422,17 +436,17 @@ const NEW_TCE_GLOBAL_VARS_REGEXP =
     "|" +
     "\"[^\"]*\"\\.split\\(\"[^\"]*\"\\)" +
     ")" +
-    ")";
+    ")", "m");
 
-const TCE_SIGN_FUNCTION_REGEXP = "function\\(\\s*([a-zA-Z0-9$])\\s*\\)\\s*\\{" +
+const TCE_SIGN_FUNCTION_REGEXP = new RegExp("function\\(\\s*([a-zA-Z0-9$])\\s*\\)\\s*\\{" +
     "\\s*\\1\\s*=\\s*\\1\\[(\\w+)\\[\\d+\\]\\]\\(\\2\\[\\d+\\]\\);" +
     "([a-zA-Z0-9$]+)\\[\\2\\[\\d+\\]\\]\\(\\s*\\1\\s*,\\s*\\d+\\s*\\);" +
     "\\s*\\3\\[\\2\\[\\d+\\]\\]\\(\\s*\\1\\s*,\\s*\\d+\\s*\\);" +
-    ".*?return\\s*\\1\\[\\2\\[\\d+\\]\\]\\(\\2\\[\\d+\\]\\)\\};";
+    ".*?return\\s*\\1\\[\\2\\[\\d+\\]\\]\\(\\2\\[\\d+\\]\\)\\};", "s");
 
-const TCE_SIGN_FUNCTION_ACTION_REGEXP = "var\\s+([$A-Za-z0-9_]+)\\s*=\\s*\\{\\s*[$A-Za-z0-9_]+\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*}[^{}]*)*}\\s*,\\s*[$A-Za-z0-9_]+\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*}[^{}]*)*}\\s*,\\s*[$A-Za-z0-9_]+\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*}[^{}]*)*}\\s*};";
+const TCE_SIGN_FUNCTION_ACTION_REGEXP = new RegExp("var\\s+([$A-Za-z0-9_]+)\\s*=\\s*\\{\\s*[$A-Za-z0-9_]+\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*}[^{}]*)*}\\s*,\\s*[$A-Za-z0-9_]+\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*}[^{}]*)*}\\s*,\\s*[$A-Za-z0-9_]+\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*}[^{}]*)*}\\s*};", "s");
 
-const TCE_N_FUNCTION_REGEXP = "function\\s*\\((\\w+)\\)\\s*\\{var\\s*\\w+\\s*=\\s*\\1\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\s*,\\s*\\w+\\s*=\\s*\\[.*?\\]\\;.*?catch\\s*\\(\\s*(\\w+)\\s*\\)\\s*\\{return\\s*\\w+\\[\\d+\\]\\s*\\+\\s*\\1\\}\\s*return\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\}\\s*\\;";
+const TCE_N_FUNCTION_REGEXP = new RegExp("function\\s*\\((\\w+)\\)\\s*\\{var\\s*\\w+\\s*=\\s*\\1\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\s*,\\s*\\w+\\s*=\\s*\\[.*?\\]\\;.*?catch\\s*\\(\\s*(\\w+)\\s*\\)\\s*\\{return\\s*\\w+\\[\\d+\\]\\s*\\+\\s*\\1\\}\\s*return\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\}\\s*\\;", "s");
 
 const PATTERN_PREFIX = "(?:^|,)\\\"?(" + VARIABLE_PART + ")\\\"?";
 const REVERSE_PATTERN = new RegExp(PATTERN_PREFIX + REVERSE_PART, "m");

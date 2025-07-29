@@ -1,9 +1,10 @@
-import { Youtube_decoder_native } from "#worker/YouTubeSignatureExtractor";
 import type { RestServerSide } from "#handler/rest";
 import { Assign, httpsClient } from "#structures";
+import { Worker } from "node:worker_threads";
 import { locale } from "#service/locale";
 import { Track } from "#service/player";
 import { db } from "#app/db";
+import path from "node:path";
 import fs from "node:fs";
 
 /**
@@ -263,7 +264,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                         return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
-                                const details = await RestYouTubeAPI.API(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`);
+                                const details = await RestYouTubeAPI.API(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=QgIIAQ%3D%3D`);
 
                                 // Если при получении данных возникла ошибка
                                 if (details instanceof Error) return resolve(details);
@@ -343,16 +344,49 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
     protected static extractFormat = async (data: json, html: string, url: string) => {
         // Если установлен wrapper
         if (fs.existsSync("node_modules/ytdlp-nodejs")) {
-            const {YtDlp} = require("ytdlp-nodejs");
+            const { YtDlp } = require("ytdlp-nodejs");
             const ytdlp = new YtDlp();
 
             const result = await ytdlp.getInfoAsync(url);
             return (result.requested_formats).find((format) => !format.fps)
         }
 
-        // adaptiveFormats, formats
-        const formats = await Youtube_decoder_native.decipherFormats(data["formats"], html);
-        return formats[0];
+        // Запускаем мусорный Signature extractor, очень много мусора за собой оставляет
+        return new Promise((resolve) => {
+            // Создаем еще 1 поток, для выполнения мусорной функции
+            const worker: Worker = new Worker(path.resolve("src/workers/YouTubeSignatureExtractor.js"), {
+                execArgv: ["-r", "tsconfig-paths/register"],
+                workerData: null
+            });
+
+            // Отправляем сообщение во 2 поток
+            worker.postMessage({formats: data["formats"], html});
+
+            // Слушаем ответ от 2 потока
+            worker.once("message", (data) => {
+                // Через время убиваем поток если он не нужен
+                setImmediate(() => {
+                    setTimeout(async () => {
+                        await worker.terminate();
+                    }, 5e3);
+                });
+
+                return resolve(data);
+            });
+
+            // Если при создании получена ошибка
+            worker.once("error", (err) => {
+                // Через время убиваем поток если он не нужен
+                setImmediate(() => {
+                    setTimeout(async () => {
+                        await worker.terminate();
+                    }, 5e3);
+                });
+
+                console.error(err);
+                return resolve(err);
+            });
+        });
     };
 
     /**

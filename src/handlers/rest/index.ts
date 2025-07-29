@@ -3,6 +3,7 @@ import { Track } from "#service/player";
 import { Logger } from "#structures";
 import path from "node:path";
 import { db } from "#app/db";
+import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -22,7 +23,13 @@ export class RestObject {
      * @description База с платформами
      * @public
      */
-    public platforms: RestServerSide.Data;
+    public platforms: RestServerSide.Data & {
+        /**
+         * @description Поддерживаемые платформы в array формате, для экономии памяти
+         * @private
+         */
+        array?: RestServerSide.API[]
+    };
 
     /**
      * @description Платформы с доступом к запросам
@@ -30,7 +37,8 @@ export class RestObject {
      * @public
      */
     public get allow(): RestServerSide.API[] {
-        return Object.values(this.platforms.supported).filter(api => api.auth);
+        if (!this.platforms.array) this.platforms.array = Object.values(this.platforms.supported);
+        return this.platforms.array.filter(api => api.auth);
     };
 
     /**
@@ -39,7 +47,8 @@ export class RestObject {
      * @public
      */
     public get audioSupport(): RestServerSide.API[] {
-        return Object.values(this.platforms.supported).filter(api => api.auth && api.audio && !this.platforms.block.includes(api.name));
+        if (!this.platforms.array) this.platforms.array = Object.values(this.platforms.supported);
+        return this.platforms.array.filter(api => api.auth !== false && api.audio !== false && !this.platforms.block.includes(api.name));
     };
 
     /**
@@ -48,7 +57,8 @@ export class RestObject {
      * @public
      */
     public get allowWave(): RestServerSide.API[] {
-        return Object.values(this.platforms.supported).filter(api => api.auth && api.requests.some((apis) => apis.name === "wave"));
+        if (!this.platforms.array) this.platforms.array = Object.values(this.platforms.supported);
+        return this.platforms.array.filter(api => api.auth && api.requests.some((apis) => apis.name === "wave"));
     };
 
     /**
@@ -90,6 +100,7 @@ export class RestObject {
                     ...data,
                     supported: Object.fromEntries(data.supported as any) as any
                 };
+
                 return resolve(true);
             });
         });
@@ -119,9 +130,6 @@ export class RestObject {
 
             // Ищем нужную платформу
             for (const platform of this.audioSupport) {
-                // Если у платформы нет даже 2 запросов или это эта же платформа
-                if (platform.requests.length < 2 && platform.name === api.name) continue;
-
                 // Получаем класс для работы с Worker
                 const platformAPI = this.request(platform.name);
 
@@ -224,7 +232,7 @@ export class RestObject {
         // Если есть такая платформа по имени
         if (platform) return platform;
 
-        return this.allow.find((api) => !!api.filter.exec(name));
+        return this.allow.find((api) => api.name === name);
     };
 
     /**
