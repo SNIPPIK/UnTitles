@@ -54,12 +54,15 @@ export class DiscordClient extends Client {
 
             // Права бота
             intents: [
+                // Доступ к серверам
                 "Guilds",
+
+                // Отправление сообщений
                 "GuildMessages",
+                "DirectMessages",
+
+                // Нужен для голосовой системы
                 "GuildVoiceStates",
-                "GuildIntegrations",
-                "GuildExpressions",
-                "DirectMessages"
             ],
 
             // Позволяет обрабатывать частичные данные
