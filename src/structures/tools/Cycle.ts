@@ -178,7 +178,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Коррекция event loop lag
         const performanceNow = performance.now();
         const eventLoopLag = this.performance
-            ? Math.max(0, (performanceNow - this.performance) - (tickTime + (driftSteps / 0.5)))
+            ? Math.max(0, (performanceNow - this.performance) - (tickTime + driftSteps))
             : duration;
         this.performance = performanceNow;
 

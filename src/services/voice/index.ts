@@ -448,7 +448,7 @@ export enum GatewayCloseCodes {
     EXIT_RESULT = 1002,
 
     /**
-     * @description Аномальное закрытие, соединение было закрыто без фрейма закрытия.
+     * @description Аномальное закрытие, соединение было закрыто без фрейма закрытия
      * @reconnecting true
      */
     ABNORMAL_CLOSURE = 1006,

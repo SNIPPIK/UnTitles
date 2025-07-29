@@ -100,7 +100,7 @@ function initProcessEvents(client: DiscordClient) {
     // Необработанная ошибка (внутри синхронного кода)
     process.on("uncaughtException", (err, origin) => {
         // Скорее всего дело в Discord.js
-        if (err.name.match(/node_modules\/ws\/lib\/websocket/)) return;
+        if (err.stack.match(/ws\/lib\/websocket/gi)) return;
 
         Logger.log(
             "ERROR",
@@ -149,7 +149,7 @@ function ProcessQueues(client: DiscordClient): boolean {
         const timeout = db.queues.timeout_reboot;
 
         // Если плееры играют и есть остаток от аудио
-        if (timeout) {
+        if (timeout > 0) {
             // Ожидаем выключения музыки на других серверах
             setTimeout(() => { process.exit(0); }, timeout + 1e3);
 

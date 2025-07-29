@@ -1,6 +1,6 @@
+import { SetArray } from "#structures";
 import * as path from "node:path";
 import fs from "node:fs";
-import {SetArray} from "#structures";
 
 /**
  * @author SNIPPIK

@@ -346,8 +346,6 @@ export class AudioPlayer extends BasePlayer {
             const queue = db.queues.get(player.id);
             const current = player.tracks.position;
 
-            console.log(skip, current);
-
             // Заставляем плеер пропустить этот трек
             if (skip) {
                 setImmediate(() => {
@@ -355,6 +353,7 @@ export class AudioPlayer extends BasePlayer {
                     if (skip.position === current) {
                         // Если плеер играет, то не пропускаем
                         if (player.playing) return;
+                        this.emit("player/wait", this);
                     }
 
                     // Если следующих треков нет

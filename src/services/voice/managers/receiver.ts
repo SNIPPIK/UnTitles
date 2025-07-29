@@ -135,7 +135,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
  */
 interface VoiceReceiverEvents {
     /**
-     * @description Событие когда говорит пользователь
+     * @description Событие когда говорит аользователь
      * @param ids - IDs всех говорящих пользователей
      * @param ssrc - SSRC сессии
      * @param audio - Аудио пакет от пользователя

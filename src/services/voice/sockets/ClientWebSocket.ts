@@ -6,6 +6,13 @@ import {Logger, TypedEmitter} from "#structures";
 
 /**
  * @author SNIPPIK
+ * @description Игнорируемые коды закрытия от discord
+ * @const GatewayCloseCodesIgnore
+ */
+const GatewayCloseCodesIgnore: GatewayCloseCodes[] = [4014, 4022];
+
+/**
+ * @author SNIPPIK
  * @description Клиент для взаимодействия с discord, по методу wss
  * @class ClientWebSocket
  * @extends TypedEmitter
@@ -57,7 +64,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public set packet(payload: WebSocketOpcodes.extract | WebSocketOpcodes.dave_opcodes | Buffer) {
         // Для отладки
-        this.emit("debug", `[WebSocket/send:]`, payload);
+        this.emit("debug", `[WebSocket/send]:`, payload);
 
         // Если ws клиент подключен
         if (this._status === "connected") {
@@ -103,7 +110,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
                     // Если текущий статус не является подключенным
                     if (this._status !== "connected") {
-                        this.emit("close", 1006, "HEARTBEAT_ACK timeout");
+                        this.emit("close", 1001, "HEARTBEAT_ACK timeout");
                         this.emit("warn", "HEARTBEAT_ACK timeout x3, reconnecting...");
                     }
                 } else {
@@ -135,7 +142,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         // Если ws клиент уже есть
         if (this.ws) {
-            if (code) Logger.log("DEBUG", `[WS/${code}] has reset connection`);
+            if (code) Logger.log("DEBUG", `[WebSocket/${code}] has reset connection`);
 
             // Удаляем ws, поскольку он будет создан заново
             this.reset();
@@ -156,6 +163,8 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Меняем статус на подключен
             this._status = WebSocketStatus.connected;
             this.emit("open");
+
+            Logger.log("DEBUG", `[WebSocket] has open connection`);
         };
 
         // Закрытие websocket соединения
@@ -163,6 +172,8 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Меняем статус на отключен
             this._status = WebSocketStatus.closed;
             this.onReceiveClose(ev.code, ev.reason);
+
+            Logger.log("DEBUG", `[WebSocket] has close connection`);
         };
 
         // Ошибка websocket соединения
@@ -207,7 +218,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this.emit("binary", { op, payload });
 
             // Для отладки
-            this.emit("debug", `[WebSocket/get:]`, {op, payload});
+            this.emit("debug", `[WebSocket/get]:`, {op, payload});
             return null;
         }
 
@@ -216,7 +227,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         try {
             payload = JSON.parse(data.toString()) as WebSocketOpcodes.extract | WebSocketOpcodes.dave_opcodes;
         } catch {
-            this.emit("error", new Error('Invalid JSON'));
+            this.emit("error", new Error("Invalid JSON"));
             return null;
         }
 
@@ -310,7 +321,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         // Для отладки
-        this.emit("debug", `[WebSocket/get:]`, payload);
+        this.emit("debug", `[WebSocket/get]:`, payload);
     };
 
     /**
@@ -321,22 +332,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @private
      */
     private onReceiveClose = (code: GatewayCloseCodes, reason: string) => {
-        const ignoreCodes: GatewayCloseCodes[] = [4014, 4022];
-        const notReconnect: GatewayCloseCodes[] = [4006, 1000, 1002];
-
         this.emit("debug", `[WebSocket/close]: ${code} - ${reason}`);
 
         // Если получен игнорируемый код
-        if (ignoreCodes.includes(code)) return;
-
-        // Если ws был подключен до отключения
-        else if (this._status === WebSocketStatus.connected && !notReconnect.includes(code)) {
-            // Если можно подключится заново создавая новой ws
-            if (code < 4000 || code === 4015) {
-                this.connect(this._endpoint, code);
-                return;
-            }
-        }
+        if (GatewayCloseCodesIgnore.includes(code)) return;
 
         // Отправляем данные в TypedEmitter
         this.emit("close", code, reason);
@@ -348,10 +347,12 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public reset = (): void => {
+        this.removeAllListeners();
+
         // Если есть websocket клиент
         if (this.ws) {
-            this.removeAllListeners();
-            this.ws.close(1_000);
+            this.ws.removeAllListeners();
+            this.ws.close();
         }
 
         this.ws = null;

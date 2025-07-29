@@ -89,6 +89,14 @@ export class ControllerCycles {
                     const size = this.options.duration / OPUS_FRAME_SIZE;
                     let i = 0;
 
+                    // Если цикл держит планку в 20 ms
+                    if (size === 1) {
+                        // Отправляем 1 пакет заранее, для заполнения кольцевого буфера
+                        if (player.audio && player.audio.current.duration === 0) {
+                            i = -1;
+                        }
+                    }
+
                     // Отправляем пакет/ы в голосовой канал
                     do {
                         player.voice.connection.packet = player.audio.current.packet;

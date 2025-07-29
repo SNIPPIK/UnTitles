@@ -357,6 +357,7 @@ export class VoiceConnection {
                 return; // Здесь происходит пересоздание ws подключения
             }
 
+            // Меняем статус на переподключение
             this._status = VoiceConnectionStatus.reconnecting;
 
             setTimeout(() => {
