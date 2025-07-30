@@ -58,6 +58,13 @@
 
 ---
 
+### ⚠️ Hardware requirements | Data from Ryzen 7 5700x3D | 1 player
+- CPU: 0-0.1%
+- Ram: ~80 MB, it all depends on the number of tracks, the load on the platforms, namely YouTube!
+- Disk: ~50 MB, 200 GB is enough for caching (1.5k tracks ~1.2 GB)
+
+---
+
 # 🎧 Main features
 #### 🎖️ Peculiarities
 - Not afraid of event loop, audio goes smoothly even under load
