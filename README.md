@@ -59,10 +59,18 @@
 ---
 
 # 🎧 Main features
+#### 🎖️ Peculiarities
+- Not afraid of event loop, audio goes smoothly even under load
+```ts
+setInterval(() => {
+    const startBlock = performance.now();
+    while (performance.now() - startBlock < 100) {}
+}, 200);
+```
 #### 🔊 Voice engine
 - [Voice Gateway Version 8](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/services/voice) + [End-to-End Encryption (DAVE Protocol)](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
 - Full **SRTP** implementation: `aead_aes256_gcm`, `xchacha20_poly1305` (via libraries)
-- Adaptive packet sending system, without full-fledged **WebRTP** you can't do anything worthwhile!
+- Adaptive packet sending system, works like a **jitter** buffer!
 - Works with ready-made **Ogg/Opus** frames!
 - **FFmpeg** is required, it is responsible for audio and filters!
 - Works even with strong **event loop lag**
