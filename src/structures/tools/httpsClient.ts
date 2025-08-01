@@ -1,7 +1,7 @@
 import { BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip } from "node:zlib";
 import { request as httpsRequest, RequestOptions } from "node:https";
 import { IncomingMessage, request as httpRequest } from "node:http";
-import { Logger } from "#structures/logger";
+import {Logger} from "#structures/logger";
 
 /**
  * @author SNIPPIK
