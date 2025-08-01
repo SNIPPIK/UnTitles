@@ -1,8 +1,7 @@
 import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType, VoiceChannel } from "discord.js";
-import { DiscordClient, Colors } from "#structures/discord";
-import { locale } from "#service/locale";
-import { Assign } from "#structures";
+import { Colors } from "#structures/discord";
+import { Assign, locale } from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -176,7 +175,7 @@ class Command_Voice extends Assign< BaseCommand<VoiceChannel | string> > {
 
                         // Подключаемся к голосовому каналу без очереди
                         else if (!queue) {
-                            db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: false }, (message.client as DiscordClient).adapter.createVoiceAdapter(guildId));
+                            db.voice.join({ channel_id: VoiceChannel.id, guild_id: guild.id, self_deaf: true, self_mute: false }, db.adapter.createVoiceAdapter(guildId));
                         }
 
                         // Отправляем сообщение о подключении к каналу

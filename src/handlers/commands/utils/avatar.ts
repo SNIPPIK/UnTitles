@@ -1,7 +1,6 @@
 import { CommandDeclare, CommandOptions, BaseCommand } from "#handler/commands";
 import { ApplicationCommandOptionType, MessageFlags, User } from "discord.js";
-import { locale } from "#service/locale";
-import { Assign } from "#structures";
+import { Assign, locale } from "#structures";
 import { db } from "#app/db";
 
 /**

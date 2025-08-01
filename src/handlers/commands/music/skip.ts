@@ -1,7 +1,6 @@
 import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType } from "discord.js";
-import { locale } from "#service/locale";
-import { Assign } from "#structures";
+import { Assign, locale } from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -110,6 +109,7 @@ class SkipUtilityCommand extends Assign< BaseCommand<number> > {
             autocomplete: ({message, args, type}) => {
                 const number = args[0];
                 const queue = db.queues.get(message.guildId);
+
                 if (!queue || isNaN(number) || number <= 0) return null;
 
                 const total = queue.tracks.total;
@@ -120,32 +120,59 @@ class SkipUtilityCommand extends Assign< BaseCommand<number> > {
                 let icon: string;
                 let highlightIndex: number;
 
+
+                // Если действие назад
                 if (type === "back") {
-                    if (position === 0) return null;
-                    startIndex = Math.max(0, position - number);
                     icon = "⬅️";
                     highlightIndex = 0;
-                } else if (type === "next") {
-                    startIndex = Math.min(total - 1, position + number);
+                    startIndex = Math.max(0, position - number);
+                }
+
+                // Если действие вперед
+                else if (type === "next") {
                     icon = "➡️";
                     highlightIndex = 0;
-                } else {
-                    const index = number - 1;
-                    if (index < 0 || index >= total) return null;
+                    startIndex = Math.min(total - 1, position + (number - 1));
+                }
 
+                // Если действие to
+                else {
                     const half = Math.floor(maxSuggestions / 2);
-                    startIndex = Math.max(0, index - half);
-                    if (startIndex + maxSuggestions > total) {
-                        startIndex = Math.max(0, total - maxSuggestions);
+                    const index = number - 1;
+
+                    // Если число больше чем треков есть
+                    if (index >= total) {
+                        startIndex = Math.max(0, total - half);
+                        highlightIndex = total - half;
+                    }
+
+                    // Если указано меньше 1
+                    else if (index <= 0) {
+                        startIndex = 0;
+                        highlightIndex = 0;
+                    }
+
+                    // Если другое
+                    else {
+                        startIndex = Math.max(0, index - half);
+
+                        if (startIndex + maxSuggestions > total) {
+                            startIndex = Math.max(0, total - maxSuggestions);
+                        }
+
+                        highlightIndex = index - startIndex;
                     }
 
                     icon = "🎵";
-                    highlightIndex = index - startIndex;
                 }
 
+                // Получаем треки
                 const tracks = queue.tracks.array(maxSuggestions, startIndex);
+
+                // Если треков нет
                 if (!tracks.length) return null;
 
+                // Результаты поиска
                 const results = tracks.map((track, i) => ({
                     name: `${startIndex + i + 1}. ${i === highlightIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
                     value: startIndex + i

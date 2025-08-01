@@ -1,9 +1,8 @@
+import { Logger, Assign, locale } from "#structures";
 import { Colors } from "#structures/discord";
-import { Logger, Assign } from "#structures";
-import { locale } from "#service/locale";
 import { Event } from "#handler/events";
-import { Track } from "#service/player";
 import { Message } from "discord.js";
+import { Track } from "#core/queue";
 import { db } from "#app/db";
 
 /**
@@ -33,7 +32,7 @@ class rest_request extends Assign<Event<"rest/request">> {
 
                 // Отправляем сообщение о том что запрос производится
                 // Сообщение о том, что запрос начался
-                let followUpPromise: Message<boolean>
+                let followUpPromise: Message<boolean>;
                 try {
                     followUpPromise = await message.followUp({
                         flags: "Ephemeral",

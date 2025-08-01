@@ -2,8 +2,7 @@ import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { CompeteInteraction, Colors } from "#structures/discord";
 import { ApplicationCommandOptionType } from "discord.js";
 import { RestClientSide } from "#handler/rest";
-import { locale } from "#service/locale";
-import { Assign } from "#structures";
+import { Assign, locale } from "#structures";
 import { db } from "#app/db";
 
 /**

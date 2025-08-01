@@ -1,9 +1,8 @@
 import { Worker } from "node:worker_threads";
-import { Track } from "#service/player";
 import { Logger } from "#structures";
+import { Track } from "#core/queue";
 import path from "node:path";
 import { db } from "#app/db";
-import * as console from "node:console";
 
 /**
  * @author SNIPPIK
@@ -137,17 +136,17 @@ export class RestObject {
                 if (!platformAPI) continue;
 
                 // Поиск трека
-                const tracks = await platformAPI.request<"search">(`${name} ${artist.title}`).request();
+                const search = await platformAPI.request<"search">(`${name} ${artist.title}`).request();
 
                 // Если при получении треков произошла ошибка
-                if (tracks instanceof Error) {
-                    Logger.log("DEBUG", `${tracks}`);
-                    lastError = tracks;
+                if (search instanceof Error) {
+                    Logger.log("DEBUG", `${search}`);
+                    lastError = search;
                     continue;
                 }
 
                 // Если треков не найдено
-                else if (!tracks.length) {
+                else if (!search.length) {
                     Logger.log("DEBUG", `[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
                     lastError = Error(`[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
                     continue;
@@ -155,7 +154,7 @@ export class RestObject {
 
                 // Ищем нужный трек
                 // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
-                const findTrack = tracks.filter((song) => {
+                const findTrack = search.filter((song) => {
                     const title = song.name.toLowerCase().replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").split(" ")
                         .map((x) => original.includes(x));
                     const time = track.time.total - song.time.total;
@@ -242,23 +241,23 @@ export class RestObject {
      */
     protected readonly request_worker = ({platform, payload, options}: RestClientSide.ClientOptions): Promise<Track | Track[] | Track.list | Error> => {
         return new Promise((resolve) => {
-            const baseAPI: RestServerSide.APIBase = {
-                name: platform.name,
-                url: platform.url,
-                color: platform.color
-            };
-
             // Передает данные запроса в другой поток
-            this.worker.postMessage({ platform: baseAPI.name, payload, options });
+            this.worker.postMessage({ platform: platform.name, payload, options });
 
             // Ждем ответ от потока
             this.worker.once("message", (message: RestServerSide.Result) => {
+                const { result, status } = message;
+                const baseAPI: RestServerSide.APIBase = {
+                    name: platform.name,
+                    url: platform.url,
+                    color: platform.color
+                };
+
                 // Если в результате ошибка
-                if (message.result instanceof Error) return resolve(message.result);
+                if (result instanceof Error) return resolve(result);
 
                 // Если статус удачный
-                else if (message.status === "success") {
-                    const { result } = message;
+                else if (status === "success") {
 
                     // Если получен список
                     if (Array.isArray(result)) {

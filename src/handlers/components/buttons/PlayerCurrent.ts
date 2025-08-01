@@ -1,8 +1,7 @@
+import { Assign, Logger, locale } from "#structures";
 import { Colors } from "#structures/discord";
-import { Assign, Logger } from "#structures";
 import { Button } from "#handler/components";
-import { RepeatType } from "#service/player";
-import { locale } from "#service/locale";
+import { RepeatType } from "#core/queue";
 import { Message } from "discord.js";
 import { db } from "#app/db";
 
@@ -51,7 +50,7 @@ class ButtonSkip extends Assign<Button> {
                 const position = queue.tracks.position + 1;
 
                 // Если позиция больше чем есть треков
-                if (position > queue.tracks.size) {
+                if (position > queue.tracks.total) {
                     // Переключаем на 0 позицию
                     queue.tracks.position = 0;
 

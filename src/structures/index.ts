@@ -1,4 +1,5 @@
 export * from "./logger";
+export * from "./locale";
 export * from "./tools/TypedEmitter";
 export * from "./tools/Assign";
 export * from "./tools/Collection";

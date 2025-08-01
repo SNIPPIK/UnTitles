@@ -143,7 +143,7 @@ async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
             if (p.name === payload) return p;
 
             // Если указана ссылка
-            else if (typeof payload === "string" && payload.startsWith("http")) {
+            else if (payload.startsWith("http")) {
                 try {
                     if (p["filter"].exec(payload) || payload.match(p["filter"])) return p;
                 } catch {
@@ -183,17 +183,10 @@ async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
 async function ExtractData() {
     const fakeReq = rest.allow.map(api => ({...api,
         requests: api.requests.map(request => {
-            const sanitized = { ...request };
-
-            // Удаляем функции
-            Object.keys(sanitized).forEach(key => {
-                if (typeof sanitized[key] === "function") {
-                    delete sanitized[key];
-                }
-            });
-
-
-            return sanitized;
+            return {
+                ...request,
+                execute: null,
+            }
         })
     }));
 

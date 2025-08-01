@@ -1,8 +1,7 @@
-import { QueueMessage } from "#service/player/structures/message";
 import { CommandInteraction, Colors } from "#structures/discord";
+import { QueueMessage } from "#core/queue/structures/message";
 import { middleware } from "#handler/middlewares";
-import { locale } from "#service/locale";
-import { Assign } from "#structures";
+import { Assign, locale } from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -75,7 +74,7 @@ class OtherVoiceChannel extends Assign<middleware<CommandInteraction>> {
                             // Если нет пользователей в голосовом канале очереди
                             if (users.size === 0) {
                                 queue.message = new QueueMessage(ctx);
-                                queue.voice.join(queue.message.client, queue.message.voice);
+                                queue.voice.connection.swapChannel = VoiceChannel.id;
 
                                 // Сообщаем о подключении к другому каналу
                                 ctx.channel.send({

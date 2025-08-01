@@ -1,7 +1,6 @@
+import { Assign, httpsClient, locale } from "#structures";
 import type { RestServerSide } from "#handler/rest";
-import { Assign, httpsClient } from "#structures";
-import { locale } from "#service/locale";
-import { Track } from "#service/player";
+import { Track } from "#core/queue";
 import { env } from "#app/env";
 import { db } from "#app/db";
 

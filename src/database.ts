@@ -1,6 +1,6 @@
-import { CacheUtility } from "#service/player/utils/cache";
-import { ControllerQueues, Queue } from "#service/player";
-import { DiscordClient } from "#structures/discord";
+import { CacheUtility } from "#core/player/utils/cache";
+import { ControllerQueues, Queue } from "#core/queue";
+import {DiscordClient, DJSVoice} from "#structures/discord";
 import { env } from "#app/env";
 
 // Database modules
@@ -9,7 +9,7 @@ import { Components } from "#handler/components";
 import { Commands } from "#handler/commands";
 import { RestObject } from "#handler/rest";
 import { Events } from "#handler/events";
-import { Voices } from "#service/voice";
+import { Voices } from "#core/voice";
 
 /**
  * @author SNIPPIK
@@ -24,6 +24,13 @@ export class Database {
      * @public
      */
     public readonly api: RestObject;
+
+    /**
+     * @description Адаптер для общения с websocket'ом клиента
+     * @readonly
+     * @public
+     */
+    public readonly adapter: DJSVoice;
 
     /**
      * @author SNIPPIK
@@ -122,6 +129,11 @@ export class Database {
             this.components = new Components();
             this.events = new Events();
             this.middlewares = new Middlewares();
+
+            // Если реально клиент
+            if (client instanceof DiscordClient) {
+                this.adapter = new DJSVoice(client);
+            }
 
             this.whitelist = {
                 toggle: env.get<boolean>("whitelist", false),

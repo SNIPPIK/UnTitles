@@ -1,6 +1,6 @@
-import { Client, Options, Partials, SimpleShardingStrategy } from "discord.js";
+import { Client, Options, Partials } from "discord.js";
 import { ActivityType } from "discord-api-types/v10";
-import { VoiceManager } from "#structures/discord";
+import { VoiceAdapters } from "#core/voice/adapter";
 import { version } from "package.json";
 import { Logger } from "#structures";
 import { env } from "#app/env";
@@ -13,13 +13,6 @@ import { db } from "#app/db";
  * @extends Client
  */
 export class DiscordClient extends Client {
-    /**
-     * @description Класс для общения с websocket
-     * @readonly
-     * @public
-     */
-    public readonly adapter = new VoiceManager(this);
-
     /**
      * @description Номер осколка
      * @returns number
@@ -36,20 +29,11 @@ export class DiscordClient extends Client {
      */
     public constructor() {
         super({
-            ws: {
-                buildStrategy(ws) {
-                    const browser = env.get("client.browser", "discord.js");
-                    if (browser) ws.options.identifyProperties.browser = browser;
-
-                    return new SimpleShardingStrategy(ws);
-                }
-            },
-
             // Данный раздел не трогать, иначе вы нарушите лицензию BSD-3
             presence: {
                 afk: false,
-                status: env.get("client.status", "online"),
-                activities: [{name: " 🌟 Startup...", type: ActivityType.Custom}]
+                status: "online",
+                activities: [{name: " 🌟 Startup...", type: 4}]
             },
 
             // Права бота
@@ -92,7 +76,6 @@ export class DiscordClient extends Client {
             })
         });
         this.setMaxListeners(10);
-
 
         // Запускаем статусы после инициализации клиента
         this.once("ready", this.IntervalStatus);
@@ -185,6 +168,37 @@ export class DiscordClient extends Client {
     };
 }
 
+/**
+ * @author SNIPPIK
+ * @description Класс реализации адаптера
+ * @class DJSVoice
+ * @extends VoiceAdapters
+ */
+export class DJSVoice extends VoiceAdapters {
+    public constructor(private client: DiscordClient) {
+        super();
+
+        //@ts-ignore
+        client.ws.on("VOICE_SERVER_UPDATE", (data) => {
+            this.onVoiceServer(data);
+        });
+
+        //@ts-ignore
+        client.ws.on("VOICE_STATE_UPDATE", (data) => {
+            this.onVoiceStateUpdate(data);
+        });
+    };
+
+    /**
+     * @description Указываем данные для отправки данных через ws
+     * @param data
+     * @public
+     */
+    protected ws_send = (data: unknown) => {
+        const id = this.client.shardID;
+        this.client.ws.shards.get(id).send(data);
+    };
+}
 
 /**
  * @author SNIPPIK

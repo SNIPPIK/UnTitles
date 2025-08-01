@@ -1,6 +1,5 @@
-import { Assign, httpsClient } from "#structures";
+import { Assign, httpsClient, locale } from "#structures";
 import { RestServerSide } from "#handler/rest";
-import { locale } from "#service/locale";
 import { env } from "#app/env";
 
 /**

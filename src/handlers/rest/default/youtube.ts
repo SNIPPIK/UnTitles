@@ -1,8 +1,7 @@
+import { Assign, httpsClient, locale } from "#structures";
 import type { RestServerSide } from "#handler/rest";
-import { Assign, httpsClient } from "#structures";
 import { Worker } from "node:worker_threads";
-import { locale } from "#service/locale";
-import { Track } from "#service/player";
+import { Track } from "#core/queue";
 import { db } from "#app/db";
 import path from "node:path";
 import fs from "node:fs";
@@ -356,33 +355,33 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
             // Создаем еще 1 поток, для выполнения мусорной функции
             const worker: Worker = new Worker(path.resolve("src/workers/YouTubeSignatureExtractor.js"), {
                 execArgv: ["-r", "tsconfig-paths/register"],
+                resourceLimits: {
+                    maxOldGenerationSizeMb: 15,
+                    maxYoungGenerationSizeMb: 10
+                },
                 workerData: null
             });
 
             // Отправляем сообщение во 2 поток
             worker.postMessage({formats: data["formats"], html});
 
+            worker.once("exit", () => {
+                setTimeout(async () => {
+                    worker.removeAllListeners();
+                    await worker.terminate();
+                    worker.ref();
+                }, 2e3);
+            });
+
             // Слушаем ответ от 2 потока
             worker.once("message", (data) => {
-                // Через время убиваем поток если он не нужен
-                setImmediate(() => {
-                    setTimeout(async () => {
-                        await worker.terminate();
-                    }, 5e3);
-                });
-
+                worker.emit("exit");
                 return resolve(data);
             });
 
             // Если при создании получена ошибка
             worker.once("error", (err) => {
-                // Через время убиваем поток если он не нужен
-                setImmediate(() => {
-                    setTimeout(async () => {
-                        await worker.terminate();
-                    }, 5e3);
-                });
-
+                worker.emit("exit");
                 console.error(err);
                 return resolve(err);
             });

@@ -1,7 +1,6 @@
 import { CommandDeclare, BaseCommand } from "#handler/commands";
 import { Colors } from "#structures/discord";
-import { locale } from "#service/locale";
-import { Assign } from "#structures";
+import { Assign, locale } from "#structures";
 import { db } from "#app/db";
 
 /**

@@ -1,8 +1,7 @@
 import { Colors } from "#structures/discord";
-import { locale } from "#service/locale";
-import { Track } from "#service/player";
+import { Assign, locale } from "#structures";
 import { Event } from "#handler/events";
-import { Assign } from "#structures";
+import { Track } from "#core/queue";
 import { db } from "#app/db";
 
 /**

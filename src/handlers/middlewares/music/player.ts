@@ -1,7 +1,6 @@
 import { Colors, CommandInteraction } from "#structures/discord";
 import { middleware } from "#handler/middlewares";
-import { locale } from "#service/locale";
-import { Assign } from "#structures";
+import { Assign, locale } from "#structures";
 import { db } from "#app/db";
 
 /**

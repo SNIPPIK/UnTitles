@@ -9,7 +9,6 @@ import { Logger } from "#structures";
 import {DiscordClient} from "#structures/discord/Client";
 
 export * from "./Client";
-export * from "./modules/VoiceManager";
 
 /**
  * @description Тип входящих данных для команд

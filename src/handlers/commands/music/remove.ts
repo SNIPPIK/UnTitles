@@ -1,7 +1,6 @@
 import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType } from "discord.js";
-import { locale } from "#service/locale";
-import { Assign } from "#structures";
+import { Assign, locale } from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -109,4 +108,4 @@ class RemoveTrackCommand extends Assign< BaseCommand<number> > {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default [RemoveTrackCommand];
+export default [ RemoveTrackCommand ];

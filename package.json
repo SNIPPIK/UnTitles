@@ -15,7 +15,7 @@
     "node": ">=23.0.0"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.17",
+    "discord-api-types": "^0.38.18",
     "discord.js": "^14.21.0",
     "ws": "^8.18.3"
   },
@@ -25,13 +25,12 @@
   "devDependencies": {
     "@types/node": "^24.1.0",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.2"
   },
   "scripts": {
     "start-bun": "bun src",
     "start": "cd build && node -r tsconfig-paths/register src --ShardManager --optimize_for_size --expose-gc",
     "auto": "npm run build && npm run start",
-
     "build": "tsc"
   }
 }

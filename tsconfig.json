@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
     "lib": ["ESNext"],
-    "module": "CommonJS",
+    "module": "NodeNext",
     "target": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
 
     "rootDir": "./",
     "baseUrl": "./",
@@ -30,14 +30,14 @@
     "skipLibCheck": true,
 
     "paths": {
+      "#core/*": ["./src/core/*"],
+
       "#handler": ["./src/handlers/index"],
       "#handler/*": ["./src/handlers/*"],
       "#worker/*": ["./src/workers/*"],
 
       "#structures/*": ["./src/structures/*"],
       "#structures": ["./src/structures/index"],
-
-      "#service/*": ["./src/services/*"],
 
       "#app": ["./src/index"],
       "#app/db": ["./src/database"],
