@@ -107,19 +107,26 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
 
                             try {
                                 const api = await RestYouTubeAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
-
-                                // Если при получении данных возникла ошибка
-                                if (api instanceof Error) return resolve(api);
+                                if (api instanceof Error) return api;
 
                                 const related = api.contents?.twoColumnWatchNextResults?.secondaryResults?.secondaryResults?.results ?? [];
                                 const relatedVideos = [];
 
                                 // Подготавливаем данные треков (video)
                                 for (const item of related) {
-                                    const videoRenderer = item.compactVideoRenderer;
-                                    if (!videoRenderer || videoRenderer.lengthText?.simpleText.duration() > 400) continue;
+                                    const render = item.compactVideoRenderer || item.lockupViewModel;
 
-                                    relatedVideos.push(RestYouTubeAPI.track(videoRenderer));
+                                    // Если не видео
+                                    if (render?.contentType && render?.contentType !== 'LOCKUP_CONTENT_TYPE_VIDEO' && !render?.rendererContext.commandContext.onTap.innertubeCommand.watchEndpoint.videoId) continue;
+
+                                    relatedVideos.push(RestYouTubeAPI.track({
+                                        videoId: render?.rendererContext.commandContext.onTap.innertubeCommand.watchEndpoint.videoId,
+                                        title: render?.rendererContext.accessibilityContext?.label ?? render?.metadata?.lockupMetadataViewModel.title.content,
+                                        channelId: "null",
+                                        lengthSeconds: "100",
+                                        author: render?.metadata?.lockupMetadataViewModel.metadata?.contentMetadataViewModel.metadataRows[0].metadataParts[0].text.content.split(",")[0],
+                                        format: { audio: null }
+                                    }))
                                 }
 
                                 return resolve({
@@ -127,10 +134,10 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                                     items: relatedVideos,
                                     title: null,
                                     image: null,
-                                    artist: null
+                                    artist: null,
                                 });
                             } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
+                                return resolve(new Error(`[APIs]: ${e}`));
                             }
                         });
                     }
@@ -393,42 +400,54 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
      * @param input - Страница
      */
     protected static extractInitialDataResponse = (input: string): json | Error => {
-        // Если получена не страница
         if (typeof input !== "string") return locale.err("api.request.fail");
 
-        // Данные о странице в формате json
         let endData: json = {};
 
-        const initialDataMatch = input?.match(/var ytInitialData = (.*?);<\/script>/);
-
-        // Если есть init данные
+        // Попытка найти ytInitialData JSON
+        const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
         if (initialDataMatch) {
             try {
-                Object.assign(endData, JSON.parse(initialDataMatch[1]));
-            } catch {}
+                endData = JSON.parse(initialDataMatch[1]);
+            } catch {
+                // Игнорируем ошибку парсинга initialData
+            }
         }
 
-        const startPattern = input?.match("var ytInitialPlayerResponse = ") ? "var ytInitialPlayerResponse = " : "var ytInitialData = ";
+        // Определяем, какой паттерн искать дальше: playerResponse или initialData
+        const startPattern = input.includes("var ytInitialPlayerResponse = ")
+            ? "var ytInitialPlayerResponse = "
+            : "var ytInitialData = ";
+
         const startIndex = input.indexOf(startPattern);
         const endIndex = input.indexOf("};", startIndex + startPattern.length);
 
-        // Если нет данных
-        if (startIndex === -1 && endIndex === -1) return locale.err("api.request.fail");
+        // Если не нашли нужный участок с JSON — возвращаем ошибку
+        if (startIndex === -1 || endIndex === -1) return locale.err("api.request.fail");
 
-        Object.assign(endData, JSON.parse(input.substring(startIndex + startPattern.length, endIndex + 1)));
-
-        // Если при получении данных происходит что-то не так
-        if (!endData) return locale.err("api.request.fail");
-
-        // Если есть статус, то проверяем
-        if (endData["playabilityStatus"]?.status) {
-            if (endData["playabilityStatus"]?.status === "LOGIN_REQUIRED") return Error(locale._(locale.language, "api.request.login"));
-            else if (endData["playabilityStatus"]?.status !== "OK") return Error(locale._(locale.language, "api.request.fail.msg", [endData["playabilityStatus"]?.reason]));
+        try {
+            const jsonStr = input.substring(startIndex + startPattern.length, endIndex + 1);
+            const parsedData = JSON.parse(jsonStr);
+            // Объединяем данные, playerResponse имеет приоритет
+            endData = { ...endData, ...parsedData };
+        } catch {
+            return locale.err("api.request.fail");
         }
 
-        // Выдаем данные
+        // Проверяем статус playabilityStatus, если есть
+        const status = endData.playabilityStatus?.status;
+        if (status) {
+            if (status === "LOGIN_REQUIRED") {
+                return new Error(locale._(locale.language, "api.request.login"));
+            } else if (status !== "OK") {
+                const reason = endData.playabilityStatus?.reason || "";
+                return new Error(locale._(locale.language, "api.request.fail.msg", [reason]));
+            }
+        }
+
         return endData;
     };
+
 
     /**
      * @description Получаем данные об авторе видео
@@ -470,18 +489,18 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
     protected static track = (track: json) => {
         const title = track.title?.simpleText ?? track.title?.["runs"]?.[0]?.text ?? track.title;
         const author = track["shortBylineText"]?.["runs"]?.[0]?.text ?? track.author;
-        const id = track?.["videoId"] ?? track?.["inlinePlaybackEndpoint"]?.["watchEndpoint"]?.["videoId"];
+        const id = track?.["videoId"] ?? track?.["inlinePlaybackEndpoint"]?.["watchEndpoint"]?.["videoId"] ?? track.contentId;
 
         try {
             return { title, id,
-                url: `https://youtu.be/${track["videoId"]}`,
+                url: `https://youtu.be/${id}`,
                 artist: {
                     title: author,
                     url: `https://www.youtube.com${track["shortBylineText"]["runs"][0]["navigationEndpoint"]["browseEndpoint"]["canonicalBaseUrl"] || track["shortBylineText"]["runs"][0]["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"].url}`,
                 },
                 time: { total: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0 },
                 image: {
-                    url: `https://i.ytimg.com/vi/${track["videoId"]}/maxresdefault.jpg`
+                    url: `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
                 },
                 audio: track?.format?.url || undefined
             };
@@ -491,12 +510,12 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                     title: author,
                     url: `https://www.youtube.com/channel/${track.channelId}`
                 },
-                url: `https://youtu.be/${track["videoId"]}`,
+                url: `https://youtu.be/${id}`,
                 time: {
                     total: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0
                 },
                 image: {
-                    url: `https://i.ytimg.com/vi/${track["videoId"]}/maxresdefault.jpg`
+                    url: `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
                 },
                 audio: track?.format?.url || undefined
             }

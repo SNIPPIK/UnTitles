@@ -119,13 +119,18 @@ export class RestObject {
             // Если платформа поддерживает получение аудио и может получать данные
             if (!authorization.includes(api.name) && !audio.includes(api.name)) {
                 const song = await this.request(api.name).request<"track">(url, { audio: true }).request();
-                return song instanceof Error ? song : song.link;
+
+                // Если получили ошибку
+                if (song instanceof Error) return null;
+
+                track["_duration"] = song.time;
+                return song.link;
             }
 
             let link: string = null, lastError: Error;
 
             // Оригинальный трек по словам
-            const original = track.name.toLowerCase().replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim().split(" ");
+            const original = track.name.toLowerCase().replace(/[^\w\s]|_/gi, "").replace(/\s+/gi, " ").split(" ");
 
             // Ищем нужную платформу
             for (const platform of this.audioSupport) {
@@ -155,7 +160,7 @@ export class RestObject {
                 // Ищем нужный трек
                 // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
                 const findTrack = search.filter((song) => {
-                    const title = song.name.toLowerCase().replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").split(" ")
+                    const title = song.name.toLowerCase().replace(/[^\w\s]|_/gi, "").replace(/\s+/gi, " ").split(" ")
                         .map((x) => original.includes(x));
                     const time = track.time.total - song.time.total;
 
@@ -181,10 +186,8 @@ export class RestObject {
 
                 // Если есть ссылка на аудио
                 if (song !== undefined) {
-                    try {
-                        // Меняем время трека на время найденного трека
-                        track.time = song.time;
-                    } catch {}
+                    // Меняем время трека на время найденного трека
+                    track["_duration"] = song.time;
 
                     // Выносим ссылку из цикла
                     link = song.link;
