@@ -1,5 +1,5 @@
 import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
-import { CompeteInteraction, Colors } from "#structures/discord";
+import { CompeteInteraction } from "#structures/discord";
 import { ApplicationCommandOptionType } from "discord.js";
 import { RestClientSide } from "#handler/rest";
 import { Assign, locale } from "#structures";
@@ -202,28 +202,6 @@ class PlayCommand extends Assign< BaseCommand > {
         }
     ]
 })
-@CommandOptions({
-    type: ApplicationCommandOptionType.Subcommand,
-    names: {
-        "en-US": "replay",
-        "ru": "заново"
-    },
-    descriptions: {
-        "en-US": "Restart queue!!! Necessary for re-enabling if playback has been completed!",
-        "ru": "Перезапуск очереди!!! Необходимо для повторного включения если проигрывание было завершено!"
-    },
-})
-@CommandOptions({
-    type: ApplicationCommandOptionType.Subcommand,
-    names: {
-        "en-US": "stop",
-        "ru": "стоп"
-    },
-    descriptions: {
-        "en-US": "Forced termination of music playback!",
-        "ru": "Принудительное завершение проигрывания музыки!"
-    },
-})
 class PlayControl extends Assign<BaseCommand> {
     public constructor() {
         super({
@@ -233,69 +211,6 @@ class PlayControl extends Assign<BaseCommand> {
             },
             execute: async ({message, args, type}) => {
                 switch (type) {
-                    // Если надо перезапустить проигрывание
-                    case "replay": {
-                        const queue = db.queues.get(message.guild.id);
-
-                        // Если нет очереди, то и нечего перезапускать
-                        if (!queue) {
-                            return message.reply({
-                                embeds: [
-                                    {
-                                        description: locale._(message.locale, "command.play.replay.queue", [message.member]),
-                                        color: Colors.Yellow
-                                    }
-                                ],
-                                flags: "Ephemeral"
-                            });
-                        }
-
-                        // Переключаем позицию трека на 0
-                        queue.player.tracks.position = 0;
-
-                        // Перезапускаем очередь
-                        db.queues.restart_player = queue.player;
-                        return message.reply({
-                            embeds: [
-                                {
-                                    description: locale._(message.locale, "command.play.replay", [message.member]),
-                                    color: Colors.Green
-                                }
-                            ],
-                            flags: "Ephemeral"
-                        });
-                    }
-
-                    // Принудительное завершение проигрывания музыки
-                    case "stop": {
-                        const queue = db.queues.get(message.guildId);
-
-                        // Если нет очереди, то и нечего не делаем
-                        if (!queue) {
-                            return message.reply({
-                                embeds: [
-                                    {
-                                        description: locale._(message.locale, "command.play.stop.queue", [message.member]),
-                                        color: Colors.Yellow
-                                    }
-                                ],
-                                flags: "Ephemeral"
-                            });
-                        }
-
-                        // Удаляем очередь
-                        db.queues.remove(message.guildId);
-                        return message.reply({
-                            embeds: [
-                                {
-                                    description: locale._(message.locale, "command.play.stop", [message.member]),
-                                    color: Colors.Green
-                                }
-                            ],
-                            flags: "Ephemeral"
-                        });
-                    }
-
                     // Включение радио-потока на треку
                     case "wave": {
                         // Запрос к платформе

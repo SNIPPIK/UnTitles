@@ -30,8 +30,8 @@ export class ControllerFilters<T extends AudioFilter> {
      * @returns string
      * @public
      */
-    public compress = (time?: number, isSwap = false) => {
-        const { volume, fade, optimization, swapFade } = db.queues.options;
+    public compress = (time: number, volume: number, isSwap = false) => {
+        const { fade, optimization, swapFade } = db.queues.options;
         const filters: string[] = [`volume=${volume / 150}`];
         const fade_int = isSwap ? swapFade : fade;
         const live = time === 0;

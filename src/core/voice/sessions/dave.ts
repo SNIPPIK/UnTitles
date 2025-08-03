@@ -517,6 +517,8 @@ let loaded_lib: any = null;
     for (const name of names) {
         try {
             const library = await import(name);
+            delete require.cache[require.resolve(name)];
+
             DAVE_PROTOCOL_VERSION = library?.DAVE_PROTOCOL_VERSION as number;
             loaded_lib = library;
             return;

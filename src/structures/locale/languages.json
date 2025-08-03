@@ -574,5 +574,16 @@
   "command.play.stop": {
     "en-US": "{ARGUMENT} | Turn off music!",
     "ru": "{ARGUMENT} | Выключение музыки!"
+  },
+
+
+  "command.value.now": {
+    "en-US": "{ARGUMENT} | Changing player volume! Please wait!",
+    "ru": "{ARGUMENT} | Изменение громкости плеера! Пожалуйста подождите!"
+  },
+
+  "command.value.later": {
+    "en-US": "{ARGUMENT} | Changing the player volume! The volume will change with the next track!",
+    "ru": "{ARGUMENT} | Изменение громкости плеера! Громкость будет изменена со следующим треком!"
   }
 }

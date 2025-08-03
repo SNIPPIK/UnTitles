@@ -269,9 +269,17 @@ export class BufferedAudioResource extends BaseAudioResource {
 
             // Начало кодирования
             decode: (input) => {
+                let emitted = false
+
                 input.on("frame", (packet: Buffer) => {
-                    // Сообщаем что поток можно начать читать
-                    if (this._buffer?.size === 0) this.emit("readable");
+                    setImmediate(() => {
+                        // Сообщаем что поток можно начать читать
+                        if (!emitted) {
+                            this.emit("readable");
+                            emitted = true;
+                        }
+                    });
+
                     this._buffer.packet = packet;
                 });
             }
@@ -352,7 +360,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @private
      */
     private encoder = new PipeEncoder({
-        highWaterMark: 512 * 5 * 5,
+        highWaterMark: 512 * 5,
         writableObjectMode: true,
         readableObjectMode: true
     });

@@ -9,47 +9,29 @@ import { GatewayOpcodes } from "discord-api-types/v10";
  * @abstract
  * @public
  */
-export abstract class VoiceAdapters {
+export abstract class VoiceAdapters<T extends any> {
     /**
      * @description Коллекция адаптеров для общения голоса с клиентским websocket'ом
      * @readonly
      * @private
      */
-    private readonly adapters = new Map<string, DiscordGatewayAdapterLibraryMethods>();
+    public readonly adapters = new Map<string, DiscordGatewayAdapterLibraryMethods>();
 
     /**
-     * @description Функция для отправки данные через клиентский websocket
-     * @abstract
-     * @public
+     * @description Создание класса
+     * @param client - Класс клиента
      */
-    protected abstract ws_send: (data: any | unknown) => void;
+    protected constructor(protected client: T) {};
 
     /**
-     * @description Создание адаптера для голосового состояния бота
-     * @returns DiscordGatewayAdapterCreator
+     * @description Адаптер состояния голоса для этой гильдии, который можно использовать с `@discordjs/voice` для воспроизведения звука в голосовых и сценических каналах.
      * @public
      */
-    public createVoiceAdapter = (guildID: string): DiscordGatewayAdapterCreator => {
-        return methods => {
-            this.adapters.set(guildID, methods);
-
-            return {
-                sendPayload: (data) => {
-                    this.ws_send(data);
-                    return true;
-                },
-                destroy: () => {
-                    this.adapters.delete(guildID);
-                }
-            };
-        };
-    };
+    public abstract voiceAdapterCreator(guildID: string): DiscordGatewayAdapterCreator;
 
     /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_SERVER_UPDATE
      * @param payload - Данные голосового состояния
-     * @returns void
-     * @public
      */
     public onVoiceServer = (payload: GatewayVoiceServerUpdateDispatchData) => {
         this.adapters.get(payload.guild_id)?.onVoiceServerUpdate(payload);
@@ -58,8 +40,6 @@ export abstract class VoiceAdapters {
     /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_STATE_UPDATE
      * @param payload - Данные голосового состояния
-     * @returns void
-     * @public
      */
     public onVoiceStateUpdate = (payload: GatewayVoiceStateUpdateDispatchData) => {
         this.adapters.get(payload.guild_id)?.onVoiceStateUpdate(payload);

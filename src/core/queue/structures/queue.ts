@@ -167,7 +167,7 @@ abstract class BaseQueue {
             self_mute: false,
             guild_id: ID,
             channel_id: queue_message.channelID
-        }, db.adapter.createVoiceAdapter(ID));
+        }, db.adapter.voiceAdapterCreator(ID));
 
         Logger.log("LOG", `[Queue/${ID}] has create`);
     };

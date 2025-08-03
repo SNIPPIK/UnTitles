@@ -174,9 +174,9 @@ export class DiscordClient extends Client {
  * @class DJSVoice
  * @extends VoiceAdapters
  */
-export class DJSVoice extends VoiceAdapters {
-    public constructor(private client: DiscordClient) {
-        super();
+export class DJSVoice<T extends DiscordClient = DiscordClient> extends VoiceAdapters<DiscordClient> {
+    public constructor(client: T) {
+        super(client);
 
         //@ts-ignore
         client.ws.on("VOICE_SERVER_UPDATE", (data) => {
@@ -189,14 +189,22 @@ export class DJSVoice extends VoiceAdapters {
         });
     };
 
-    /**
-     * @description Указываем данные для отправки данных через ws
-     * @param data
-     * @public
-     */
-    protected ws_send = (data: unknown) => {
+    public voiceAdapterCreator = (guildID: string) => {
         const id = this.client.shardID;
-        this.client.ws.shards.get(id).send(data);
+
+        return methods => {
+            this.adapters.set(guildID, methods);
+
+            return {
+                sendPayload: (data) => {
+                    this.client.ws.shards.get(id).send(data);
+                    return true;
+                },
+                destroy: () => {
+                    this.adapters.delete(guildID);
+                }
+            };
+        };
     };
 }
 
