@@ -43,7 +43,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                         }]
                     });
                 } catch (err) {
-                    console.error(err);
+                    Logger.log("ERROR", err as Error);
                 }
 
                 // Получаем данные в системе rest/API
@@ -60,7 +60,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                         // Удаляем сообщение после выполнения запроса
                         if (followUpPromise) setTimeout(() => followUpPromise.deletable ? followUpPromise.delete().catch(() => null) : {}, timeout);
                     } catch (err) {
-                        console.error(err);
+                        Logger.log("ERROR", err as Error);
                     }
 
                     // Обработка ошибки если что-то пошло не так
@@ -88,9 +88,9 @@ class rest_request extends Assign<Event<"rest/request">> {
                     }
 
                     // Добавляем в очередь
-                    db.queues.create(message, rest);
+                    return db.queues.create(message, rest);
                 } catch (err) {
-                    console.error(err);
+                    Logger.log("ERROR", err as Error);
                     db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.type}**\n**❯** **${err}**`);
                 }
             }
@@ -129,7 +129,7 @@ class rest_error extends Assign<Event<"rest/error">> {
                     if (message.replied && !message.deferred) msg = await message.followUp(options as any);
                     else if (message.deferred && !message.replied) msg = await message.editReply(options as any);
                     else if (!message.deferred && !message.replied) msg = await message.reply(options as any);
-                    else message.channel.send(options as any);
+                    else msg = await message.channel.send(options as any);
 
                     if (msg.deletable) setTimeout(msg.delete, 15e3);
                 } catch (err) {

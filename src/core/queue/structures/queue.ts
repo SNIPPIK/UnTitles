@@ -241,7 +241,7 @@ export class Queue extends BaseQueue {
         const buttons = QueueButtons.component(this._player);
 
         try {
-            const {api, artist, name, user, image, url} = this._tracks.track;
+            const {api, artist, name, image} = this._tracks.track;
             const position = this._tracks.position;
 
             return [{
@@ -257,7 +257,7 @@ export class Queue extends BaseQueue {
                             },
                             {
                                 "type": 10,
-                                "content": `### ** _[${name}](${url})_ **\n-# ${user.username}`
+                                "content": `\`\`\`${name}\`\`\``
                             }
                         ],
                         "accessory": {

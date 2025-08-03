@@ -109,12 +109,13 @@ setInterval(() => {
 - It is not afraid of **event loop** and **drift**, it just takes them into account not as a problem, but as parameters!
 - The loop can work ahead from 0 to 2 ms to process objects in the loop!
 - Audio sending is built on it!
-- Cycle accuracy `±0.05 ms` with `process.hrtime.bigint`
+- Cycle accuracy `±0.05 ms` with `process.hrtime.bigint` + `performance.now`
 
 #### ⚙️ Internal tools
 - [`SetArray`](src/structures/tools/SetArray.ts) - 2 in one Array and Set in one class
 - [`Cycle`](src/structures/tools/Cycle.ts) - Manages the message update system and sending audio packets
 - [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - typed `EventEmitterAsyncResource`
+- [`SimpleWorker`](src/structures/tools/SimpleWorker.ts) - Class that simplifies working with threads
 
 ---
 

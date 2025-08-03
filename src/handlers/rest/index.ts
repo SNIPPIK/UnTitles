@@ -1,8 +1,7 @@
-import { Logger } from "#structures";
+import { Logger, SimpleWorker } from "#structures";
 import { Worker } from "node:worker_threads";
 import { Track } from "#core/queue";
 import { db } from "#app/db";
-import path from "node:path";
 
 /**
  * @author SNIPPIK
@@ -92,34 +91,28 @@ export class RestObject {
     public startWorker = async (): Promise<boolean> => {
         this.generateUniqueId(true);
 
-        // Создаем Worker (распараллеливание запросов Rest/API)
-        this.worker = new Worker(path.resolve("src/workers/RestAPIServerThread"), {
-            execArgv: ["-r", "tsconfig-paths/register"],
-            workerData: { rest: true }
-        });
-
-        // Если возникнет ошибка, пересоздадим worker
-        this.worker.once("error", (err) => {
-            this.worker.removeAllListeners();
-            this.worker = null;
-
-            console.log(err);
-            return this.startWorker();
-        });
-
         return new Promise(resolve => {
-            // Если нет данных о платформах
-            if (this.platforms) return resolve(true);
+            const worker = this.worker = SimpleWorker.create<RestServerSide.Data>({
+                file: "src/workers/RestAPIServerThread",
+                options: {
+                    execArgv: ["-r", "tsconfig-paths/register"],
+                    workerData: { rest: true }
+                },
+                postMessage: { data: true },
+                not_destroyed: true,
+                callback: (data) => {
+                    this.platforms = {
+                        ...data,
+                        supported: Object.fromEntries(data.supported as any) as any
+                    };
 
-            // Получаем данные о загруженных платформах
-            this.worker.postMessage({data: true});
-            this.worker.once("message", (data: RestServerSide.Data) => {
-                this.platforms = {
-                    ...data,
-                    supported: Object.fromEntries(data.supported as any) as any
-                };
+                    return resolve(true);
+                }
+            });
 
-                return resolve(true);
+            // Если возникнет ошибка, пересоздадим worker
+            worker.once("error", () => {
+                return this.startWorker();
             });
         });
     };
@@ -167,7 +160,7 @@ export class RestObject {
 
                 // Если при получении треков произошла ошибка
                 if (search instanceof Error) {
-                    Logger.log("DEBUG", `${search}`);
+                    Logger.log("ERROR", search);
                     lastError = search;
                     continue;
                 }
@@ -205,7 +198,7 @@ export class RestObject {
 
                 // Если при получении трека произошла ошибка
                 if (song instanceof Error) {
-                    Logger.log("DEBUG", `${song}`);
+                    Logger.log("ERROR", song);
                     lastError = song;
                     continue;
                 }

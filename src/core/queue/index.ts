@@ -107,46 +107,57 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @param item    - Добавляемый объект
      * @private
      */
-    public create = (message: CommandInteraction, item?: Track.list | Track) => {
+    public create = async (message: CommandInteraction, item?: Track.list | Track) => {
         let queue = this.get(message.guildId);
 
-        // Проверяем есть ли очередь в списке, если нет то создаем
-        if (!queue) queue = new Queue(message) as T;
-        else {
-            // Значит что плеера нет в циклах
-            if (!this.cycles.players.has(queue.player) && queue.player.status !== "player/pause") {
+        // Если очереди нет — создаём новую
+        if (!queue) {
+            queue = new Queue(message) as T;
+        } else {
+            const player = queue.player;
+
+            // Проверяем, активен ли плеер в цикле или находится на паузе
+            const isPlayerInactive = !this.cycles.players.has(player) && player.status !== "player/pause";
+
+            if (isPlayerInactive) {
+                // Перезапуск плеера отложенным вызовом
                 setImmediate(() => {
-                    // Если добавлен трек
-                    if (item instanceof Track) queue.player.tracks.position = queue.player.tracks.total - 1;
+                    // Установка позиции воспроизведения в зависимости от типа добавленного item
 
-                    // Если очередь перезапущена
-                    else if (!item) queue.player.tracks.position = 0;
+                    if (item instanceof Track) {
+                        // Добавлен один трек — ставим позицию в конец очереди
+                        player.tracks.position = player.tracks.total - 1;
+                    } else if (!item) {
+                        // Очередь была перезапущена без треков
+                        player.tracks.position = 0;
+                    } else {
+                        // Добавлен плейлист — позиция на начало добавленного плейлиста
+                        player.tracks.position = player.tracks.total - item.items.length;
+                    }
 
-                    // Если добавлен плейлист
-                    else queue.player.tracks.position = queue.player.tracks.total - item.items.length;
-
-                    // Если разные текстовые каналы
+                    // Если текстовый канал изменился — обновляем привязку
                     if (queue.message.channelID !== message.channelId) {
-                        // Меняем текстовый канал
                         queue.message = new QueueMessage(message);
                     }
 
-                    this.restart_player = queue.player;
+                    // Сохраняем плеер для последующего перезапуска
+                    this.restart_player = player;
                 });
             }
         }
 
-        // Если вносятся треки
+        // Если передан трек или список треков — добавляем в очередь
         if (item) {
-            // Отправляем сообщение о том что было добавлено
-            if ("items" in item || queue.tracks.total > 0) {
-                db.events.emitter.emit("message/push", queue, message.member, item);
-            }
+            const tracks = (item as Track.list).items ?? [item as Track];
 
-            // Добавляем треки в очередь
-            for (const track of (item["items"] ?? [item]) as Track[]) {
+            for (const track of tracks) {
                 track.user = message.member.user;
                 queue.tracks.push(track);
+            }
+
+            // Отправка события о добавлении
+            if ((item as Track.list).items || queue.tracks.total > 0) {
+                db.events.emitter.emit("message/push", queue, message.member, item);
             }
         }
     };

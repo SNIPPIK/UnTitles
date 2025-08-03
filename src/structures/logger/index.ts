@@ -1,4 +1,5 @@
 import * as process from "node:process";
+import { env } from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -40,7 +41,7 @@ export class Logger {
      * @public
      * @static
      */
-    public static debug = process.env["NODE_ENV"] === "development";
+    public static debug = env.get("NODE_ENV") === "development";
 
     /**
      * @description Отправляем лог в консоль
@@ -48,11 +49,24 @@ export class Logger {
      * @public
      * @static
      */
-    public static log = (status: keyof typeof db.status, text: string): void => {
+    public static log = (status: keyof typeof db.status, text: string | Error): void => {
         // Игнорируем debug сообщения
         if (status === "DEBUG" && !this.debug) return;
 
-        text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
+        // Если пришел текст
+        if (typeof text === "string") text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
+
+        // Если вместо текста пришла ошибка
+        else if (text instanceof Error) {
+            text = `Uncaught Exception\n` +
+                `┌ Name:    ${text.name}\n` +
+                `├ Message: ${text.message}\n` +
+                `├ Origin:  ${text}\n` +
+                `└ Stack:   ${text.stack}`
+        }
+
+        // Если объект
+        else if (typeof text === "object") text = JSON.stringify(text);
 
         const date = new Date();
         const extStatus = db.status[status];
@@ -63,7 +77,7 @@ export class Logger {
         const memUsedMB = (mem.heapTotal / 1024 / 1024).toFixed(2);
 
         // Отправляем лог
-        process.stdout.write(`\x1b[35m[RAM ${memUsedMB} MB]\x1b[0m ${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}\n`)
+        process.stdout.write(`\x1b[35m[RAM ${memUsedMB} MB]\x1b[0m ${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}\n`);
     };
 
     /**

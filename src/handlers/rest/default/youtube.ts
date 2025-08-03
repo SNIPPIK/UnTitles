@@ -1,9 +1,7 @@
-import { Assign, httpsClient, locale } from "#structures";
+import { Assign, httpsClient, locale, SimpleWorker } from "#structures";
 import type { RestServerSide } from "#handler/rest";
-import { Worker } from "node:worker_threads";
 import { Track } from "#core/queue";
 import { db } from "#app/db";
-import path from "node:path";
 import fs from "node:fs";
 
 /**
@@ -43,7 +41,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 {
                     name: "playlist",
                     filter: /playlist\?list=[a-zA-Z0-9-_]+/i,
-                    execute: (url, {limit}) => {
+                    execute: (url, { limit }) => {
                         const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/i).pop();
                         let artist = null;
 
@@ -150,7 +148,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 {
                     name: "track",
                     filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
-                    execute: (url, options) => {
+                    execute: (url: string, options) => {
                         const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
 
                         return new Promise(async (resolve) => {
@@ -223,7 +221,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 {
                     name: "artist",
                     filter: /\/(channel)?(@)/i,
-                    execute: (url, {limit}) => {
+                    execute: (url: string, {limit}) => {
                         return new Promise(async (resolve) => {
                             try {
                                 let ID: string;
@@ -266,7 +264,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "search",
-                    execute: (query, {limit}) => {
+                    execute: (query: string, {limit}) => {
                         return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
@@ -359,38 +357,23 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
 
         // Запускаем мусорный Signature extractor, очень много мусора за собой оставляет
         return new Promise((resolve) => {
-            // Создаем еще 1 поток, для выполнения мусорной функции
-            const worker: Worker = new Worker(path.resolve("src/workers/YouTubeSignatureExtractor.js"), {
-                execArgv: ["-r", "tsconfig-paths/register"],
-                resourceLimits: {
-                    maxOldGenerationSizeMb: 15,
-                    maxYoungGenerationSizeMb: 10
+            SimpleWorker.create<string>({
+                file: "src/workers/YouTubeSignatureExtractor.js",
+                postMessage: {
+                    formats: data["formats"],
+                    html
                 },
-                workerData: null
-            });
-
-            // Отправляем сообщение во 2 поток
-            worker.postMessage({formats: data["formats"], html});
-
-            worker.once("exit", () => {
-                setTimeout(async () => {
-                    worker.removeAllListeners();
-                    await worker.terminate();
-                    worker.ref();
-                }, 2e3);
-            });
-
-            // Слушаем ответ от 2 потока
-            worker.once("message", (data) => {
-                worker.emit("exit");
-                return resolve(data);
-            });
-
-            // Если при создании получена ошибка
-            worker.once("error", (err) => {
-                worker.emit("exit");
-                console.error(err);
-                return resolve(err);
+                options: {
+                    execArgv: ["-r", "tsconfig-paths/register"],
+                    resourceLimits: {
+                        maxOldGenerationSizeMb: 14,
+                        maxYoungGenerationSizeMb: 5
+                    },
+                    workerData: null
+                },
+                callback: (data) => {
+                    return resolve(data);
+                }
             });
         });
     };

@@ -6,6 +6,7 @@ export * from "./tools/Collection";
 export * from "./tools/SetArray";
 export * from "./tools/Cycle";
 export * from "./tools/httpsClient";
+export * from "./tools/SimpleWorker";
 
 /**
  * @description Все prototype объектов
