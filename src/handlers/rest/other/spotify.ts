@@ -67,7 +67,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                 {
                     name: "track",
                     filter: /track\/[0-9z]+/i,
-                    execute: (url: string, options) => {
+                    execute: (url, options) => {
                         const ID = /track\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("track\/")?.pop();
 
                         return new Promise(async (resolve) => {

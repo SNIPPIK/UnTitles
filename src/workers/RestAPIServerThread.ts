@@ -122,6 +122,7 @@ if (parentPort && workerData.rest) {
 
     // Если возникнет непредвиденная ошибка
     process.on("unhandledRejection", (err) => {
+        parentPort.removeAllListeners();
         throw err;
     });
 }
@@ -135,19 +136,20 @@ if (parentPort && workerData.rest) {
  * @async
  */
 async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
+    const { platform, payload, options, requestId } = api;
+
     try {
-        const { platform, payload, options } = api;
-        const readPlatform: RestServerSide.API = rest.platform( payload?.startsWith("http") ? payload : platform );
+        const readPlatform: RestServerSide.API = rest.platform( platform );
         const callback = readPlatform.requests.find((p) => {
             // Если производится прямой запрос по названию
-            if (p.name === payload) return p;
+            if (p.name === payload) return true;
 
             // Если указана ссылка
             else if (payload.startsWith("http")) {
                 try {
-                    if (p["filter"].exec(payload) || payload.match(p["filter"])) return p;
+                    return p["filter"]?.test(payload);
                 } catch {
-                    return null;
+                    return false;
                 }
             }
 
@@ -157,18 +159,18 @@ async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
 
         // Если не найдена функция вызова
         if (!callback) {
-            return parentPort.postMessage({status: "error", result: Error(`Callback not found for platform: ${platform}`)});
+            return parentPort.postMessage({requestId, status: "error", result: Error(`Callback not found for platform: ${platform}`)});
         }
 
         // Получаем результат запроса
-        const result = await callback.execute(payload, {
+        let result = await callback.execute(payload, {
             audio: options?.audio !== undefined ? options.audio : true,
             limit: rest.limits[callback.name]
         });
 
-        return parentPort.postMessage({ status: "success", result, type: callback.name });
+        return parentPort.postMessage({ status: "success", result, type: callback.name, requestId });
     } catch (err) {
-        parentPort.postMessage({status: "error", result: err});
+        parentPort.postMessage({status: "error", result: err, requestId});
         throw new Error(`${err}`);
     }
 }

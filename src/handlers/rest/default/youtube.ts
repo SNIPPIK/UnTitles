@@ -43,7 +43,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 {
                     name: "playlist",
                     filter: /playlist\?list=[a-zA-Z0-9-_]+/i,
-                    execute: (url: string, {limit}) => {
+                    execute: (url, {limit}) => {
                         const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/i).pop();
                         let artist = null;
 
@@ -150,7 +150,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 {
                     name: "track",
                     filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
-                    execute: (url: string, options) => {
+                    execute: (url, options) => {
                         const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
 
                         return new Promise(async (resolve) => {
@@ -223,7 +223,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 {
                     name: "artist",
                     filter: /\/(channel)?(@)/i,
-                    execute: (url: string, {limit}) => {
+                    execute: (url, {limit}) => {
                         return new Promise(async (resolve) => {
                             try {
                                 let ID: string;
@@ -266,7 +266,7 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "search",
-                    execute: (query: string, {limit}) => {
+                    execute: (query, {limit}) => {
                         return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос

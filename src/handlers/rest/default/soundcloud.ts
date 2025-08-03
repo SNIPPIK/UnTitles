@@ -59,7 +59,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
                 {
                     name: "track",
                     filter: /^https?:\/\/soundcloud\.com\/([\w-]+)\/?([\w-]+)(?:\?.*)?$/i, // https://soundcloud.com/neffexmusic/neffex-save-a-life-
-                    execute: (url: string, options) => {
+                    execute: (url, options) => {
                         const fixed = url.split("?")[0];
 
                         return new Promise(async (resolve) => {
@@ -100,8 +100,8 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "playlist",
-                    filter: /sets\/[a-zA-Z0-9]+/i, // https://soundcloud.com/neffexmusic/neffex-save-a-life-
-                    execute: (url: string, {limit}) => {
+                    filter: /sets\/[a-zA-Z0-9]+/i,
+                    execute: (url, {limit}) => {
                         const fixed = url.split("?")[0];
 
                         return new Promise(async (resolve) => {
@@ -148,7 +148,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
                  */
                 {
                     name: "search",
-                    execute: (query: string, options) => {
+                    execute: (query, options) => {
                         return new Promise(async (resolve) => {
                             try {
                                 // Создаем запрос
