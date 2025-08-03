@@ -498,6 +498,11 @@
     "ru": "Был удален из очереди трек\n\n**❯** **{ARGUMENT}**"
   },
 
+  "command.remove.track.fail": {
+    "en-US": "{ARGUMENT} | I can't delete a track that doesn't even exist!",
+    "ru": "{ARGUMENT} | Я не могу удалить трек которого даже нет!"
+  },
+
 
   "command.filter.push.two": {
     "en-US": "Current filter has enabled!",

@@ -2,6 +2,7 @@ import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
 import { ApplicationCommandOptionType } from "discord.js";
 import { Assign, locale } from "#structures";
 import { db } from "#app/db";
+import {Colors} from "#structures/discord";
 
 /**
  * @author SNIPPIK
@@ -76,7 +77,17 @@ class RemoveTrackCommand extends Assign< BaseCommand<number> > {
                 const track = queue.tracks.get(number);
 
                 // Если указан трек которого нет
-                if (!track) return null;
+                if (!track) {
+                    return message.reply({
+                        embeds: [
+                            {
+                                description: locale._(message.locale, "command.remove.track.fail", [message.member]),
+                                color: Colors.DarkRed
+                            }
+                        ],
+                        flags: "Ephemeral"
+                    });
+                }
 
                 const {name, url, api} = track;
 
