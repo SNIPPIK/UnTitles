@@ -1,8 +1,8 @@
 import { Worker } from "node:worker_threads";
 import { Logger } from "#structures";
 import { Track } from "#core/queue";
-import path from "node:path";
 import { db } from "#app/db";
+import path from "node:path";
 
 /**
  * @author SNIPPIK
@@ -17,6 +17,12 @@ export class RestObject {
      * @private
      */
     private worker: Worker;
+
+    /**
+     * @description Последний уникальный ID запроса
+     * @private
+     */
+    private lastID = 0;
 
     /**
      * @description База с платформами
@@ -36,7 +42,7 @@ export class RestObject {
      * @public
      */
     public get allow(): RestServerSide.API[] {
-        if (!this.platforms.array) this.platforms.array = Object.values(this.platforms.supported);
+        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
         return this.platforms.array.filter(api => api.auth);
     };
 
@@ -46,7 +52,7 @@ export class RestObject {
      * @public
      */
     public get audioSupport(): RestServerSide.API[] {
-        if (!this.platforms.array) this.platforms.array = Object.values(this.platforms.supported);
+        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
         return this.platforms.array.filter(api => api.auth !== false && api.audio !== false && !this.platforms.block.includes(api.name));
     };
 
@@ -56,8 +62,23 @@ export class RestObject {
      * @public
      */
     public get allowWave(): RestServerSide.API[] {
-        if (!this.platforms.array) this.platforms.array = Object.values(this.platforms.supported);
+        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
         return this.platforms.array.filter(api => api.auth && api.requests.some((apis) => apis.name === "wave"));
+    };
+
+    /**
+     * @description Генерация уникального ID
+     * @param reset
+     */
+    private generateUniqueId = (reset = false) => {
+        // Если надо сбросить данные
+        if (reset) {
+            this.lastID = 0;
+            return null;
+        }
+
+        this.lastID += 1;
+        return this.lastID.toString();
     };
 
     /**
@@ -66,12 +87,7 @@ export class RestObject {
      * @public
      */
     public startWorker = async (): Promise<boolean> => {
-        // Если уже есть worker
-        if (this.worker) {
-            this.worker.removeAllListeners();
-            await this.worker.terminate();
-            this.worker = null;
-        }
+        this.generateUniqueId(true);
 
         // Создаем Worker (распараллеливание запросов Rest/API)
         this.worker = new Worker(path.resolve("src/workers/RestAPIServerThread"), {
@@ -134,6 +150,9 @@ export class RestObject {
 
             // Ищем нужную платформу
             for (const platform of this.audioSupport) {
+                // Делаем запрет на поиск на той же платформе
+                if (platform.name === track.api.name) continue;
+
                 // Получаем класс для работы с Worker
                 const platformAPI = this.request(platform.name);
 
@@ -169,7 +188,7 @@ export class RestObject {
 
                 // Если отфильтровать треки не удалось
                 if (!findTrack) {
-                    Logger.log("DEBUG", `[APIs/${platform.name}/fetch] The tracks found do not match the description of this`);
+                    Logger.log("ERROR", `[APIs/${platform.name}/fetch] The tracks found do not match the description of this`);
                     lastError = Error(`[APIs/${platform.name}] The tracks found do not match the description of this`);
                     continue;
                 }
@@ -209,7 +228,7 @@ export class RestObject {
 
             return link;
         } catch (err) {
-            Logger.log("DEBUG", `[APIs/fetch] ${err}`);
+            Logger.log("ERROR", `[APIs/fetch] ${err}`);
             return err instanceof Error ? err : Error(`[APIs/fetch] Unexpected error ${err}`);
         }
     };
@@ -244,11 +263,17 @@ export class RestObject {
      */
     protected readonly request_worker = ({platform, payload, options}: RestClientSide.ClientOptions): Promise<Track | Track[] | Track.list | Error> => {
         return new Promise((resolve) => {
-            // Передает данные запроса в другой поток
-            this.worker.postMessage({ platform: platform.name, payload, options });
+            const requestId = this.generateUniqueId(); // Можно использовать UUID или простой счетчик
 
-            // Ждем ответ от потока
-            this.worker.once("message", (message: RestServerSide.Result) => {
+            // Отправляем запрос с requestId
+            this.worker.postMessage({ platform: platform.name, payload, options, requestId });
+
+            // Слушаем только сообщение с нашим requestId
+            const onMessage = (message: RestServerSide.Result & { requestId?: string }) => {
+                if (message.requestId !== requestId) return; // Не наш ответ — игнорируем
+
+                this.worker.off("message", onMessage); // Отписываемся после получения
+
                 const { result, status } = message;
                 const baseAPI: RestServerSide.APIBase = {
                     name: platform.name,
@@ -256,32 +281,23 @@ export class RestObject {
                     color: platform.color
                 };
 
-                // Если в результате ошибка
                 if (result instanceof Error) return resolve(result);
 
-                // Если статус удачный
-                else if (status === "success") {
-
-                    // Если получен список
+                if (status === "success") {
                     if (Array.isArray(result)) {
-                        return resolve(result.map((item) => new Track(item, baseAPI)));
-                    }
-
-                    // Если получен плейлист или альбом
-                    else if (typeof result === "object" && "items" in result) {
+                        return resolve(result.map(item => new Track(item, baseAPI)));
+                    } else if (typeof result === "object" && "items" in result) {
                         return resolve({
                             ...result,
-                            items: result.items.map((item) => new Track(item, baseAPI)),
+                            items: result.items.map(item => new Track(item, baseAPI)),
                         });
                     }
-
-                    // Если получен 1 объект
                     return resolve(new Track(result, baseAPI));
                 }
+                resolve(null);
+            };
 
-                // Если что-то не так
-                return null;
-            });
+            this.worker.on("message", onMessage);
         });
     };
 }
@@ -299,6 +315,7 @@ export namespace RestClientSide {
      * @interface ServerOptions
      */
     export interface ClientOptions {
+        requestId: string;
         platform: RestServerSide.API;
         payload: string;
         options?: {
@@ -375,7 +392,7 @@ export namespace RestClientSide {
          * @param _api - Данные платформы
          * @public
          */
-        public constructor(private readonly _api: RestServerSide.API) {};
+        public constructor(private _api: RestServerSide.API) {};
 
         /**
          * @description Запрос в систему Rest/API, через систему worker
@@ -387,11 +404,11 @@ export namespace RestClientSide {
                 // Получение типа запроса
                 type: this._api.requests.find((item) => {
                     // Если производится прямой запрос по названию
-                    if (item.name === payload) return item;
+                    if (item.name === payload) return true;
 
                     // Если указана ссылка
                     else if (typeof payload === "string" && payload.startsWith("http")) {
-                        if (item.name === "track" && item.filter?.test(payload)) return item;
+                        if (item["filter"] && item["filter"]?.test(payload)) return true;
                     }
 
                     // Скорее всего надо произвести поиск
@@ -402,8 +419,9 @@ export namespace RestClientSide {
                 request: () => db.api["request_worker"](
                     {
                         platform: this._api,
-                        payload: payload as any,
-                        options
+                        payload: payload,
+                        requestId: null, // Присваивается в request_worker
+                        options,
                     }
                 ) as Promise<RestClientSide.ResultData<T>>
             }
@@ -603,7 +621,7 @@ export namespace RestServerSide {
      * @description Данные для валидного запроса параллельном процессу
      * @interface ServerOptions
      */
-    //@ts-ignore
+        //@ts-ignore
     export interface ServerOptions extends RestClientSide.ClientOptions {
         platform: API["name"];
         // Для получения ответа с найденными платформами
