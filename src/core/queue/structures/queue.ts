@@ -274,13 +274,13 @@ export class Queue extends BaseQueue {
                     },
                     {
                         "type": 10, // Text
-                        "content": `${this._tracks.total > 1 ? `-# ${position + 1}/${this._tracks.total} | ${this._tracks.time}` : ""}` + this._player.progress
+                        "content": `-# ${getVolumeIndicator(this._player.volume)} ${this._tracks.total > 1 ? `| ${position + 1}/${this._tracks.total} | ${this._tracks.time}` : ""}` + this._player.progress
                     },
                     ...buttons
                 ]
             }];
         } catch (error) {
-            console.log(error);
+            Logger.log("ERROR", error as Error);
         }
 
         return null;
@@ -293,11 +293,27 @@ export class Queue extends BaseQueue {
      */
     public constructor(message: CommandInteraction) {
         super(message);
-        const ID = message.guild.id;
+        const ID = message.guildId;
 
         // Добавляем очередь в список очередей
         db.queues.set(ID, this);
     };
+}
+
+/**
+ * @param volume - Уровень громкости (0–200)
+ * @returns строка-индикатор громкости
+ */
+function getVolumeIndicator(volume: number): string {
+    const maxBlocks = 8;
+    const clamped = Math.max(0, Math.min(volume, 200));
+    const filled = Math.round((clamped / 100) * (maxBlocks / 2)); // 100% = 4 блока
+    const empty = maxBlocks - filled;
+    const bar = "▓".repeat(filled) + "░".repeat(empty);
+
+    const volumeStr = `${clamped}%`.padStart(4, " ");
+
+    return `${bar} ${volumeStr}`;
 }
 
 /**

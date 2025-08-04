@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { ShardingManager } from "discord.js";
 import { Logger } from "#structures";
-import {DiscordClient} from "#structures/discord/Client";
+import { DiscordClient } from "#structures/discord/Client";
 
 export * from "./Client";
 

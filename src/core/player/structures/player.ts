@@ -186,6 +186,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         return true;
     };
 
+    
     /**
      * @description Изменяем значение громкости у плеера
      * @param vol - Громкость допустимый диапазон (10-200)
@@ -198,6 +199,16 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Меняем параметр
         this._volume = vol;
     };
+
+
+    /**
+     * @description Текущая громкость плеера
+     * @public
+     */
+    public get volume() {
+        return this._volume;
+    };
+
 
     /**
      * @description Задаем параметры плеера перед началом работы
