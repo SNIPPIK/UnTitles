@@ -1,7 +1,7 @@
 <div align="center">
   <h1>🌟 Discord Music Bot</h1>
 
-<h4>Incredible bot with its own voice engine, scalable architecture, multiple filters and support for multiple music platforms.</h4>
+<h4>Incredible bot with its own voice/audio engine, scalable architecture, multiple filters and support for multiple music platforms.</h4>
 <h4>Audio quality surpasses lavalink, don't believe me? Listen for yourself!</h4>
 
   <p>
@@ -88,6 +88,7 @@ setInterval(() => {
 - There is a system of smooth transition from one audio to another `Hot audio swap`
 - 16+ filters, you can add your own without complex digging in the code [filters](src/core/player/filters.json)
 - There is support for long videos, Live video is still raw.
+- There is explicit synchronization of the audio stream only for tracks <8 min.
 #### 🌐 Platforms
 - YouTube, Spotify, VK, Yandex-Music, SoundCloud support
 - Platforms work in a separate **worker** (thread) for performance
@@ -109,13 +110,12 @@ setInterval(() => {
 - It is not afraid of **event loop** and **drift**, it just takes them into account not as a problem, but as parameters!
 - The loop can work ahead from 0 to 2 ms to process objects in the loop!
 - Audio sending is built on it!
-- Cycle accuracy `±0.05 ms` with `process.hrtime.bigint` + `performance.now`
+- Cycle accuracy `±0.05 ms` with `process.hrtime.bigint`
 
 #### ⚙️ Internal tools
 - [`SetArray`](src/structures/tools/SetArray.ts) - 2 in one Array and Set in one class
 - [`Cycle`](src/structures/tools/Cycle.ts) - Manages the message update system and sending audio packets
 - [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - typed `EventEmitterAsyncResource`
-- [`SimpleWorker`](src/structures/tools/SimpleWorker.ts) - Class that simplifies working with threads
 
 ---
 
@@ -125,19 +125,18 @@ setInterval(() => {
 - Responsive UI - does not require reusing commands
 
 #### 📚 Commands
-|   Command | Autocomplete | Arguments                       | Description           |
-|----------:|:-------------|:--------------------------------|:----------------------|
-|    `/api` | ❌            | access:(block, unblock)         | API management        |
-|    `/bot` | ❌            | restart:(commands, bot, events) | Restart               |
-| `/filter` | ✅            | (off, push, disable)            | Audio filters         |
-|   `/play` | ✅            | (api, replay, stop, wave)       | Playback              |
-| `/volume` | ❌            | value                           | Volume audio playback |
-| `/remove` | ✅            | value                           | Delete track          |
-|   `/seek` | ❌            | 00:00, int                      | Rewind                |
-|   `/skip` | ✅            | (back, to, next)                | Skip                  |
-| `/avatar` | ✅            | {user}                          | User avatar           |
-|  `/voice` | ✅            | (join, leave, tribune)          | Voice channel         |
-| `/report` | ❌            | (none)                          | Contact developer     |
+|   Command | Autocomplete | Arguments                       | Description       |
+|----------:|:-------------|:--------------------------------|:------------------|
+|    `/api` | ❌            | access:(block, unblock)         | API management    |
+|    `/bot` | ❌            | restart:(commands, bot, events) | Restart           |
+| `/filter` | ✅            | (off, push, disable)            | Audio filters     |
+|   `/play` | ✅            | (api, replay, stop, wave)       | Playback          |
+| `/remove` | ✅            | value                           | Delete track      |
+|   `/seek` | ❌            | 00:00, int                      | Rewind            |
+|   `/skip` | ✅            | (back, to, next)                | Skip              |
+| `/avatar` | ✅            | {user}                          | User avatar       |
+|  `/voice` | ✅            | (join, leave, tribune)          | Voice channel     |
+| `/report` | ❌            | (none)                          | Contact developer |
 
 ---
 ## 🚀 Quick start
@@ -162,7 +161,7 @@ bun run start-bun
 ```
 
 ---
-[![TypeScript](https://img.shields.io/badge/typescript-5.9.2-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/typescript-5.8.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Bun](https://img.shields.io/badge/bun-1.2.15-6DA55F?style=for-the-badge&logo=bun&logoColor=white&color=white)](https://bun.com/)
 [![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/en)
 [![Discord.js](https://img.shields.io/badge/discord.js-14.21-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)

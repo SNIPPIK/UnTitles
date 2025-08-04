@@ -365,10 +365,6 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                 },
                 options: {
                     execArgv: ["-r", "tsconfig-paths/register"],
-                    resourceLimits: {
-                        maxOldGenerationSizeMb: 14,
-                        maxYoungGenerationSizeMb: 5
-                    },
                     workerData: null
                 },
                 callback: (data) => {

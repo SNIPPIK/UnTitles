@@ -55,13 +55,12 @@ export class ControllerCycles {
                 custom: {
                     step: async () => {
                         const time = Math.abs(this.time - this.insideTime);
-                        const drift = this.drifting;
 
                         // Если цикл уходит от оригинала, подстраиваем плееры
                         // 1 - Очень много
                         // 0.5 - То что надо
                         // 0.2 - 0.3 - Допустимо
-                        if (drift > 0.2) {
+                        if (time > 20) {
                             const frames = (Math.ceil(time / OPUS_FRAME_SIZE) + 1) * OPUS_FRAME_SIZE;
 
                             // Если текущее не совпадает с новым
@@ -159,7 +158,7 @@ export class ControllerCycles {
                 },
 
                 // Функция проверки
-                filter: (message) => message["editable"] && (message.editedTimestamp ?? message.createdTimestamp) + 10e3 < Date.now(),
+                filter: (message) => message.editable && (message.editedTimestamp ?? message.createdTimestamp) + 10e3 < Date.now(),
 
                 // Функция обновления сообщения
                 execute: async (message) => {

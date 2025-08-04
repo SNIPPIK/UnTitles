@@ -364,6 +364,12 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
             // Действия при готовности
             const handleReady = () => {
+                // Производим явную синхронизацию времени (только для BufferedAudioResource)
+                if (this._audio.current && stream instanceof BufferedAudioResource) {
+                    stream.seek = this._audio.current.duration;
+                }
+
+                // Переводим плеер в состояние чтения аудио
                 this._audio.current = stream;
                 this.status = "player/playing";
 
@@ -377,7 +383,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Заставляем плеер запускаться самостоятельно
-                setImmediate(this.enableCycle);
+                this.enableCycle();
             };
 
             // Подключаем события для отслеживания работы потока (временные)

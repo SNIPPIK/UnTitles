@@ -141,8 +141,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     protected constructor({options}: AudioResourceOptions) {
         super();
-
-        if (options?.seek > 0) this._seek = (options.seek * 1e3) / OPUS_FRAME_SIZE;
+        this._seek = (options.seek * 1e3) / OPUS_FRAME_SIZE;
     };
 
     /**
@@ -240,6 +239,15 @@ export class BufferedAudioResource extends BaseAudioResource {
     };
 
     /**
+     * @description Изменяем время проигрывания трека
+     * @param seek - Время в сек
+     * @public
+     */
+    public set seek(seek: number) {
+        this._buffer.position = (seek * 1e3) / OPUS_FRAME_SIZE;
+    };
+
+    /**
      * @description Создаем класс и задаем параметры
      * @constructor
      * @public
@@ -269,15 +277,10 @@ export class BufferedAudioResource extends BaseAudioResource {
 
             // Начало кодирования
             decode: (input) => {
-                let emitted = false
-
                 input.on("frame", (packet: Buffer) => {
                     setImmediate(() => {
                         // Сообщаем что поток можно начать читать
-                        if (!emitted) {
-                            this.emit("readable");
-                            emitted = true;
-                        }
+                        if (!this._buffer?.position) this.emit("readable");
                     });
 
                     this._buffer.packet = packet;
