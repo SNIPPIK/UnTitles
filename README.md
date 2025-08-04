@@ -125,18 +125,19 @@ setInterval(() => {
 - Responsive UI - does not require reusing commands
 
 #### 📚 Commands
-|   Command | Autocomplete | Arguments                       | Description       |
-|----------:|:-------------|:--------------------------------|:------------------|
-|    `/api` | ❌            | access:(block, unblock)         | API management    |
-|    `/bot` | ❌            | restart:(commands, bot, events) | Restart           |
-| `/filter` | ✅            | (off, push, disable)            | Audio filters     |
-|   `/play` | ✅            | (api, replay, stop, wave)       | Playback          |
-| `/remove` | ✅            | value                           | Delete track      |
-|   `/seek` | ❌            | 00:00, int                      | Rewind            |
-|   `/skip` | ✅            | (back, to, next)                | Skip              |
-| `/avatar` | ✅            | {user}                          | User avatar       |
-|  `/voice` | ✅            | (join, leave, tribune)          | Voice channel     |
-| `/report` | ❌            | (none)                          | Contact developer |
+|   Command | Autocomplete | Arguments                       | Description           |
+|----------:|:-------------|:--------------------------------|:----------------------|
+|    `/api` | ❌            | access:(block, unblock)         | API management        |
+|    `/bot` | ❌            | restart:(commands, bot, events) | Restart               |
+| `/filter` | ✅            | (off, push, disable)            | Audio filters         |
+|   `/play` | ✅            | (api, replay, stop, wave)       | Playback              |
+| `/volume` | ❌            | value                           | Volume audio playback |
+| `/remove` | ✅            | value                           | Delete track          |
+|   `/seek` | ❌            | 00:00, int                      | Rewind                |
+|   `/skip` | ✅            | (back, to, next)                | Skip                  |
+| `/avatar` | ✅            | {user}                          | User avatar           |
+|  `/voice` | ✅            | (join, leave, tribune)          | Voice channel         |
+| `/report` | ❌            | (none)                          | Contact developer     |
 
 ---
 ## 🚀 Quick start
@@ -161,7 +162,7 @@ bun run start-bun
 ```
 
 ---
-[![TypeScript](https://img.shields.io/badge/typescript-5.8.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/typescript-5.9.2-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Bun](https://img.shields.io/badge/bun-1.2.15-6DA55F?style=for-the-badge&logo=bun&logoColor=white&color=white)](https://bun.com/)
 [![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/en)
 [![Discord.js](https://img.shields.io/badge/discord.js-14.21-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)

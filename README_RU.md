@@ -127,18 +127,19 @@ setInterval(() => {
 - Отзывчивый UI — не требует повторного использования команд
 
 #### 📚 Команды
-|   Команда | Autocomplete | Аргументы                       | Описание              |
-|----------:|:-------------|:--------------------------------|:----------------------|
-|    `/api` | ❌            | access:(block, unblock)         | Управление API        |
-|    `/bot` | ❌            | restart:(commands, bot, events) | Перезапуск            |
-| `/filter` | ✅            | (off, push, disable)            | Аудио-фильтры         |
-|   `/play` | ✅            | (api, replay, stop, wave)       | Проигрывание          |
-| `/remove` | ✅            | value                           | Удаление трека        |
-|   `/seek` | ❌            | 00:00, int                      | Перемотка             |
-|   `/skip` | ✅            | (back, to, next)                | Пропуск               |
-| `/avatar` | ✅            | {user}                          | Аватар пользователя   |
-|  `/voice` | ✅            | (join, leave, tribune)          | Голосовой канал       |
-| `/report` | ❌            | (none)                          | Связь с разработчиком |
+|   Команда | Autocomplete | Аргументы                       | Описание                         |
+|----------:|:-------------|:--------------------------------|:---------------------------------|
+|    `/api` | ❌            | access:(block, unblock)         | Управление API                   |
+|    `/bot` | ❌            | restart:(commands, bot, events) | Перезапуск                       |
+| `/filter` | ✅            | (off, push, disable)            | Аудио-фильтры                    |
+|   `/play` | ✅            | (api, replay, stop, wave)       | Проигрывание                     |
+| `/volume` | ❌            | value                           | Изменение громкости проигрывания |
+| `/remove` | ✅            | value                           | Удаление трека                   |
+|   `/seek` | ❌            | 00:00, int                      | Перемотка                        |
+|   `/skip` | ✅            | (back, to, next)                | Пропуск                          |
+| `/avatar` | ✅            | {user}                          | Аватар пользователя              |
+|  `/voice` | ✅            | (join, leave, tribune)          | Голосовой канал                  |
+| `/report` | ❌            | (none)                          | Связь с разработчиком            |
 
 ---
 ## 🚀 Быстрый старт
@@ -163,7 +164,7 @@ bun run start-bun
 ```
 
 ---
-[![TypeScript](https://img.shields.io/badge/typescript-5.8.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/typescript-5.9.2-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Bun](https://img.shields.io/badge/bun-1.2.15-6DA55F?style=for-the-badge&logo=bun&logoColor=white&color=white)](https://bun.com/)
 [![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/en)
 [![Discord.js](https://img.shields.io/badge/discord.js-14.21-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)

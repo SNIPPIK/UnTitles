@@ -80,8 +80,8 @@ export class Process {
                 std.destroy();
             }
 
-            this._process.ref();
             this._process.removeAllListeners();
+            this._process.ref();
             this._process.kill("SIGKILL");
             this._process = null;
         }

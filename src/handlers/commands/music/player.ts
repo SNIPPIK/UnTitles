@@ -51,9 +51,23 @@ import { db } from "#app/db";
         "ru": "громкость"
     },
     descriptions: {
-        "en-US": "Forced termination of music playback!",
-        "ru": "Принудительное завершение проигрывания музыки!"
+        "en-US": "Change the volume of music playback!",
+        "ru": "Изменение громкости проигрывания музыки!"
     },
+    options: [
+        {
+            names: {
+                "en-US": "value",
+                "ru": "значение"
+            },
+            descriptions: {
+                "en-US": "Значение громкости плеера! Диапазон 10-200",
+                "ru": "Player volume value! Range 10-200"
+            },
+            required: true,
+            type: ApplicationCommandOptionType["String"]
+        }
+    ]
 })
 class PlayerControl extends Assign<BaseCommand> {
     public constructor() {
