@@ -143,8 +143,11 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
+                // Пропускаем лишние SILENT_FRAMEs
+                if (packet.length < 5) continue;
+
                 // Если найден заголовок
-                if (isOpusHead(packet)) {
+                else if (isOpusHead(packet)) {
                     this.emit("head", packet);
                     continue;
                 }

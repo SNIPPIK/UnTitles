@@ -36,8 +36,8 @@ export class Process {
 
     /**
      * @description Задаем параметры и запускаем процесс
-     * @param args {string[]} Аргументы для запуска
-     * @param name {string} Имя процесса
+     * @param args - Аргументы для запуска
+     * @param name - Имя процесса
      * @constructor
      * @public
      */

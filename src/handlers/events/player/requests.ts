@@ -2,7 +2,6 @@ import { Logger, Assign, locale } from "#structures";
 import { Colors } from "#structures/discord";
 import { Event } from "#handler/events";
 import { Message } from "discord.js";
-import { Track } from "#core/queue";
 import { db } from "#app/db";
 
 /**
@@ -22,77 +21,73 @@ class rest_request extends Assign<Event<"rest/request">> {
             execute: async (platform, message, url) => {
                 // Получаем функцию запроса данных с платформы
                 const api = platform.request(url);
-                const timeout = !platform.audio ? 2e3 : 0;
+                const isAudio = platform.audio;
+                const timeout = isAudio ? 0 : 2000;
 
-                // Если нет поддержки такого запроса!
+                // Проверка поддержки запроса
                 if (!api.type) {
-                    db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.support"));
-                    return;
+                    return db.events.emitter.emit("rest/error", message,
+                        locale._(message.locale, "api.platform.support"));
                 }
 
-                // Отправляем сообщение о том что запрос производится
-                // Сообщение о том, что запрос начался
-                let followUpPromise: Message<boolean>;
+                // Предупреждение о запуске запроса
+                let followUpMsg: Message<boolean>;
                 try {
-                    followUpPromise = await message.followUp({
+                    followUpMsg = await message.followUp({
                         flags: "Ephemeral",
                         embeds: [{
                             title: `${platform.platform}.${api.type}`,
-                            description: timeout ? locale._(message.locale, "api.platform.request.long", [db.images.loading, platform.platform]) : locale._(message.locale, "api.platform.request", [db.images.loading]),
+                            description: locale._(message.locale,
+                                isAudio ? "api.platform.request" : "api.platform.request.long",
+                                [db.images.loading, platform.platform]
+                            ),
                             color: platform.color
                         }]
                     });
                 } catch (err) {
-                    Logger.log("ERROR", err as Error);
+                    console.error("Followup error:", err);
                 }
 
-                // Получаем данные в системе rest/API
+                // Обёртка над таймаутом + запрос
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(locale._(message.locale, "api.platform.timeout"))), 15000)
+                );
+
+                let rest
                 try {
-                    // Если ответ не был получен от сервера
-                    const timeoutPromise = new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error(locale._(message.locale, "api.platform.timeout"))), 15e3)
-                    );
-
-                    // Дожидаемся выполнения запроса
-                    let rest = await Promise.race([api.request(), timeoutPromise]) as Track.list | Track[] | Track | Error;
-
-                    try {
-                        // Удаляем сообщение после выполнения запроса
-                        if (followUpPromise) setTimeout(() => followUpPromise.deletable ? followUpPromise.delete().catch(() => null) : {}, timeout);
-                    } catch (err) {
-                        Logger.log("ERROR", err as Error);
-                    }
-
-                    // Обработка ошибки если что-то пошло не так
-                    if (rest instanceof Error) {
-                        db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.error", [rest]));
-                        return;
-                    }
-
-                    // Если был получен результат в виде массива
-                    else if (Array.isArray(rest)) {
-                        if (rest.length === 0) {
-                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "player.search.fail"));
-                            return;
-                        }
-                        // Меняем на первый трек из массива
-                        rest = rest[0];
-                    }
-
-                    // Если найден плейлист
-                    else if ("items" in rest) {
-                        if (rest.items.length === 0) {
-                            db.events.emitter.emit("rest/error", message, locale._(message.locale, "player.search.fail"));
-                            return;
-                        }
-                    }
-
-                    // Добавляем в очередь
-                    return db.queues.create(message, rest);
+                    rest = await Promise.race([api.request(), timeoutPromise]);
                 } catch (err) {
                     Logger.log("ERROR", err as Error);
-                    db.events.emitter.emit("rest/error", message, `**${platform.platform}.${api.type}**\n**❯** **${err}**`);
+                    return db.events.emitter.emit("rest/error", message,
+                        `**${platform.platform}.${api.type}**\n**❯** **${err}**`);
                 }
+
+                // Очистка сообщения
+                if (followUpMsg) {
+                    setTimeout(() => followUpMsg.delete().catch(() => null), timeout);
+                }
+
+                // Обработка результата
+                if (rest instanceof Error) {
+                    return db.events.emitter.emit("rest/error", message,
+                        locale._(message.locale, "api.platform.error", [rest]));
+                }
+
+                if (Array.isArray(rest)) {
+                    if (!rest.length)
+                        return db.events.emitter.emit("rest/error", message,
+                            locale._(message.locale, "player.search.fail"));
+
+                    rest = rest[0];
+                }
+
+                if ("items" in rest && rest.items.length === 0) {
+                    return db.events.emitter.emit("rest/error", message,
+                        locale._(message.locale, "player.search.fail"));
+                }
+
+                // Добавление в очередь
+                return db.queues.create(message, rest);
             }
         });
     };

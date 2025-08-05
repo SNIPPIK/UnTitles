@@ -216,7 +216,9 @@ export class BufferedAudioResource extends BaseAudioResource {
      */
     public get duration() {
         if (!this._buffer?.position) return 0;
-        return Math.abs((((this._buffer?.position + this._seek) * OPUS_FRAME_SIZE) / 1e3));
+
+        const time = (this._buffer?.position + this._seek) * OPUS_FRAME_SIZE;
+        return Math.abs(((time - OPUS_FRAME_SIZE) / 1e3));
     };
 
     /**
@@ -283,7 +285,8 @@ export class BufferedAudioResource extends BaseAudioResource {
                         if (!this._buffer?.position) this.emit("readable");
                     });
 
-                    this._buffer.packet = packet;
+                    // Если создал класс буфера, начинаем кеширование пакетов
+                    if (this._buffer && packet) this._buffer.packet = packet;
                 });
             }
         });
@@ -305,7 +308,6 @@ export class BufferedAudioResource extends BaseAudioResource {
                 "-acodec", "libopus",
                 "-frame_duration", "20",
                 "-f", "opus",
-
                 "pipe:"
             ]),
 
@@ -457,7 +459,6 @@ export class PipeAudioResource extends BaseAudioResource {
                 "-acodec", "libopus",
                 "-frame_duration", "20",
                 "-f", "opus",
-
                 "pipe:"
             ]),
 

@@ -1,10 +1,8 @@
 import { CycleInteraction } from "#structures/discord";
 import { Logger, TaskCycle } from "#structures";
-import { db } from "#app/db";
-
-// Low level
 import { OPUS_FRAME_SIZE } from "#core/audio";
 import { AudioPlayer } from "#core/player";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -55,18 +53,16 @@ export class ControllerCycles {
                 custom: {
                     step: async () => {
                         const time = Math.abs(this.time - this.insideTime);
+                        const drift = this.drifting;
 
                         // Если цикл уходит от оригинала, подстраиваем плееры
-                        // 1 - Очень много
-                        // 0.5 - То что надо
-                        // 0.2 - 0.3 - Допустимо
-                        if (time > 20) {
+                        if (drift > 0.2) {
                             const frames = (Math.ceil(time / OPUS_FRAME_SIZE) + 1) * OPUS_FRAME_SIZE;
 
                             // Если текущее не совпадает с новым
-                            if (frames !== this.options.duration) {
+                            if (this.options.duration < frames) {
                                 // Устанавливаем время шага для поддержания
-                                this._stepTimestamp = Date.now() + 1e3;
+                                this._stepTimestamp = Date.now() + 700;
 
                                 // Меняем время цикла
                                 this.options.duration = frames;
@@ -76,9 +72,8 @@ export class ControllerCycles {
                             }
                         }
 
-                        // Сброс таймера
+                        // Сброс таймера (Jitter buffer)
                         else if (this.options.duration !== OPUS_FRAME_SIZE && !this._switched) {
-
                             // Защищаемся от спама
                             if (this._stepTimestamp < Date.now()) {
                                 this._switched = true;

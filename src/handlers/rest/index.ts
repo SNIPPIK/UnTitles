@@ -167,8 +167,6 @@ export class RestObject {
 
                 // Если треков не найдено
                 else if (!search.length) {
-                    console.log(platform, platformAPI, search);
-
                     Logger.log("DEBUG", `[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
                     lastError = Error(`[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
                     continue;
@@ -186,8 +184,6 @@ export class RestObject {
 
                 // Если отфильтровать треки не удалось
                 if (!findTrack) {
-                    console.log(platform, platformAPI, search, findTrack);
-
                     Logger.log("ERROR", `[APIs/${platform.name}/fetch] The tracks found do not match the description of this`);
                     lastError = Error(`[APIs/${platform.name}] The tracks found do not match the description of this`);
                     continue;
@@ -351,7 +347,7 @@ type APIRequestsRaw = {
 type ExecuteParams<T extends keyof APIRequests = keyof APIRequests> =
     T extends "track" ? { audio: boolean } :
         T extends "playlist" | "album" | "artist" | "wave" | "search" ? { limit: number } :
-            never;
+                never;
 
 /**
  * @description Сырые типы данных для дальнейшего использования

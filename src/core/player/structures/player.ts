@@ -336,22 +336,20 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public play = async (seek: number = 0, timeout: number = 0, position: number = null): Promise<void> => {
-        const track = typeof position === "number" ? this._tracks.get(position) : this._tracks.track;
+        const index = typeof position === "number"
+            ? position
+            : this._tracks.indexOf(this._tracks.track);
+
+        const track = this._tracks.get(index);
 
         // Если нет такого трека
         if (!track) return;
-
-        // Позиция трека
-        const index = position ?? this._tracks.indexOf(track);
 
         try {
             const resource = await this._preloadTrack(index);
 
             // Если получена ошибка вместо исходника
-            if (!resource) return;
-
-            // Если при получении ссылки или пути на аудио произошла ошибка
-            else if (resource instanceof Error) {
+            if (!resource || resource instanceof Error) {
                 this.emit("player/error", this, `${resource}`, { skip: true, position: index });
                 return;
             }
@@ -383,7 +381,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Заставляем плеер запускаться самостоятельно
-                this.enableCycle();
+                setImmediate(this.enableCycle);
             };
 
             // Подключаем события для отслеживания работы потока (временные)
