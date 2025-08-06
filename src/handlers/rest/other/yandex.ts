@@ -75,8 +75,13 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
 
                                 // Если включена утилита кеширования аудио
                                 else if (db.cache.audio) {
+                                    const check = db.cache.audio.status(`${RestYandexAPI._platform.url}/${ID}`);
+
                                     // Если есть кеш аудио
-                                    if (db.cache.audio.status(`${RestYandexAPI._platform.url}/${ID}`).status === "ended") return resolve(cache);
+                                    if (check.status === "ended") {
+                                        cache.audio = check.path;
+                                        return resolve(cache);
+                                    }
                                 }
                             }
 
@@ -94,8 +99,13 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                                 if (options.audio) {
                                     // Если включена утилита кеширования
                                     if (db.cache.audio) {
+                                        const check = db.cache.audio.status(`${RestYandexAPI._platform.url}/${ID}`);
+
                                         // Если есть кеш аудио
-                                        if (db.cache.audio.status(`${RestYandexAPI._platform.url}/${ID}`).status === "ended") return resolve(track);
+                                        if (check.status === "ended") {
+                                            track.audio = check.path;
+                                            return resolve(track);
+                                        }
                                     }
 
                                     const link = await RestYandexAPI.getAudio(ID);
@@ -355,7 +365,8 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
                 title: author?.name,
                 url: `https://music.yandex.ru/artist/${author.id}`,
                 image: this.parseImage({image: author?.["ogImage"] ?? author?.["coverUri"]}) ?? null
-            }
+            },
+            audio: null
         };
     };
 }

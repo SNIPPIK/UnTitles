@@ -241,7 +241,7 @@ export class Queue extends BaseQueue {
         const buttons = QueueButtons.component(this._player);
 
         try {
-            const {api, artist, name, image} = this._tracks.track;
+            const {api, artist, name, image, user} = this._tracks.track;
             const position = this._tracks.position;
 
             return [{
@@ -274,7 +274,7 @@ export class Queue extends BaseQueue {
                     },
                     {
                         "type": 10, // Text
-                        "content": `-# ${getVolumeIndicator(this._player.volume)} ${this._tracks.total > 1 ? `| ${position + 1}/${this._tracks.total} | ${this._tracks.time}` : ""}` + this._player.progress
+                        "content": `-# ${user.username} ● ${getVolumeIndicator(this._player.volume)} ${this._tracks.total > 1 ? `| ${position + 1}/${this._tracks.total} | ${this._tracks.time}` : ""}` + this._player.progress
                     },
                     ...buttons
                 ]
@@ -305,15 +305,8 @@ export class Queue extends BaseQueue {
  * @returns строка-индикатор громкости
  */
 function getVolumeIndicator(volume: number): string {
-    const maxBlocks = 8;
     const clamped = Math.max(0, Math.min(volume, 200));
-    const filled = Math.round((clamped / 100) * (maxBlocks / 2)); // 100% = 4 блока
-    const empty = maxBlocks - filled;
-    const bar = "▓".repeat(filled) + "░".repeat(empty);
-
-    const volumeStr = `${clamped}%`.padStart(4, " ");
-
-    return `${bar} ${volumeStr}`;
+    return `${clamped}%`.padStart(4, " ");
 }
 
 /**

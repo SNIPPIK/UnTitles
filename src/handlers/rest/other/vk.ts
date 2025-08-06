@@ -75,8 +75,13 @@ class RestVKAPI extends Assign<RestServerSide.API> {
 
                                 // Если включена утилита кеширования аудио
                                 else if (db.cache.audio) {
+                                    const check = db.cache.audio.status(`${RestVKAPI._platform.url}/${ID}`);
+
                                     // Если есть кеш аудио
-                                    if (db.cache.audio.status(`${RestVKAPI._platform.url}/${ID}`).status === "ended") return resolve(cache);
+                                    if (check.status === "ended") {
+                                        cache.audio = check.path;
+                                        return resolve(cache);
+                                    }
                                 }
                             }
 
@@ -89,10 +94,18 @@ class RestVKAPI extends Assign<RestServerSide.API> {
 
                                 const track = RestVKAPI.track(api.response.pop(), url);
 
-                                // Если включена утилита кеширования
-                                if (db.cache.audio) {
-                                    // Если есть кеш аудио
-                                    if (db.cache.audio.status(`${RestVKAPI._platform.url}/${ID}`).status === "ended") return resolve(track);
+                                // Если указано получение аудио
+                                if (options.audio) {
+                                    // Если включена утилита кеширования
+                                    if (db.cache.audio) {
+                                        const check = db.cache.audio.status(`${RestVKAPI._platform.url}/${ID}`);
+
+                                        // Если есть кеш аудио
+                                        if (check.status === "ended") {
+                                            track.audio = check.path;
+                                            return resolve(track);
+                                        }
+                                    }
                                 }
 
                                 // Если нет ссылки на трек

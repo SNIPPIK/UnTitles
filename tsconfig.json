@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
-    "lib": ["ESNext"],
-    "module": "NodeNext",
+    "module": "CommonJS",
     "target": "ESNext",
-    "moduleResolution": "nodenext",
+    "moduleResolution": "node",
 
     "rootDir": "./",
     "baseUrl": "./",
@@ -45,6 +44,13 @@
     }
   },
 
-  "include": ["package.json", "tsconfig.json", "src"],
-  "exclude": ["node_modules"]
+  "include": [
+    "package.json",
+    "tsconfig.json",
+    "src"
+  ],
+
+  "exclude": [
+    "node_modules"
+  ]
 }

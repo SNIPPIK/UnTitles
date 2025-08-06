@@ -28,32 +28,37 @@ const emoji = {
     /**
      * @description Разделение прогресс бара, поддерживает платформы
      */
-    bottom: env.get("progress.bottom"),
+    button: env.get("progress.button"),
 
     /**
      * @description Разделение прогресс бара, поддерживает платформы
      */
-    bottom_vk: env.get("progress.bottom.vk"),
+    button_vk: env.get("progress.button.vk"),
 
     /**
      * @description Разделение прогресс бара, поддерживает платформы
      */
-    bottom_yandex: env.get("progress.bottom.yandex"),
+    button_yandex: env.get("progress.button.yandex"),
 
     /**
      * @description Разделение прогресс бара, поддерживает платформы
      */
-    bottom_youtube: env.get("progress.bottom.youtube"),
+    button_youtube: env.get("progress.button.youtube"),
 
     /**
      * @description Разделение прогресс бара, поддерживает платформы
      */
-    bottom_spotify: env.get("progress.bottom.spotify"),
+    button_spotify: env.get("progress.button.spotify"),
 
     /**
      * @description Разделение прогресс бара, поддерживает платформы
      */
-    bottom_soundcloud: env.get("progress.bottom.soundcloud")
+    button_soundcloud: env.get("progress.button.soundcloud"),
+
+    /**
+     * @description Разделение прогресс бара, поддерживает платформы
+     */
+    button_deezer: env.get("progress.button.deezer")
 }
 
 /**
@@ -78,7 +83,7 @@ export class PlayerProgress {
      */
     public bar = ({ duration, platform }: PlayerProgressInput): string => {
         const { current, total } = duration;
-        const button = emoji[`bottom_${platform.toLowerCase()}`] || emoji.bottom;
+        const button = emoji[`button_${platform.toLowerCase()}`] || emoji.button;
 
         // Если live-трек
         if (total === 0) {
