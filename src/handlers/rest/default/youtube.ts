@@ -164,8 +164,13 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
 
                                     // Если включена утилита кеширования аудио
                                     else if (db.cache.audio) {
+                                        const check = db.cache.audio.status(`${RestYouTubeAPI._platform.url}/${ID}`);
+
                                         // Если есть кеш аудио
-                                        if (db.cache.audio.status(`${RestYouTubeAPI._platform.url}/${ID}`).status === "ended") return resolve(cache);
+                                        if (check.status === "ended") {
+                                            cache.audio = check.path;
+                                            return resolve(cache);
+                                        }
                                     }
                                 }
 
@@ -186,8 +191,13 @@ class RestYouTubeAPI extends Assign<RestServerSide.API> {
                                 if (options.audio) {
                                     // Если включена утилита кеширования
                                     if (db.cache.audio) {
+                                        const check = db.cache.audio.status(`${RestYouTubeAPI._platform.url}/${ID}`);
+
                                         // Если есть кеш аудио
-                                        if (db.cache.audio.status(`${RestYouTubeAPI._platform.url}/${ID}`).status === "ended") return resolve(track);
+                                        if (check.status === "ended") {
+                                            track.audio = check.path;
+                                            return resolve(track);
+                                        }
                                     }
 
                                     const data = api["streamingData"];

@@ -190,7 +190,7 @@ export class RestObject {
                 }
 
                 // Получение исходника
-                const song = await platformAPI.request<"track">(findTrack["url"], { audio: true }).request();
+                const song = await platformAPI.request<"track">(findTrack["url"]).request();
 
                 // Если при получении трека произошла ошибка
                 if (song instanceof Error) {
@@ -309,7 +309,7 @@ export class RestObject {
  * @description Названия всех доступных платформ
  * @type APIs_names
  */
-type APIs_names = 'YOUTUBE' | 'SPOTIFY' | 'VK' | 'YANDEX' | 'SOUNDCLOUD';
+type APIs_names = 'YOUTUBE' | 'SPOTIFY' | 'VK' | 'YANDEX' | 'SOUNDCLOUD' | "DEEZER";
 
 /**
  * @description Helper: all possible requests across platforms

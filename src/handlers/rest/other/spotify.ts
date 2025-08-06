@@ -83,8 +83,13 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
 
                                 // Если включена утилита кеширования аудио
                                 else if (db.cache.audio) {
+                                    const check = db.cache.audio.status(`${RestSpotifyAPI._platform.url}/${ID}`);
+
                                     // Если есть кеш аудио
-                                    if (db.cache.audio.status(`${RestSpotifyAPI._platform.url}/${ID}`).status === "ended") return resolve(cache);
+                                    if (check.status === "ended") {
+                                        cache.audio = check.path;
+                                        return resolve(cache);
+                                    }
                                 }
                             }
 
@@ -95,6 +100,20 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
                                 // Если запрос выдал ошибку то
                                 if (api instanceof Error) return resolve(api);
                                 const track = RestSpotifyAPI.track(api);
+
+                                // Если указано получение аудио
+                                if (options.audio) {
+                                    // Если включена утилита кеширования
+                                    if (db.cache.audio) {
+                                        const check = db.cache.audio.status(`${RestSpotifyAPI._platform.url}/${ID}`);
+
+                                        // Если есть кеш аудио
+                                        if (check.status === "ended") {
+                                            track.audio = check.path;
+                                            return resolve(track);
+                                        }
+                                    }
+                                }
 
                                 setImmediate(() => {
                                     // Сохраняем кеш в системе
@@ -294,6 +313,7 @@ class RestSpotifyAPI extends Assign<RestServerSide.API> {
             },
             time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
             image: track_images.sort((item1: any, item2: any) => item1.width > item2.width)[0],
+            audio: null
         };
     };
 }
