@@ -50,6 +50,12 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public sequence: number = -1;
 
     /**
+     * @description Последовательность запроса
+     * @public
+     */
+    public sequence_ask: number = -1;
+
+    /**
      * @description Текущий статус клиента
      * @public
      */
@@ -98,7 +104,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                     op: VoiceOpcodes.Heartbeat,
                     d: {
                         t: Date.now(),
-                        seq_ack: this.sequence
+                        seq_ack: this.sequence_ask
                     }
                 };
             },
@@ -120,7 +126,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Получен HEARTBEAT_ACK
             onAck: (latency) => {
-                //this.sequence++;
+                this.sequence_ask++;
                 this.emit("warn", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
             }
         });
@@ -149,11 +155,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         this._endpoint = endpoint;
-        this.ws = new WebSocket(`wss://${endpoint}?v=8`, {
-            headers: {
-                "User-Agent": "VoiceClient (https://github.com/SNIPPIK/UnTitles/tree/beta/src/services/voice)"
-            }
-        });
+        this.ws = new WebSocket(`wss://${endpoint}?v=8`);
 
         // Сообщение от websocket соединения
         this.ws.onmessage = this.onReceiveMessage;
