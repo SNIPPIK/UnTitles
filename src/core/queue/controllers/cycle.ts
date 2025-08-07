@@ -52,11 +52,10 @@ export class ControllerCycles {
                 // Кастомные функции (если хочется немного изменить логику выполнения)
                 custom: {
                     step: async () => {
-                        const time = Math.abs(this.time - this.insideTime);
-                        const drift = this.drifting;
+                        const time = this.time - this.insideTime;
 
                         // Если цикл уходит от оригинала, подстраиваем плееры
-                        if (drift > 0.2) {
+                        if (time > OPUS_FRAME_SIZE) {
                             const frames = (Math.ceil(time / OPUS_FRAME_SIZE) + 1) * OPUS_FRAME_SIZE;
 
                             // Если текущее не совпадает с новым
@@ -109,7 +108,9 @@ export class ControllerCycles {
 
                     // Отправляем пакет/ы в голосовой канал
                     do {
-                        player.voice.connection.packet = player.audio.current.packet;
+                        try {
+                            player.voice.connection.packet = player.audio.current.packet;
+                        } catch (err) {}
                         i++;
                     } while (i < size);
                 }
@@ -146,18 +147,18 @@ export class ControllerCycles {
                         }
                     },
                     push: (item) => {
-                        const old = this.find(msg => msg.guild.id === item.guild.id);
+                        const old = this.find(msg => msg.guildId === item.guildId);
                         // Удаляем прошлое сообщение
                         if (old) this.delete(old);
                     }
                 },
 
                 // Функция проверки
-                filter: (message) => message.editable && (message.editedTimestamp ?? message.createdTimestamp) + 10e3 < Date.now(),
+                filter: (message) => !!message.edit && message.createdTimestamp + 10e3 < Date.now(),
 
                 // Функция обновления сообщения
                 execute: async (message) => {
-                    const queue = db.queues.get(message.guild.id);
+                    const queue = db.queues.get(message.guildId);
 
                     // Если нет очереди
                     if (!queue) this.delete(message);
@@ -173,7 +174,7 @@ export class ControllerCycles {
                         }
 
                         try {
-                            await message.edit({components: component});
+                            await message.edit({ components: component });
                         } catch (error) {
                             Logger.log("ERROR", `Failed to edit message in cycle: ${error instanceof Error ? error.message : error}`);
 

@@ -131,7 +131,9 @@ setInterval(() => {
 |    `/api` | ❌            | access:(block, unblock)         | API management    |
 |    `/bot` | ❌            | restart:(commands, bot, events) | Restart           |
 | `/filter` | ✅            | (off, push, disable)            | Audio filters     |
-|   `/play` | ✅            | (api, replay, stop, wave)       | Playback          |
+|   `/play` | ✅            | (query)                         | Playback          |
+| `/player` | ✅            | (api, replay, stop, wave)       | Advanced playback |
+| `/volume` | ✅            | value                           | Player volume     |
 | `/remove` | ✅            | value                           | Delete track      |
 |   `/seek` | ❌            | 00:00, int                      | Rewind            |
 |   `/skip` | ✅            | (back, to, next)                | Skip              |
