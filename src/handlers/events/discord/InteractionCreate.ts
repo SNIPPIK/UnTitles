@@ -1,13 +1,8 @@
-import {
-    AnySelectMenuInteraction,
-    AutocompleteInteraction,
-    ButtonInteraction,
-    ChannelType,
-    ChatInputCommandInteraction,
-    Events
-} from "discord.js"
+import { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteraction, ChannelType, ChatInputCommandInteraction, Events } from "discord.js"
 import { CommandInteraction, Colors } from "#structures/discord";
 import { Assign, Logger, locale } from "#structures";
+import { SubCommand } from "#handler/commands";
+import { Selector } from "#handler/components";
 import { Event } from "#handler/events";
 import { env } from "#app/env";
 import { db } from "#app/db";
@@ -147,6 +142,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
     private readonly SelectCommand = async (ctx: ChatInputCommandInteraction) => {
         const command = db.commands.get(ctx.commandName);
         const permissions = command.permissions;
+        const subcommand: SubCommand = command.options.find((cmd) => cmd.name === ctx.options["_subcommand"]) as any;
 
         // Если нет команды
         // Если пользователь пытается использовать команду разработчика
@@ -188,15 +184,14 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         }
 
         // Выполняем команду
-        return command.execute({
+        return (subcommand ?? command).execute({
             message: ctx,
             args: ctx.options?.["_hoistedOptions"]?.map((f) => {
                 const value = f[f.name];
 
                 if (value) return value;
                 return f.value;
-            }),
-            type: ctx.options?.["_subcommand"]
+            })
         });
     };
 
@@ -208,24 +203,29 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      */
     private readonly SelectAutocomplete = (ctx: AutocompleteInteraction) => {
         const command = db.commands.get(ctx.commandName);
-        // Если есть команда
-        if (command && typeof command.autocomplete === "function") {
-            const args: any[] = ctx.options?.["_hoistedOptions"]?.map((f) => {
-                const value = f[f.name];
+        const subcommand = command.options.find((cmd) => {
+            if (ctx.options["_subcommand"]) return cmd.name === ctx.options["_subcommand"];
+            return cmd.autocomplete;
+        });
+        const groupCommand = subcommand?.options?.find((option) => option.autocomplete);
 
-                if (value) return value;
-                return f.value;
-            });
+        // Если нет autocomplete под команды
+        if (!subcommand && !groupCommand) return null;
 
-            // Если аргумент пустой
-            if (!args || args[0] === "" || args[1] === "") return null;
+        const args: any[] = ctx.options?.["_hoistedOptions"]?.map((f) => {
+            const value = f[f.name];
 
-            return command.autocomplete({
-                message: ctx,
-                args: args,
-                type: ctx.options?.["_subcommand"]
-            })
-        }
+            if (value) return value;
+            return f.value;
+        });
+
+        // Если аргумент пустой
+        if (!args || args[0] === "" || args[1] === "") return null;
+
+        return (groupCommand ?? subcommand).autocomplete({
+            message: ctx,
+            args: args
+        });
     };
 
     /**
@@ -247,7 +247,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         if (!isValid) return;
 
         // Если кнопка была найдена
-        return button.callback(ctx);
+        return button.callback(ctx as any);
     };
 
     /**
@@ -257,36 +257,10 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @private
      */
     private readonly SelectMenuCallback = async (ctx: AnySelectMenuInteraction) => {
-        const id = ctx["customId"] as string;
+        const selector = db.components.get(ctx.customId) as Selector;
 
-        if (id === "filter_select") {
-            const queue = db.queues.get(ctx.guildId);
-
-            // Если нет очереди
-            if (!queue) return;
-
-            const filter = ctx["values"][0] as string;
-            const findFilter = queue.player.filters.enabled.find((fl) => fl.name === filter);
-
-            const command = db.commands.get("filter");
-
-            if (!command) return;
-
-            // Если права не соответствуют правде
-            if (command.middlewares && command.middlewares?.length > 0) {
-                const rules = db.middlewares.filter((rule) => command.middlewares.includes(rule.name));
-
-                for (const rule of rules) {
-                    if (!(await rule.callback(ctx as any))) return null;
-                }
-            }
-
-            return command.execute({
-                message: ctx as any,
-                args: ctx["values"],
-                type: findFilter ? "disable" : "push"
-            });
-        }
+        // Если кнопка была найдена
+        return selector.callback(ctx as any);
     };
 }
 

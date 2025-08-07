@@ -1,17 +1,18 @@
-import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
+import { Command, CommandContext, Declare, Options, Middlewares, Permissions } from "#handler/commands";
 import { ApplicationCommandOptionType } from "discord.js";
 import { Colors } from "#structures/discord";
-import { Assign, locale } from "#structures";
+import { locale } from "#structures";
 import { db } from "#app/db";
+
 
 /**
  * @author SNIPPIK
  * @description Управление временем, дает возможность пропускать время в треке
- * @class SeekTrackCommand
- * @extends Assign
+ * @class SeekCommand
+ * @extends Command
  * @public
  */
-@CommandDeclare({
+@Declare({
     names: {
         "en-US": "seek",
         "ru": "переход"
@@ -22,75 +23,73 @@ import { db } from "#app/db";
     },
     integration_types: ["GUILD_INSTALL"]
 })
-@CommandOptions({
-    type: ApplicationCommandOptionType["String"],
-    names: {
-        "en-US": "time",
-        "ru": "время"
-    },
-    descriptions: {
-        "en-US": "It is necessary to specify what time to arrive. Example - 00:00",
-        "ru": "Необходимо указать к какому времени прейти. Пример - 00:00"
-    },
-    required: true,
+@Options({
+    seek: {
+        type: ApplicationCommandOptionType["String"],
+        names: {
+            "en-US": "time",
+            "ru": "время"
+        },
+        descriptions: {
+            "en-US": "It is necessary to specify what time to arrive. Example - 00:00",
+            "ru": "Необходимо указать к какому времени прейти. Пример - 00:00"
+        },
+        required: true,
+    }
 })
-class SeekTrackCommand extends Assign< BaseCommand > {
-    public constructor() {
-        super({
-            permissions: {
-                client: ["ViewChannel", "SendMessages"]
-            },
-            middlewares: ["queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"],
-            execute: async ({message, args}) => {
-                const queue = db.queues.get(message.guildId);
-                const duration = args[0]?.duration();
+@Middlewares(["queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
+@Permissions({
+    client: ["SendMessages", "ViewChannel"]
+})
+class SeekCommand extends Command {
+    async execute({message, args}: CommandContext) {
+        const queue = db.queues.get(message.guildId);
+        const duration = args[0]?.duration();
 
-                // Если пользователь написал что-то не так
-                if (isNaN(duration)) {
-                    return message.reply({
-                        embeds: [
-                            {
-                                color: Colors.DarkRed,
-                                description: locale._(message.locale, "command.seek.duration.nan")
-                            }
-                        ],
-                        flags: "Ephemeral"
-                    });
+        // Если пользователь написал что-то не так
+        if (isNaN(duration)) {
+            return message.reply({
+                embeds: [
+                    {
+                        color: Colors.DarkRed,
+                        description: locale._(message.locale, "command.seek.duration.nan")
+                    }
+                ],
+                flags: "Ephemeral"
+            });
+        }
+
+        // Если пользователь указал времени больше чем в треке
+        else if (duration > queue.tracks.track.time.total || duration <= 0) {
+            return message.reply({
+                embeds: [
+                    {
+                        color: Colors.DarkRed,
+                        description: locale._(message.locale, "command.seek.duration.big")
+                    }
+                ],
+                flags: "Ephemeral"
+            });
+        }
+
+        // Начинаем проигрывание трека с <пользователем указанного тайм кода>
+        await queue.player.play(duration);
+
+        // Отправляем сообщение о пропуске времени
+        return message.reply({
+            embeds: [
+                {
+                    color: Colors.Green,
+                    description: locale._(message.locale, "command.seek", [duration])
                 }
-
-                // Если пользователь указал времени больше чем в треке
-                else if (duration > queue.tracks.track.time.total || duration <= 0) {
-                    return message.reply({
-                        embeds: [
-                            {
-                                color: Colors.DarkRed,
-                                description: locale._(message.locale, "command.seek.duration.big")
-                            }
-                        ],
-                        flags: "Ephemeral"
-                    });
-                }
-
-                // Начинаем проигрывание трека с <пользователем указанного тайм кода>
-                await queue.player.play(duration);
-
-                // Отправляем сообщение о пропуске времени
-                return message.reply({
-                    embeds: [
-                        {
-                            color: Colors.Green,
-                            description: locale._(message.locale, "command.seek", [duration])
-                        }
-                    ],
-                    flags: "Ephemeral"
-                });
-            }
+            ],
+            flags: "Ephemeral"
         });
-    };
+    }
 }
 
 /**
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default [SeekTrackCommand];
+export default [SeekCommand];

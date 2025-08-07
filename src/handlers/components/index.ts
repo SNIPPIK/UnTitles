@@ -1,4 +1,5 @@
 import { buttonInteraction } from "#structures/discord";
+import { AnySelectMenuInteraction } from "discord.js";
 import { handler } from "#handler";
 
 /**
@@ -9,7 +10,7 @@ import { handler } from "#handler";
  * @extends handler
  * @public
  */
-export class Components extends handler<Button> {
+export class Components extends handler<Button | Selector> {
     public constructor() {
         super("src/handlers/components");
     };
@@ -38,6 +39,14 @@ export class Components extends handler<Button> {
  */
 export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters";
 
+
+/**
+ * @author SNIPPIK
+ * @description Доступные селекторы меню
+ * @type SupportSelector
+ */
+export type SupportSelector = "filter_select";
+
 /**
  * @author SNIPPIK
  * @description Интерфейс кнопки для общего понимания
@@ -54,4 +63,22 @@ export interface Button {
      * @param msg - Сообщение пользователя
      */
     callback: (ctx: buttonInteraction) => void;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Интерфейс кнопки для общего понимания
+ * @interface Button
+ */
+export interface Selector {
+    /**
+     * @description Название кнопки
+     */
+    name: SupportSelector;
+
+    /**
+     * @description Функция выполнения кнопки
+     * @param msg - Сообщение пользователя
+     */
+    callback: (ctx: AnySelectMenuInteraction) => void;
 }
