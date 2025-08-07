@@ -1,4 +1,5 @@
-import { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteraction, ChannelType, ChatInputCommandInteraction, Events } from "discord.js"
+import type { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
+import { ChannelType, Events } from "discord.js"
 import { CommandInteraction, Colors } from "#structures/discord";
 import { Assign, Logger, locale } from "#structures";
 import { SubCommand } from "#handler/commands";
@@ -115,7 +116,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 }
 
                 // Действия выбора
-                else if (ctx.isAnySelectMenu && !ctx.isButton()) {
+                else if (ctx.isAnySelectMenu) {
                     Logger.log("DEBUG", `[${ctx.user.username}] run selector menu ${ctx?.["customId"]}`);
                     return this.SelectMenuCallback(ctx as any);
                 }
@@ -141,7 +142,6 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      */
     private readonly SelectCommand = async (ctx: ChatInputCommandInteraction) => {
         const command = db.commands.get(ctx.commandName);
-        const permissions = command.permissions;
         const subcommand: SubCommand = command.options.find((cmd) => cmd.name === ctx.options["_subcommand"]) as any;
 
         // Если нет команды
@@ -169,6 +169,8 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             }
         }
 
+
+        const permissions = command.permissions;
         if (permissions && isBased(ctx) === "guild") {
             // Проверка прав пользователя
             const userPermissions = ctx.member?.permissions;
@@ -187,10 +189,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         return (subcommand ?? command).execute({
             message: ctx,
             args: ctx.options?.["_hoistedOptions"]?.map((f) => {
-                const value = f[f.name];
-
-                if (value) return value;
-                return f.value;
+                return f[f.name] ?? f.value;
             })
         });
     };
@@ -213,10 +212,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         if (!subcommand && !groupCommand) return null;
 
         const args: any[] = ctx.options?.["_hoistedOptions"]?.map((f) => {
-            const value = f[f.name];
-
-            if (value) return value;
-            return f.value;
+            return f[f.name] ?? f.value;
         });
 
         // Если аргумент пустой
