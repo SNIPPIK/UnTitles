@@ -1,4 +1,4 @@
-import { Declare, Command, CommandContext} from "#handler/commands";
+import { Declare, Command, CommandContext, Middlewares } from "#handler/commands";
 import { Colors } from "#structures/discord";
 import { locale } from "#structures";
 import { db } from "#app/db";
@@ -25,6 +25,7 @@ import { db } from "#app/db";
     integration_types: ["GUILD_INSTALL", "USER_INSTALL"],
     contexts: ["GUILD"]
 })
+@Middlewares(["cooldown"])
 class ReportCommand extends Command {
     async execute({message}: CommandContext<any>) {
         const lang = message.locale;

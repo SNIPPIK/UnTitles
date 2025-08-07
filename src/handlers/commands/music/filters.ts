@@ -353,7 +353,7 @@ class AudioFilterRemove extends SubCommand {
     integration_types: ["GUILD_INSTALL"]
 })
 @Options([AudioFilterPush, AudioFiltersOff, AudioFilterRemove])
-@Middlewares(["queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
+@Middlewares(["cooldown", "queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
 @Permissions({
     client: ["SendMessages", "ViewChannel"]
 })

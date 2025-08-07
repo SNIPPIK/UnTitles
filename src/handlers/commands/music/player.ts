@@ -152,7 +152,7 @@ class PlayerVolume extends SubCommand {
     integration_types: ["GUILD_INSTALL"]
 })
 @Options([PlayerReplay, PlayerStop, PlayerVolume])
-@Middlewares(["queue", "voice", "another_voice"])
+@Middlewares(["cooldown", "queue", "voice", "another_voice"])
 @Permissions({
     client: ["SendMessages", "ViewChannel"]
 })

@@ -250,7 +250,7 @@ class PlayWaveCommand extends SubCommand {
     integration_types: ["GUILD_INSTALL"]
 })
 @Options([PlaySearchCommand, PlayWaveCommand])
-@Middlewares(["voice", "another_voice"])
+@Middlewares(["cooldown", "voice", "another_voice"])
 @Permissions({
     client: ["SendMessages", "ViewChannel"]
 })
@@ -294,7 +294,7 @@ class PlayControlCommand extends Command {
         }
     }
 })
-@Middlewares(["voice", "another_voice"])
+@Middlewares(["cooldown", "voice", "another_voice"])
 @Permissions({
     client: ["SendMessages", "ViewChannel"]
 })

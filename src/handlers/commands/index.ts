@@ -55,7 +55,7 @@ export class Commands extends handler<Command> {
      * @public
      */
     public get owner() {
-        return this.files.filter(cmd => cmd.owner === true);
+        return this.files.filter(cmd => cmd.owner);
     };
 
     /**
@@ -327,7 +327,7 @@ export abstract class SubCommand extends BaseCommand {
  * @description Все доступные ограничения
  * @type RegisteredMiddlewares
  */
-type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream"
+type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream" | "cooldown"
 
 /**
  * @author SNIPPIK
@@ -385,6 +385,14 @@ type DeclareOptions = {
      * @private
      */
     readonly contexts?: ("GUILD" | "BOT_DM" | "PRIVATE_CHANNEL")[];
+
+    /**
+     * @description Команду может использовать только разработчик
+     * @default false
+     * @readonly
+     * @public
+     */
+    readonly owner?: boolean;
 }
 
 /**
@@ -409,7 +417,8 @@ export function Declare(options: DeclareOptions) {
             description = description;
             description_localizations = description_localizations;
             integration_types = options.integration_types ? options.integration_types.map((type) => type === "GUILD_INSTALL" ? 0 : 1) : [0];
-            contexts = options.contexts ? options.contexts.map((type) => type === "GUILD" ? 0 : type === "BOT_DM" ? 1 : 2) : [0]
+            contexts = options.contexts ? options.contexts.map((type) => type === "GUILD" ? 0 : type === "BOT_DM" ? 1 : 2) : [0];
+            owner = options.owner;
         }
 }
 

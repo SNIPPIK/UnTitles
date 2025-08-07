@@ -21,7 +21,8 @@ import { db } from "#app/db";
         "en-US": "Managing API work inside the bot!",
         "ru": "Управление системой APIs внутри бота!"
     },
-    integration_types: ["GUILD_INSTALL"]
+    integration_types: ["GUILD_INSTALL"],
+    owner: true
 })
 @Options({
     api: {

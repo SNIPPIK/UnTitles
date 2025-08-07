@@ -20,7 +20,8 @@ import { db } from "#app/db";
         "en-US": "Managing bot!",
         "ru": "Управление ботом!"
     },
-    integration_types: ["GUILD_INSTALL"]
+    integration_types: ["GUILD_INSTALL"],
+    owner: true
 })
 @Options({
     bot: {
