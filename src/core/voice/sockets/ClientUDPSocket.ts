@@ -133,15 +133,6 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
             this.emit("error", err);
         });
 
-        this.socket.on("listening", () => {
-            try {
-                this.socket.setRecvBufferSize(1024 * 1024); // 1MB
-                this.socket.setSendBufferSize(1024 * 1024);
-            } catch (e) {
-                this.emit("error", new Error("Failed to set socket buffer size: " + e));
-            }
-        });
-
         this.socket.on("message", (msg) => {
             this.emit("message", msg);
         });
