@@ -267,7 +267,7 @@ class ToPositionCommand extends SubCommand {
     integration_types: ["GUILD_INSTALL"]
 })
 @Options([BackPositionCommand, SkipPositionCommand, ToPositionCommand])
-@Middlewares(["queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
+@Middlewares(["cooldown", "queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
 @Permissions({
     client: ["SendMessages", "ViewChannel"]
 })

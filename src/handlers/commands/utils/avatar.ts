@@ -1,4 +1,4 @@
-import { Declare, Options, Command, CommandContext } from "#handler/commands";
+import { Declare, Options, Command, CommandContext, Middlewares } from "#handler/commands";
 import { ApplicationCommandOptionType, MessageFlags, User } from "discord.js";
 import { locale } from "#structures";
 import { db } from "#app/db";
@@ -36,6 +36,7 @@ import { db } from "#app/db";
         required: true
     }
 })
+@Middlewares(["cooldown"])
 class AvatarCommand extends Command {
     public override execute = ({message, args}: CommandContext<User>) => {
         const user = args[0];

@@ -5,7 +5,6 @@ import { Assign, Logger, locale } from "#structures";
 import { SubCommand } from "#handler/commands";
 import { Selector } from "#handler/components";
 import { Event } from "#handler/events";
-import { env } from "#app/env";
 import { db } from "#app/db";
 
 /**
@@ -17,13 +16,6 @@ import { db } from "#app/db";
  * @public
  */
 class Interaction extends Assign<Event<Events.InteractionCreate>> {
-    /**
-     * @author SNIPPIK
-     * @description База данных для системы ожидания
-     * @private
-     */
-    private cooldown: { time: number; db: Map<string, number> } | null;
-
     /**
      * @description Создание события
      * @public
@@ -79,39 +71,6 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 // Если пользователь использует команду
                 else if (ctx.isChatInputCommand()) {
                     Logger.log("DEBUG", `[${ctx.user.username}] run command ${ctx?.commandName}`);
-
-                    // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
-                    if (!db.owner.ids.includes(ctx.user.id)) {
-                        const user = this.cooldown.db.get(ctx.user.id);
-
-                        // Если нет пользователя в системе ожидания
-                        if (!user) {
-                            // Добавляем пользователя в систему ожидания
-                            this.cooldown.db.set(ctx.user.id, Date.now() + (this.cooldown.time * 1e3));
-                        }
-
-                        // Если пользователь уже в списке
-                        else {
-                            // Если время еще не прошло говорим пользователю об этом
-                            if (user >= Date.now()) {
-                                if (ctx.isAutocomplete() || !("reply" in ctx)) return;
-
-                                return ctx.reply({
-                                    flags: "Ephemeral",
-                                    embeds: [
-                                        {
-                                            description: locale._(ctx.locale, "interaction.cooldown", [ctx.member, (user / 1000).toFixed(0), 5]),
-                                            color: Colors.Yellow
-                                        }
-                                    ]
-                                });
-                            }
-
-                            // Удаляем пользователя из базы
-                            this.cooldown.db.delete(ctx.user.id);
-                        }
-                    }
-
                     return this.SelectCommand(ctx);
                 }
 
@@ -130,8 +89,6 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 return null;
             }
         });
-
-        this.cooldown = env.get("cooldown", true) ? { time: parseInt(env.get("cooldown.time", "2")), db: new Map() }: null;
     };
 
     /**

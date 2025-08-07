@@ -37,7 +37,7 @@ import { db } from "#app/db";
         required: true,
     }
 })
-@Middlewares(["queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
+@Middlewares(["cooldown", "queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
 @Permissions({
     client: ["SendMessages", "ViewChannel"]
 })

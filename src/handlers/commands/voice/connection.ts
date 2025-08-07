@@ -225,7 +225,7 @@ class VoiceTribuneCommand extends SubCommand {
     integration_types: ["GUILD_INSTALL"]
 })
 @Options([VoiceJoinCommand, VoiceLeaveCommand, VoiceTribuneCommand])
-@Middlewares(["voice", "another_voice"])
+@Middlewares(["cooldown", "voice", "another_voice"])
 @Permissions({
     client: ["SendMessages", "ViewChannel"]
 })
