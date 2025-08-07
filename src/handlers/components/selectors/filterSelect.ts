@@ -6,12 +6,12 @@ import { AudioFilter } from "#core/player";
 import { db } from "#app/db";
 
 /**
- * @description Кнопка stop, отвечает за остановку проигрывания
- * @class ButtonStop
+ * @description Включение или выключения аудио фильтра через контекстное меню
+ * @class FilterSelector
  * @extends Assign
  * @loadeble
  */
-class ButtonStop extends Assign<Selector> {
+class FilterSelector extends Assign<Selector> {
     public constructor() {
         super({
             name: "filter_select",
@@ -105,4 +105,4 @@ class ButtonStop extends Assign<Selector> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default [ButtonStop];
+export default [FilterSelector];
