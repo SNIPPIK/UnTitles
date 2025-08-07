@@ -1,17 +1,17 @@
-import { BaseCommand, CommandDeclare, CommandOptions } from "#handler/commands";
+import { Command, CommandContext, Declare, Options } from "#handler/commands";
 import { ApplicationCommandOptionType } from "discord.js";
 import { Colors } from "#structures/discord";
-import { Assign, locale } from "#structures";
+import { locale } from "#structures";
 import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
  * @description Управление системами бота
  * @class WorkBotCommand
- * @extends Assign
+ * @extends Command
  * @public
  */
-@CommandDeclare({
+@Declare({
     names: {
         "en-US": "bot",
         "ru": "бот"
@@ -22,103 +22,97 @@ import { db } from "#app/db";
     },
     integration_types: ["GUILD_INSTALL"]
 })
-@CommandOptions({
-    names: {
-        "en-US": "restart",
-        "ru": "перезагрузка"
-    },
-    descriptions: {
-        "en-US": "Reloading a Specific Item",
-        "ru": "Перезагрузка конкретного элемента!"
-    },
-    type: ApplicationCommandOptionType["String"],
-    choices: [
-        {
-            value: "bot",
-            name: "bot",
-            nameLocalizations: {
-                "en-US": "bot",
-                "ru": "бот"
-            }
+@Options({
+    bot: {
+        names: {
+            "en-US": "restart",
+            "ru": "перезагрузка"
         },
-        {
-            value: "commands",
-            name: "commands",
-            nameLocalizations: {
-                "en-US": "commands",
-                "ru": "команды"
-            }
+        descriptions: {
+            "en-US": "Reloading a Specific Item",
+            "ru": "Перезагрузка конкретного элемента!"
         },
-        {
-            value: "events",
-            name: "events",
-            nameLocalizations: {
-                "en-US": "events",
-                "ru": "события"
+        type: ApplicationCommandOptionType["String"],
+        choices: [
+            {
+                value: "bot",
+                name: "bot",
+                nameLocalizations: {
+                    "en-US": "bot",
+                    "ru": "бот"
+                }
+            },
+            {
+                value: "commands",
+                name: "commands",
+                nameLocalizations: {
+                    "en-US": "commands",
+                    "ru": "команды"
+                }
+            },
+            {
+                value: "events",
+                name: "events",
+                nameLocalizations: {
+                    "en-US": "events",
+                    "ru": "события"
+                }
+            }
+        ]
+    }
+})
+class WorkBotCommand extends Command {
+    public execute({message, args}: CommandContext<string>) {
+        // Варианты перезагрузки (аргументы)
+        switch (args[0]) {
+            // Перезагружаем все команды
+            case "commands": {
+                db.commands.register(message.guild.members.client);
+
+                return message.reply({
+                    embeds: [
+                        {
+                            description: locale._(message.locale, `has.reload`, [db.commands.size]),
+                            color: Colors.Green
+                        }
+                    ],
+                    flags: "Ephemeral"
+                });
+            }
+
+            // Перезагрузка всех событий
+            case "events": {
+                db.events.register(message.guild.members.client);
+
+                return message.reply({
+                    embeds: [
+                        {
+                            description: locale._(message.locale, `has.reload`, [db.events.size]),
+                            color: Colors.Green
+                        }
+                    ],
+                    flags: "Ephemeral"
+                });
+            }
+
+            // Перезагрузка бота, правильно работает только с ShardManager
+            case "bot": {
+                // Запускаем перезапуск, по истечению времени последнего плеера будет включение нового процесса
+                process.emit("SIGINT");
+
+                return message.reply({
+                    embeds: [
+                        {
+                            description: locale._(message.locale, `self.reload`, [message.member]),
+                            color: Colors.Green
+                        }
+                    ],
+                    flags: "Ephemeral"
+                });
             }
         }
-    ]
-})
-class WorkBotCommand extends Assign< BaseCommand > {
-    public constructor() {
-        super({
-            owner: true,
-            permissions: {
-                client: ["SendMessages"]
-            },
-            execute: async ({message, args}) => {
-                // Варианты перезагрузки (аргументы)
-                switch (args[0]) {
-                    // Перезагружаем все команды
-                    case "commands": {
-                        db.commands.register(message.guild.members.client);
-
-                        return message.reply({
-                            embeds: [
-                                {
-                                    description: locale._(message.locale, `has.reload`, [db.commands.size]),
-                                    color: Colors.Green
-                                }
-                            ],
-                            flags: "Ephemeral"
-                        });
-                    }
-
-                    // Перезагрузка всех событий
-                    case "events": {
-                        db.events.register(message.guild.members.client);
-
-                        return message.reply({
-                            embeds: [
-                                {
-                                    description: locale._(message.locale, `has.reload`, [db.events.size]),
-                                    color: Colors.Green
-                                }
-                            ],
-                            flags: "Ephemeral"
-                        });
-                    }
-
-                    // Перезагрузка бота, правильно работает только с ShardManager
-                    case "bot": {
-                        // Запускаем перезапуск, по истечению времени последнего плеера будет включение нового процесса
-                        process.emit("SIGINT");
-
-                        return message.reply({
-                            embeds: [
-                                {
-                                    description: locale._(message.locale, `self.reload`, [message.member]),
-                                    color: Colors.Green
-                                }
-                            ],
-                            flags: "Ephemeral"
-                        });
-                    }
-                }
-                return null;
-            }
-        });
-    };
+        return null;
+    }
 }
 
 
@@ -126,10 +120,10 @@ class WorkBotCommand extends Assign< BaseCommand > {
  * @author SNIPPIK
  * @description Управление профилем бота
  * @class ManageBotCommand
- * @extends Assign
+ * @extends Command
  * @public
  */
-@CommandDeclare({
+@Declare({
     names: {
         "en-US": "bot-profile",
         "ru": "бот-профиль"
@@ -139,90 +133,79 @@ class WorkBotCommand extends Assign< BaseCommand > {
         "ru": "Управление профилем бота!"
     }
 })
-@CommandOptions({
-    names: {
-        "en-US": "avatar",
-        "ru": "аватар"
-    },
-    descriptions: {
-        "en-US": "Change avatar a bot",
-        "ru": "Изменение аватара бота!"
-    },
-    type: ApplicationCommandOptionType.Subcommand,
-    options: [
-        {
-            names: {
-                "en-US": "file",
-                "ru": "файл"
-            },
-            descriptions: {
-                "en-US": "New avatar, needed a file!",
-                "ru": "Смена аватара, необходим файл!"
-            },
-            type: ApplicationCommandOptionType.Attachment,
-            required: true
-        }
-    ]
-})
-class ManageBotCommand extends Assign< BaseCommand > {
-    public constructor() {
-        super({
-            owner: true,
-            permissions: {
-                client: ["SendMessages"]
-            },
-            execute: async ({message, type}) => {
-                // Варианты команд (доп команд)
-                switch (type) {
-                    case "avatar": {
-                        const attachment = message.options.getAttachment("file");
-                        const client = message.client;
-
-                        //Если попытка всунуть не изображение
-                        if (!attachment.contentType.match(/image/)) {
-                            return message.reply({
-                                embeds: [
-                                    {
-                                        description: locale._(message.locale, "command.bot.avatar.image.fail"),
-                                        color: Colors.Yellow
-                                    }
-                                ]
-                            });
-                        }
-
-                        client.user.setAvatar(attachment.url)
-                            // Если удалось установить новый аватар
-                            .then(async () => {
-                                return message.reply({
-                                    embeds: [
-                                        {
-                                            author: { name: client.user.username, icon_url: client.user.avatarURL() },
-                                            description: locale._(message.locale, "command.bot.avatar.ok"),
-                                            color: Colors.Green
-                                        }
-                                    ]
-                                });
-                            })
-
-                            // Если не удалось установить новый аватар
-                            .catch(async (err) => {
-                                return message.reply({
-                                    embeds: [
-                                        {
-                                            author: { name: client.user.username, icon_url: client.user.avatarURL() },
-                                            description: locale._(message.locale, "command.bot.avatar.fail", [err]),
-                                            color: Colors.DarkRed
-                                        }
-                                    ]
-                                });
-                            });
-                        break;
-                    }
-                }
-                return null;
+@Options({
+    avatar: {
+        names: {
+            "en-US": "avatar",
+            "ru": "аватар"
+        },
+        descriptions: {
+            "en-US": "Change avatar a bot",
+            "ru": "Изменение аватара бота!"
+        },
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+            {
+                names: {
+                    "en-US": "file",
+                    "ru": "файл"
+                },
+                descriptions: {
+                    "en-US": "New avatar, needed a file!",
+                    "ru": "Смена аватара, необходим файл!"
+                },
+                type: ApplicationCommandOptionType.Attachment,
+                required: true
             }
-        });
-    };
+        ]
+    }
+})
+class ManageBotCommand extends Command {
+    public execute({message}: CommandContext<string>) {
+        const attachment = message.options.getAttachment("file");
+        const client = message.client;
+
+        //Если попытка всунуть не изображение
+        if (!attachment.contentType.match(/image/)) {
+            return message.reply({
+                embeds: [
+                    {
+                        description: locale._(message.locale, "command.bot.avatar.image.fail"),
+                        color: Colors.Yellow
+                    }
+                ]
+            });
+        }
+
+        client.user.setAvatar(attachment.url)
+            // Если удалось установить новый аватар
+            .then(async () => {
+                return message.reply({
+                    embeds: [
+                        {
+                            author: { name: client.user.username, icon_url: client.user.avatarURL() },
+                            description: locale._(message.locale, "command.bot.avatar.ok"),
+                            color: Colors.Green
+                        }
+                    ]
+                });
+            })
+
+            // Если не удалось установить новый аватар
+            .catch(async (err) => {
+                return message.reply({
+                    embeds: [
+                        {
+                            author: { name: client.user.username, icon_url: client.user.avatarURL() },
+                            description: locale._(message.locale, "command.bot.avatar.fail", [err]),
+                            color: Colors.DarkRed
+                        }
+                    ]
+                });
+            });
+
+        return null;
+    }
 }
 
 /**

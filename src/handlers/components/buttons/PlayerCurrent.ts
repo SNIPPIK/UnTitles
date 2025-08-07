@@ -620,4 +620,4 @@ class ButtonShuffle extends Assign<Button> {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default [ButtonStop, ButtonSkip, ButtonBack, ButtonStop, ButtonFilters, ButtonLyrics, ButtonPlayToggle, ButtonQueue, ButtonRepeat, ButtonReplay, ButtonShuffle];
+export default [ButtonStop, ButtonSkip, ButtonBack, ButtonFilters, ButtonLyrics, ButtonPlayToggle, ButtonQueue, ButtonRepeat, ButtonReplay, ButtonShuffle];

@@ -1,11 +1,11 @@
-import { ApplicationCommandOption, Client, Routes, PermissionsString } from "discord.js";
-import type { LocalizationMap, Locale, Permissions } from "discord-api-types/v10";
-import { CommandInteraction, CompeteInteraction } from "#structures/discord";
+import {ApplicationCommandOption, ApplicationCommandOptionType, Client, PermissionsString, Routes} from "discord.js";
+import type {Locale, LocalizationMap, Permissions} from "discord-api-types/v10";
+import {CommandInteraction, CompeteInteraction} from "#structures/discord";
 import filters from "#core/player/filters.json";
-import { AudioFilter } from "#core/player";
-import { Logger } from "#structures";
-import { handler } from "#handler";
-import { env } from "#app/env";
+import {AudioFilter} from "#core/player";
+import {Logger} from "#structures";
+import {handler} from "#handler";
+import {env} from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -20,7 +20,7 @@ export class Commands extends handler<Command> {
      * @public
      */
     public get filters_choices() {
-        const temples: SlashCommand.Component["choices"] = [];
+        const temples: Choice[] = [];
 
         // Если фильтров слишком много
         if (filters.length > 25) return temples;
@@ -119,110 +119,35 @@ export class Commands extends handler<Command> {
         if (!this.files.size) throw new Error("Not loaded commands");
 
         // Загрузка глобальных команд
-        client.application.commands.set(this.public as any)
+        client.application.commands.set(this.parseJsonData(this.public))
             .then(() => Logger.log("DEBUG", `[App/Commands | ${this.public.length}] has load public commands`))
             .catch(console.error);
 
         // Загрузка приватных команд
-        if (guild) guild.commands.set(this.owner as any)
+        if (guild) guild.commands.set(this.parseJsonData(this.owner))
             .then(() => Logger.log("DEBUG", `[App/Commands | ${this.owner.length}] has load guild commands`))
             .catch(console.error);
     };
-}
-
-/**
- * @author SNIPPIK
- * @description Базовый интерфейс для команд, что должна включать в себя команда
- * @interface BaseCommand
- */
-export interface BaseCommand<Argument = string> {
-    /**
-     * @description Команду может использовать только разработчик
-     * @default false
-     * @readonly
-     * @public
-     */
-    readonly owner?: boolean;
 
     /**
-     * @description Управление правами
+     * @description Передаем только необходимые данные discord'у
+     * @param data - Все команды
      * @private
      */
-    readonly permissions: {
-        /**
-         * @description Права для пользователя
-         */
-        readonly user?: PermissionsString[],
-
-        /**
-         * @description Права для клиента (бота)
-         */
-        readonly client: PermissionsString[]
+    private parseJsonData = (data: Command[]): any => {
+        return data.map(cmd => {
+            return cmd.toJSON();
+        });
     };
-
-    /**
-     * @description Права для использования той или иной команды
-     * @default null
-     * @readonly
-     * @public
-     */
-    readonly middlewares?: ("voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream")[]
-
-    /**
-     * @description Выполнение команды
-     * @default null
-     * @readonly
-     * @public
-     */
-    readonly execute: (options: {
-        /**
-         * @description Сообщение пользователя для работы с discord
-         */
-        message: CommandInteraction;
-
-        /**
-         * @description Тип команды, необходимо для работы много ступенчатых команд
-         * @warning Необходимо правильно понимать логику загрузки команд для работы с этим параметром
-         */
-        type: Command["options"][number]["name"];
-
-        /**
-         * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
-         */
-        args?: Argument[];
-    }) => any;
-
-    /**
-     * @description Выполнение действия autocomplete
-     * @default null
-     * @readonly
-     * @public
-     */
-    readonly autocomplete?: (options: {
-        /**
-         * @description Сообщение пользователя для работы с discord
-         */
-        message: CompeteInteraction;
-
-        /**
-         * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
-         */
-        args?: Argument[];
-
-        /**
-         * @description Тип опции, будет указан если используется много ступенчатая команда
-         */
-        type?: string
-    }) => any;
 }
 
 /**
  * @author SNIPPIK
- * @description Интерфейс команды прошедший парсинг и все декораторы
- * @warnig НЕ СОЗДАВАТЬ ПО НЕМУ КОМАНДЫ ЭТОТ ИНТЕРФЕЙС ЯВЛЯФЕТСЯ ТИПИЗАЦИОННЫМ И НЕ ВСЕ ПАРАМЕТРЫ МОГУТ БЫТЬ ПРАВИЛЬНО СОЗДАНЫ
- * @interface Command
+ * @description Стандартный прототип команды
  */
-export interface Command extends BaseCommand {
+export abstract class BaseCommand {
+    type!: number; // ApplicationCommandType.ChatInput | ApplicationCommandOptionType.Subcommand
+
     /**
      * @description Название команды
      * @private
@@ -275,16 +200,199 @@ export interface Command extends BaseCommand {
      * @description Доп параметры для работы slashCommand
      * @private
      */
-    readonly options?: ApplicationCommandOption[];
+    readonly options?: ((AutocompleteCommandOption & ChoiceOption) & ApplicationCommandOption)[];
+
+    /**
+     * @description Команду может использовать только разработчик
+     * @default false
+     * @readonly
+     * @public
+     */
+    readonly owner?: boolean;
+
+    /**
+     * @description Управление правами
+     * @private
+     */
+    readonly permissions: {
+        /**
+         * @description Права для пользователя
+         */
+        readonly user?: PermissionsString[],
+
+        /**
+         * @description Права для клиента (бота)
+         */
+        readonly client: PermissionsString[]
+    };
+
+    /**
+     * @description Права для использования той или иной команды
+     * @default null
+     * @readonly
+     * @public
+     */
+    readonly middlewares?: RegisteredMiddlewares[]
+
+    /**
+     * @description Выполнение команды
+     * @default null
+     * @readonly
+     * @public
+     */
+    abstract execute(options: CommandContext<any>): any
+
+    /**
+     * @description Отдаем данные в формате JSON и только необходимые
+     * @public
+     */
+    toJSON() {
+        return {
+            name: this.name,
+            type: this.type,
+            nsfw: !!this.nsfw,
+            description: this.description,
+            name_localizations: this.name_localizations,
+            description_localizations: this.description_localizations,
+            default_member_permissions: this.default_member_permissions,
+            contexts: this.contexts,
+            integration_types: this.integration_types,
+        } as {
+            name: BaseCommand['name'];
+            type: BaseCommand['type'];
+            nsfw: BaseCommand['nsfw'];
+            description: BaseCommand['description'];
+            name_localizations: BaseCommand['name_localizations'];
+            description_localizations: BaseCommand['description_localizations'];
+            default_member_permissions: string;
+            contexts: BaseCommand['contexts'];
+            integration_types: BaseCommand['integration_types'];
+        };
+    };
 }
 
 /**
  * @author SNIPPIK
- * @description Декоратор slash команды
- * @constructor
+ * @description Глобальный прототип команды
+ */
+export abstract class Command extends BaseCommand {
+    /**
+     * @description Отдаем данные в формате JSON и только необходимые
+     * @public
+     */
+    toJSON = () => {
+        const options: ApplicationCommandOption[] = [];
+
+        for (const i of this.options ?? []) {
+            if (!(i instanceof SubCommand)) {
+                // Изменяем данные autocomplete на boolean
+                options.push({ ...i, autocomplete: "autocomplete" in i } as ApplicationCommandOption);
+                continue;
+            }
+
+            // Добавляем данные
+            options.push(i.toJSON());
+        }
+
+        return {
+            ...super.toJSON(),
+            options,
+        };
+    }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Глобальный прототип под команды
+ */
+export abstract class SubCommand extends BaseCommand {
+    type = ApplicationCommandOptionType.Subcommand;
+
+    /**
+     * @description Отдаем данные в формате JSON и только необходимые
+     * @public
+     */
+    toJSON() {
+        return {
+            ...super.toJSON(),
+
+            // Изменяем данные autocomplete на boolean
+            options: this.options?.map(x => ({ ...x, autocomplete: "autocomplete" in x }) as ApplicationCommandOption) ?? [],
+        };
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Все доступные ограничения
+ * @type RegisteredMiddlewares
+ */
+type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream"
+
+/**
+ * @author SNIPPIK
+ * @description Параметры команды
+ * @type CommandContext
+ */
+export type CommandContext<T = string> = {
+    /**
+     * @description Сообщение пользователя для работы с discord
+     */
+    message: CommandInteraction;
+
+    /**
+     * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
+     */
+    args?: T[];
+}
+
+
+
+
+/**
+ * @author SNIPPIK
+ * @description Параметры декоратора команды
+ */
+type DeclareOptions = {
+    /**
+     * @description Имена команды на разных языках
+     * @example Первое именование будет выставлено для других языков как по-умолчанию
+     * @public
+     */
+    readonly names: LocalizationMap;
+
+    /**
+     * @description Описание команды на розных языках
+     * @example Первое именование будет выставлено для других языков как по-умолчанию
+     * @public
+     */
+    readonly descriptions: LocalizationMap;
+
+    /**
+     * @description Права на использование команды
+     * @private
+     */
+    default_member_permissions?: Permissions | null | undefined;
+
+    /**
+     * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
+     * @public
+     */
+    readonly integration_types?: ("GUILD_INSTALL" | "USER_INSTALL")[];
+
+    /**
+     * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
+     * @private
+     */
+    readonly contexts?: ("GUILD" | "BOT_DM" | "PRIVATE_CHANNEL")[];
+}
+
+/**
+ * @author SNIPPIK
+ * @description Декоратор создающий заголовок команды
  * @decorator
  */
-export function CommandDeclare(options: SlashCommand.Options) {
+export function Declare(options: DeclareOptions) {
     const name_key = Object.keys(options.names)[0] as Locale
     const name = options.names[name_key];
     const name_localizations = options.names;
@@ -294,199 +402,188 @@ export function CommandDeclare(options: SlashCommand.Options) {
     const description_localizations = options.descriptions;
 
     // Загружаем данные в класс
-    return function (target: Function) {
-        target.prototype.name = name;
-        target.prototype["name_localizations"] = name_localizations;
-        target.prototype.description = description;
-        target.prototype["description_localizations"] = description_localizations;
-        target.prototype["integration_types"] = options.integration_types ? options.integration_types.map((type) => type === "GUILD_INSTALL" ? 0 : 1) : [0];
-        target.prototype["contexts"] = options.contexts ? options.contexts.map((type) => type === "GUILD" ? 0 : type === "BOT_DM" ? 1 : 2) : [0];
-
-        // Если надо создать простую команду
-        if (options.options?.length > 0) {
-            target.prototype["autocomplete"] = options.autocomplete;
-
-            // Если нет options — создаём массив
-            if (!Array.isArray(target.prototype.options)) {
-                target.prototype.options = [];
-            }
-
-            // Изменяем данные для правильной работы api
-            const transformed = options.options.map(opt => ({
-                ...opt,
-                name: opt.names[Object.keys(opt.names)[0] as Locale],
-                nameLocalizations: opt.names,
-                description: opt.descriptions[Object.keys(opt.descriptions)[0] as Locale],
-                descriptionLocalizations: opt.descriptions,
-            }));
-
-            // Добавляем новый объект
-            target.prototype.options.push(...transformed);
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            name = name;
+            name_localizations = name_localizations;
+            description = description;
+            description_localizations = description_localizations;
+            integration_types = options.integration_types ? options.integration_types.map((type) => type === "GUILD_INSTALL" ? 0 : 1) : [0];
+            contexts = options.contexts ? options.contexts.map((type) => type === "GUILD" ? 0 : type === "BOT_DM" ? 1 : 2) : [0]
         }
-    };
+}
+
+
+
+
+/**
+ * @author SNIPPIK
+ * @description Оригинальный элемент выбора
+ * @interface Choice
+ */
+interface Choice {
+    /**
+     * @description Имя действия
+     */
+    name: string;
+
+    /**
+     * @description Тип возврата данных, нужен для кода разработчика
+     */
+    value: string;
+
+    /**
+     * @description Перевод имен действий на разные языки
+     */
+    nameLocalizations?: LocalizationMap;
 }
 
 /**
  * @author SNIPPIK
- * @description Декоратор параметром доп команды
- * @constructor
+ * @description Параметры параметров autocomplete
+ */
+type BaseCommandOption = {
+    /**
+     * @description Имена команды на разных языках
+     * @example Первое именование будет выставлено для других языков как по-умолчанию
+     * @public
+     */
+    names: ApplicationCommandOption['nameLocalizations'];
+
+    /**
+     * @description Описание команды на разных языках
+     * @example Первое именование будет выставлено для других языков как по-умолчанию
+     * @public
+     */
+    descriptions: ApplicationCommandOption["descriptionLocalizations"];
+
+    /**
+     * @description Тип вводимых данных
+     * @public
+     */
+    type: ApplicationCommandOption["type"];
+
+    /**
+     * @description Ввод данных обязателен
+     * @public
+     */
+    required?: boolean;
+
+    /**
+     * @description Доп параметры для работы slashCommand
+     * @private
+     */
+    readonly options?: BaseCommandOption[];
+}
+
+/**
+ * @author SNIPPIK
+ * @description Параметры параметров autocomplete
+ */
+type AutocompleteCommandOption = {
+    /**
+     * @description Выполнение действия autocomplete
+     * @default null
+     * @readonly
+     * @public
+     */
+    readonly autocomplete?: (options: {
+        /**
+         * @description Сообщение пользователя для работы с discord
+         */
+        message: CompeteInteraction;
+
+        /**
+         * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
+         */
+        args?: any[];
+    }) => any;
+
+    /**
+     * @description Доп параметры для работы slashCommand
+     * @private
+     */
+    readonly options?: AutocompleteCommandOption[];
+} & BaseCommandOption;
+
+/**
+ * @author SNIPPIK
+ * @description Параметры параметров autocomplete
+ */
+type ChoiceOption = {
+    /**
+     * @description Список действий на выбор пользователей
+     * @public
+     */
+    choices?: Choice[];
+
+    /**
+     * @description Доп параметры для работы slashCommand
+     * @private
+     */
+    readonly options?: ChoiceOption[];
+} & BaseCommandOption;
+
+/**
+ * @author SNIPPIK
+ * @description Записываем параметры команды в json формат
+ */
+type OptionsRecord = Record<string, AutocompleteCommandOption | ChoiceOption & BaseCommandOption>;
+
+/**
+ * @author SNIPPIK
+ * @description Декоратор под команд
  * @decorator
  */
-export function CommandOptions(component: SlashCommand.Component) {
-    const transformed: SlashCommand.Component = {
-        ...component,
-        name: component.names[Object.keys(component.names)[0] as Locale],
-        nameLocalizations: component.names,
-        description: component.descriptions[Object.keys(component.descriptions)[0] as Locale],
-        descriptionLocalizations: component.descriptions,
-        options: component.options
-            ? component.options.map(opt => ({
-                ...opt,
-                name: opt.names[Object.keys(opt.names)[0] as Locale],
-                nameLocalizations: opt.names,
-                description: opt.descriptions[Object.keys(opt.descriptions)[0] as Locale],
-                descriptionLocalizations: opt.descriptions,
-            }))
-            : undefined,
-    } as any;
+export function Options(options: (new () => SubCommand)[] | OptionsRecord) {
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            options: SubCommand[] | AutocompleteCommandOption | ChoiceOption[] = Array.isArray(options)
+                ? options.map(x => new x())
+                : Object.entries(options).map(([, option]) => {
+                    return {
+                        ...option,
+                        name: option.names[Object.keys(option.names)[0] as Locale],
+                        nameLocalizations: option.names,
+                        description: option.descriptions[Object.keys(option.descriptions)[0] as Locale],
+                        descriptionLocalizations: option.descriptions,
+                        options: option.options
+                            ? option.options.map(opt => ({
+                                ...opt,
+                                name: opt.names[Object.keys(opt.names)[0] as Locale],
+                                nameLocalizations: opt.names,
+                                description: opt.descriptions[Object.keys(opt.descriptions)[0] as Locale],
+                                descriptionLocalizations: opt.descriptions
+                            }))
+                            : undefined,
+                    } as any;
+                });
+        };
+}
 
-    return function (target: Function) {
-        // Если нет options — создаём массив
-        if (!Array.isArray(target.prototype.options)) {
-            target.prototype.options = [];
-        }
-        // Добавляем новый объект
-        target.prototype.options.push(transformed);
-    };
+
+
+
+/**
+ * @author SNIPPIK
+ * @description Декоратор ограничений
+ * @decorator
+ */
+export function Middlewares(cbs: RegisteredMiddlewares[]) {
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            middlewares = cbs;
+        };
 }
 
 /**
  * @author SNIPPIK
- * @description Интерфейсы slash-command
- * @namespace SlashCommand
+ * @description Декоратор ограничений
+ * @decorator
  */
-export namespace SlashCommand {
-    /**
-     * @author SNIPPIK
-     * @description Параметры декоратора
-     * @interface Options
-     */
-    export interface Options {
-        /**
-         * @description Имена команды на разных языках
-         * @example Первое именование будет выставлено для других языков как по-умолчанию
-         * @public
-         */
-        readonly names: LocalizationMap;
-
-        /**
-         * @description Описание команды на розных языках
-         * @example Первое именование будет выставлено для других языков как по-умолчанию
-         * @public
-         */
-        readonly descriptions: LocalizationMap;
-
-        /**
-         * @description Права на использование команды
-         * @private
-         */
-        default_member_permissions?: Permissions | null | undefined;
-
-        /**
-         * @description Доп команды к команде или к подкоманде. Внимание нельзя нарушать структуру discord а то команды не будут приняты
-         * @public
-         */
-        options?: Component[];
-
-        /**
-         * @description Если ли возможность редактировать данные ввода
-         * @public
-         */
-        autocomplete?: boolean;
-
-        /**
-         * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
-         * @public
-         */
-        readonly integration_types?: ("GUILD_INSTALL" | "USER_INSTALL")[];
-
-        /**
-         * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
-         * @private
-         */
-        readonly contexts?: ("GUILD" | "BOT_DM" | "PRIVATE_CHANNEL")[];
-    }
-
-    /**
-     * @author SNIPPIK
-     * @description Оригинальный элемент выбора
-     * @interface Choice
-     */
-    export interface Choice {
-        /**
-         * @description Имя действия
-         */
-        name: string;
-
-        /**
-         * @description Тип возврата данных, нужен для кода разработчика
-         */
-        value: string;
-
-        /**
-         * @description Перевод имен действий на разные языки
-         */
-        nameLocalizations?: LocalizationMap;
-    }
-
-    /**
-     * @author SNIPPIK
-     * @description Упрощающий элемент создания компонентов для команд
-     * @interface Component
-     */
-    export interface Component {
-        /**
-         * @description Имена команды на разных языках
-         * @example Первое именование будет выставлено для других языков как по-умолчанию
-         * @public
-         */
-        names: ApplicationCommandOption['nameLocalizations'];
-
-        /**
-         * @description Описание команды на разных языках
-         * @example Первое именование будет выставлено для других языков как по-умолчанию
-         * @public
-         */
-        descriptions: ApplicationCommandOption["descriptionLocalizations"];
-
-        /**
-         * @description Тип вводимых данных
-         * @public
-         */
-        type: ApplicationCommandOption["type"];
-
-        /**
-         * @description Ввод данных обязателен
-         * @public
-         */
-        required?: boolean;
-
-        /**
-         * @description Доп команды к команде или к подкоманде. Внимание нельзя нарушать структуру discord а то команды не будут приняты
-         * @public
-         */
-        options?: Component[];
-
-        /**
-         * @description Список действий на выбор пользователей
-         * @public
-         */
-        choices?: Choice[];
-
-        /**
-         * @description Если ли возможность редактировать данные ввода
-         * @public
-         */
-        autocomplete?: boolean;
-    }
+export function Permissions(permissions: BaseCommand["permissions"]) {
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            permissions = permissions;
+        };
 }
