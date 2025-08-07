@@ -131,13 +131,13 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
                 // Если найден заголовок
                 if (isOpusHead(packet)) {
-                    this.emit("head", segment);
+                    this.emit("head", packet);
                     continue;
                 }
 
                 // Если найден тег
                 else if (isOpusTags(packet)) {
-                    this.emit("tags", segment);
+                    this.emit("tags", packet);
                     continue;
                 }
 
