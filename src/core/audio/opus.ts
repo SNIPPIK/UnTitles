@@ -4,14 +4,12 @@ import { TypedEmitter } from "#structures";
 /**
  * @author SNIPPIK
  * @description Заголовок для поиска opus
- * @const OGG_MAGIC
  */
 const OGG_MAGIC = Buffer.from("OggS");
 
 /**
  * @author SNIPPIK
  * @description Когда есть перерыв в отправленных данных, передача пакета не должна просто останавливаться. Вместо этого отправьте пять кадров молчания перед остановкой, чтобы избежать непреднамеренного интерполяции Opus с последующими передачами
- * @const SILENT_FRAME
  * @public
  */
 export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
@@ -19,18 +17,15 @@ export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
 /**
  * @author SNIPPIK
  * @description Длительность opus фрейма в ms
- * @const OPUS_FRAME_SIZE
- * @public
  */
 export const OPUS_FRAME_SIZE = 20;
 
 /**
  * @author SNIPPIK
  * @description Пустой фрейм для предотвращения чтения null
- * @const EMPTY_FRAME
- * @private
  */
-const EMPTY_FRAME =  Buffer.alloc(4);
+const EMPTY_FRAME =  Buffer.alloc(0);
+
 
 /**
  * @author SNIPPIK
@@ -60,12 +55,12 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
         this._buffer = Buffer.concat([this._buffer, chunk]);
 
         // Начинаем обработку буфера с начала
+        const size = this._buffer.length;
         let offset = 0;
 
         // Основной цикл обработки страниц в OGG-потоке
         // Цикл продолжается, пока доступно хотя бы 27 байт — минимальный размер заголовка страницы
-        while (offset + 27 <= this._buffer.length) {
-
+        while (offset + 27 <= size) {
             // Проверяем, соответствует ли текущая позиция сигнатуре "OggS" (OGG_MAGIC)
             // Это "магическая строка", которая всегда должна быть в начале страницы
             if (!this._buffer.subarray(offset, offset + 4).equals(OGG_MAGIC)) {
@@ -87,41 +82,32 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             // Байты [offset + 26] содержит количество сегментов (Lacing Table Entries)
             // Каждая запись определяет длину одного Opus-пакета (фрагмента)
             const pageSegments = this._buffer.readUInt8(offset + 26);
-
-            // Вычисляем конец сегментной таблицы (находится сразу после заголовка)
-            const segmentTableEnd = offset + 27 + pageSegments;
+            const headerLength = 27 + pageSegments;
 
             // Проверяем, пришла ли вся сегментная таблица
             // Если нет — выходим, ждём следующих данных
-            if (segmentTableEnd > this._buffer.length) break;
-
-            // Извлекаем сегментную таблицу (lacing table) — массив из `pageSegments` байт
-            // Каждый байт содержит длину фрагмента (от 0 до 255)
-            const segmentTable = this._buffer.subarray(offset + 27, segmentTableEnd);
-
-            // Суммируем длину всех фрагментов, чтобы получить размер payload'а
-            const totalSegmentLength = segmentTable.reduce((a, b) => a + b, 0);
-
-            // Полный размер страницы = заголовок (27), таблица (pageSegments), и payload (все фрагменты)
-            const fullPageEnd = segmentTableEnd + totalSegmentLength;
+            if (offset + headerLength > size) break;
 
             // Проверяем, получена ли вся страница
             // Если нет — выход из цикла до прихода полной страницы
-            if (fullPageEnd > this._buffer.length) break;
+            const segmentTable = this._buffer.subarray(offset + 27, offset + 27 + pageSegments);
+            const totalSegmentLength = segmentTable.reduce((sum, val) => sum + val, 0);
+            const fullPageLength = headerLength + totalSegmentLength;
 
             // Извлекаем содержимое страницы — начиная с конца таблицы и до конца страницы
-            const payload = this._buffer.subarray(segmentTableEnd, fullPageEnd);
+            if (offset + fullPageLength > size) break;
 
             // Передаём таблицу сегментов и payload в обработчике, который выделяет Opus-пакеты
-            this._extractPackets(segmentTable, payload);
+            const payload = this._buffer.subarray(offset + headerLength, offset + fullPageLength);
+            this.extractPackets(segmentTable, payload);
 
             // Смещаем offset на конец текущей страницы и продолжаем со следующей
-            offset = fullPageEnd;
+            offset += fullPageLength;
         }
 
         // После выхода из цикла: обрезаем буфер, удаляя обработанные байты
         // Это важно, чтобы избежать переполнения и сохранить только "хвост", который ещё не разобран
-        if (offset > 0) this._buffer = this._buffer.subarray(offset);
+        this._buffer = this._buffer.subarray(offset);
     };
 
     /**
@@ -130,7 +116,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @param payload - Данные для корректного поиска сегмента
      * @private
      */
-    private _extractPackets = (segmentTable: Buffer, payload: Buffer) => {
+    private extractPackets = (segmentTable: Buffer, payload: Buffer) => {
         let currentPacket: Buffer[] = [], payloadOffset = 0;
 
         // Проверяем все фреймы
@@ -143,18 +129,15 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
-                // Пропускаем лишние SILENT_FRAMEs
-                if (packet.length < 5) continue;
-
                 // Если найден заголовок
-                else if (isOpusHead(packet)) {
-                    this.emit("head", packet);
+                if (isOpusHead(packet)) {
+                    this.emit("head", segment);
                     continue;
                 }
 
                 // Если найден тег
                 else if (isOpusTags(packet)) {
-                    this.emit("tags", packet);
+                    this.emit("tags", segment);
                     continue;
                 }
 
