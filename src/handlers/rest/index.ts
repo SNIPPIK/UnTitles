@@ -179,7 +179,7 @@ export class RestObject {
                         .map((x) => original.includes(x));
                     const time = track.time.total - song.time.total;
 
-                    return (time >= -15 && time <= 15 || time === 0) && title.length >= (original.length / 2);
+                    return (time >= -15 && time <= 15 || time === 0) && original.length >= title.length || title.length >= (original.length / 2);
                 })?.at(0);
 
                 // Если отфильтровать треки не удалось
