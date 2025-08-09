@@ -1,9 +1,8 @@
 import type { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { ChannelType, Events } from "discord.js"
 import { CommandInteraction, Colors } from "#structures/discord";
 import { Assign, Logger, locale } from "#structures";
+import { ChannelType, Events } from "discord.js"
 import { SubCommand } from "#handler/commands";
-import { Selector } from "#handler/components";
 import { Event } from "#handler/events";
 import { db } from "#app/db";
 
@@ -74,16 +73,10 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                     return this.SelectCommand(ctx);
                 }
 
-                // Действия выбора
-                else if (ctx.isAnySelectMenu) {
-                    Logger.log("DEBUG", `[${ctx.user.username}] run selector menu ${ctx?.["customId"]}`);
-                    return this.SelectMenuCallback(ctx as any);
-                }
-
-                // Управление кнопками
-                else if (ctx.isButton()) {
-                    Logger.log("DEBUG", `[${ctx.user.username}] run button ${ctx?.customId}`);
-                    return this.SelectButton(ctx);
+                // Действия выбора/кнопок
+                else if (ctx.isAnySelectMenu || ctx.isButton()) {
+                    Logger.log("DEBUG", `[${ctx.user.username}] run component ${ctx?.["customId"]}`);
+                    return this.SelectComponent(ctx as any);
                 }
 
                 return null;
@@ -99,55 +92,52 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      */
     private readonly SelectCommand = async (ctx: ChatInputCommandInteraction) => {
         const command = db.commands.get(ctx.commandName);
-        const subcommand: SubCommand = command.options.find((cmd) => cmd.name === ctx.options["_subcommand"]) as any;
 
-        // Если нет команды
+        /// Если нет команды
         // Если пользователь пытается использовать команду разработчика
-        if (!command || (command?.owner && !db.owner.ids.includes(ctx.member.user.id))) {
+        if (!command || (command.owner && !db.owner.ids.includes(ctx.member.user.id))) {
             db.commands.remove(ctx.client, ctx.commandGuildId, ctx.commandId);
 
             return ctx.reply({
                 flags: "Ephemeral",
-                embeds: [
-                    {
-                        description: locale._(ctx.locale, "interaction.command.fail"),
-                        color: Colors.DarkRed
-                    }
-                ]
+                embeds: [{
+                    description: locale._(ctx.locale, "interaction.command.fail"),
+                    color: Colors.DarkRed
+                }]
             });
         }
 
-        // Если права не соответствуют правде
-        if (command.middlewares && command.middlewares?.length > 0) {
-            const rules = db.middlewares.filter((rule) => command.middlewares.includes(rule.name));
-
-            for (const rule of rules) {
-                if (!(await rule.callback(ctx))) return null;
+        // Проверка middleware
+        if (command.middlewares?.length) {
+            for (const rule of db.middlewares.array) {
+                if (command.middlewares.includes(rule.name) && !(await rule.callback(ctx))) {
+                    return null;
+                }
             }
         }
 
+        // Проверка прав
+        if (command.permissions && isBased(ctx) === "guild") {
+            const { user: userPerms, client: botPerms } = command.permissions;
 
-        const permissions = command.permissions;
-        if (permissions && isBased(ctx) === "guild") {
             // Проверка прав пользователя
-            const userPermissions = ctx.member?.permissions;
-            if (permissions.user && !permissions.user.every(perm => userPermissions?.has(perm))) {
+            if (userPerms?.length && !userPerms.every(perm => ctx.member?.permissions?.has(perm))) {
                 return ctx.reply(locale._(ctx.locale, "interaction.permission.user", [ctx.member]));
             }
 
             // Проверка прав бота
-            const botPermissions = ctx.guild?.members.me?.permissionsIn(ctx.channel);
-            if (permissions.client && !permissions.client.every(perm => botPermissions?.has(perm))) {
+            if (botPerms?.length && !botPerms.every(perm => ctx.guild?.members.me?.permissionsIn(ctx.channel)?.has(perm))) {
                 return ctx.reply(locale._(ctx.locale, "interaction.permission.client", [ctx.member]));
             }
         }
 
-        // Выполняем команду
+        // Получаем подкоманду (если есть)
+        const subcommand: SubCommand = command.options.find((cmd) => cmd.name === ctx.options["_subcommand"]) as any;
+
+        // Запускаем команду
         return (subcommand ?? command).execute({
             message: ctx,
-            args: ctx.options?.["_hoistedOptions"]?.map((f) => {
-                return f[f.name] ?? f.value;
-            })
+            args: ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value)
         });
     };
 
@@ -158,62 +148,56 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @private
      */
     private readonly SelectAutocomplete = (ctx: AutocompleteInteraction) => {
-        const command = db.commands.get(ctx.commandName);
-        const subcommand = command.options.find((cmd) => {
-            if (ctx.options["_subcommand"]) return cmd.name === ctx.options["_subcommand"];
-            return cmd.autocomplete;
-        });
-        const groupCommand = subcommand?.options?.find((option) => option.autocomplete);
+        const subName = ctx.options["_subcommand"];
+        const command = db.commands.get(subName ?? ctx.commandName);
+        if (!command) return null;
 
-        // Если нет autocomplete под команды
+        // Находим нужную подкоманду, у которой есть autocomplete
+        const subcommand = command.options.find(cmd =>
+            subName ? cmd.name === subName : cmd.autocomplete
+        );
+        const groupCommand = subcommand?.options?.find(option => option.autocomplete);
+
         if (!subcommand && !groupCommand) return null;
 
-        const args: any[] = ctx.options?.["_hoistedOptions"]?.map((f) => {
-            return f[f.name] ?? f.value;
-        });
+        // Извлекаем аргументы сразу без лишней вложенности
+        const args = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
 
-        // Если аргумент пустой
-        if (!args || args[0] === "" || args[1] === "") return null;
+        // Проверка на пустые аргументы
+        if (!args.length || args.some(a => a === "")) return null;
 
+        // Запускаем функцию autocomplete
         return (groupCommand ?? subcommand).autocomplete({
             message: ctx,
-            args: args
+            args
         });
     };
 
     /**
-     * @description Функция выполняющая действия SelectButton
+     * @description Функция выполняющая действия компонентов такие как button/selector
      * @param ctx - Данные для запуска функций
      * @readonly
      * @private
      */
-    private readonly SelectButton = (ctx: ButtonInteraction) => {
-        const button = db.components.get(ctx.customId);
-        const queue = db.queues.get(ctx.guildId);
-        const userChannel = ctx.member.voice.channel;
-        const botChannel = ctx.guild.members.me.voice.channel;
+    private readonly SelectComponent = async (ctx: ButtonInteraction | AnySelectMenuInteraction) => {
+        const component = db.components.get(ctx.customId);
 
-        // Если была не найдена кнопка
-        // Если пользователь не подключен к голосовым каналам и нет очереди
-        // Если есть очередь и пользователь не подключен к тому же голосовому каналу
-        const isValid = button && userChannel && botChannel && queue && userChannel.id === queue.message.voiceID;
-        if (!isValid) return;
+        // Если не найден такой компонент
+        if (!component) return null;
 
-        // Если кнопка была найдена
-        return button.callback(ctx as any);
-    };
+        const { middlewares, callback } = component;
 
-    /**
-     * @description Функция выполняющая действия SelectMenu
-     * @param ctx - Данные для запуска функций
-     * @readonly
-     * @private
-     */
-    private readonly SelectMenuCallback = async (ctx: AnySelectMenuInteraction) => {
-        const selector = db.components.get(ctx.customId) as Selector;
+        // Делаем проверку ограничений
+        if (middlewares?.length > 0) {
+            for (const rule of db.middlewares.array) {
+                if (middlewares.includes(rule.name) && !(await rule.callback(ctx as any))) {
+                    return null;
+                }
+            }
+        }
 
-        // Если кнопка была найдена
-        return selector.callback(ctx as any);
+        // Если компонент был найден
+        return callback(ctx);
     };
 }
 

@@ -1,3 +1,4 @@
+import { RegisteredMiddlewares } from "#handler/commands";
 import { buttonInteraction } from "#structures/discord";
 import { AnySelectMenuInteraction } from "discord.js";
 import { handler } from "#handler";
@@ -10,7 +11,7 @@ import { handler } from "#handler";
  * @extends handler
  * @public
  */
-export class Components extends handler<Button | Selector> {
+export class Components extends handler<SupportComponent> {
     public constructor() {
         super("src/handlers/components");
     };
@@ -39,7 +40,6 @@ export class Components extends handler<Button | Selector> {
  */
 export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters";
 
-
 /**
  * @author SNIPPIK
  * @description Доступные селекторы меню
@@ -49,36 +49,46 @@ export type SupportSelector = "filter_select";
 
 /**
  * @author SNIPPIK
- * @description Интерфейс кнопки для общего понимания
- * @interface Button
+ * @description
  */
-export interface Button {
+export type SupportComponent<T = "button" | "selector"> = {
     /**
      * @description Название кнопки
      */
-    name: SupportButtons;
+    name?: T extends "button" ? SupportButtons : SupportSelector;
 
     /**
      * @description Функция выполнения кнопки
      * @param msg - Сообщение пользователя
      */
-    callback: (ctx: buttonInteraction) => void;
+    callback?: (ctx: T extends "button" ? buttonInteraction : AnySelectMenuInteraction) => any;
+
+    /**
+     * @description Права для использования той или иной команды
+     * @default null
+     * @readonly
+     * @public
+     */
+    readonly middlewares?: RegisteredMiddlewares[];
 }
 
 /**
  * @author SNIPPIK
- * @description Интерфейс кнопки для общего понимания
- * @interface Button
+ * @description Класс для создания компонентов
  */
-export interface Selector {
-    /**
-     * @description Название кнопки
-     */
-    name: SupportSelector;
+export class Component<T = "button" | "selector"> implements SupportComponent<T> {
+    public callback: SupportComponent<T>["callback"];
+}
 
-    /**
-     * @description Функция выполнения кнопки
-     * @param msg - Сообщение пользователя
-     */
-    callback: (ctx: AnySelectMenuInteraction) => void;
+/**
+ * @author SNIPPIK
+ * @description Декоратор создающий заголовок команды
+ * @decorator
+ */
+export function DeclareComponent(options: {name: SupportSelector | SupportButtons}) {
+    // Загружаем данные в класс
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            name = options.name;
+        }
 }

@@ -231,6 +231,7 @@ class PlayWaveCommand extends SubCommand {
     };
 }
 
+
 /**
  * @author SNIPPIK
  * @description Расширенное включение музыки
@@ -257,6 +258,7 @@ class PlayWaveCommand extends SubCommand {
 class PlayControlCommand extends Command {
     async execute() {}
 }
+
 
 /**
  * @author SNIPPIK

@@ -128,6 +128,15 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         // Отправляем пакет данных для получения реального ip, port
         this.discovery(options.ssrc);
 
+        this.socket.on("listening", () => {
+            try {
+                this.socket.setRecvBufferSize(1024 * 1024); // 1MB
+                this.socket.setSendBufferSize(1024 * 1024);
+            } catch (e) {
+                this.emit("error", new Error("Failed to set socket buffer size: " + e));
+            }
+        });
+
         // Если подключение возвращает ошибки
         this.socket.on("error", (err) => {
             this.emit("error", err);
