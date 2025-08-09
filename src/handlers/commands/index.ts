@@ -84,11 +84,6 @@ export class Commands extends handler<Command> {
             // Если указанное имя совпало с именем команды
             if (typeof names === "string") return cmd.name === names;
 
-            // Если есть подкоманды
-            else if (cmd.options) {
-                return !!cmd.options.find((sub) => typeof names === "string" ? sub.name === names : names.includes(sub.name));
-            }
-
             // Проверяем имена если это список
             return names.includes(cmd.name);
         });

@@ -46,6 +46,14 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
 
     /**
+     * @description Отправлен ли аудио пакет для синхронизации jitter buffer
+     * @usage Отправлять только с новым треком!
+     * @public
+     */
+    public _sendPrepareJitter = false;
+
+
+    /**
      * @description Текущий статус плеера, при создании он должен быть в ожидании
      * @private
      */
@@ -241,6 +249,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const repeat = player.tracks.repeat;
             const current = player.tracks.position;
 
+            // Позволяем отправить 1 аудио пакет заранее
+            this._sendPrepareJitter = false;
+
             // Если включен повтор трека сменить позицию нельзя
             if (repeat === RepeatType.Song) player.tracks.position = current;
 
@@ -362,10 +373,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
             // Действия при готовности
             const handleReady = () => {
-                // Производим явную синхронизацию времени (только для BufferedAudioResource)
-                if (this._audio.current && stream instanceof BufferedAudioResource) {
-                    stream.seek = this._audio.current.duration;
-                }
+                // Производим явную синхронизацию времени
+                if (this._audio.current) stream.seek = this._audio.current.duration;
 
                 // Переводим плеер в состояние чтения аудио
                 this._audio.current = stream;
@@ -541,7 +550,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         const timeout = setTimeout(() => {
             // Отправляем данные событию для отображения ошибки
             stream.emit("error", new Error("Timeout: the stream has been exceeded!"));
-        }, 5e3);
+        }, 10e3);
 
         // Отслеживаем аудио поток на ошибки
         (stream as BufferedAudioResource).once("error", () => {

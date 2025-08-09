@@ -262,7 +262,7 @@ class AudioFiltersOff extends SubCommand {
 
             const items = filters.filter(filter => !!filter.name.match(args[0])).map((filter) => {
                 return {
-                    name: `🌀 ${filter.name}`,
+                    name: `🌀 ${filter.name} - ${filter.locale[message.locale].substring(0, 75)}`,
                     value: filter.name
                 }
             });

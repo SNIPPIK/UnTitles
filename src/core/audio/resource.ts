@@ -139,9 +139,9 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @constructor
      * @protected
      */
-    protected constructor({options}: AudioResourceOptions) {
+    protected constructor(protected input_data: AudioResourceOptions) {
         super();
-        this._seek = (options.seek * 1e3) / OPUS_FRAME_SIZE;
+        this._seek = (input_data.options.seek * 1e3) / OPUS_FRAME_SIZE;
     };
 
     /**
@@ -183,6 +183,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 
         this._readable = null;
         this._seek = null;
+        this.input_data = null;
     };
 }
 
@@ -254,12 +255,12 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @constructor
      * @public
      */
-    public constructor(public config: AudioResourceOptions) {
+    public constructor(config: AudioResourceOptions) {
         super(config);
 
         const { path, options } = config;
         const decoder = new BufferedEncoder({
-            highWaterMark: 512 * 5
+            highWaterMark: 512 * 5 // Буфер на ~1:14
         });
 
         // Расшифровщик
@@ -365,9 +366,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @private
      */
     private encoder = new PipeEncoder({
-        highWaterMark: 512 * 5,
-        writableObjectMode: true,
-        readableObjectMode: true
+        highWaterMark: 512 * 5 // Буфер на ~1:14
     });
 
     /**
@@ -406,7 +405,28 @@ export class PipeAudioResource extends BaseAudioResource {
      * @public
      */
     public get duration() {
-        return (this._seek + this.played * OPUS_FRAME_SIZE) / 1e3;
+        if (!this.played) return 0;
+
+        const time = (this.played + this._seek) * OPUS_FRAME_SIZE;
+        return Math.abs(((time - OPUS_FRAME_SIZE) / 1e3));
+    };
+
+    /**
+     * @description Изменяем время проигрывания трека
+     * @param seek - Время в сек
+     * @public
+     */
+    public set seek(seek: number) {
+        let steps = (seek * 1e3) / OPUS_FRAME_SIZE;
+
+        // Если диапазон слишком мал или большой
+        if (steps >= 0 || steps > this.packets) return;
+
+        // Пропускаем аудио фреймы
+        do {
+            steps--;
+            this.encoder.read();
+        } while (steps > 0)
     };
 
     /**

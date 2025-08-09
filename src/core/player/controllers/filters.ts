@@ -48,15 +48,17 @@ export class ControllerFilters<T extends AudioFilter> {
             }
         }
 
-        // Если трек live
-        if (live) return filters.join(",");
+        // Если трек не live
+        if (!live) {
+            // Берем данные из всех фильтров
+            for (const enabled of this._filters) {
+                const {filter, args, argument} = enabled;
 
-        // Берем данные из всех фильтров
-        for (const { filter, args, argument } of this._filters) {
-            filters.push(args ? `${filter}${argument ?? ""}` : filter);
+                filters.push(args ? `${filter}${argument ?? ""}` : filter);
+            }
         }
 
-        return filters.join(",");
+        return filters.join(",")
     };
 }
 
