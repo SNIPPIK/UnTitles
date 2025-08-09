@@ -2,7 +2,6 @@ import type { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteracti
 import { CommandInteraction, Colors } from "#structures/discord";
 import { Assign, Logger, locale } from "#structures";
 import { ChannelType, Events } from "discord.js"
-import { SubCommand } from "#handler/commands";
 import { Event } from "#handler/events";
 import { db } from "#app/db";
 
@@ -91,7 +90,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @private
      */
     private readonly SelectCommand = async (ctx: ChatInputCommandInteraction) => {
-        const command = db.commands.get(ctx.commandName);
+        const command = db.commands.get(ctx.options["_subcommand"] ?? ctx.commandName);
 
         /// Если нет команды
         // Если пользователь пытается использовать команду разработчика
@@ -110,9 +109,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         // Проверка middleware
         if (command.middlewares?.length) {
             for (const rule of db.middlewares.array) {
-                if (command.middlewares.includes(rule.name) && !(await rule.callback(ctx))) {
-                    return null;
-                }
+                if (command.middlewares.includes(rule.name) && !(await rule.callback(ctx))) return null;
             }
         }
 
@@ -131,11 +128,8 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             }
         }
 
-        // Получаем подкоманду (если есть)
-        const subcommand: SubCommand = command.options.find((cmd) => cmd.name === ctx.options["_subcommand"]) as any;
-
         // Запускаем команду
-        return (subcommand ?? command).execute({
+        return command.execute({
             message: ctx,
             args: ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value)
         });
@@ -152,23 +146,13 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         const command = db.commands.get(ctx.commandName);
         if (!command) return null;
 
-        const args = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
+        // Ищем аргументы
+        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
         if (args.length === 0 || args.some(a => a === "")) return null;
 
         for (const opt of command.options) {
-            // Если это подкоманда
-            if (subName && opt.name === subName) {
-                if (opt.autocomplete) return opt.autocomplete({ message: ctx, args });
-                if (opt.options) {
-                    for (const subOpt of opt.options) {
-                        if (subOpt.autocomplete) return subOpt.autocomplete({ message: ctx, args });
-                    }
-                }
-                return null;
-            }
-
-            // Если это команда с autocomplete без подкоманд
-            if (!subName && opt.autocomplete) return opt.autocomplete({ message: ctx, args });
+            if (subName ? opt.name === subName : opt.autocomplete) return (opt.autocomplete ?? opt.options?.find(o => o.autocomplete)?.
+                autocomplete)?.({message: ctx, args}) ?? null;
         }
 
         return null;
@@ -191,9 +175,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         // Делаем проверку ограничений
         if (middlewares?.length > 0) {
             for (const rule of db.middlewares.array) {
-                if (middlewares.includes(rule.name) && !(await rule.callback(ctx as any))) {
-                    return null;
-                }
+                if (middlewares.includes(rule.name) && !(await rule.callback(ctx as any))) return null;
             }
         }
 
