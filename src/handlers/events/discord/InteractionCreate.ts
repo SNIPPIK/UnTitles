@@ -2,6 +2,7 @@ import type { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteracti
 import { CommandInteraction, Colors } from "#structures/discord";
 import { Assign, Logger, locale } from "#structures";
 import { ChannelType, Events } from "discord.js"
+import { SubCommand } from "#handler/commands";
 import { Event } from "#handler/events";
 import { db } from "#app/db";
 
@@ -90,7 +91,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @private
      */
     private readonly SelectCommand = async (ctx: ChatInputCommandInteraction) => {
-        const command = db.commands.get(ctx.options["_subcommand"] ?? ctx.commandName);
+        const command = db.commands.get(ctx.commandName);
 
         /// Если нет команды
         // Если пользователь пытается использовать команду разработчика
@@ -128,8 +129,10 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             }
         }
 
+        const subcommand: SubCommand = command.options.find((sub) => sub.name === ctx.options["_subcommand"] && "execute" in sub) as any;
+
         // Запускаем команду
-        return command.execute({
+        return (subcommand ?? command).execute({
             message: ctx,
             args: ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value)
         });

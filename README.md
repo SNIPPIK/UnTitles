@@ -87,7 +87,7 @@ while (performance.now() - startBlock < 100) {}
 - There is a system of smooth transition from one audio to another `Hot audio swap`
 - 16+ filters, you can add your own without complex digging in the code [filters](src/core/player/filters.json)
 - There is support for long videos, Live video is still raw.
-- There is an explicit synchronization of the audio stream only for tracks <8 min
+- There is an explicit synchronization of the audio stream
 #### 🌐 Platforms
 - Support for `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
 - Precise search in the absence of audio, through time and names by syllables

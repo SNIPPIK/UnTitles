@@ -121,46 +121,22 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
         // Проверяем все фреймы
         for (const segmentLength of segmentTable) {
-            const segment = payload.subarray(payloadOffset, payloadOffset + segmentLength);
-            currentPacket.push(segment);
+            currentPacket.push(payload.subarray(payloadOffset, payloadOffset + segmentLength));
             payloadOffset += segmentLength;
 
+            // Если сегмент меньше 255 — пакет окончен
             if (segmentLength < 255) {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
-                // Если найден заголовок
-                if (isOpusHead(packet)) {
-                    this.emit("head", packet);
-                    continue;
+                if (this._first) {
+                    this.emit("frame", SILENT_FRAME);
+                    this._first = false;
                 }
 
-                // Если найден тег
-                else if (isOpusTags(packet)) {
-                    this.emit("tags", packet);
-                    continue;
-                }
-
-                this._choiceFrame(packet);
+                this.emit("frame", packet);
             }
         }
-    };
-
-    /**
-     * @description Что надо сделать с opus фрагментом
-     * @param frame - Сам фрагмент
-     * @returns void
-     * @private
-     */
-    private _choiceFrame = (frame: Buffer) => {
-        // Если еще не отправлен 1 пустой фрейм
-        if (this._first) {
-            this.emit("frame", SILENT_FRAME);
-            this._first = false;
-        }
-
-        // Если получен обычный frame
-        this.emit("frame", frame);
     };
 
     /**
@@ -201,9 +177,6 @@ export class BufferedEncoder extends Writable {
      */
     public constructor(options: WritableOptions = { autoDestroy: true }) {
         super(options);
-
-        this.encoder.on("head", this.emit.bind(this, "head"));
-        this.encoder.on("tags", this.emit.bind(this, "tags"));
         this.encoder.on("frame", this.emit.bind(this, "frame"));
     };
 
@@ -252,9 +225,6 @@ export class PipeEncoder extends Transform {
      */
     public constructor(options: TransformOptions = { autoDestroy: true }) {
         super(Object.assign(options, { readableObjectMode: true }));
-
-        this.encoder.on("head", this.emit.bind(this, "head"));
-        this.encoder.on("tags", this.emit.bind(this, "tags"));
         this.encoder.on("frame", this.push.bind(this));
     };
 
@@ -279,38 +249,6 @@ export class PipeEncoder extends Transform {
         super._destroy(error, callback);
         this.removeAllListeners();
     };
-}
-
-/**
- * @author SNIPPIK
- * @description По строковый расчет opusHead
- * @param packet
- */
-function isOpusHead(packet: Buffer): boolean {
-    // "OpusHead" в ASCII: 0x4F 0x70 0x75 0x73 0x48 0x65 0x61 0x64
-    return (
-        packet.length >= 8 &&
-        packet[4] === 0x48 && // 'H'
-        packet[5] === 0x65 && // 'e'
-        packet[6] === 0x61 && // 'a'
-        packet[7] === 0x64    // 'd'
-    );
-}
-
-/**
- * @author SNIPPIK
- * @description По строковый расчет opusTags
- * @param packet
- */
-function isOpusTags(packet: Buffer): boolean {
-    // "OpusTags" в ASCII: 0x4F 0x70 0x75 0x73 0x54 0x61 0x67 0x73
-    return (
-        packet.length >= 8 &&
-        packet[4] === 0x54 && // 'T'
-        packet[5] === 0x61 && // 'a'
-        packet[6] === 0x67 && // 'g'
-        packet[7] === 0x73    // 's'
-    );
 }
 
 /**

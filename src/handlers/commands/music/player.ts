@@ -98,7 +98,7 @@ class PlayerStop extends SubCommand {
     }
 })
 class PlayerVolume extends SubCommand {
-    async execute({message, args}: CommandContext<string>) {
+    async execute({message, args}: CommandContext) {
         const { player } = db.queues.get(message.guildId);
 
         // Изменение громкости
