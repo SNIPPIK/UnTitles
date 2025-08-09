@@ -11,6 +11,14 @@ import { handler } from "#handler";
  */
 export class Middlewares<T = middleware<CommandInteraction>> extends handler<T> {
     /**
+     * @description Производим поиск по функции
+     * @public
+     */
+    public get array() {
+        return this.files.array
+    };
+
+    /**
      * @description Загружаем класс вместе с дочерним
      */
     public constructor() {
@@ -28,6 +36,7 @@ export class Middlewares<T = middleware<CommandInteraction>> extends handler<T> 
     /**
      * @description Производим фильтрацию по функции
      * @param predicate - Функция поиска
+     * @public
      */
     public filter(predicate: (item: T) => boolean) {
         return this.files.filter(predicate);

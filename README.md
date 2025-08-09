@@ -1,7 +1,7 @@
 <div align="center">
   <h1>🌟 Discord Music Bot</h1>
 
-<h4>Incredible bot with its own voice/audio engine, scalable architecture, multiple filters and support for multiple music platforms.</h4>
+<h4>Incredible bot with its own voice/audio engine, scalable architecture, multiple filters and support for 6 music platforms.</h4>
 <h4>Audio quality surpasses lavalink, don't believe me? Listen for yourself!</h4>
 
   <p>
@@ -66,36 +66,37 @@
 ---
 
 # 🎧 Main features
-#### 🎖️ Peculiarities
-- Not afraid of event loop, even in this case the sound goes quite smoothly
+#### 🎖️ Features
+- Not afraid of the event loop, even in this case the sound goes smoothly!!!
 ```ts
 setInterval(() => {
-    const startBlock = performance.now();
-    while (performance.now() - startBlock < 100) {}
+const startBlock = performance.now();
+while (performance.now() - startBlock < 100) {}
 }, 200);
 ```
 #### 🔊 Voice engine
-- [Voice Gateway Version 8](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/core/voice) + [End-to-End Encryption (DAVE Protocol)](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
-- Full **SRTP** implementation: `aead_aes256_gcm`, `xchacha20_poly1305` (via libraries)
-- Adaptive packet sending system, works like a **jitter** buffer!
-- Works with ready-made **Ogg/Opus** frames!
-- **FFmpeg** is required, it is responsible for audio and filters!
-- Works even with strong **event loop lag**
+- Implementation of [Voice Gateway Version 8](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/core/voice) + [End-to-End Encryption (DAVE Protocol)](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
+- Full implementation of **SRTP**: `aead_aes256_gcm`, `xchacha20_poly1305` (via libraries)
+- Does not require any opus encoders/decoders, has its own opus encoder by parsing method!
+- Adaptive system for sending audio packets, its own `Jitter Buffer`!
+- Requires **FFmpeg**, it is responsible for audio and filters!
+- Works even with strong **event loop lag**!
 #### 🎵 Audio
-- Has its own **Ogg/Opus** parser to get pure opus!
 - It is possible to reuse audio without conversion if it is less than 8 minutes long
-- Smooth **fade-in/fade-out** transition between tracks, even with **skip**, **seek**, **etc**.
+- Smooth **fade-in/fade-out** transition between tracks, even with **skip**, **seek** and **tp**.
 - There is a system of smooth transition from one audio to another `Hot audio swap`
 - 16+ filters, you can add your own without complex digging in the code [filters](src/core/player/filters.json)
 - There is support for long videos, Live video is still raw.
-- There is explicit synchronization of the audio stream only for tracks <8 min.
+- There is an explicit synchronization of the audio stream only for tracks <8 min
 #### 🌐 Platforms
-- YouTube, Spotify, VK, Yandex-Music, SoundCloud, Deezer support
+- Support for `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
+- Precise search in the absence of audio, through time and names by syllables
+- If searching on other platforms in the absence of audio!
 - Platforms work in a separate **worker** (thread) for performance
 - Everything is described in detail, there are examples and a bunch of interfaces for typing
-- Easy expansion and adding new platforms via `Dynamic Loader - Handler`
+- Easy expansion and addition of new platforms via `Dynamic Loader - Handler`
 #### 🌍 Localization
-- Available languages: `English`, `Russian` ([language file](src/structures/locale/languages.json))
+- Available languages: `English`, `Russian` ([file with languages](src/structures/locale/languages.json))
 - You can add any language supported by discord
 
 ---
@@ -103,6 +104,7 @@ setInterval(() => {
 # 🔩 Other functionality
 #### Own system [handlers](src/handlers)
 - Universal loader: [`commands`](src/handlers/commands), [`events`](src/handlers/events), [`components`](src/handlers/components), [`middlewares`](src/handlers/middlewares), [`rest`](src/handlers/rest)
+- Own framework for commands, buttons, menu selectors, events
 - Decorators and interfaces are used, including typing
 - Support for "hot" reloading
 

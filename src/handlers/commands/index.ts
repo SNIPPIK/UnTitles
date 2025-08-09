@@ -80,13 +80,13 @@ export class Commands extends handler<Command> {
      * @public
      */
     public get = (names: string | string[]): Command | null => {
-        // Если указанное имя совпало с именем команды
-        if (typeof names === "string") {
-            return this.files.find(cmd => cmd.name === names) ?? null;
-        }
+        return this.files.find((cmd) => {
+            // Если указанное имя совпало с именем команды
+            if (typeof names === "string") return cmd.name === names;
 
-        // Проверяем имена если это список
-        return this.files.find(cmd => names.includes(cmd.name)) ?? null;
+            // Проверяем имена если это список
+            return names.includes(cmd.name)
+        });
     };
 
     /**
@@ -134,7 +134,7 @@ export class Commands extends handler<Command> {
      * @param data - Все команды
      * @private
      */
-    private parseJsonData = (data: Command[]): any => {
+    private parseJsonData = (data: Command[]) => {
         return data.map(cmd => {
             return cmd.toJSON();
         });
@@ -327,7 +327,7 @@ export abstract class SubCommand extends BaseCommand {
  * @description Все доступные ограничения
  * @type RegisteredMiddlewares
  */
-type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream" | "cooldown"
+export type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream" | "cooldown"
 
 /**
  * @author SNIPPIK

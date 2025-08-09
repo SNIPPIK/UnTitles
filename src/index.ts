@@ -52,13 +52,13 @@ async function runShard() {
     // Запускаем бота
     await client.login(env.get("token.discord"));
 
-    // Загружаем components
-    db.components.register();
-    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.components.size} components`)}`);
-
     // Загружаем API
     await db.api.startWorker();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow.length} APIs`)}`);
+
+    // Загружаем components
+    db.components.register();
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.components.size} components`)}`);
 
     // Загружаем middlewares
     db.middlewares.register();
@@ -82,7 +82,12 @@ async function runShard() {
 
     // Искусственная нагрузка, если вы видите это, значит хватит сюда смотреть 0_0
     /*
+    let interval = 0;
+
     setInterval(() => {
+        if (interval > 70) return;
+        interval++;
+
         const startBlock = performance.now();
         while (performance.now() - startBlock < 100) {} // Блокируем Event Loop
     }, 200);

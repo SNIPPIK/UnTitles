@@ -50,12 +50,6 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public sequence: number = -1;
 
     /**
-     * @description Последовательность запроса
-     * @public
-     */
-    public sequence_ask: number = -1;
-
-    /**
      * @description Текущий статус клиента
      * @public
      */
@@ -104,7 +98,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                     op: VoiceOpcodes.Heartbeat,
                     d: {
                         t: Date.now(),
-                        seq_ack: this.sequence_ask
+                        seq_ack: this.sequence
                     }
                 };
             },
@@ -126,7 +120,6 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Получен HEARTBEAT_ACK
             onAck: (latency) => {
-                this.sequence_ask++;
                 this.emit("warn", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
             }
         });
