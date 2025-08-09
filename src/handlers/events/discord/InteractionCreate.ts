@@ -149,28 +149,29 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      */
     private readonly SelectAutocomplete = (ctx: AutocompleteInteraction) => {
         const subName = ctx.options["_subcommand"];
-        const command = db.commands.get(subName ?? ctx.commandName);
+        const command = db.commands.get(ctx.commandName);
         if (!command) return null;
 
-        // Находим нужную подкоманду, у которой есть autocomplete
-        const subcommand = command.options.find(cmd =>
-            subName ? cmd.name === subName : cmd.autocomplete
-        );
-        const groupCommand = subcommand?.options?.find(option => option.autocomplete);
-
-        if (!subcommand && !groupCommand) return null;
-
-        // Извлекаем аргументы сразу без лишней вложенности
         const args = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
+        if (args.length === 0 || args.some(a => a === "")) return null;
 
-        // Проверка на пустые аргументы
-        if (!args.length || args.some(a => a === "")) return null;
+        for (const opt of command.options) {
+            // Если это подкоманда
+            if (subName && opt.name === subName) {
+                if (opt.autocomplete) return opt.autocomplete({ message: ctx, args });
+                if (opt.options) {
+                    for (const subOpt of opt.options) {
+                        if (subOpt.autocomplete) return subOpt.autocomplete({ message: ctx, args });
+                    }
+                }
+                return null;
+            }
 
-        // Запускаем функцию autocomplete
-        return (groupCommand ?? subcommand).autocomplete({
-            message: ctx,
-            args
-        });
+            // Если это команда с autocomplete без подкоманд
+            if (!subName && opt.autocomplete) return opt.autocomplete({ message: ctx, args });
+        }
+
+        return null;
     };
 
     /**
