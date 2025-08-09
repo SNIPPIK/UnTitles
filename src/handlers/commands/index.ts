@@ -79,13 +79,18 @@ export class Commands extends handler<Command> {
      * @param names - Имя или имена для поиска
      * @public
      */
-    public get = (names: string | string[]): Command | null => {
+    public get = (names: string | string[]): Command | SubCommand => {
         return this.files.find((cmd) => {
             // Если указанное имя совпало с именем команды
             if (typeof names === "string") return cmd.name === names;
 
+            // Если есть подкоманды
+            else if (cmd.options) {
+                return !!cmd.options.find((sub) => typeof names === "string" ? sub.name === names : names.includes(sub.name));
+            }
+
             // Проверяем имена если это список
-            return names.includes(cmd.name)
+            return names.includes(cmd.name);
         });
     };
 
