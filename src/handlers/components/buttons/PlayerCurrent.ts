@@ -17,7 +17,7 @@ import { db } from "#app/db";
 })
 @Middlewares(["queue", "another_voice", "voice"])
 class ButtonStop extends Component<"button"> {
-    public callback: Component<"button">["callback"] = async (ctx) => {
+    public callback: Component<"button">["callback"] = (ctx) => {
         const queue = db.queues.get(ctx.guildId);
 
         // Если есть очередь, то удаляем ее
@@ -46,7 +46,7 @@ class ButtonStop extends Component<"button"> {
 })
 @Middlewares(["queue", "another_voice", "voice", "player-wait-stream"])
 class ButtonSkip extends Component<"button"> {
-    public callback: Component<"button">["callback"] = async (ctx) => {
+    public callback: Component<"button">["callback"] = (ctx) => {
         const queue = db.queues.get(ctx.guildId);
         const position = queue.tracks.position + 1;
 
@@ -56,12 +56,12 @@ class ButtonSkip extends Component<"button"> {
             queue.tracks.position = 0;
 
             // Переключаемся на первый трек
-            await queue.player.play(0, 0, queue.tracks.position);
+            queue.player.play(0, 0, queue.tracks.position).catch(console.error);
         }
 
         else {
             // Переключаемся вперед
-            await queue.player.play(0, 0, position);
+            queue.player.play(0, 0, position).catch(console.error);
         }
 
         // Уведомляем пользователя о пропущенном треке
@@ -88,7 +88,7 @@ class ButtonSkip extends Component<"button"> {
 })
 @Middlewares(["queue", "another_voice", "voice", "player-wait-stream"])
 class ButtonBack extends Component<"button"> {
-    public callback: Component<"button">["callback"] = async (ctx) => {
+    public callback: Component<"button">["callback"] = (ctx) => {
         const queue = db.queues.get(ctx.guildId);
         const repeat = queue.tracks.repeat;
         const position = queue.tracks.position;
@@ -102,12 +102,12 @@ class ButtonBack extends Component<"button"> {
             queue.tracks.position = queue.tracks.total - 1;
 
             // Переключаемся на последний трек
-            await queue.player.play(0, 0, queue.tracks.position);
+            queue.player.play(0, 0, queue.tracks.position).catch(console.error);
         }
 
         else {
             // Переключаемся на прошлый трек
-            await queue.player.play(0, 0, position - 1);
+            queue.player.play(0, 0, position - 1).catch(console.error);
         }
 
         // Возвращаем повтор
@@ -553,11 +553,11 @@ class ButtonRepeat extends Component<"button"> {
 })
 @Middlewares(["queue", "another_voice", "voice", "player-wait-stream"])
 class ButtonReplay extends Component<"button"> {
-    public callback: Component<"button">["callback"] = async (ctx) => {
+    public callback: Component<"button">["callback"] = (ctx) => {
         const queue = db.queues.get(ctx.guildId);
 
         // Запускаем проигрывание текущего трека
-        await queue.player.play(0, 0, queue.player.tracks.position);
+        queue.player.play(0, 0, queue.player.tracks.position).catch(console.error);
 
         // Сообщаем о том что музыка начата с начала
         return ctx.reply({
@@ -583,7 +583,7 @@ class ButtonReplay extends Component<"button"> {
 })
 @Middlewares(["queue", "another_voice", "voice"])
 class ButtonShuffle extends Component<"button"> {
-    public callback: Component<"button">["callback"] = async (ctx) => {
+    public callback: Component<"button">["callback"] = (ctx) => {
         const queue = db.queues.get(ctx.guildId);
 
         // Если в очереди менее 2 треков
