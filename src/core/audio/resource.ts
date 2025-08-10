@@ -219,7 +219,7 @@ export class BufferedAudioResource extends BaseAudioResource {
         if (!this._buffer?.position) return 0;
 
         const time = (this._buffer?.position + this._seek) * OPUS_FRAME_SIZE;
-        return Math.abs(((time - OPUS_FRAME_SIZE) / 1e3));
+        return Math.abs(time / 1e3);
     };
 
     /**
@@ -408,7 +408,7 @@ export class PipeAudioResource extends BaseAudioResource {
         if (!this.played) return 0;
 
         const time = (this.played + this._seek) * OPUS_FRAME_SIZE;
-        return Math.abs(((time - OPUS_FRAME_SIZE) / 1e3));
+        return Math.abs(time / 1e3);
     };
 
     /**

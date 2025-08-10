@@ -10,9 +10,18 @@ const OGG_MAGIC = Buffer.from("OggS");
 /**
  * @author SNIPPIK
  * @description Когда есть перерыв в отправленных данных, передача пакета не должна просто останавливаться. Вместо этого отправьте пять кадров молчания перед остановкой, чтобы избежать непреднамеренного интерполяции Opus с последующими передачами
+ * @const SILENT_FRAME
  * @public
  */
 export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
+
+/**
+ * @author SNIPPIK
+ * @description Пустой фрейм, требуется для большей правдоподобности opus потока
+ * @const OPUS_SILENT_FRAME
+ * @private
+ */
+const OPUS_SILENT_FRAME = Buffer.from([0xFC, 0xFF, 0xFE]);
 
 /**
  * @author SNIPPIK
@@ -129,8 +138,20 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
+                // Пропускаем технические данные
+                // 3    - SILENT_FRAME
+                if (packet.length === 3) continue;
+
+                // Если найден заголовок
+                // 19   - Head frame
+                else if (isOpusHead(packet)) continue;
+
+                // Если найден тег
+                // 296  - Tags frame
+                else if (isOpusTags(packet)) continue;
+
                 if (this._first) {
-                    this.emit("frame", SILENT_FRAME);
+                    this.emit("frame", OPUS_SILENT_FRAME);
                     this._first = false;
                 }
 
@@ -145,7 +166,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      */
     public emitDestroy() {
         // Отправляем пустой пакет последним
-        this.emit("frame", SILENT_FRAME);
+        this.emit("frame", OPUS_SILENT_FRAME);
 
         this._first = null;
         this._buffer = null;
@@ -249,6 +270,38 @@ export class PipeEncoder extends Transform {
         super._destroy(error, callback);
         this.removeAllListeners();
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description По строковый расчет opusHead
+ * @param packet
+ */
+function isOpusHead(packet: Buffer): boolean {
+    // "OpusHead" в ASCII: 0x4F 0x70 0x75 0x73 0x48 0x65 0x61 0x64
+    return (
+        packet.length >= 8 &&
+        packet[4] === 0x48 && // 'H'
+        packet[5] === 0x65 && // 'e'
+        packet[6] === 0x61 && // 'a'
+        packet[7] === 0x64    // 'd'
+    );
+}
+
+/**
+ * @author SNIPPIK
+ * @description По строковый расчет opusTags
+ * @param packet
+ */
+function isOpusTags(packet: Buffer): boolean {
+    // "OpusTags" в ASCII: 0x4F 0x70 0x75 0x73 0x54 0x61 0x67 0x73
+    return (
+        packet.length >= 8 &&
+        packet[4] === 0x54 && // 'T'
+        packet[5] === 0x61 && // 'a'
+        packet[6] === 0x67 && // 'g'
+        packet[7] === 0x73    // 's'
+    );
 }
 
 /**
