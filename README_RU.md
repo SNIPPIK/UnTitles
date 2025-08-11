@@ -139,8 +139,9 @@ setInterval(() => {
 | `/player` | ✅            | (api, replay, stop, wave)       | Расширенное проигрывание |
 | `/volume` | ✅            | value                           | Громкость плеера         |
 | `/remove` | ✅            | value                           | Удаление трека           |
-|   `/seek` | ❌            | 00:00, int                      | Перемотка                |
-|   `/skip` | ✅            | (back, to, next)                | Пропуск                  |
+|   `/seek` | ❌            | 00:00, int                      | Перемотка времени трека  |
+|   `/skip` | ✅            | (back, to, next)                | Пропуск треков           |
+|  `/queue` | ✅            | {destroy, list}                 | Управление очередью      |
 | `/avatar` | ✅            | {user}                          | Аватар пользователя      |
 |  `/voice` | ✅            | (join, leave, tribune)          | Голосовой канал          |
 | `/report` | ❌            | (none)                          | Связь с разработчиком    |

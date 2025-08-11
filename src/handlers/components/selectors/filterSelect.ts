@@ -68,9 +68,10 @@ class FilterSelector extends Component<"selector"> {
 
 
         /* Включаем фильтр */
+        player.filters.enabled.add(Filter);
+
         // Если можно включить фильтр или фильтры сейчас
         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
-            player.filters.enabled.add(Filter);
             player.play(seek).catch(console.error);
 
             // Сообщаем о включении фильтров

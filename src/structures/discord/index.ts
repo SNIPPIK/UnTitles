@@ -36,7 +36,7 @@ export type buttonInteraction = ButtonInteraction<CacheType>;
  * @type buttonInteraction
  * @public
  */
-export type CycleInteraction = Message<true>;
+export type CycleInteraction = Message<boolean>;
 
 /**
  * @author SNIPPIK

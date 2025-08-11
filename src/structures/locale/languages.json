@@ -504,6 +504,17 @@
   },
 
 
+  "command.queue.destroy": {
+    "en-US": "The queue has been deleted! It will not be possible to return the tracks!",
+    "ru": "Очередь была удалена! Вернуть треки уже не выйдет!"
+  },
+
+  "command.queue.track.notfound": {
+    "en-US": "But there is no track with such number, there are only {ARGUMENT} tracks!",
+    "ru": "Но трека с таким номером нет, всего треков {ARGUMENT}!"
+  },
+
+
   "command.filter.push.two": {
     "en-US": "Current filter has enabled!",
     "ru": "Данный фильтр уже включен!"

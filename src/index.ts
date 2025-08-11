@@ -85,13 +85,13 @@ async function runShard() {
     let interval = 0;
 
     setInterval(() => {
-        if (interval > 70) return;
+        if (interval > 90) return;
         interval++;
 
         const startBlock = performance.now();
         while (performance.now() - startBlock < 100) {} // Блокируем Event Loop
     }, 200);
-     */
+    */
 }
 
 /**

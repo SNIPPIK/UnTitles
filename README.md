@@ -128,20 +128,21 @@ while (performance.now() - startBlock < 100) {}
 - Responsive UI - does not require reusing commands
 
 #### 📚 Commands
-|   Command | Autocomplete | Arguments                       | Description       |
-|----------:|:-------------|:--------------------------------|:------------------|
-|    `/api` | ❌            | access:(block, unblock)         | API management    |
-|    `/bot` | ❌            | restart:(commands, bot, events) | Restart           |
-| `/filter` | ✅            | (off, push, disable)            | Audio filters     |
-|   `/play` | ✅            | (query)                         | Playback          |
-| `/player` | ✅            | (api, replay, stop, wave)       | Advanced playback |
-| `/volume` | ✅            | value                           | Player volume     |
-| `/remove` | ✅            | value                           | Delete track      |
-|   `/seek` | ❌            | 00:00, int                      | Rewind            |
-|   `/skip` | ✅            | (back, to, next)                | Skip              |
-| `/avatar` | ✅            | {user}                          | User avatar       |
-|  `/voice` | ✅            | (join, leave, tribune)          | Voice channel     |
-| `/report` | ❌            | (none)                          | Contact developer |
+|   Command | Autocomplete | Arguments                       | Description        |
+|----------:|:-------------|:--------------------------------|:-------------------|
+|    `/api` | ❌            | access:(block, unblock)         | API management     |
+|    `/bot` | ❌            | restart:(commands, bot, events) | Restart            |
+| `/filter` | ✅            | (off, push, disable)            | Audio filters      |
+|   `/play` | ✅            | (query)                         | Playback           |
+| `/player` | ✅            | (api, replay, stop, wave)       | Advanced playback  |
+| `/volume` | ✅            | value                           | Player volume      |
+| `/remove` | ✅            | value                           | Delete track       |
+|   `/seek` | ❌            | 00:00, int                      | Seeking time track |
+|   `/skip` | ✅            | (back, to, next)                | Skip tracks        |
+|  `/queue` | ✅            | {destroy, list}                 | Queue management   |
+| `/avatar` | ✅            | {user}                          | User avatar        |
+|  `/voice` | ✅            | (join, leave, tribune)          | Voice channel      |
+| `/report` | ❌            | (none)                          | Contact developer  |
 
 ---
 ## 🚀 Quick start
