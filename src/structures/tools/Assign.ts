@@ -5,7 +5,7 @@
  * @abstract
  * @public
  */
-export abstract class Assign<T> {
+export abstract class Assign<T extends object> {
     /**
      * @description Создаем команду
      * @param options Любые параметры указанные через T
@@ -13,6 +13,6 @@ export abstract class Assign<T> {
      * @protected
      */
     protected constructor(options: T) {
-        Object.assign(this, options);
+        Object.assign(this as this & T, options);
     };
 }

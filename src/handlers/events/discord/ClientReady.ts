@@ -2,7 +2,6 @@ import { Assign, Logger } from "#structures";
 import { Event } from "#handler/events";
 import { Events } from "discord.js";
 
-
 /**
  * @author SNIPPIK
  * @description Класс события ClientReady

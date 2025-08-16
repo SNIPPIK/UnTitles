@@ -348,7 +348,6 @@ export type CommandContext<T = string> = {
 
 
 
-
 /**
  * @author SNIPPIK
  * @description Параметры декоратора команды
@@ -421,7 +420,6 @@ export function Declare(options: DeclareOptions) {
             owner = options.owner;
         }
 }
-
 
 
 
@@ -569,7 +567,6 @@ export function Options(options: (new () => SubCommand)[] | OptionsRecord) {
                 });
         };
 }
-
 
 
 

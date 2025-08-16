@@ -2,7 +2,7 @@ import { WebSocketOpcodes, GatewayCloseCodes } from "#core/voice";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
 import { HeartbeatManager } from "../managers/heartbeat";
 import { WebSocket, MessageEvent, Data } from "ws";
-import {Logger, TypedEmitter} from "#structures";
+import { Logger, TypedEmitter } from "#structures";
 
 /**
  * @author SNIPPIK
@@ -204,10 +204,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             const buffer = data instanceof ArrayBuffer ? Buffer.from(data) : data;
             const op = buffer.readUInt8(2) as WebSocketOpcodes.dave_opcodes["op"];
             const payload = buffer.subarray(3);
-            const seq = buffer.readUInt16BE(0);
+            const sequence = buffer.readUInt16BE(0);
 
-            // Если есть последний seq
-            if (seq) this.sequence = seq;
+            // Если есть последний sequence
+            if (sequence) this.sequence = sequence;
 
             // Отправляем полученный буфер
             this.emit("binary", { op, payload });
