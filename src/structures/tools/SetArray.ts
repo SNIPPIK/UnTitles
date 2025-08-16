@@ -11,7 +11,7 @@ export class SetArray<T> extends Set<T> {
      * @returns T[]
      * @public
      */
-    public get array() {
+    public get array(): T[] {
         return Array.from(this.values());
     };
 

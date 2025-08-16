@@ -200,7 +200,7 @@ async function ExtractData() {
     });
 
     parentPort?.postMessage({
-        supported: fakeReq.map(api => [api.name, api]),
+        supported: fakeReq,
         authorization: fakeReq.filter(api => api.auth !== null).map(api => api.name),
         audio: fakeReq.filter(api => api.audio === false).map(api => api.name),
         block: []

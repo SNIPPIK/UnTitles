@@ -15,7 +15,7 @@ export class Middlewares<T = middleware<CommandInteraction>> extends handler<T> 
      * @public
      */
     public get array() {
-        return this.files.array
+        return this.files.array;
     };
 
     /**
@@ -29,9 +29,7 @@ export class Middlewares<T = middleware<CommandInteraction>> extends handler<T> 
      * @description Регистрируем в эко системе бота
      * @public
      */
-    public register = () => {
-        this.load();
-    };
+    public register = this.load
 
     /**
      * @description Производим фильтрацию по функции
@@ -50,6 +48,6 @@ export class Middlewares<T = middleware<CommandInteraction>> extends handler<T> 
  * @public
  */
 export interface middleware<T> {
-    name: Command["middlewares"][number],
+    name: Command["middlewares"][number];
     callback: (message: T) => Promise<boolean>;
 }

@@ -36,13 +36,21 @@ export class RestObject {
     };
 
     /**
+     * @description Получаем список всех доступных платформ
+     * @private
+     */
+    private get array(): RestServerSide.API[] {
+        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
+        return this.platforms.array;
+    };
+
+    /**
      * @description Платформы с доступом к запросам
      * @returns RestServerSide.API[]
      * @public
      */
     public get allow(): RestServerSide.API[] {
-        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
-        return this.platforms.array.filter(api => api.auth !== null);
+        return this.array.filter(api => api.auth !== null);
     };
 
     /**
@@ -51,8 +59,7 @@ export class RestObject {
      * @public
      */
     public get audioSupport(): RestServerSide.API[] {
-        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
-        return this.platforms.array.filter(api => api.auth !== null && api.audio !== false && !this.platforms.block.includes(api.name));
+        return this.array.filter(api => api.auth !== null && api.audio !== false && !this.platforms.block.includes(api.name));
     };
 
     /**
@@ -61,8 +68,7 @@ export class RestObject {
      * @public
      */
     public get allowWave(): RestServerSide.API[] {
-        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
-        return this.platforms.array.filter(api => api.auth !== null && api.requests.some((apis) => apis.name === "wave"));
+        return this.array.filter(api => api.auth !== null && api.requests.some((apis) => apis.name === "wave"));
     };
 
     /**
@@ -101,11 +107,7 @@ export class RestObject {
                 postMessage: { data: true },
                 not_destroyed: true,
                 callback: (data) => {
-                    this.platforms = {
-                        ...data,
-                        supported: Object.fromEntries(data.supported as any) as any
-                    };
-
+                    this.platforms = data;
                     return resolve(true);
                 }
             });
@@ -116,6 +118,29 @@ export class RestObject {
                 return this.startWorker();
             });
         });
+    };
+
+    /**
+     * @description Создание класса для взаимодействия с платформой
+     * @public
+     */
+    public request = (name: RestServerSide.API["name"]): RestClientSide.Request => {
+        const platform = this.platform(name);
+        return platform ? new RestClientSide.Request(platform) : null;
+    };
+
+    /**
+     * @description Получаем платформу
+     * @param name - Имя платформы
+     * @private
+     */
+    private platform = (name: RestServerSide.API["name"]) => {
+        const platform = this.platforms.supported[name];
+
+        // Если есть такая платформа по имени
+        if (platform) return platform;
+
+        return this.allow.find((api) => api.name === name);
     };
 
     /**
@@ -175,13 +200,13 @@ export class RestObject {
 
                 // Ищем нужный трек
                 // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
-                const findTrack = search.filter((song) => {
-                    const title = song.name.toLowerCase().replace(/[^\w\s]|_/gi, "").replace(/\s+/gi, " ").split(" ")
-                        .map((x) => original.includes(x));
-                    const time = track.time.total - song.time.total;
+                const findTrack = search.find((song) => {
+                    const candidate = song.name.toLowerCase().replace(/[^\w\s]|_/gi, "").replace(/\s+/gi, " ").split(" ");
+                    const Matches = candidate.map((x) => original.includes(x));
+                    const time = Math.abs(track.time.total - song.time.total);
 
-                    return (time >= -5 && time <= 5 || time === 0) && (original.length >= title.length || title.length >= (original.length / 2));
-                })?.at(0);
+                    return (time <= 5 || time === 0) && Matches.length / Math.max(original.length, candidate.length);
+                });
 
                 // Если отфильтровать треки не удалось
                 if (!findTrack) {
@@ -231,30 +256,7 @@ export class RestObject {
     };
 
     /**
-     * @description Создание класса для взаимодействия с платформой
-     * @public
-     */
-    public request = (name: RestServerSide.API["name"]): RestClientSide.Request => {
-        const platform = this.platform(name);
-        return platform ? new RestClientSide.Request(platform) : null;
-    };
-
-    /**
-     * @description Получаем платформу
-     * @param name - Имя платформы
-     * @private
-     */
-    private platform = (name: RestServerSide.API["name"]) => {
-        const platform = this.platforms.supported[name];
-
-        // Если есть такая платформа по имени
-        if (platform) return platform;
-
-        return this.allow.find((api) => api.name === name);
-    };
-
-    /**
-     * @description Создание класса для взаимодействия с платформой
+     * @description Создание класса для взаимодействия с платформой, рекомендуются добавлять timeout из-вне
      * @protected
      * @readonly
      */
@@ -267,9 +269,11 @@ export class RestObject {
 
             // Слушаем сообщение или же ответ
             const onMessage = (message: RestServerSide.Result<T> & { requestId?: string }) => {
-                if (message.requestId !== requestId) return; // Не наш ответ — игнорируем
+                // Не наш ответ — игнорируем
+                if (message.requestId !== requestId) return;
 
-                this.worker.off("message", onMessage); // Отписываемся после получения
+                // Отписываемся после получения
+                this.worker.off("message", onMessage);
 
                 const { result, status } = message;
                 const baseAPI: RestServerSide.APIBase = {

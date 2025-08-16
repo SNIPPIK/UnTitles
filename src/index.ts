@@ -79,19 +79,6 @@ async function runShard() {
     setImmediate(() => {
         if (typeof global.gc === "function") global.gc();
     });
-
-    // Искусственная нагрузка, если вы видите это, значит хватит сюда смотреть 0_0
-    /*
-    let interval = 0;
-
-    setInterval(() => {
-        if (interval > 90) return;
-        interval++;
-
-        const startBlock = performance.now();
-        while (performance.now() - startBlock < 100) {} // Блокируем Event Loop
-    }, 200);
-    */
 }
 
 /**

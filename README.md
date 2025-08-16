@@ -112,7 +112,7 @@ while (performance.now() - startBlock < 100) {}
 - It is not afraid of **event loop** and **drift**, it just takes them into account not as a problem, but as parameters!
 - The loop can work ahead from 0 to 2 ms to process objects in the loop!
 - Audio sending is built on it!
-- Cycle accuracy `±0.05 ms` with `process.hrtime.bigint` + `performance.now`
+- Cycle accuracy `±0.05 ms` with `Date.now` + `performance.now`
 
 #### ⚙️ Internal tools
 - [`SetArray`](src/structures/tools/SetArray.ts) - 2 in one Array and Set in one class

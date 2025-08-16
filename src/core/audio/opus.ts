@@ -156,7 +156,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @description Удаляем неиспользуемые данные
      * @public
      */
-    public emitDestroy() {
+    public destroy() {
         // Отправляем пустой пакет последним
         this.emit("frame", SILENT_FRAME);
 
@@ -205,13 +205,13 @@ export class BufferedEncoder extends Writable {
     /**
      * @description Удаляем неиспользуемые данные
      * @param error - Ошибка
-     * @param callback - Вызов ошибки
+     * @public
      */
-    public _destroy(error: Error, callback: { (error?: Error): void }) {
-        this.encoder.emitDestroy();
+    public _destroy(error: Error) {
+        this.encoder.destroy();
         this.encoder = null;
 
-        super._destroy(error, callback);
+        super.destroy(error);
         this.removeAllListeners();
     };
 }
@@ -253,13 +253,13 @@ export class PipeEncoder extends Transform {
     /**
      * @description Удаляем неиспользуемые данные
      * @param error - Ошибка
-     * @param callback - Вызов ошибки
+     * @public
      */
-    public _destroy(error: Error, callback: { (error?: Error): void }) {
-        this.encoder.emitDestroy();
+    public _destroy(error: Error) {
+        this.encoder.destroy();
         this.encoder = null;
 
-        super._destroy(error, callback);
+        super.destroy(error);
         this.removeAllListeners();
     };
 }

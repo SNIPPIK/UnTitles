@@ -91,7 +91,7 @@ export abstract class handler<T = unknown> {
      * @param path - Путь до файла
      */
     private _push = (path: string) => {
-        const imported = require(path);
+        const imported: { default?: T } | json = require(path);
 
         // Удаляем кеш загружаемого файла
         delete require.cache[require.resolve(path)];

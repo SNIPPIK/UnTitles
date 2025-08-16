@@ -172,7 +172,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @description Удаляем ненужные данные
      * @protected
      */
-    protected _destroy = () => {
+    public destroy() {
         Logger.log("DEBUG", `[AudioResource] has destroyed`);
 
         // Чистим все потоки от мусора
@@ -346,9 +346,9 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public destroy = () => {
+        super.destroy();
         this._buffer.clear();
         this._buffer = null;
-        this._destroy();
     };
 }
 
@@ -505,10 +505,9 @@ export class PipeAudioResource extends BaseAudioResource {
      * @public
      */
     public destroy = () => {
+        super.destroy();
         this.played = null;
         this.encoder = null;
-
-        this._destroy();
     };
 }
 

@@ -128,7 +128,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @returns void
      * @public
      */
-    public reset = (): void => {
+    public reset(): void {
         this.clear(); // Удаляем все объекты
 
         this.startTime = 0;
@@ -141,11 +141,6 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Чистим performance.now
         this.performance = 0;
         this.prevEventLoopLag = 0;
-
-        // Запускаем Garbage Collector
-        setImmediate(() => {
-            if (typeof global.gc === "function") global.gc();
-        });
     };
 
     /**

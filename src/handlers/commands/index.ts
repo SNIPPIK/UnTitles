@@ -1,11 +1,11 @@
-import {ApplicationCommandOption, ApplicationCommandOptionType, Client, PermissionsString, Routes} from "discord.js";
-import type {Locale, LocalizationMap, Permissions} from "discord-api-types/v10";
-import {CommandInteraction, CompeteInteraction} from "#structures/discord";
+import { ApplicationCommandOption, ApplicationCommandOptionType, Client, PermissionsString, Routes } from "discord.js";
+import type { Locale, LocalizationMap, Permissions } from "discord-api-types/v10";
+import { CommandInteraction, CompeteInteraction } from "#structures/discord";
 import filters from "#core/player/filters.json";
-import {AudioFilter} from "#core/player";
-import {Logger} from "#structures";
-import {handler} from "#handler";
-import {env} from "#app/env";
+import { AudioFilter } from "#core/player";
+import { Logger } from "#structures";
+import { handler } from "#handler";
+import { env } from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -400,23 +400,18 @@ type DeclareOptions = {
  * @decorator
  */
 export function Declare(options: DeclareOptions) {
-    const name_key = Object.keys(options.names)[0] as Locale
-    const name = options.names[name_key];
-    const name_localizations = options.names;
-
-    const description_key = Object.keys(options.descriptions)[0] as Locale;
-    const description = options.descriptions[description_key];
-    const description_localizations = options.descriptions;
+    const [nameKey] = Object.keys(options.names) as Locale[];
+    const [descKey] = Object.keys(options.descriptions) as Locale[];
 
     // Загружаем данные в класс
     return <T extends { new (...args: any[]): object }>(target: T) =>
         class extends target {
-            name = name;
-            name_localizations = name_localizations;
-            description = description;
-            description_localizations = description_localizations;
-            integration_types = options.integration_types ? options.integration_types.map((type) => type === "GUILD_INSTALL" ? 0 : 1) : [0];
-            contexts = options.contexts ? options.contexts.map((type) => type === "GUILD" ? 0 : type === "BOT_DM" ? 1 : 2) : [0];
+            name = options.names[nameKey];
+            name_localizations = options.names;
+            description = options.descriptions[descKey];
+            description_localizations = options.descriptions;
+            integration_types = options.integration_types?.map(x => x === "GUILD_INSTALL" ? 0 : 1) ?? [0];
+            contexts = options.contexts?.map(x =>  x === "GUILD" ? 0 : x === "BOT_DM" ? 1 : 2) ?? [0];
             owner = options.owner;
         }
 }
@@ -539,6 +534,26 @@ type OptionsRecord = Record<string, AutocompleteCommandOption | ChoiceOption & B
 
 /**
  * @author SNIPPIK
+ * @description Нормализуем параметры подкоманд для discord api
+ * @param opt - Параметры подкоманд
+ * @private
+ */
+function normalizeOption(opt: BaseCommandOption) {
+    const [nameKey] = Object.keys(opt.names) as Locale[];
+    const [descKey] = Object.keys(opt.descriptions) as Locale[];
+
+    return {
+        ...opt,
+        name: opt.names[nameKey],
+        nameLocalizations: opt.names,
+        description: opt.descriptions[descKey],
+        descriptionLocalizations: opt.descriptions,
+        options: opt.options?.map(normalizeOption)
+    };
+}
+
+/**
+ * @author SNIPPIK
  * @description Декоратор под команд
  * @decorator
  */
@@ -547,27 +562,9 @@ export function Options(options: (new () => SubCommand)[] | OptionsRecord) {
         class extends target {
             options: SubCommand[] | AutocompleteCommandOption | ChoiceOption[] = Array.isArray(options)
                 ? options.map(x => new x())
-                : Object.entries(options).map(([, option]) => {
-                    return {
-                        ...option,
-                        name: option.names[Object.keys(option.names)[0] as Locale],
-                        nameLocalizations: option.names,
-                        description: option.descriptions[Object.keys(option.descriptions)[0] as Locale],
-                        descriptionLocalizations: option.descriptions,
-                        options: option.options
-                            ? option.options.map(opt => ({
-                                ...opt,
-                                name: opt.names[Object.keys(opt.names)[0] as Locale],
-                                nameLocalizations: opt.names,
-                                description: opt.descriptions[Object.keys(opt.descriptions)[0] as Locale],
-                                descriptionLocalizations: opt.descriptions
-                            }))
-                            : undefined,
-                    } as any;
-                });
+                : Object.values(options).map(normalizeOption);
         };
 }
-
 
 
 /**

@@ -110,6 +110,20 @@ export class ControllerCycles {
                 }
             });
         };
+
+        /**
+         * @description Чистка цикла от всего + выполнение gc
+         * @returns void
+         * @public
+         */
+        public reset = () => {
+            super.reset();
+
+            // Запускаем Garbage Collector
+            setImmediate(() => {
+                if (typeof global.gc === "function") global.gc();
+            });
+        };
     };
 
     /**
