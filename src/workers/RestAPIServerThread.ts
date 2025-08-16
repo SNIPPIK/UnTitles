@@ -42,7 +42,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @public
      */
     public get allow(): RestServerSide.API[] {
-        return Object.values(this.platforms.supported).filter(api => api.auth);
+        return Object.values(this.platforms.supported).filter(api => api.auth !== null);
     };
 
     /**
@@ -183,18 +183,25 @@ async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
  * @async
  */
 async function ExtractData() {
-    const fakeReq = rest.allow.map(api => ({...api,
-        requests: api.requests.map(request => {
-            return {
-                ...request,
-                execute: null,
-            }
-        })
-    }));
+    const fakeReq = rest.allow.map(api => {
+        // Удаляем все поля-функции на верхнем уровне
+        const safeApi = Object.fromEntries(
+            Object.entries(api).filter(([_, v]) => typeof v !== "function")
+        );
+
+        // Обрабатываем requests
+        safeApi.requests = (api.requests ?? []).map(request =>
+            Object.fromEntries(
+                Object.entries(request).filter(([_, v]) => typeof v !== "function")
+            )
+        );
+
+        return safeApi;
+    });
 
     parentPort?.postMessage({
         supported: fakeReq.map(api => [api.name, api]),
-        authorization: fakeReq.filter(api => !api.auth).map(api => api.name),
+        authorization: fakeReq.filter(api => api.auth !== null).map(api => api.name),
         audio: fakeReq.filter(api => api.audio === false).map(api => api.name),
         block: []
     });

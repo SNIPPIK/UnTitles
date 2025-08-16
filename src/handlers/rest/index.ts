@@ -42,7 +42,7 @@ export class RestObject {
      */
     public get allow(): RestServerSide.API[] {
         if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
-        return this.platforms.array.filter(api => api.auth);
+        return this.platforms.array.filter(api => api.auth !== null);
     };
 
     /**
@@ -52,7 +52,7 @@ export class RestObject {
      */
     public get audioSupport(): RestServerSide.API[] {
         if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
-        return this.platforms.array.filter(api => api.auth !== false && api.audio !== false && !this.platforms.block.includes(api.name));
+        return this.platforms.array.filter(api => api.auth !== null && api.audio !== false && !this.platforms.block.includes(api.name));
     };
 
     /**
@@ -62,7 +62,7 @@ export class RestObject {
      */
     public get allowWave(): RestServerSide.API[] {
         if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
-        return this.platforms.array.filter(api => api.auth && api.requests.some((apis) => apis.name === "wave"));
+        return this.platforms.array.filter(api => api.auth !== null && api.requests.some((apis) => apis.name === "wave"));
     };
 
     /**
@@ -111,7 +111,8 @@ export class RestObject {
             });
 
             // Если возникнет ошибка, пересоздадим worker
-            worker.once("error", () => {
+            worker.once("error", (error) => {
+                console.log(error);
                 return this.startWorker();
             });
         });
@@ -179,7 +180,7 @@ export class RestObject {
                         .map((x) => original.includes(x));
                     const time = track.time.total - song.time.total;
 
-                    return (time >= -15 && time <= 15 || time === 0) && original.length >= title.length || title.length >= (original.length / 2);
+                    return (time >= -5 && time <= 5 || time === 0) && (original.length >= title.length || title.length >= (original.length / 2));
                 })?.at(0);
 
                 // Если отфильтровать треки не удалось
@@ -304,12 +305,58 @@ export class RestObject {
 }
 
 
+/** ================= Decorators ================= */
+/**
+ * @author SNIPPIK
+ * @description Параметры запроса
+ */
+interface RestOptions {
+    readonly name: APIs_names;
+    readonly url: string;
+    readonly color: number;
+    readonly audio: boolean;
+    readonly auth?: string;
+    readonly filter: RegExp;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Декоратор создающий заголовок запроса
+ * @decorator
+ */
+export function DeclareRest(options: RestOptions) {
+    // Загружаем данные в класс
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            name = options.name;
+            url = options.url;
+            color = options.color;
+            audio = options.audio;
+            auth = options.auth;
+            filter = options.filter;
+        }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Дополнительные параметры
+ * @decorator
+ */
+export function OptionsRest<T>(options: T) {
+    // Загружаем данные в класс
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            options = options;
+        }
+}
+/** ================= Decorators ================= */
+
 
 /**
  * @description Названия всех доступных платформ
  * @type APIs_names
  */
-type APIs_names = 'YOUTUBE' | 'SPOTIFY' | 'VK' | 'YANDEX' | 'SOUNDCLOUD' | "DEEZER";
+type APIs_names = "YOUTUBE" | "SPOTIFY" | "VK" | "YANDEX" | "SOUNDCLOUD" | "DEEZER";
 
 /**
  * @description Helper: all possible requests across platforms
@@ -344,10 +391,7 @@ type APIRequestsRaw = {
  * @type ExecuteParams
  * @helper
  */
-type ExecuteParams<T extends keyof APIRequests = keyof APIRequests> =
-    T extends "track" ? { audio: boolean } :
-        T extends "playlist" | "album" | "artist" | "wave" | "search" ? { limit: number } :
-                never;
+type ExecuteParams<T extends keyof APIRequests = keyof APIRequests> = T extends "track" ? { audio: boolean } : T extends "playlist" | "album" | "artist" | "wave" | "search" ? { limit: number } : never;
 
 /**
  * @description Сырые типы данных для дальнейшего использования
@@ -423,7 +467,7 @@ export namespace RestClientSide {
          * @public
          */
         public get auth() {
-            return this._api.auth
+            return this._api.auth !== null;
         };
 
         /**
@@ -528,21 +572,68 @@ export namespace RestServerSide {
      * @public
      */
     export interface APIBase {
-        readonly name: APIs_names
-        readonly url: string
-        readonly color: number
+        /**
+         * @description Название платформы
+         */
+        readonly name: APIs_names;
+
+        /**
+         * @description Ссылка на платформу
+         */
+        readonly url: string;
+
+        /**
+         * @description Цвет платформы, в стиле discord
+         */
+        readonly color: number;
     }
 
     /**
      * @description Создаем класс для итоговой платформы для взаимодействия с APIs
-     * @interface API
+     * @class API
      * @public
      */
-    export interface API extends APIBase {
+    export class API implements APIBase {
+        /**
+         * @description Название платформы
+         */
+        readonly name: APIs_names;
+
+        /**
+         * @description Ссылка на платформу
+         */
+        readonly url: string;
+
+        /**
+         * @description Цвет платформы, в стиле discord
+         */
+        readonly color: number;
+
+        /**
+         * @description Может ли платформа получать аудио сама. Аудио получается через запрос к track
+         */
         readonly audio: boolean;
-        readonly auth: boolean;
+
+        /**
+         * @description Если ли данные для авторизации
+         * @default undefined - данные не требуются
+         */
+        readonly auth?: string;
+
+        /**
+         * @description Regexp для поиска платформы
+         */
         readonly filter: RegExp;
+
+        /**
+         * @description Запросы к данных платформы
+         */
         readonly requests: (RequestDef<"track"> | RequestDef<"search"> | RequestDef<"artist"> | RequestDef<"wave"> | RequestDef<"album"> | RequestDef<"playlist">)[];
+
+        /**
+         * @description Доп параметры
+         */
+        readonly options: any;
     }
 
     /**

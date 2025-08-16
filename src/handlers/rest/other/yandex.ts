@@ -1,5 +1,5 @@
-import { Assign, httpsClient, locale } from "#structures";
-import type { RestServerSide } from "#handler/rest";
+import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
+import { httpsClient, locale } from "#structures";
 import crypto from "node:crypto";
 import { env } from "#app/env";
 import { db } from "#app/db";
@@ -10,255 +10,228 @@ import { db } from "#app/db";
  * @class RestYandexAPI
  * @public
  */
-class RestYandexAPI extends Assign<RestServerSide.API> {
+@DeclareRest({
+    name: "YANDEX",
+    color: 16705372,
+    url: "music.yandex.ru",
+    audio: true,
+    auth: env.get<string>("token.yandex", null),
+    filter: /^(https?:\/\/)?(music\.)?(yandex\.ru)\/.+$/i
+})
+@OptionsRest({
     /**
-     * @description Данные для создания трека с этими данными
-     * @protected
-     * @static
-     */
-    protected static _platform: RestServerSide.APIBase = {
-        name: "YANDEX",
-        color: 16705372,
-        url: "music.yandex.ru",
-    };
-
-    /**
-     * @description Данные для создания запросов
+     * @description Ссылка на метод API
      * @protected
      */
-    protected static authorization = {
+    api: "https://api.music.yandex.net",
+})
+class RestYandexAPI extends RestServerSide.API {
+    readonly requests: RestServerSide.API["requests"] = [
         /**
-         * @description Ссылка на метод API
-         * @protected
+         * @description Запрос данных о треке
+         * @type "track"
          */
-        api: "https://api.music.yandex.net",
+        {
+            name: "track",
+            filter: /track\/[0-9]+/i,
+            execute: (url, options) => {
+                const ID = /track\/[0-9]+/gi.exec(url)[0]?.split("track")?.at(1);
 
-        /**
-         * @description Токен для авторизации
-         * @protected
-         */
-        token: env.get<string>("token.yandex", null)
-    };
+                return new Promise(async (resolve) => {
+                    // Если ID трека не удалось извлечь из ссылки
+                    if (!ID) return resolve(locale.err( "api.request.id.track"));
 
-    /**
-     * @description Создаем экземпляр запросов
-     * @constructor RestYandexAPI
-     * @public
-     */
-    public constructor() {
-        super({ ...RestYandexAPI._platform,
-            audio: true,
-            auth: !!RestYandexAPI.authorization.token,
-            filter: /^(https?:\/\/)?(music\.)?(yandex\.ru)\/.+$/i,
+                    // Интеграция с утилитой кеширования
+                    const cache = db.cache.get(`${this.url}/${ID}`);
 
-            requests: [
-                /**
-                 * @description Запрос данных о треке
-                 * @type "track"
-                 */
-                {
-                    name: "track",
-                    filter: /track\/[0-9]+/i,
-                    execute: (url, options) => {
-                        const ID = /track\/[0-9]+/gi.exec(url)[0]?.split("track")?.at(1);
+                    // Если трек есть в кеше
+                    if (cache) {
+                        if (!options.audio) return resolve(cache);
 
-                        return new Promise(async (resolve) => {
-                            // Если ID трека не удалось извлечь из ссылки
-                            if (!ID) return resolve(locale.err( "api.request.id.track"));
+                        // Если включена утилита кеширования аудио
+                        else if (db.cache.audio) {
+                            const check = db.cache.audio.status(`${this.url}/${ID}`);
 
-                            // Интеграция с утилитой кеширования
-                            const cache = db.cache.get(`${RestYandexAPI._platform.url}/${ID}`);
+                            // Если есть кеш аудио
+                            if (check.status === "ended") {
+                                cache.audio = check.path;
+                                return resolve(cache);
+                            }
+                        }
+                    }
 
-                            // Если трек есть в кеше
-                            if (cache) {
-                                if (!options.audio) return resolve(cache);
+                    try {
+                        // Делаем запрос
+                        const api = await this.API(`tracks/${ID}`);
 
-                                // Если включена утилита кеширования аудио
-                                else if (db.cache.audio) {
-                                    const check = db.cache.audio.status(`${RestYandexAPI._platform.url}/${ID}`);
+                        // Обрабатываем ошибки
+                        if (api instanceof Error) return resolve(api);
+                        else if (!api[0]) return resolve(locale.err( "api.request.fail"));
 
-                                    // Если есть кеш аудио
-                                    if (check.status === "ended") {
-                                        cache.audio = check.path;
-                                        return resolve(cache);
-                                    }
+                        const track = this.track(api[0]);
+
+                        // Если указано получение аудио
+                        if (options.audio) {
+                            // Если включена утилита кеширования
+                            if (db.cache.audio) {
+                                const check = db.cache.audio.status(`${this.url}/${ID}`);
+
+                                // Если есть кеш аудио
+                                if (check.status === "ended") {
+                                    track.audio = check.path;
+                                    return resolve(track);
                                 }
                             }
 
-                            try {
-                                // Делаем запрос
-                                const api = await RestYandexAPI.API(`tracks/${ID}`);
+                            const link = await this.getAudio(ID);
 
-                                // Обрабатываем ошибки
-                                if (api instanceof Error) return resolve(api);
-                                else if (!api[0]) return resolve(locale.err( "api.request.fail"));
+                            // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл
+                            if (link instanceof Error) return resolve(link);
+                            track["audio"] = link;
+                        }
 
-                                const track = RestYandexAPI.track(api[0]);
+                        setImmediate(() => {
+                            // Сохраняем кеш в системе
+                            if (!cache) db.cache.set(track, this.url);
+                        });
 
-                                // Если указано получение аудио
-                                if (options.audio) {
-                                    // Если включена утилита кеширования
-                                    if (db.cache.audio) {
-                                        const check = db.cache.audio.status(`${RestYandexAPI._platform.url}/${ID}`);
+                        return resolve(track);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs]: ${e}`))
+                    }
+                });
+            }
+        },
 
-                                        // Если есть кеш аудио
-                                        if (check.status === "ended") {
-                                            track.audio = check.path;
-                                            return resolve(track);
-                                        }
-                                    }
+        /**
+         * @description Запрос данных об альбоме
+         * @type "album"
+         */
+        {
+            name: "album",
+            filter: /(album)\/[0-9]+/i,
+            execute: (url, {limit}) => {
+                const ID = /[0-9]+/i.exec(url)?.at(0)?.split("album")?.at(0);
 
-                                    const link = await RestYandexAPI.getAudio(ID);
+                return new Promise(async (resolve) => {
+                    // Если ID альбома не удалось извлечь из ссылки
+                    if (!ID) return resolve(locale.err( "api.request.id.album"));
 
-                                    // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл
-                                    if (link instanceof Error) return resolve(link);
-                                    track["audio"] = link;
-                                }
+                    try {
+                        // Создаем запрос
+                        const api = await this.API(`albums/${ID}/with-tracks`);
 
-                                setImmediate(() => {
-                                    // Сохраняем кеш в системе
-                                    if (!cache) db.cache.set(track, RestYandexAPI._platform.url);
-                                });
+                        // Если запрос выдал ошибку то
+                        if (api instanceof Error) return resolve(api);
+                        else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return resolve(locale.err("api.request.fail"));
 
-                                return resolve(track);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
+                        const AlbumImage = this.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
+                        const tracks = api["volumes"]?.pop().splice(0, limit);
+                        const songs = tracks.map(this.track);
+
+                        return resolve({url, title: api.title, image: AlbumImage, items: songs});
+                    } catch (e) {
+                        return resolve(Error(`[APIs]: ${e}`))
+                    }
+                });
+            }
+        },
+
+        /**
+         * @description Запрос данных об плейлисте
+         * @type "playlist"
+         */
+        {
+            name: "playlist",
+            filter: /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/i,
+            execute: (url, {limit}) => {
+                const ID = /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/i.exec(url);
+
+                return new Promise(async (resolve) => {
+                    if (!ID[1]) return resolve(locale.err("api.request.id.author"));
+                    else if (!ID[2]) return resolve(locale.err("api.request.id.playlist"));
+
+                    try {
+                        // Создаем запрос
+                        const api = await this.API(ID[0]);
+
+                        // Если запрос выдал ошибку то
+                        if (api instanceof Error) return resolve(api);
+                        else if (api?.tracks?.length === 0) return resolve(locale.err("api.request.fail.msg", ["Not found tracks in playlist"]));
+
+                        const image = this.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
+                        const tracks: any[] = api.tracks?.splice(0, limit);
+                        const songs = tracks.map(({track}) => this.track(track));
+
+                        return resolve({
+                            url, title: api.title, image: image, items: songs,
+                            artist: {
+                                title: api.owner.name,
+                                url: `https://music.yandex.ru/users/${ID[1]}`
                             }
                         });
+                    } catch (e) {
+                        return resolve(Error(`[APIs]: ${e}`))
                     }
-                },
+                });
+            }
+        },
 
-                /**
-                 * @description Запрос данных об альбоме
-                 * @type "album"
-                 */
-                {
-                    name: "album",
-                    filter: /(album)\/[0-9]+/i,
-                    execute: (url, {limit}) => {
-                        const ID = /[0-9]+/i.exec(url)?.at(0)?.split("album")?.at(0);
+        /**
+         * @description Запрос данных треков артиста
+         * @type "artist"
+         */
+        {
+            name: "artist",
+            filter: /(artist)\/[0-9]+/i,
+            execute: (url, {limit}) => {
+                const ID = /(artist)\/[0-9]+/i.exec(url)?.at(0)?.split("artist")?.at(0);
 
-                        return new Promise(async (resolve) => {
-                            // Если ID альбома не удалось извлечь из ссылки
-                            if (!ID) return resolve(locale.err( "api.request.id.album"));
+                return new Promise(async (resolve) => {
+                    // Если ID автора не удалось извлечь из ссылки
+                    if (!ID) return resolve(locale.err("api.request.id.author"));
 
-                            try {
-                                // Создаем запрос
-                                const api = await RestYandexAPI.API(`albums/${ID}/with-tracks`);
+                    try {
+                        // Создаем запрос
+                        const api = await this.API(`artists/${ID}/tracks`);
 
-                                // Если запрос выдал ошибку то
-                                if (api instanceof Error) return resolve(api);
-                                else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return resolve(locale.err("api.request.fail"));
+                        // Если запрос выдал ошибку то
+                        if (api instanceof Error) return resolve(api);
+                        const tracks = api.tracks.splice(0, limit).map(this.track);
 
-                                const AlbumImage = RestYandexAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
-                                const tracks = api["volumes"]?.pop().splice(0, limit);
-                                const songs = tracks.map(RestYandexAPI.track);
-
-                                return resolve({url, title: api.title, image: AlbumImage, items: songs});
-                            } catch (e) {
-                                return resolve(Error(`[APIs]: ${e}`))
-                            }
-                        });
+                        return resolve(tracks);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs]: ${e}`))
                     }
-                },
+                });
+            }
+        },
 
-                /**
-                 * @description Запрос данных об плейлисте
-                 * @type "playlist"
-                 */
-                {
-                    name: "playlist",
-                    filter: /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/i,
-                    execute: (url, {limit}) => {
-                        const ID = /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/i.exec(url);
+        /**
+         * @description Запрос данных по поиску
+         * @type search
+         */
+        {
+            name: "search",
+            execute: (query , {limit}) => {
+                return new Promise(async (resolve) => {
+                    try {
+                        // Создаем запрос
+                        const api = await this.API(`search?type=all&text=${encodeURIComponent(query)}&page=0&nococrrect=false`);
 
-                        return new Promise(async (resolve) => {
-                            if (!ID[1]) return resolve(locale.err("api.request.id.author"));
-                            else if (!ID[2]) return resolve(locale.err("api.request.id.playlist"));
+                        // Обрабатываем ошибки
+                        if (api instanceof Error) return resolve(api);
+                        else if (!api.tracks) return resolve([]);
 
-                            try {
-                                // Создаем запрос
-                                const api = await RestYandexAPI.API(ID[0]);
-
-                                // Если запрос выдал ошибку то
-                                if (api instanceof Error) return resolve(api);
-                                else if (api?.tracks?.length === 0) return resolve(locale.err("api.request.fail.msg", ["Not found tracks in playlist"]));
-
-                                const image = RestYandexAPI.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
-                                const tracks: any[] = api.tracks?.splice(0, limit);
-                                const songs = tracks.map(({track}) => RestYandexAPI.track(track));
-
-                                return resolve({
-                                    url, title: api.title, image: image, items: songs,
-                                    artist: {
-                                        title: api.owner.name,
-                                        url: `https://music.yandex.ru/users/${ID[1]}`
-                                    }
-                                });
-                            } catch (e) {
-                                return resolve(Error(`[APIs]: ${e}`))
-                            }
-                        });
+                        const tracks = api.tracks["results"].splice(0, limit).map(this.track);
+                        return resolve(tracks);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs]: ${e}`))
                     }
-                },
-
-                /**
-                 * @description Запрос данных треков артиста
-                 * @type "artist"
-                 */
-                {
-                    name: "artist",
-                    filter: /(artist)\/[0-9]+/i,
-                    execute: (url, {limit}) => {
-                        const ID = /(artist)\/[0-9]+/i.exec(url)?.at(0)?.split("artist")?.at(0);
-
-                        return new Promise(async (resolve) => {
-                            // Если ID автора не удалось извлечь из ссылки
-                            if (!ID) return resolve(locale.err("api.request.id.author"));
-
-                            try {
-                                // Создаем запрос
-                                const api = await RestYandexAPI.API(`artists/${ID}/tracks`);
-
-                                // Если запрос выдал ошибку то
-                                if (api instanceof Error) return resolve(api);
-                                const tracks = api.tracks.splice(0, limit).map(RestYandexAPI.track);
-
-                                return resolve(tracks);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
-                            }
-                        });
-                    }
-                },
-
-                /**
-                 * @description Запрос данных по поиску
-                 * @type search
-                 */
-                {
-                    name: "search",
-                    execute: (query , {limit}) => {
-                        return new Promise(async (resolve) => {
-                            try {
-                                // Создаем запрос
-                                const api = await RestYandexAPI.API(`search?type=all&text=${encodeURIComponent(query)}&page=0&nococrrect=false`);
-
-                                // Обрабатываем ошибки
-                                if (api instanceof Error) return resolve(api);
-                                else if (!api.tracks) return resolve([]);
-
-                                const tracks = api.tracks["results"].splice(0, limit).map(RestYandexAPI.track);
-                                return resolve(tracks);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
-                            }
-                        });
-                    }
-                }
-            ]
-        });
-    };
+                });
+            }
+        }
+    ];
 
     /**
      * @description Делаем запрос на {data.api}/methods
@@ -266,12 +239,12 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static API = (method: string): Promise<json> => {
+    protected API = (method: string): Promise<json> => {
         return new Promise<any | Error>((resolve) => {
             new httpsClient({
-                url: `${this.authorization.api}/${method}`,
+                url: `${this.options.api}/${method}`,
                 headers: {
-                    "Authorization": "OAuth " + this.authorization.token
+                    "Authorization": "OAuth " + this.auth
                 },
                 method: "GET",
             }).toJson.then((req) => {
@@ -294,8 +267,7 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-
-    protected static getAudio = (ID: string): Promise<string | Error> => {
+    protected getAudio = (ID: string): Promise<string | Error> => {
         return new Promise<string | Error>(async (resolve) => {
             try {
                 const api = await this.API(`tracks/${ID}/download-info`);
@@ -334,7 +306,7 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static parseImage = ({image, size = 1e3}: { image: string, size?: number }): {url: string, width?: number, height?: number} => {
+    protected parseImage = ({image, size = 1e3}: { image: string, size?: number }): {url: string, width?: number, height?: number} => {
         if (!image) return { url: "" };
 
         return {
@@ -349,7 +321,7 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static track = (track: any) => {
+    protected track = (track: any) => {
         const author = track["artists"]?.length ? track["artists"]?.pop() : track["artists"];
         const album = track["albums"]?.length ? track["albums"][0] : track["albums"];
 
@@ -357,13 +329,12 @@ class RestYandexAPI extends Assign<RestServerSide.API> {
             id: `${album.id}_${track.id}`,
             title: `${track?.title ?? track?.name}` + (track.version ? ` - ${track.version}` : ""),
             image: this.parseImage({image: track?.["ogImage"] || track?.["coverUri"]}) ?? null,
-            url: `https://music.yandex.ru/album/${album.id}/track/${track.id}`,
-            //@ts-ignore
+            url: `https://${this.url}/album/${album.id}/track/${track.id}`,
             time: { total: (track["durationMs"] / 1000).toFixed(0) ?? "250" as any },
 
             artist: track.author ?? {
                 title: author?.name,
-                url: `https://music.yandex.ru/artist/${author.id}`,
+                url: `https://${this.url}/artist/${author.id}`,
                 image: this.parseImage({image: author?.["ogImage"] ?? author?.["coverUri"]}) ?? null
             },
             audio: null

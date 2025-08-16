@@ -1,5 +1,5 @@
-import { Assign, httpsClient, locale } from "#structures";
-import type { RestServerSide } from "#handler/rest";
+import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
+import { httpsClient, locale } from "#structures";
 
 /**
  * @author SNIPPIK
@@ -7,181 +7,159 @@ import type { RestServerSide } from "#handler/rest";
  * @class RestDeezerAPI
  * @public
  */
-class RestDeezerAPI extends Assign<RestServerSide.API> {
+@DeclareRest({
+    name: "DEEZER",
+    color: 7419530,
+    url: "www.deezer.com",
+    audio: false,
+    filter: /^(https?:\/\/)?(www\.)?(deezer\.com)\/.+$/i,
+})
+@OptionsRest({
     /**
-     * @description Данные для создания трека с этими данными
-     * @protected
-     * @static
-     */
-    protected static _platform: RestServerSide.APIBase = {
-        name: "DEEZER",
-        color: 7419530,
-        url: "www.deezer.com",
-    };
-
-    /**
-     * @description Данные для создания запросов
+     * @description Ссылка на метод API
      * @protected
      */
-    protected static authorization = {
+    api: "https://api.deezer.com"
+})
+class RestDeezerAPI extends RestServerSide.API {
+    readonly requests: RestServerSide.API["requests"] = [
         /**
-         * @description Ссылка на метод API
-         * @protected
+         * @description Запрос данных об альбоме
+         * @type "album"
          */
-        api: "https://api.deezer.com"
-    };
+        {
+            name: "album",
+            filter: /(album)\/[0-9]+/i,
+            execute: (url, {limit}) => {
+                const ID = /[0-9]+/i.exec(url)?.at(0)?.split("album")?.at(0);
 
-    /**
-     * @description Создаем экземпляр запросов
-     * @constructor RestYandexAPI
-     * @public
-     */
-    public constructor() {
-        super({ ...RestDeezerAPI._platform,
-            audio: false,
-            auth: true,
-            filter: /^(https?:\/\/)?(www\.)?(deezer\.com)\/.+$/i,
+                return new Promise(async (resolve) => {
+                    // Если ID альбома не удалось извлечь из ссылки
+                    if (!ID) return resolve(locale.err( "api.request.id.album"));
 
-            requests: [
-                /**
-                 * @description Запрос данных об альбоме
-                 * @type "album"
-                 */
-                {
-                    name: "album",
-                    filter: /(album)\/[0-9]+/i,
-                    execute: (url, {limit}) => {
-                        const ID = /[0-9]+/i.exec(url)?.at(0)?.split("album")?.at(0);
+                    try {
+                        // Создаем запрос
+                        const api = await this.API(`album/${ID}`);
 
-                        return new Promise(async (resolve) => {
-                            // Если ID альбома не удалось извлечь из ссылки
-                            if (!ID) return resolve(locale.err( "api.request.id.album"));
+                        // Если запрос выдал ошибку то
+                        if (api instanceof Error) return resolve(api);
 
-                            try {
-                                // Создаем запрос
-                                const api = await RestDeezerAPI.API(`album/${ID}`);
+                        const tracks = api.tracks.data.splice(0, limit);
+                        const songs = tracks.map(this.track);
 
-                                // Если запрос выдал ошибку то
-                                if (api instanceof Error) return resolve(api);
-
-                                const tracks = api.tracks.data.splice(0, limit);
-                                const songs = tracks.map(RestDeezerAPI.track);
-
-                                return resolve({
-                                    url,
-                                    title: api.title,
-                                    items: songs,
-                                    image: {
-                                        url: api.cover_xl
-                                    }
-                                });
-                            } catch (e) {
-                                return resolve(Error(`[APIs]: ${e}`))
+                        return resolve({
+                            url,
+                            title: api.title,
+                            items: songs,
+                            image: {
+                                url: api.cover_xl
                             }
                         });
+                    } catch (e) {
+                        return resolve(Error(`[APIs]: ${e}`))
                     }
-                },
+                });
+            }
+        },
 
-                /**
-                 * @description Запрос данных об плейлисте
-                 * @type "playlist"
-                 */
-                {
-                    name: "playlist",
-                    filter: /(playlist)\/[0-9]+/i,
-                    execute: (url, {limit}) => {
-                        const ID = /[0-9]+/i.exec(url).pop();
+        /**
+         * @description Запрос данных об плейлисте
+         * @type "playlist"
+         */
+        {
+            name: "playlist",
+            filter: /(playlist)\/[0-9]+/i,
+            execute: (url, {limit}) => {
+                const ID = /[0-9]+/i.exec(url).pop();
 
-                        return new Promise(async (resolve) => {
-                            if (!ID) return resolve(locale.err("api.request.id.playlist"));
+                return new Promise(async (resolve) => {
+                    if (!ID) return resolve(locale.err("api.request.id.playlist"));
 
-                            try {
-                                // Создаем запрос
-                                const api = await RestDeezerAPI.API(`playlist/${ID}`);
+                    try {
+                        // Создаем запрос
+                        const api = await this.API(`playlist/${ID}`);
 
-                                // Если запрос выдал ошибку то
-                                if (api instanceof Error) return resolve(api);
-                                else if (api?.tracks?.data?.length === 0) return resolve(locale.err("api.request.fail.msg", ["Not found tracks in playlist"]));
+                        // Если запрос выдал ошибку то
+                        if (api instanceof Error) return resolve(api);
+                        else if (api?.tracks?.data?.length === 0) return resolve(locale.err("api.request.fail.msg", ["Not found tracks in playlist"]));
 
-                                const tracks: any[] = api.tracks.data?.splice(0, limit);
-                                const songs = tracks.map(RestDeezerAPI.track);
+                        const tracks: any[] = api.tracks.data?.splice(0, limit);
+                        const songs = tracks.map(this.track);
 
-                                return resolve({
-                                    url,
-                                    title: api.title,
-                                    image: {
-                                        url: api.picture_xl
-                                    },
-                                    items: songs,
-                                    artist: {
-                                        title: api.creator.name,
-                                        url: `https://${RestDeezerAPI._platform.url}/${api.creator.type === "user" ? "profile" : "artist"}/${api.creator.id}`
-                                    }
-                                });
-                            } catch (e) {
-                                return resolve(Error(`[APIs]: ${e}`))
+                        return resolve({
+                            url,
+                            title: api.title,
+                            image: {
+                                url: api.picture_xl
+                            },
+                            items: songs,
+                            artist: {
+                                title: api.creator.name,
+                                url: `https://${this.url}/${api.creator.type === "user" ? "profile" : "artist"}/${api.creator.id}`
                             }
                         });
+                    } catch (e) {
+                        return resolve(Error(`[APIs]: ${e}`))
                     }
-                },
+                });
+            }
+        },
 
-                /**
-                 * @description Запрос данных треков артиста
-                 * @type "artist"
-                 */
-                {
-                    name: "artist",
-                    filter: /(artist)\/[0-9]+/i,
-                    execute: (url, {limit}) => {
-                        const ID = /(artist)\/[0-9]+/i.exec(url)?.at(0)?.split("artist")?.at(0);
+        /**
+         * @description Запрос данных треков артиста
+         * @type "artist"
+         */
+        {
+            name: "artist",
+            filter: /(artist)\/[0-9]+/i,
+            execute: (url, {limit}) => {
+                const ID = /(artist)\/[0-9]+/i.exec(url)?.at(0)?.split("artist")?.at(0);
 
-                        return new Promise(async (resolve) => {
-                            // Если ID автора не удалось извлечь из ссылки
-                            if (!ID) return resolve(locale.err("api.request.id.author"));
+                return new Promise(async (resolve) => {
+                    // Если ID автора не удалось извлечь из ссылки
+                    if (!ID) return resolve(locale.err("api.request.id.author"));
 
-                            try {
-                                // Создаем запрос
-                                const api = await RestDeezerAPI.API(`artist/${ID}/top`);
+                    try {
+                        // Создаем запрос
+                        const api = await this.API(`artist/${ID}/top`);
 
-                                // Если запрос выдал ошибку то
-                                if (api instanceof Error) return resolve(api);
-                                const tracks = api.data.splice(0, limit).map(RestDeezerAPI.track);
+                        // Если запрос выдал ошибку то
+                        if (api instanceof Error) return resolve(api);
+                        const tracks = api.data.splice(0, limit).map(this.track);
 
-                                return resolve(tracks);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
-                            }
-                        });
+                        return resolve(tracks);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs]: ${e}`))
                     }
-                },
+                });
+            }
+        },
 
-                /**
-                 * @description Запрос данных по поиску
-                 * @type search
-                 */
-                {
-                    name: "search",
-                    execute: (query , {limit}) => {
-                        return new Promise(async (resolve) => {
-                            try {
-                                // Создаем запрос
-                                const api = await RestDeezerAPI.API(`search?q=${encodeURIComponent(query)}`);
+        /**
+         * @description Запрос данных по поиску
+         * @type search
+         */
+        {
+            name: "search",
+            execute: (query , {limit}) => {
+                return new Promise(async (resolve) => {
+                    try {
+                        // Создаем запрос
+                        const api = await this.API(`search?q=${encodeURIComponent(query)}`);
 
-                                // Обрабатываем ошибки
-                                if (api instanceof Error) return resolve(api);
-                                else if (!api.data) return resolve([]);
+                        // Обрабатываем ошибки
+                        if (api instanceof Error) return resolve(api);
+                        else if (!api.data) return resolve([]);
 
-                                const tracks = api.data.splice(0, limit).map(RestDeezerAPI.track);
-                                return resolve(tracks);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
-                            }
-                        });
+                        const tracks = api.data.splice(0, limit).map(this.track);
+                        return resolve(tracks);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs]: ${e}`))
                     }
-                }
-            ]
-        });
-    };
+                });
+            }
+        }
+    ];
 
     /**
      * @description Делаем запрос на {data.api}/methods
@@ -189,10 +167,10 @@ class RestDeezerAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static API = (method: string): Promise<json> => {
+    protected API = (method: string): Promise<json> => {
         return new Promise<any | Error>((resolve) => {
             new httpsClient({
-                url: `${this.authorization.api}/${method}`,
+                url: `${this.options.api}/${method}`,
                 method: "GET",
             }).toJson.then((req) => {
                 // Если на этапе получение данных получена одна из ошибок
@@ -210,7 +188,7 @@ class RestDeezerAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static track = (track: any) => {
+    protected track = (track: any) => {
         const author = track["artist"]?.length ? track["artist"]?.pop() : track["artist"];
         const album = track["album"]?.length ? track["album"][0] : track["album"];
 
@@ -218,12 +196,12 @@ class RestDeezerAPI extends Assign<RestServerSide.API> {
             id: track.id,
             title: track?.title,
             image: {url: track.cover_xl ?? track.album.cover_xl},
-            url: `https://${this._platform.url}/album/${album.id}/track/${track.id}`,
+            url: `https://${this.url}/album/${album.id}/track/${track.id}`,
             time: { total: `${track["duration"]}` },
 
             artist: track.author ?? {
                 title: author?.name,
-                url: `https://${this._platform.url}/artist/${author.id}`
+                url: `https://${this.url}/artist/${author.id}`
             }
         };
     };

@@ -1,5 +1,5 @@
-import { Assign, httpsClient, locale } from "#structures";
-import type { RestServerSide } from "#handler/rest";
+import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
+import { httpsClient, locale } from "#structures";
 import { Track } from "#core/queue";
 import { env } from "#app/env";
 import { db } from "#app/db";
@@ -10,146 +10,119 @@ import { db } from "#app/db";
  * @class RestVKAPI
  * @public
  */
-class RestVKAPI extends Assign<RestServerSide.API> {
+@DeclareRest({
+    name: "VK",
+    color: 30719,
+    url: "vk.com",
+    audio: true,
+    auth: env.get("token.vk", null),
+    filter: /^(https?:\/\/)?(vk\.com)\/.+$/i
+})
+@OptionsRest({
     /**
-     * @description Данные для создания трека с этими данными
-     * @protected
-     * @static
-     */
-    protected static _platform: RestServerSide.APIBase = {
-        name: "VK",
-        color: 30719,
-        url: "vk.com",
-    };
-
-    /**
-     * @description Данные для создания запросов
+     * @description Ссылка на метод API
      * @protected
      */
-    protected static authorization = {
+    api: "https://api.vk.com/method"
+})
+class RestVKAPI extends RestServerSide.API {
+    readonly requests: RestServerSide.API["requests"] = [
         /**
-         * @description Ссылка на метод API
-         * @protected
+         * @description Запрос данных о треке
+         * @type "track"
          */
-        api: "https://api.vk.com/method",
+        {
+            name: "track",
+            filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i,
+            execute: (url, options) => {
+                const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i.exec(url).pop();
 
-        /**
-         * @description Токен для авторизации
-         * @protected
-         */
-        token: env.get("token.vk", null)
-    };
+                return new Promise(async (resolve) => {
+                    //Если ID трека не удалось извлечь из ссылки
+                    if (!ID) return resolve(locale.err( "api.request.id.track"));
 
-    /**
-     * @description Создаем экземпляр запросов
-     * @constructor RestVKAPI
-     * @public
-     */
-    public constructor() {
-        super({...RestVKAPI._platform,
-            audio: true,
-            auth: !!RestVKAPI.authorization.token,
-            filter: /^(https?:\/\/)?(vk\.com)\/.+$/i,
+                    // Интеграция с утилитой кеширования
+                    const cache = db.cache.get(`${this.url}/${ID}`);
 
-            requests: [
-                /**
-                 * @description Запрос данных о треке
-                 * @type "track"
-                 */
-                {
-                    name: "track",
-                    filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i,
-                    execute: (url, options) => {
-                        const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i.exec(url).pop();
+                    // Если трек есть в кеше
+                    if (cache) {
+                        if (!options.audio) return resolve(cache);
 
-                        return new Promise(async (resolve) => {
-                            //Если ID трека не удалось извлечь из ссылки
-                            if (!ID) return resolve(locale.err( "api.request.id.track"));
+                        // Если включена утилита кеширования аудио
+                        else if (db.cache.audio) {
+                            const check = db.cache.audio.status(`${this.url}/${ID}`);
 
-                            // Интеграция с утилитой кеширования
-                            const cache = db.cache.get(`${RestVKAPI._platform.url}/${ID}`);
+                            // Если есть кеш аудио
+                            if (check.status === "ended") {
+                                cache.audio = check.path;
+                                return resolve(cache);
+                            }
+                        }
+                    }
 
-                            // Если трек есть в кеше
-                            if (cache) {
-                                if (!options.audio) return resolve(cache);
+                    try {
+                        // Создаем запрос
+                        const api = await this.API("audio", "getById", `&audios=${ID}`);
 
-                                // Если включена утилита кеширования аудио
-                                else if (db.cache.audio) {
-                                    const check = db.cache.audio.status(`${RestVKAPI._platform.url}/${ID}`);
+                        // Если запрос выдал ошибку то
+                        if (api instanceof Error) return resolve(api);
 
-                                    // Если есть кеш аудио
-                                    if (check.status === "ended") {
-                                        cache.audio = check.path;
-                                        return resolve(cache);
-                                    }
+                        const track = this.track(api.response.pop(), url);
+
+                        // Если указано получение аудио
+                        if (options.audio) {
+                            // Если включена утилита кеширования
+                            if (db.cache.audio) {
+                                const check = db.cache.audio.status(`${this.url}/${ID}`);
+
+                                // Если есть кеш аудио
+                                if (check.status === "ended") {
+                                    track.audio = check.path;
+                                    return resolve(track);
                                 }
                             }
+                        }
 
-                            try {
-                                // Создаем запрос
-                                const api = await RestVKAPI.API("audio", "getById", `&audios=${ID}`);
+                        // Если нет ссылки на трек
+                        if (!track.audio) return resolve(locale.err( "api.request.fail"));
 
-                                // Если запрос выдал ошибку то
-                                if (api instanceof Error) return resolve(api);
-
-                                const track = RestVKAPI.track(api.response.pop(), url);
-
-                                // Если указано получение аудио
-                                if (options.audio) {
-                                    // Если включена утилита кеширования
-                                    if (db.cache.audio) {
-                                        const check = db.cache.audio.status(`${RestVKAPI._platform.url}/${ID}`);
-
-                                        // Если есть кеш аудио
-                                        if (check.status === "ended") {
-                                            track.audio = check.path;
-                                            return resolve(track);
-                                        }
-                                    }
-                                }
-
-                                // Если нет ссылки на трек
-                                if (!track.audio) return resolve(locale.err( "api.request.fail"));
-
-                                setImmediate(() => {
-                                    // Сохраняем кеш в системе
-                                    if (!cache) db.cache.set(track, RestVKAPI._platform.url);
-                                });
-
-                                return resolve(track);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
-                            }
+                        setImmediate(() => {
+                            // Сохраняем кеш в системе
+                            if (!cache) db.cache.set(track, this.url);
                         });
+
+                        return resolve(track);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs]: ${e}`))
                     }
-                },
+                });
+            }
+        },
 
-                /**
-                 * @description Запрос данных по поиску
-                 * @type "search"
-                 */
-                {
-                    name: "search",
-                    execute: (query, {limit}) => {
-                        return new Promise(async (resolve) => {
-                            try {
-                                // Создаем запрос
-                                const api = await RestVKAPI.API("audio", "search", `&q=${encodeURIComponent(query)}`);
+        /**
+         * @description Запрос данных по поиску
+         * @type "search"
+         */
+        {
+            name: "search",
+            execute: (query, {limit}) => {
+                return new Promise(async (resolve) => {
+                    try {
+                        // Создаем запрос
+                        const api = await this.API("audio", "search", `&q=${encodeURIComponent(query)}`);
 
-                                // Если запрос выдал ошибку то
-                                if (api instanceof Error) return resolve(api);
-                                const tracks = (api.response.items.splice(0, limit)).map((track: any) => RestVKAPI.track(track));
+                        // Если запрос выдал ошибку то
+                        if (api instanceof Error) return resolve(api);
+                        const tracks = (api.response.items.splice(0, limit)).map(this.track);
 
-                                return resolve(tracks);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
-                            }
-                        });
+                        return resolve(tracks);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs]: ${e}`))
                     }
-                }
-            ]
-        });
-    };
+                });
+            }
+        }
+    ];
 
     /**
      * @description Делаем запрос к VK API
@@ -159,9 +132,9 @@ class RestVKAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static API = (method: "audio" | "execute" | "catalog", type: "getById" | "search" | "getPlaylistById", options: string): Promise<json | Error> => {
+    protected API = (method: "audio" | "execute" | "catalog", type: "getById" | "search" | "getPlaylistById", options: string): Promise<json | Error> => {
         return new Promise((resolve) => {
-            const url = `${this.authorization.api}/${method}.${type}` + `?access_token=${this.authorization.token}${options}&v=5.95`;
+            const url = `${this.options.api}/${method}.${type}` + `?access_token=${this.auth}${options}&v=5.95`;
 
             new httpsClient({
                 url
@@ -184,7 +157,7 @@ class RestVKAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static track = (track: json, url: string = null) => {
+    protected track = (track: json, url: string = null) => {
         const image = track?.album?.["thumb"];
 
         return {
@@ -204,7 +177,7 @@ class RestVKAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static author = (user: any): Track.artist => {
+    protected author = (user: any): Track.artist => {
         const url = `https://vk.com/audio?performer=1&q=${user.artist.replaceAll(" ", "").toLowerCase()}`;
 
         return { url, title: user.artist };

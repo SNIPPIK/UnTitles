@@ -1,5 +1,5 @@
-import { Assign, httpsClient, locale } from "#structures";
-import { RestServerSide } from "#handler/rest";
+import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
+import { httpsClient, locale } from "#structures";
 import { env } from "#app/env";
 
 /**
@@ -9,167 +9,139 @@ import { env } from "#app/env";
  * @extends Assign
  * @public
  */
-class RestSoundCloudAPI extends Assign<RestServerSide.API> {
+@DeclareRest({
+    name: "SOUNDCLOUD",
+    url: "soundcloud.com",
+    color: 15105570,
+    audio: true,
+    auth: env.get("token.soundcloud", null),
+    filter: /^(?:(https?):\/\/)?(?:(?:www|m)\.)?(api\.soundcloud\.com|soundcloud\.com|snd\.sc)\/(.*)$/,
+})
+@OptionsRest({
     /**
-     * @description Данные для создания трека с этими данными
-     * @protected
-     * @static
-     */
-    protected static _platform: RestServerSide.APIBase = {
-        name: "SOUNDCLOUD",
-        url: "soundcloud.com",
-        color: 15105570
-    };
-
-    /**
-     * @description Данные для создания запросов
+     * @description Ссылка для работы API
      * @protected
      */
-    protected static authorization = {
+    api: "https://api-v2.soundcloud.com",
+})
+class RestSoundCloudAPI extends RestServerSide.API {
+    readonly requests: RestServerSide.API["requests"] = [
         /**
-         * @description Ссылки для работы API
-         * @protected
+         * @description Запрос данных о треке
+         * @type "track"
          */
-        api: "https://api-v2.soundcloud.com",
+        {
+            name: "track",
+            filter: /^https?:\/\/soundcloud\.com\/([\w-]+)\/?([\w-]+)(?:\?.*)?$/i,
+            execute: (url, options) => {
+                const fixed = url.split("?")[0];
+
+                return new Promise(async (resolve) => {
+                    try {
+                        // Создаем запрос
+                        const request = await this.API(`resolve?url=${fixed}`);
+
+                        // Если запрос выдал ошибку то
+                        if (request instanceof Error) return resolve(request);
+
+                        const {api, ClientID} = request;
+
+                        // Если был найден трек
+                        if (api.kind === "track") {
+                            const track = this.track(api);
+
+                            // Если указано получение аудио
+                            if (options.audio) {
+                                if (api.media.transcodings) {
+                                    // Расшифровываем аудио формат
+                                    track.audio = await this.getFormat(api.media.transcodings, ClientID);
+                                }
+                            }
+
+                            return resolve(track);
+                        }
+                        return resolve(null);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs/track]: ${e}`))
+                    }
+                });
+            }
+        },
 
         /**
-         * @description Данные для авторизации
-         * @protected
+         * @description Запрос данных о треке
+         * @type "playlist"
          */
-        token: env.get("token.soundcloud", null),
-    };
+        {
+            name: "playlist",
+            filter: /sets\/[a-zA-Z0-9]+/i,
+            execute: (url, {limit}) => {
+                const fixed = url.split("?")[0];
 
-    /**
-     * @description Создаем экземпляр запросов
-     * @constructor RestSoundCloudAPI
-     * @public
-     */
-    public constructor() {
-        super({
-            ...RestSoundCloudAPI._platform,
-            audio: true,
-            auth: !!RestSoundCloudAPI.authorization.token,
-            filter: /^(?:(https?):\/\/)?(?:(?:www|m)\.)?(api\.soundcloud\.com|soundcloud\.com|snd\.sc)\/(.*)$/,
+                return new Promise(async (resolve) => {
+                    try {
+                        // Создаем запрос
+                        const request = await this.API(`resolve?url=${fixed}`);
 
-            requests: [
-                /**
-                 * @description Запрос данных о треке
-                 * @type "track"
-                 */
-                {
-                    name: "track",
-                    filter: /^https?:\/\/soundcloud\.com\/([\w-]+)\/?([\w-]+)(?:\?.*)?$/i, // https://soundcloud.com/neffexmusic/neffex-save-a-life-
-                    execute: (url, options) => {
-                        const fixed = url.split("?")[0];
+                        // Если запрос выдал ошибку то
+                        if (request instanceof Error) return resolve(request);
 
-                        return new Promise(async (resolve) => {
-                            try {
-                                // Создаем запрос
-                                const request = await RestSoundCloudAPI.API(`resolve?url=${fixed}`);
+                        const { api } = request;
 
-                                // Если запрос выдал ошибку то
-                                if (request instanceof Error) return resolve(request);
+                        // Если был найден плейлист
+                        if (api.kind === "playlist") {
+                            // Если SoundCloud нас обманул со ссылкой, есть нет <result>.tracks, то это просто трек!
+                            if (!api.tracks) return resolve(null);
 
-                                const {api, ClientID} = request;
+                            // Все доступные треки в плейлисте
+                            const items = api.tracks.filter((i) => i["permalink_url"]).splice(0, limit).map(this.track);
 
-                                // Если был найден трек
-                                if (api.kind === "track") {
-                                    const track = RestSoundCloudAPI.track(api);
-
-                                    // Если указано получение аудио
-                                    if (options.audio) {
-                                        if (api.media.transcodings) {
-                                            // Расшифровываем аудио формат
-                                            track.audio = await RestSoundCloudAPI.getFormat(api.media.transcodings, ClientID);
-                                        }
-                                    }
-
-                                    return resolve(track);
-                                }
-                                return resolve(null);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs/track]: ${e}`))
-                            }
-                        });
+                            return resolve({
+                                url,
+                                title: api.title,
+                                artist: {
+                                    url: api.user.permalink_url,
+                                    title: api.user.username,
+                                    image: api.user.avatar_url,
+                                },
+                                image: api.artwork_url,
+                                items
+                            });
+                        }
+                        return resolve(null);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs/playlist]: ${e}`))
                     }
-                },
+                });
+            }
+        },
 
-                /**
-                 * @description Запрос данных о треке
-                 * @type "playlist"
-                 */
-                {
-                    name: "playlist",
-                    filter: /sets\/[a-zA-Z0-9]+/i,
-                    execute: (url, {limit}) => {
-                        const fixed = url.split("?")[0];
+        /**
+         * @description Запрос данных о треке
+         * @type "search"
+         */
+        {
+            name: "search",
+            execute: (query, options) => {
+                return new Promise(async (resolve) => {
+                    try {
+                        // Создаем запрос
+                        const request = await this.API(`search/tracks?q=${encodeURIComponent(query)}&limit=${options.limit}`);
 
-                        return new Promise(async (resolve) => {
-                            try {
-                                // Создаем запрос
-                                const request = await RestSoundCloudAPI.API(`resolve?url=${fixed}`);
+                        // Если запрос выдал ошибку то
+                        if (request instanceof Error) return resolve(request);
 
-                                // Если запрос выдал ошибку то
-                                if (request instanceof Error) return resolve(request);
+                        const {api} = request;
 
-                                const { api } = request;
-
-                                // Если был найден плейлист
-                                if (api.kind === "playlist") {
-                                    // Если SoundCloud нас обманул со ссылкой, есть нет <result>.tracks, то это просто трек!
-                                    if (!api.tracks) return resolve(null);
-
-                                    // Все доступные треки в плейлисте
-                                    const items = api.tracks.filter((i) => i["permalink_url"]).splice(0, limit).map(RestSoundCloudAPI.track);
-
-                                    return resolve({
-                                        url,
-                                        title: api.title,
-                                        artist: {
-                                            url: api.user.permalink_url,
-                                            title: api.user.username,
-                                            image: api.user.avatar_url,
-                                        },
-                                        image: api.artwork_url,
-                                        items
-                                    });
-                                }
-                                return resolve(null);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs/playlist]: ${e}`))
-                            }
-                        });
+                        const tracks = api.collection.filter((i) => i.user).map(this.track);
+                        return resolve(tracks);
+                    } catch (e) {
+                        return resolve(new Error(`[APIs]: ${e}`))
                     }
-                },
-
-                /**
-                 * @description Запрос данных о треке
-                 * @type "search"
-                 */
-                {
-                    name: "search",
-                    execute: (query, options) => {
-                        return new Promise(async (resolve) => {
-                            try {
-                                // Создаем запрос
-                                const request = await RestSoundCloudAPI.API(`search/tracks?q=${encodeURIComponent(query)}&limit=${options.limit}`);
-
-                                // Если запрос выдал ошибку то
-                                if (request instanceof Error) return resolve(request);
-
-                                const {api} = request;
-
-                                const tracks = api.collection.filter((i) => i.user).map(RestSoundCloudAPI.track);
-                                return resolve(tracks);
-                            } catch (e) {
-                                return resolve(new Error(`[APIs]: ${e}`))
-                            }
-                        });
-                    }
-                },
-            ]
-        });
-    };
+                });
+            }
+        }
+    ];
 
     /**
      * @description Получаем страницу и ищем на ней данные
@@ -177,10 +149,10 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static API = (url: string): Promise<{api: json, ClientID: string} | Error> => {
+    protected API = (url: string): Promise<{api: json, ClientID: string} | Error> => {
         return new Promise(async (resolve) => {
             const result = await new httpsClient({
-                url: `${this.authorization.api}/${url}&client_id=${this.authorization.token}`,
+                url: `${this.options.api}/${url}&client_id=${this.auth}`,
             }).toJson;
 
             // Если возникает ошибка при получении страницы
@@ -188,7 +160,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
 
             return resolve({
                 api: result,
-                ClientID: this.authorization.token
+                ClientID: this.auth
             });
         });
     };
@@ -198,7 +170,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
      * @param formats - Зашифрованные форматы аудио
      * @param ClientID - ID клиента
      */
-    protected static getFormat = (formats: any[], ClientID: string): Promise<string> => {
+    protected getFormat = (formats: any[], ClientID: string): Promise<string> => {
         return new Promise<string>(async (resolve) => {
             const FilterFormats = formats.filter((d) => d.format.protocol === "progressive").pop() ?? formats[0];
             const EndFormat = await new httpsClient({url: `${FilterFormats.url}?client_id=${ClientID}`, userAgent: true}).toJson as json;
@@ -213,7 +185,7 @@ class RestSoundCloudAPI extends Assign<RestServerSide.API> {
      * @protected
      * @static
      */
-    protected static track = (track: json) => {
+    protected track = (track: json) => {
         return {
             id: track.id,
             url: track.permalink_url,
