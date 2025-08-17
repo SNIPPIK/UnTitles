@@ -143,17 +143,16 @@ class RestYandexAPI extends RestServerSide.API {
          */
         {
             name: "playlist",
-            filter: /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/i,
+            filter: /(playlists\/[a0-Z9.-]*)/i,
             execute: (url, {limit}) => {
-                const ID = /(users\/[a-zA-Z0-9]+).*(playlists\/[0-9]+)/i.exec(url);
+                const ID = /(playlists\/[a0-Z9.-]*)/i.exec(url)[0].split("/")[1];
 
                 return new Promise(async (resolve) => {
-                    if (!ID[1]) return resolve(locale.err("api.request.id.author"));
-                    else if (!ID[2]) return resolve(locale.err("api.request.id.playlist"));
+                    if (!ID) return resolve(locale.err("api.request.id.playlist"));
 
                     try {
                         // Создаем запрос
-                        const api = await this.API(ID[0]);
+                        const api = await this.API(`playlist/${ID}`);
 
                         // Если запрос выдал ошибку то
                         if (api instanceof Error) return resolve(api);
