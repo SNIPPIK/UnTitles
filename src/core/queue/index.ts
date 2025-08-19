@@ -111,9 +111,8 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
         let queue = this.get(message.guildId);
 
         // Если очереди нет — создаём новую
-        if (!queue) {
-            queue = new Queue(message) as T;
-        } else {
+        if (!queue) queue = new Queue(message) as T;
+        else {
             const player = queue.player;
 
             // Проверяем, активен ли плеер в цикле или находится на паузе

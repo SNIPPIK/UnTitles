@@ -42,17 +42,17 @@ import { db } from "#app/db";
     client: ["SendMessages", "ViewChannel"]
 })
 class SeekCommand extends Command {
-    async execute({message, args}: CommandContext) {
-        const queue = db.queues.get(message.guildId);
+    async run({ctx, args}: CommandContext) {
+        const queue = db.queues.get(ctx.guildId);
         const duration = args[0]?.duration();
 
         // Если пользователь написал что-то не так
         if (isNaN(duration)) {
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
                         color: Colors.DarkRed,
-                        description: locale._(message.locale, "command.seek.duration.nan")
+                        description: locale._(ctx.locale, "command.seek.duration.nan")
                     }
                 ],
                 flags: "Ephemeral"
@@ -61,11 +61,11 @@ class SeekCommand extends Command {
 
         // Если пользователь указал времени больше чем в треке
         else if (duration > queue.tracks.track.time.total || duration <= 0) {
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
                         color: Colors.DarkRed,
-                        description: locale._(message.locale, "command.seek.duration.big")
+                        description: locale._(ctx.locale, "command.seek.duration.big")
                     }
                 ],
                 flags: "Ephemeral"
@@ -76,11 +76,11 @@ class SeekCommand extends Command {
         await queue.player.play(duration);
 
         // Отправляем сообщение о пропуске времени
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
                     color: Colors.Green,
-                    description: locale._(message.locale, "command.seek", [duration])
+                    description: locale._(ctx.locale, "command.seek", [duration])
                 }
             ],
             flags: "Ephemeral"

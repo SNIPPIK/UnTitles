@@ -240,7 +240,7 @@ export abstract class BaseCommand {
      * @readonly
      * @public
      */
-    abstract execute(options: CommandContext<any>): any
+    abstract run(options: CommandContext<any>): any
 
     /**
      * @description Отдаем данные в формате JSON и только необходимые
@@ -327,7 +327,7 @@ export abstract class SubCommand extends BaseCommand {
  * @description Все доступные ограничения
  * @type RegisteredMiddlewares
  */
-export type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream" | "cooldown"
+export type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream" | "cooldown";
 
 /**
  * @author SNIPPIK
@@ -338,7 +338,7 @@ export type CommandContext<T = string> = {
     /**
      * @description Сообщение пользователя для работы с discord
      */
-    message: CommandInteraction;
+    ctx: CommandInteraction;
 
     /**
      * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде
@@ -493,7 +493,7 @@ type AutocompleteCommandOption = {
         /**
          * @description Сообщение пользователя для работы с discord
          */
-        message: CompeteInteraction;
+        ctx: CompeteInteraction;
 
         /**
          * @description Аргументы пользователя будут указаны только в том случаем если они есть в команде

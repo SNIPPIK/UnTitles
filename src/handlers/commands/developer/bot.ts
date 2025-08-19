@@ -63,17 +63,17 @@ import { db } from "#app/db";
     }
 })
 class WorkBotCommand extends Command {
-    public execute({message, args}: CommandContext<string>) {
+    public run({ctx, args}: CommandContext<string>) {
         // Варианты перезагрузки (аргументы)
         switch (args[0]) {
             // Перезагружаем все команды
             case "commands": {
-                db.commands.register(message.guild.members.client);
+                db.commands.register(ctx.guild.members.client);
 
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
-                            description: locale._(message.locale, `has.reload`, [db.commands.size]),
+                            description: locale._(ctx.locale, `has.reload`, [db.commands.size]),
                             color: Colors.Green
                         }
                     ],
@@ -83,12 +83,12 @@ class WorkBotCommand extends Command {
 
             // Перезагрузка всех событий
             case "events": {
-                db.events.register(message.guild.members.client);
+                db.events.register(ctx.guild.members.client);
 
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
-                            description: locale._(message.locale, `has.reload`, [db.events.size]),
+                            description: locale._(ctx.locale, `has.reload`, [db.events.size]),
                             color: Colors.Green
                         }
                     ],
@@ -101,10 +101,10 @@ class WorkBotCommand extends Command {
                 // Запускаем перезапуск, по истечению времени последнего плеера будет включение нового процесса
                 process.emit("SIGINT");
 
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
-                            description: locale._(message.locale, `self.reload`, [message.member]),
+                            description: locale._(ctx.locale, `self.reload`, [ctx.member]),
                             color: Colors.Green
                         }
                     ],
@@ -162,16 +162,16 @@ class WorkBotCommand extends Command {
     }
 })
 class ManageBotCommand extends Command {
-    public execute({message}: CommandContext<string>) {
-        const attachment = message.options.getAttachment("file");
-        const client = message.client;
+    public run({ctx}: CommandContext<string>) {
+        const attachment = ctx.options.getAttachment("file");
+        const client = ctx.client;
 
         //Если попытка всунуть не изображение
         if (!attachment.contentType.match(/image/)) {
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.bot.avatar.image.fail"),
+                        description: locale._(ctx.locale, "command.bot.avatar.image.fail"),
                         color: Colors.Yellow
                     }
                 ]
@@ -181,11 +181,11 @@ class ManageBotCommand extends Command {
         client.user.setAvatar(attachment.url)
             // Если удалось установить новый аватар
             .then(async () => {
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
                             author: { name: client.user.username, icon_url: client.user.avatarURL() },
-                            description: locale._(message.locale, "command.bot.avatar.ok"),
+                            description: locale._(ctx.locale, "command.bot.avatar.ok"),
                             color: Colors.Green
                         }
                     ]
@@ -194,11 +194,11 @@ class ManageBotCommand extends Command {
 
             // Если не удалось установить новый аватар
             .catch(async (err) => {
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
                             author: { name: client.user.username, icon_url: client.user.avatarURL() },
-                            description: locale._(message.locale, "command.bot.avatar.fail", [err]),
+                            description: locale._(ctx.locale, "command.bot.avatar.fail", [err]),
                             color: Colors.DarkRed
                         }
                     ]

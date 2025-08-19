@@ -17,17 +17,11 @@ import { db } from "#app/db";
 })
 @Middlewares(["queue", "another_voice", "voice"])
 class FilterSelector extends Component<"selector"> {
-    public callback: Component["callback"] = async (ctx) => {
-        const queue = db.queues.get(ctx.guildId);
-
-        // Если нет очереди
-        if (!queue) return null;
-
-        const { player } = queue;
-        const name: string = ctx["values"][0];
-        const Filter = filters.find((item) => item.name === name) as AudioFilter;
-        const findFilter = queue.player.filters.enabled.find((fl) => fl.name === Filter.name);
-        const seek: number = queue.player.audio.current?.duration ?? 0;
+    public callback: Component["callback"] = (ctx) => {
+        const { player } = db.queues.get(ctx.guildId);
+        const Filter = filters.find((item) => item.name === ctx["values"][0]) as AudioFilter;
+        const findFilter = player.filters.enabled.find((fl) => fl.name === Filter.name);
+        const seek: number = player.audio.current?.duration ?? 0;
 
 
         /* Отключаем фильтр */

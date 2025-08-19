@@ -38,13 +38,13 @@ import { db } from "#app/db";
 })
 @Middlewares(["cooldown"])
 class AvatarCommand extends Command {
-    public override execute = ({message, args}: CommandContext<User>) => {
+    public override run = ({ctx, args}: CommandContext<User>) => {
         const user = args[0];
-        const me = message.client.user;
+        const me = ctx.client.user;
         const avatar = user.avatar ? user.avatarURL({size: 1024, forceStatic: false}) : db.images.no_image;
 
         // Отправляем сообщение в текстовый канал
-        return message.reply({
+        return ctx.reply({
             components: [
                 {
                     type: 1,
@@ -67,7 +67,7 @@ class AvatarCommand extends Command {
             embeds: [
                 {
                     color: user.accentColor,
-                    description: `${locale._(message.locale, "user")} <@!${user.id}>`,
+                    description: `${locale._(ctx.locale, "user")} <@!${user.id}>`,
                     timestamp: new Date() as any,
                     image: { url: avatar },
                     footer: {

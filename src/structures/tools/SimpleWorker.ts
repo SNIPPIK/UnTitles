@@ -40,8 +40,8 @@ export class SimpleWorker {
      * @private
      */
     private static destroy = async (worker: Worker) => {
-        worker.ref(); // Привязываем к main, что-бы GC понял что это надо удалить
         worker.removeAllListeners();
+        worker.ref(); // Привязываем к main, что-бы GC понял что это надо удалить
 
         try {
             await worker.terminate();

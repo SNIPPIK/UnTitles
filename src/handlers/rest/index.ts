@@ -205,7 +205,7 @@ export class RestObject {
                     const Matches = candidate.map((x) => original.includes(x));
                     const time = Math.abs(track.time.total - song.time.total);
 
-                    return (time <= 5 || time === 0) && Matches.length / Math.max(original.length, candidate.length);
+                    return (time <= 10 || time === 0) && Matches.length / Math.max(original.length, candidate.length);
                 });
 
                 // Если отфильтровать треки не удалось

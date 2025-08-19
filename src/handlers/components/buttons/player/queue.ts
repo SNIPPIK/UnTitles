@@ -41,7 +41,7 @@ class ButtonQueue extends Component<"button"> {
                             },
                             {
                                 "type": 10,
-                                "content": `### **[${track.name}](${track.url})**\n-# ${track.time.split} - ${track.api.name.toLowerCase()}`
+                                "content": `### **[${track.name}](${track.url})**\n-# ${track.time.split} - ${track.api.name.toLowerCase()} | ${track.user.username}`
                             }
                         ],
                         "accessory": {

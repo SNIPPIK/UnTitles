@@ -21,7 +21,7 @@ class CheckCooldown extends Assign<middleware<CommandInteraction>> {
     public constructor() {
         super({
             name: "cooldown",
-            callback: async (ctx) => {
+            callback: (ctx) => {
                 // Если пользователь не является разработчиком, то на него будут накладываться штрафы в виде cooldown
                 if (!db.owner.ids.includes(ctx.user.id)) {
                     const user = cooldown.db.get(ctx.user.id);
@@ -36,7 +36,7 @@ class CheckCooldown extends Assign<middleware<CommandInteraction>> {
                     else {
                         // Если время еще не прошло говорим пользователю об этом
                         if (user >= Date.now()) {
-                            await ctx.reply({
+                            ctx.reply({
                                 flags: "Ephemeral",
                                 embeds: [
                                     {

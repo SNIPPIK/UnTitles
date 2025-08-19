@@ -130,13 +130,9 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
-                // Пропускаем технические данные
-                // 3    - SILENT_FRAME
-                if (packet.length === 3) continue;
-
                 // Если найден заголовок
                 // 19   - Head frame
-                else if (isOpusHead(packet)) continue;
+                if (isOpusHead(packet)) continue;
 
                 // Если найден тег
                 // 296  - Tags frame

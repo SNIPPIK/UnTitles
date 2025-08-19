@@ -27,11 +27,11 @@ import { db } from "#app/db";
 })
 @Middlewares(["cooldown"])
 class ReportCommand extends Command {
-    async execute({message}: CommandContext<any>) {
-        const lang = message.locale;
+    async run({ctx}: CommandContext<any>) {
+        const lang = ctx.locale;
 
         // Отправляем сообщение в текстовый канал
-        const msg= await message.reply({
+        const msg= await ctx.reply({
             flags: "IsComponentsV2",
             components: [
                 {
@@ -50,7 +50,7 @@ class ReportCommand extends Command {
                         },
                         {
                             "type": 10, // Text
-                            "content": `# ${locale._(lang, "report")} - ${message.guild.name}`
+                            "content": `# ${locale._(lang, "report")} - ${ctx.guild.name}`
                         },
                         {
                             "type": 10, // Text

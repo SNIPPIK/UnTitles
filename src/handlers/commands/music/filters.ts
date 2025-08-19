@@ -46,8 +46,8 @@ import { db } from "#app/db";
     }
 })
 class AudioFilterPush extends SubCommand {
-    async execute({message, args}: CommandContext<string>) {
-        const queue = db.queues.get(message.guildId);
+    async run({ctx, args}: CommandContext<string>) {
+        const queue = db.queues.get(ctx.guildId);
         const player = queue.player;
         const seek: number = player.audio.current?.duration ?? 0;
         const name = args && args?.length > 0 ? args[0] : null;
@@ -58,10 +58,10 @@ class AudioFilterPush extends SubCommand {
 
         // Пользователь пытается включить включенный фильтр
         if (findFilter) {
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.filter.push.two"),
+                        description: locale._(ctx.locale, "command.filter.push.two"),
                         color: Colors.Yellow
                     }
                 ],
@@ -74,10 +74,10 @@ class AudioFilterPush extends SubCommand {
             // Если аргументы подходят
             if (argument && argument >= Filter.args[0] && argument <= Filter.args[1]) Filter.argument = argument;
             else {
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
-                            description: locale._(message.locale, "command.filter.push.argument", Filter.args),
+                            description: locale._(ctx.locale, "command.filter.push.argument", Filter.args),
                             color: Colors.Yellow
                         }
                     ],
@@ -93,10 +93,10 @@ class AudioFilterPush extends SubCommand {
 
             // Новый фильтр несовместим с уже включённым?
             if (Filter.unsupported.includes(enabledFilter.name)) {
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
-                            description: locale._(message.locale, "command.filter.push.unsupported", [Filter.name, enabledFilter.name]),
+                            description: locale._(ctx.locale, "command.filter.push.unsupported", [Filter.name, enabledFilter.name]),
                             color: Colors.DarkRed
                         }
                     ],
@@ -106,10 +106,10 @@ class AudioFilterPush extends SubCommand {
 
             // Уже включённый фильтр несовместим с новым?
             if (enabledFilter.unsupported.includes(Filter.name)) {
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
-                            description: locale._(message.locale, "command.filter.push.unsupported", [enabledFilter.name, Filter.name]),
+                            description: locale._(ctx.locale, "command.filter.push.unsupported", [enabledFilter.name, Filter.name]),
                             color: Colors.DarkRed
                         }
                     ],
@@ -126,10 +126,10 @@ class AudioFilterPush extends SubCommand {
             await player.play(seek);
 
             // Сообщаем о включении фильтров
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.filter.push.before", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                        description: locale._(ctx.locale, "command.filter.push.before", [Filter.name, Filter.locale[ctx.locale].split(" - ").pop()]),
                         color: Colors.Green,
                         timestamp: new Date() as any
                     }
@@ -140,10 +140,10 @@ class AudioFilterPush extends SubCommand {
 
         // Если нельзя включить фильтр или фильтры сейчас.
         // Сообщаем о включении фильтров
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.filter.push.after", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                    description: locale._(ctx.locale, "command.filter.push.after", [Filter.name, Filter.locale[ctx.locale].split(" - ").pop()]),
                     color: Colors.Green,
                     timestamp: new Date() as any
                 }
@@ -168,16 +168,16 @@ class AudioFilterPush extends SubCommand {
     }
 })
 class AudioFiltersOff extends SubCommand {
-    async execute({message}: CommandContext<string>) {
-        const queue = db.queues.get(message.guildId);
+    async run({ctx}: CommandContext<string>) {
+        const queue = db.queues.get(ctx.guildId);
         const player = queue.player;
 
         // Если нет включенных фильтров
         if (player.filters.enabled.size === 0) {
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.filter.off.null"),
+                        description: locale._(ctx.locale, "command.filter.off.null"),
                         color: Colors.Yellow
                     }
                 ],
@@ -190,10 +190,10 @@ class AudioFiltersOff extends SubCommand {
             await player.play(player.audio.current?.duration);
 
             // Сообщаем о выключении фильтров
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.filter.off.after"),
+                        description: locale._(ctx.locale, "command.filter.off.after"),
                         color: Colors.Green,
                         timestamp: new Date() as any,
                     }
@@ -205,10 +205,10 @@ class AudioFiltersOff extends SubCommand {
         // Если нельзя выключить фильтр или фильтры сейчас
         else {
             // Сообщаем о выключении фильтров
-            await message.reply({
+            await ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.filter.off.before"),
+                        description: locale._(ctx.locale, "command.filter.off.before"),
                         color: Colors.Green,
                         timestamp: new Date() as any
                     }
@@ -249,8 +249,8 @@ class AudioFiltersOff extends SubCommand {
         },
         required: true,
         type: ApplicationCommandOptionType["String"],
-        autocomplete: ({message, args}) => {
-            const queue = db.queues.get(message.guildId);
+        autocomplete: ({ctx, args}) => {
+            const queue = db.queues.get(ctx.guildId);
 
             // Если нет очереди
             if (!queue) return null;
@@ -262,7 +262,7 @@ class AudioFiltersOff extends SubCommand {
 
             const items = filters.filter(filter => !!filter.name.match(args[0])).map((filter) => {
                 return {
-                    name: `🌀 ${filter.name} - ${filter.locale[message.locale].substring(0, 75)}`,
+                    name: `🌀 ${filter.name} - ${filter.locale[ctx.locale].substring(0, 75)}`,
                     value: filter.name
                 }
             });
@@ -271,13 +271,13 @@ class AudioFiltersOff extends SubCommand {
             if (!items) return null;
 
             // Отправка ответа
-            return message.respond(items);
+            return ctx.respond(items);
         }
     }
 })
 class AudioFilterRemove extends SubCommand {
-    async execute({message, args}: CommandContext<string>) {
-        const queue = db.queues.get(message.guildId);
+    async run({ctx, args}: CommandContext<string>) {
+        const queue = db.queues.get(ctx.guildId);
         const player = queue.player;
         const seek: number = player.audio.current?.duration ?? 0;
         const name = args && args?.length > 0 ? args[0] : null;
@@ -287,10 +287,10 @@ class AudioFilterRemove extends SubCommand {
 
         // Пользователь пытается выключить выключенный фильтр
         if (!findFilter) {
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.filter.remove.two"),
+                        description: locale._(ctx.locale, "command.filter.remove.two"),
                         color: Colors.Yellow
                     }
                 ],
@@ -306,10 +306,10 @@ class AudioFilterRemove extends SubCommand {
             await player.play(seek);
 
             // Сообщаем о включении фильтров
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.filter.remove.after", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                        description: locale._(ctx.locale, "command.filter.remove.after", [Filter.name, Filter.locale[ctx.locale].split(" - ").pop()]),
                         color: Colors.Green,
                         timestamp: new Date() as any
                     }
@@ -320,10 +320,10 @@ class AudioFilterRemove extends SubCommand {
 
         // Если нельзя выключить фильтр или фильтры сейчас.
         // Сообщаем о включении фильтров
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.filter.remove.before", [Filter.name, Filter.locale[message.locale].split(" - ").pop()]),
+                    description: locale._(ctx.locale, "command.filter.remove.before", [Filter.name, Filter.locale[ctx.locale].split(" - ").pop()]),
                     color: Colors.Green,
                     timestamp: new Date() as any
                 }
@@ -358,7 +358,7 @@ class AudioFilterRemove extends SubCommand {
     client: ["SendMessages", "ViewChannel"]
 })
 class AudioFilterGroup extends Command {
-    async execute() {}
+    async run() {}
 }
 
 

@@ -33,20 +33,20 @@ import { db } from "#app/db";
     }
 })
 class VoiceJoinCommand extends SubCommand {
-    async execute({message, args}: CommandContext) {
-        const { guild, guildId } = message;
+    async run({ctx, args}: CommandContext) {
+        const { guild, guildId } = ctx;
 
         const voiceConnection = db.voice.get(guildId);
         const queue = db.queues.get(guildId);
-        const VoiceChannel = args[0] ?? message.member.voice.channel;
+        const VoiceChannel = args[0] ?? ctx.member.voice.channel;
 
         // Если указан не голосовой канал
         if (typeof VoiceChannel === "string" || VoiceChannel?.type !== 2) {
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
                         color: Colors.Green,
-                        description: locale._(message.locale, "voice.tribune.join.fail")
+                        description: locale._(ctx.locale, "voice.tribune.join.fail")
                     }
                 ],
                 flags: "Ephemeral"
@@ -56,11 +56,11 @@ class VoiceJoinCommand extends SubCommand {
         // Если производится попытка подключится к тому же голосовому каналу
         else if (voiceConnection) {
             if (voiceConnection.configuration.channel_id === VoiceChannel.id) {
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
                             color: Colors.Green,
-                            description: locale._(message.locale, "voice.rejoin", [VoiceChannel])
+                            description: locale._(ctx.locale, "voice.rejoin", [VoiceChannel])
                         }
                     ],
                     flags: "Ephemeral"
@@ -77,11 +77,11 @@ class VoiceJoinCommand extends SubCommand {
         }
 
         // Отправляем сообщение о подключении к каналу
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
                     color: Colors.Green,
-                    description: locale._(message.locale, "voice.join", [VoiceChannel])
+                    description: locale._(ctx.locale, "voice.join", [VoiceChannel])
                 }
             ],
             flags: "Ephemeral"
@@ -104,12 +104,12 @@ class VoiceJoinCommand extends SubCommand {
     }
 })
 class VoiceLeaveCommand extends SubCommand {
-    async execute({message, args}: CommandContext) {
-        const { guildId } = message;
+    async run({ctx, args}: CommandContext) {
+        const { guildId } = ctx;
 
         const voiceConnection = db.voice.get(guildId);
         const queue = db.queues.get(guildId);
-        const VoiceChannel = args[0] ?? message.member.voice.channel;
+        const VoiceChannel = args[0] ?? ctx.member.voice.channel;
 
         /// Если есть очередь, то удаляем ее!
         if (queue) queue.cleanup();
@@ -117,11 +117,11 @@ class VoiceLeaveCommand extends SubCommand {
         // Отключаемся от голосового канала
         if (!voiceConnection.disconnect) return null;
 
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
                     color: Colors.Green,
-                    description: locale._(message.locale, "voice.leave", [VoiceChannel])
+                    description: locale._(ctx.locale, "voice.leave", [VoiceChannel])
                 }
             ],
             flags: "Ephemeral"
@@ -174,8 +174,8 @@ class VoiceLeaveCommand extends SubCommand {
     }
 })
 class VoiceTribuneCommand extends SubCommand {
-    async execute({message, args}: CommandContext) {
-        const me = message.guild.members?.me;
+    async run({ctx, args}: CommandContext) {
+        const me = ctx.guild.members?.me;
 
         try {
             // Если бота просят подключится
@@ -185,10 +185,10 @@ class VoiceTribuneCommand extends SubCommand {
             else await me.voice.setRequestToSpeak(true);
         } catch (err) {
             // Если не удалось подключиться или сделать запрос
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: args[0] === "join" ? locale._(message.locale, "voice.tribune.join.fail") : locale._(message.locale, "voice.tribune.join.request.fail"),
+                        description: args[0] === "join" ? locale._(ctx.locale, "voice.tribune.join.fail") : locale._(ctx.locale, "voice.tribune.join.request.fail"),
                         color: Colors.DarkRed
                     }
                 ],
@@ -197,10 +197,10 @@ class VoiceTribuneCommand extends SubCommand {
         }
 
         // Если удалось подключиться или сделать запрос
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: args[0] === "join" ? locale._(message.locale, "voice.tribune.join") : locale._(message.locale, "voice.tribune.join.request"),
+                    description: args[0] === "join" ? locale._(ctx.locale, "voice.tribune.join") : locale._(ctx.locale, "voice.tribune.join.request"),
                     color: Colors.Green
                 }
             ],
@@ -230,7 +230,7 @@ class VoiceTribuneCommand extends SubCommand {
     client: ["SendMessages", "ViewChannel"]
 })
 class VoiceControllerCommand extends Command {
-    async execute() {}
+    async run() {}
 }
 
 

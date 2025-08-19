@@ -124,33 +124,33 @@ function getPlatform(search: string) {
         },
         required: true,
         type: ApplicationCommandOptionType["String"],
-        autocomplete: ({message, args}) => {
+        autocomplete: ({ctx, args}) => {
             if (!args[1] || args[1] === "") return null;
 
             const platform = db.api.request(args[0] as any);
-            return allAutoComplete(message, platform, args[1]);
+            return allAutoComplete(ctx, platform, args[1]);
         }
     }
 })
 class PlaySearchCommand extends SubCommand {
-    async execute({message, args}: CommandContext<string>) {
+    async run({ctx, args}: CommandContext<string>) {
         // Запрос к платформе
         const platform = db.api.request(args[0] as any);
 
         // Если платформа заблокирована
         if (platform.block) {
-            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.block"));
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
             return null;
         }
 
         // Если есть проблема с авторизацией на платформе
         else if (!platform.auth) {
-            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.auth"));
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.auth"));
             return null;
         }
 
-        await message.deferReply();
-        db.events.emitter.emit("rest/request", platform, message, args[1]);
+        await ctx.deferReply();
+        db.events.emitter.emit("rest/request", platform, ctx, args[1]);
         return null;
     };
 }
@@ -200,33 +200,33 @@ class PlaySearchCommand extends SubCommand {
         },
         required: true,
         type: ApplicationCommandOptionType["String"],
-        autocomplete: ({message, args}) => {
+        autocomplete: ({ctx, args}) => {
             if (!args[1] || args[1] === "") return null;
 
-            const platform = db.api.request(args[0] as any);
-            return allAutoComplete(message, platform, args[1]);
+            const platform = db.api.request(args[0]);
+            return allAutoComplete(ctx, platform, args[1]);
         }
     }
 })
 class PlayWaveCommand extends SubCommand {
-    async execute({message, args}: CommandContext<string>) {
+    async run({ctx, args}: CommandContext) {
         // Запрос к платформе
         const platform = db.api.request(args[0] as any);
 
         // Если платформа заблокирована
         if (platform.block) {
-            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.block"));
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
             return null;
         }
 
         // Если есть проблема с авторизацией на платформе
         else if (!platform.auth) {
-            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.auth"));
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.auth"));
             return null;
         }
 
-        await message.deferReply();
-        db.events.emitter.emit("rest/request", platform, message, args[1]);
+        await ctx.deferReply();
+        db.events.emitter.emit("rest/request", platform, ctx, args[1]);
         return null;
     };
 }
@@ -256,7 +256,7 @@ class PlayWaveCommand extends SubCommand {
     client: ["SendMessages", "ViewChannel"]
 })
 class PlayControlCommand extends Command {
-    async execute() {}
+    async run() {}
 }
 
 
@@ -290,9 +290,9 @@ class PlayControlCommand extends Command {
         },
         required: true,
         type: ApplicationCommandOptionType["String"],
-        autocomplete: ({message, args}) => {
+        autocomplete: ({ctx, args}) => {
             const platform = getPlatform(args[0]);
-            return allAutoComplete(message, platform, args[0]);
+            return allAutoComplete(ctx, platform, args[0]);
         }
     }
 })
@@ -301,29 +301,29 @@ class PlayControlCommand extends Command {
     client: ["SendMessages", "ViewChannel"]
 })
 class PlayCommand extends Command {
-    async execute({message, args}: CommandContext<string>) {
+    async run({ctx, args}: CommandContext<string>) {
         const platform = getPlatform(args[0]);
 
         // Если не нашлась платформа
         if (!platform) {
-            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.support"));
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.support"));
             return null;
         }
 
         // Если платформа заблокирована
         if (platform.block) {
-            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.block"));
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
             return null;
         }
 
         // Если есть проблема с авторизацией на платформе
         else if (!platform.auth) {
-            db.events.emitter.emit("rest/error", message, locale._(message.locale, "api.platform.auth"));
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.auth"));
             return null;
         }
 
-        await message.deferReply();
-        db.events.emitter.emit("rest/request", platform, message, args[0]);
+        await ctx.deferReply();
+        db.events.emitter.emit("rest/request", platform, ctx, args[0]);
         return null;
     };
 }

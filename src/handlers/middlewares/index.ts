@@ -1,3 +1,4 @@
+import { ButtonInteraction, AnySelectMenuInteraction } from "discord.js";
 import { CommandInteraction } from "#structures/discord";
 import { Command } from "#handler/commands";
 import { handler } from "#handler";
@@ -9,7 +10,7 @@ import { handler } from "#handler";
  * @extends handler
  * @public
  */
-export class Middlewares<T = middleware<CommandInteraction>> extends handler<T> {
+export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction | AnySelectMenuInteraction>> extends handler<T> {
     /**
      * @description Производим поиск по функции
      * @public
@@ -49,5 +50,5 @@ export class Middlewares<T = middleware<CommandInteraction>> extends handler<T> 
  */
 export interface middleware<T> {
     name: Command["middlewares"][number];
-    callback: (message: T) => Promise<boolean>;
+    callback: (message: T) => boolean;
 }

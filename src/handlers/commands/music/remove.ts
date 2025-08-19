@@ -34,9 +34,9 @@ import { db } from "#app/db";
         },
         type: ApplicationCommandOptionType["Number"],
         required: true,
-        autocomplete: ({message, args}) => {
+        autocomplete: ({ctx, args}) => {
             const number = args[0];
-            const queue = db.queues.get(message.guildId);
+            const queue = db.queues.get(ctx.guildId);
             if (!queue || isNaN(number) || number <= 0) return null;
 
             const total = queue.tracks.total;
@@ -57,11 +57,11 @@ import { db } from "#app/db";
             const highlightIndex = index - startIndex;
 
             const results = tracks.map((track, i) => ({
-                name: `${startIndex + i + 1}. ${i === highlightIndex ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
+                name: `${startIndex + i + 1}. ${i === highlightIndex ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: startIndex + i
             }));
 
-            return message.respond(results);
+            return ctx.respond(results);
         },
     }
 })
@@ -70,17 +70,17 @@ import { db } from "#app/db";
     client: ["SendMessages", "ViewChannel"]
 })
 class RemoveTracksCommand extends Command {
-    async execute({message, args}: CommandContext<number>) {
-        const queue = db.queues.get(message.guildId);
+    async run({ctx, args}: CommandContext<number>) {
+        const queue = db.queues.get(ctx.guildId);
         const number = args[0];
         const track = queue.tracks.get(number);
 
         // Если указан трек которого нет
         if (!track) {
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.remove.track.fail", [message.member]),
+                        description: locale._(ctx.locale, "command.remove.track.fail", [ctx.member]),
                         color: Colors.DarkRed
                     }
                 ],
@@ -100,10 +100,10 @@ class RemoveTracksCommand extends Command {
             await queue.player.play(0, 0, queue.tracks.position);
         }
 
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.remove.track", [`[${name}](${url})`]),
+                    description: locale._(ctx.locale, "command.remove.track", [`[${name}](${url})`]),
                     color: api.color
                 }
             ],

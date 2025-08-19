@@ -15,12 +15,12 @@ class VoiceChannel extends Assign<middleware<CommandInteraction>> {
     public constructor() {
         super({
             name: "voice",
-            callback: async (ctx) => {
+            callback: (ctx) => {
                 const VoiceChannel = ctx.member.voice.channel;
 
                 // Если нет голосового подключения
                 if (!VoiceChannel) {
-                    await ctx.reply({
+                    ctx.reply({
                         flags: "Ephemeral",
                         embeds: [
                             {
@@ -49,7 +49,7 @@ class OtherVoiceChannel extends Assign<middleware<CommandInteraction>> {
     public constructor() {
         super({
             name: "another_voice",
-            callback: async (ctx) => {
+            callback: (ctx) => {
                 const VoiceChannelMe = ctx.guild?.members?.me?.voice?.channel;
                 const VoiceChannel = ctx.member?.voice?.channel;
 
@@ -89,7 +89,7 @@ class OtherVoiceChannel extends Assign<middleware<CommandInteraction>> {
                             }
 
                             else {
-                                await ctx.reply({
+                                ctx.reply({
                                     flags: "Ephemeral",
                                     embeds: [
                                         {

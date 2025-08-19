@@ -17,7 +17,13 @@ class RestServer extends handler<RestServerSide.API> {
      * @protected
      * @readonly
      */
-    public readonly platforms: RestServerSide.Data = {
+    public readonly platforms: RestServerSide.Data & {
+        /**
+         * @description Поддерживаемые платформы в array формате, для экономии памяти
+         * @private
+         */
+        array?: RestServerSide.API[]
+    } = {
         supported: null,
         authorization: [],
         audio: [],
@@ -38,11 +44,20 @@ class RestServer extends handler<RestServerSide.API> {
     })();
 
     /**
+     * @description Получаем список всех доступных платформ
+     * @private
+     */
+    private get array(): RestServerSide.API[] {
+        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
+        return this.platforms.array;
+    };
+
+    /**
      * @description Исключаем платформы из общего списка
      * @public
      */
     public get allow(): RestServerSide.API[] {
-        return Object.values(this.platforms.supported).filter(api => api.auth !== null);
+        return this.array.filter(api => api.auth !== null);
     };
 
     /**

@@ -213,7 +213,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this.emit("binary", { op, payload });
 
             // Для отладки
-            this.emit("debug", `[WebSocket/get]:`, {op, payload});
+            this.emit("debug", `[WebSocket/get]:`, { op, sequence, payload: !!payload });
             return null;
         }
 

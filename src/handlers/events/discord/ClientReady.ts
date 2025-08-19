@@ -16,7 +16,7 @@ class ClientReady extends Assign<Event<Events.ClientReady>> {
             name: Events.ClientReady,
             type: "client",
             once: false,
-            execute: async (client) => {
+            execute: (client) => {
                 const id = client.shard?.ids[0] ?? 0;
 
                 Logger.log("LOG", `[Core/${id}] on ${Logger.color(32, `${client.guilds.cache.size} guilds`)}`);

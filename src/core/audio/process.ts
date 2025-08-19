@@ -1,4 +1,4 @@
-import type { ChildProcessWithoutNullStreams } from "node:child_process"
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { spawn, spawnSync } from "node:child_process";
 import { env } from "#app/env";
 import path from "node:path";
@@ -50,7 +50,7 @@ export class Process {
             const isLink = args.at(index_resource + 1)?.startsWith("http");
 
             // Если указана ссылка
-            if (isLink) args.unshift("-reconnect", "1", "-reconnect_delay_max", "5");
+            if (isLink) args.unshift("-reconnect", "1", "-reconnect_delay_max", "5", "-reconnect_on_network_error", "1");
         }
 
         // Проверяем на наличие пропуска времени
@@ -62,7 +62,11 @@ export class Process {
         }
 
         args.unshift("-vn", "-loglevel", "error", "-hide_banner");
-        this._process = spawn(name, args);
+        this._process = spawn(name, args, {
+            env: { PATH: process.env.PATH },
+            stdio: "pipe",
+            shell: false
+        });
 
         for (let event of ["end", "error", "exit"]) {
             this._process.once(event, this.destroy);

@@ -32,15 +32,15 @@ import { db } from "#app/db";
         },
         type: ApplicationCommandOptionType.Number,
         required: true,
-        autocomplete: ({ message, args }) => {
-            const { tracks } = db.queues.get(message.guildId);
+        autocomplete: ({ ctx, args }) => {
+            const { tracks } = db.queues.get(ctx.guildId);
             const { position } = tracks;
             const center = args[0] ?? position;
 
             const before = tracks.array(-10, center);
             const after = tracks.array(10, center);
 
-            return message.respond(
+            return ctx.respond(
                 [...before, ...after].map((track, i) => {
                     const index = center - before.length + i;
                     const isCurrent = index === position;
@@ -56,16 +56,16 @@ import { db } from "#app/db";
     }
 })
 class QueueList extends SubCommand {
-    async execute({message, args}: CommandContext<number>) {
-        const queue = db.queues.get(message.guildId);
+    async run({ctx, args}: CommandContext<number>) {
+        const queue = db.queues.get(ctx.guildId);
         const track = queue.tracks.get(args[0]);
 
         // Если указан не существующий трек
-        if (!track) return message.reply(
+        if (!track) return ctx.reply(
             {
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.queue.track.notfound", [queue.tracks.total]),
+                        description: locale._(ctx.locale, "command.queue.track.notfound", [queue.tracks.total]),
                         color: Colors.White
                     }
                 ],
@@ -76,7 +76,7 @@ class QueueList extends SubCommand {
         const {artist, url, name, image, api, ID, time, user, link} = track;
 
         // Отправляем данные о выбранном треке
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
                     author: {
@@ -117,15 +117,15 @@ class QueueList extends SubCommand {
     }
 })
 class QueueDestroy extends SubCommand {
-    async execute({message}: CommandContext) {
-        db.queues.remove(message.guildId);
-        db.voice.remove(message.guildId);
+    async run({ctx}: CommandContext) {
+        db.queues.remove(ctx.guildId);
+        db.voice.remove(ctx.guildId);
 
         // Отправляем данные о выбранном треке
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.queue.destroy"),
+                    description: locale._(ctx.locale, "command.queue.destroy"),
                     color: Colors.White
                 }
             ],
@@ -159,7 +159,7 @@ class QueueDestroy extends SubCommand {
     client: ["SendMessages", "ViewChannel"]
 })
 class QueueCommand extends Command {
-    async execute() {}
+    async run() {}
 }
 
 /**

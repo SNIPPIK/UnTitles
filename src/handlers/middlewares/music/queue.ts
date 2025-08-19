@@ -14,12 +14,12 @@ class ExistQueue extends Assign<middleware<CommandInteraction>> {
     public constructor() {
         super({
             name: "queue",
-            callback: async (ctx) => {
+            callback: (ctx) => {
                 const queue = db.queues.get(ctx.guildId);
 
                 // Если нет очереди
                 if (!queue) {
-                    await ctx.reply({
+                    ctx.reply({
                         flags: "Ephemeral",
                         embeds: [
                             {

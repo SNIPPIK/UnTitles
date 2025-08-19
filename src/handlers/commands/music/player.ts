@@ -19,18 +19,18 @@ import { db } from "#app/db";
     }
 })
 class PlayerReplay extends SubCommand {
-    async execute({message}: CommandContext<string>) {
-        const queue = db.queues.get(message.guild.id);
+    async run({ctx}: CommandContext<string>) {
+        const queue = db.queues.get(ctx.guild.id);
 
         // Переключаем позицию трека на 0
         queue.player.tracks.position = 0;
 
         // Перезапускаем очередь
         db.queues.restart_player = queue.player;
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.play.replay", [message.member]),
+                    description: locale._(ctx.locale, "command.play.replay", [ctx.member]),
                     color: Colors.Green
                 }
             ],
@@ -53,15 +53,15 @@ class PlayerReplay extends SubCommand {
     }
 })
 class PlayerStop extends SubCommand {
-    async execute({message}: CommandContext<string>) {
+    async run({ctx}: CommandContext<string>) {
         // Удаляем очередь
-        db.queues.remove(message.guildId);
+        db.queues.remove(ctx.guildId);
 
         // Отправляем сообщение
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.play.stop", [message.member]),
+                    description: locale._(ctx.locale, "command.play.stop", [ctx.member]),
                     color: Colors.Green
                 }
             ],
@@ -98,8 +98,8 @@ class PlayerStop extends SubCommand {
     }
 })
 class PlayerVolume extends SubCommand {
-    async execute({message, args}: CommandContext) {
-        const { player } = db.queues.get(message.guildId);
+    async run({ctx, args}: CommandContext) {
+        const { player } = db.queues.get(ctx.guildId);
 
         // Изменение громкости
         player.volume = parseInt(args[0]);
@@ -109,10 +109,10 @@ class PlayerVolume extends SubCommand {
             player.play(player.audio.current.duration).catch(console.error);
 
             // Отправляем сообщение о переключение громкости сейчас
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.value.now", [message.member]),
+                        description: locale._(ctx.locale, "command.value.now", [ctx.member]),
                         color: Colors.Green
                     }
                 ],
@@ -121,10 +121,10 @@ class PlayerVolume extends SubCommand {
         }
 
         // Отправляем сообщение о переключение громкости со следующим треком
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.value.later", [message.member]),
+                    description: locale._(ctx.locale, "command.value.later", [ctx.member]),
                     color: Colors.Green
                 }
             ],
@@ -157,7 +157,7 @@ class PlayerVolume extends SubCommand {
     client: ["SendMessages", "ViewChannel"]
 })
 class PlayerController extends Command {
-    async execute() {}
+    async run() {}
 }
 
 /**

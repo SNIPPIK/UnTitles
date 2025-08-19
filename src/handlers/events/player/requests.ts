@@ -2,6 +2,7 @@ import { Logger, Assign, locale } from "#structures";
 import { Colors } from "#structures/discord";
 import { Event } from "#handler/events";
 import { Message } from "discord.js";
+import { Track } from "#core/queue";
 import { db } from "#app/db";
 
 /**
@@ -49,11 +50,11 @@ class rest_request extends Assign<Event<"rest/request">> {
                 }
 
                 // Обёртка над таймаутом + запрос
-                const timeoutPromise = new Promise((_, reject) =>
+                const timeoutPromise = new Promise<Error>((_, reject) =>
                     setTimeout(() => reject(new Error(locale._(message.locale, "api.platform.timeout"))), 15000)
                 );
 
-                let rest
+                let rest: Error | Track[] | Track.list | Track;
                 try {
                     rest = await Promise.race([api.request(), timeoutPromise]);
                 } catch (err) {
@@ -73,7 +74,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                         locale._(message.locale, "api.platform.error", [rest]));
                 }
 
-                if (Array.isArray(rest)) {
+                else if (Array.isArray(rest)) {
                     if (!rest.length)
                         return db.events.emitter.emit("rest/error", message,
                             locale._(message.locale, "player.search.fail"));
@@ -81,7 +82,7 @@ class rest_request extends Assign<Event<"rest/request">> {
                     rest = rest[0];
                 }
 
-                if ("items" in rest && rest.items.length === 0) {
+                else if ("items" in rest && rest.items.length === 0) {
                     return db.events.emitter.emit("rest/error", message,
                         locale._(message.locale, "player.search.fail"));
                 }
@@ -119,7 +120,7 @@ class rest_error extends Assign<Event<"rest/error">> {
                 }
 
                 try {
-                    let msg
+                    let msg: any
 
                     if (message.replied && !message.deferred) msg = await message.followUp(options as any);
                     else if (message.deferred && !message.replied) msg = await message.editReply(options as any);

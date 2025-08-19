@@ -20,19 +20,19 @@ class GuildCreate extends Assign<Event<Events.GuildCreate>> {
             name: Events.GuildCreate,
             type: "client",
             once: false,
-            execute: async (guild) => {
+            execute: (guild) => {
                 const id = guild.client.shard?.ids[0] ?? 0;
                 Logger.log("LOG", `[Core/${id}] has ${Logger.color(32, `added a new guild ${guild.id}`)}`);
 
                 // Получаем владельца сервера
-                const owner = await guild.fetchOwner();
+                const owner = guild.members.cache.get(guild.ownerId);
 
                 // Если владельца не удалось найти
-                if (!owner) return;
+                if (!owner) return null;
 
                 try {
                     // Отправляем сообщение владельцу сервера
-                    await owner.send({
+                    return owner.send({
                         flags: "IsComponentsV2",
                         components: [
                             {

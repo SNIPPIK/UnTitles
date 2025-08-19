@@ -28,9 +28,9 @@ import { db } from "#app/db";
         },
         type: ApplicationCommandOptionType["Number"],
         required: true,
-        autocomplete: ({message, args}) => {
+        autocomplete: ({ctx, args}) => {
             const number = parseInt(args[0]);
-            const queue = db.queues.get(message.guildId);
+            const queue = db.queues.get(ctx.guildId);
 
             if (!queue || isNaN(number) || number <= 0) return null;
 
@@ -48,18 +48,18 @@ import { db } from "#app/db";
 
             // Результаты поиска
             const results = tracks.map((track, i) => ({
-                name: `${startIndex + i + 1}. ${i === highlightIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
+                name: `${startIndex + i + 1}. ${i === highlightIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: startIndex + i
             }));
 
-            return message.respond(results);
+            return ctx.respond(results);
         }
     }
 })
 class BackPositionCommand extends SubCommand {
-    async execute({message, args}: CommandContext<number>) {
+    async run({ctx, args}: CommandContext<number>) {
         const number = args[0];
-        const {player, tracks} = db.queues.get(message.guildId);
+        const {player, tracks} = db.queues.get(ctx.guildId);
         const track = tracks.get(number);
 
         // Если указан трек которого нет
@@ -70,10 +70,10 @@ class BackPositionCommand extends SubCommand {
         // Переходим к позиции
         await player.play(0, 0, number);
 
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.position", [number - 1, `[${name}](${url})`]),
+                    description: locale._(ctx.locale, "command.position", [number - 1, `[${name}](${url})`]),
                     color: api.color
                 }
             ],
@@ -108,9 +108,9 @@ class BackPositionCommand extends SubCommand {
         },
         type: ApplicationCommandOptionType["Number"],
         required: true,
-        autocomplete: ({message, args}) => {
+        autocomplete: ({ctx, args}) => {
             const number = parseInt(args[0]);
-            const queue = db.queues.get(message.guildId);
+            const queue = db.queues.get(ctx.guildId);
 
             if (!queue || isNaN(number) || number <= 0) return null;
 
@@ -129,18 +129,18 @@ class BackPositionCommand extends SubCommand {
 
             // Результаты поиска
             const results = tracks.map((track, i) => ({
-                name: `${startIndex + i + 1}. ${i === highlightIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
+                name: `${startIndex + i + 1}. ${i === highlightIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: startIndex + i
             }));
 
-            return message.respond(results);
+            return ctx.respond(results);
         }
     }
 })
 class SkipPositionCommand extends SubCommand {
-    async execute({message, args}: CommandContext<number>) {
+    async run({ctx, args}: CommandContext<number>) {
         const number = args[0];
-        const {player, tracks} = db.queues.get(message.guildId);
+        const {player, tracks} = db.queues.get(ctx.guildId);
         const track = tracks.get(number);
 
         // Если указан трек которого нет
@@ -151,10 +151,10 @@ class SkipPositionCommand extends SubCommand {
         // Переходим к позиции
         await player.play(0, 0, number);
 
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
+                    description: locale._(ctx.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
                     color: api.color
                 }
             ],
@@ -189,9 +189,9 @@ class SkipPositionCommand extends SubCommand {
         },
         type: ApplicationCommandOptionType["Number"],
         required: true,
-        autocomplete: ({message, args}) => {
+        autocomplete: ({ctx, args}) => {
             const number = parseInt(args[0]);
-            const queue = db.queues.get(message.guildId);
+            const queue = db.queues.get(ctx.guildId);
 
             if (!queue || isNaN(number) || number <= 0) return null;
 
@@ -213,18 +213,18 @@ class SkipPositionCommand extends SubCommand {
 
             // Генерация результатов
             const results = tracks.map((track, i) => ({
-                name: `${start + i + 1}. ${i === highlight ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 120)}`,
+                name: `${start + i + 1}. ${i === highlight ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: start + i
             }));
 
-            return message.respond(results);
+            return ctx.respond(results);
         }
     }
 })
 class ToPositionCommand extends SubCommand {
-    async execute({message, args}: CommandContext<number>) {
+    async run({ctx, args}: CommandContext<number>) {
         const number = args[0];
-        const {player, tracks} = db.queues.get(message.guildId);
+        const {player, tracks} = db.queues.get(ctx.guildId);
         const track = tracks.get(number);
 
         // Если указан трек которого нет
@@ -235,10 +235,10 @@ class ToPositionCommand extends SubCommand {
         // Переходим к позиции
         await player.play(0, 0, number);
 
-        return message.reply({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(message.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
+                    description: locale._(ctx.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
                     color: api.color
                 }
             ],
@@ -272,7 +272,7 @@ class ToPositionCommand extends SubCommand {
     client: ["SendMessages", "ViewChannel"]
 })
 class SkipUtilityCommand extends Command {
-    async execute() {}
+    async run() {}
 }
 
 /**

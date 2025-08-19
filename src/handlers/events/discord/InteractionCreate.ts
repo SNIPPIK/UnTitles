@@ -1,7 +1,7 @@
 import type { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
+import { ChannelType, Events, InteractionType } from "discord.js";
 import { CommandInteraction, Colors } from "#structures/discord";
 import { Assign, Logger, locale } from "#structures";
-import { ChannelType, Events } from "discord.js"
 import { SubCommand } from "#handler/commands";
 import { Event } from "#handler/events";
 import { db } from "#app/db";
@@ -24,7 +24,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             name: Events.InteractionCreate,
             type: "client",
             once: false,
-            execute: async (ctx) => {
+            execute: (ctx) => {
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
@@ -62,21 +62,21 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
                 }
 
                 // Если используется функция ответа от бота
-                if (ctx.isAutocomplete()) {
+                if (ctx.type === InteractionType.ApplicationCommandAutocomplete) {
                     Logger.log("DEBUG", `[${ctx.user.username}] run autocomplete ${ctx?.commandName}`);
                     return this.SelectAutocomplete(ctx);
                 }
 
                 // Если пользователь использует команду
-                else if (ctx.isChatInputCommand()) {
+                else if (ctx.type === InteractionType.ApplicationCommand) {
                     Logger.log("DEBUG", `[${ctx.user.username}] run command ${ctx?.commandName}`);
-                    return this.SelectCommand(ctx);
+                    return this.SelectCommand(ctx as any);
                 }
 
                 // Действия выбора/кнопок
-                else if (ctx.isAnySelectMenu || ctx.isButton()) {
+                else if (ctx.type == InteractionType.MessageComponent) {
                     Logger.log("DEBUG", `[${ctx.user.username}] run component ${ctx?.["customId"]}`);
-                    return this.SelectComponent(ctx as any);
+                    return this.SelectComponent(ctx);
                 }
 
                 return null;
@@ -90,7 +90,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @readonly
      * @private
      */
-    private readonly SelectCommand = async (ctx: ChatInputCommandInteraction) => {
+    private readonly SelectCommand = (ctx: ChatInputCommandInteraction) => {
         const command = db.commands.get(ctx.commandName);
 
         /// Если нет команды
@@ -108,14 +108,14 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         }
 
         // Проверка middleware
-        if (command.middlewares?.length) {
+        else if (command.middlewares?.length > 0) {
             for (const rule of db.middlewares.array) {
-                if (command.middlewares.includes(rule.name) && !(await rule.callback(ctx))) return null;
+                if (command.middlewares.includes(rule.name) && !rule.callback(ctx)) return null;
             }
         }
 
         // Проверка прав
-        if (command.permissions && isBased(ctx) === "guild") {
+        else if (command.permissions && isBased(ctx) === "guild") {
             const { user: userPerms, client: botPerms } = command.permissions;
 
             // Проверка прав пользователя
@@ -129,13 +129,14 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             }
         }
 
-        const subcommand: SubCommand = command.options.find((sub) => sub.name === ctx.options["_subcommand"] && "execute" in sub) as any;
+        // Ищем подкоманду
+        const subcommand: SubCommand = command.options.find((sub) => sub.name === ctx.options["_subcommand"] && "run" in sub) as any;
+
+        // Ищем аргументы
+        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
 
         // Запускаем команду
-        return (subcommand ?? command).execute({
-            message: ctx,
-            args: ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value)
-        });
+        return (subcommand ?? command).run({ ctx, args });
     };
 
     /**
@@ -145,17 +146,19 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @private
      */
     private readonly SelectAutocomplete = (ctx: AutocompleteInteraction) => {
-        const subName = ctx.options["_subcommand"];
         const command = db.commands.get(ctx.commandName);
+
+        // Если не найдена команда
         if (!command) return null;
 
         // Ищем аргументы
         const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
         if (args.length === 0 || args.some(a => a === "")) return null;
 
+        const subName = ctx.options["_subcommand"];
         for (const opt of command.options) {
             if (subName ? opt.name === subName : opt.autocomplete) return (opt.autocomplete ?? opt.options?.find(o => o.autocomplete)?.
-                autocomplete)?.({message: ctx, args}) ?? null;
+                autocomplete)?.({ctx, args}) ?? null;
         }
 
         return null;
@@ -167,7 +170,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @readonly
      * @private
      */
-    private readonly SelectComponent = async (ctx: ButtonInteraction | AnySelectMenuInteraction) => {
+    private readonly SelectComponent = (ctx: ButtonInteraction | AnySelectMenuInteraction) => {
         const component = db.components.get(ctx.customId);
 
         // Если не найден такой компонент
@@ -178,7 +181,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         // Делаем проверку ограничений
         if (middlewares?.length > 0) {
             for (const rule of db.middlewares.array) {
-                if (middlewares.includes(rule.name) && !(await rule.callback(ctx as any))) return null;
+                if (middlewares.includes(rule.name) && !rule.callback(ctx)) return null;
             }
         }
 

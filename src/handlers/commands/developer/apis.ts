@@ -86,14 +86,14 @@ import { db } from "#app/db";
     }
 })
 class APISCommand extends Command {
-    public execute({message, args}: CommandContext<string>) {
+    public run({ctx, args}: CommandContext<string>) {
         if (args[0] === "block") {
             // Если платформа уже заблокирована
             if (db.api.platforms.block.includes(args[1] as RestServerSide.API["name"])) {
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
-                            description: locale._(message.locale, "command.api.block.retry", [message.member]),
+                            description: locale._(ctx.locale, "command.api.block.retry", [ctx.member]),
                             color: Colors.Yellow
                         }
                     ],
@@ -103,10 +103,10 @@ class APISCommand extends Command {
 
             // Блокируем платформу
             db.api.platforms.block.push(args[1] as RestServerSide.API["name"]);
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.api.block", [message.member]),
+                        description: locale._(ctx.locale, "command.api.block", [ctx.member]),
                         color: Colors.Green
                     }
                 ],
@@ -116,10 +116,10 @@ class APISCommand extends Command {
         else if (args[0] === "unblock") {
             // Если платформа не заблокирована
             if (!db.api.platforms.block.includes(args[1] as RestServerSide.API["name"])) {
-                return message.reply({
+                return ctx.reply({
                     embeds: [
                         {
-                            description: locale._(message.locale, "command.api.unblock.retry", [message.member]),
+                            description: locale._(ctx.locale, "command.api.unblock.retry", [ctx.member]),
                             color: Colors.Yellow
                         }
                     ],
@@ -131,10 +131,10 @@ class APISCommand extends Command {
             const index = db.api.platforms.block.indexOf(args[1] as RestServerSide.API["name"]);
             db.api.platforms.block.splice(index - 1, 1);
 
-            return message.reply({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(message.locale, "command.api.unblock", [message.member]),
+                        description: locale._(ctx.locale, "command.api.unblock", [ctx.member]),
                         color: Colors.Green
                     }
                 ],
