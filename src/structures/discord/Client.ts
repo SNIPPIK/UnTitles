@@ -78,7 +78,7 @@ export class DiscordClient extends Client {
         this.setMaxListeners(10);
 
         // Запускаем статусы после инициализации клиента
-        this.once("ready", this.IntervalStatus);
+        this.once("clientReady", this.IntervalStatus);
     };
 
     /**

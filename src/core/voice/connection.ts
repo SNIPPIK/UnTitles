@@ -170,7 +170,7 @@ export class VoiceConnection {
                 delay: 0,
                 ssrc: this._attention.ssrc
             },
-            seq: this.websocket.sequence
+            seq: this.websocket?.sequence ?? -1
         };
     };
 

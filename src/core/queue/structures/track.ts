@@ -215,7 +215,7 @@ export class Track extends BaseTrack {
      */
     public get resource(): Promise<string | Error> {
         return new Promise(async (resolve) => {
-            const resource = await this.prepareResource();
+            const resource = await this._prepareResource();
 
             // Если произошла ошибка при получении ресурса
             if (resource instanceof Error || !resource) {
@@ -273,7 +273,7 @@ export class Track extends BaseTrack {
      * @returns Promise<string | Error>
      * @private
      */
-    private prepareResource = async (): Promise<string | Error> => {
+    private _prepareResource = async (): Promise<string | Error> => {
         // Если включено кеширование
         if (db.cache.audio) {
             const status = db.cache.audio.status(this);
@@ -319,7 +319,7 @@ export class Track extends BaseTrack {
             else if (!link) return Error(`The platform does not provide a link`);
 
             this.link = link;
-            return this.prepareResource();
+            return this._prepareResource();
         } catch (err) {
             return Error(`This link track is not available... Fail update link!`);
         }

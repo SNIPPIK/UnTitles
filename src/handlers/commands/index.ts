@@ -135,9 +135,7 @@ export class Commands extends handler<Command> {
      * @private
      */
     private parseJsonData = (data: Command[]) => {
-        return data.map(cmd => {
-            return cmd.toJSON();
-        });
+        return data.map(cmd => cmd.toJSON());
     };
 }
 
@@ -412,7 +410,7 @@ export function Declare(options: DeclareOptions) {
             description_localizations = options.descriptions;
             integration_types = options.integration_types?.map(x => x === "GUILD_INSTALL" ? 0 : 1) ?? [0];
             contexts = options.contexts?.map(x =>  x === "GUILD" ? 0 : x === "BOT_DM" ? 1 : 2) ?? [0];
-            owner = options.owner;
+            owner = options.owner ?? false;
         }
 }
 

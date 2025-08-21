@@ -11,7 +11,7 @@ import { Script } from "node:vm";
 if (!isMainThread) {
     // Разовое событие
     parentPort.once("message", async (message) => {
-        const formats = await Youtube_decoder_native.decipherFormats(message.formats, message.html);
+        const formats = await YouTubeSignatureExtractor.decipherFormats(message.formats, message.html);
         return parentPort.postMessage(formats[0]);
     });
 }
@@ -56,7 +56,7 @@ const extractTceFunc = (body: string) => {
  * @class Youtube_decoder
  * @private
  */
-class Youtube_decoder_native {
+class YouTubeSignatureExtractor {
     /**
      * @author SNIPPIK
      * @description Функции для расшифровки
@@ -69,55 +69,45 @@ class Youtube_decoder_native {
             name: "extractDecipherFunction",
             callback: (body, _, code) => {
                 try {
-                    const callerFunc = DECIPHER_FUNC_NAME + "(" + DECIPHER_ARGUMENT + ");";
-                    let resultFunc: string;
+                    const callerFunc = `${DECIPHER_FUNC_NAME}(${DECIPHER_ARGUMENT});`;
 
-                    const sigFunctionMatcher = body.match(TCE_SIGN_FUNCTION_REGEXP);
-                    const sigFunctionActionsMatcher = body.match(TCE_SIGN_FUNCTION_ACTION_REGEXP);
+                    // --- Попытка взять TCE-вариант (новая схема YouTube) ---
+                    const sigFunc = body.match(TCE_SIGN_FUNCTION_REGEXP);
+                    const sigActions = body.match(TCE_SIGN_FUNCTION_ACTION_REGEXP);
 
-                    if (sigFunctionMatcher && sigFunctionActionsMatcher && code) {
-                        resultFunc = "var " + DECIPHER_FUNC_NAME + "=" + sigFunctionMatcher[0] + sigFunctionActionsMatcher[0] + code + ";\n";
-                        return resultFunc + callerFunc;
-                    }
+                    if (sigFunc && sigActions && code) return `var ${DECIPHER_FUNC_NAME}=${sigFunc[0]}${sigActions[0]}${code};\n${callerFunc}`;
 
+                    // --- Классический helper ---
                     const helperMatch = body.match(HELPER_REGEXP);
                     if (!helperMatch) return null;
 
-                    const helperObject = helperMatch[0];
-                    const actionBody = helperMatch[2];
+                    const [helperObject, , actionBody] = helperMatch;
 
-                    const reverseKey = mRegex(REVERSE_PATTERN, actionBody);
-                    const sliceKey = mRegex(SLICE_PATTERN, actionBody);
-                    const spliceKey = mRegex(SPLICE_PATTERN, actionBody);
-                    const swapKey = mRegex(SWAP_PATTERN, actionBody);
+                    // Поиск ключей операций
+                    const keys = [
+                        mRegex(REVERSE_PATTERN, actionBody),
+                        mRegex(SLICE_PATTERN, actionBody),
+                        mRegex(SPLICE_PATTERN, actionBody),
+                        mRegex(SWAP_PATTERN, actionBody),
+                    ].filter(Boolean);
 
-                    const quotedFunctions = [reverseKey, sliceKey, spliceKey, swapKey]
-                        .filter(Boolean)
-                        .map(key => key.replace(/[.*+?^${}()|[\]\\]/i, '\\$&'));
+                    if (keys.length === 0) return null;
 
-                    if (quotedFunctions.length === 0) return null;
-
-                    let funcMatch = body.match(DECIPHER_REGEXP);
-                    let isTce = false;
-                    let decipherFunc: string;
-
-                    if (funcMatch) decipherFunc = funcMatch[0];
-                    else {
-                        const tceFuncMatch = body.match(FUNCTION_TCE_REGEXP);
-                        if (!tceFuncMatch) return null;
-
-                        decipherFunc = tceFuncMatch[0];
-                        isTce = true;
-                    }
-
+                    // --- Функция-дешифратор ---
+                    let decipherFunc = body.match(DECIPHER_REGEXP)?.[0];
                     let tceVars = "";
-                    if (isTce) {
+
+                    if (!decipherFunc) {
+                        const tceFunc = body.match(FUNCTION_TCE_REGEXP);
+                        if (!tceFunc) return null;
+                        decipherFunc = tceFunc[0];
+
+                        // Если TCE — берем глобальные переменные
                         const tceVarsMatch = body.match(TCE_GLOBAL_VARS_REGEXP);
-                        if (tceVarsMatch) tceVars = tceVarsMatch[1] + ";\n";
+                        if (tceVarsMatch) tceVars = `${tceVarsMatch[1]};\n`;
                     }
 
-                    resultFunc = tceVars + helperObject + "\nvar " + DECIPHER_FUNC_NAME + "=" + decipherFunc + ";\n";
-                    return resultFunc + callerFunc;
+                    return `${tceVars}${helperObject}\nvar ${DECIPHER_FUNC_NAME}=${decipherFunc};\n${callerFunc}`;
                 } catch (e) {
                     console.error("Error in extractDecipherFunc:", e);
                     return null;
@@ -132,61 +122,37 @@ class Youtube_decoder_native {
             name: "extractNTransformFunction",
             callback: (body, name, code) => {
                 try {
-                    const callerFunc = N_TRANSFORM_FUNC_NAME + "(" + N_ARGUMENT + ");";
-                    let resultFunc = "";
-                    let nFunction = "";
+                    const caller = `${N_TRANSFORM_FUNC_NAME}(${N_ARGUMENT});`;
 
-                    const nFunctionMatcher = body.match(TCE_N_FUNCTION_REGEXP);
-
-                    if (nFunctionMatcher && name && code) {
-                        nFunction = nFunctionMatcher[0];
-
-                        const tceEscapeName = name.replace("$", "\\$");
-                        const shortCircuitPattern = new RegExp(
-                            `;\\s*if\\s*\\(\\s*typeof\\s+[a-zA-Z0-9_$]+\\s*===?\\s*(?:\"undefined\"|'undefined'|${tceEscapeName}\\[\\d+\\])\\s*\\)\\s*return\\s+\\w+;`
+                    // Попытка найти прямую TCE-функцию
+                    const tceMatch = body.match(TCE_N_FUNCTION_REGEXP);
+                    if (tceMatch && name && code) {
+                        let func = tceMatch[0];
+                        const escapedName = name.replace("$", "\\$");
+                        const shortCircuit = new RegExp(
+                            `;\\s*if\\s*\\(\\s*typeof\\s+[\\w$]+\\s*===?\\s*(?:\"undefined\"|'undefined'|${escapedName}\\[\\d+\\])\\s*\\)\\s*return\\s+\\w+;`
                         );
-
-                        const tceShortCircuitMatcher = nFunction.match(shortCircuitPattern);
-
-                        if (tceShortCircuitMatcher) {
-                            nFunction = nFunction.replaceAll(tceShortCircuitMatcher[0], ";");
-                        }
-
-                        resultFunc = "var " + N_TRANSFORM_FUNC_NAME + "=" + nFunction + code + ";\n";
-                        return resultFunc + callerFunc;
+                        func = func.replace(shortCircuit, ";");
+                        return `var ${N_TRANSFORM_FUNC_NAME}=${func}${code};\n${caller}`;
                     }
 
-                    let nMatch = body.match(N_TRANSFORM_REGEXP);
-                    let isTce = false;
+                    // Альтернатива: стандартный или TCE-формат
+                    const nMatch = body.match(N_TRANSFORM_REGEXP) ?? body.match(N_TRANSFORM_TCE_REGEXP);
+                    if (!nMatch) return null;
 
-                    if (nMatch) nFunction = nMatch[0];
-                    else {
-
-                        const nTceMatch = body.match(N_TRANSFORM_TCE_REGEXP);
-                        if (!nTceMatch) return null;
-
-                        nFunction = nTceMatch[0];
-                        isTce = true;
-                    }
-
-                    const paramMatch = nFunction.match(/function\s*\(\s*(\w+)\s*\)/);
-                    if (!paramMatch) return null;
-
-                    const paramName = paramMatch[1];
-
-                    const cleanedFunction = nFunction.replace(
-                        new RegExp(`if\\s*\\(typeof\\s*[^\\s()]+\\s*===?.*?\\)return ${paramName}\\s*;?`, "g"),
-                        ""
-                    );
-
+                    let func = nMatch[0];
                     let tceVars = "";
-                    if (isTce) {
+                    if (!body.match(N_TRANSFORM_REGEXP)) {
                         const tceVarsMatch = body.match(TCE_GLOBAL_VARS_REGEXP);
-                        if (tceVarsMatch) tceVars = tceVarsMatch[1] + ";\n";
+                        tceVars = tceVarsMatch ? tceVarsMatch[1] + ";\n" : "";
                     }
 
-                    resultFunc = tceVars + "var " + N_TRANSFORM_FUNC_NAME + "=" + cleanedFunction + ";\n";
-                    return resultFunc + callerFunc;
+                    const param = func.match(/function\s*\(\s*(\w+)\s*\)/)?.[1];
+                    if (!param) return null;
+
+                    func = func.replace(new RegExp(`if\\s*\\(typeof\\s*[^\\s()]+\\s*===?.*?\\)return ${param}\\s*;?`, "g"), "");
+
+                    return `${tceVars}var ${N_TRANSFORM_FUNC_NAME}=${func};\n${caller}`;
                 } catch (e) {
                     console.error("Error in extractNTransformFunc:", e);
                     return null;
@@ -201,7 +167,15 @@ class Youtube_decoder_native {
      * @param html5player - Ссылка на плеер
      */
     public static decipherFormats = async (formats: YouTubeFormat[], html5player: string): Promise<YouTubeFormat[]> => {
-        const [decipher, nTransform] = await this.extractPage(html5player);
+        // Получаем страницу плеера
+        const body = await new httpsClient({url: html5player}).toString;
+
+        // Если при получении страницы плеера произошла ошибка
+        if (body instanceof Error) return formats;
+
+        const { name, code } = extractTceFunc(body);
+        const [ decipher, nTransform ] = [this.extractDecipher(body, name, code), this.extractNTransform(body, name, code)];
+
         for (let item of formats) this.getting_url(item, {decipher, nTransform});
         return formats;
     };
@@ -215,65 +189,61 @@ class Youtube_decoder_native {
     private static getting_url = (format: YouTubeFormat, {decipher, nTransform}: YouTubeChanter): void => {
         if (!format) return;
 
-        const decipherF = (url: string) => {
+        const rawUrl = format.url || format.signatureCipher || format.cipher;
+        if (!rawUrl) return;
+
+        const decodeURL = (url: string) => {
+            try {
+                return new URL(decodeURIComponent(url));
+            } catch {
+                return null;
+            }
+        };
+        const applyDecipher = (url: string) => {
+            if (!decipher) return url;
+
             const args = querystring.parse(url);
-            if (!args.s || !decipher) return args.url as string;
+            if (!args.s) return args.url as string;
 
             try {
-                const context = { [DECIPHER_ARGUMENT]: decodeURIComponent(args.s as any) };
-                const components = new URL(decodeURIComponent(args.url as any));
-                const decipheredSig = decipher.runInNewContext(Object.assign(context, console));
+                const context = { [DECIPHER_ARGUMENT]: decodeURIComponent(args.s as string) };
+                const components = decodeURL(args.url as string);
+                if (!components) return args.url as string;
 
-                components.searchParams.set((args.sp || "sig" as any), decipheredSig);
+                const deciphered = decipher.runInNewContext({ ...context, console });
+                components.searchParams.set((args.sp as string) || DECIPHER_ARGUMENT, deciphered);
                 return components.toString();
-            } catch (err) {
+            } catch {
                 return args.url as string;
             }
         };
+        const applyNTransform = (url: string) => {
+            if (!nTransform) return url;
 
-        const nTransformF = (url: string) => {
+            const components = decodeURL(url);
+            if (!components) return url;
+
+            const nParam = components.searchParams.get("n");
+            if (!nParam) return url;
+
             try {
-                const components = new URL(decodeURIComponent(url));
-                const n = components.searchParams.get("n");
-
-                if (!n || !nTransform) return url;
-                const context = { [N_ARGUMENT]: n };
-                const transformedN = nTransform.runInNewContext(Object.assign(context, console));
-
-                if (transformedN) components.searchParams.set("n", transformedN);
-
+                const transformed = nTransform.runInNewContext({ [N_ARGUMENT]: nParam, console });
+                if (transformed) components.searchParams.set("n", transformed);
                 return components.toString();
-            } catch (err) {
+            } catch {
                 return url;
             }
         };
 
-        const cipher = !format.url;
-        const url = format.url || format.signatureCipher || format.cipher;
-
-        if (!url) return;
-
         try {
-            format.url = nTransformF(cipher ? decipherF(url) : url);
+            const initialUrl = rawUrl === format.url ? rawUrl : applyDecipher(rawUrl);
+            format.url = applyNTransform(initialUrl);
+
             delete format.signatureCipher;
             delete format.cipher;
         } catch (err) {
             throw err;
         }
-    };
-
-    /**
-     * @description Извлекает функции расшифровки сигнатур и преобразования n параметров из файла html5 player.
-     * @param html5 - Ссылка на плеер
-     * @private
-     */
-    private static extractPage = async (html5: string) => {
-        const body = await new httpsClient({url: html5}).toString;
-
-        if (body instanceof Error) return null;
-
-        const { name, code } = extractTceFunc(body);
-        return [this.extractDecipher(body, name, code), this.extractNTransform(body, name, code)];
     };
 
     /**
@@ -322,8 +292,7 @@ class Youtube_decoder_native {
 
                 // Выполняем виртуальный код
                 return new Script(postProcess ? postProcess(func) : func);
-            } catch {
-            }
+            } catch {}
         }
 
         return null;
@@ -358,8 +327,10 @@ interface YouTubeChanter {
     nTransform?: Script;
 }
 
-const DECIPHER_FUNC_NAME = "CORDODecipherFunc";
-const N_TRANSFORM_FUNC_NAME = "CORDONTransformFunc";
+const DECIPHER_ARGUMENT = "sig";
+const N_ARGUMENT = "ncode";
+const DECIPHER_FUNC_NAME = "DecipherFunc";
+const N_TRANSFORM_FUNC_NAME = "NTransformFunc";
 
 const VARIABLE_PART = "[a-zA-Z_\\$][a-zA-Z_0-9\\$]*";
 const VARIABLE_PART_DEFINE = "\\\"?" + VARIABLE_PART + "\\\"?";
@@ -371,6 +342,12 @@ const SLICE_PART = ":function\\(\\w,\\w\\)\\{return \\w\\.slice\\(\\w\\)\\}";
 const SPLICE_PART = ":function\\(\\w,\\w\\)\\{\\w\\.splice\\(0,\\w\\)\\}";
 const SWAP_PART = ":function\\(\\w,\\w\\)\\{" +
     "var \\w=\\w\\[0\\];\\w\\[0\\]=\\w\\[\\w%\\w\\.length\\];\\w\\[\\w(?:%\\w.length|)\\]=\\w(?:;return \\w)?\\}";
+
+const PATTERN_PREFIX = "(?:^|,)\\\"?(" + VARIABLE_PART + ")\\\"?";
+const REVERSE_PATTERN = new RegExp(PATTERN_PREFIX + REVERSE_PART, "m");
+const SLICE_PATTERN = new RegExp(PATTERN_PREFIX + SLICE_PART, "m");
+const SPLICE_PATTERN = new RegExp(PATTERN_PREFIX + SPLICE_PART, "m");
+const SWAP_PATTERN = new RegExp(PATTERN_PREFIX + SWAP_PART, "m");
 
 const DECIPHER_REGEXP = new RegExp(
     "function(?: " + VARIABLE_PART + ")?\\(([a-zA-Z])\\)\\{" +
@@ -452,12 +429,3 @@ const TCE_SIGN_FUNCTION_ACTION_REGEXP = new RegExp(
 "\\s*" + VARIABLE_PART_OBJECT_DECLARATION + "\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*}[^{}]*)*}\\s*};", "s");
 
 const TCE_N_FUNCTION_REGEXP = new RegExp("function\\s*\\((\\w+)\\)\\s*\\{var\\s*\\w+\\s*=\\s*\\1\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\s*,\\s*\\w+\\s*=\\s*\\[.*?\\]\\;.*?catch\\s*\\(\\s*(\\w+)\\s*\\)\\s*\\{return\\s*\\w+\\[\\d+\\]\\s*\\+\\s*\\1\\}\\s*return\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\}\\s*\\;", "gs");
-
-const PATTERN_PREFIX = "(?:^|,)\\\"?(" + VARIABLE_PART + ")\\\"?";
-const REVERSE_PATTERN = new RegExp(PATTERN_PREFIX + REVERSE_PART, "m");
-const SLICE_PATTERN = new RegExp(PATTERN_PREFIX + SLICE_PART, "m");
-const SPLICE_PATTERN = new RegExp(PATTERN_PREFIX + SPLICE_PART, "m");
-const SWAP_PATTERN = new RegExp(PATTERN_PREFIX + SWAP_PART, "m");
-
-const DECIPHER_ARGUMENT = "sig";
-const N_ARGUMENT = "ncode";

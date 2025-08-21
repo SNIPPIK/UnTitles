@@ -294,7 +294,6 @@ class RestYouTubeAPI extends RestServerSide.API {
      */
     protected static API = (url: string): Promise<Error | json> => {
         return new Promise((resolve) => {
-            // Если не надо использовать ключ, то используем систему поиска данных по странице
             new httpsClient({
                 url,
                 userAgent: true,
@@ -317,12 +316,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     // Если возникает ошибка при поиске на странице
                     if (data instanceof Error) return resolve(data);
 
-                    // Путь плеера (необходим для расшифровки)
-                    const html5Player = /<script\s+src="([^"]+)"(?:\s+type="text\/javascript")?\s+name="player_ias\/base"\s*>|"jsUrl":"([^"]+)"/.exec(api);
-
-                    return resolve(Object.assign(data, {
-                        html: `https://www.youtube.com${html5Player ? html5Player[1] || html5Player[2] : null}`
-                    }));
+                    return resolve(data);
                 })
 
                 // Если происходит ошибка
@@ -339,7 +333,7 @@ class RestYouTubeAPI extends RestServerSide.API {
      * @static
      */
     protected static extractFormat = async (data: json, html: string, url: string) => {
-        // Если установлен wrapper
+        // Если установлен wrapper ytdlp
         if (fs.existsSync("node_modules/ytdlp-nodejs")) {
             const { YtDlp } = require("ytdlp-nodejs");
             const ytdlp = new YtDlp();
@@ -360,9 +354,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     execArgv: ["-r", "tsconfig-paths/register"],
                     workerData: null
                 },
-                callback: (data) => {
-                    return resolve(data);
-                }
+                callback: (data) => resolve(data)
             });
         });
     };
@@ -374,13 +366,18 @@ class RestYouTubeAPI extends RestServerSide.API {
     protected static extractInitialDataResponse = (input: string): json | Error => {
         if (typeof input !== "string") return locale.err("api.request.fail");
 
-        let endData: json = {};
+        // Путь плеера (необходим для расшифровки)
+        const html5Player = /<script\s+src="([^"]+)"(?:\s+type="text\/javascript")?\s+name="player_ias\/base"\s*>|"jsUrl":"([^"]+)"/.exec(input);
+
+        let endData: json = {
+            html: `https://www.youtube.com${html5Player ? html5Player[1] || html5Player[2] : null}`
+        };
 
         // Попытка найти ytInitialData JSON
         const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
         if (initialDataMatch) {
             try {
-                endData = JSON.parse(initialDataMatch[1]);
+                endData = { ...endData, ...JSON.parse(initialDataMatch[1]) };
             } catch {
                 // Игнорируем ошибку парсинга initialData
             }
@@ -412,7 +409,7 @@ class RestYouTubeAPI extends RestServerSide.API {
             if (status === "LOGIN_REQUIRED") {
                 return new Error(locale._(locale.language, "api.request.login"));
             } else if (status !== "OK") {
-                const reason = endData.playabilityStatus?.reason || "";
+                const reason = endData.playabilityStatus?.reason || "Not found status error";
                 return new Error(locale._(locale.language, "api.request.fail.msg", [reason]));
             }
         }

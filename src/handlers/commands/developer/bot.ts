@@ -132,7 +132,8 @@ class WorkBotCommand extends Command {
     descriptions: {
         "en-US": "Manage profile bot!",
         "ru": "Управление профилем бота!"
-    }
+    },
+    owner: true
 })
 @Options({
     avatar: {
@@ -162,11 +163,11 @@ class WorkBotCommand extends Command {
     }
 })
 class ManageBotCommand extends Command {
-    public run({ctx}: CommandContext<string>) {
+    async run({ctx}: CommandContext<string>) {
         const attachment = ctx.options.getAttachment("file");
         const client = ctx.client;
 
-        //Если попытка всунуть не изображение
+        // Если попытка всунуть не изображение
         if (!attachment.contentType.match(/image/)) {
             return ctx.reply({
                 embeds: [
@@ -178,10 +179,12 @@ class ManageBotCommand extends Command {
             });
         }
 
+        await ctx.deferReply();
+
         client.user.setAvatar(attachment.url)
             // Если удалось установить новый аватар
             .then(async () => {
-                return ctx.reply({
+                return ctx.editReply({
                     embeds: [
                         {
                             author: { name: client.user.username, icon_url: client.user.avatarURL() },
@@ -194,7 +197,7 @@ class ManageBotCommand extends Command {
 
             // Если не удалось установить новый аватар
             .catch(async (err) => {
-                return ctx.reply({
+                return ctx.editReply({
                     embeds: [
                         {
                             author: { name: client.user.username, icon_url: client.user.avatarURL() },

@@ -46,14 +46,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
 
     /**
-     * @description Отправлен ли аудио пакет для синхронизации jitter buffer
-     * @usage Отправлять только с новым треком!
-     * @public
-     */
-    public _sendPrepareJitter = false;
-
-
-    /**
      * @description Текущий статус плеера, при создании он должен быть в ожидании
      * @private
      */
@@ -245,12 +237,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
          * @description Событие смены позиции плеера
          * @private
          */
-        this.on("player/wait", async (player) => {
+        this.on("player/wait", (player) => {
             const repeat = player.tracks.repeat;
             const current = player.tracks.position;
-
-            // Позволяем отправить 1 аудио пакет заранее
-            this._sendPrepareJitter = false;
 
             // Если включен повтор трека сменить позицию нельзя
             if (repeat === RepeatType.Song) player.tracks.position = current;
@@ -292,7 +281,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     if (skip.position === current) {
                         // Если плеер играет, то не пропускаем
                         if (player.playing) return;
-                        this.emit("player/wait", this);
+                        this.emit("player/wait", player);
                     }
 
                     // Если следующих треков нет
