@@ -1,6 +1,5 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
-import { env } from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -14,7 +13,6 @@ import { env } from "#app/env";
     url: "soundcloud.com",
     color: 15105570,
     audio: true,
-    auth: env.get("token.soundcloud", null),
     filter: /^(?:(https?):\/\/)?(?:(?:www|m)\.)?(api\.soundcloud\.com|soundcloud\.com|snd\.sc)\/(.*)$/,
 })
 @OptionsRest({
@@ -23,6 +21,18 @@ import { env } from "#app/env";
      * @protected
      */
     api: "https://api-v2.soundcloud.com",
+
+    /**
+     * @description Время жизни токена
+     * @protected
+     */
+    time: 0,
+
+    /**
+     * @description Токен авторизации
+     * @protected
+     */
+    client_id: null
 })
 class RestSoundCloudAPI extends RestServerSide.API {
     readonly requests: RestServerSide.API["requests"] = [
@@ -151,8 +161,13 @@ class RestSoundCloudAPI extends RestServerSide.API {
      */
     protected API = (url: string): Promise<{api: json, ClientID: string} | Error> => {
         return new Promise(async (resolve) => {
+            const ClientID = await this.getClientID();
+
+            // Если client_id не был получен
+            if (!ClientID) return resolve(locale.err("api.request.fail"));
+
             const result = await new httpsClient({
-                url: `${this.options.api}/${url}&client_id=${this.auth}`,
+                url: `${this.options.api}/${url}&client_id=${ClientID}`,
             }).toJson;
 
             // Если возникает ошибка при получении страницы
@@ -164,6 +179,56 @@ class RestSoundCloudAPI extends RestServerSide.API {
             });
         });
     };
+
+    /**
+     * @description Получаем временный client_id для SoundCloud
+     * @protected
+     */
+    protected getClientID = async (): Promise<string | null> => {
+        // Если client_id ещё действителен, возвращаем его
+        if (this.options.client_id && this.options.time > Date.now()) {
+            return this.options.client_id;
+        }
+
+        try {
+            // Получаем главную страницу SoundCloud
+            const mainPage = await new httpsClient({
+                url: "https://soundcloud.com/",
+                userAgent: true,
+                headers: {
+                    "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "accept-encoding": "gzip, deflate, br"
+                }
+            }).toString;
+
+            if (!mainPage || mainPage instanceof Error) return null;
+
+            // Ищем все скрипты на странице
+            const scriptUrls = mainPage
+                .split('<script crossorigin src="')
+                .filter(s => s.startsWith("https"))
+                .map(s => s.split('"')[0]);
+
+            if (!scriptUrls.length) return null;
+
+            // Загружаем последний скрипт (обычно содержит client_id)
+            const scriptContent = await new httpsClient({ url: scriptUrls.pop()! }).toString;
+            if (!scriptContent || scriptContent instanceof Error) return null;
+
+            // Парсим client_id
+            const match = scriptContent.match(/,client_id:"(.*?)"/);
+            if (!match) return null;
+
+            this.options.client_id = match[1];
+            this.options.time = Date.now() + 60 * 60 * 1000; // действителен 1 час
+
+            return match[1];
+        } catch (err) {
+            console.error("Error fetching client_id:", err);
+            return null;
+        }
+    };
+
 
     /**
      * @description Проходим все этапы для получения ссылки на поток трека
