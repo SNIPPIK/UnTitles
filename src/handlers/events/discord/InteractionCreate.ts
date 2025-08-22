@@ -130,7 +130,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         }
 
         // Ищем подкоманду
-        const subcommand: SubCommand = command.options.find((sub) => sub.name === ctx.options["_subcommand"] && "run" in sub) as any;
+        const subcommand: SubCommand = command.options?.find((sub) => sub.name === ctx.options["_subcommand"] && "run" in sub) as any;
 
         // Ищем аргументы
         const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
