@@ -175,7 +175,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
 
             return resolve({
                 api: result,
-                ClientID: this.auth
+                ClientID: ClientID
             });
         });
     };
@@ -186,13 +186,10 @@ class RestSoundCloudAPI extends RestServerSide.API {
      */
     protected getClientID = async (): Promise<string | null> => {
         // Если client_id ещё действителен, возвращаем его
-        if (this.options.client_id && this.options.time > Date.now()) {
-            return this.options.client_id;
-        }
+        if (this.options.client_id && this.options.time > Date.now()) return this.options.client_id;
 
         try {
-            // Получаем главную страницу SoundCloud
-            const mainPage = await new httpsClient({
+            const parsedPage = await new httpsClient({
                 url: "https://soundcloud.com/",
                 userAgent: true,
                 headers: {
@@ -201,28 +198,21 @@ class RestSoundCloudAPI extends RestServerSide.API {
                 }
             }).toString;
 
-            if (!mainPage || mainPage instanceof Error) return null;
+            if (!parsedPage || parsedPage instanceof Error) return null;
+            const split = parsedPage.split("<script crossorigin src=\"");
+            const urls: string[] = [];
 
-            // Ищем все скрипты на странице
-            const scriptUrls = mainPage
-                .split('<script crossorigin src="')
-                .filter(s => s.startsWith("https"))
-                .map(s => s.split('"')[0]);
+            split.forEach((r) => r.startsWith("https") ? urls.push(r.split("\"")[0]) : null);
 
-            if (!scriptUrls.length) return null;
+            const parsedPage2 = await new httpsClient({url: urls.at(-1)}).toString;
+            if (!parsedPage2 || parsedPage2 instanceof Error) return null;
 
-            // Загружаем последний скрипт (обычно содержит client_id)
-            const scriptContent = await new httpsClient({ url: scriptUrls.pop()! }).toString;
-            if (!scriptContent || scriptContent instanceof Error) return null;
+            const client_id = parsedPage2.split(",client_id:\"")[1].split("\",")[0];
 
-            // Парсим client_id
-            const match = scriptContent.match(/,client_id:"(.*?)"/);
-            if (!match) return null;
+            this.options.client_id = client_id;
+            this.options.time = Date.now() + 60 * 60 * 1e3;
 
-            this.options.client_id = match[1];
-            this.options.time = Date.now() + 60 * 60 * 1000; // действителен 1 час
-
-            return match[1];
+            return client_id;
         } catch (err) {
             console.error("Error fetching client_id:", err);
             return null;

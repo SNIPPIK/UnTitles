@@ -193,7 +193,7 @@ export class RestObject {
 
                 // Если треков не найдено
                 else if (!search.length) {
-                    Logger.log("DEBUG", `[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
+                    Logger.log("ERROR", `[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
                     lastError = Error(`[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
                     continue;
                 }
@@ -205,7 +205,7 @@ export class RestObject {
                     const Matches = candidate.map((x) => original.includes(x));
                     const time = Math.abs(track.time.total - song.time.total);
 
-                    return (time <= 10 || time === 0) && Matches.length / Math.max(original.length, candidate.length);
+                    return (time <= 10 || time === 0) && Matches.length / Math.max(original.length, candidate.length) || Matches.length >= Math.abs(original.length - Matches.length);
                 });
 
                 // Если отфильтровать треки не удалось
@@ -226,7 +226,7 @@ export class RestObject {
                 }
 
                 // Если есть ссылка на аудио
-                if (song !== undefined) {
+                if (song.link) {
                     // Меняем время трека на время найденного трека
                     track["_duration"] = song.time;
 
