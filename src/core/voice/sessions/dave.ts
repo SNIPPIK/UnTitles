@@ -138,7 +138,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @public
      */
     public reinit = (): void => {
-        if (this.protocolVersion > 0) {
+        if (this.protocolVersion > 0 && this.user_id && this.channel_id) {
             if (this.session) {
                 this.session.reinit(this.protocolVersion, this.user_id, this.channel_id);
                 this.emit("debug", `Session reinitialized for protocol version ${this.protocolVersion}`);
