@@ -58,7 +58,7 @@ import { db } from "#app/db";
 
             const results = tracks.map((track, i) => ({
                 name: `${startIndex + i + 1}. ${i === highlightIndex ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
-                value: startIndex + i
+                value: startIndex + i + 1
             }));
 
             return ctx.respond(results);
@@ -72,7 +72,7 @@ import { db } from "#app/db";
 class RemoveTracksCommand extends Command {
     async run({ctx, args}: CommandContext<number>) {
         const queue = db.queues.get(ctx.guildId);
-        const number = args[0];
+        const number = args[0] - 1;
         const track = queue.tracks.get(number);
 
         // Если указан трек которого нет
@@ -94,7 +94,7 @@ class RemoveTracksCommand extends Command {
         queue.tracks.remove(number);
 
         // Если выбран текущий трек
-        if ((number - 1) === queue.tracks.position) {
+        if (number === queue.tracks.position) {
             // Если треков нет в очереди
             if (!queue.tracks.total) return queue.cleanup();
             await queue.player.play(0, 0, queue.tracks.position);
