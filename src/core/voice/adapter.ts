@@ -41,7 +41,7 @@ export abstract class VoiceAdapters<T extends any> {
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_STATE_UPDATE
      * @param payload - Данные голосового состояния
      */
-    public onVoiceStateUpdate = (payload: GatewayVoiceStateUpdateDispatchData) => {
+    public onVoiceStateUpdate = (payload: GatewayVoiceStateUpdateDispatchData & { guild_id: string }) => {
         this.adapters.get(payload.guild_id)?.onVoiceStateUpdate(payload);
     };
 }
