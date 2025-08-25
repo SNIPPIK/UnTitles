@@ -49,6 +49,21 @@ class ButtonRepeat extends Component<"button"> {
             });
         }
 
+        // Включение бесконечного потока
+        else if (loop === RepeatType.Song) {
+            queue.tracks.repeat = RepeatType.AutoPlay;
+
+            return ctx.reply({
+                flags: "Ephemeral",
+                embeds: [
+                    {
+                        description: locale._(ctx.locale, "player.button.repeat.related"),
+                        color: Colors.Green
+                    }
+                ]
+            });
+        }
+
         queue.tracks.repeat = RepeatType.None;
 
         return ctx.reply({

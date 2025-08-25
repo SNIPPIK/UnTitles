@@ -27,6 +27,7 @@ class RestServer extends handler<RestServerSide.API> {
         supported: null,
         authorization: [],
         audio: [],
+        related: [],
         block: []
     };
 
@@ -48,7 +49,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @private
      */
     private get array(): RestServerSide.API[] {
-        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
+        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported).sort((a, b) => a.name.localeCompare(b.name));
         return this.platforms.array;
     };
 
@@ -58,6 +59,15 @@ class RestServer extends handler<RestServerSide.API> {
      */
     public get allow(): RestServerSide.API[] {
         return this.array.filter(api => api.auth !== null);
+    };
+
+    /**
+     * @description Платформы с доступом к похожим трекам
+     * @returns RestServerSide.API[]
+     * @public
+     */
+    public get allowRelated(): RestServerSide.API[] {
+        return this.array.filter(api => api.auth !== null && api.requests.some((apis) => apis.name === "related"));
     };
 
     /**
@@ -94,8 +104,9 @@ class RestServer extends handler<RestServerSide.API> {
 
         // Загружаем команды в текущий класс
         for (let file of this.files) {
-            if (!file.auth) this.platforms.authorization.push(file.name);
-            if (!file.audio) this.platforms.audio.push(file.name);
+            if (file.auth !== null) this.platforms.authorization.push(file.name);
+            if (file.audio) this.platforms.audio.push(file.name);
+            if (file.requests.find((req) => req.name === "related")) this.platforms.related.push(file.name);
 
             this.platforms.supported = {
                 ...this.platforms.supported,
@@ -217,7 +228,8 @@ async function ExtractData() {
     parentPort?.postMessage({
         supported: fakeReq,
         authorization: fakeReq.filter(api => api.auth !== null).map(api => api.name),
-        audio: fakeReq.filter(api => api.audio === false).map(api => api.name),
+        audio: fakeReq.filter(api => api.audio).map(api => api.name),
+        related: rest.allowRelated.map(api => api.name),
         block: []
     });
 }

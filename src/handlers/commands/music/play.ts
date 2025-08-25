@@ -14,7 +14,7 @@ import { db } from "#app/db";
  */
 async function allAutoComplete(message: CompeteInteraction, platform: RestClientSide.Request, search: string) {
     // Если платформа заблокирована
-    if (platform.block || !platform.auth) return;
+    if (platform?.block || !platform?.auth) return;
 
     // Получаем функцию запроса данных с платформы
     const api = platform.request(search, { audio: false });
@@ -157,13 +157,13 @@ class PlaySearchCommand extends SubCommand {
 
 
 /**
- * @description Под команда включения аудио потока
+ * @description Под команда включения похожих треков
  * @type SubCommand
  */
 @Declare({
     names: {
-        "en-US": "wave",
-        "ru": "поток"
+        "en-US": "related",
+        "ru": "похожее"
     },
     descriptions: {
         "en-US": "Endless track playback mode!",
@@ -182,7 +182,7 @@ class PlaySearchCommand extends SubCommand {
         },
         type: ApplicationCommandOptionType["String"],
         required: true,
-        choices: db.api.allowWave.map((platform) => {
+        choices: db.api.allowRelated.map((platform) => {
             return {
                 name: `${platform.name.toLowerCase()} | ${platform.url}`,
                 value: platform.name
@@ -208,7 +208,7 @@ class PlaySearchCommand extends SubCommand {
         }
     }
 })
-class PlayWaveCommand extends SubCommand {
+class PlayRelatedCommand extends SubCommand {
     async run({ctx, args}: CommandContext) {
         // Запрос к платформе
         const platform = db.api.request(args[0] as any);
@@ -226,7 +226,7 @@ class PlayWaveCommand extends SubCommand {
         }
 
         await ctx.deferReply();
-        db.events.emitter.emit("rest/request", platform, ctx, args[1]);
+        db.events.emitter.emit("rest/request", platform, ctx, `${args[1]}&list=RD`);
         return null;
     };
 }
@@ -250,7 +250,7 @@ class PlayWaveCommand extends SubCommand {
     },
     integration_types: ["GUILD_INSTALL"]
 })
-@Options([PlaySearchCommand, PlayWaveCommand])
+@Options([PlaySearchCommand, PlayRelatedCommand])
 @Middlewares(["cooldown", "voice", "another_voice"])
 @Permissions({
     client: ["SendMessages", "ViewChannel"]
@@ -311,7 +311,7 @@ class PlayCommand extends Command {
         }
 
         // Если платформа заблокирована
-        if (platform.block) {
+        else if (platform.block) {
             db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
             return null;
         }

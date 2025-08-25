@@ -11,9 +11,9 @@ export type languages = `${keyof LocalizationMap}`;
 /**
  * @author SNIPPIK
  * @description Все доступные имена переменных для помощи
- * @type locale_text
+ * @type localeString
  */
-type locale_text = keyof typeof locales;
+export type localeString = keyof typeof locales;
 
 /**
  * @author SNIPPIK
@@ -53,7 +53,7 @@ export class locale {
      * @returns string
      * @public
      */
-    public static _ = (language: languages, locale: locale_text, args?: any[]) => {
+    public static _ = (language: languages, locale: localeString, args?: any[]) => {
         const lang = this.universalLang(language);
         let translate = locales[locale][lang] as string;
 
@@ -80,7 +80,7 @@ export class locale {
      * @returns Error
      * @public
      */
-    public static err = (locale: locale_text, args?: any[]) => {
+    public static err = (locale: localeString, args?: any[]) => {
         return Error(this._(this.language, locale, args));
     };
 }

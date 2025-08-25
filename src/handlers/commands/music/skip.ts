@@ -36,7 +36,6 @@ import { db } from "#app/db";
 
             const position = queue.tracks.position;
             const maxSuggestions = 5;
-            const icon = "⬅️";
             const highlightIndex = 0;
             const startIndex = Math.max(0, position - number);
 
@@ -48,7 +47,7 @@ import { db } from "#app/db";
 
             // Результаты поиска
             const results = tracks.map((track, i) => ({
-                name: `${startIndex + i + 1}. ${i === highlightIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                name: `${startIndex + i + 1}. ${i === highlightIndex ? "➡" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: startIndex + i
             }));
 
@@ -117,7 +116,6 @@ class BackPositionCommand extends SubCommand {
             const total = queue.tracks.total;
             const position = queue.tracks.position;
             const maxSuggestions = 5;
-            const icon = "➡️";
             const highlightIndex = 0;
             const startIndex = Math.min(total - 1, position + (number - 1));
 
@@ -129,7 +127,7 @@ class BackPositionCommand extends SubCommand {
 
             // Результаты поиска
             const results = tracks.map((track, i) => ({
-                name: `${startIndex + i + 1}. ${i === highlightIndex ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                name: `${startIndex + i + 1}. ${i === highlightIndex ? "➡" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: startIndex + i
             }));
 
@@ -197,7 +195,6 @@ class SkipPositionCommand extends SubCommand {
 
             const { total } = queue.tracks;
             const max = 5;
-            const icon = "🎵";
             const index = number - 1;
 
             // Определяем начальную позицию и индекс подсветки
@@ -213,7 +210,7 @@ class SkipPositionCommand extends SubCommand {
 
             // Генерация результатов
             const results = tracks.map((track, i) => ({
-                name: `${start + i + 1}. ${i === highlight ? icon : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                name: `${start + i + 1}. ${i === highlight ? "➡" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: start + i
             }));
 

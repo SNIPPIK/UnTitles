@@ -3,6 +3,15 @@ import { VoiceOpcodes } from "discord-api-types/voice/v8";
 import { HeartbeatManager } from "../managers/heartbeat";
 import { WebSocket, MessageEvent, Data } from "ws";
 import { Logger, TypedEmitter } from "#structures";
+import { version, name } from "package.json";
+import os from "node:os";
+
+/**
+ * @author SNIPPIK
+ * @description Версия user agent для WebSocket
+ * @const user_agent
+ */
+const user_agent = `SNPK Team (${os.arch()}; ${os.version()}) ${version}/${name}`;
 
 /**
  * @author SNIPPIK
@@ -148,7 +157,11 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         this._endpoint = endpoint;
-        this.ws = new WebSocket(`wss://${endpoint}?v=8`);
+        this.ws = new WebSocket(`wss://${endpoint}?v=8`, {
+            headers: {
+                "user-agent": user_agent
+            }
+        });
 
         // Сообщение от websocket соединения
         this.ws.onmessage = this.onReceiveMessage;

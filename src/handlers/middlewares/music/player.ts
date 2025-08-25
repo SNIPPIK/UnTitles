@@ -50,7 +50,7 @@ class PlayerWait extends Assign<middleware<CommandInteraction>> {
                 const queue = db.queues.get(ctx.guildId);
 
                 // Если музыку нельзя пропустить из-за плеера
-                if (queue && queue.player.waitStream) {
+                if (queue && queue.player?.audio.waitStream) {
                     ctx.reply({
                         flags: "Ephemeral",
                         embeds: [

@@ -2,7 +2,7 @@ import { CommandInteraction, Colors } from "#structures/discord";
 import { Collection, Logger, locale } from "#structures";
 import { ControllerCycles } from "./controllers/cycle";
 import { Queue } from "#core/queue/structures/queue";
-import { QueueMessage } from "./structures/message";
+import { QueueMessage } from "./modules/message";
 import { RestClientSide } from "#handler/rest";
 import { AudioPlayer } from "#core/player";
 import { Track } from "./structures/track";
@@ -81,7 +81,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
             queue.player.removeAllListeners();
 
             // Тихо удаляем очередь
-            this.remove(queue.guild.id, true);
+            this.remove(queue.message.guildID, true);
         }
 
         Logger.log("DEBUG", `[Queues] has getting max timeout: ${timeout} ms`);
@@ -107,32 +107,27 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @param item    - Добавляемый объект
      * @private
      */
-    public create = async (message: CommandInteraction, item?: Track.list | Track) => {
-        let queue = this.get(message.guildId);
+    public create = (message: CommandInteraction, item: Track.list | Track | Track[]) => {
+        const items = this._prepareGettingData(item);
+
+        // Если данных нет
+        if (!items.length) {
+            db.events.emitter.emit("rest/error", message, locale._(message.locale, "player.search.fail"));
+            return null;
+        }
 
         // Если очереди нет — создаём новую
-        if (!queue) queue = new Queue(message) as T;
-        else {
-            const player = queue.player;
+        const queue = this.get(message.guildId) ?? (new Queue(message) as T);
+        const { player, tracks } = queue;
 
+        // Если есть треки в очереди
+        if (tracks.total > 0) {
             // Проверяем, активен ли плеер в цикле или находится на паузе
-            const isPlayerInactive = !this.cycles.players.has(player) && player.status !== "player/pause";
-
-            if (isPlayerInactive) {
+            if (!this.cycles.players.has(player) && player.status !== "player/pause") {
                 // Перезапуск плеера отложенным вызовом
                 setImmediate(() => {
                     // Установка позиции воспроизведения в зависимости от типа добавленного item
-
-                    if (item instanceof Track) {
-                        // Добавлен один трек — ставим позицию в конец очереди
-                        player.tracks.position = player.tracks.total - 1;
-                    } else if (!item) {
-                        // Очередь была перезапущена без треков
-                        player.tracks.position = 0;
-                    } else {
-                        // Добавлен плейлист — позиция на начало добавленного плейлиста
-                        player.tracks.position = player.tracks.total - item.items.length;
-                    }
+                    tracks.position = items.length ? tracks.total - items.length : 0;
 
                     // Если текстовый канал изменился — обновляем привязку
                     if (queue.message.channelID !== message.channelId) {
@@ -145,20 +140,38 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
             }
         }
 
-        // Если передан трек или список треков — добавляем в очередь
-        if (item) {
-            const tracks = (item as Track.list).items ?? [item as Track];
+        // Добавляем треки
+        items.forEach(track => {
+            track.user = message.member.user;
+            tracks.push(track);
+        });
 
-            for (const track of tracks) {
-                track.user = message.member.user;
-                queue.tracks.push(track);
-            }
-
-            // Отправка события о добавлении
-            if ((item as Track.list).items || queue.tracks.total > 0) {
-                db.events.emitter.emit("message/push", queue, message.member, item);
-            }
+        // Отправка события о добавлении
+        if (tracks.total > 0 && !Array.isArray(item)) {
+            db.events.emitter.emit("message/push", queue, message.member, item);
         }
+
+        return null;
+    };
+
+    /**
+     * @description Подготовка данных для сохранения в очереди
+     * @param item - Данные полученных треков и прочего
+     * @private
+     */
+    private _prepareGettingData = (item: Track.list | Track | Track[]): Track[] => {
+        const items: Track[] = [];
+
+        // Если получен трек
+        if (item instanceof Track) items.push(item);
+
+        // Если получен список треков
+        else if (Array.isArray(item)) items.push(item[0]);
+
+        // Если получен плейлист или альбом
+        else items.push(...item.items);
+
+        return items;
     };
 }
 

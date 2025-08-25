@@ -102,7 +102,7 @@ class PlayerVolume extends SubCommand {
         const { player } = db.queues.get(ctx.guildId);
 
         // Изменение громкости
-        player.volume = parseInt(args[0]);
+        player.audio.volume = parseInt(args[0]);
 
         // Если можно изменить громкость сейчас
         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {

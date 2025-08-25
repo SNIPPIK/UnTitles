@@ -28,6 +28,37 @@ import { db } from "#app/db";
 class RestYandexAPI extends RestServerSide.API {
     readonly requests: RestServerSide.API["requests"] = [
         /**
+         * @description Запрос треков из волны, для выполнения требуется указать list=RD в ссылке
+         * @type "related"
+         */
+        {
+            name: "related",
+            filter: /(track\/[0-9]+)?(list=RD)/,
+            execute: (url) => {
+                const ID = /track\/[0-9]+/gi.exec(url)[0]?.split("track")?.at(1);
+
+                return new Promise(async (resolve) => {
+                    // Если ID альбома не удалось извлечь из ссылки
+                    if (!ID) return resolve(locale.err( "api.request.id.album"));
+
+                    try {
+                        // Создаем запрос
+                        const api = await this.API(`tracks/${ID}/similar`);
+
+                        // Если запрос выдал ошибку то
+                        if (api instanceof Error) return resolve(api);
+                        else if (!api["similarTracks"]?.length) return resolve(locale.err("api.request.fail.msg", ["0 tracks received"]));
+
+                        const songs = api["similarTracks"].map(this.track);
+                        return resolve({url, title: null, image: null, items: songs});
+                    } catch (e) {
+                        return resolve(Error(`[APIs]: ${e}`))
+                    }
+                });
+            }
+        },
+
+        /**
          * @description Запрос данных о треке
          * @type "track"
          */

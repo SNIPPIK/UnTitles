@@ -210,7 +210,7 @@ class YouTubeSignatureExtractor {
                 const components = decodeURL(args.url as string);
                 if (!components) return args.url as string;
 
-                const deciphered = decipher.runInNewContext({ ...context, console });
+                const deciphered = decipher.runInNewContext({ ...context, console }, { breakOnSigint: true, timeout: 5e3 });
                 components.searchParams.set((args.sp as string) || DECIPHER_ARGUMENT, deciphered);
                 return components.toString();
             } catch {
@@ -227,7 +227,7 @@ class YouTubeSignatureExtractor {
             if (!nParam) return url;
 
             try {
-                const transformed = nTransform.runInNewContext({ [N_ARGUMENT]: nParam, console });
+                const transformed = nTransform.runInNewContext({ [N_ARGUMENT]: nParam, console }, { breakOnSigint: true, timeout: 5e3 });
                 if (transformed) components.searchParams.set("n", transformed);
                 return components.toString();
             } catch {

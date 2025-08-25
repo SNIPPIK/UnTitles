@@ -1,5 +1,5 @@
 import { CommandInteraction, Colors } from "#structures/discord";
-import { QueueMessage } from "#core/queue/structures/message";
+import { QueueMessage } from "#core/queue/modules/message";
 import { middleware } from "#handler/middlewares";
 import { Assign, locale } from "#structures";
 import { db } from "#app/db";

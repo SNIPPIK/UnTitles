@@ -90,8 +90,9 @@ while (performance.now() - startBlock < 100) {}
 - There is an explicit synchronization of the audio stream
 #### 🌐 Platforms
 - Support for `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
-- Precise search in the absence of audio, through time and names by syllables
-- If searching on other platforms in the absence of audio!
+- Precise search in the absence of audio, by time and names by syllables
+- There is a search on other platforms in the absence of audio!
+- There is support for `related`, inclusion of similar tracks
 - Platforms work in a separate **worker** (thread) for performance
 - Everything is described in detail, there are examples and a bunch of interfaces for typing
 - Easy expansion and addition of new platforms via `Dynamic Loader - Handler`
@@ -134,7 +135,7 @@ while (performance.now() - startBlock < 100) {}
 |    `/bot` | ❌            | restart:(commands, bot, events) | Restart            |
 | `/filter` | ✅            | (off, push, disable)            | Audio filters      |
 |   `/play` | ✅            | (query)                         | Playback           |
-| `/player` | ✅            | (api, replay, stop, wave)       | Advanced playback  |
+| `/player` | ✅            | (api, replay, stop, related)    | Advanced playback  |
 | `/volume` | ✅            | value                           | Player volume      |
 | `/remove` | ✅            | value                           | Delete track       |
 |   `/seek` | ❌            | 00:00, int                      | Seeking time track |

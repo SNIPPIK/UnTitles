@@ -283,5 +283,10 @@ export enum RepeatType {
     /**
      * @description Повтор всех треков
      */
-    Songs = 2
+    Songs = 2,
+
+    /**
+     * @description Бесконечный музыкальный поток
+     */
+    AutoPlay
 }

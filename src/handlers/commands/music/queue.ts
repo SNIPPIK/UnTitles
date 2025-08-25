@@ -47,7 +47,7 @@ import { db } from "#app/db";
                     const Selected = (args[0] - 1) === index;
 
                     return {
-                        name: `${index + 1}. ${isCurrent ? "🎵" : Selected ? "➡️" : "🎶"} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
+                        name: `${index + 1}. ${isCurrent && !Selected ? "🎵" : Selected && !isCurrent ? "➡️" : Selected && isCurrent ? "➡ 🎵️" : "🎶"} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
                         value: index
                     };
                 })

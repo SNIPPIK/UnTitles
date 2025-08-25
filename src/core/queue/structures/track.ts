@@ -72,10 +72,11 @@ abstract class BaseTrack {
         this.time = _track.time as any;
 
         // Удаляем мусорные названия из текста
-        if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic/gi, "");
-        _track.title = `${_track.title}`.replace(/Lyrics Video|[\/()\[\]"]/gi, "");
+        if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic|[\/()\[\]"]|[:;]/gi, "");
+        _track.title = `${_track.title}`.replace(/Lyrics Video|[\/()\[\]"]|[:;]/gi, "");
     };
 }
+
 
 /**
  * @author SNIPPIK
@@ -310,21 +311,22 @@ export class Track extends BaseTrack {
 
         // Если нет ссылки на исходный файл
         try {
-            const link = await db.api.fetch(this);
+            const song = await db.api.fetchAudioLink(this);
 
             // Если вместо ссылки получили ошибку
-            if (link instanceof Error) return link;
+            if (song instanceof Error) return song;
 
             // Если платформа не хочет давать данные трека
-            else if (!link) return Error(`The platform does not provide a link`);
+            else if (!song) return Error(`The platform does not provide a link`);
 
-            this.link = link;
+            this.link = song;
             return this._prepareResource();
         } catch (err) {
             return Error(`This link track is not available... Fail update link!`);
         }
     };
 }
+
 
 /**
  * @author SNIPPIK
@@ -347,6 +349,7 @@ interface TrackDuration {
      */
     total: number;
 }
+
 
 /**
  * @author SNIPPIK

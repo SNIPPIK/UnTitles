@@ -79,10 +79,10 @@ class RestYouTubeAPI extends RestServerSide.API {
 
         /**
          * @description Запрос треков из волны, для выполнения требуется указать list=RD в ссылке
-         * @type "wave"
+         * @type "related"
          */
         {
-            name: "wave",
+            name: "related",
             filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})?(list=RD)/,
             execute: (url) => {
                 return new Promise(async (resolve) => {

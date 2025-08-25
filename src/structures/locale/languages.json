@@ -194,6 +194,11 @@
     "ru": "Включен повтор текущего трека!"
   },
 
+  "player.button.repeat.related": {
+    "en-US": "Endless track mode enabled!",
+    "ru": "Включен бесконечный режим треков!"
+  },
+
   "player.button.repeat.off": {
     "en-US": "Disable repeat!",
     "ru": "Повтор выключен!"
