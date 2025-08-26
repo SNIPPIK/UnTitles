@@ -99,17 +99,23 @@ class RestYouTubeAPI extends RestServerSide.API {
                         for (const item of related) {
                             const render = item.compactVideoRenderer || item.lockupViewModel;
 
-                            // Если не видео
-                            if (render?.contentType && render?.contentType !== 'LOCKUP_CONTENT_TYPE_VIDEO' && !render?.rendererContext.commandContext.onTap.innertubeCommand.watchEndpoint.videoId) continue;
+                            // Если есть недопустимые типы контента
+                            if (!render?.contentType || render?.contentType !== 'LOCKUP_CONTENT_TYPE_VIDEO') continue;
+
+                            const title = render?.rendererContext.accessibilityContext?.label ?? render?.metadata?.lockupMetadataViewModel.title.content;
+                            const duration = (title as string).duration();
+
+                            // Если время слишком много
+                            if (duration > 800 && !title.match(/album|ALBUM|Album/)) continue;
 
                             relatedVideos.push(RestYouTubeAPI.track({
-                                videoId: render?.rendererContext.commandContext.onTap.innertubeCommand.watchEndpoint.videoId,
-                                title: render?.rendererContext.accessibilityContext?.label ?? render?.metadata?.lockupMetadataViewModel.title.content,
+                                videoId: render.contentId,
+                                title: render?.metadata?.lockupMetadataViewModel.title.content,
                                 channelId: "null",
-                                lengthSeconds: "100",
+                                lengthSeconds: duration.duration(),
                                 author: render?.metadata?.lockupMetadataViewModel.metadata?.contentMetadataViewModel.metadataRows[0].metadataParts[0].text.content.split(",")[0],
                                 format: { audio: null }
-                            }))
+                            }));
                         }
 
                         return resolve({

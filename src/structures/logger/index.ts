@@ -70,7 +70,7 @@ export class Logger {
 
         const date = new Date();
         const extStatus = db.status[status];
-        const time = `\x1b[90m${date.getDate().toSplit()}/${(date.getMonth() + 1).toSplit()}/${date.getFullYear()} ${date.getHours().toSplit()}:${date.getMinutes().toSplit()}\x1b[0m`;
+        const time = `\x1b[90m${date.getDate()}/${(date.getMonth() + 1)}/${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}\x1b[0m`;
 
         // Получаем память в мегабайтах с двумя знаками после запятой
         const mem = process.memoryUsage();

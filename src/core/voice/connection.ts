@@ -157,7 +157,7 @@ export class VoiceConnection {
      */
     public set speaking(speaking: SpeakerType) {
         // Если нельзя по состоянию или уже бот говорит
-        if (this._speaking === speaking) return;
+        if (this._speaking === speaking || !this.websocket) return;
 
         // Меняем состояние спикера
         this._speaking = speaking;
