@@ -52,13 +52,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     protected _status: keyof AudioPlayerEvents = "player/wait";
 
-
     /**
      * @description Класс для управления временем плеера
      * @protected
      */
     protected _timer = new AudioPlayerTimeout();
-
 
     /**
      * @description Хранилище аудио фильтров
@@ -67,14 +65,12 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     protected _filters = new ControllerFilters<AudioFilter>();
 
-
     /**
      * @description Управление потоковым вещанием
      * @readonly
      * @private
      */
     protected _audio = new PlayerAudio<AudioPlayerAudio>();
-
 
     /**
      * @description Делаем tracks параметр публичным для использования вне класса
@@ -84,7 +80,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         return this._tracks;
     };
 
-
     /**
      * @description Делаем filters параметр публичным для использования вне класса
      * @public
@@ -92,7 +87,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public get filters() {
         return this._filters;
     };
-
 
     /**
      * @description Делаем voice параметр публичным для использования вне класса
@@ -102,7 +96,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         return this._voice;
     };
 
-
     /**
      * @description Делаем stream параметр публичным для использования вне класса
      * @public
@@ -110,7 +103,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public get audio() {
         return this._audio;
     };
-
 
     /**
      * @description Текущий статус плеера
@@ -120,7 +112,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public get status() {
         return this._status;
     };
-
 
     /**
      * @description Смена статуса плеера, если не знаешь что делаешь, то лучше не трогай!
@@ -138,7 +129,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         this._status = status;
     };
 
-
     /**
      * @description Строка состояния трека
      * @public
@@ -155,7 +145,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         return `\n\`\`${current.duration()}\`\` ${bar} \`\`${time.split}\`\``;
     };
-
 
     /**
      * @description Проверяем играет ли плеер
@@ -179,7 +168,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         return true;
     };
-
 
     /**
      * @description Задаем параметры плеера перед началом работы
@@ -299,7 +287,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         });
     };
 
-
     /**
      * @description Включение плеера в цикл
      * @private
@@ -313,7 +300,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         }
     };
 
-
     /**
      * @description Отключение плеера от цикла
      * @private
@@ -326,7 +312,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             Logger.log("DEBUG", `[AudioPlayer/${this.id}] removed from cycle`);
         }
     };
-
 
     /**
      * @description Функция отвечает за циклическое проигрывание, если хотим воспроизвести следующий трек надо избавится от текущего
@@ -410,7 +395,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         }
     };
 
-
     /**
      * @description Приостанавливает воспроизведение плеера
      * @public
@@ -477,7 +461,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         this._voice.connection.packet = SILENT_FRAME;
     };
 
-
     /**
      * @description Запуск чтения потока
      * @param path - Путь до файла или ссылка на аудио
@@ -511,7 +494,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         }, 10e3);
 
         // Отслеживаем аудио поток на ошибки
-        (stream as BufferedAudioResource).once("error", () => {
+        (stream as BufferedAudioResource).once("error", async () => {
             // Разрешаем вводить новые аудио потоки
             this._audio.waitStream = false;
 
@@ -522,7 +505,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             stream.destroy();
         });
 
-        (stream as BufferedAudioResource).once("readable", () => {
+        (stream as BufferedAudioResource).once("readable", async () => {
             // Разрешаем вводить новые аудио потоки
             this._audio.waitStream = false;
 
@@ -532,7 +515,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         return stream;
     };
-
 
     /**
      * @description Пред загрузка трека, если конечно это возможно
@@ -556,7 +538,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если получить трек удалось
         return path;
     };
-
 
     /**
      * @description Эта функция частично удаляет плеер и некоторые сопутствующие данные
@@ -591,12 +572,14 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public destroy = () => {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has destroyed`);
-        this.removeAllListeners();
+        super.destroy();
 
         this.id = null;
         this._audio = null;
         this._filters = null;
+        this._status = null;
         this._timer.destroy();
+        this._timer = null;
     };
 }
 

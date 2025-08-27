@@ -373,6 +373,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public destroy = (): void => {
+        super.destroy();
         this.reset();
         this.sequence = null;
         this._heartbeat.stop();

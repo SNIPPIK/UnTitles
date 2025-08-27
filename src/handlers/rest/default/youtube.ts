@@ -100,7 +100,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                             const render = item.compactVideoRenderer || item.lockupViewModel;
 
                             // Если есть недопустимые типы контента
-                            if (!render?.contentType || render?.contentType !== 'LOCKUP_CONTENT_TYPE_VIDEO') continue;
+                            if (!render?.contentType || render?.contentType !== "LOCKUP_CONTENT_TYPE_VIDEO") continue;
 
                             const title = render?.rendererContext.accessibilityContext?.label ?? render?.metadata?.lockupMetadataViewModel.title.content;
                             const duration = (title as string).duration();

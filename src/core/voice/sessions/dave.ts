@@ -363,6 +363,8 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @public
      */
     public destroy = () => {
+        super.destroy();
+
         try {
             this.session?.reset();
         } catch {}

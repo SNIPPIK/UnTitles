@@ -1,5 +1,5 @@
 import { createSocket, type Socket } from "node:dgram";
-import { WebSocketOpcodes } from "#core/voice";
+import { type WebSocketOpcodes } from "#core/voice";
 import { TypedEmitter } from "#structures";
 import { isIPv4 } from "node:net";
 
@@ -85,7 +85,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public set packet(packet: Buffer) {
-        // Отправляем (RTP+OPUS) пакет
+        // Отправляем DAVE(RTP+OPUS) пакет
         this.socket.send(packet, 0, packet.length, this.options.port, this.options.ip, (err) => {
             if (err) this.emit("error", err);
         });
@@ -122,32 +122,25 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         if (this.socket) this.reset();
 
         // Проверяем через какое соединение подключатся
-        if (isIPv4(options.ip)) this.socket = createSocket("udp4");
-        else this.socket = createSocket("udp6");
+        const socket = this.socket = createSocket({
+            type: isIPv4(options.ip) ? "udp4" : "udp6"
+        });
 
         // Отправляем пакет данных для получения реального ip, port
         this.discovery(options.ssrc);
 
-        this.socket.on("listening", () => {
-            try {
-                this.socket.setRecvBufferSize(1024 * 1024); // 1MB
-                this.socket.setSendBufferSize(1024 * 1024);
-            } catch (e) {
-                this.emit("error", new Error("Failed to set socket buffer size: " + e));
-            }
-        });
-
         // Если подключение возвращает ошибки
-        this.socket.on("error", (err) => {
+        socket.on("error", (err) => {
             this.emit("error", err);
         });
 
-        this.socket.on("message", (msg) => {
+        socket.on("message", (msg) => {
+            this.isConnected = true;
             this.emit("message", msg);
         });
 
         // Если подключение оборвалось
-        this.socket.on("close", () => {
+        socket.once("close", () => {
             this.isConnected = false;
             this.emit("close");
         });
@@ -176,7 +169,6 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
                     return;
                 }
 
-                this.isConnected = true;
                 this.emit("connected", { ip, port });
             }
         });
@@ -213,7 +205,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         clearTimeout(this.keepAlive.timeout);
 
         this.socket.removeAllListeners();
-        this.removeAllListeners();
+        super.destroy();
 
         this.keepAlive = null;
         this.destroyed = null;

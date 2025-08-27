@@ -1,13 +1,11 @@
-import { PromiseCycle } from "#structures";
+import { PLAYER_BUFFERED_TIME } from "#core/player";
+import { Logger, PromiseCycle } from "#structures";
+import { Process } from "#core/audio";
+import { Track } from "#core/queue";
 import afs from "node:fs/promises";
 import { env } from "#app/env";
 import path from "node:path";
 import fs from "node:fs";
-
-// Low level
-import { PLAYER_BUFFERED_TIME } from "#core/player";
-import { Process } from "#core/audio";
-import { Track } from "#core/queue";
 
 /**
  * @author SNIPPIK
@@ -212,12 +210,19 @@ class CacheAudio extends PromiseCycle<Track> {
                     ffmpeg.stdout.once("error", () => {
                         ffmpeg.destroy();
                         this.delete(track);
-                        fs.unlinkSync(`${status.path}.opus`);
+
+                        // Удаляем файл
+                        fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
                         return resolve(false);
                     });
 
                     // Если запись была завершена
                     ffmpeg.stdout.once("end", () => {
+                       fs.stat(`${status.path}.opus`, (err, stats) => {
+                           // Если файл не проходит проверку
+                           if (err || stats.size < 10) fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
+                       });
+
                         ffmpeg.destroy();
                         this.delete(track);
                         return resolve(true);

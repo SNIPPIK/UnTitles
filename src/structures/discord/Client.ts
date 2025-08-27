@@ -11,6 +11,7 @@ import { db } from "#app/db";
  * @description Класс клиента
  * @class DiscordClient
  * @extends Client
+ * @public
  */
 export class DiscordClient extends Client {
     /**
@@ -173,6 +174,7 @@ export class DiscordClient extends Client {
  * @description Класс реализации адаптера
  * @class DJSVoice
  * @extends VoiceAdapters
+ * @public
  */
 export class DJSVoice<T extends DiscordClient = DiscordClient> extends VoiceAdapters<DiscordClient> {
     public constructor(client: T) {

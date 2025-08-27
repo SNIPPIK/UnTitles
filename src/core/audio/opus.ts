@@ -159,8 +159,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
         this._first = null;
         this._buffer = null;
 
-        super.emitDestroy();
-        this.removeAllListeners();
+        super.destroy();
     };
 }
 

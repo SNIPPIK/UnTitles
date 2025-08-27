@@ -179,7 +179,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
         this.emit("close");
 
         // Удаляем все вызовы функций
-        this.removeAllListeners();
+        super.destroy();
 
         this._readable = null;
         this._seek = null;

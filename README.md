@@ -80,6 +80,7 @@ while (performance.now() - startBlock < 100) {}
 - Does not require any opus encoders/decoders, has its own opus encoder by parsing method!
 - Adaptive system for sending audio packets, its own `Jitter Buffer`!
 - Requires **FFmpeg**, it is responsible for audio and filters!
+- Supported: Autoplay, Repeat, Shuffle, Replay and more functions
 - Works even with strong **event loop lag**!
 #### 🎵 Audio
 - It is possible to reuse audio without conversion if it is less than 8 minutes long
@@ -89,10 +90,10 @@ while (performance.now() - startBlock < 100) {}
 - There is support for long videos, Live video is still raw.
 - There is an explicit synchronization of the audio stream
 #### 🌐 Platforms
-- Support for `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
+- Supported: `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
 - Precise search in the absence of audio, by time and names by syllables
 - There is a search on other platforms in the absence of audio!
-- There is support for `related`, inclusion of similar tracks
+- There is support for `related`(**related tracks**), inclusion of similar tracks
 - Platforms work in a separate **worker** (thread) for performance
 - Everything is described in detail, there are examples and a bunch of interfaces for typing
 - Easy expansion and addition of new platforms via `Dynamic Loader - Handler`
@@ -161,7 +162,7 @@ npm install
 # configure environment variables in build/.env
 npm run build && npm run start
 
-# Run via Bun
+# Run via Bun (does not work now)
 # configure environment variables in ./env
 npm i dotenv
 bun run start-bun
@@ -169,7 +170,7 @@ bun run start-bun
 
 ---
 [![TypeScript](https://img.shields.io/badge/typescript-5.9.2-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Bun](https://img.shields.io/badge/bun-1.2.15-6DA55F?style=for-the-badge&logo=bun&logoColor=white&color=white)](https://bun.com/)
+[![Bun](https://img.shields.io/badge/bun-1.2.25-6DA55F?style=for-the-badge&logo=bun&logoColor=white&color=white)](https://bun.com/)
 [![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/en)
 [![Discord.js](https://img.shields.io/badge/discord.js-14.22-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)
 [![WS](https://img.shields.io/badge/ws-8.18.3-%23CB3837.svg?style=for-the-badge&logo=socket&logoColor=white)](https://www.npmjs.com/package/ws)

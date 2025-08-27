@@ -7,7 +7,6 @@ import { Logger } from "#structures";
 import type { Track } from "./track";
 import { db } from "#app/db";
 
-
 /**
  * @author SNIPPIK
  * @description Класс очереди для управления всей системой, бесконтрольное использование ведет к поломке всего процесса!!!
@@ -59,7 +58,6 @@ export class Queue {
         return this._timestamp;
     };
 
-
     /**
      * @description Получаем доступ к трекам
      * @public
@@ -67,7 +65,6 @@ export class Queue {
     public get tracks() {
         return this._tracks;
     };
-
 
     /**
      * @description Записываем сообщение в базу для дальнейшего использования
@@ -78,7 +75,6 @@ export class Queue {
         this._cleanupOldMessage();
         this._message = message;
     };
-
 
     /**
      * @description Выдаем сообщение
@@ -91,7 +87,6 @@ export class Queue {
         return this._message;
     };
 
-
     /**
      * @description Выдаем плеер привязанный к очереди
      * @return AudioPlayer
@@ -102,7 +97,6 @@ export class Queue {
         if (!this._player) return null;
         return this._player;
     };
-
 
     /**
      * @description Выдаем плеер привязанный к очереди
@@ -119,7 +113,6 @@ export class Queue {
         if (oldPlayer) oldPlayer.destroy();
     };
 
-
     /**
      * @description Выдаем голосовой канал
      * @return VoiceChannel
@@ -129,7 +122,6 @@ export class Queue {
         return this._voice;
     };
 
-
     /**
      * @description Записываем голосовой канал в базу для дальнейшего использования
      * @param voice - Сохраняемый голосовой канал
@@ -138,7 +130,6 @@ export class Queue {
     public set voice(voice) {
         this._voice = voice;
     };
-
 
     /**
      * @description Создаем очередь для дальнейшей работы, все подключение находятся здесь

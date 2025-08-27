@@ -130,6 +130,6 @@ export class ShardManager extends ShardingManager {
         this.setMaxListeners(1);
 
         // Создаем дубликат
-        this.spawn({amount: "auto", delay: -1}).catch((err: Error) => Logger.log("ERROR", `[Manager] ${err}`));
+        this.spawn({amount: "auto", delay: -1}).catch((err: Error) => Logger.log("ERROR", err));
     };
 }

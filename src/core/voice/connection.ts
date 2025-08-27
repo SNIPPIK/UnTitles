@@ -598,7 +598,7 @@ export class VoiceConnection {
 
         // Если есть класс слушателя
         if (this.receiver) {
-            this.receiver?.emitDestroy();
+            this.receiver?.removeAllListeners();
             this.receiver = null;
         }
 

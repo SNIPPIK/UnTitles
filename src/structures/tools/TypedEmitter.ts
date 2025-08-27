@@ -1,9 +1,8 @@
-import { EventEmitterAsyncResource } from "node:events";
-
 /**
  * @author SNIPPIK
  * @description Параметры событий по указанию type
  * @type ListenerSignature
+ * @public
  */
 export type ListenerSignature<L> = {
     [E in keyof L]: L[E] extends (...args: any[]) => any ? L[E] : (...args: any[]) => void;
@@ -13,27 +12,36 @@ export type ListenerSignature<L> = {
  * @author SNIPPIK
  * @description Параметры событий по умолчанию
  * @type DefaultListener
+ * @public
  */
-export type DefaultListener = (...args: any[]) => void;
+export type DefaultListener = (...args: any[]) => void | Promise<void>;
 
 /**
  * @author SNIPPIK
- * @description Типизированный EventEmitter с поддержкой async ресурсов и ограничением количества слушателей
+ * @description Тип события для разделения on и once
+ * @interface EventBucket
+ * @private
+ */
+interface EventBucket {
+    listener: DefaultListener;
+    type: "on" | "once"
+}
+
+/**
+ * @author SNIPPIK
+ * @description Типизированный EventEmitter построенный на Map
  * @template L - Интерфейс событий и их типов слушателей
  * @class TypedEmitter
- * @extends EventEmitterAsyncResource
  * @public
+ *
+ * @usage Если требуется ответ в событиях once использовать async!
  */
-export class TypedEmitter<L extends Record<string, any>> extends EventEmitterAsyncResource {
+export class TypedEmitter<L extends Record<string, any>> {
     /**
-     * @description Инициализирует новый экземпляр TypedEmitter с максимальным количеством слушателей 5
-     * @constructor
-     * @public
+     * @description Локальной список событий, функций в map
+     * @private
      */
-    public constructor() {
-        super();
-        this.setMaxListeners(5);
-    };
+    private _set = new Map<string, EventBucket[]>();
 
     /**
      * @description Подписаться на событие с типизированным слушателем
@@ -45,7 +53,10 @@ export class TypedEmitter<L extends Record<string, any>> extends EventEmitterAsy
     public on<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
     public on<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
     public on(event: string, listener: (...args: any[]) => any): this {
-        return super.on(event, listener);
+        const arr = this._set.get(event) ?? [];
+        arr.push({ listener, type: "on" });
+        this._set.set(event, arr);
+        return this;
     };
 
     /**
@@ -58,7 +69,10 @@ export class TypedEmitter<L extends Record<string, any>> extends EventEmitterAsy
     public once<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
     public once<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
     public once(event: string, listener: (...args: any[]) => any): this {
-        return super.once(event, listener);
+        const arr = this._set.get(event) ?? [];
+        arr.push({ listener, type: "once" });
+        this._set.set(event, arr);
+        return this;
     };
 
     /**
@@ -71,7 +85,27 @@ export class TypedEmitter<L extends Record<string, any>> extends EventEmitterAsy
     public emit<E extends keyof ListenerSignature<L>>(event: E, ...args: Parameters<ListenerSignature<L>[E]>): boolean;
     public emit<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, ...args: any[]): boolean;
     public emit(event: string, ...args: any[]): boolean {
-        return super.emit(event, ...args);
+        const arr = this._set?.get(event);
+        if (!arr?.length) return false;
+
+        for (const run of arr) {
+            const res = run.listener(...args);
+
+            // 🚀 Асинхронный emit
+            if (res instanceof Promise) {
+                res.catch(err => {
+                    // Чтобы ошибки не "падали" в unhandledRejection
+                    setImmediate(() => { throw err; });
+                }).finally(() => {
+                    // Если разовая функция
+                    if (run.type === "once") this.off(event, run.listener as any);
+                });
+            } else {
+                // Если разовая функция
+                if (run.type === "once") this.off(event, run.listener as any);
+            }
+        }
+        return true;
     };
 
     /**
@@ -84,7 +118,10 @@ export class TypedEmitter<L extends Record<string, any>> extends EventEmitterAsy
     public off<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
     public off<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
     public off(event: string, listener: (...args: any[]) => any): this {
-        return super.off(event, listener);
+        const arr = this._set?.get(event);
+        if (!arr) return this;
+        this._set.set(event, arr.filter(x => x.listener !== listener));
+        return this;
     };
 
     /**
@@ -97,6 +134,37 @@ export class TypedEmitter<L extends Record<string, any>> extends EventEmitterAsy
     public removeListener<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
     public removeListener<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
     public removeListener(event: string, listener: (...args: any[]) => any): this {
-        return super.removeListener(event, listener);
+        this._set.delete(event);
+
+        // Если есть событие с таким именем
+        if (listener) listener();
+        return this;
+    };
+
+    /**
+     * @description Все слушатели по названию события
+     * @param event - Название события
+     * @public
+     */
+    public listeners<E extends keyof ListenerSignature<E>>(event: string) {
+        return (this._set.get(event) ?? []).map(l => l.listener);
+    };
+
+    /**
+     * @description Удаление всех событий
+     * @public
+     */
+    public removeAllListeners = () => {
+        this._set.clear();
+        return this;
+    };
+
+    /**
+     * @description Удаление всех событий и уничтожение TypedEmitter
+     * @public
+     */
+    public destroy(): void {
+        this.removeAllListeners();
+        this._set = null;
     };
 }

@@ -4,7 +4,7 @@
  * @abstract
  * @public
  */
-export abstract class Collection<K, T = string> {
+export class Collection<K, T = string> {
     /**
      * @description База Map для взаимодействия с объектами через идентификатор
      * @readonly
@@ -82,5 +82,13 @@ export abstract class Collection<K, T = string> {
         }
 
         this._map.delete(ID);
+    };
+
+    /**
+     * @description Удаление всего из set/map
+     * @public
+     */
+    public clear = (): void => {
+        this._map.clear();
     };
 }

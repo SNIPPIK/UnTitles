@@ -15,6 +15,7 @@ export class QueueMessage<T extends CommandInteraction> {
     private readonly _guildID: string;
     private readonly _channelID: string;
     private readonly _voiceID: string;
+    private _deferred = false;
 
     /**
      * @description Язык сообщения
@@ -102,7 +103,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public get deferred() {
-        return this._original["deferred"];
+        return this._deferred;
     };
     /**
      * @description Создаем класс для общения с discord api
@@ -124,17 +125,22 @@ export class QueueMessage<T extends CommandInteraction> {
     public send = (options: {embeds?: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
         try {
             // Если бот уже ответил на сообщение
-            if (this.replied && !this.deferred) return this._original.followUp(options as any) as any;
-
-            // Если можно просто отредактировать сообщение
-            else if (this.deferred && !this.replied) return this._original.editReply(options as any) as any;
+            if (this.replied && !this.deferred) {
+                this._deferred = true;
+                return this._original.followUp(options as any) as any;
+            }
 
             // Если можно дать ответ на сообщение
-            else if (!this.deferred && !this.replied) return this._original.reply(options as any) as any;
+            else if (!this.deferred && !this.replied) {
+                this._deferred = true;
+                return this._original.reply(options as any) as any;
+            }
 
             // Отправляем обычное сообщение
             return this._original.channel.send(options as any);
         } catch {
+            this._deferred = false;
+
             // Отправляем обычное сообщение
             return this._original.channel.send(options as any);
         }

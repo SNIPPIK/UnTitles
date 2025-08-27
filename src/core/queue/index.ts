@@ -120,35 +120,37 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
         const queue = this.get(message.guildId) ?? (new Queue(message) as T);
         const { player, tracks } = queue;
 
-        // Если есть треки в очереди
-        if (tracks.total > 0) {
-            // Проверяем, активен ли плеер в цикле или находится на паузе
-            if (!this.cycles.players.has(player) && player.status !== "player/pause") {
-                // Перезапуск плеера отложенным вызовом
-                setImmediate(() => {
-                    // Установка позиции воспроизведения в зависимости от типа добавленного item
-                    tracks.position = items.length ? tracks.total - items.length : 0;
-
-                    // Если текстовый канал изменился — обновляем привязку
-                    if (queue.message.channelID !== message.channelId) {
-                        queue.message = new QueueMessage(message);
-                    }
-
-                    // Сохраняем плеер для последующего перезапуска
-                    this.restart_player = player;
-                });
-            }
-        }
-
         // Добавляем треки
         items.forEach(track => {
             track.user = message.member.user;
             tracks.push(track);
         });
 
-        // Отправка события о добавлении
-        if (tracks.total > 0 && !Array.isArray(item)) {
-            db.events.emitter.emit("message/push", queue, message.member, item);
+        // Если есть треки в очереди
+        if (tracks.total > 0) {
+            // Отправляем сообщение о добавлении треков
+            if (!Array.isArray(item)) {
+                db.events.emitter.emit("message/push", queue, message.member, item);
+            }
+
+            const position = items.length ? tracks.total - items.length : 0;
+
+            // Проверяем, активен ли плеер в цикле или находится на паузе
+            if (!this.cycles.players.has(player) && player.status !== "player/pause" && position > 0) {
+                // Перезапуск плеера отложенным вызовом
+                setImmediate(() => {
+                    // Установка позиции воспроизведения в зависимости от типа добавленного item
+                    tracks.position = position;
+
+                    // Сохраняем плеер для последующего перезапуска
+                    this.restart_player = player;
+                });
+            }
+
+            // Если текстовый канал изменился — обновляем привязку
+            else if (queue.message.channelID !== message.channelId) {
+                queue.message = new QueueMessage(message);
+            }
         }
 
         return null;

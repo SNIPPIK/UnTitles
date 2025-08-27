@@ -117,7 +117,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Запускаем цикл, если добавлен первый объект
         if (this.size === 1 && this.startTime === 0) {
             this.startTime = this.time;
-            setImmediate(this._stepCycle);
+            process.nextTick(this._stepCycle);
         }
 
         return this;

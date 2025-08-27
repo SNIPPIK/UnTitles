@@ -1,6 +1,5 @@
 import { AudioPlayer } from "#core/player";
 
-
 export * from "./structures/player";
 export * from "./controllers/filters";
 

@@ -94,14 +94,7 @@ function initProcessEvents(client: DiscordClient) {
         // Скорее всего дело в Discord.js
         if (err.stack.match(/ws\/lib\/websocket/gi) || err.stack.match(/APPLICATION_COMMAND_OPTIONS_VALUE_TOO_LARGE/)) return;
 
-        Logger.log(
-            "ERROR",
-            `Uncaught Exception\n` +
-            `┌ Name:    ${err.name}\n` +
-            `├ Message: ${err.message}\n` +
-            `├ Origin:  ${origin}\n` +
-            `└ Stack:   ${err.stack}`
-        );
+        Logger.log("ERROR", origin);
     });
 
     // Необработанный обещание
