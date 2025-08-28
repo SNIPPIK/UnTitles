@@ -1,6 +1,6 @@
 import type { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
+import { CommandInteraction, Colors, DiscordClient } from "#structures/discord";
 import { ChannelType, Events, InteractionType } from "discord.js";
-import { CommandInteraction, Colors } from "#structures/discord";
 import { Assign, Logger, locale } from "#structures";
 import { SubCommand } from "#handler/commands";
 import { Event } from "#handler/events";
@@ -96,7 +96,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         /// Если нет команды
         // Если пользователь пытается использовать команду разработчика
         if (!command || (command.owner && !db.owner.ids.includes(ctx.member.user.id))) {
-            db.commands.remove(ctx.client, ctx.commandGuildId, ctx.commandId);
+            db.commands.remove(ctx.client as DiscordClient, ctx.commandGuildId, ctx.commandId);
 
             return ctx.reply({
                 flags: "Ephemeral",

@@ -1,5 +1,6 @@
-import { Declare, Options, Command, CommandContext, Middlewares } from "#handler/commands";
-import { ApplicationCommandOptionType, MessageFlags, User } from "discord.js";
+import { Declare, Command, CommandContext, Middlewares } from "#handler/commands";
+import { ApplicationCommandType } from "discord-api-types/v10";
+import { MessageFlags, User } from "discord.js";
 import { locale } from "#structures";
 import { db } from "#app/db";
 
@@ -12,32 +13,15 @@ import { db } from "#app/db";
  */
 @Declare({
     names: {
-        "en-US": "avatar",
-        "ru": "аватар"
-    },
-    descriptions: {
-        "en-US": "If you need to take a closer look at the user's avatar!",
-        "ru": "Если надо глянуть аватар пользователя поближе!"
+        "en-US": "Avatar",
+        "ru": "Аватар"
     },
     integration_types: ["GUILD_INSTALL", "USER_INSTALL"],
     contexts: ["GUILD", "BOT_DM", "PRIVATE_CHANNEL"],
-})
-@Options({
-    user: {
-        names: {
-            "en-US": "user",
-            "ru": "пользователь"
-        },
-        descriptions: {
-            "en-US": "Specify the user!",
-            "ru": "Укажи пользователя!"
-        },
-        type: ApplicationCommandOptionType["User"],
-        required: true
-    }
+    type: ApplicationCommandType.User
 })
 @Middlewares(["cooldown"])
-class AvatarCommand extends Command {
+class AvatarContextCommand extends Command {
     public override run = ({ctx, args}: CommandContext<User>) => {
         const user = args[0];
         const me = ctx.client.user;
@@ -85,4 +69,4 @@ class AvatarCommand extends Command {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default [AvatarCommand];
+export default [AvatarContextCommand];

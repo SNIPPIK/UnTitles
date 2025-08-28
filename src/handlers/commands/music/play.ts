@@ -1,9 +1,9 @@
-import { Command, CommandContext, Declare, Middlewares, Options, SubCommand, Permissions } from "#handler/commands";
-import { ApplicationCommandOptionType } from "discord.js";
-import { CompeteInteraction } from "#structures/discord";
-import { RestClientSide } from "#handler/rest";
-import { locale } from "#structures";
-import { db } from "#app/db";
+import {Command, CommandContext, Declare, Middlewares, Options, Permissions, SubCommand} from "#handler/commands";
+import {ApplicationCommandOptionType, ApplicationCommandType, Message} from "discord.js";
+import {CompeteInteraction} from "#structures/discord";
+import {RestClientSide} from "#handler/rest";
+import {locale} from "#structures";
+import {db} from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -235,7 +235,7 @@ class PlayRelatedCommand extends SubCommand {
 /**
  * @author SNIPPIK
  * @description Расширенное включение музыки
- * @class PlayControlCommand
+ * @class PlayAdvancedCommand
  * @extends Command
  * @public
  */
@@ -255,8 +255,59 @@ class PlayRelatedCommand extends SubCommand {
 @Permissions({
     client: ["SendMessages", "ViewChannel"]
 })
-class PlayControlCommand extends Command {
+class PlayAdvancedCommand extends Command {
     async run() {}
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Базовое включение музыки из сообщения
+ * @class PlayContextCommand
+ * @extends Assign
+ * @public
+ */
+@Declare({
+    names: {
+        "en-US": "Play",
+        "ru": "Воспроизвести"
+    },
+    integration_types: ["GUILD_INSTALL"],
+    type: ApplicationCommandType.Message
+})
+@Middlewares(["cooldown", "voice", "another_voice"])
+@Permissions({
+    client: ["SendMessages", "ViewChannel"]
+})
+class PlayContextCommand extends Command {
+    async run({ctx, args}: CommandContext<Message>) {
+        const regex = /(https?:\/\/[^\s)]+)/g;
+        const url = Array.from(args[0].content.matchAll(regex), m => m[1])[0];
+
+        const platform = getPlatform(url);
+
+        // Если не нашлась платформа
+        if (!platform) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.support"));
+            return null;
+        }
+
+        // Если платформа заблокирована
+        else if (platform.block) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
+            return null;
+        }
+
+        // Если есть проблема с авторизацией на платформе
+        else if (!platform.auth) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.auth"));
+            return null;
+        }
+
+        await ctx.deferReply();
+        db.events.emitter.emit("rest/request", platform, ctx, url);
+        return null;
+    };
 }
 
 
@@ -332,4 +383,4 @@ class PlayCommand extends Command {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default [ PlayCommand, PlayControlCommand ];
+export default [ PlayContextCommand, PlayCommand, PlayAdvancedCommand ];

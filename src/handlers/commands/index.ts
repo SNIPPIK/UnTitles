@@ -1,6 +1,6 @@
-import { ApplicationCommandOption, ApplicationCommandOptionType, Client, PermissionsString, Routes } from "discord.js";
+import { ApplicationCommandOption, ApplicationCommandOptionType, ApplicationCommandType, PermissionsString, Routes } from "discord.js";
+import { CommandInteraction, CompeteInteraction, DiscordClient } from "#structures/discord";
 import type { Locale, LocalizationMap, Permissions } from "discord-api-types/v10";
-import { CommandInteraction, CompeteInteraction } from "#structures/discord";
 import filters from "#core/player/filters.json";
 import { AudioFilter } from "#core/player";
 import { Logger } from "#structures";
@@ -95,23 +95,20 @@ export class Commands extends handler<Command> {
      * @param guildID - ID сервера
      * @param CommandID - ID Команды
      */
-    public remove = (client: Client, guildID: string, CommandID: string) => {
+    public remove = (client: DiscordClient, guildID: string, CommandID: string) => {
         // Удаление приватной команды
-        if (guildID) client.rest.delete(Routes.applicationGuildCommand(client.user.id, guildID, CommandID))
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed in guild ${guildID}`))
-            .catch(console.error);
+        this.unregisterRest(Routes.applicationGuildCommand(client.user.id, guildID, CommandID), client);
 
         // Удаление глобальной команды
-        else client.rest.delete(Routes.applicationCommand(client.user.id, CommandID))
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed`))
-            .catch(console.error);
+        this.unregisterRest(Routes.applicationCommand(client.user.id, CommandID), client);
     };
 
     /**
      * @description Регистрируем команды в эко системе discord
+     * @param client - Экземпляр клиента
      * @public
      */
-    public register = (client: Client) => {
+    public register = (client: DiscordClient) => {
         const guildID = env.get("owner.server"), guild = client.guilds.cache.get(guildID);
         this.load();
 
@@ -119,32 +116,55 @@ export class Commands extends handler<Command> {
         if (!this.files.size) throw new Error("Not loaded commands");
 
         // Загрузка глобальных команд
-        client.application.commands.set(this.parseJsonData(this.public))
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${this.public.length}] has load public commands`))
-            .catch(console.error);
+        this.registerRest(Routes.applicationCommands(client.application.id), this.public, client);
 
         // Загрузка приватных команд
-        if (guild) guild.commands.set(this.parseJsonData(this.owner))
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${this.owner.length}] has load guild commands`))
+        if (guild) {
+            this.registerRest(Routes.applicationGuildCommands(client.application.id, guildID), this.owner, client);
+        }
+    };
+
+    /**
+     * @description Отправляем команды через rest клиента
+     * @param route - Путь запроса rest
+     * @param body - Команды для отправки
+     * @param client - Экземпляр клиента
+     * @private
+     */
+    private registerRest = (route: `/${string}`, body: Command[], client: DiscordClient) => {
+        const rest = client.rest;
+
+        rest.put(route, {
+            body: body ? body.map(cmd => cmd.toJSON()) : null
+        })
+            .then(() => Logger.log("DEBUG", `[Rest | ${body.length}] has send a rest system`))
             .catch(console.error);
     };
 
     /**
-     * @description Передаем только необходимые данные discord'у
-     * @param data - Все команды
+     * @description Отправляем команды через rest клиента
+     * @param route - Путь запроса rest
+     * @param client - Экземпляр клиента
      * @private
      */
-    private parseJsonData = (data: Command[]) => {
-        return data.map(cmd => cmd.toJSON());
+    private unregisterRest = (route: `/${string}`, client: DiscordClient) => {
+        const rest = client.rest;
+
+        rest.delete(route)
+            .then(() => Logger.log("DEBUG", `[Rest | ${route}] has deleted`))
+            .catch(console.error);
     };
 }
 
 /**
  * @author SNIPPIK
  * @description Стандартный прототип команды
+ * @class BaseCommand
+ * @abstract
+ * @public
  */
 export abstract class BaseCommand {
-    type!: number; // ApplicationCommandType.ChatInput | ApplicationCommandOptionType.Subcommand
+    type?: ApplicationCommandType = ApplicationCommandType.ChatInput; // ApplicationCommandType.ChatInput | ApplicationCommandOptionType.Subcommand
 
     /**
      * @description Название команды
@@ -272,6 +292,10 @@ export abstract class BaseCommand {
 /**
  * @author SNIPPIK
  * @description Глобальный прототип команды
+ * @extends BaseCommand
+ * @class Command
+ * @abstract
+ * @public
  */
 export abstract class Command extends BaseCommand {
     /**
@@ -289,7 +313,7 @@ export abstract class Command extends BaseCommand {
             }
 
             // Добавляем данные
-            options.push(i.toJSON());
+            options.push(i.toJSON() as any);
         }
 
         return {
@@ -302,9 +326,13 @@ export abstract class Command extends BaseCommand {
 /**
  * @author SNIPPIK
  * @description Глобальный прототип под команды
+ * @extends BaseCommand
+ * @class Command
+ * @abstract
+ * @public
  */
 export abstract class SubCommand extends BaseCommand {
-    type = ApplicationCommandOptionType.Subcommand;
+    type = ApplicationCommandOptionType.Subcommand as any;
 
     /**
      * @description Отдаем данные в формате JSON и только необходимые
@@ -324,6 +352,7 @@ export abstract class SubCommand extends BaseCommand {
  * @author SNIPPIK
  * @description Все доступные ограничения
  * @type RegisteredMiddlewares
+ * @public
  */
 export type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream" | "cooldown";
 
@@ -331,6 +360,7 @@ export type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "playe
  * @author SNIPPIK
  * @description Параметры команды
  * @type CommandContext
+ * @public
  */
 export type CommandContext<T = string> = {
     /**
@@ -348,22 +378,17 @@ export type CommandContext<T = string> = {
 
 /**
  * @author SNIPPIK
- * @description Параметры декоратора команды
+ * @description Параметры декоратора команды по умолчанию
+ * @usage Только как компонент для остальных
+ * @type DeclareOptionsBase
  */
-type DeclareOptions = {
+type DeclareOptionsBase = {
     /**
      * @description Имена команды на разных языках
      * @example Первое именование будет выставлено для других языков как по-умолчанию
      * @public
      */
     readonly names: LocalizationMap;
-
-    /**
-     * @description Описание команды на розных языках
-     * @example Первое именование будет выставлено для других языков как по-умолчанию
-     * @public
-     */
-    readonly descriptions: LocalizationMap;
 
     /**
      * @description Права на использование команды
@@ -394,23 +419,65 @@ type DeclareOptions = {
 
 /**
  * @author SNIPPIK
+ * @description Параметры декоратора команды
+ * @usage Только как основной компонент для создания команд
+ * @type DeclareOptionsChatInput
+ */
+type DeclareOptionsChatInput = DeclareOptionsBase & {
+    /**
+     * @description Тип команды, поддерживаются все доступные типы
+     * @default ChatInput = 1
+     * @public
+     */
+    type?: ApplicationCommandType.ChatInput;
+
+    /**
+     * @description Описание команды на розных языках
+     * @example Первое именование будет выставлено для других языков как по-умолчанию
+     * @public
+     */
+    descriptions: LocalizationMap;
+};
+
+/**
+ * @author SNIPPIK
+ * @description Параметры декоратора команды
+ * @usage Только как основной компонент для создания команд пользователя
+ * @type DeclareOptionsUser
+ */
+type DeclareOptionsUser = DeclareOptionsBase & {
+    /**
+     * @description Тип команды, поддерживаются все доступные типы
+     * @default ChatInput = 1
+     * @public
+     */
+    type: ApplicationCommandType.User | ApplicationCommandType.Message;
+};
+
+/**
+ * @author SNIPPIK
  * @description Декоратор создающий заголовок команды
  * @decorator
  */
-export function Declare(options: DeclareOptions) {
+export function Declare(options: DeclareOptionsChatInput | DeclareOptionsUser) {
+    const CommandType = options.type ?? ApplicationCommandType.ChatInput;
+
     const [nameKey] = Object.keys(options.names) as Locale[];
-    const [descKey] = Object.keys(options.descriptions) as Locale[];
+    const [descKey] = CommandType === 1 ? Object.keys(options["descriptions"]) as Locale[] : [null];
 
     // Загружаем данные в класс
     return <T extends { new (...args: any[]): object }>(target: T) =>
         class extends target {
             name = options.names[nameKey];
             name_localizations = options.names;
-            description = options.descriptions[descKey];
-            description_localizations = options.descriptions;
+
+            description = CommandType === 1 ? options["descriptions"][descKey] : null;
+            description_localizations = CommandType === 1 ? options["descriptions"] : null;
+
             integration_types = options.integration_types?.map(x => x === "GUILD_INSTALL" ? 0 : 1) ?? [0];
-            contexts = options.contexts?.map(x =>  x === "GUILD" ? 0 : x === "BOT_DM" ? 1 : 2) ?? [0];
+            contexts = options.contexts?.map(x => x === "GUILD" ? 0 : x === "BOT_DM" ? 1 : 2) ?? [0];
             owner = options.owner ?? false;
+            type = CommandType;
         }
 }
 

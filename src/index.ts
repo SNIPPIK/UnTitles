@@ -90,11 +90,11 @@ async function runShard() {
  */
 function initProcessEvents(client: DiscordClient) {
     // Необработанная ошибка (внутри синхронного кода)
-    process.on("uncaughtException", (err, origin) => {
+    process.on("uncaughtException", (err) => {
         // Скорее всего дело в Discord.js
         if (err.stack.match(/ws\/lib\/websocket/gi) || err.stack.match(/APPLICATION_COMMAND_OPTIONS_VALUE_TOO_LARGE/)) return;
 
-        Logger.log("ERROR", origin);
+        Logger.log("ERROR", err);
     });
 
     // Необработанный обещание
