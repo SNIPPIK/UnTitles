@@ -587,14 +587,10 @@ export class VoiceConnection {
         if (this.speakingTimeout) clearTimeout(this.speakingTimeout);
 
         // Уничтожаем подключения
-        try {
-            if (this.websocket && this.clientUDP) {
-                this.websocket?.destroy();
-                this.clientUDP?.destroy();
-                this.clientSRTP?.destroy();
-                this.clientDave?.destroy();
-            }
-        } catch {}
+        this.websocket?.destroy?.();
+        this.clientUDP?.destroy?.();
+        this.clientSRTP?.destroy?.();
+        this.clientDave?.destroy?.();
 
         // Если есть класс слушателя
         if (this.receiver) {
