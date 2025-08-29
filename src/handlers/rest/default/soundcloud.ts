@@ -164,7 +164,8 @@ class RestSoundCloudAPI extends RestServerSide.API {
             const ClientID = await this.getClientID();
 
             // Если client_id не был получен
-            if (!ClientID) return resolve(locale.err("api.request.fail"));
+            if (ClientID instanceof Error) return resolve(ClientID);
+            else if (!ClientID) return resolve(locale.err("api.request.fail"));
 
             const result = await new httpsClient({
                 url: `${this.options.api}/${url}&client_id=${ClientID}`,
@@ -184,7 +185,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
      * @description Получаем временный client_id для SoundCloud
      * @protected
      */
-    protected getClientID = async (): Promise<string | null> => {
+    protected getClientID = async (): Promise<string | Error> => {
         // Если client_id ещё действителен, возвращаем его
         if (this.options.client_id && this.options.time > Date.now()) return this.options.client_id;
 
@@ -198,13 +199,15 @@ class RestSoundCloudAPI extends RestServerSide.API {
                 }
             }).toString;
 
-            if (!parsedPage || parsedPage instanceof Error) return null;
+            if (parsedPage instanceof Error) return parsedPage;
+            else if (!parsedPage) return null;
+
             const split = parsedPage.split("<script crossorigin src=\"");
             const urls: string[] = [];
 
             split.forEach((r) => r.startsWith("https") ? urls.push(r.split("\"")[0]) : null);
 
-            const parsedPage2 = await new httpsClient({url: urls.at(-1)}).toString;
+            const parsedPage2 = await new httpsClient({url: urls[0]}).toString;
             if (!parsedPage2 || parsedPage2 instanceof Error) return null;
 
             const client_id = parsedPage2.split(",client_id:\"")[1].split("\",")[0];

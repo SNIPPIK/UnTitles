@@ -325,9 +325,6 @@ export class RestObject {
         return new Promise((resolve) => {
             const requestId = this.generateUniqueId(); // Генерируем номер запроса
 
-            // Отправляем запрос
-            this.worker.postMessage({ platform: platform.name, payload, options, requestId });
-
             // Слушаем сообщение или же ответ
             const onMessage = (message: RestServerSide.Result<T> & { requestId?: string }) => {
                 // Не наш ответ — игнорируем
@@ -344,20 +341,31 @@ export class RestObject {
                 };
 
                 // Если получена ошибка
-                if (result instanceof Error) return resolve(result);
+                if (result instanceof Error) {
+                    // Если платформа не отвечает, то отключаем ее!
+                    if (/Connection Timeout/.test(result.message)) {
+                        this.platforms.block.push(platform.name);
+                    }
+
+                    return result;
+                }
 
                 // Если получен успешный ответ
                 else if (status === "success") {
-                    if (Array.isArray(result)) return resolve(result.map(item => new Track(item, baseAPI)) as APIRequests[T]);
+                    const parseTrack = (item: TrackRaw.Data) => new Track(item, baseAPI);
 
-                    else if (typeof result === "object" && "items" in result) {
-                        return resolve({
-                            ...result,
-                            items: result.items.map(item => new Track(item, baseAPI)),
-                        } as any);
+                    // Если пришел список треков
+                    if (Array.isArray(result)) {
+                        return resolve(result.map(parseTrack) as APIRequests[T]);
                     }
 
-                    return resolve(new Track(result, baseAPI) as APIRequests[T]);
+                    // Если пришел плейлист
+                    else if (typeof result === "object" && "items" in result) {
+                        return resolve({ ...result, items: result.items.map(parseTrack) } as any);
+                    }
+
+                    // Если просто трек
+                    return resolve(parseTrack(result) as APIRequests[T]);
                 }
 
                 resolve(null);
@@ -365,6 +373,9 @@ export class RestObject {
 
             // Слушаем worker
             this.worker.on("message", onMessage);
+
+            // Отправляем запрос
+            this.worker.postMessage({ platform: platform.name, payload, options, requestId });
         });
     };
 }
