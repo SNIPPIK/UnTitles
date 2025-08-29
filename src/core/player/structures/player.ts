@@ -1,11 +1,11 @@
-import {BufferedAudioResource, PipeAudioResource, SILENT_FRAME} from "#core/audio";
-import {ControllerTracks, ControllerVoice, RepeatType, Track} from "#core/queue";
-import {AudioFilter, AudioPlayerEvents, ControllerFilters} from "#core/player";
-import {PlayerProgress} from "../modules/progress";
-import {Logger, TypedEmitter} from "#structures";
-import type {VoiceConnection} from "#core/voice";
-import {PlayerAudio} from "../modules/audio";
-import {db} from "#app/db";
+import { BufferedAudioResource, PipeAudioResource, SILENT_FRAME } from "#core/audio";
+import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue";
+import { AudioFilter, AudioPlayerEvents, ControllerFilters } from "#core/player";
+import { PlayerProgress } from "../modules/progress";
+import { Logger, TypedEmitter } from "#structures";
+import type { VoiceConnection } from "#core/voice";
+import { PlayerAudio } from "../modules/audio";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -156,7 +156,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (this._status === "player/wait" || this._status === "player/pause") return false;
 
         // Если голосовое состояние не позволяет отправлять пакеты
-        else if (!this._voice.connection && !this._voice.connection.ready) return false;
+        else if (!this._voice.connection && !this._voice.connection?.ready) return false;
 
         // Если поток не читается, переходим в состояние ожидания
         else if (!this._audio.current && !this._audio.current.packets || !this._audio.current?.readable) {
@@ -482,7 +482,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 path,
                 options: {
                     seek,
-                    filters: this._filters.compress(time, this._audio.volume, this._audio.current && this._audio.current?.packets > 0)
+                    filters: this._filters.toString(time, this._audio.volume, this._audio.current && this._audio.current?.packets > 0)
                 }
             }
         );
@@ -548,7 +548,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has cleanup`);
 
         // Отключаем фильтры при очистке
-        if (this._filters.enabled.size > 0) this._filters.enabled.clear();
+        if (this._filters.size > 0) this._filters.clear();
 
         // Отключаем плеер от цикла
         this.disableCycle();

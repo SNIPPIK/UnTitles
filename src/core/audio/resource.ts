@@ -103,17 +103,13 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @description Если чтение возможно
      * @public
      */
-    public get readable(): boolean {
-        return this._readable;
-    };
+    public abstract get readable(): boolean;
 
     /**
      * @description Duration в секундах с учётом текущей позиции в буфере и seek-а (предыдущего смещения)
      * @public
      */
-    public get duration() {
-        return 0;
-    };
+    public abstract get duration(): number;
 
     /**
      * @description Выдаем фрагмент потока или пустышку
@@ -121,18 +117,14 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @return Buffer
      * @public
      */
-    public get packet(): Buffer {
-        return SILENT_FRAME;
-    };
+    public abstract get packet(): Buffer;
 
     /**
      * @description Оставшееся кол-во пакетов
      * @help (время пакета 20ms)
      * @public
      */
-    public get packets(): number {
-        return 0;
-    };
+    public abstract get packets(): number;
 
     /**
      * @description Создаем класс и задаем параметры
@@ -374,6 +366,14 @@ export class PipeAudioResource extends BaseAudioResource {
      * @private
      */
     private played = 0;
+
+    /**
+     * @description Если чтение возможно
+     * @public
+     */
+    public get readable(): boolean {
+        return this.encoder.readable;
+    };
 
     /**
      * @description Выдаем фрагмент потока

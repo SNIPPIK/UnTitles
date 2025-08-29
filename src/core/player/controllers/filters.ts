@@ -8,29 +8,13 @@ import {SetArray} from "#structures";
  * @class ControllerFilters
  * @public
  */
-export class ControllerFilters<T extends AudioFilter> {
-    /**
-     * @description Включенные фильтры
-     * @readonly
-     * @private
-     */
-    private readonly _filters = new SetArray<T>();
-
-    /**
-     * @description Получаем список включенных фильтров
-     * @returns T[]
-     * @public
-     */
-    public get enabled() {
-        return this._filters;
-    };
-
+export class ControllerFilters<T extends AudioFilter> extends SetArray<T> {
     /**
      * @description Сжимаем фильтры для работы ffmpeg
      * @returns string
      * @public
      */
-    public compress = (time: number, volume: number, isSwap = false) => {
+    public toString = (time: number, volume: number, isSwap = false) => {
         const { fade, optimization, swapFade } = db.queues.options;
         const filters: string[] = [`volume=${volume / 150}`];
         const fade_int = isSwap ? swapFade : fade;
@@ -51,7 +35,7 @@ export class ControllerFilters<T extends AudioFilter> {
         // Если трек не live
         if (!live) {
             // Берем данные из всех фильтров
-            for (const enabled of this._filters) {
+            for (const enabled of this) {
                 const {filter, args, argument} = enabled;
 
                 filters.push(args ? `${filter}${argument ?? ""}` : filter);

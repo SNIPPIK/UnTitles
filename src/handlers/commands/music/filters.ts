@@ -54,7 +54,7 @@ class AudioFilterPush extends SubCommand {
         const argument = args && args?.length > 1 ? Number(args[1]) : null;
 
         const Filter = filters.find((item) => item.name === name) as AudioFilter;
-        const findFilter = player.filters.enabled.find((fl) => fl.name === name);
+        const findFilter = player.filters.find((fl) => fl.name === name);
 
         // Пользователь пытается включить включенный фильтр
         if (findFilter) {
@@ -88,7 +88,7 @@ class AudioFilterPush extends SubCommand {
 
         // Делаем проверку на совместимость
         // Проверяем, не конфликтует ли новый фильтр с уже включёнными
-        for (const enabledFilter of player.filters.enabled) {
+        for (const enabledFilter of player.filters) {
             if (!enabledFilter) continue;
 
             // Новый фильтр несовместим с уже включённым?
@@ -119,7 +119,7 @@ class AudioFilterPush extends SubCommand {
         }
 
         // Добавляем фильтр
-        player.filters.enabled.add(Filter);
+        player.filters.add(Filter);
 
         // Если можно включить фильтр или фильтры сейчас
         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
@@ -173,7 +173,7 @@ class AudioFiltersOff extends SubCommand {
         const player = queue.player;
 
         // Если нет включенных фильтров
-        if (player.filters.enabled.size === 0) {
+        if (player.filters.size === 0) {
             return ctx.reply({
                 embeds: [
                     {
@@ -218,7 +218,7 @@ class AudioFiltersOff extends SubCommand {
         }
 
         // Удаляем фильтры
-        player.filters.enabled.clear();
+        player.filters.clear();
         return null;
     }
 }
@@ -255,7 +255,7 @@ class AudioFiltersOff extends SubCommand {
             // Если нет очереди
             if (!queue) return null;
 
-            const filters = queue.player.filters.enabled;
+            const filters = queue.player.filters;
 
             // Если нет включенных фильтров
             if (!filters) return null;
@@ -283,7 +283,7 @@ class AudioFilterRemove extends SubCommand {
         const name = args && args?.length > 0 ? args[0] : null;
 
         const Filter = filters.find((item) => item.name === name) as AudioFilter;
-        const findFilter = player.filters.enabled.find((fl) => fl.name === name);
+        const findFilter = player.filters.find((fl) => fl.name === name);
 
         // Пользователь пытается выключить выключенный фильтр
         if (!findFilter) {
@@ -299,7 +299,7 @@ class AudioFilterRemove extends SubCommand {
         }
 
         // Удаляем фильтр
-        player.filters.enabled.delete(findFilter);
+        player.filters.delete(findFilter);
 
         // Если можно выключить фильтр или фильтры сейчас
         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {

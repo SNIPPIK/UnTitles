@@ -44,6 +44,7 @@ abstract class Request {
         // Пользовательский User-Agent
         userAgent?: string | boolean;
     } & RequestOptions = {
+        timeout: 3e3,
         headers: {},
         maxVersion: "TLSv1.3"
     };

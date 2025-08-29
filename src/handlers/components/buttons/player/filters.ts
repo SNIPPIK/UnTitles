@@ -17,7 +17,7 @@ import { db } from "#app/db";
 class ButtonFilters extends Component<"button"> {
     public callback: Component<"button">["callback"] = async (ctx) => {
         const queue = db.queues.get(ctx.guildId);
-        const filters = queue.player.filters.enabled;
+        const filters = queue.player.filters;
 
         // Если нет фильтров
         if (filters.size === 0) {

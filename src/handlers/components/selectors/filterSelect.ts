@@ -20,14 +20,14 @@ class FilterSelector extends Component<"selector"> {
     public callback: Component["callback"] = (ctx) => {
         const { player } = db.queues.get(ctx.guildId);
         const Filter = filters.find((item) => item.name === ctx["values"][0]) as AudioFilter;
-        const findFilter = player.filters.enabled.find((fl) => fl.name === Filter.name);
+        const findFilter = player.filters.find((fl) => fl.name === Filter.name);
         const seek: number = player.audio.current?.duration ?? 0;
 
 
         /* Отключаем фильтр */
         // Если есть включенный фильтр
         if (findFilter) {
-            player.filters.enabled.delete(findFilter);
+            player.filters.delete(findFilter);
 
             // Если можно выключить фильтр или фильтры сейчас
             if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
@@ -62,7 +62,7 @@ class FilterSelector extends Component<"selector"> {
 
 
         /* Включаем фильтр */
-        player.filters.enabled.add(Filter);
+        player.filters.add(Filter);
 
         // Если можно включить фильтр или фильтры сейчас
         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {

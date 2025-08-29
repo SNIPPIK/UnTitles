@@ -347,7 +347,7 @@ export class RestObject {
                         this.platforms.block.push(platform.name);
                     }
 
-                    return result;
+                    return resolve(result);
                 }
 
                 // Если получен успешный ответ
@@ -368,7 +368,7 @@ export class RestObject {
                     return resolve(parseTrack(result) as APIRequests[T]);
                 }
 
-                resolve(null);
+                return resolve(null);
             };
 
             // Слушаем worker

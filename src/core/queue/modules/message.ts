@@ -250,7 +250,7 @@ export class QueueButtons {
         const isShuffled = player.tracks.shuffle;
         const isPaused = player.status === "player/pause";
         const currentRepeatType = player.tracks.repeat;
-        const hasFilters = player.filters.enabled.size > 0;
+        const hasFilters = player.filters.size > 0;
 
         // Хелпер для обновления кнопки
         const setButton = (btn: any, { disabled, style, emoji }: { disabled?: boolean; style?: number; emoji?: any }) => {
