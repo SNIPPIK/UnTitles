@@ -14,19 +14,19 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @description Последний записанное значение performance.now(), нужно для улавливания event loop lags
      * @private
      */
-    private performance: number;
+    private performance: number = 0;
 
     /**
      * @description Последний записанное значение performance.now(), нужно для сглаживания лага
      * @private
      */
-    private prevEventLoopLag: number;
+    private prevEventLoopLag: number = 0;
 
     /**
      * @description Последний сохраненный временной интервал
      * @private
      */
-    private lastDelay: number;
+    private lastDelay: number = 0;
 
     /**
      * @description Следующее запланированное время запуска (в ms, с плавающей точкой)
@@ -52,7 +52,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @public
      */
     public get drifting(): number {
-        return this.drift + this.prevEventLoopLag;
+        return this.drift;
     };
 
     /**
@@ -117,7 +117,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Запускаем цикл, если добавлен первый объект
         if (this.size === 1 && this.startTime === 0) {
             this.startTime = this.time;
-            process.nextTick(this._stepCycle);
+            setImmediate(this._stepCycle);
         }
 
         return this;
@@ -140,7 +140,12 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Чистим performance.now
         this.performance = 0;
-        this.prevEventLoopLag = 0;
+        this.prevEventLoopLag = 0
+
+        // Запускаем Garbage Collector
+        setImmediate(() => {
+            if (typeof global.gc === "function") global.gc();
+        });
     };
 
     /**
@@ -177,25 +182,24 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     protected _stepCheckTimeCycleDrift = (duration: number): void => {
         if (this.size === 0) return this.reset();
 
-        // Для компенсации дрейфа
-        const tickStart = this.time;
-
         // Высчитываем время шага
         this.delay = duration;
 
-        // Получение задержки event loop
+        // Коррекция event loop lag
         const lags = this._calculateLags(this.lastDelay);
 
-        // Следующее время шага с вычетом упущенного времени
-        const nextTargetTime = this.insideTime - this.drift - lags;
+        // Следующее время шага
+        const nextTargetTime = this.insideTime + this.drift - lags;
 
         // Запускаем шаг
         this._runTimeout(nextTargetTime, () => {
+            // EMA сглаживание дрейфа
+            const tickStart = this.time + this.lastDelay;
             this._stepCycle();
             const tickEnd = this.time;
 
-            // Компенсируем дрейф
-            this.drift = this._compensator(0.9, this.drift, tickEnd - tickStart);
+            // Сглаживание дрейфа
+            this.drift = this._compensator(0.5, this.drift, tickEnd - tickStart);
         });
     };
 
@@ -219,14 +223,14 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @protected
      * @readonly
      */
-    protected _calculateLags = (duration: number): number => {
+    protected _calculateLags = (duration: number) => {
         // Коррекция event loop lag
         const performanceNow = performance.now();
         const driftEvent = this.performance ? Math.max(0, (performanceNow - this.performance) - duration) : 0;
         this.performance = performanceNow;
 
         // Смягчение event loop lag
-        return this.prevEventLoopLag = this.prevEventLoopLag !== undefined ? this._compensator(0.9, this.prevEventLoopLag, driftEvent): driftEvent;
+        return this.prevEventLoopLag = this.prevEventLoopLag !== undefined ? this._compensator(0.95, this.prevEventLoopLag, driftEvent): driftEvent;
     };
 
     /**
@@ -236,7 +240,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @param current - Новое время
      * @private
      */
-    private _compensator = (alpha: number, old: number, current: number): number => {
+    private _compensator = (alpha: number, old: number, current: number) => {
         return alpha * old + (1 - alpha) * current;
     };
 }

@@ -317,39 +317,41 @@ class RestYandexAPI extends RestServerSide.API {
      * @static
      */
     protected getAudio = (ID: string): Promise<string | Error> => {
+        const trackId = ID.split("/")[1];
+
         return new Promise<string | Error>(async (resolve) => {
             for (let i = 0; i < 3; i++) {
 
                 try { /* Flac Audio handler */
-                    const trackId = ID.split("/")[1];
                     const timestamp = Math.floor(Date.now() / 1000);
                     const encoder = new TextEncoder();
                     const keyData = encoder.encode(this.options.keys[0]);
                     const cryptoKey = await crypto.subtle.importKey("raw", keyData, {name: "HMAC", hash: {name: "SHA-256"}},false, ["sign"]);
                     const dataEncoded = encoder.encode(`${timestamp}${trackId}losslessflacaache-aacmp3raw`);
                     const signature = await crypto.subtle.sign("HMAC", cryptoKey, dataEncoded);
-                    const sign = btoa(String.fromCharCode(...new Uint8Array(signature))).slice(0, -1);
-                    //@ts-ignore
+                    const sign = btoa(String.fromCharCode(...new Uint8Array(signature)));
                     const params = new URLSearchParams({
-                        ts: timestamp,
+                        ts: `${timestamp}`,
                         trackId: trackId,
                         quality: "lossless",
                         codecs: "flac,aac,he-aac,mp3",
                         transports: "raw",
-                        sign: sign
+
+                        // Удаляем лишний символ с конца (=)
+                        sign: sign.slice(0, -1)
                     });
 
                     // Делаем запрос для получения аудио
                     const api = await this.API(`get-file-info?${params.toString()}`) as { downloadInfo: {url: string, trackId: string, realId: string} };
 
                     // Если yandex пытается подсунуть рекламу вместо реального аудио
-                    if (`/${api.downloadInfo.trackId}` !== ID || `/${api.downloadInfo.realId}` !== ID) continue;
+                    if (api.downloadInfo.trackId !== trackId || api.downloadInfo.realId !== trackId) continue;
 
                     return resolve(api.downloadInfo.url);
                 } catch (e) { /* MP3 Audio handler */
                     try {
                         // Делаем запрос для получения аудио
-                        const api = await this.API(`tracks/${ID}/download-info`);
+                        const api = await this.API(`tracks/${trackId}/download-info`);
 
                         // Если на этапе получение данных получена одна из ошибок
                         if (!api) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]));
@@ -362,7 +364,7 @@ class RestYandexAPI extends RestServerSide.API {
                         if (!url) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio url"]));
 
                         // Если yandex пытается подсунуть рекламу вместо реального аудио
-                        else if (`/${url.downloadInfoUrl.split(".").at(-1).split("/")[0]}` !== ID) continue;
+                        else if (`${url.downloadInfoUrl.split(".").at(-1).split("/")[0]}` !== trackId) continue;
 
                         // Расшифровываем xml страницу на фрагменты
                         new httpsClient({url: url["downloadInfoUrl"],
