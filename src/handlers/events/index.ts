@@ -55,27 +55,6 @@ export class Events extends handler<Event<keyof ClientEvents>> {
 
 /**
  * @author SNIPPIK
- * @description Все имена событий доступных для прослушивания
- * @type EventNames
- */
-type EventNames<T> = T extends keyof QueueEvents ? keyof QueueEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
-
-/**
- * @author SNIPPIK
- * @description Все типы для фильтрации событий
- * @type EventType
- */
-type EventType<T> = T extends keyof QueueEvents | keyof AudioPlayerEvents ? "player" : "client";
-
-/**
- * @author SNIPPIK
- * @description Функция выполняемая при вызове события
- * @type EventCallback
- */
-type EventCallback<T> = T extends keyof QueueEvents ? QueueEvents[T] : T extends keyof AudioPlayerEvents ? AudioPlayerEvents[T] : T extends keyof ClientEvents ? (...args: ClientEvents[T]) => void : never;
-
-/**
- * @author SNIPPIK
  * @description Интерфейс для событий
  * @class Event
  * @public
@@ -87,7 +66,7 @@ export abstract class Event<T extends keyof ClientEvents | keyof QueueEvents | k
      * @readonly
      * @public
      */
-    readonly name: EventNames<T>;
+    readonly name: T extends keyof QueueEvents ? keyof QueueEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
 
     /**
      * @description Тип события
@@ -95,7 +74,7 @@ export abstract class Event<T extends keyof ClientEvents | keyof QueueEvents | k
      * @readonly
      * @public
      */
-    readonly type?: EventType<T>;
+    readonly type?: T extends keyof QueueEvents | keyof AudioPlayerEvents ? "player" : "client";
 
     /**
      * @description Тип выполнения события
@@ -111,5 +90,5 @@ export abstract class Event<T extends keyof ClientEvents | keyof QueueEvents | k
      * @readonly
      * @public
      */
-    readonly execute: EventCallback<T>;
+    readonly execute: T extends keyof QueueEvents ? QueueEvents[T] : T extends keyof AudioPlayerEvents ? AudioPlayerEvents[T] : T extends keyof ClientEvents ? (...args: ClientEvents[T]) => void : never;
 }

@@ -30,6 +30,12 @@ const db = {
 };
 
 /**
+ * @description Функция превращающая число в строку с добавлением 0
+ * @param n - Число
+ */
+const splitter = (n: number) => (n < 10 ? "0" : "") + n;
+
+/**
  * @author SNIPPIK
  * @description Простенький logger, не надо использовать new, все функции в нем статичны
  * @class Logger
@@ -70,7 +76,7 @@ export class Logger {
 
         const date = new Date();
         const extStatus = db.status[status];
-        const time = `\x1b[90m${date.getDate()}/${(date.getMonth() + 1)}/${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}\x1b[0m`;
+        const time = `\x1b[90m${splitter(date.getDate())}/${(splitter(date.getMonth() + 1))}/${splitter(date.getFullYear())} ${splitter(date.getHours())}:${splitter(date.getMinutes())}\x1b[0m`;
 
         // Получаем память в мегабайтах с двумя знаками после запятой
         const mem = process.memoryUsage();

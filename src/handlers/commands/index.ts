@@ -1,6 +1,7 @@
 import { ApplicationCommandOption, ApplicationCommandOptionType, ApplicationCommandType, PermissionsString, Routes } from "discord.js";
 import { CommandInteraction, CompeteInteraction, DiscordClient } from "#structures/discord";
 import type { Locale, LocalizationMap, Permissions } from "discord-api-types/v10";
+import { RegisteredMiddlewares } from "#handler/middlewares";
 import filters from "#core/player/filters.json";
 import { AudioFilter } from "#core/player";
 import { Logger } from "#structures";
@@ -97,15 +98,18 @@ export class Commands extends handler<Command> {
      */
     public remove = (client: DiscordClient, guildID: string, CommandID: string) => {
         // Удаление приватной команды
-        this.unregisterRest(Routes.applicationGuildCommand(client.user.id, guildID, CommandID), client);
+        if (guildID) client.rest.delete(Routes.applicationGuildCommand(client.user.id, guildID, CommandID))
+            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed in guild ${guildID}`))
+            .catch(console.error);
 
         // Удаление глобальной команды
-        this.unregisterRest(Routes.applicationCommand(client.user.id, CommandID), client);
+        else client.rest.delete(Routes.applicationCommand(client.user.id, CommandID))
+            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed`))
+            .catch(console.error);
     };
 
     /**
      * @description Регистрируем команды в эко системе discord
-     * @param client - Экземпляр клиента
      * @public
      */
     public register = (client: DiscordClient) => {
@@ -116,43 +120,23 @@ export class Commands extends handler<Command> {
         if (!this.files.size) throw new Error("Not loaded commands");
 
         // Загрузка глобальных команд
-        this.registerRest(Routes.applicationCommands(client.application.id), this.public, client);
+        client.application.commands.set(this.parseJsonData(this.public) as any)
+            .then(() => Logger.log("DEBUG", `[App/Commands | ${this.public.length}] has load public commands`))
+            .catch(console.error);
 
         // Загрузка приватных команд
-        if (guild) {
-            this.registerRest(Routes.applicationGuildCommands(client.application.id, guildID), this.owner, client);
-        }
-    };
-
-    /**
-     * @description Отправляем команды через rest клиента
-     * @param route - Путь запроса rest
-     * @param body - Команды для отправки
-     * @param client - Экземпляр клиента
-     * @private
-     */
-    private registerRest = (route: `/${string}`, body: Command[], client: DiscordClient) => {
-        const rest = client.rest;
-
-        rest.put(route, {
-            body: body ? body.map(cmd => cmd.toJSON()) : null
-        })
-            .then(() => Logger.log("DEBUG", `[Rest | ${body.length}] has send a rest system`))
+        if (guild) guild.commands.set(this.parseJsonData(this.owner) as any)
+            .then(() => Logger.log("DEBUG", `[App/Commands | ${this.owner.length}] has load guild commands`))
             .catch(console.error);
     };
 
     /**
-     * @description Отправляем команды через rest клиента
-     * @param route - Путь запроса rest
-     * @param client - Экземпляр клиента
+     * @description Передаем только необходимые данные discord'у
+     * @param data - Все команды
      * @private
      */
-    private unregisterRest = (route: `/${string}`, client: DiscordClient) => {
-        const rest = client.rest;
-
-        rest.delete(route)
-            .then(() => Logger.log("DEBUG", `[Rest | ${route}] has deleted`))
-            .catch(console.error);
+    private parseJsonData = (data: Command[]) => {
+        return data.map(cmd => cmd.toJSON());
     };
 }
 
@@ -347,14 +331,6 @@ export abstract class SubCommand extends BaseCommand {
         };
     };
 }
-
-/**
- * @author SNIPPIK
- * @description Все доступные ограничения
- * @type RegisteredMiddlewares
- * @public
- */
-export type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream" | "cooldown";
 
 /**
  * @author SNIPPIK

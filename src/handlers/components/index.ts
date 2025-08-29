@@ -1,4 +1,4 @@
-import { RegisteredMiddlewares } from "#handler/commands";
+import { RegisteredMiddlewares } from "#handler/middlewares";
 import { buttonInteraction } from "#structures/discord";
 import { AnySelectMenuInteraction } from "discord.js";
 import { handler } from "#handler";

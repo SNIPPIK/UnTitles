@@ -16,8 +16,8 @@ export class Collection<K, T = string> {
      * @description Получаем случайный объект из MAP
      * @public
      */
-    public get array(): K[] {
-        return this._map.values().toArray();
+    public get array() {
+        return this._map.values();
     };
 
     /**
@@ -62,7 +62,7 @@ export class Collection<K, T = string> {
     };
 
     /**
-     * @description Удаляем элемент из списка
+     * @description Удаляем элемент из списка, с выполнением функций "disconnect", "cleanup", "destroy"
      * @param ID - ID Сервера
      * @param silent - тихое удаление объекта
      * @returns void

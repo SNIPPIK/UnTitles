@@ -1,7 +1,14 @@
 import { ButtonInteraction, AnySelectMenuInteraction } from "discord.js";
 import { CommandInteraction } from "#structures/discord";
-import { Command } from "#handler/commands";
 import { handler } from "#handler";
+
+/**
+ * @author SNIPPIK
+ * @description Все доступные ограничения
+ * @type RegisteredMiddlewares
+ * @public
+ */
+export type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "player-not-playing" | "player-wait-stream" | "cooldown";
 
 /**
  * @author SNIPPIK
@@ -49,6 +56,6 @@ export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction |
  * @public
  */
 export interface middleware<T> {
-    name: Command["middlewares"][number];
+    name: RegisteredMiddlewares;
     callback: (message: T) => boolean;
 }
