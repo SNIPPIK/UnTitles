@@ -413,11 +413,12 @@ class RestYandexAPI extends RestServerSide.API {
     protected track = (track: any) => {
         const author = track["artists"]?.length ? track["artists"]?.pop() : track["artists"];
         const album = track["albums"]?.length ? track["albums"][0] : track["albums"];
+        const image = this.parseImage({image: album?.["ogImage"] ?? album?.["coverUri"] ?? track?.["ogImage"] ?? track?.["coverUri"]}) ?? null
 
         return {
             id: `${album.id}_${track.id}`,
             title: `${track?.title ?? track?.name}` + (track.version ? ` - ${track.version}` : ""),
-            image: this.parseImage({image: track?.["ogImage"] || track?.["coverUri"]}) ?? null,
+            image,
             url: `https://${this.url}/album/${album.id}/track/${track.id}`,
             time: { total: (track["durationMs"] / 1000).toFixed(0) ?? "250" as any },
 
