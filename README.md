@@ -91,6 +91,7 @@ while (performance.now() - startBlock < 100) {}
 - There is an explicit synchronization of the audio stream
 #### 🌐 Platforms
 - Supported: `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
+- Audio: `YouTube`, `VK`, `Yandex-Music` **(MP3 + Lossless)**, `SoundCloud`
 - Precise search in the absence of audio, by time and names by syllables
 - There is a search on other platforms in the absence of audio!
 - There is support for `related`(**related tracks**), inclusion of similar tracks

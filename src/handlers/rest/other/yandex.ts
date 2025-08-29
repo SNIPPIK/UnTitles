@@ -24,6 +24,23 @@ import { db } from "#app/db";
      * @protected
      */
     api: "https://api.music.yandex.net",
+
+    /**
+     * @description Ключи для расшифровки ссылок
+     * @protected
+     */
+    keys: ["kzqU4XhfCaY6B6JTHODeq5", "XGRlBW9FXlekgbPrRHuSiA"],
+
+    /**
+     * @description Доступные заголовки
+     */
+    agents: [
+        // Windows Desktop
+        "YandexMusicDesktopAppWindows/5.13.2",
+
+        // Phone Android
+        "YandexMusicAndroid/2025071"
+    ],
 })
 class RestYandexAPI extends RestServerSide.API {
     readonly requests: RestServerSide.API["requests"] = [
@@ -274,7 +291,8 @@ class RestYandexAPI extends RestServerSide.API {
             new httpsClient({
                 url: `${this.options.api}/${method}`,
                 headers: {
-                    "Authorization": "OAuth " + this.auth
+                    "Authorization": "OAuth " + this.auth,
+                    "X-Yandex-Music-Client": method?.startsWith("get-file-info") ? this.options.agents[0] : this.options.agents[1]
                 },
                 method: "GET",
             }).toJson.then((req) => {
@@ -294,37 +312,78 @@ class RestYandexAPI extends RestServerSide.API {
     /**
      * @description Получаем исходный файл трека
      * @param ID - ID трека
+     * @support MP3, Lossless
      * @protected
      * @static
      */
     protected getAudio = (ID: string): Promise<string | Error> => {
         return new Promise<string | Error>(async (resolve) => {
-            try {
-                const api = await this.API(`tracks/${ID}/download-info`);
+            for (let i = 0; i < 3; i++) {
 
-                // Если на этапе получение данных получена одна из ошибок
-                if (!api) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]));
-                else if (api instanceof Error) return resolve(api);
-                else if (api.length === 0) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api.size as 0"]));
+                try { /* Flac Audio handler */
+                    const trackId = ID.split("/")[1];
+                    const timestamp = Math.floor(Date.now() / 1000);
+                    const encoder = new TextEncoder();
+                    const keyData = encoder.encode(this.options.keys[0]);
+                    const cryptoKey = await crypto.subtle.importKey("raw", keyData, {name: "HMAC", hash: {name: "SHA-256"}},false, ["sign"]);
+                    const dataEncoded = encoder.encode(`${timestamp}${trackId}losslessflacaache-aacmp3raw`);
+                    const signature = await crypto.subtle.sign("HMAC", cryptoKey, dataEncoded);
+                    const sign = btoa(String.fromCharCode(...new Uint8Array(signature))).slice(0, -1);
+                    //@ts-ignore
+                    const params = new URLSearchParams({
+                        ts: timestamp,
+                        trackId: trackId,
+                        quality: "lossless",
+                        codecs: "flac,aac,he-aac,mp3",
+                        transports: "raw",
+                        sign: sign
+                    });
 
-                const url = api.find((data: any) => data.codec !== "aac");
+                    // Делаем запрос для получения аудио
+                    const api = await this.API(`get-file-info?${params.toString()}`) as { downloadInfo: {url: string, trackId: string, realId: string} };
 
-                // Если нет ссылки на xml
-                if (!url) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio url"]));
+                    // Если yandex пытается подсунуть рекламу вместо реального аудио
+                    if (`/${api.downloadInfo.trackId}` !== ID || `/${api.downloadInfo.realId}` !== ID) continue;
 
-                // Расшифровываем xml страницу на фрагменты
-                new httpsClient({url: url["downloadInfoUrl"]}).toXML.then((xml) => {
-                    if (xml instanceof Error) return resolve(xml);
+                    return resolve(api.downloadInfo.url);
+                } catch (e) { /* MP3 Audio handler */
+                    try {
+                        // Делаем запрос для получения аудио
+                        const api = await this.API(`tracks/${ID}/download-info`);
 
-                    const path = xml[1];
-                    const sign = crypto.createHash("md5").update("XGRlBW9FXlekgbPrRHuSiA" + path.slice(1) + xml[4]).digest("hex");
+                        // Если на этапе получение данных получена одна из ошибок
+                        if (!api) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]));
+                        else if (api instanceof Error) return resolve(api);
+                        else if (api.length === 0) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api.size as 0"]));
 
-                    return resolve(`https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`);
-                }).catch((e) => {
-                    return resolve(Error(e));
-                });
-            } catch (e) {
-                return resolve(Error(e as string));
+                        const url = api.find((data: any) => data.codec !== "aac") as { downloadInfoUrl: string };
+
+                        // Если нет ссылки на xml
+                        if (!url) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio url"]));
+
+                        // Если yandex пытается подсунуть рекламу вместо реального аудио
+                        else if (`/${url.downloadInfoUrl.split(".").at(-1).split("/")[0]}` !== ID) continue;
+
+                        // Расшифровываем xml страницу на фрагменты
+                        new httpsClient({url: url["downloadInfoUrl"],
+                            headers: {
+                                "X-Yandex-Music-Client": this.options.agents[1]
+                            }
+                        }).toXML.then((xml) => {
+                            if (xml instanceof Error) return resolve(xml);
+
+                            const path = xml[1];
+                            const sign = crypto.createHash("md5").update(this.options.keys[1] + path.slice(1) + xml[4]).digest("hex");
+
+                            return resolve(`https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`);
+                        }).catch((e) => {
+                            return resolve(Error(e));
+                        });
+                    } catch (err) {
+                        return resolve(Error(e as string));
+                    }
+                }
+
             }
         });
     };
