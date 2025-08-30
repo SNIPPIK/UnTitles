@@ -165,7 +165,7 @@ class RestVKAPI extends RestServerSide.API {
             url: url || `https://vk.com/audio${track.owner_id}_${track.id}`,
             title: track.title,
             artist: this.author(track),
-            image: { url: image?.["photo_1200"] ?? image?.["photo_600"] ?? image?.["photo_300"] ?? image?.["photo_270"] ?? undefined },
+            image: image?.["photo_1200"] ?? image?.["photo_600"] ?? image?.["photo_300"] ?? image?.["photo_270"] ?? undefined,
             time: { total: track.duration.toFixed(0) },
             audio: track?.url
         };

@@ -1,9 +1,9 @@
-import {Command, CommandContext, Declare, Middlewares, Options, Permissions, SubCommand} from "#handler/commands";
-import {ApplicationCommandOptionType, ApplicationCommandType, Message} from "discord.js";
-import {CompeteInteraction} from "#structures/discord";
-import {RestClientSide} from "#handler/rest";
-import {locale} from "#structures";
-import {db} from "#app/db";
+import { Command, CommandContext, Declare, Middlewares, Options, Permissions, SubCommand } from "#handler/commands";
+import { ApplicationCommandOptionType, ApplicationCommandType, Message } from "discord.js";
+import { CompeteInteraction } from "#structures/discord";
+import { RestClientSide } from "#handler/rest";
+import { locale } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

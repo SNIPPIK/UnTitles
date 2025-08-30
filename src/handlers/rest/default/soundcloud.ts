@@ -253,9 +253,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
                 title: track.user.username,
                 image: track.user.avatar_url,
             },
-            image: {
-                url: track.artwork_url
-            },
+            image: track.artwork_url,
             time: {
                 total: (track.duration / 1e3).toFixed(0)
             },

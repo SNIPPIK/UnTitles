@@ -4,6 +4,7 @@ import { TypedEmitter } from "#structures";
 /**
  * @author SNIPPIK
  * @description Заголовок для поиска opus
+ * @const OGG_MAGIC
  */
 const OGG_MAGIC = Buffer.from("OggS");
 
@@ -18,12 +19,14 @@ export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
 /**
  * @author SNIPPIK
  * @description Длительность opus фрейма в ms
+ * @const OPUS_FRAME_SIZE
  */
 export const OPUS_FRAME_SIZE = 20;
 
 /**
  * @author SNIPPIK
  * @description Пустой фрейм для предотвращения чтения null
+ * @const EMPTY_FRAME
  */
 const EMPTY_FRAME =  Buffer.alloc(0);
 

@@ -294,7 +294,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                 url: track["artists"][0]["external_urls"]["spotify"]
             },
             time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
-            image: track_images.sort((item1: any, item2: any) => item1.width > item2.width)[0],
+            image: track_images.sort((item1: any, item2: any) => item1.width > item2.width)[0].url,
             audio: null
         };
     };

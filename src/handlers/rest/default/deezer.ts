@@ -51,9 +51,7 @@ class RestDeezerAPI extends RestServerSide.API {
                             url,
                             title: api.title,
                             items: songs,
-                            image: {
-                                url: api.cover_xl
-                            }
+                            image: api.cover_xl
                         });
                     } catch (e) {
                         return resolve(Error(`[APIs]: ${e}`))
@@ -89,9 +87,7 @@ class RestDeezerAPI extends RestServerSide.API {
                         return resolve({
                             url,
                             title: api.title,
-                            image: {
-                                url: api.picture_xl
-                            },
+                            image: api.picture_xl,
                             items: songs,
                             artist: {
                                 title: api.creator.name,
@@ -195,7 +191,7 @@ class RestDeezerAPI extends RestServerSide.API {
         return {
             id: track.id,
             title: track?.title,
-            image: {url: track.cover_xl ?? track.album.cover_xl},
+            image: track.cover_xl ?? track.album.cover_xl,
             url: `https://${this.url}/album/${album.id}/track/${track.id}`,
             time: { total: `${track["duration"]}` },
 

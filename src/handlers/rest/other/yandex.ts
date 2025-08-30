@@ -397,13 +397,9 @@ class RestYandexAPI extends RestServerSide.API {
      * @protected
      * @static
      */
-    protected parseImage = ({image, size = 1e3}: { image: string, size?: number }): {url: string, width?: number, height?: number} => {
-        if (!image) return { url: "" };
-
-        return {
-            url: `https://${image.split("%%")[0]}m${size}x${size}`,
-            width: size, height: size
-        };
+    protected parseImage = ({image, size = 1e3}: { image: string, size?: number }): string => {
+        if (!image) return null;
+        return `https://${image.split("%%")[0]}m${size}x${size}`;
     };
 
     /**

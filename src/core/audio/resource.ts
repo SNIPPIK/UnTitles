@@ -252,7 +252,7 @@ export class BufferedAudioResource extends BaseAudioResource {
 
         const { path, options } = config;
         const decoder = new BufferedEncoder({
-            //highWaterMark: 512 * 5 // Буфер на ~1:14
+            highWaterMark: 512 * 5 // Буфер на ~1:14
         });
 
         // Расшифровщик

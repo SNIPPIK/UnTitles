@@ -84,11 +84,12 @@ export class Logger {
         const mem = process.memoryUsage();
         const memUsedMB = (mem.heapTotal / 1024 / 1024).toFixed(2);
 
-        // Сохраняем логи
-        if (this._createFiles) this.saveLog(`[RAM ${memUsedMB} MB] ${time}.${date.getMilliseconds()} | ${status} - ${text}`);
-
         // Если пришел текст
-        if (typeof text === "string") text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
+        if (typeof text === "string") {
+            // Сохраняем логи
+            this.saveLog(`[RAM ${memUsedMB} MB] ${time}.${date.getMilliseconds()} | ${status} - ${text}`);
+            text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
+        }
 
         // Если вместо текста пришла ошибка
         else if (text instanceof Error) {
@@ -96,7 +97,10 @@ export class Logger {
                 `┌ Name:    ${text.name}\n` +
                 `├ Message: ${text.message}\n` +
                 `├ Origin:  ${text}\n` +
-                `└ Stack:   ${text.stack}`
+                `└ Stack:   ${text.stack}`;
+
+            // Сохраняем логи
+            this.saveLog(`[RAM ${memUsedMB} MB] ${time}.${date.getMilliseconds()} | ${status} - ${text}`);
         }
 
         // Если объект
@@ -114,8 +118,10 @@ export class Logger {
      * @param text
      */
     private static saveLog = (text: string) => {
+        if (!this._createFiles) return;
+
         // Если нет пути сохранения
-        if (!fs.existsSync(this._path)) fs.mkdirSync(this._path);
+        else if (!fs.existsSync(this._path)) fs.mkdirSync(this._path);
 
         // Сохраняем данные в файл
         fs.appendFileSync(`${this._path}/${_timestamp}.txt`, text + "\n", "utf8");

@@ -132,8 +132,10 @@ export class Track extends BaseTrack {
      */
     public get image(): { url: string } {
         // Если нет картинки
-        if (!this._track?.image?.url) return { url: db.images.no_image };
-        return this._track.image;
+        if (!this._track?.image) return { url: db.images.no_image };
+        return {
+            url: this._track.image
+        };
     };
 
     /**
@@ -389,12 +391,7 @@ export namespace Track {
         /**
          * @description База с картинками трека и автора
          */
-        image: {
-            /**
-             * @description Ссылка на картинку трека
-             */
-            url: string
-        };
+        image: string;
 
         /**
          * @description Данные о времени трека
@@ -442,12 +439,7 @@ export namespace Track {
         /**
          * @description Картинка автора плейлиста
          */
-        image: {
-            /**
-             * @description Ссылка на картинку плейлиста
-             */
-            url: string;
-        };
+        image: string;
 
         /**
          * @description Данные об авторе плейлиста
@@ -475,12 +467,7 @@ export namespace Track {
         /**
          * @description Картинка артиста трека
          */
-        image?: {
-            /**
-             * @description Ссылка на картинку артиста
-             */
-            url: string
-        };
+        image?: string;
     }
 
     /**

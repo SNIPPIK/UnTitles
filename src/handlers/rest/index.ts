@@ -476,21 +476,21 @@ type ExecuteParams<T extends keyof APIRequests = keyof APIRequests> = T extends 
  */
 namespace TrackRaw {
     export interface Data {
-        readonly id: string
-        title: string
-        readonly url: string
-        artist: { title: string; readonly url: string; image?: { url: string } }
-        image: { url: string }
+        readonly id: string;
+        title: string;
+        readonly url: string;
+        artist: { title: string; readonly url: string; image?: string }
+        image: string;
         time: { total: string; split?: string }
-        audio?: string
+        audio?: string;
     }
 
     export interface List {
-        readonly url: string
-        readonly title: string
-        items: Data[]
-        image: { url: string }
-        artist?: { title: string; readonly url: string; image?: { url: string } }
+        readonly url: string;
+        readonly title: string;
+        items: Data[];
+        image: string;
+        artist?: { title: string; readonly url: string; image?: string }
     }
 }
 

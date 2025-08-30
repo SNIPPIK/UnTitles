@@ -139,15 +139,22 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public reinit = (): void => {
         if (this.protocolVersion > 0 && this.user_id && this.channel_id) {
+            // Если сессия уже есть
             if (this.session) {
                 this.session.reinit(this.protocolVersion, this.user_id, this.channel_id);
                 this.emit("debug", `Session reinitialized for protocol version ${this.protocolVersion}`);
-            } else {
+            }
+
+            // Если сессии еще нет
+            else {
                 this.session = new loaded_lib.DAVESession(this.protocolVersion, this.user_id, this.channel_id);
                 this.emit("debug", `Session initialized for protocol version ${this.protocolVersion}`);
             }
 
-            this.emit("key", this.session!.getSerializedKeyPackage());
+            // Даем немного времени для отправки ключа
+            setImmediate(() => {
+                this.emit("key", this.session.getSerializedKeyPackage());
+            });
         } else if (this.session) {
             this.session.reset();
             this.session.setPassthroughMode(true, TRANSITION_EXPIRY);

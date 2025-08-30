@@ -474,9 +474,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     url: `https://www.youtube.com${track["shortBylineText"]["runs"][0]["navigationEndpoint"]["browseEndpoint"]["canonicalBaseUrl"] || track["shortBylineText"]["runs"][0]["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"].url}`,
                 },
                 time: { total: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0 },
-                image: {
-                    url: `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
-                },
+                image: `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
                 audio: track?.format?.url || undefined
             };
         } catch {
@@ -489,9 +487,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                 time: {
                     total: track["lengthSeconds"] ?? track["lengthText"]?.["simpleText"] ?? 0
                 },
-                image: {
-                    url: `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
-                },
+                image: `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
                 audio: track?.format?.url || undefined
             }
         }
