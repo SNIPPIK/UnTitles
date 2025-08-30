@@ -340,7 +340,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @private
      */
     private onReceiveClose = (code: GatewayCloseCodes, reason: string) => {
-        this.emit("debug", `[WebSocket/close]: ${code} - ${reason}`);
+        this.emit("debug", `[WebSocket/close]:`, `${code} - ${reason}`);
 
         // Если получен игнорируемый код
         if (GatewayCloseCodesIgnore.includes(code)) return;
@@ -416,6 +416,9 @@ interface ClientWebSocketEvents {
      * @param err - Сама ошибка
      */
     "error": (err: Error) => void;
+
+    "warn": (text: string) => void;
+    "debug": (state: string, text: any) => void;
 
     /**
      * @description Если получен код выключения от discord

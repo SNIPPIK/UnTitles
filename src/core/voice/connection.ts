@@ -268,8 +268,8 @@ export class VoiceConnection {
         this.websocket.connect(endpoint, code); // Подключаемся к endpoint
 
         // Если включен debug режим
-        //this.websocket.on("debug", console.log);
-        //this.websocket.on("warn", console.log);
+        this.websocket.on("debug", (status, text) => Logger.log("DEBUG", `${status} ${JSON.stringify(text)}`));
+        this.websocket.on("warn", (status) => Logger.log("DEBUG", status));
 
         /**
          * @description Отправляем Identify данные, для регистрации голосового подключения
@@ -372,7 +372,7 @@ export class VoiceConnection {
             this._status = VoiceConnectionStatus.reconnecting;
 
             setTimeout(() => {
-                this.websocket?.emit("debug", `[${code}/${reason}] Voice Connection reconstruct ws... 500 ms`);
+                this.websocket?.emit("debug", `[${code}/${reason}]`, `Voice Connection reconstruct ws... 500 ms`);
                 this.createWebSocket(this.serverState.endpoint, code);
             }, 500);
         });
@@ -431,7 +431,10 @@ export class VoiceConnection {
             };
         });
 
-        // Если UDP подключение разорвет соединение принудительно
+        /**
+         * @description Если UDP подключение разорвет соединение принудительно
+         * @event close
+         */
         this.clientUDP.on("close", () => {
             // Если голосовое подключение полностью отключено
             if (this._status === VoiceConnectionStatus.disconnected) return;
@@ -443,7 +446,10 @@ export class VoiceConnection {
             this.websocket.emit("warn", `UDP Close. Reinitializing UDP socket...`);
         });
 
-        // Отлавливаем ошибки при отправке пакетов
+        /**
+         * @description Ловим ошибки при отправке пакетов
+         * @event error
+         */
         this.clientUDP.on("error", (error) => {
             // Если произведена попытка подключения к закрытому каналу
             if (`${error}`.match(/Not found IPv4 address/)) {
@@ -552,14 +558,21 @@ export class VoiceConnection {
             }
         });
 
-        // Создание ключа
+
+        /**
+         * @description Создаем слушателя события для получения ключа
+         * @event
+         */
         session.on("key", (key) => {
             if (this._status === VoiceConnectionStatus.ready || this._status === VoiceConnectionStatus.SessionDescription) {
                 this.websocket.packet = Buffer.concat([new Uint8Array([VoiceOpcodes.DaveMlsKeyPackage]), key]);
             }
         });
 
-        // Сообщаем что мы тоже хотим использовать DAVE
+        /**
+         * @description Сообщаем что мы тоже хотим использовать DAVE
+         * @event
+         */
         session.on("invalidateTransition", (transitionId) => {
             if (this._status === VoiceConnectionStatus.ready || this._status === VoiceConnectionStatus.SessionDescription) {
                 this.websocket.packet = {
@@ -571,7 +584,7 @@ export class VoiceConnection {
             }
         });
 
-        // Запускаем заново
+        // Запускаем заново или впервые
         session.reinit();
         this.clientDave = session;
     };

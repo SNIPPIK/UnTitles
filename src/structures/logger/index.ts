@@ -1,5 +1,7 @@
 import * as process from "node:process";
 import { env } from "#app/env";
+import path from "node:path";
+import fs from "node:fs";
 
 /**
  * @author SNIPPIK
@@ -30,6 +32,12 @@ const db = {
 };
 
 /**
+ * @description Время запуска процесса
+ * @private
+ */
+const _timestamp = Date.now();
+
+/**
  * @description Функция превращающая число в строку с добавлением 0
  * @param n - Число
  */
@@ -50,14 +58,34 @@ export class Logger {
     public static debug = env.get("NODE_ENV") === "development";
 
     /**
+     * @description Путь для сохранения логов
+     * @private
+     */
+    private static _path = path.resolve(env.get("cache.dir"), "logs");
+
+    /**
+     * @description Можно ли создавать файлы логов
+     * @private
+     */
+    private static _createFiles = env.get("cache.file");
+
+    /**
      * @description Отправляем лог в консоль
      * @returns void
      * @public
      * @static
      */
     public static log = (status: keyof typeof db.status, text: string | Error): void => {
-        // Игнорируем debug сообщения
-        if (status === "DEBUG" && !this.debug) return;
+        const date = new Date();
+        const extStatus = db.status[status];
+        const time = `${splitter(date.getDate())}/${(splitter(date.getMonth() + 1))}/${splitter(date.getFullYear())} ${splitter(date.getHours())}:${splitter(date.getMinutes())}`;
+
+        // Получаем память в мегабайтах с двумя знаками после запятой
+        const mem = process.memoryUsage();
+        const memUsedMB = (mem.heapTotal / 1024 / 1024).toFixed(2);
+
+        // Сохраняем логи
+        if (this._createFiles) this.saveLog(`[RAM ${memUsedMB} MB] ${time}.${date.getMilliseconds()} | ${status} - ${text}`);
 
         // Если пришел текст
         if (typeof text === "string") text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
@@ -74,16 +102,23 @@ export class Logger {
         // Если объект
         else if (typeof text === "object") text = JSON.stringify(text);
 
-        const date = new Date();
-        const extStatus = db.status[status];
-        const time = `\x1b[90m${splitter(date.getDate())}/${(splitter(date.getMonth() + 1))}/${splitter(date.getFullYear())} ${splitter(date.getHours())}:${splitter(date.getMinutes())}\x1b[0m`;
-
-        // Получаем память в мегабайтах с двумя знаками после запятой
-        const mem = process.memoryUsage();
-        const memUsedMB = (mem.heapTotal / 1024 / 1024).toFixed(2);
+        // Игнорируем debug сообщения
+        if (status === "DEBUG" && !this.debug) return;
 
         // Отправляем лог
-        process.stdout.write(`\x1b[35m[RAM ${memUsedMB} MB]\x1b[0m ${time} |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}\n`);
+        process.stdout.write(`\x1b[35m[RAM ${memUsedMB} MB]\x1b[0m \x1b[90m${time}\x1b[0m |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}\n`);
+    };
+
+    /**
+     * @description Сохранение лога в файл для анализа
+     * @param text
+     */
+    private static saveLog = (text: string) => {
+        // Если нет пути сохранения
+        if (!fs.existsSync(this._path)) fs.mkdirSync(this._path);
+
+        // Сохраняем данные в файл
+        fs.appendFileSync(`${this._path}/${_timestamp}.txt`, text + "\n", "utf8");
     };
 
     /**

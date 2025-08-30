@@ -161,7 +161,7 @@ export class Queue {
         // Создаем класс для отображения кнопок
         this._buttons = new QueueButtons(queue_message);
 
-        Logger.log("LOG", `[Queue/${ID}] has create`);
+        Logger.log("DEBUG", `[Queue/${ID}] has create`);
     };
 
     /**
@@ -256,7 +256,7 @@ export class Queue {
      * @readonly
      */
     protected destroy = () => {
-        Logger.log("LOG", `[Queue/${this.message.guildID}] has destroyed`);
+        Logger.log("DEBUG", `[Queue/${this.message.guildID}] has destroyed`);
 
         // Удаляем плеер
         if (this._player) this._player.destroy();
