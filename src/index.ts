@@ -77,7 +77,10 @@ async function runShard() {
 
     // Запускаем Garbage Collector
     setImmediate(() => {
-        if (typeof global.gc === "function") global.gc();
+        if (typeof global.gc === "function") {
+            Logger.log("DEBUG", "[Node] running Garbage Collector - running main thread");
+            global.gc();
+        }
     });
 }
 

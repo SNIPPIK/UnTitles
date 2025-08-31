@@ -141,11 +141,6 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Чистим performance.now
         this.performance = 0;
         this.prevEventLoopLag = 0
-
-        // Запускаем Garbage Collector
-        setImmediate(() => {
-            if (typeof global.gc === "function") global.gc();
-        });
     };
 
     /**

@@ -121,7 +121,10 @@ export class ControllerCycles {
 
             // Запускаем Garbage Collector
             setImmediate(() => {
-                if (typeof global.gc === "function") global.gc();
+                if (typeof global.gc === "function") {
+                    Logger.log("DEBUG", "[Node] running Garbage Collector - running player cycle");
+                    global.gc();
+                }
             });
         };
     };

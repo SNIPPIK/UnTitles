@@ -183,10 +183,10 @@ export class RestObject {
             // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
             const findTrack = search.find((song) => {
                 const candidate = song.name.toLowerCase().replace(/[^\w\s:;]|_/gi, "").replace(/\s+/gi, " ").split(" ");
-                const Matches = candidate.map((x) => original.includes(x));
+                const Match = candidate.filter((name, i) => name === original[i]).every((word, i) => word === original[i]);
                 const time = Math.abs(track.time.total - song.time.total);
 
-                return (time <= 10 || time === 0) && Matches.length / Math.max(original.length, candidate.length);
+                return (time <= 10 || time === 0) && Match;
             });
 
             // Если отфильтровать треки не удалось

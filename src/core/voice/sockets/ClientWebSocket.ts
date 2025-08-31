@@ -340,7 +340,7 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @private
      */
     private onReceiveClose = (code: GatewayCloseCodes, reason: string) => {
-        this.emit("debug", `[WebSocket/close]:`, `${code} - ${reason}`);
+        this.emit("warn", `[WebSocket/close]: ${code} - ${reason}`);
 
         // Если получен игнорируемый код
         if (GatewayCloseCodesIgnore.includes(code)) return;
