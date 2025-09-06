@@ -134,11 +134,6 @@ if (parentPort && workerData.rest) {
 
     // Получаем ответ от основного потока
     parentPort.on("message", (message: RestServerSide.ServerOptions): Promise<void> | void => {
-        // Запускаем Garbage Collector
-        setImmediate(() => {
-            if (global.gc) global.gc();
-        });
-
         // Если запрос к платформе
         if (message.platform) return ExtractDataFromAPI(message);
 
@@ -184,17 +179,16 @@ async function ExtractDataFromAPI(api: RestServerSide.ServerOptions) {
         });
 
         // Если не найдена функция вызова
-        if (!callback) {
-            return parentPort.postMessage({requestId, status: "error", result: Error(`Callback not found for platform: ${platform}`)});
-        }
+        if (!callback) return parentPort.postMessage({requestId, status: "error", result: Error(`Callback not found for platform: ${platform}`)});
 
-        // Получаем результат запроса
-        let result = await callback.execute(payload, {
-            audio: options?.audio !== undefined ? options.audio : true,
-            limit: rest.limits[callback.name]
+        return parentPort.postMessage({ requestId,
+            type: callback.name,
+            status: "success",
+            result: await callback.execute(payload, {
+                audio: options?.audio !== undefined ? options.audio : true,
+                limit: rest.limits[callback.name]
+            })
         });
-
-        return parentPort.postMessage({ status: "success", result, type: callback.name, requestId });
     } catch (err) {
         parentPort.postMessage({status: "error", result: err, requestId});
         throw new Error(`${err}`);

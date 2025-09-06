@@ -119,9 +119,7 @@ export class VoiceConnection {
             }
         }
 
-        else {
-            this.speaking = SpeakerType.fake;
-        }
+        else this.speaking = SpeakerType.fake;
     };
 
     /**
@@ -471,7 +469,7 @@ export class VoiceConnection {
      */
     private createDaveSession = (version: number) => {
         const { user_id, channel_id } = this.adapter.packet.state;
-        const session = new ClientDAVE(version, user_id, channel_id);
+        const session = this.clientDave = new ClientDAVE(version, user_id, channel_id);
 
         /**
          * @description Получаем коды dave от WebSocket
@@ -583,10 +581,10 @@ export class VoiceConnection {
                 };
             }
         });
+        session.on("debug", (msg) => Logger.log("DEBUG", msg));
 
         // Запускаем заново или впервые
         session.reinit();
-        this.clientDave = session;
     };
 
     /**

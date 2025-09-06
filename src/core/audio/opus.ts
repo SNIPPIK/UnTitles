@@ -25,6 +25,13 @@ export const OPUS_FRAME_SIZE = 20;
 
 /**
  * @author SNIPPIK
+ * @description Размер opus аудио пакета
+ * @const OPUS_FRAME_LENGTH
+ */
+const OPUS_FRAME_LENGTH = 255;
+
+/**
+ * @author SNIPPIK
  * @description Пустой фрейм для предотвращения чтения null
  * @const EMPTY_FRAME
  */
@@ -81,7 +88,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
             // Проверяем, доступен ли весь заголовок страницы (27 байт)
             // Бывает, что заголовок ещё не весь пришёл — тогда ждём следующих данных
-            if (offset + 27 > this._buffer.length) break;
+            else if (offset + 27 > this._buffer.length) break;
 
             // Байты [offset + 26] содержит количество сегментов (Lacing Table Entries)
             // Каждая запись определяет длину одного Opus-пакета (фрагмента)
@@ -129,7 +136,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             payloadOffset += segmentLength;
 
             // Если сегмент меньше 255 — пакет окончен
-            if (segmentLength < 255) {
+            if (segmentLength < OPUS_FRAME_LENGTH) {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 
@@ -141,7 +148,8 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                 // 296  - Tags frame
                 else if (isOpusTags(packet)) continue;
 
-                if (this._first) {
+                // Если не отправлен 1 opus frame
+                else if (this._first) {
                     this.emit("frame", SILENT_FRAME);
                     this._first = false;
                 }

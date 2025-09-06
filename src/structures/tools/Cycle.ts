@@ -52,7 +52,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @public
      */
     public get drifting(): number {
-        return this.drift;
+        return this.drift + this.lastDelay;
     };
 
     /**
@@ -98,7 +98,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected get time(): number {
-        return Date.now();
+        return Number(process.hrtime.bigint()) / 1e6;
     };
 
     /**
@@ -188,13 +188,12 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Запускаем шаг
         this._runTimeout(nextTargetTime, () => {
-            // EMA сглаживание дрейфа
-            const tickStart = this.time + this.lastDelay;
+            const tickStart = this.time;
             this._stepCycle();
             const tickEnd = this.time;
 
             // Сглаживание дрейфа
-            this.drift = this._compensator(0.5, this.drift, tickEnd - tickStart);
+            this.drift = this._compensator(0.95, this.drift, tickEnd - tickStart);
         });
     };
 
@@ -225,7 +224,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         this.performance = performanceNow;
 
         // Смягчение event loop lag
-        return this.prevEventLoopLag = this.prevEventLoopLag !== undefined ? this._compensator(0.95, this.prevEventLoopLag, driftEvent): driftEvent;
+        return this.prevEventLoopLag = this.prevEventLoopLag !== undefined ? this._compensator(0.95, this.prevEventLoopLag, driftEvent) : driftEvent;
     };
 
     /**

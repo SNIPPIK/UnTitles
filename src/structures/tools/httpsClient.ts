@@ -1,7 +1,7 @@
 import { BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip } from "node:zlib";
 import { request as httpsRequest, RequestOptions } from "node:https";
 import { IncomingMessage, request as httpRequest } from "node:http";
-import {Logger} from "#structures/logger";
+import { Logger } from "#structures/logger";
 
 /**
  * @author SNIPPIK
@@ -30,7 +30,7 @@ abstract class Request {
      * @description Данные для создания запроса
      * @protected
      */
-    protected readonly data: {
+    protected data: {
         url?: string;
 
         method?: "POST" | "GET" | "HEAD" | "PATCH";
@@ -88,14 +88,14 @@ abstract class Request {
             request.once("timeout", () => {
                 Logger.log("DEBUG", `${this.data}`);
 
-                return resolve(Error(`[httpsClient]: Connection Timeout Exceeded ${this.data.url}:443`))
+                return resolve(Error(`[httpsClient]: Connection Timeout Exceeded ${this.data.url}:443`));
             });
 
             /**
              * @description Если получена ошибка
              */
             request.once("error", (err) => {
-                return resolve(Error(`[httpsClient]: Connection Error: ${err}`))
+                return resolve(Error(`[httpsClient]: Connection Error: ${err}`));
             });
 
             /**
@@ -103,6 +103,7 @@ abstract class Request {
              */
             request.once("end", () => {
                 request.removeAllListeners();
+                this.data = null;
             });
 
             request.end();
@@ -118,35 +119,33 @@ abstract class Request {
     public constructor(options: httpsClient["data"]) {
         // Если ссылка является ссылкой
         if (options.url.startsWith("http")) {
-            const {hostname, pathname, search, port, protocol} = new URL(options.url);
+            const { hostname, pathname, search, port, protocol } = URL.parse(options.url);
 
-            //Создаем стандартные настройки
-            Object.assign(this.data, {
-                port, hostname, path: pathname + search, protocol
-            });
+            // Создаем стандартные настройки
+            this.data = { ...this.data, port, hostname, path: pathname + search, protocol }
         }
 
         // Надо ли генерировать user-agent
         if (options?.userAgent !== undefined) {
             // Если указан свой user-agent
             if (typeof options?.userAgent === "string") {
-                Object.assign(this.data.headers, {
+                this.data.headers = { ...this.data.headers,
                     "User-Agent": options.userAgent
-                });
+                };
 
                 // Генерируем новый
             } else {
                 const revision = `${(140).random(130)}.0`;
                 const OS = ["(X11; Linux x86_64;", "(Windows NT 10.0; Win64; x64;"];
 
-                Object.assign(this.data.headers, {
+                this.data.headers = { ...this.data.headers,
                     "User-Agent": `Mozilla/5.0 ${OS[(OS.length - 1).random(0)]} rv:${revision}) Gecko/20100101 Firefox/${revision}`
-                });
+                };
             }
         }
 
         options.url = null;
-        Object.assign(this.data, options);
+        this.data = { ...this.data, ...options };
     };
 }
 

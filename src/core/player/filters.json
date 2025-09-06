@@ -2,8 +2,8 @@
   {
     "name": "stable",
     "locale": {
-      "en-US": "Stabilization of audio stream by volume",
-      "ru": "Стабилизация аудио поток по громкости"
+      "en-US": "Normalizes and stabilizes the volume for consistent loudness.",
+      "ru": "Нормализует и стабилизирует громкость для постоянного уровня звука."
     },
     "unsupported": [],
     "filter": "loudnorm",
@@ -12,8 +12,8 @@
   {
     "name": "nightcore",
     "locale": {
-      "en-US": "Increases track speed by 20% and changes some tones!",
-      "ru": "Увеличивает скорость трека на 20% и изменяет некоторые тона!"
+      "en-US": "Speeds up playback by 20% and raises pitch for a nightcore effect.",
+      "ru": "Ускоряет воспроизведение на 20% и повышает тональность для эффекта nightcore."
     },
     "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl"],
     "filter": "asetrate=48000*1.20,aresample=128000",
@@ -22,8 +22,8 @@
   {
     "name": "vaporwave",
     "locale": {
-      "en-US": "Micro genre of electronic music",
-      "ru": "Микро жанр электронной музыки"
+      "en-US": "Slows down playback and lowers pitch, creating a vaporwave atmosphere.",
+      "ru": "Замедляет воспроизведение и понижает тональность, создавая атмосферу vaporwave."
     },
     "unsupported": ["nightcore", "demonic", "speed", "treble", "reverse", "vinyl"],
     "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1",
@@ -32,8 +32,8 @@
   {
     "name": "demonic",
     "locale": {
-      "en-US": "Will turn any track into a demonic one",
-      "ru": "Превратит любой трек в демонический"
+      "en-US": "Deep, distorted effect with echoes — makes a track sound demonic.",
+      "ru": "Глубокий и искажённый эффект с эхо — превращает трек в демонический."
     },
     "unsupported": ["stable", "nightcore", "vaporwave", "bass", "speed", "vinyl"],
     "filter": "loudnorm=I=-16:TP=-1.5:LRA=11,asetrate=48000*1.20,aresample=128000,bass=g=5,aecho=0.8:0.9:1000:0.3",
@@ -42,8 +42,8 @@
   {
     "name": "vinyl",
     "locale": {
-      "en-US": "Adds vinyl record noise and crackle",
-      "ru": "Добавляет шум и потрескивание виниловой пластинки"
+      "en-US": "Adds vinyl record hiss, crackle, and a retro lo-fi effect.",
+      "ru": "Добавляет шипение, потрескивания и ретро lo-fi эффект винила."
     },
     "unsupported": ["nightcore", "demonic", "vaporwave"],
     "filter": "acrusher=bits=8:mode=log:mix=0.7,highpass=f=200,lowpass=f=5000",
@@ -52,8 +52,8 @@
   {
     "name": "speed",
     "locale": {
-      "en-US": "The speed of music playback",
-      "ru": "Скорость проигрывания музыки"
+      "en-US": "Changes playback speed (1.0 = normal, up to 3x faster).",
+      "ru": "Изменяет скорость воспроизведения (1.0 = нормальная, до 3х быстрее)."
     },
     "unsupported": [],
     "filter": "atempo=",
@@ -62,8 +62,8 @@
   {
     "name": "bass",
     "locale": {
-      "en-US": "This is the lower limit of the sound spectrum",
-      "ru": "Это нижняя граница звукового спектра"
+      "en-US": "Boosts low frequencies for deeper and punchier bass.",
+      "ru": "Усиливает низкие частоты для более глубокого и мощного баса."
     },
     "unsupported": ["demonic"],
     "filter": "bass=g=",
@@ -72,8 +72,8 @@
   {
     "name": "sub_boost",
     "locale": {
-      "en-US": "Something similar to bass but sounds deeper",
-      "ru": "Что-то похожее на bass но звучит более глубже"
+      "en-US": "Emphasizes sub-bass frequencies for a deeper rumble.",
+      "ru": "Подчёркивает саб-бас частоты для более глубокого звучания."
     },
     "unsupported": ["demonic"],
     "filter": "asubboost",
@@ -82,8 +82,8 @@
   {
     "name": "mono",
     "locale": {
-      "en-US": "Only one audio channel is used for playback",
-      "ru": "Используется только один аудио канал для воспроизведения"
+      "en-US": "Mixes both stereo channels into a single mono output.",
+      "ru": "Объединяет оба стерео канала в один моно сигнал."
     },
     "unsupported": ["8d"],
     "filter": "pan=mono|c0=.5*c0+.5*c1",
@@ -92,8 +92,8 @@
   {
     "name": "treble",
     "locale": {
-      "en-US": "Increases sound clarity up to 20 kHz!",
-      "ru": "Увеличивает чистоту звучания до 20 kHz!"
+      "en-US": "Boosts high frequencies up to 20 kHz for brighter sound.",
+      "ru": "Усиливает высокие частоты до 20 kHz для более яркого звука."
     },
     "unsupported": [],
     "filter": "treble=g=5",
@@ -102,8 +102,8 @@
   {
     "name": "reverse",
     "locale": {
-      "en-US": "The music will play backwards!",
-      "ru": "Музыка будет играть задом на перед!"
+      "en-US": "Plays the audio track backwards.",
+      "ru": "Воспроизводит аудио трек в обратном направлении."
     },
     "unsupported": [],
     "filter": "areverse",
@@ -112,8 +112,8 @@
   {
     "name": "flanger",
     "locale": {
-      "en-US": "Reminds me of a «flying» sound.",
-      "ru": "Напоминает «летящее» звучание."
+      "en-US": "Creates a sweeping, ‘flying’ sound with time-delayed signal mixing.",
+      "ru": "Создаёт переливающийся «летящий» звук через смешивание с задержкой."
     },
     "unsupported": [],
     "filter": "flanger",
@@ -122,8 +122,8 @@
   {
     "name": "haas",
     "locale": {
-      "en-US": "Haas effect, otherwise known as the «precedence» effect",
-      "ru": "Эффект Хааса, иначе называемый эффектом «предшествования»"
+      "en-US": "Haas effect (precedence) widens stereo image using channel delay.",
+      "ru": "Эффект Хааса (предшествования) расширяет стерео за счёт задержки каналов."
     },
     "unsupported": ["mono"],
     "filter": "haas",
@@ -132,8 +132,8 @@
   {
     "name": "echo",
     "locale": {
-      "en-US": "Repeated repetition several times in a row",
-      "ru": "Многократное повторения несколько раз подряд"
+      "en-US": "Adds multiple repeating echoes to the audio.",
+      "ru": "Добавляет многократные повторяющиеся эхо к звуку."
     },
     "unsupported": [],
     "filter": "aecho=0.8:0.9:1000:0.3",
@@ -142,8 +142,8 @@
   {
     "name": "8d",
     "locale": {
-      "en-US": "Spatial Reverb and Mixing",
-      "ru": "Пространственная реверберация и микширование"
+      "en-US": "Simulates 3D spatial audio by rotating sound around the listener.",
+      "ru": "Имитирует 3D-пространство, вращая звук вокруг слушателя."
     },
     "unsupported": ["mono"],
     "filter": "apulsator=hz=0.09",
@@ -152,8 +152,8 @@
   {
     "name": "phaser",
     "locale": {
-      "en-US": "Filters the audio signal with subsequent generation",
-      "ru": "Фильтрует аудио сигнал с последующей генерацией"
+      "en-US": "Applies a sweeping phase effect, creating a ‘shimmering’ sound.",
+      "ru": "Накладывает фазовый сдвиг, создавая «мерцающий» эффект звучания."
     },
     "unsupported": [],
     "filter": "aphaser=in_gain=0.4",

@@ -1,11 +1,15 @@
 import { BufferedAudioResource, PipeAudioResource } from "#core/audio";
 import { db } from "#app/db";
+import {clearTimeout} from "node:timers";
 
 /**
  * @author SNIPPIK
  * @description Класс для управления включенным потоком, хранит в себе все данные потока
  * @class PlayerAudio
  * @public
+ *
+ * # Модуль для плеера
+ * - Хранит в себе метаданные об аудио включая аудио
  */
 export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
     /**
@@ -15,16 +19,22 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
     private _audio: T;
 
     /**
+     * @description Поток, находящийся в ожидании загрузки и проигрывания
+     * @private
+     */
+    private _pre_audio: T;
+
+    /**
+     * @description Таймер чтения аудио потока, для авто удаления
+     * @private
+     */
+    private _timeout: NodeJS.Timeout | null = null;
+
+    /**
      * @description Громкость аудио, по умолчанию берется параметр из db/env
      * @protected
      */
     private _volume = db.queues.options.volume;
-
-    /**
-     * @description Параметр отвечающий за загрузку потока
-     * @help Если поток загружается или ждет начала, то новый загрузить не получится
-     */
-    public waitStream = false;
 
     /**
      * @description Изменяем значение громкости у аудио
@@ -57,18 +67,55 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
     };
 
     /**
-     * @description Подключаем новый поток
-     * @param stream - Аудио поток
+     * @description Есть ли пред-загруженное аудио
      * @public
      */
-    public set current(stream) {
-        const oldStream = this._audio;
+    public get preloaded() {
+        return !!this._pre_audio;
+    };
 
-        // Перезаписываем текущий поток
-        this._audio = stream;
+    /**
+     * @description Пред-загрузка аудио потока для использования и замены текущего потока
+     * @param stream
+     * @public
+     */
+    public set preload(stream: T) {
+        // Если уже есть пред-загруженное аудио
+        if (this._pre_audio) this._pre_audio?.destroy();
 
-        // Если есть активный поток
-        if (oldStream) oldStream.destroy();
+        // Записываем аудио в пред-загруженные
+        this._pre_audio = stream;
+
+        // Если аудио поток не ответил в течении указанного времени
+        this._timeout = setTimeout(() => {
+            // Отправляем данные событию для отображения ошибки
+            stream.emit("error", new Error("Timeout: the stream has been exceeded!"));
+        }, 10e3);
+
+        // Отслеживаем аудио поток на ошибки
+        (stream as BufferedAudioResource).once("error", async () => {
+            // Удаляем таймер
+            clearTimeout(this._timeout);
+
+            // Уничтожаем новый аудио поток
+            stream.destroy();
+            this._pre_audio = null;
+        });
+
+        // Отслеживаем аудио поток на готовность к чтению
+        (stream as BufferedAudioResource).once("readable", async () => {
+            const oldStream = this._audio;
+
+            // Удаляем таймер
+            clearTimeout(this._timeout);
+
+            // Перезаписываем текущий поток
+            this._audio = stream;
+            this._pre_audio = null;
+
+            // Если есть активный поток
+            if (oldStream) oldStream.destroy();
+        });
     };
 
     /**
@@ -78,6 +125,11 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
     public destroy = () => {
         this._audio?.destroy();
         this._audio = null;
-        this.waitStream = null;
+
+        this._pre_audio?.destroy();
+        this._pre_audio = null;
+
+        clearTimeout(this._timeout);
+        this._timeout = null;
     };
 }

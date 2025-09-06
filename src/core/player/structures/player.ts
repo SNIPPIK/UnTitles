@@ -44,6 +44,10 @@ type AudioPlayerAudio = BufferedAudioResource | PipeAudioResource;
  * @class AudioPlayer
  * @extends TypedEmitter
  * @public
+ *
+ * # Особенности
+ * - Плеер не даст загрузить новый трек если прошлый не загружен! Через 10 сек можно будет загрузить новый!
+ * - Поддерживает hot swap, не ломает jitter buffer (AudioPlayerTimeout)
  */
 export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     /**
@@ -160,7 +164,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Если поток не читается, переходим в состояние ожидания
         else if (!this._audio.current && !this._audio.current.packets || !this._audio.current?.readable) {
-            this._audio.current = null;
             this.status = "player/wait";
             this.disableCycle();
             return false;
@@ -262,21 +265,19 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const queue = db.queues.get(player.id);
             const current = player.tracks.position;
 
-            // Заставляем плеер пропустить этот трек
+            // Если надо пропустить трек
             if (skip) {
-                setImmediate(() => {
-                    // Если надо пропустить текущую позицию
-                    if (skip.position === current) {
-                        // Если плеер играет, то не пропускаем
-                        if (player.playing) return;
-                        this.emit("player/wait", player);
-                    }
+                // Если надо пропустить текущую позицию
+                if (skip.position === current) {
+                    // Если плеер играет, то не пропускаем
+                    if (player?.audio && player?.audio?.current?.packets > 0) return;
+                    this.emit("player/wait", player);
+                }
 
-                    // Если следующих треков нет
-                    else if (player.tracks.size === 0) return queue.cleanup();
+                // Если следующих треков нет
+                else if (player.tracks.size === 0) return queue.cleanup();
 
-                    player.tracks.remove(skip.position);
-                });
+                player.tracks.remove(skip.position);
             }
 
             // Позиция трека для сообщения
@@ -326,8 +327,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Получаем трек следуя позиции
         const track = this._tracks.get(index);
 
-        // Если нет такого трека
-        if (!track) return;
+        // Если нет такого трека или статуса
+        if (!track || this._status === null) return;
 
         try {
             const resource = await this._preloadTrack(index);
@@ -350,7 +351,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 if (this._audio.current) stream.seek = this._audio.current.duration;
 
                 // Переводим плеер в состояние чтения аудио
-                this._audio.current = stream;
                 this.status = "player/playing";
 
                 // Меняем позицию если удачно
@@ -383,7 +383,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 })
 
                 // Если была получена ошибка при чтении
-                .once("error", (error: Error) => {
+                .once("error", async (error: Error) => {
                     // Отправляем данные событию для отображения ошибки
                     this.emit("player/error", this, `${error}`, { skip: true, position: index });
                 });
@@ -471,13 +471,10 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         Logger.log("DEBUG", `[AudioPlayer/${this.id}] has read stream ${path}`);
 
         // Если другой аудио поток загружается, то запрещаем включение
-        if (this._audio.waitStream) return null;
-
-        // Если нет других аудио потоков, задаем запрет на изменение
-        this._audio.waitStream = true;
+        if (this._audio.preloaded) return null;
 
         // Выбираем и создаем класс для предоставления аудио потока
-        const stream = new (time > PLAYER_BUFFERED_TIME || time === 0 ? PipeAudioResource : BufferedAudioResource)(
+        return this._audio.preload = new (time > PLAYER_BUFFERED_TIME || time === 0 ? PipeAudioResource : BufferedAudioResource)(
             {
                 path,
                 options: {
@@ -486,34 +483,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
             }
         );
-
-        // Если аудио поток не ответил в течении указанного времени
-        const timeout = setTimeout(() => {
-            // Отправляем данные событию для отображения ошибки
-            stream.emit("error", new Error("Timeout: the stream has been exceeded!"));
-        }, 10e3);
-
-        // Отслеживаем аудио поток на ошибки
-        (stream as BufferedAudioResource).once("error", async () => {
-            // Разрешаем вводить новые аудио потоки
-            this._audio.waitStream = false;
-
-            // Удаляем таймер
-            clearTimeout(timeout);
-
-            // Уничтожаем новый аудио поток
-            stream.destroy();
-        });
-
-        (stream as BufferedAudioResource).once("readable", async () => {
-            // Разрешаем вводить новые аудио потоки
-            this._audio.waitStream = false;
-
-            // Удаляем таймер
-            clearTimeout(timeout);
-        });
-
-        return stream;
     };
 
     /**

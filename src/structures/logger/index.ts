@@ -32,16 +32,20 @@ const db = {
 };
 
 /**
+ * @author SNIPPIK
+ * @description Функция создания локального времени
+ * @private
+ */
+const createDate = (ms: boolean = false) => {
+    const local_date = new Date();
+    return `${local_date.getDate().toZero()}.${(local_date.getMonth() + 1).toZero()}.${local_date.getFullYear()} ${local_date.getHours().toZero()}:${local_date.getMinutes().toZero()}` + (ms ? `.${local_date.getMilliseconds().toZero(4)}` : "");
+}
+
+/**
  * @description Время запуска процесса
  * @private
  */
-const _timestamp = Date.now();
-
-/**
- * @description Функция превращающая число в строку с добавлением 0
- * @param n - Число
- */
-const splitter = (n: number) => (n < 10 ? "0" : "") + n;
+const _timestamp = createDate(true);
 
 /**
  * @author SNIPPIK
@@ -60,12 +64,14 @@ export class Logger {
     /**
      * @description Путь для сохранения логов
      * @private
+     * @static
      */
     private static _path = path.resolve(env.get("cache.dir"), "logs");
 
     /**
      * @description Можно ли создавать файлы логов
      * @private
+     * @static
      */
     private static _createFiles = env.get("cache.file");
 
@@ -76,18 +82,17 @@ export class Logger {
      * @static
      */
     public static log = (status: keyof typeof db.status, text: string | Error): void => {
-        const date = new Date();
         const extStatus = db.status[status];
-        const time = `${splitter(date.getDate())}/${(splitter(date.getMonth() + 1))}/${splitter(date.getFullYear())} ${splitter(date.getHours())}:${splitter(date.getMinutes())}`;
 
         // Получаем память в мегабайтах с двумя знаками после запятой
         const mem = process.memoryUsage();
-        const memUsedMB = (mem.heapTotal / 1024 / 1024).toFixed(2);
+        const memUsedMB = ((mem.heapUsed + mem.external + mem.arrayBuffers) / 1024 / 1024).toFixed(2);
+        const time = createDate(true);
 
         // Если пришел текст
         if (typeof text === "string") {
             // Сохраняем логи
-            this.saveLog(`[RAM ${memUsedMB} MB] ${time}.${date.getMilliseconds()} | ${status} - ${text}`);
+            this.saveLog(`[RAM ${memUsedMB} MB] ${time} | ${status} - ${text}`);
             text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
         }
 
@@ -100,11 +105,13 @@ export class Logger {
                 `└ Stack:   ${text.stack}`;
 
             // Сохраняем логи
-            this.saveLog(`[RAM ${memUsedMB} MB] ${time}.${date.getMilliseconds()} | ${status} - ${text}`);
+            this.saveLog(`[RAM ${memUsedMB} MB] ${time} | ${status} - ${text}`);
         }
 
         // Если объект
-        else if (typeof text === "object") text = JSON.stringify(text);
+        else if (typeof text === "object") {
+            text = JSON.stringify(text);
+        }
 
         // Игнорируем debug сообщения
         if (status === "DEBUG" && !this.debug) return;
@@ -116,6 +123,8 @@ export class Logger {
     /**
      * @description Сохранение лога в файл для анализа
      * @param text
+     * @private
+     * @static
      */
     private static saveLog = (text: string) => {
         if (!this._createFiles) return;

@@ -79,14 +79,14 @@ export class RestObject {
         // Если надо сбросить данные
         if (reset) {
             this.lastID = 0;
-            return null;
+            return this.lastID;
         }
 
         // Если большое кол-во запросов
         if (this.lastID >= 2 ** 16) this.generateUniqueId(true);
 
         this.lastID += 1;
-        return this.lastID.toString();
+        return this.lastID;
     };
 
     /**
@@ -102,7 +102,7 @@ export class RestObject {
                 file: "src/workers/RestAPIServerThread",
                 options: {
                     execArgv: ["-r", "tsconfig-paths/register"],
-                    workerData: { rest: true }
+                    workerData: { rest: true },
                 },
                 postMessage: { data: true },
                 not_destroyed: true,
@@ -632,12 +632,12 @@ export namespace RestServerSide {
      * @public
      */
     export type Result<T extends keyof APIRequests = keyof APIRequests> = {
-        requestId: string;
+        requestId: number;
         status: "success";
         type: T;
         result: APIRequestsRaw[T];
     } | {
-        requestId: string;
+        requestId: number;
         status: "error";
         result: Error;
     }

@@ -155,7 +155,7 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @public
      */
     public removeAllListeners = () => {
-        this._set.clear();
+        if (this._set) this._set.clear();
         return this;
     };
 

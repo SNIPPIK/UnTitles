@@ -186,6 +186,10 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
  * @class BufferedAudioResource
  * @extends BaseAudioResource
  * @public
+ *
+ * # Класс буферизированного аудио
+ * - Не более 8 мин, хранится в памяти.
+ * - Может быть использован заново
  */
 export class BufferedAudioResource extends BaseAudioResource {
     /**
@@ -200,7 +204,8 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get readable() {
-        return this._buffer?.position !== this._buffer?.size;
+        if (!this._buffer) return false;
+        return this._buffer.position !== this._buffer.size;
     };
 
     /**
@@ -208,9 +213,9 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get duration() {
-        if (!this._buffer?.position) return 0;
+        if (!this._buffer || !this._buffer?.position) return 0;
 
-        const time = (this._buffer?.position + this._seek) * OPUS_FRAME_SIZE;
+        const time = (this._buffer.position + this._seek) * OPUS_FRAME_SIZE;
         return Math.abs(time / 1e3);
     };
 
@@ -221,7 +226,8 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get packet(): Buffer {
-        return this._buffer?.packet;
+        if (!this._buffer) return null;
+        return this._buffer.packet;
     };
 
     /**
@@ -230,7 +236,8 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get packets(): number {
-        return this._buffer?.size - this._buffer?.position;
+        if (!this._buffer) return 0;
+        return this._buffer.size - this._buffer.position;
     };
 
     /**
@@ -273,13 +280,15 @@ export class BufferedAudioResource extends BaseAudioResource {
             // Начало кодирования
             decode: (input) => {
                 input.on("frame", (packet: Buffer) => {
-                    setImmediate(() => {
-                        // Сообщаем что поток можно начать читать
-                        if (!this._buffer?.position) this.emit("readable");
-                    });
+                    if (this._buffer) {
+                        setImmediate(() => {
+                            // Сообщаем что поток можно начать читать
+                            if (!this._buffer.position) this.emit("readable");
+                        });
 
-                    // Если создал класс буфера, начинаем кеширование пакетов
-                    if (this._buffer && packet) this._buffer.packet = packet;
+                        // Если создал класс буфера, начинаем кеширование пакетов
+                        if (packet) this._buffer.packet = packet;
+                    }
                 });
             }
         });
@@ -351,6 +360,9 @@ export class BufferedAudioResource extends BaseAudioResource {
  * @class PipeAudioResource
  * @extends BaseAudioResource
  * @public
+ *
+ * # Класс потокового аудио
+ * - Нет ограничения по времени, хранится в FFMPEG
  */
 export class PipeAudioResource extends BaseAudioResource {
     /**

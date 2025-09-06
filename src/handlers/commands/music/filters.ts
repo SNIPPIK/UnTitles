@@ -276,7 +276,7 @@ class AudioFiltersOff extends SubCommand {
     }
 })
 class AudioFilterRemove extends SubCommand {
-    async run({ctx, args}: CommandContext<string>) {
+    async run({ctx, args}: CommandContext) {
         const queue = db.queues.get(ctx.guildId);
         const player = queue.player;
         const seek: number = player.audio.current?.duration ?? 0;

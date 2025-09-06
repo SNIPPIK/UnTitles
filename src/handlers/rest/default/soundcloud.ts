@@ -210,7 +210,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
             const parsedPage2 = await new httpsClient({url: urls[0]}).toString;
             if (!parsedPage2 || parsedPage2 instanceof Error) return null;
 
-            const client_id = parsedPage2.split(",client_id:\"")[1].split("\",")[0];
+            const client_id = parsedPage2?.split(",client_id:\"")[1]?.split("\",")[0];
 
             this.options.client_id = client_id;
             this.options.time = Date.now() + 60 * 60 * 1e3;

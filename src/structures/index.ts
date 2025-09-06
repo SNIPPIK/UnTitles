@@ -1,19 +1,3 @@
-export * from "./logger";
-export * from "./locale";
-export * from "./tools/TypedEmitter";
-export * from "./tools/Assign";
-export * from "./tools/Collection";
-export * from "./tools/SetArray";
-export * from "./tools/Cycle";
-export * from "./tools/httpsClient";
-export * from "./tools/SimpleWorker";
-
-
-/**
- * @description Функция превращающая число в строку с добавлением 0
- * @param n - Число
- */
-const splitter = (n: number) => (n < 10 ? "0" : "") + n;
 
 /**
  * @description Все prototype объектов
@@ -54,7 +38,13 @@ const prototypes: { type: any, name: string, value: any}[] = [
         type: Number.prototype, name: "duration",
         value: function () {
             const t = Number(this), days = ~~(t / 86400), hours = ~~(t % 86400 / 3600), min = ~~(t % 3600 / 60), sec = ~~(t % 60);
-            return [days && days, (days || hours) && splitter(hours), splitter(min), splitter(sec)].filter(Boolean).join(":");
+            return [days && days, (days || hours) && hours.toZero(), min.toZero(), sec.toZero()].filter(Boolean).join(":");
+        }
+    },
+    {
+        type: Number.prototype, name: "toZero",
+        value: function (size: number = 2) {
+            return String(this).padStart(size, "0");
         }
     },
     {
@@ -71,6 +61,16 @@ const prototypes: { type: any, name: string, value: any}[] = [
 for (const {type, name, value} of prototypes) {
     Object.defineProperty(type, name, { value, writable: true, configurable: true });
 }
+
+export * from "./logger";
+export * from "./locale";
+export * from "./tools/TypedEmitter";
+export * from "./tools/Assign";
+export * from "./tools/Collection";
+export * from "./tools/SetArray";
+export * from "./tools/Cycle";
+export * from "./tools/httpsClient";
+export * from "./tools/SimpleWorker";
 
 /**
  * @description Декларируем для TS
@@ -103,5 +103,12 @@ declare global {
          * @param min {number} Мин число
          */
         random(min?: number): number;
+
+        /**
+         * @prototype Number
+         * @description Функция превращающая число в строку с добавлением 0
+         * @param size - Размер ряда, 2 = 00
+         */
+        toZero(size?: number): number;
     }
 }

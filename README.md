@@ -88,7 +88,7 @@ while (performance.now() - startBlock < 100) {}
 - There is a system of smooth transition from one audio to another `Hot audio swap`
 - 16+ filters, you can add your own without complex digging in the code [filters](src/core/player/filters.json)
 - There is support for long videos, Live video is still raw.
-- There is an explicit synchronization of the audio stream
+- There is an explicit synchronization of the audio stream, without audio filters!
 #### 🌐 Platforms
 - Supported: `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
 - Audio: `YouTube`, `VK`, `Yandex-Music` **(MP3 + Lossless)**, `SoundCloud`
@@ -115,7 +115,7 @@ while (performance.now() - startBlock < 100) {}
 - It is not afraid of **event loop** and **drift**, it just takes them into account not as a problem, but as parameters!
 - The loop can work ahead from 0 to 2 ms to process objects in the loop!
 - Audio sending is built on it!
-- Cycle accuracy `±0.05 ms` with `Date.now` + `performance.now`
+- Cycle accuracy `±0.05 ms` with `process.hrtime` + `performance.now`
 
 #### ⚙️ Internal tools
 - [`SetArray`](src/structures/tools/SetArray.ts) - 2 in one Array and Set in one class

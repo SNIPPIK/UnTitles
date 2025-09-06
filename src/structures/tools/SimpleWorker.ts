@@ -1,4 +1,5 @@
 import { Worker, WorkerOptions } from "node:worker_threads";
+import { Logger } from "#structures";
 import path from "node:path";
 
 /**
@@ -41,12 +42,11 @@ export class SimpleWorker {
      */
     private static destroy = async (worker: Worker) => {
         worker.removeAllListeners();
-        worker.ref(); // Привязываем к main, что-бы GC понял что это надо удалить
 
         try {
             await worker.terminate();
         } catch (err) {
-            console.error("Worker terminate failed", err);
+            Logger.log("ERROR", err as Error);
         }
     };
 }

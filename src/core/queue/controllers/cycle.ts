@@ -63,19 +63,17 @@ export class ControllerCycles {
 
                         // === 2. Плавная коррекция options.duration с задержкой между изменениями ===
                         const now = this.time;
+
                         if (now - this._lastAdjust >= OPUS_FRAME_SIZE) {
                             // Если текущее время меньше указанного
-                            if (this.options.duration < this._targetDuration)
-                                this.options.duration = Math.min(this.options.duration + OPUS_FRAME_SIZE, this._targetDuration);
+                            if (this.options.duration < this._targetDuration) this.options.duration = Math.min(this.options.duration + OPUS_FRAME_SIZE, this._targetDuration);
 
                             // Если текущее время меньше указанного
-                            else if (this.options.duration > this._targetDuration)
-                                this.options.duration = Math.max(this.options.duration - OPUS_FRAME_SIZE, this._targetDuration);
-
+                            else if (this.options.duration > this._targetDuration) this.options.duration = Math.max(this.options.duration - OPUS_FRAME_SIZE, this._targetDuration);
                             this._lastAdjust = now;
 
                             // Для отладки
-                            //console.log(`[step] duration adjusted to ${this.options.duration} ms, target: ${this._targetDuration} ms | ${this.delay}\n\nTime: ${this.insideTime} - ${this.time} | ${this.drifting}`);
+                            //console.log(`[step] duration adjusted to ${this.options.duration} ms, target: ${this._targetDuration} ms | ${this.delay}\nTime: ${this.insideTime} - ${this.time} | ${this.drifting}\n`);
                         }
                     }
                 },
@@ -92,15 +90,11 @@ export class ControllerCycles {
                     // Если цикл держит планку в 20 ms
                     if (size === 1) {
                         // Отправляем 1 пакет заранее, для заполнения кольцевого буфера
-                        if (player.audio && !player._sendPrepareJitter) {
-                            player._sendPrepareJitter = true;
-
+                        if (player.audio) {
                             // Проверяем можно ли отправить пакеты
                             i = player.audio.current.packets >= 2 ? -1 : 0;
                         }
-                    }
-
-                     */
+                    }*/
 
                     // Отправляем пакет/ы в голосовой канал
                     do {

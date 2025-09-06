@@ -23,7 +23,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public get locale() {
-        return this._original?.locale ?? this._original?.guildLocale
+        return this._original?.locale ?? this._original?.guildLocale;
     };
 
     /**

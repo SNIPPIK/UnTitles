@@ -30,27 +30,6 @@ const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 24;
  */
 const DEFAULT_DECRYPTION_FAILURE_TOLERANCE = 36;
 
-
-/**
- * @author SNIPPIK
- * @description События класса DAVESession
- * @interface ClientDAVE
- */
-export interface ClientDAVEEvents {
-    // Ошибка?! Какая ошибка
-    "error": (error: Error) => void
-
-    // Для отладки
-    "debug": (message: string) => void
-
-    // Получение ключа
-    "key": (message: Buffer) => void;
-
-    // Если ключ больше не действителен
-    "invalidateTransition": (transitionId: number) => void;
-}
-
-
 /**
  * @author SNIPPIK
  * @description Управляет сеансом группы протокола DAVE.
@@ -373,7 +352,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         super.destroy();
 
         try {
-            this.session?.reset();
+            this.session?.reset?.();
         } catch {}
 
         this.session = null;
@@ -385,6 +364,25 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         this.downgraded = null;
         this.pendingTransition = null;
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description События класса DAVESession
+ * @interface ClientDAVE
+ */
+export interface ClientDAVEEvents {
+    // Ошибка?! Какая ошибка
+    "error": (error: Error) => void
+
+    // Для отладки
+    "debug": (message: string) => void
+
+    // Получение ключа
+    "key": (message: Buffer) => void;
+
+    // Если ключ больше не действителен
+    "invalidateTransition": (transitionId: number) => void;
 }
 
 /**

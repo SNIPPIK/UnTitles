@@ -116,34 +116,24 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
             return null;
         }
 
-        // Если очереди нет — создаём новую
-        const queue = this.get(message.guildId) ?? (new Queue(message) as T);
-        const { player, tracks } = queue;
+        let queue = this.get(message.guildId);
 
-        // Добавляем треки
-        items.forEach(track => {
-            track.user = message.member.user;
-            tracks.push(track);
-        });
-
-        // Если есть треки в очереди
-        if (tracks.total > 0) {
-            // Отправляем сообщение о добавлении треков
-            if (!Array.isArray(item)) {
-                db.events.emitter.emit("message/push", queue, message.member, item);
-            }
-
-            const position = items.length ? tracks.total - items.length : 0;
-
-            // Проверяем, активен ли плеер в цикле или находится на паузе
-            if (!this.cycles.players.has(player) && player.status !== "player/pause" && position > 0) {
-                // Перезапуск плеера отложенным вызовом
+        // Проверяем есть ли очередь в списке, если нет то создаем
+        if (!queue) queue = new Queue(message) as T;
+        else {
+            // Значит что плеера нет в циклах
+            if (!this.cycles.players.has(queue.player) && queue.player.status !== "player/pause" && !queue.player.audio.preloaded) {
                 setImmediate(() => {
                     // Установка позиции воспроизведения в зависимости от типа добавленного item
-                    tracks.position = position;
+                    queue.tracks.position = items.length ? queue.tracks.total - items.length : 0;
 
-                    // Сохраняем плеер для последующего перезапуска
-                    this.restart_player = player;
+                    // Если разные текстовые каналы
+                    if (queue.message.channelID !== message.channelId) {
+                        // Меняем текстовый канал
+                        queue.message = new QueueMessage(message);
+                    }
+
+                    this.restart_player = queue.player;
                 });
             }
 
@@ -152,6 +142,17 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
                 queue.message = new QueueMessage(message);
             }
         }
+
+        // Отправляем сообщение о добавлении треков
+        if (!Array.isArray(item)) {
+            db.events.emitter.emit("message/push", queue, message.member, item);
+        }
+
+        // Добавляем треки
+        items.forEach(track => {
+            track.user = message.member.user;
+            queue.tracks.push(track);
+        });
 
         return null;
     };
