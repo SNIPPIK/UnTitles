@@ -138,11 +138,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public get progress() {
-        const {api, time} = this._tracks.track;
-        let current = this._audio?.current?.duration;
-
-        // Скорее всего трек играет следующий трек
-        if (time.total > 0 && current > time.total || !this.playing) current = 0;
+        const { api, time } = this._tracks.track;
+        const current = this._audio.current?.duration ?? 0;
 
         // Создаем прогресс бар
         const bar =  Progress.bar({ platform: api.name, duration: { current, total: time.total } });
@@ -200,30 +197,33 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
          * @private
          */
         this.on("player/wait", async (player) => {
-            const repeat = player.tracks.repeat;
-            const current = player.tracks.position;
+            const { tracks } = player;
+            const repeat = tracks.repeat;
+            const current = tracks.position;
 
             // Если включен повтор трека сменить позицию нельзя
-            if (repeat === RepeatType.Song) player.tracks.position = current;
+            if (repeat === RepeatType.Song) tracks.position = current;
 
             // Если включен бесконечный поток
             else if (repeat === RepeatType.AutoPlay) {
                 // Если последняя позиция
-                if (current === player.tracks.total - 1) {
+                if (current === tracks.total - 1) {
                     try {
-                        const tracks = await db.api.fetchRelatedTracks(player.tracks.track);
+                        const related = await db.api.fetchRelatedTracks(tracks.track);
 
                         // Если получена ошибка
-                        if (tracks instanceof Error) Logger.log("ERROR", tracks);
+                        if (related instanceof Error) Logger.log("ERROR", related);
 
                         // Если нет похожих треков
-                        else if (!tracks.length) this.emit("player/error", player, "Autoplay System: failed get related tracks");
+                        else if (!related.length) this.emit("player/error", player, "Autoplay System: failed get related tracks");
 
                         // Добавляем треки
                         else {
-                            tracks.forEach((song) => {
-                                song.user = player.tracks.get(player.tracks.total - 1).user;
-                                player.tracks.push(song);
+                            const user = tracks.track.user;
+
+                            related.forEach((song) => {
+                                song.user = user;
+                                tracks.push(song);
                             });
                         }
                     } catch (err) {
@@ -232,19 +232,19 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Меняем позицию трека в списке
-                player.tracks.position = player.tracks.position + 1;
+                tracks.position = player.tracks.position + 1;
             }
 
             // Если включен повтор треков или его вовсе нет
             else {
                 // Меняем позицию трека в списке
-                player.tracks.position = player.tracks.position + 1;
+                tracks.position = tracks.position + 1;
 
                 // Если повтор выключен
                 if (repeat === RepeatType.None) {
 
                     // Если очередь началась заново
-                    if (current + 1 === player.tracks.total && player.tracks.position === 0) {
+                    if (current + 1 === tracks.total && tracks.position === 0) {
                         const queue = db.queues.get(player.id);
 
                         return queue.cleanup();

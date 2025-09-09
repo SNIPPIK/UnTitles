@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🌟 Discord Music Bot</h1>
+  <h1>🌟 Discord Music Bot 💫</h1>
 
 <h4>Incredible bot with its own voice/audio engine, scalable architecture, multiple filters and support for 6 music platforms.</h4>
 <h4>Audio quality surpasses lavalink, don't believe me? Listen for yourself! Works without any drops even on ARM!</h4>

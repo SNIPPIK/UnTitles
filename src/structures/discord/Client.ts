@@ -34,7 +34,7 @@ export class DiscordClient extends Client {
             presence: {
                 afk: false,
                 status: "online",
-                activities: [{name: " 🌟 Startup...", type: 4}]
+                activities: [{name: " 💫 Startup...", type: 4}]
             },
 
             // Права бота
@@ -77,6 +77,7 @@ export class DiscordClient extends Client {
             })
         });
         this.setMaxListeners(10);
+        this.ws.setMaxListeners(10);
 
         // Запускаем статусы после инициализации клиента
         this.once("clientReady", this.IntervalStatus);

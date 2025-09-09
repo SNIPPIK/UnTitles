@@ -1,4 +1,4 @@
-import { PipeEncoder, BufferedEncoder, SILENT_FRAME, OPUS_FRAME_SIZE } from "./opus";
+import { BufferedEncoder, OPUS_FRAME_SIZE, PipeEncoder } from "./opus";
 import { Logger } from "#structures/logger";
 import { TypedEmitter } from "#structures";
 import { Process } from "./process";
@@ -63,8 +63,7 @@ class AudioBuffer {
      */
     public get packet() {
         if (this._position >= this.size) return null;
-        const frame = this._chunks[this._position++];
-        return frame ?? SILENT_FRAME;
+        return this._chunks[this._position++];
     };
 
     /**

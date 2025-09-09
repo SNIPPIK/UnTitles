@@ -51,7 +51,7 @@ class GuildCreate extends Assign<Event<Events.GuildCreate>> {
 
                                     {
                                         "type": 10, // Text
-                                        "content": `# 🌟 For owner of Guild ||${guild}|| \n` +
+                                        "content": `# 💫 For owner of Guild ||${guild}|| \n` +
                                             `👋 Hi listener, thanks for adding the bot to your server, if it wasn't you, another user with privilege could have done it\n` +
                                             `## 💣 Features\n` +
                                             `- 💵 No premium\n` +

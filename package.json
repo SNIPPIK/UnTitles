@@ -1,6 +1,6 @@
 {
   "name": "untitles",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "homepage": "https://github.com/SNIPPIK/UnTitles",
   "bugs": "https://github.com/SNIPPIK/UnTitles/issues",
   "author": {
@@ -15,7 +15,7 @@
     "node": ">=23.0.0"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.22",
+    "discord-api-types": "^0.38.23",
     "discord.js": "^14.22.1",
     "ws": "^8.18.3"
   },
@@ -23,7 +23,7 @@
     "@snazzah/davey": "^0.1.6"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
+    "@types/node": "^24.3.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.2"
   },

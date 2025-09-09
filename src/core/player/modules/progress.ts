@@ -93,22 +93,21 @@ export class PlayerProgress {
         const clamped = Math.min(Math.max(current / total, 0), 1);
         const filled = Math.floor(this.size * clamped);
 
-        const left = current > 0 ? emoji.upped.left : emoji.empty.left;
+        const left = current >= 1 ? emoji.upped.left : emoji.empty.left;
         const right = filled >= this.size ? emoji.upped.right : emoji.empty.right;
 
         // Если в самом начале — просто пустой бар без кнопки
-        if (current === 0) {
+        if (current < 1) {
             return left + emoji.empty.center.repeat(this.size) + right;
         }
 
         // Если в самом конце — полностью заполненный бар
-        if (filled >= this.size || current >= total) {
+        else if (filled >= this.size || current >= total) {
             return left + emoji.upped.center.repeat(this.size) + right;
         }
 
         // Стандартный случай: середина с кнопкой
         const middle = emoji.upped.center.repeat(filled) + button + emoji.empty.center.repeat(this.size - filled - 1); // -1 под кнопку
-
         return left + middle + right;
     };
 }

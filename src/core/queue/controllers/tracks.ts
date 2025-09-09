@@ -199,7 +199,7 @@ export class ControllerTracks<T extends Track> {
      * @returns T[]
      * @public
      */
-    public array(size: number, position?: number): T[] {
+    public array = (size: number, position?: number): T[] => {
         const realPosition = position ?? this._position;
         const startIndex = size < 0 ? realPosition + size : realPosition;
         const endIndex = size < 0 ? realPosition : realPosition + size;

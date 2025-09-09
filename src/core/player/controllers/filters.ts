@@ -1,6 +1,6 @@
 import type { LocalizationMap } from "discord-api-types/v10";
+import { SetArray } from "#structures";
 import { db } from "#app/db";
-import {SetArray} from "#structures";
 
 /**
  * @author SNIPPIK

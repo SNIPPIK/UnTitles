@@ -1,4 +1,4 @@
-import {httpsClient, httpsStatusCode} from "#structures";
+import { httpsClient, httpsStatusCode } from "#structures";
 import type { RestServerSide } from "#handler/rest";
 import { db } from "#app/db";
 
