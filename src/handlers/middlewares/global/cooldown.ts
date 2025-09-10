@@ -9,7 +9,10 @@ import {db} from "#app/db";
  * @description База данных для системы ожидания
  * @private
  */
-const cooldown = env.get("cooldown", true) ? { time: parseInt(env.get("cooldown.time", "2")), db: new Map() }: null;
+const cooldown = env.get("cooldown", true) ? {
+    time: parseInt(env.get("cooldown.time", "2")),
+    db: new Map()
+}: null;
 
 /**
  * @author SNIPPIK

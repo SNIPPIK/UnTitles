@@ -2,7 +2,7 @@
   <h1>🌟 Discord Music Bot 💫</h1>
 
 <h4>Incredible bot with its own voice/audio engine, scalable architecture, multiple filters and support for 6 music platforms.</h4>
-<h4>Audio quality surpasses lavalink, don't believe me? Listen for yourself! Works without any drops even on ARM!</h4>
+<h4>Audio quality surpasses lavalink and used E2EE 🔐, don't believe me? Listen for yourself! Works without any drops even on ARM!</h4>
 
   <p>
     English
@@ -75,8 +75,9 @@ while (performance.now() - startBlock < 100) {}
 }, 200);
 ```
 #### 🔊 Voice engine
-- Implementation of [Voice Gateway Version 8](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/core/voice) + [End-to-End Encryption (DAVE Protocol)](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
+- Implementation of [Voice Gateway Version 8](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/core/voice) + [End-to-End Encryption (E2EE 🔐)](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
 - Full implementation of **SRTP**: `aead_aes256_gcm`, `xchacha20_poly1305` (via libraries)
+- Best audio player compared to **open source** solutions!
 - Does not require any opus encoders/decoders, has its own opus encoder by parsing method!
 - Adaptive system for sending audio packets, its own `Jitter Buffer`!
 - Requires **FFmpeg**, it is responsible for audio and filters!
@@ -173,7 +174,7 @@ bun run start-bun
 [![TypeScript](https://img.shields.io/badge/typescript-5.9.2-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Bun](https://img.shields.io/badge/bun-1.2.25-6DA55F?style=for-the-badge&logo=bun&logoColor=white&color=white)](https://bun.com/)
 [![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/en)
-[![Discord.js](https://img.shields.io/badge/discord.js-14.22-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)
+[![Discord.js](https://img.shields.io/badge/discord.js-14.22.1-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)
 [![WS](https://img.shields.io/badge/ws-8.18.3-%23CB3837.svg?style=for-the-badge&logo=socket&logoColor=white)](https://www.npmjs.com/package/ws)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-7.*.*-%23CB3837.svg?style=for-the-badge&logo=ffmpeg&logoColor=white&color)](https://ffmpeg.org/)
 ---

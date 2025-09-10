@@ -207,6 +207,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         this.socket.removeAllListeners();
         super.destroy();
 
+        this.keepAlive.buffer = null;
         this.keepAlive = null;
         this.destroyed = null;
 

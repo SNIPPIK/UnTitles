@@ -37,7 +37,7 @@ export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction |
      * @description Регистрируем в эко системе бота
      * @public
      */
-    public register = this.load
+    public register = this.load;
 
     /**
      * @description Производим фильтрацию по функции

@@ -1,5 +1,5 @@
 import { Command, CommandContext, Declare, Middlewares, Options, Permissions, SubCommand } from "#handler/commands";
-import { ApplicationCommandOptionType, ApplicationCommandType, Message } from "discord.js";
+import { ApplicationCommandOptionType } from "discord.js";
 import { CompeteInteraction } from "#structures/discord";
 import { RestClientSide } from "#handler/rest";
 import { locale } from "#structures";
@@ -62,25 +62,6 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
 }
 
 /**
- * @author SNIPPIK
- * @description Получение платформы из поиска
- * @param search - Что запросил пользователь
- */
-function getPlatform(search: string) {
-    // Если ссылка
-    if (search.startsWith("http")) {
-        const api = db.api.allow.find((pl) => !!pl.filter.exec(search));
-
-        // Если нет поддержки такой платформы
-        if (!api) return null;
-
-        return db.api.request(api.name);
-    }
-
-    return db.api.request("YOUTUBE");
-}
-
-/**
  * @description Под команда поиска трека
  * @type SubCommand
  */
@@ -106,7 +87,7 @@ function getPlatform(search: string) {
         },
         type: ApplicationCommandOptionType["String"],
         required: true,
-        choices: db.api.allow.map((platform) => {
+        choices: db.api.array.map((platform) => {
             return {
                 name: `${platform.name.toLowerCase()} | ${platform.url}`,
                 value: platform.name
@@ -127,15 +108,15 @@ function getPlatform(search: string) {
         autocomplete: ({ctx, args}) => {
             if (!args[1] || args[1] === "") return null;
 
-            const platform = db.api.request(args[0] as any);
+            const platform = db.api.request(args[0]);
             return allAutoComplete(ctx, platform, args[1]);
         }
     }
 })
 class PlaySearchCommand extends SubCommand {
-    async run({ctx, args}: CommandContext<string>) {
-        // Запрос к платформе
-        const platform = db.api.request(args[0] as any);
+    async run({ctx, args}: CommandContext) {
+        const platform = db.api.request(args[0]);
+        await ctx.deferReply();
 
         // Если платформа заблокирована
         if (platform.block) {
@@ -149,7 +130,6 @@ class PlaySearchCommand extends SubCommand {
             return null;
         }
 
-        await ctx.deferReply();
         db.events.emitter.emit("rest/request", platform, ctx, args[1]);
         return null;
     };
@@ -182,7 +162,7 @@ class PlaySearchCommand extends SubCommand {
         },
         type: ApplicationCommandOptionType["String"],
         required: true,
-        choices: db.api.allowRelated.map((platform) => {
+        choices: db.api.arrayRelated.map((platform) => {
             return {
                 name: `${platform.name.toLowerCase()} | ${platform.url}`,
                 value: platform.name
@@ -210,8 +190,8 @@ class PlaySearchCommand extends SubCommand {
 })
 class PlayRelatedCommand extends SubCommand {
     async run({ctx, args}: CommandContext) {
-        // Запрос к платформе
         const platform = db.api.request(args[0] as any);
+        await ctx.deferReply();
 
         // Если платформа заблокирована
         if (platform.block) {
@@ -225,7 +205,6 @@ class PlayRelatedCommand extends SubCommand {
             return null;
         }
 
-        await ctx.deferReply();
         db.events.emitter.emit("rest/request", platform, ctx, `${args[1]}&list=RD`);
         return null;
     };
@@ -262,57 +241,6 @@ class PlayAdvancedCommand extends Command {
 
 /**
  * @author SNIPPIK
- * @description Базовое включение музыки из сообщения
- * @class PlayContextCommand
- * @extends Assign
- * @public
- */
-@Declare({
-    names: {
-        "en-US": "Play",
-        "ru": "Воспроизвести"
-    },
-    integration_types: ["GUILD_INSTALL"],
-    type: ApplicationCommandType.Message
-})
-@Middlewares(["cooldown", "voice", "another_voice"])
-@Permissions({
-    client: ["SendMessages", "ViewChannel"]
-})
-class PlayContextCommand extends Command {
-    async run({ctx, args}: CommandContext<Message>) {
-        const regex = /(https?:\/\/[^\s)]+)/g;
-        const url = Array.from(args[0].content.matchAll(regex), m => m[1])[0];
-
-        const platform = getPlatform(url);
-
-        // Если не нашлась платформа
-        if (!platform) {
-            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.support"));
-            return null;
-        }
-
-        // Если платформа заблокирована
-        else if (platform.block) {
-            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
-            return null;
-        }
-
-        // Если есть проблема с авторизацией на платформе
-        else if (!platform.auth) {
-            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.auth"));
-            return null;
-        }
-
-        await ctx.deferReply();
-        db.events.emitter.emit("rest/request", platform, ctx, url);
-        return null;
-    };
-}
-
-
-/**
- * @author SNIPPIK
  * @description Базовое включение музыки
  * @class PlayCommand
  * @extends Assign
@@ -342,7 +270,7 @@ class PlayContextCommand extends Command {
         required: true,
         type: ApplicationCommandOptionType["String"],
         autocomplete: ({ctx, args}) => {
-            const platform = getPlatform(args[0]);
+            const platform = db.api.request(args[0]);
             return allAutoComplete(ctx, platform, args[0]);
         }
     }
@@ -352,8 +280,9 @@ class PlayContextCommand extends Command {
     client: ["SendMessages", "ViewChannel"]
 })
 class PlayCommand extends Command {
-    async run({ctx, args}: CommandContext<string>) {
-        const platform = getPlatform(args[0]);
+    async run({ctx, args}: CommandContext) {
+        const platform = db.api.request(args[0]);
+        await ctx.deferReply();
 
         // Если не нашлась платформа
         if (!platform) {
@@ -373,7 +302,6 @@ class PlayCommand extends Command {
             return null;
         }
 
-        await ctx.deferReply();
         db.events.emitter.emit("rest/request", platform, ctx, args[0]);
         return null;
     };
@@ -383,4 +311,4 @@ class PlayCommand extends Command {
  * @export default
  * @description Не даем классам или объектам быть доступными везде в проекте
  */
-export default [ PlayContextCommand, PlayCommand, PlayAdvancedCommand ];
+export default [ PlayCommand, PlayAdvancedCommand ];

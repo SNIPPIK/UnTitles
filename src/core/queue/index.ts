@@ -81,7 +81,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
             queue.player.removeAllListeners();
 
             // Тихо удаляем очередь
-            this.remove(queue.message.guildID, true);
+            this.remove(queue.message.guild_id, true);
         }
 
         Logger.log("DEBUG", `[Queues] has getting max timeout: ${timeout} ms`);
@@ -126,19 +126,12 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
                 setImmediate(() => {
                     // Установка позиции воспроизведения в зависимости от типа добавленного item
                     queue.tracks.position = items.length ? queue.tracks.total - items.length : 0;
-
-                    // Если разные текстовые каналы
-                    if (queue.message.channelID !== message.channelId) {
-                        // Меняем текстовый канал
-                        queue.message = new QueueMessage(message);
-                    }
-
                     this.restart_player = queue.player;
                 });
             }
 
             // Если текстовый канал изменился — обновляем привязку
-            else if (queue.message.channelID !== message.channelId) {
+            if (queue.message.channel_id !== message.channelId) {
                 queue.message = new QueueMessage(message);
             }
         }

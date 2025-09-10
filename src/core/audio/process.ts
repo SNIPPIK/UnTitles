@@ -61,6 +61,7 @@ export class Process {
             if (isNaN(seek) || !seek) args.splice(index_seek, 2);
         }
 
+        // =Добавляем аргументы отключения видео и логирования
         args.unshift("-vn", "-loglevel", "error", "-hide_banner");
         this._process = spawn(name, args, {
             env: { PATH: process.env.PATH },
@@ -68,6 +69,7 @@ export class Process {
             shell: false
         });
 
+        // дДобавляем события к процессу
         for (let event of ["end", "error", "exit"]) {
             this._process.once(event, this.destroy);
         }
@@ -79,13 +81,18 @@ export class Process {
      */
     public destroy = () => {
         if (this._process) {
+            // Отключаем все точки данных и удаляем их
             for (const std of [this._process.stdout, this._process.stderr, this._process.stdin]) {
                 std.removeAllListeners();
                 std.destroy();
             }
 
+            // Отключаем события
             this._process.removeAllListeners();
+            // Убиваем процесс
             this._process.kill("SIGKILL");
+
+            // Удаляем данные процесса
             this._process = null;
         }
     };

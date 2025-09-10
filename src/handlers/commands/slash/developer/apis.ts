@@ -75,7 +75,7 @@ import { db } from "#app/db";
                 },
                 required: true,
                 type: ApplicationCommandOptionType["String"],
-                choices: db.api.allow.map((platform) => {
+                choices: db.api.array.map((platform) => {
                     return {
                         name: `[${platform.requests.length}] - ${platform.name} | ${platform.url}`,
                         value: platform.name

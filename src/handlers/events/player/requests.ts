@@ -109,13 +109,18 @@ class rest_error extends Assign<Event<"rest/error">> {
                         description: error,
                         color: Colors.DarkRed
                     }]
-                }
+                };
 
                 try {
-                    let msg = await message.channel.send(options);
-                    setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 15e3);
+                    let msg = await message.followUp(options);
+                    setTimeout(() => msg.delete().catch(() => null), 15e3);
                 } catch (err) {
-                    console.error(err);
+                    try {
+                        let msg = await message.channel.send(options);
+                        setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 15e3);
+                    } catch (err) {
+                        console.error(err);
+                    }
                 }
             }
         });

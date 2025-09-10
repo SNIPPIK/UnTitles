@@ -63,10 +63,10 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @private
      */
     public parseAvailablePages = (chunk: Buffer) => {
-        this._buffer = Buffer.concat([this._buffer, chunk]);
+        const frame = this._buffer = Buffer.concat([this._buffer, chunk]);
 
         // Начинаем обработку буфера с начала
-        const size = this._buffer.length;
+        const size = frame.length;
         let offset = 0;
 
         // Основной цикл обработки страниц в OGG-потоке
@@ -74,9 +74,9 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
         while (offset + 27 <= size) {
             // Проверяем, соответствует ли текущая позиция сигнатуре "OggS" (OGG_MAGIC)
             // Это "магическая строка", которая всегда должна быть в начале страницы
-            if (!this._buffer.subarray(offset, offset + 4).equals(OGG_MAGIC)) {
+            if (!frame.subarray(offset, offset + 4).equals(OGG_MAGIC)) {
                 // Если не совпадает, пытаемся найти ближайшую следующую сигнатуру OGG
-                const next = this._buffer.indexOf(OGG_MAGIC, offset + 1);
+                const next = frame.indexOf(OGG_MAGIC, offset + 1);
 
                 // Если ничего не найдено — выходим из цикла, т.к. Не можем синхронизироваться
                 if (next === -1) break;
@@ -88,11 +88,11 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
             // Проверяем, доступен ли весь заголовок страницы (27 байт)
             // Бывает, что заголовок ещё не весь пришёл — тогда ждём следующих данных
-            else if (offset + 27 > this._buffer.length) break;
+            else if (offset + 27 > size) break;
 
             // Байты [offset + 26] содержит количество сегментов (Lacing Table Entries)
             // Каждая запись определяет длину одного Opus-пакета (фрагмента)
-            const pageSegments = this._buffer.readUInt8(offset + 26);
+            const pageSegments = frame.readUInt8(offset + 26);
             const headerLength = 27 + pageSegments;
 
             // Проверяем, пришла ли вся сегментная таблица
@@ -101,7 +101,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
             // Проверяем, получена ли вся страница
             // Если нет — выход из цикла до прихода полной страницы
-            const segmentTable = this._buffer.subarray(offset + 27, offset + 27 + pageSegments);
+            const segmentTable = frame.subarray(offset + 27, offset + 27 + pageSegments);
             const totalSegmentLength = segmentTable.reduce((sum, val) => sum + val, 0);
             const fullPageLength = headerLength + totalSegmentLength;
 
@@ -109,7 +109,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             if (offset + fullPageLength > size) break;
 
             // Передаём таблицу сегментов и payload в обработчике, который выделяет Opus-пакеты
-            const payload = this._buffer.subarray(offset + headerLength, offset + fullPageLength);
+            const payload = frame.subarray(offset + headerLength, offset + fullPageLength);
             this.extractPackets(segmentTable, payload);
 
             // Смещаем offset на конец текущей страницы и продолжаем со следующей
@@ -154,6 +154,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                     this._first = false;
                 }
 
+                // Отправляем пакет
                 this.emit("frame", packet);
             }
         }
@@ -164,12 +165,14 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @public
      */
     public destroy() {
-        // Отправляем пустой пакет последним
+        // Финальный тихий пакет, чтобы downstream понял завершение
         this.emit("frame", SILENT_FRAME);
 
-        this._first = null;
-        this._buffer = null;
+        // Сброс состояния
+        this._first = true;           // возвращаем в исходное состояние
+        this._buffer = EMPTY_FRAME;   // очищаем ссылку на буфер
 
+        // Освобождаем emitter
         super.destroy();
     };
 }

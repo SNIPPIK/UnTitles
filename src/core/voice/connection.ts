@@ -29,38 +29,38 @@ export class VoiceConnection {
      * @readonly
      * @public
      */
-    public receiver: VoiceReceiver;
+    public receiver: VoiceReceiver | null;
 
     /**
      * @description Функции для общения с websocket клиента
      * @readonly
      * @public
      */
-    public adapter: VoiceAdapter = new VoiceAdapter();
+    public adapter: VoiceAdapter | null = new VoiceAdapter();
 
     /**
      * @description Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway
      * @private
      */
-    protected websocket: ClientWebSocket = new ClientWebSocket();
+    protected websocket: ClientWebSocket | null = new ClientWebSocket();
 
     /**
      * @description Клиент UDP соединения, ключевой класс для отправки пакетов
      * @private
      */
-    protected clientUDP: ClientUDPSocket = new ClientUDPSocket();
+    protected clientUDP: ClientUDPSocket | null = new ClientUDPSocket();
 
     /**
      * @description Клиент RTP, ключевой класс для шифрования пакетов для отправки через UDP
      * @private
      */
-    protected clientSRTP: ClientSRTPSocket;
+    protected clientSRTP: ClientSRTPSocket | null;
 
     /**
      * @description Клиент Dave, для работы сквозного шифрования
      * @protected
      */
-    protected clientDave: ClientDAVE;
+    protected clientDave: ClientDAVE | null;
 
     /**
      * @description Таймер для автоматического отключения Speaking

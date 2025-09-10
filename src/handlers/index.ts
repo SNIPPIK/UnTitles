@@ -63,6 +63,7 @@ export abstract class handler<T = unknown> {
     /**
      * @description Поиск файлов загрузки
      * @param dirPath - Путь до директории
+     * @private
      */
     private _loadRecursive = (dirPath: string) => {
         const entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -75,11 +76,8 @@ export abstract class handler<T = unknown> {
 
             // Если это файл
             else if (entry.isFile()) {
-                // Если это не файл ts или js
-                if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) continue;
-
-                // Не загружаем index файлы (они являются загрузочными)
-                if (entry.name.startsWith("index")) continue;
+                // Если это не файл ts или js, не загружаем index файлы (они являются загрузочными)
+                if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js") || entry.name.startsWith("index")) continue;
 
                 this._push(fullPath);
             }
@@ -89,6 +87,7 @@ export abstract class handler<T = unknown> {
     /**
      * @description Добавляем загруженный файл в коллекцию файлов
      * @param path - Путь до файла
+     * @private
      */
     private _push = (path: string) => {
         const imported: { default?: T } | json = require(path);
@@ -107,6 +106,7 @@ export abstract class handler<T = unknown> {
                 if (obj.prototype) this._files.add(new obj(null));
                 else this._files.add(obj);
             }
+
             return;
         }
 
