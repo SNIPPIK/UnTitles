@@ -51,64 +51,62 @@ class RestSpotifyAPI extends RestServerSide.API {
         {
             name: "track",
             filter: /track\/[0-9z]+/i,
-            execute: (url, options) => {
+            execute: async (url, options) => {
                 const ID = /track\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("track\/")?.pop();
 
-                return new Promise(async (resolve) => {
-                    //Если ID трека не удалось извлечь из ссылки
-                    if (!ID) return resolve(locale.err("api.request.id.track"));
+                //Если ID трека не удалось извлечь из ссылки
+                if (!ID) return locale.err("api.request.id.track");
 
-                    // Интеграция с утилитой кеширования
-                    const cache = db.cache.get(`${this.url}/${ID}`);
+                // Интеграция с утилитой кеширования
+                const cache = db.cache.get(`${this.url}/${ID}`);
 
-                    // Если трек есть в кеше
-                    if (cache) {
-                        if (!options.audio) return resolve(cache);
+                // Если трек есть в кеше
+                if (cache) {
+                    if (!options.audio) return cache;
 
-                        // Если включена утилита кеширования аудио
-                        else if (db.cache.audio) {
+                    // Если включена утилита кеширования аудио
+                    else if (db.cache.audio) {
+                        const check = db.cache.audio.status(`${this.url}/${ID}`);
+
+                        // Если есть кеш аудио
+                        if (check.status === "ended") {
+                            cache.audio = check.path;
+                            return cache;
+                        }
+                    }
+                }
+
+                try {
+                    // Создаем запрос
+                    const api = await this.API(`tracks/${ID}`);
+
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
+                    const track = this.track(api);
+
+                    // Если указано получение аудио
+                    if (options.audio) {
+                        // Если включена утилита кеширования
+                        if (db.cache.audio) {
                             const check = db.cache.audio.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
-                                cache.audio = check.path;
-                                return resolve(cache);
+                                track.audio = check.path;
+                                return track;
                             }
                         }
                     }
 
-                    try {
-                        // Создаем запрос
-                        const api = await this.API(`tracks/${ID}`);
+                    setImmediate(() => {
+                        // Сохраняем кеш в системе
+                        if (!cache) db.cache.set(track, this.url);
+                    });
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
-                        const track = this.track(api);
-
-                        // Если указано получение аудио
-                        if (options.audio) {
-                            // Если включена утилита кеширования
-                            if (db.cache.audio) {
-                                const check = db.cache.audio.status(`${this.url}/${ID}`);
-
-                                // Если есть кеш аудио
-                                if (check.status === "ended") {
-                                    track.audio = check.path;
-                                    return resolve(track);
-                                }
-                            }
-                        }
-
-                        setImmediate(() => {
-                            // Сохраняем кеш в системе
-                            if (!cache) db.cache.set(track, this.url);
-                        });
-
-                        return resolve(track);
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return track;
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         },
 
@@ -119,27 +117,25 @@ class RestSpotifyAPI extends RestServerSide.API {
         {
             name: "album",
             filter: /album\/[0-9z]+/i,
-            execute: (url, {limit}) => {
+            execute: async (url, {limit}) => {
                 const ID = /album\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("album\/")?.pop();
 
-                return new Promise(async (resolve) => {
-                    // Если ID альбома не удалось извлечь из ссылки
-                    if (!ID) return resolve(locale.err( "api.request.id.album"));
+                // Если ID альбома не удалось извлечь из ссылки
+                if (!ID) return locale.err( "api.request.id.album");
 
-                    try {
-                        // Создаем запрос
-                        const api: Error | any = await this.API(`albums/${ID}?offset=0&limit=${limit}`);
+                try {
+                    // Создаем запрос
+                    const api: Error | any = await this.API(`albums/${ID}?offset=0&limit=${limit}`);
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
 
-                        const tracks = api.tracks.items.map((track: any) => this.track(track, api.images));
+                    const tracks = api.tracks.items.map((track: any) => this.track(track, api.images));
 
-                        return resolve({ url, title: api.name, image: api.images[0], items: tracks, artist: api?.["artists"][0] });
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return { url, title: api.name, image: api.images[0], items: tracks, artist: api?.["artists"][0] };
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         },
 
@@ -150,26 +146,24 @@ class RestSpotifyAPI extends RestServerSide.API {
         {
             name: "playlist",
             filter: /playlist\/[0-9z]+/i,
-            execute: (url, {limit}) => {
+            execute: async (url, {limit}) => {
                 const ID = /playlist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("playlist\/")?.pop();
 
-                return new Promise(async (resolve) => {
-                    // Если ID плейлиста не удалось извлечь из ссылки
-                    if (!ID) return resolve(locale.err( "api.request.id.playlist"));
+                // Если ID плейлиста не удалось извлечь из ссылки
+                if (!ID) return locale.err( "api.request.id.playlist");
 
-                    try {
-                        // Создаем запрос
-                        const api: Error | any = await this.API(`playlists/${ID}?offset=0&limit=${limit}`);
+                try {
+                    // Создаем запрос
+                    const api: Error | any = await this.API(`playlists/${ID}?offset=0&limit=${limit}`);
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
-                        const tracks = api.tracks.items.map(({ track }) => this.track(track));
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
+                    const tracks = api.tracks.items.map(({ track }) => this.track(track));
 
-                        return resolve({ url, title: api.name, image: api.images[0], items: tracks });
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return { url, title: api.name, image: api.images[0], items: tracks };
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         },
 
@@ -180,25 +174,23 @@ class RestSpotifyAPI extends RestServerSide.API {
         {
             name: "artist",
             filter: /artist\/[0-9z]+/i,
-            execute: (url, {limit}) => {
+            execute: async (url, {limit}) => {
                 const ID = /artist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("artist\/")?.pop();
 
-                return new Promise(async (resolve) => {
-                    // Если ID автора не удалось извлечь из ссылки
-                    if (!ID) return resolve(locale.err( "api.request.id.author"));
+                // Если ID автора не удалось извлечь из ссылки
+                if (!ID) return locale.err( "api.request.id.author");
 
-                    try {
-                        // Создаем запрос
-                        const api = await this.API(`artists/${ID}/top-tracks?market=ES&limit=${limit}`);
+                try {
+                    // Создаем запрос
+                    const api = await this.API(`artists/${ID}/top-tracks?market=ES&limit=${limit}`);
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
 
-                        return resolve((api.tracks?.items ?? api.tracks).map(this.track));
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return (api.tracks?.items ?? api.tracks).map(this.track);
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         },
 
@@ -208,20 +200,18 @@ class RestSpotifyAPI extends RestServerSide.API {
          */
         {
             name: "search",
-            execute: (query, {limit}) => {
-                return new Promise(async (resolve) => {
-                    try {
-                        // Создаем запрос
-                        const api: Error | any = await this.API(`search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
+            execute: async (query, {limit}) => {
+                try {
+                    // Создаем запрос
+                    const api: Error | any = await this.API(`search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
 
-                        return resolve(api.tracks.items.map(this.track));
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return api.tracks.items.map(this.track);
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         }
     ]

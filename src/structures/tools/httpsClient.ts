@@ -31,8 +31,10 @@ abstract class Request {
      * @protected
      */
     protected data: {
+        // Ссылка подключения
         url?: string;
 
+        // Методы запроса
         method?: "POST" | "GET" | "HEAD" | "PATCH";
 
         // Headers запроса
@@ -88,7 +90,7 @@ abstract class Request {
             request.once("timeout", () => {
                 Logger.log("DEBUG", `${this.data}`);
 
-                return resolve(Error(`[httpsClient]: Connection Timeout Exceeded ${this.data.url}:443`));
+                return resolve(Error(`[httpsClient]: Connection Timeout Exceeded ${this.data.hostname}:443`));
             });
 
             /**
@@ -122,7 +124,7 @@ abstract class Request {
             const { hostname, pathname, search, port, protocol } = URL.parse(options.url);
 
             // Создаем стандартные настройки
-            this.data = { ...this.data, port, hostname, path: pathname + search, protocol }
+            this.data = { ...this.data, port, hostname, path: pathname + search, protocol };
         }
 
         // Надо ли генерировать user-agent
@@ -144,7 +146,7 @@ abstract class Request {
             }
         }
 
-        options.url = null;
+        delete options.url;
         this.data = { ...this.data, ...options };
     };
 }

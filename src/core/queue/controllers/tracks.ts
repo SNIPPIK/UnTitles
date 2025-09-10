@@ -9,14 +9,12 @@ import { Track } from "#core/queue";
 export class ControllerTracks<T extends Track> {
     /**
      * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
-     * @readonly
      * @private
      */
     private _current: T[] = [];
 
     /**
      * @description Хранилище треков в оригинальном порядке, необходимо для правильной работы shuffle
-     * @readonly
      * @private
      */
     private _original: T[] = [];
@@ -173,12 +171,14 @@ export class ControllerTracks<T extends Track> {
         this._current.splice(position, 1);
 
         // Корректируем позицию, если она больше длины или не равна нулю
-        if (this._position > position) {
-            this._position--;
-        } else if (this._position >= this._current.length) {
+        if (this._position > position) this._position--;
+
+        // Если позиция больше максимальной
+        else if (this._position >= this._current.length) {
             this._position = this._current.length - 1;
         }
 
+        // Если позиция менее 0
         if (this._position < 0) this._position = 0;
     };
 
@@ -204,6 +204,7 @@ export class ControllerTracks<T extends Track> {
         const startIndex = size < 0 ? realPosition + size : realPosition;
         const endIndex = size < 0 ? realPosition : realPosition + size;
 
+        // Отдает список треков с учетом позиции
         return this._current.slice(startIndex, endIndex);
     };
 
@@ -252,8 +253,8 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public clear = () => {
-        this._current.length = null;
-        this._original.length = null;
+        this._current.length = 0;
+        this._original.length = 0;
         this._current = null;
         this._original = null;
 

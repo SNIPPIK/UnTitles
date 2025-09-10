@@ -12,9 +12,32 @@ import { env } from "#app/env";
  * @public
  */
 export class QueueMessage<T extends CommandInteraction> {
-    private readonly _guildID: string;
-    private readonly _channelID: string;
-    private readonly _voiceID: string;
+    /**
+     * @description ID сервера, привязанный к сообщению
+     * @readonly
+     * @private
+     */
+    private readonly _guild_id: string;
+
+    /**
+     * @description ID канала, привязанный к сообщению
+     * @readonly
+     * @private
+     */
+    private readonly _channel_id: string;
+
+    /**
+     * @description ID канала, привязанный к голосовому каналу
+     * @readonly
+     * @private
+     */
+    private readonly _voice_id: string;
+
+    /**
+     * @description Ответил ли бот на сообщение
+     * @readonly
+     * @private
+     */
     private _deferred = false;
 
     /**
@@ -40,8 +63,8 @@ export class QueueMessage<T extends CommandInteraction> {
      * @returns string
      * @public
      */
-    public get guildID() {
-        return this._guildID;
+    public get guild_id() {
+        return this._guild_id;
     };
 
     /**
@@ -58,8 +81,8 @@ export class QueueMessage<T extends CommandInteraction> {
      * @returns string
      * @public
      */
-    public get channelID() {
-        return this._channelID;
+    public get channel_id() {
+        return this._channel_id;
     };
 
     /**
@@ -76,8 +99,8 @@ export class QueueMessage<T extends CommandInteraction> {
      * @returns string
      * @public
      */
-    public get voiceID() {
-        return this._voiceID;
+    public get voice_id() {
+        return this._voice_id;
     };
 
     /**
@@ -111,10 +134,10 @@ export class QueueMessage<T extends CommandInteraction> {
      * @constructor
      * @public
      */
-    public constructor(private readonly _original: T) {
-        this._voiceID = _original.member.voice.channelId;
-        this._channelID = _original.channelId;
-        this._guildID = _original.guildId;
+    public constructor(private _original: T) {
+        this._voice_id = _original.member.voice.channelId;
+        this._channel_id = _original.channelId;
+        this._guild_id = _original.guildId;
     };
 
     /**
@@ -123,26 +146,28 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public send = (options: {embeds?: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
+        const ctx = this._original;
+
         try {
             // Если бот уже ответил на сообщение
             if (this.replied && !this.deferred) {
                 this._deferred = true;
-                return this._original.followUp(options as any) as any;
+                return ctx.followUp(options as any);
             }
 
             // Если можно дать ответ на сообщение
             else if (!this.deferred && !this.replied) {
                 this._deferred = true;
-                return this._original.reply(options as any) as any;
+                return ctx.reply(options as any) as any;
             }
 
             // Отправляем обычное сообщение
-            return this._original.channel.send(options as any);
+            return ctx.channel.send(options as any);
         } catch {
             this._deferred = false;
 
             // Отправляем обычное сообщение
-            return this._original.channel.send(options as any);
+            return ctx.channel.send(options as any);
         }
     };
 }

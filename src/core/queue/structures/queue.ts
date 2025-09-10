@@ -139,7 +139,7 @@ export class Queue {
      */
     public constructor(message: CommandInteraction) {
         const queue_message = new QueueMessage(message);
-        const ID = queue_message.guildID;
+        const ID = queue_message.guild_id;
 
         // Добавляем очередь в список очередей
         db.queues.set(ID, this);
@@ -155,7 +155,7 @@ export class Queue {
             self_deaf: true,
             self_mute: false,
             guild_id: ID,
-            channel_id: queue_message.voiceID
+            channel_id: queue_message.voice_id
         }, db.adapter.voiceAdapterCreator(ID));
 
         // Создаем класс для отображения кнопок
@@ -173,7 +173,7 @@ export class Queue {
         if (this._message && this._message.guild) {
             // Удаляем старое сообщение, если оно есть
             const message = db.queues.cycles.messages.find((msg) => {
-                return msg.guildId === this._message.guildID;
+                return msg.guildId === this._message.guild_id;
             });
 
             if (message) db.queues.cycles.messages.delete(message);
@@ -240,7 +240,7 @@ export class Queue {
      * @public
      */
     public cleanup = () => {
-        Logger.log("DEBUG", `[Queue/${this.message.guildID}] has cleanup`);
+        Logger.log("DEBUG", `[Queue/${this.message.guild_id}] has cleanup`);
 
         // Останавливаем плеер
         if (this._player) this._player.cleanup();
@@ -256,7 +256,7 @@ export class Queue {
      * @readonly
      */
     protected destroy = () => {
-        Logger.log("DEBUG", `[Queue/${this.message.guildID}] has destroyed`);
+        Logger.log("DEBUG", `[Queue/${this.message.guild_id}] has destroyed`);
 
         // Удаляем плеер
         if (this._player) this._player.destroy();

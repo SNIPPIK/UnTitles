@@ -19,10 +19,13 @@ export class ControllerVoice<T extends VoiceConnection> {
      * @public
      */
     public set connection(connection: T) {
+        // Если уже есть голосовое подключение
         if (this.connection) {
+            // Если можно отключится
             if (this._connection.disconnect) this._connection.destroy();
         }
 
+        // Перезаписываем старое на новое
         this._connection = connection;
     };
 

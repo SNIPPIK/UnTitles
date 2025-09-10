@@ -54,7 +54,7 @@ async function runShard() {
 
     // Загружаем API
     await db.api.startWorker();
-    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow.length} APIs`)}`);
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.array.length} APIs`)}`);
 
     // Загружаем components
     db.components.register();

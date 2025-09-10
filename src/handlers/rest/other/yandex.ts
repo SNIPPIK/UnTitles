@@ -1,5 +1,5 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
-import { httpsClient, locale } from "#structures";
+import { httpsClient, locale, Logger } from "#structures";
 import crypto from "node:crypto";
 import { env } from "#app/env";
 import { db } from "#app/db";
@@ -51,27 +51,25 @@ class RestYandexAPI extends RestServerSide.API {
         {
             name: "related",
             filter: /(track\/[0-9]+)?(list=RD)/,
-            execute: (url) => {
+            execute: async (url) => {
                 const ID = /track\/[0-9]+/gi.exec(url)[0]?.split("track")?.at(1);
 
-                return new Promise(async (resolve) => {
-                    // Если ID альбома не удалось извлечь из ссылки
-                    if (!ID) return resolve(locale.err( "api.request.id.album"));
+                // Если ID альбома не удалось извлечь из ссылки
+                if (!ID) return locale.err( "api.request.id.album");
 
-                    try {
-                        // Создаем запрос
-                        const api = await this.API(`tracks/${ID}/similar`);
+                try {
+                    // Создаем запрос
+                    const api = await this.API(`tracks/${ID}/similar`);
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
-                        else if (!api["similarTracks"]?.length) return resolve(locale.err("api.request.fail.msg", ["0 tracks received"]));
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
+                    else if (!api["similarTracks"]?.length) return locale.err("api.request.fail.msg", ["0 tracks received"]);
 
-                        const songs = api["similarTracks"].map(this.track);
-                        return resolve({url, title: null, image: null, items: songs});
-                    } catch (e) {
-                        return resolve(Error(`[APIs]: ${e}`))
-                    }
-                });
+                    const songs = api["similarTracks"].map(this.track);
+                    return {url, title: null, image: null, items: songs};
+                } catch (e) {
+                    return Error(`[APIs]: ${e}`);
+                }
             }
         },
 
@@ -82,72 +80,70 @@ class RestYandexAPI extends RestServerSide.API {
         {
             name: "track",
             filter: /track\/[0-9]+/i,
-            execute: (url, options) => {
+            execute: async (url, options) => {
                 const ID = /track\/[0-9]+/gi.exec(url)[0]?.split("track")?.at(1);
 
-                return new Promise(async (resolve) => {
-                    // Если ID трека не удалось извлечь из ссылки
-                    if (!ID) return resolve(locale.err( "api.request.id.track"));
+                // Если ID трека не удалось извлечь из ссылки
+                if (!ID) return locale.err( "api.request.id.track");
 
-                    // Интеграция с утилитой кеширования
-                    const cache = db.cache.get(`${this.url}/${ID}`);
+                // Интеграция с утилитой кеширования
+                const cache = db.cache.get(`${this.url}/${ID}`);
 
-                    // Если трек есть в кеше
-                    if (cache) {
-                        if (!options.audio) return resolve(cache);
+                // Если трек есть в кеше
+                if (cache) {
+                    if (!options.audio) return cache;
 
-                        // Если включена утилита кеширования аудио
-                        else if (db.cache.audio) {
+                    // Если включена утилита кеширования аудио
+                    else if (db.cache.audio) {
+                        const check = db.cache.audio.status(`${this.url}/${ID}`);
+
+                        // Если есть кеш аудио
+                        if (check.status === "ended") {
+                            cache.audio = check.path;
+                            return cache;
+                        }
+                    }
+                }
+
+                try {
+                    // Делаем запрос
+                    const api = await this.API(`tracks/${ID}`);
+
+                    // Обрабатываем ошибки
+                    if (api instanceof Error) return api;
+                    else if (!api[0]) return locale.err( "api.request.fail");
+
+                    const track = this.track(api[0]);
+
+                    // Если указано получение аудио
+                    if (options.audio) {
+                        // Если включена утилита кеширования
+                        if (db.cache.audio) {
                             const check = db.cache.audio.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
-                                cache.audio = check.path;
-                                return resolve(cache);
+                                track.audio = check.path;
+                                return track;
                             }
                         }
+
+                        const link = await this.getAudio(ID);
+
+                        // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл
+                        if (link instanceof Error) return link;
+                        track["audio"] = link;
                     }
 
-                    try {
-                        // Делаем запрос
-                        const api = await this.API(`tracks/${ID}`);
+                    setImmediate(() => {
+                        // Сохраняем кеш в системе
+                        if (!cache) db.cache.set(track, this.url);
+                    });
 
-                        // Обрабатываем ошибки
-                        if (api instanceof Error) return resolve(api);
-                        else if (!api[0]) return resolve(locale.err( "api.request.fail"));
-
-                        const track = this.track(api[0]);
-
-                        // Если указано получение аудио
-                        if (options.audio) {
-                            // Если включена утилита кеширования
-                            if (db.cache.audio) {
-                                const check = db.cache.audio.status(`${this.url}/${ID}`);
-
-                                // Если есть кеш аудио
-                                if (check.status === "ended") {
-                                    track.audio = check.path;
-                                    return resolve(track);
-                                }
-                            }
-
-                            const link = await this.getAudio(ID);
-
-                            // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл
-                            if (link instanceof Error) return resolve(link);
-                            track["audio"] = link;
-                        }
-
-                        setImmediate(() => {
-                            // Сохраняем кеш в системе
-                            if (!cache) db.cache.set(track, this.url);
-                        });
-
-                        return resolve(track);
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return track;
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         },
 
@@ -158,30 +154,28 @@ class RestYandexAPI extends RestServerSide.API {
         {
             name: "album",
             filter: /(album)\/[0-9]+/i,
-            execute: (url, {limit}) => {
+            execute: async (url, {limit}) => {
                 const ID = /[0-9]+/i.exec(url)?.at(0)?.split("album")?.at(0);
 
-                return new Promise(async (resolve) => {
-                    // Если ID альбома не удалось извлечь из ссылки
-                    if (!ID) return resolve(locale.err( "api.request.id.album"));
+                // Если ID альбома не удалось извлечь из ссылки
+                if (!ID) return locale.err( "api.request.id.album");
 
-                    try {
-                        // Создаем запрос
-                        const api = await this.API(`albums/${ID}/with-tracks`);
+                try {
+                    // Создаем запрос
+                    const api = await this.API(`albums/${ID}/with-tracks`);
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
-                        else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return resolve(locale.err("api.request.fail"));
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
+                    else if (!api?.["duplicates"]?.length && !api?.["volumes"]?.length) return locale.err("api.request.fail");
 
-                        const AlbumImage = this.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
-                        const tracks = api["volumes"]?.pop().splice(0, limit);
-                        const songs = tracks.map(this.track);
+                    const AlbumImage = this.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
+                    const tracks = api["volumes"]?.pop().splice(0, limit);
+                    const songs = tracks.map(this.track);
 
-                        return resolve({url, title: api.title, image: AlbumImage, items: songs});
-                    } catch (e) {
-                        return resolve(Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return {url, title: api.title, image: AlbumImage, items: songs};
+                } catch (e) {
+                    return Error(`[APIs]: ${e}`);
+                }
             }
         },
 
@@ -192,35 +186,33 @@ class RestYandexAPI extends RestServerSide.API {
         {
             name: "playlist",
             filter: /(playlists\/[a0-Z9.-]*)/i,
-            execute: (url, {limit}) => {
+            execute: async (url, {limit}) => {
                 const ID = /(playlists\/[a0-Z9.-]*)/i.exec(url)[0].split("/")[1];
 
-                return new Promise(async (resolve) => {
-                    if (!ID) return resolve(locale.err("api.request.id.playlist"));
+                if (!ID) return locale.err("api.request.id.playlist");
 
-                    try {
-                        // Создаем запрос
-                        const api = await this.API(`playlist/${ID}`);
+                try {
+                    // Создаем запрос
+                    const api = await this.API(`playlist/${ID}`);
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
-                        else if (api?.tracks?.length === 0) return resolve(locale.err("api.request.fail.msg", ["Not found tracks in playlist"]));
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
+                    else if (api?.tracks?.length === 0) return locale.err("api.request.fail.msg", ["Not found tracks in playlist"]);
 
-                        const image = this.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
-                        const tracks: any[] = api.tracks?.splice(0, limit);
-                        const songs = tracks.map(({track}) => this.track(track));
+                    const image = this.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
+                    const tracks: any[] = api.tracks?.splice(0, limit);
+                    const songs = tracks.map(({track}) => this.track(track));
 
-                        return resolve({
-                            url, title: api.title, image: image, items: songs,
-                            artist: {
-                                title: api.owner.name,
-                                url: `https://music.yandex.ru/users/${ID[1]}`
-                            }
-                        });
-                    } catch (e) {
-                        return resolve(Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return {
+                        url, title: api.title, image: image, items: songs,
+                        artist: {
+                            title: api.owner.name,
+                            url: `https://music.yandex.ru/users/${ID[1]}`
+                        }
+                    };
+                } catch (e) {
+                    return Error(`[APIs]: ${e}`);
+                }
             }
         },
 
@@ -231,26 +223,22 @@ class RestYandexAPI extends RestServerSide.API {
         {
             name: "artist",
             filter: /(artist)\/[0-9]+/i,
-            execute: (url, {limit}) => {
+            execute: async (url, {limit}) => {
                 const ID = /(artist)\/[0-9]+/i.exec(url)?.at(0)?.split("artist")?.at(0);
 
-                return new Promise(async (resolve) => {
-                    // Если ID автора не удалось извлечь из ссылки
-                    if (!ID) return resolve(locale.err("api.request.id.author"));
+                // Если ID автора не удалось извлечь из ссылки
+                if (!ID) return locale.err("api.request.id.author");
 
-                    try {
-                        // Создаем запрос
-                        const api = await this.API(`artists/${ID}/tracks`);
+                try {
+                    // Создаем запрос
+                    const api = await this.API(`artists/${ID}/tracks`);
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
-                        const tracks = api.tracks.splice(0, limit).map(this.track);
-
-                        return resolve(tracks);
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
+                    return api.tracks.splice(0, limit).map(this.track);
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`)
+                }
             }
         },
 
@@ -260,22 +248,19 @@ class RestYandexAPI extends RestServerSide.API {
          */
         {
             name: "search",
-            execute: (query , {limit}) => {
-                return new Promise(async (resolve) => {
-                    try {
-                        // Создаем запрос
-                        const api = await this.API(`search?type=all&text=${encodeURIComponent(query)}&page=0&nococrrect=false`);
+            execute: async (query , {limit}) => {
+                try {
+                    // Создаем запрос
+                    const api = await this.API(`search?type=all&text=${encodeURIComponent(query)}&page=0&nococrrect=false`);
 
-                        // Обрабатываем ошибки
-                        if (api instanceof Error) return resolve(api);
-                        else if (!api.tracks) return resolve([]);
+                    // Обрабатываем ошибки
+                    if (api instanceof Error) return api;
+                    else if (!api.tracks) return [];
 
-                        const tracks = api.tracks["results"].splice(0, limit).map(this.track);
-                        return resolve(tracks);
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return api.tracks["results"].splice(0, limit).map(this.track);
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`)
+                }
             }
         }
     ];
@@ -316,78 +301,88 @@ class RestYandexAPI extends RestServerSide.API {
      * @protected
      * @static
      */
-    protected getAudio = (ID: string): Promise<string | Error> => {
+    protected getAudio = async (ID: string): Promise<Error | string> => {
         const trackId = ID.split("/")[1];
 
-        return new Promise<string | Error>(async (resolve) => {
-            for (let i = 0; i < 3; i++) {
+        for (let i = 0; i <= 3; i++) {
+            // Если достигли максимума
+            if (i === 3) {
+                Logger.log("ERROR", Error("Max requests getAudio in yandex"));
+                return locale.err("api.request.fail.msg", ["Fail getting audio url"]);
+            }
 
-                try { /* Flac Audio handler */
-                    const timestamp = Math.floor(Date.now() / 1000);
-                    const encoder = new TextEncoder();
-                    const keyData = encoder.encode(this.options.keys[0]);
-                    const cryptoKey = await crypto.subtle.importKey("raw", keyData, {name: "HMAC", hash: {name: "SHA-256"}},false, ["sign"]);
-                    const dataEncoded = encoder.encode(`${timestamp}${trackId}losslessflacaache-aacmp3raw`);
-                    const signature = await crypto.subtle.sign("HMAC", cryptoKey, dataEncoded);
-                    const sign = btoa(String.fromCharCode(...new Uint8Array(signature)));
-                    const params = new URLSearchParams({
-                        ts: `${timestamp}`,
-                        trackId: trackId,
-                        quality: "lossless",
-                        codecs: "flac,aac,he-aac,mp3",
-                        transports: "raw",
+            try { /* Flac Audio handler */
+                const timestamp = Math.floor(Date.now() / 1000);
+                const encoder = new TextEncoder();
+                const keyData = encoder.encode(this.options.keys[0]);
+                const cryptoKey = await crypto.subtle.importKey("raw", keyData, {
+                    name: "HMAC",
+                    hash: {name: "SHA-256"}
+                }, false, ["sign"]);
+                const dataEncoded = encoder.encode(`${timestamp}${trackId}losslessflacaache-aacmp3raw`);
+                const signature = await crypto.subtle.sign("HMAC", cryptoKey, dataEncoded);
+                const sign = btoa(String.fromCharCode(...new Uint8Array(signature)));
+                const params = new URLSearchParams({
+                    ts: `${timestamp}`,
+                    trackId: trackId,
+                    quality: "lossless",
+                    codecs: "flac,aac,he-aac,mp3",
+                    transports: "raw",
 
-                        // Удаляем лишний символ с конца (=)
-                        sign: sign.slice(0, -1)
-                    });
+                    // Удаляем лишний символ с конца (=)
+                    sign: sign.slice(0, -1)
+                });
 
+                // Делаем запрос для получения аудио
+                const api = await this.API(`get-file-info?${params.toString()}`) as {
+                    downloadInfo: { url: string, trackId: string, realId: string }
+                };
+
+                // Если yandex пытается подсунуть рекламу вместо реального аудио
+                if (api.downloadInfo.trackId !== trackId || api.downloadInfo.realId !== trackId) continue;
+
+                return api.downloadInfo.url;
+            } catch { /* MP3 Audio handler */
+                try {
                     // Делаем запрос для получения аудио
-                    const api = await this.API(`get-file-info?${params.toString()}`) as { downloadInfo: {url: string, trackId: string, realId: string} };
+                    const api = await this.API(`tracks/${trackId}/download-info`);
+
+                    // Если на этапе получение данных получена одна из ошибок
+                    if (!api) return locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]);
+                    else if (api instanceof Error) return api;
+                    else if (api.length === 0) return locale.err("api.request.fail.msg", ["Fail getting audio file, api.size as 0"]);
+
+                    const url = api.find((data: any) => data.codec !== "aac") as { downloadInfoUrl: string };
+
+                    // Если нет ссылки на xml
+                    if (!url) return locale.err("api.request.fail.msg", ["Fail getting audio url"]);
 
                     // Если yandex пытается подсунуть рекламу вместо реального аудио
-                    if (api.downloadInfo.trackId !== trackId || api.downloadInfo.realId !== trackId) continue;
+                    else if (`${url.downloadInfoUrl.split(".").at(-1).split("/")[0]}` !== trackId) continue;
 
-                    return resolve(api.downloadInfo.url);
-                } catch (e) { /* MP3 Audio handler */
-                    try {
-                        // Делаем запрос для получения аудио
-                        const api = await this.API(`tracks/${trackId}/download-info`);
+                    // Расшифровываем xml страницу на фрагменты
+                    new httpsClient({
+                        url: url["downloadInfoUrl"],
+                        headers: {
+                            "X-Yandex-Music-Client": this.options.agents[1]
+                        }
+                    }).toXML.then((xml) => {
+                        if (xml instanceof Error) return xml;
 
-                        // Если на этапе получение данных получена одна из ошибок
-                        if (!api) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]));
-                        else if (api instanceof Error) return resolve(api);
-                        else if (api.length === 0) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio file, api.size as 0"]));
+                        const path = xml[1];
+                        const sign = crypto.createHash("md5").update(this.options.keys[1] + path.slice(1) + xml[4]).digest("hex");
 
-                        const url = api.find((data: any) => data.codec !== "aac") as { downloadInfoUrl: string };
-
-                        // Если нет ссылки на xml
-                        if (!url) return resolve(locale.err("api.request.fail.msg", ["Fail getting audio url"]));
-
-                        // Если yandex пытается подсунуть рекламу вместо реального аудио
-                        else if (`${url.downloadInfoUrl.split(".").at(-1).split("/")[0]}` !== trackId) continue;
-
-                        // Расшифровываем xml страницу на фрагменты
-                        new httpsClient({url: url["downloadInfoUrl"],
-                            headers: {
-                                "X-Yandex-Music-Client": this.options.agents[1]
-                            }
-                        }).toXML.then((xml) => {
-                            if (xml instanceof Error) return resolve(xml);
-
-                            const path = xml[1];
-                            const sign = crypto.createHash("md5").update(this.options.keys[1] + path.slice(1) + xml[4]).digest("hex");
-
-                            return resolve(`https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`);
-                        }).catch((e) => {
-                            return resolve(Error(e));
-                        });
-                    } catch (err) {
-                        return resolve(Error(e as string));
-                    }
+                        return `https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`;
+                    }).catch((e) => {
+                        return e instanceof Error ? e : Error(String(e));
+                    });
+                } catch (err) {
+                    return Error(err as string);
                 }
-
             }
-        });
+        }
+
+        return null;
     };
 
     /**

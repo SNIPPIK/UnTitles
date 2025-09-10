@@ -160,7 +160,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         else if (!this._voice.connection && !this._voice.connection?.ready) return false;
 
         // Если поток не читается, переходим в состояние ожидания
-        else if (!this._audio.current && !this._audio.current.packets || !this._audio.current?.readable) {
+        else if (!this._audio.current?.packets || !this._audio.current?.readable) {
             this.status = "player/wait";
             this.disableCycle();
             return false;

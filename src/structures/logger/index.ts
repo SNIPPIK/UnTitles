@@ -101,7 +101,6 @@ export class Logger {
             text = `Uncaught Exception\n` +
                 `┌ Name:    ${text.name}\n` +
                 `├ Message: ${text.message}\n` +
-                `├ Origin:  ${text}\n` +
                 `└ Stack:   ${text.stack}`;
 
             // Сохраняем логи

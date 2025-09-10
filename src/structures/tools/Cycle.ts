@@ -41,18 +41,12 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     private tickTime: number = 0;
 
     /**
-     * @description Временное число отставания цикла в миллисекундах
-     * @private
-     */
-    private drift: number = 0;
-
-    /**
      * @description Последний зафиксированный разбег во времени
      * @returns number
      * @public
      */
     public get drifting(): number {
-        return this.drift + this.lastDelay;
+        return this.prevEventLoopLag;
     };
 
     /**
@@ -79,16 +73,21 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @private
      */
     private set delay(duration: number) {
-        // Получаем следующее время
-        const expectedTime = this.startTime + this.tickTime + duration;
+        // ожидаемое время следующего запуска (без учета drift/lag)
+        const expectedNext = this.startTime + this.tickTime + duration;
+        const now = this.time;
 
-        // Корректируем шаги, для точности цикла
-        const step = Math.max(1, (this.time - expectedTime) / duration);
+        // сколько шагов "пропустили" по времени (если any)
+        let missedSteps = 1;
+        if (now > expectedNext) {
+            // (now - expectedNext) может быть > duration * N
+            const over = (now - expectedNext) / duration;
+            missedSteps = Math.max(1, over);
+        }
 
-        // Делаем шаг
-        const timeCorrection = step * duration;
-        this.tickTime += timeCorrection;
-        this.lastDelay = timeCorrection;
+        const correction = missedSteps * duration;
+        this.tickTime += correction;
+        this.lastDelay = correction;
     };
 
     /**
@@ -116,8 +115,10 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Запускаем цикл, если добавлен первый объект
         if (this.size === 1 && this.startTime === 0) {
+            process.nextTick(this._stepCycle);
+
+            // Записываем время
             this.startTime = this.time;
-            setImmediate(this._stepCycle);
         }
 
         return this;
@@ -135,21 +136,10 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         this.tickTime = 0;
         this.lastDelay = 0;
 
-        // Чистимся от drift составляющих
-        this.drift = 0;
-
         // Чистим performance.now
         this.performance = 0;
         this.prevEventLoopLag = 0
     };
-
-    /**
-     * @description Выполняет шаг цикла с учётом точного времени следующего запуска
-     * @returns void
-     * @protected
-     * @abstract
-     */
-    protected abstract _stepCycle: () => void;
 
     /**
      * @description Проверяем время для запуска цикла повторно, без учета дрифта
@@ -181,20 +171,10 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         this.delay = duration;
 
         // Коррекция event loop lag
-        const lags = this._calculateLags(this.lastDelay);
-
-        // Следующее время шага
-        const nextTargetTime = this.insideTime + this.drift - lags;
+        const lags = this._calculateLags();
 
         // Запускаем шаг
-        this._runTimeout(nextTargetTime, () => {
-            const tickStart = this.time;
-            this._stepCycle();
-            const tickEnd = this.time;
-
-            // Сглаживание дрейфа
-            this.drift = this._compensator(0.95, this.drift, tickEnd - tickStart);
-        });
+        this._runTimeout(this.insideTime - lags, this._stepCycle);
     };
 
     /**
@@ -208,23 +188,29 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     protected _runTimeout = (actualTime: number, callback: () => void): void => {
         const delay = Math.max(0, actualTime - this.time);
 
-        (delay < 1 ? process.nextTick : setTimeout)(callback, delay);
+        // Если требуется запустить шаг немедленно
+        if (delay === 0) process.nextTick(callback);
+
+        // Суб миллисекундный шаг
+        else if (delay < 4) setImmediate(callback);
+
+        // Запускаем стандартный шаг
+        else setTimeout(callback, Math.ceil(delay));
     };
 
     /**
      * @description Высчитываем задержки event loop
-     * @param duration - Размер шага
      * @protected
      * @readonly
      */
-    protected _calculateLags = (duration: number) => {
+    protected _calculateLags = () => {
         // Коррекция event loop lag
         const performanceNow = performance.now();
-        const driftEvent = this.performance ? Math.max(0, (performanceNow - this.performance) - duration) : 0;
+        const driftEvent = this.performance ? Math.max(0, (performanceNow - this.performance)) : 0;
         this.performance = performanceNow;
 
         // Смягчение event loop lag
-        return this.prevEventLoopLag = this.prevEventLoopLag !== undefined ? this._compensator(0.95, this.prevEventLoopLag, driftEvent) : driftEvent;
+        return this.prevEventLoopLag = this.prevEventLoopLag !== undefined ? this._compensator(0.99, this.prevEventLoopLag, driftEvent) : driftEvent;
     };
 
     /**
@@ -235,8 +221,17 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @private
      */
     private _compensator = (alpha: number, old: number, current: number) => {
+        if (old < 0 || current < 0) return 0;
         return alpha * old + (1 - alpha) * current;
     };
+
+    /**
+     * @description Выполняет шаг цикла с учётом точного времени следующего запуска
+     * @returns void
+     * @protected
+     * @abstract
+     */
+    protected abstract _stepCycle: () => void;
 }
 
 /**

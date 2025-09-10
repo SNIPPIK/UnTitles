@@ -34,68 +34,66 @@ class RestVKAPI extends RestServerSide.API {
         {
             name: "track",
             filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i,
-            execute: (url, options) => {
+            execute: async (url, options) => {
                 const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i.exec(url).pop();
 
-                return new Promise(async (resolve) => {
-                    //Если ID трека не удалось извлечь из ссылки
-                    if (!ID) return resolve(locale.err( "api.request.id.track"));
+                //Если ID трека не удалось извлечь из ссылки
+                if (!ID) return locale.err( "api.request.id.track");
 
-                    // Интеграция с утилитой кеширования
-                    const cache = db.cache.get(`${this.url}/${ID}`);
+                // Интеграция с утилитой кеширования
+                const cache = db.cache.get(`${this.url}/${ID}`);
 
-                    // Если трек есть в кеше
-                    if (cache) {
-                        if (!options.audio) return resolve(cache);
+                // Если трек есть в кеше
+                if (cache) {
+                    if (!options.audio) return cache;
 
-                        // Если включена утилита кеширования аудио
-                        else if (db.cache.audio) {
+                    // Если включена утилита кеширования аудио
+                    else if (db.cache.audio) {
+                        const check = db.cache.audio.status(`${this.url}/${ID}`);
+
+                        // Если есть кеш аудио
+                        if (check.status === "ended") {
+                            cache.audio = check.path;
+                            return cache;
+                        }
+                    }
+                }
+
+                try {
+                    // Создаем запрос
+                    const api = await this.API("audio", "getById", `&audios=${ID}`);
+
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
+
+                    const track = this.track(api.response.pop(), url);
+
+                    // Если указано получение аудио
+                    if (options.audio) {
+                        // Если включена утилита кеширования
+                        if (db.cache.audio) {
                             const check = db.cache.audio.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
-                                cache.audio = check.path;
-                                return resolve(cache);
+                                track.audio = check.path;
+                                return track;
                             }
                         }
                     }
 
-                    try {
-                        // Создаем запрос
-                        const api = await this.API("audio", "getById", `&audios=${ID}`);
+                    // Если нет ссылки на трек
+                    if (!track.audio) return locale.err( "api.request.fail");
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
+                    setImmediate(() => {
+                        // Сохраняем кеш в системе
+                        if (!cache) db.cache.set(track, this.url);
+                    });
 
-                        const track = this.track(api.response.pop(), url);
-
-                        // Если указано получение аудио
-                        if (options.audio) {
-                            // Если включена утилита кеширования
-                            if (db.cache.audio) {
-                                const check = db.cache.audio.status(`${this.url}/${ID}`);
-
-                                // Если есть кеш аудио
-                                if (check.status === "ended") {
-                                    track.audio = check.path;
-                                    return resolve(track);
-                                }
-                            }
-                        }
-
-                        // Если нет ссылки на трек
-                        if (!track.audio) return resolve(locale.err( "api.request.fail"));
-
-                        setImmediate(() => {
-                            // Сохраняем кеш в системе
-                            if (!cache) db.cache.set(track, this.url);
-                        });
-
-                        return resolve(track);
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return track;
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         },
 
@@ -105,21 +103,17 @@ class RestVKAPI extends RestServerSide.API {
          */
         {
             name: "search",
-            execute: (query, {limit}) => {
-                return new Promise(async (resolve) => {
-                    try {
-                        // Создаем запрос
-                        const api = await this.API("audio", "search", `&q=${encodeURIComponent(query)}`);
+            execute: async (query, {limit}) => {
+                try {
+                    // Создаем запрос
+                    const api = await this.API("audio", "search", `&q=${encodeURIComponent(query)}`);
 
-                        // Если запрос выдал ошибку то
-                        if (api instanceof Error) return resolve(api);
-                        const tracks = (api.response.items.splice(0, limit)).map(this.track);
-
-                        return resolve(tracks);
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
+                    return (api.response.items.splice(0, limit)).map(this.track);
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         }
     ];

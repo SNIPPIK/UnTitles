@@ -10,7 +10,7 @@ export class Collection<K, T = string> {
      * @readonly
      * @private
      */
-    private readonly _map = new Map<T, K>();
+    private _map = new Map<T, K>();
 
     /**
      * @description Получаем случайный объект из MAP
@@ -25,7 +25,7 @@ export class Collection<K, T = string> {
      * @returns number
      * @public
      */
-    public get size(): number {
+    public get size() {
         return this._map.size;
     };
 
@@ -88,7 +88,8 @@ export class Collection<K, T = string> {
      * @description Удаление всего из set/map
      * @public
      */
-    public clear = (): void => {
+    public clear = () => {
         this._map.clear();
+        this._map = null;
     };
 }

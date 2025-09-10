@@ -1,14 +1,15 @@
 import { httpsClient, httpsStatusCode } from "#structures";
 import type { RestServerSide } from "#handler/rest";
+import { version, name, homepage } from "package.json";
 import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
- * @description Класс трека, хранит все данные трека, время и аудио ссылку или путь до файла
- * @class BaseTrack
- * @protected
+ * @description Класс трека, реализует другой класс <BaseTrack>
+ * @class Track
+ * @public
  */
-abstract class BaseTrack {
+export class Track {
     /**
      * @description Здесь хранятся данные времени трека
      * @protected
@@ -27,64 +28,6 @@ abstract class BaseTrack {
      */
     protected _user: Track.user;
 
-    /**
-     * @description Получаем данные времени трека
-     * @returns TrackDuration
-     * @public
-     */
-    public get time() {
-        return this._duration;
-    };
-
-    /**
-     * @description Проверяем время и подгоняем к необходимым типам
-     * @param time - Данные о времени трека
-     * @public
-     */
-    public set time(time) {
-        // Если время в числовом формате
-        if (typeof time?.total === "number") {
-            this._duration = { split: (time?.total as number).duration(), total: time.total };
-        }
-        // Если что-то другое
-        else {
-            // Если время указано в формате 00:00
-            if (`${time?.total}`.match(/:/)) {
-                this._duration = { split: time.total, total: (time.total as string).duration() };
-                return;
-            }
-
-            const total = parseInt(time.total);
-
-            // Время трека
-            if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };
-            else this._duration = { split: total.duration(), total };
-        }
-    };
-
-    /**
-     * @description Создаем трек
-     * @param _track - Данные трека с учетом <Song.track>
-     * @param _api   - Данне о платформе
-     * @public
-     */
-    public constructor(protected _track: Track.data, protected _api: RestServerSide.APIBase) {
-        this.time = _track.time as any;
-
-        // Удаляем мусорные названия из текста
-        if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic|[\/()\[\]"]|[:;]/gi, "");
-        _track.title = `${_track.title}`.replace(/Lyrics Video|[\/()\[\]"]|[:;]/gi, "");
-    };
-}
-
-
-/**
- * @author SNIPPIK
- * @description Класс трека, реализует другой класс <BaseTrack>
- * @class Track
- * @public
- */
-export class Track extends BaseTrack {
     /**
      * @description Идентификатор трека
      * @returns string
@@ -182,7 +125,6 @@ export class Track extends BaseTrack {
         };
     };
 
-
     /**
      * @description Получаем ссылку на исходный файл
      * @returns string
@@ -210,6 +152,41 @@ export class Track extends BaseTrack {
         return this._api;
     };
 
+    /**
+     * @description Получаем данные времени трека
+     * @returns TrackDuration
+     * @public
+     */
+    public get time() {
+        return this._duration;
+    };
+
+    /**
+     * @description Проверяем время и подгоняем к необходимым типам
+     * @param time - Данные о времени трека
+     * @public
+     */
+    public set time(time) {
+        // Если время в числовом формате
+        if (typeof time?.total === "number") {
+            this._duration = { split: (time?.total as number).duration(), total: time.total };
+        }
+        // Если что-то другое
+        else {
+            // Если время указано в формате 00:00
+            if (`${time?.total}`.match(/:/)) {
+                this._duration = { split: time.total, total: (time.total as string).duration() };
+                return;
+            }
+
+            const total = parseInt(time.total);
+
+            // Время трека
+            if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };
+            else this._duration = { split: total.duration(), total };
+        }
+    };
+
 
     /**
      * @description Проверяем ссылку на доступность и выдаем ее если ссылка имеет код !==200, то обновляем
@@ -218,7 +195,7 @@ export class Track extends BaseTrack {
      */
     public get resource(): Promise<string | Error> {
         return new Promise(async (resolve) => {
-            const resource = await this._prepareResource();
+            const resource = await _prepareResource(this);
 
             // Если произошла ошибка при получении ресурса
             if (resource instanceof Error || !resource) {
@@ -245,17 +222,19 @@ export class Track extends BaseTrack {
             // Выдаем повторно текст песни
             if (this._lyrics || this._duration.total === 0) return resolve(this._lyrics);
 
-            // Если ответ не был получен от сервера
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Timeout server request")), 10e3)
-            );
+            const api = await Promise.race(
+                [
+                    await new httpsClient({
+                        url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(this._track.artist.title)}&track_name=${encodeURIComponent(this._track.title)}`,
+                        userAgent: `(${name}; ${version}) ${homepage}`
+                    }).toJson,
 
-            let api = await Promise.race([await new httpsClient(
-                {
-                    url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(this.artist.title)}&track_name=${encodeURIComponent(this.name)}`,
-                    userAgent: "UnTitles 0.3.0, Music bot, github.com/SNIPPIK/UnTitles"
-                }
-            ).toJson, timeoutPromise]) as json | Error;
+                    // Если ответ не был получен от сервера
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error("Timeout server request")), 10e3)
+                    )
+                ]
+            ) as json | Error;
 
             // Если получаем вместо данных ошибку
             if (api instanceof Error) return resolve(api);
@@ -271,64 +250,80 @@ export class Track extends BaseTrack {
         });
     };
 
+
     /**
-     * @description Функция подготавливающая путь до аудио, так же проверяющая его актуальность
-     * @returns Promise<string | Error>
-     * @private
+     * @description Создаем трек
+     * @param _track - Данные трека с учетом <Song.track>
+     * @param _api   - Данне о платформе
+     * @public
      */
-    private _prepareResource = async (): Promise<string | Error> => {
-        // Если включено кеширование
-        if (db.cache.audio) {
-            const status = db.cache.audio.status(this);
+    public constructor(protected _track: Track.data, protected _api: RestServerSide.APIBase) {
+        this.time = _track.time as any;
 
-            // Если есть кеш аудио, то выдаем его
-            if (status.status === "ended") {
-                this.link = status.path;
-                return status.path;
-            }
-        }
-
-        // Если есть данные об исходном файле
-        if (this.link) {
-            // Проверяем ссылку на актуальность
-            if (this.link.startsWith("http")) {
-                try {
-                    const status = await new httpsClient({url: this.link}).toHead;
-                    const error = httpsStatusCode.parse(status);
-
-                    // Если получена ошибка
-                    if (error) return error;
-
-                    // Добавляем трек в кеширование
-                    if (db.cache.audio) db.cache.audio.add(this);
-                    return this.link;
-                } catch (err) { // Если произошла ошибка при проверке статуса
-                    return Error(`Unknown error, ${err}`);
-                }
-            }
-
-            // Скорее всего это файл
-            return this.link;
-        }
-
-        // Если нет ссылки на исходный файл
-        try {
-            const song = await db.api.fetchAudioLink(this);
-
-            // Если вместо ссылки получили ошибку
-            if (song instanceof Error) return song;
-
-            // Если платформа не хочет давать данные трека
-            else if (!song) return Error(`The platform does not provide a link`);
-
-            this.link = song;
-            return this._prepareResource();
-        } catch (err) {
-            return Error(`This link track is not available... Fail update link!`);
-        }
+        // Удаляем мусорные названия из текста
+        if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic|[\/()\[\]"]|[:;]/gi, "");
+        _track.title = `${_track.title}`.replace(/Lyrics Video|[\/()\[\]"]|[:;]/gi, "");
     };
 }
 
+/**
+ * @description Функция подготавливающая путь до аудио, так же проверяющая его актуальность
+ * @returns Promise<string | Error>
+ * @private
+ */
+async function _prepareResource(track: Track): Promise<string | Error> {
+    // Если включено кеширование
+    if (db.cache.audio) {
+        const status = db.cache.audio.status(track);
+
+        // Если есть кеш аудио, то выдаем его
+        if (status.status === "ended") {
+            track.link = status.path;
+            return status.path;
+        }
+    }
+
+    const link = track.link;
+
+    // Если есть данные об исходном файле
+    if (link) {
+        // Проверяем ссылку на актуальность
+        if (link.startsWith("http")) {
+            try {
+                const status = await new httpsClient({url: link}).toHead;
+                const error = httpsStatusCode.parse(status);
+
+                // Если получена ошибка
+                if (error) return error;
+
+                // Добавляем трек в кеширование
+                if (db.cache.audio) db.cache.audio.add(track);
+                return link;
+            } catch (err) { // Если произошла ошибка при проверке статуса
+                return Error(`Unknown error, ${err}`);
+            }
+        }
+
+        // Скорее всего это файл
+        return link;
+    }
+
+    // Если нет ссылки на исходный файл
+    try {
+        const song = await db.api.fetchAudioLink(track);
+
+        // Если вместо ссылки получили ошибку
+        if (song instanceof Error) return song;
+
+        // Если платформа не хочет давать данные трека
+        else if (!song) return Error(`The platform does not provide a link`);
+
+        track.link = song;
+        return _prepareResource(track);
+    } catch (err) {
+        return Error(`This link track is not available... Fail update link!`);
+    }
+}
 
 /**
  * @author SNIPPIK

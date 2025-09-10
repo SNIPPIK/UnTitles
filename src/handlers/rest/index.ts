@@ -37,20 +37,11 @@ export class RestObject {
 
     /**
      * @description Получаем список всех доступных платформ
-     * @private
-     */
-    private get array(): RestServerSide.API[] {
-        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported);
-        return this.platforms.array;
-    };
-
-    /**
-     * @description Платформы с доступом к запросам
-     * @returns RestServerSide.API[]
      * @public
      */
-    public get allow(): RestServerSide.API[] {
-        return this.array.filter(api => api.auth !== null);
+    public get array(): RestServerSide.API[] {
+        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported).filter(api => api.auth !== null);
+        return this.platforms.array;
     };
 
     /**
@@ -58,8 +49,8 @@ export class RestObject {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get audioSupport(): RestServerSide.API[] {
-        return this.array.filter(api => api.auth !== null && api.audio !== false && !this.platforms.block.includes(api.name));
+    public get arrayAudio(): RestServerSide.API[] {
+        return this.array.filter(api => api.audio !== false && !this.platforms.block.includes(api.name));
     };
 
     /**
@@ -67,8 +58,8 @@ export class RestObject {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get allowRelated(): RestServerSide.API[] {
-        return this.array.filter(api => api.auth !== null && api.requests.some((apis) => apis.name === "related"));
+    public get arrayRelated(): RestServerSide.API[] {
+        return this.array.filter(api => api.requests.some((apis) => apis.name === "related"));
     };
 
     /**
@@ -124,9 +115,8 @@ export class RestObject {
      * @description Создание класса для взаимодействия с платформой
      * @public
      */
-    public request = (name: RestServerSide.API["name"]): RestClientSide.Request => {
-        const platform = this.platform(name);
-        return platform ? new RestClientSide.Request(platform) : null;
+    public request = (name: RestServerSide.API["name"] | string): RestClientSide.Request => {
+        return new RestClientSide.Request(this.platform(name));
     };
 
     /**
@@ -134,13 +124,8 @@ export class RestObject {
      * @param name - Имя платформы
      * @private
      */
-    private platform = (name: RestServerSide.API["name"]) => {
-        const platform = this.platforms.supported[name];
-
-        // Если есть такая платформа по имени
-        if (platform) return platform;
-
-        return this.allow.find((api) => api.name === name);
+    private platform = (name: RestServerSide.API["name"] | string): RestServerSide.API => {
+        return this.platforms.supported[name] ?? this.array.find((api) => api.name === name || api.filter.exec(name) || api.name === "YOUTUBE");
     };
 
     /**
@@ -186,7 +171,7 @@ export class RestObject {
                 const Match = candidate.filter((name, i) => name === original[i]).every((word, i) => word === original[i]);
                 const time = Math.abs(track.time.total - song.time.total);
 
-                return (time <= 10 || time === 0) && Match;
+                return (time <= 5 || time === 0) && Match;
             });
 
             // Если отфильтровать треки не удалось
@@ -240,11 +225,11 @@ export class RestObject {
      */
     public fetchAudioLink = async (track: Track): Promise<string | Error> => {
         const { url, api } = track;
-        const { authorization, audio } = this.platforms;
+        const { authorization, audio, block } = this.platforms;
 
         try {
             // Если платформа поддерживает получение аудио и может получать данные
-            if (authorization.includes(api.name) && audio.includes(api.name)) {
+            if (authorization.includes(api.name) && audio.includes(api.name) && !block.includes(api.name)) {
                 const song = await this.request(api.name).request<"track">(url, { audio: true }).request();
 
                 // Если получили ошибку
@@ -254,7 +239,7 @@ export class RestObject {
                 return song.link;
             }
 
-            const song = await this.fetch(track, this.audioSupport);
+            const song = await this.fetch(track, this.arrayAudio);
 
             // Если получена ошибка
             if (song instanceof Error) return song;
@@ -304,7 +289,7 @@ export class RestObject {
                 return item.items;
             }
 
-            const song = await this.fetch(track, this.allowRelated);
+            const song = await this.fetch(track, this.arrayRelated);
 
             // Если получена ошибка
             if (song instanceof Error) return song;
@@ -343,7 +328,7 @@ export class RestObject {
                 // Если получена ошибка
                 if (result instanceof Error) {
                     // Если платформа не отвечает, то отключаем ее!
-                    if (/Connection Timeout/.test(result.message)) {
+                    if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
                         this.platforms.block.push(platform.name);
                     }
 
