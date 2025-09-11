@@ -1,7 +1,6 @@
-import { BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip } from "node:zlib";
-import { request as httpsRequest, RequestOptions } from "node:https";
-import { IncomingMessage, request as httpRequest } from "node:http";
-import { Logger } from "#structures/logger";
+import { type BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, type Deflate, type Gunzip } from "node:zlib";
+import { request as httpsRequest, type RequestOptions } from "node:https";
+import { type IncomingMessage, request as httpRequest } from "node:http";
 
 /**
  * @author SNIPPIK
@@ -88,8 +87,6 @@ abstract class Request {
              * @description Если превышено время ожидания
              */
             request.once("timeout", () => {
-                Logger.log("DEBUG", `${this.data}`);
-
                 return resolve(Error(`[httpsClient]: Connection Timeout Exceeded ${this.data.hostname}:443`));
             });
 
@@ -121,7 +118,7 @@ abstract class Request {
     public constructor(options: httpsClient["data"]) {
         // Если ссылка является ссылкой
         if (options.url.startsWith("http")) {
-            const { hostname, pathname, search, port, protocol } = URL.parse(options.url);
+            const { hostname, pathname, search, port, protocol } = new URL(options.url);
 
             // Создаем стандартные настройки
             this.data = { ...this.data, port, hostname, path: pathname + search, protocol };
@@ -179,7 +176,7 @@ export class httpsClient extends Request {
                 return resolve({
                     statusCode: response.statusCode === 400 && response.statusMessage === "Bad Request" ? 200 : response.statusCode,
                     statusMessage: response.statusMessage,
-                    headers: response.headers,
+                    headers: response.headers
                 });
             });
         });
@@ -204,15 +201,7 @@ export class httpsClient extends Request {
 
                 decoder.setEncoding("utf-8")
                     .on("data", (c) => data += c)
-                    .once("end", () => {
-                        setImmediate(() => {
-                            data = null;
-                            decoder.removeAllListeners();
-                            decoder.destroy();
-                        });
-
-                        return resolve(data);
-                    });
+                    .once("end", () => resolve(data));
             }).catch((err) => {
                 return resolve(err);
             });

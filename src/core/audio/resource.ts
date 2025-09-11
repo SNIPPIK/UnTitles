@@ -383,7 +383,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @public
      */
     public get readable(): boolean {
-        return this.encoder.readable;
+        return this._readable;
     };
 
     /**

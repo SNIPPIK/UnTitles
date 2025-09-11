@@ -52,7 +52,7 @@
 > Incorrect use, removal of authorship or appropriation will lead to the closure of the public repository
 
 > [!IMPORTANT]
-> If there is no response from YouTube - install `ytdlp-nodejs`. It is strongly recommended to enable caching  
+> It is strongly recommended to enable caching  
 > `main` — stable, but rarely updated branch  
 > `beta` — newest fixes and features, may be unstable
 

@@ -15,13 +15,13 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
      * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
      * @private
      */
-    private _audio: T;
+    private _audio: T | null = null;
 
     /**
      * @description Поток, находящийся в ожидании загрузки и проигрывания
      * @private
      */
-    private _pre_audio: T;
+    private _pre_audio: T | null = null;
 
     /**
      * @description Таймер чтения аудио потока, для авто удаления

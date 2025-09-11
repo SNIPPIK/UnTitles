@@ -47,7 +47,7 @@ const EMPTY_FRAME =  Buffer.alloc(0);
  */
 class BaseEncoder extends TypedEmitter<EncoderEvents> {
     /**
-     * @description Отправлен ли 1 аудио пакет
+     * @description Не отправлен ли 1 аудио пакет
      * @private
      */
     private _first = true;
@@ -63,7 +63,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @private
      */
     public parseAvailablePages = (chunk: Buffer) => {
-        const frame = this._buffer = Buffer.concat([this._buffer, chunk]);
+        const frame = Buffer.concat([this._buffer, chunk]);
 
         // Начинаем обработку буфера с начала
         const size = frame.length;
@@ -118,7 +118,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
         // После выхода из цикла: обрезаем буфер, удаляя обработанные байты
         // Это важно, чтобы избежать переполнения и сохранить только "хвост", который ещё не разобран
-        this._buffer = this._buffer.subarray(offset);
+        this._buffer = frame.subarray(offset);
     };
 
     /**
@@ -173,6 +173,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
         this._buffer = EMPTY_FRAME;   // очищаем ссылку на буфер
 
         // Освобождаем emitter
+        this.removeAllListeners();
         super.destroy();
     };
 }
@@ -220,8 +221,8 @@ export class BufferedEncoder extends Writable {
         this.encoder.destroy();
         this.encoder = null;
 
-        super.destroy(error);
         this.removeAllListeners();
+        super.destroy(error);
     };
 }
 
@@ -268,8 +269,8 @@ export class PipeEncoder extends Transform {
         this.encoder.destroy();
         this.encoder = null;
 
-        super.destroy(error);
         this.removeAllListeners();
+        super.destroy(error);
     };
 }
 

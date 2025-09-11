@@ -46,7 +46,7 @@ export class ClientSRTPSocket {
      * @description Пустой заголовок RTP, для использования внутри класса
      * @private
      */
-    private _RTP_HEAD = Buffer.allocUnsafe(12);
+    private _RTP_HEAD = Buffer.alloc(12);
 
     /**
      * @description Пустой буфер

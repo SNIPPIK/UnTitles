@@ -1,4 +1,3 @@
-import { performance } from "perf_hooks";
 import { SetArray } from "#structures";
 
 /**
