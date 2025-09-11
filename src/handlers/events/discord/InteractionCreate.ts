@@ -93,7 +93,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
     private readonly SelectCommand = (ctx: ChatInputCommandInteraction) => {
         const command = db.commands.get(ctx.commandName);
 
-        /// Если нет команды
+        // Если нет команды
         // Если пользователь пытается использовать команду разработчика
         if (!command || (command.owner && !db.owner.ids.includes(ctx.member.user.id))) {
             db.commands.remove(ctx.client as DiscordClient, ctx.commandGuildId, ctx.commandId);

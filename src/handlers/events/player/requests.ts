@@ -1,6 +1,6 @@
-import { Colors, CommandInteraction } from "#structures/discord";
+import { Colors, type CommandInteraction } from "#structures/discord";
 import { Logger, Assign, locale } from "#structures";
-import type { RestClientSide } from "#handler/rest";
+import type { RestClientSide} from "#handler/rest";
 import type { Event } from "#handler/events";
 import type { Track } from "#core/queue";
 import { db } from "#app/db";
@@ -31,11 +31,17 @@ class rest_request extends Assign<Event<"rest/request">> {
 
                 let rest: Error | Track[] | Track.list | Track;
                 try {
-                    rest = await Promise.race([api.request(),
-                        new Promise<Error>((resolve) => {
-                            setTimeout(() => resolve(new Error(locale._(ctx.locale, "api.platform.timeout"))), 15e3)
-                        })
-                    ]);
+                    rest = await Promise.race(
+                        [
+                            // Делаем запрос к платформе
+                            api.request(),
+
+                            // Создаем обертку с таймером по достижению которого будет выдана ошибка вместо запроса
+                            new Promise<Error>((resolve) => {
+                                setTimeout(() => resolve(new Error(locale._(ctx.locale, "api.platform.timeout"))), 15e3)
+                            })
+                        ]
+                    );
 
                     if (message) message();
                 } catch (err) {

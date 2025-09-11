@@ -1,8 +1,8 @@
 import { Component, DeclareComponent } from "#handler/components";
 import { Middlewares } from "#handler/commands";
 import filters from "#core/player/filters.json";
+import type { AudioFilter } from "#core/player";
 import { Colors } from "#structures/discord";
-import { AudioFilter } from "#core/player";
 import { locale } from "#structures";
 import { db } from "#app/db";
 

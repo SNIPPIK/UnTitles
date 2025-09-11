@@ -61,7 +61,7 @@ export class Process {
             if (isNaN(seek) || !seek) args.splice(index_seek, 2);
         }
 
-        // =Добавляем аргументы отключения видео и логирования
+        // Добавляем аргументы отключения видео и логирования
         args.unshift("-vn", "-loglevel", "error", "-hide_banner");
         this._process = spawn(name, args, {
             env: { PATH: process.env.PATH },

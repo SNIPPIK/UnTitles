@@ -157,9 +157,8 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         this.packet = this.discoveryBuffer(ssrc);
 
         // Ждем получения сообщения после отправки код, для подключения UDP
-        this.socket.once("message", (message) => {
-            if (message.readUInt16BE(0) === 2) {
-                const packet = Buffer.from(message);
+        this.socket.once("message", (packet) => {
+            if (packet.readUInt16BE(0) === 2) {
                 const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
                 const port = packet.readUInt16BE(packet.length - 2);
 
@@ -220,8 +219,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     private discoveryBuffer = (ssrc: number) => {
-        /** Безопасен, поскольку данные будут сразу перезаписаны */
-        const packet = Buffer.allocUnsafe(74);
+        const packet = Buffer.alloc(74);
         packet.writeUInt16BE(1, 0);
         packet.writeUInt16BE(70, 2);
         packet.writeUInt32BE(ssrc, 4);

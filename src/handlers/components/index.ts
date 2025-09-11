@@ -3,6 +3,9 @@ import { buttonInteraction } from "#structures/discord";
 import { AnySelectMenuInteraction } from "discord.js";
 import { handler } from "#handler";
 
+// Export decorator
+export * from "./index.decorator";
+
 /**
  * @author SNIPPIK
  * @description Загружаем динамические компоненты для работы с ними
@@ -78,17 +81,4 @@ export type SupportComponent<T = "button" | "selector"> = {
  */
 export class Component<T = "button" | "selector"> implements SupportComponent<T> {
     public callback: SupportComponent<T>["callback"];
-}
-
-/**
- * @author SNIPPIK
- * @description Декоратор создающий заголовок команды
- * @decorator
- */
-export function DeclareComponent(options: {name: SupportSelector | SupportButtons}) {
-    // Загружаем данные в класс
-    return <T extends { new (...args: any[]): object }>(target: T) =>
-        class extends target {
-            name = options.name;
-        }
 }

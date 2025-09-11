@@ -1,5 +1,5 @@
 import { parentPort, workerData } from "node:worker_threads";
-import type { RestServerSide } from "#handler/rest";
+import type { RestServerSide } from "./index.server";
 import { initDatabase } from "#app/db";
 import { handler } from "#handler";
 import { env } from "#app/env";
