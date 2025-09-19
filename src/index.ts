@@ -49,9 +49,6 @@ async function runShard() {
     // Инициализируем базу данных
     initDatabase(client);
 
-    // Запускаем бота
-    await client.login(env.get("token.discord"));
-
     // Загружаем API
     await db.api.startWorker();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.array.length} APIs`)}`);
@@ -63,6 +60,11 @@ async function runShard() {
     // Загружаем middlewares
     db.middlewares.register();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.middlewares.size} middlewares`)}`);
+
+
+    // Запускаем бота
+    await client.login(env.get("token.discord"));
+
 
     // Загружаем events
     db.events.register(client);

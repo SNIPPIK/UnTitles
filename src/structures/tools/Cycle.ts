@@ -40,6 +40,12 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     private tickTime: number = 0;
 
     /**
+     * @description Таймер или функция ожидания
+     * @private
+     */
+    private timeout: NodeJS.Timeout | NodeJS.Immediate;
+
+    /**
      * @description Последний зафиксированный разбег во времени
      * @returns number
      * @public
@@ -137,7 +143,13 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Чистим performance.now
         this.performance = 0;
-        this.prevEventLoopLag = 0
+        this.prevEventLoopLag = 0;
+
+        // Если есть таймер
+        if (this.timeout) {
+            if ("close" in this.timeout) clearTimeout(this.timeout);
+            else clearImmediate(this.timeout);
+        }
     };
 
     /**
@@ -187,14 +199,20 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     protected _runTimeout = (actualTime: number, callback: () => void): void => {
         const delay = Math.max(0, actualTime - this.time);
 
+        // Если есть таймер
+        if (this.timeout) {
+            if ("close" in this.timeout) clearTimeout(this.timeout);
+            else clearImmediate(this.timeout);
+        }
+
         // Если требуется запустить шаг немедленно
         if (delay === 0) process.nextTick(callback);
 
         // Суб миллисекундный шаг
-        else if (delay < 4) setImmediate(callback);
+        else if (delay < 4) this.timeout = setImmediate(callback);
 
         // Запускаем стандартный шаг
-        else setTimeout(callback, Math.ceil(delay));
+        else this.timeout = setTimeout(callback, Math.ceil(delay));
     };
 
     /**
@@ -205,7 +223,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     protected _calculateLags = () => {
         // Коррекция event loop lag
         const performanceNow = performance.now();
-        const driftEvent = this.performance ? Math.max(0, (performanceNow - this.performance)) : 0;
+        const driftEvent = this.performance ? Math.max(0, (performanceNow - this.performance)) : -this.lastDelay;
         this.performance = performanceNow;
 
         // Смягчение event loop lag
