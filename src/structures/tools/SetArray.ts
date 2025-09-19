@@ -16,6 +16,33 @@ export class SetArray<T> extends Set<T> {
     };
 
     /**
+     * @description Добавление задачи в базу
+     * @param task - Задача
+     * @public
+     */
+    public add(task: T) {
+        if (this.has(task)) this.delete(task);
+
+        super.add(task);
+        return this;
+    };
+
+    /**
+     * @description Удаляет элемент из массива
+     * @param item - объект задачи или item с next
+     * @returns true если элемент найден и удалён, иначе false
+     */
+    public delete(item: T) {
+        if (!this.has(item)) {
+            this.delete(item);
+            return true;
+        }
+
+        super.delete(item);
+        return true;
+    };
+
+    /**
      * @description Производим фильтрацию по функции
      * @param predicate - Функция поиска
      * @returns T[]

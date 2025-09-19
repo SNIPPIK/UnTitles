@@ -6,33 +6,15 @@ import { Script } from "node:vm";
  * @author SNIPPIK
  * @description Если запускается фрагмент кода в другом процессе
  */
-if (!isMainThread) {
-    // Разовое событие
-    parentPort.once("message", async (message) => {
-        const formats = await YouTubeSignatureExtractor.decipherFormats(message.formats, message.html);
-        return parentPort.postMessage(formats[0]);
-    });
-}
+if (!isMainThread) parentPort.once("message", async (message) => {
+    const formats = await YouTubeSignatureExtractor.decipherFormats(message.formats, message.html);
+    return parentPort.postMessage(formats[0]);
+});
 
-/**
- * @author SNIPPIK
- * @description Поиск вспомогательных данных
- * @param body - Страница
- */
-const extractTceFunc = (body: string) => {
-    try {
-        const matcher = body.match(GLOBAL_VARS_PATTERN);
-        if (!matcher?.groups?.varname || !matcher.groups.code) return null;
-
-        return {
-            name: matcher.groups.varname,
-            code: matcher.groups.code
-        };
-    } catch (error) {
-        console.error("extractTceFunc error:", error);
-        return null;
-    }
-};
+const SIG_NAME = "sig";                // Заголовок signature
+const N_NAME = "ncode";                // Заголовок n-code
+const SIG_FUNCTION = "DecipherFunc";   // Название функции расшифровки
+const N_FUNCTION =   "NTransformFunc"; // Название функции расшифровки n-кода
 
 /**
  * @author SNIPPIK
@@ -53,13 +35,13 @@ class YouTubeSignatureExtractor {
             name: "extractDecipherFunction",
             callback: (body, _, code) => {
                 try {
-                    const callerFunc = `${DECIPHER_FUNC_NAME}(${DECIPHER_ARGUMENT});`;
+                    const callerFunc = `${SIG_FUNCTION}(${SIG_NAME});`;
 
                     // --- Попытка взять TCE-вариант (новая схема YouTube) ---
                     const sigFunc = body.match(TCE_SIG_FUNCTION_PATTERN);
                     const sigActions = body.match(SIG_ACTIONS_PATTERN);
 
-                    if (sigFunc && sigActions && code) return `var ${DECIPHER_FUNC_NAME}=${sigFunc[0]}${sigActions[0]}${code};\n${callerFunc}`;
+                    if (sigFunc && sigActions && code) return `var ${SIG_FUNCTION}=${sigFunc[0]}${sigActions[0]}${code};\n${callerFunc}`;
                     return null;
                 } catch (e) {
                     console.error("Error in extractDecipherFunc:", e);
@@ -75,7 +57,7 @@ class YouTubeSignatureExtractor {
             name: "extractNTransformFunction",
             callback: (body, name, code) => {
                 try {
-                    const caller = `${N_TRANSFORM_FUNC_NAME}(${N_ARGUMENT});`; // Метод выполнения функции
+                    const caller = `${N_FUNCTION}(${N_NAME});`; // Метод выполнения функции
 
                     // Попытка найти прямую NTransform функцию
                     const NTransformTce = body.match(N_TRANSFORM_PATTERN);
@@ -84,7 +66,7 @@ class YouTubeSignatureExtractor {
                     if (NTransformTce && name && code) {
                         const NTransform = NTransformTce[0], NTransformName = name.replace("$", "\\$");
                         const shortCircuit = new RegExp(`;\\s*if\\s*\\(\\s*typeof\\s+[\\w$]+\\s*===?\\s*(?:\"undefined\"|'undefined'|${NTransformName}\\[\\d+])\\s*\\)\\s*return\\s+\\w+;`);
-                        return `var ${N_TRANSFORM_FUNC_NAME}=${NTransform.replace(shortCircuit, ";")}${code};\n${caller}`;
+                        return `var ${N_FUNCTION}=${NTransform.replace(shortCircuit, ";")}${code};\n${caller}`;
                     }
 
                     return null;
@@ -108,7 +90,7 @@ class YouTubeSignatureExtractor {
         // Если при получении страницы плеера произошла ошибка
         if (body instanceof Error) return formats;
 
-        const { name, code } = extractTceFunc(body);
+        const { name, code } = this.extractTceFunc(body);
         const [ decipher, nTransform ] = [
             // Decipher
             this.extraction(this.extractors[0].callback, body, name, code),
@@ -137,7 +119,7 @@ class YouTubeSignatureExtractor {
         const args: Record<string, string> = {};
         for (const part of rawUrl.split("&")) {
             const [k, v] = part.split("=");
-            if (k && v && ["s", "sp", "url", "n"].includes(k)) args[k] = decodeURIComponent(v);
+            if (v && ["s", "sp", "url", "n"].includes(k)) args[k] = decodeURIComponent(v);
         }
 
         // Применяем decipher к s
@@ -145,11 +127,11 @@ class YouTubeSignatureExtractor {
             if (!decipher || !args.s || !args.url) return args.url || rawUrl;
 
             try {
-                const context = { [DECIPHER_ARGUMENT]: args.s };
+                const context = { [SIG_NAME]: args.s };
                 const deciphered = decipher.runInNewContext(context);
 
                 const urlObj = new URL(args.url);
-                urlObj.searchParams.set(args.sp || DECIPHER_ARGUMENT, deciphered);
+                urlObj.searchParams.set(args.sp || SIG_NAME, deciphered);
 
                 return urlObj.toString();
             } catch {
@@ -166,7 +148,7 @@ class YouTubeSignatureExtractor {
                 const nParam = urlObj.searchParams.get("n");
                 if (!nParam) return url;
 
-                const context = { [N_ARGUMENT]: nParam };
+                const context = { [N_NAME]: nParam };
                 const transformed = nTransform.runInNewContext(context);
 
                 if (transformed) urlObj.searchParams.set("n", transformed);
@@ -188,6 +170,27 @@ class YouTubeSignatureExtractor {
     };
 
     /**
+     * @author SNIPPIK
+     * @description Поиск параметров на странице
+     * @param body - Страница
+     * @private
+     */
+    private static extractTceFunc = (body: string) => {
+        try {
+            const matcher = body.match(GLOBAL_VARS_PATTERN);
+            if (!matcher?.groups?.varname || !matcher.groups.code) return null;
+
+            return {
+                name: matcher.groups.varname,
+                code: matcher.groups.code
+            };
+        } catch (error) {
+            console.error("extractTceFunc error:", error);
+            return null;
+        }
+    };
+
+    /**
      * @description Получаем функции для расшифровки
      * @param extractFunction - Функция расшифровки
      * @param body - Станица youtube
@@ -203,7 +206,6 @@ class YouTubeSignatureExtractor {
         return func ? new Script(func) : null;
     };
 }
-
 
 /**
  * @author SNIPPIK
@@ -231,12 +233,6 @@ interface YouTubeChanter {
     nTransform?: Script;
 }
 
-const DECIPHER_ARGUMENT = "sig";
-const N_ARGUMENT = "ncode";
-const DECIPHER_FUNC_NAME = "DecipherFunc";
-const N_TRANSFORM_FUNC_NAME = "NTransformFunc";
-const VARIABLE_PART_OBJECT_DECLARATION = "[\"']?[a-zA-Z_\\$][a-zA-Z_0-9\\$]*[\"']?"
-
 /**
  * @description RegExp для поиска параметров
  */
@@ -249,6 +245,7 @@ const GLOBAL_VARS_PATTERN = new RegExp(
     "\\s*,?\\s*)*\\]|\"[^\"]*\"\\.split\\(\"[^\"]*\"\\)))", "m"
 );
 
+const VARIABLE_PART_OBJECT_DECLARATION = "[\"']?[a-zA-Z_\\$][a-zA-Z_0-9\\$]*[\"']?";
 /**
  * @description RegExp для поиска более короткого варианта SIG_FUNCTION_PATTERN а именно функции
  */

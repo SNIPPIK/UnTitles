@@ -353,45 +353,44 @@ class RestYouTubeAPI extends RestServerSide.API {
     protected extractInitialDataResponse = (input: string): json | Error => {
         if (typeof input !== "string") return locale.err("api.request.fail");
 
-        // Одна регэксп-машина на все данные
-        const re = /"jsUrl":"([^"]+)"|<script\s+src="([^"]+)"[^>]*player_ias\/base[^>]*>|var ytInitial(PlayerResponse|Data) = ({.*?});<\/script>/g;
+        // Путь плеера (необходим для расшифровки)
+        const html5Player = /<script\s+src="([^"]+)"(?:\s+type="text\/javascript")?\s+name="player_ias\/base"\s*>|"jsUrl":"([^"]+)"/.exec(input);
 
-        let endData: json = {};
-        let match: RegExpExecArray | null;
+        let endData: json = {
+            html: `https://www.youtube.com${html5Player ? html5Player[1] || html5Player[2] : null}`
+        };
 
-        while ((match = re.exec(input))) {
-            // jsUrl
-            if (match[1] || match[2]) {
-                const jsUrl = match[1] || match[2];
-                endData.html = `https://www.youtube.com${jsUrl}`;
-                continue;
-            }
-
-            // JSON-блок
-            if (match[4]) {
-                const raw = match[4];
-
-                // Быстрая проверка статуса без парсинга
-                if (raw.lastIndexOf('"status":"LOGIN_REQUIRED"') !== -1) {
-                    return new Error(locale._(locale.language, "api.request.login"));
-                }
-                if (raw.lastIndexOf('"status":"ERROR"') !== -1) {
-                    return new Error(locale._(locale.language, "api.request.fail.msg", ["ERROR"]));
-                }
-
-                try {
-                    const parsed = JSON.parse(raw);
-                    // PlayerResponse перекрывает Data
-                    endData = match[3] === "PlayerResponse"
-                        ? { ...endData, ...parsed }
-                        : { ...parsed, ...endData };
-                } catch {
-                    // если json битый — пропускаем
-                }
+        // Попытка найти ytInitialData JSON
+        const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
+        if (initialDataMatch) {
+            try {
+                endData = { ...endData, ...JSON.parse(initialDataMatch[1]) };
+            } catch {
+                // Игнорируем ошибку парсинга initialData
             }
         }
 
-        // Проверка playabilityStatus после парсинга
+        // Определяем, какой паттерн искать дальше: playerResponse или initialData
+        const startPattern = input.includes("var ytInitialPlayerResponse = ")
+            ? "var ytInitialPlayerResponse = "
+            : "var ytInitialData = ";
+
+        const startIndex = input.indexOf(startPattern);
+        const endIndex = input.indexOf("};", startIndex + startPattern.length);
+
+        // Если не нашли нужный участок с JSON — возвращаем ошибку
+        if (startIndex === -1 || endIndex === -1) return locale.err("api.request.fail");
+
+        try {
+            const jsonStr = input.substring(startIndex + startPattern.length, endIndex + 1);
+            const parsedData = JSON.parse(jsonStr);
+            // Объединяем данные, playerResponse имеет приоритет
+            endData = { ...endData, ...parsedData };
+        } catch {
+            return locale.err("api.request.fail");
+        }
+
+        // Проверяем статус playabilityStatus, если есть
         const status = endData.playabilityStatus?.status;
         if (status && status !== "OK") {
             const reason = endData.playabilityStatus?.reason || "Not found status error";

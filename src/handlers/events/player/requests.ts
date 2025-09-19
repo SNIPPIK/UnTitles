@@ -107,12 +107,12 @@ class rest_error extends Assign<Event<"rest/error">> {
             type: "player",
             once: false,
             execute: async (message, error) => {
-                Logger.log("ERROR", `[Rest/API] ${error}`);
+                Logger.log("ERROR", error);
 
                 const options = {
                     embeds: [{
                         title: locale._(message.locale, "api.error"),
-                        description: error,
+                        description: `${error}`,
                         color: Colors.DarkRed
                     }]
                 };
@@ -121,11 +121,13 @@ class rest_error extends Assign<Event<"rest/error">> {
                     let msg = await message.followUp(options);
                     setTimeout(() => msg.delete().catch(() => null), 15e3);
                 } catch (err) {
+                    Logger.log("ERROR", err as Error);
+
                     try {
                         let msg = await message.channel.send(options);
                         setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 15e3);
                     } catch (err) {
-                        console.error(err);
+                        Logger.log("ERROR", err as Error);
                     }
                 }
             }

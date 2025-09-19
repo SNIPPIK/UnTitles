@@ -84,7 +84,7 @@ class message_push extends Assign<Event<"message/push">> {
                         },
                         author: {
                             name: artist?.title,
-                            url: artist?.url,
+                            url: artist?.url ?? null,
                             iconURL: db.images.disk
                         },
                         fields: [

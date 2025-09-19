@@ -195,7 +195,7 @@ export interface QueueEvents {
     /**
      * @description Событие при котором коллекция будет отправлять сообщение об ошибке
      * @param queue     - Очередь сервера
-     * @param error     - Ошибка в формате string или в типе Error
+     * @param error     - Ошибка
      */
     readonly "message/error": (queue: Queue, error?: string | Error, position?: number) => void;
 
@@ -210,7 +210,7 @@ export interface QueueEvents {
     /**
      * @description Событие при котором будут отправляться ошибки из системы API
      * @param message    - Сообщение с сервера
-     * @param error      - Ошибка в формате string
+     * @param error      - Ошибка
      */
-    readonly "rest/error": (message: CommandInteraction, error: string) => void;
+    readonly "rest/error": (message: CommandInteraction, error: string | Error) => void;
 }

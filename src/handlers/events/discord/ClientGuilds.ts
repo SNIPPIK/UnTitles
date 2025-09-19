@@ -1,8 +1,15 @@
+import { ChannelType, Events, PermissionsBitField, TextChannel } from "discord.js";
 import { Assign, Logger } from "#structures";
 import { Event } from "#handler/events";
 import { homepage } from "package.json";
-import { Events } from "discord.js";
 import { db } from "#app/db";
+
+// Список прав, которые проверяем
+const REQUIRED_PERMISSIONS = [
+    PermissionsBitField.Flags.SendMessages,       // Отправка сообщений
+    PermissionsBitField.Flags.EmbedLinks,         // Вставка ссылок/встраиваемых сообщений
+    PermissionsBitField.Flags.ViewChannel
+];
 
 /**
  * @author SNIPPIK
@@ -24,15 +31,21 @@ class GuildCreate extends Assign<Event<Events.GuildCreate>> {
                 const id = guild.client.shard?.ids[0] ?? 0;
                 Logger.log("LOG", `[Core/${id}] has ${Logger.color(32, `added a new guild ${guild.id}`)}`);
 
-                // Получаем владельца сервера
-                const owner = guild.members.cache.get(guild.ownerId);
+                const channel = guild.channels.cache.find((ch): ch is TextChannel => {
+                    if (ch.type !== ChannelType.GuildText) return false;
+
+                    const perms = ch.permissionsFor(guild.members.me!);
+                    if (!perms) return false;
+
+                    return REQUIRED_PERMISSIONS.every(p => perms.has(p));
+                });
 
                 // Если владельца не удалось найти
-                if (!owner) return null;
+                if (!channel) return null;
 
                 try {
                     // Отправляем сообщение владельцу сервера
-                    return owner.send({
+                    return channel.send({
                         flags: "IsComponentsV2",
                         components: [
                             {
@@ -51,14 +64,25 @@ class GuildCreate extends Assign<Event<Events.GuildCreate>> {
 
                                     {
                                         "type": 10, // Text
-                                        "content": `# 💫 For owner of Guild ||${guild}|| \n` +
-                                            `👋 Hi listener, thanks for adding the bot to your server, if it wasn't you, another user with privilege could have done it\n` +
-                                            `## 💣 Features\n` +
-                                            `- 💵 No premium\n` +
-                                            `- 🪛 Not using lava services such as lavalink, lavaplayer\n` +
-                                            `- 🎶 Smooth transitions between tracks, they are still raw!\n` +
-                                            `- 🪪 More detailed track data with dynamic message about the current track\n` +
-                                            `- 🎛 Access to filters, yes you have full access to audio filters, many bots provide paid access!`,
+                                        "content": `# 💫 For users Guild ||${guild}|| \n` +
+                                            `👋 Hi listeners, thanks for adding the bot to your server, if it wasn't you, another user with privilege could have done it\n` +
+                                            `## 🔊 Voice Engine [without lavalink]\n` +
+                                            ` - 🎧 Full **Voice Gateway v8** implementation\n` +
+                                            ` - 🔐 Full **SRTP + E2EE** support\n` +
+                                            ` - 🎶 Best open-source audio player alternative\n` +
+                                            ` - 📦 Adaptive audio packet system with custom \`Jitter Buffer\`\n` +
+                                            ` - 🔁 Supported: Autoplay, Repeat, Shuffle, Replay, and more\n` +
+                                            `## 🎵 Audio\n` +
+                                            ` - 🔄 Reuse audio <8 minutes without conversion\n` +
+                                            ` - 🎶 Smooth **fade-in/fade-out**, skip, seek & tp transitions\n` +
+                                            ` - 🔀 \`Hot audio swap\` between tracks\n` +
+                                            ` - 🎚 16+ built-in filters + custom filter support\n` +
+                                            ` - 📺 Long video support & raw Live video\n` +
+                                            ` - ⏱ Explicit audio stream synchronization without filters\n` +
+                                            `## 🌐 Platforms\n` +
+                                            ` - 🌍 Supported: ${db.api.platforms.array.map((api) => db.api.platforms.authorization.includes(api.name) || db.api.platforms.block.includes(api.name) ? `\`${api.name}\`` : `~~${api.name}~~`)}\n` +
+                                            ` - 🎵 Audio: ${db.api.platforms.audio.map((api) => `\`${api}\``)}\n` +
+                                            ` - 🔍 Precise search by time, name syllables, and related tracks`
                                     },
                                     {
                                         "type": 14, // Separator
@@ -68,8 +92,7 @@ class GuildCreate extends Assign<Event<Events.GuildCreate>> {
                                     {
                                         "type": 10, // Text
                                         "content": `## 📑 Support\n`+
-                                            `- 📣 If you find a mistake or have any ideas, please post them on github, discord\n` +
-                                            `- 🗃 Default support platform: YouTube, Spotify, SoundCloud, Yandex, VK`
+                                            `- 📣 If you find a mistake or have any ideas, please post them on github, discord`
                                     }
                                 ]
                             },
