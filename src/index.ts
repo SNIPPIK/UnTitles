@@ -16,19 +16,19 @@ function main() {
     const isManager = process.argv.includes("--ShardManager");
 
     // Если включен менеджер осколков
-    if (isManager) return runShardManager();
+    if (isManager) return execute_shardManager();
 
     // Запускаем осколок
-    return runShard();
+    return execute_shard();
 }
 
 /**
  * @author SNIPPIK
  * @description Если требуется запустить менеджер осколков
- * @function runShardManager
+ * @function execute_shardManager
  * @returns void
  */
-function runShardManager() {
+function execute_shardManager() {
     Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
     new ShardManager(__filename, env.get("token.discord"));
 }
@@ -36,11 +36,11 @@ function runShardManager() {
 /**
  * @author SNIPPIK
  * @description Если требуется запустить осколок
- * @function runShard
+ * @function execute_shard
  * @returns Promise<void>
  * @async
  */
-async function runShard() {
+async function execute_shard() {
     Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
 
     const client = new DiscordClient();
@@ -75,7 +75,7 @@ async function runShard() {
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
 
     // Запускаем отслеживание событий процесса
-    initProcessEvents(client);
+    init_process_events(client);
 
     // Запускаем Garbage Collector
     setImmediate(() => {
@@ -90,10 +90,10 @@ async function runShard() {
  * @author SNIPPIK
  * @description Инициализирует события процесса (ошибки, сигналы)
  * @param client - Класс клиента
- * @function initProcessEvents
+ * @function init_process_events
  * @returns void
  */
-function initProcessEvents(client: DiscordClient) {
+function init_process_events(client: DiscordClient): void {
     // Необработанная ошибка (внутри синхронного кода)
     process.on("uncaughtException", (err) => {
         // Скорее всего дело в Discord.js
@@ -115,7 +115,7 @@ function initProcessEvents(client: DiscordClient) {
     // Возможность завершить процесс корректно
     for (const event of ["SIGINT", "SIGTERM"]) {
         process.on(event, () => {
-            if (ProcessQueues(client)) return;
+            if (init_queue_destroyer(client)) return;
 
             Logger.log("WARN", `Received ${event}. Shutting down...`);
             process.exit(0);
@@ -127,10 +127,10 @@ function initProcessEvents(client: DiscordClient) {
  * @author SNIPPIK
  * @description Функция проверяющая состояние очередей, для безопасного выключения
  * @param client - Класс клиента
- * @function ProcessQueues
- * @returns void
+ * @function init_queue_destroyer
+ * @returns boolean
  */
-function ProcessQueues(client: DiscordClient): boolean {
+function init_queue_destroyer(client: DiscordClient): boolean {
     if (db.queues.size > 0) {
         // Отключаем все события от клиента, для предотвращения включения или создания еще очередей
         client.removeAllListeners();

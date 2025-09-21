@@ -282,7 +282,7 @@ export class BufferedAudioResource extends BaseAudioResource {
                     if (this._buffer) {
                         setImmediate(() => {
                             // Сообщаем что поток можно начать читать
-                            if (!this._buffer.position) this.emit("readable");
+                            if (!this._buffer?.position) this.emit("readable");
                         });
 
                         // Если создал класс буфера, начинаем кеширование пакетов

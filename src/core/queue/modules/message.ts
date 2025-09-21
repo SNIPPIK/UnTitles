@@ -310,7 +310,7 @@ export class QueueButtons {
             style: currentRepeatType === RepeatType.None ? 2 : 3,
         });
 
-        // ⏸ / ▶ Pause / Resume
+        // ⏸ / ▶ - Pause / Resume
         setButton(firstRow[2], {
             emoji: isPaused ? QueueButtons.button.resume : QueueButtons.button.pause,
             style: isPaused ? 3 : 1,

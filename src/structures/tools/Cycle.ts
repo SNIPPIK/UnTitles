@@ -1,3 +1,4 @@
+import { performance } from "perf_hooks";
 import { SetArray } from "#structures";
 
 /**
@@ -40,6 +41,12 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     private tickTime: number = 0;
 
     /**
+     * @description Временное число отставания цикла в миллисекундах
+     * @private
+     */
+    private drift: number = 0;
+
+    /**
      * @description Таймер или функция ожидания
      * @private
      */
@@ -51,7 +58,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @public
      */
     public get drifting(): number {
-        return this.prevEventLoopLag;
+        return this.drift + this.lastDelay;
     };
 
     /**
@@ -120,10 +127,9 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
 
         // Запускаем цикл, если добавлен первый объект
         if (this.size === 1 && this.startTime === 0) {
-            process.nextTick(this._stepCycle);
-
             // Записываем время
             this.startTime = this.time;
+            process.nextTick(this._stepCycle);
         }
 
         return this;
@@ -140,6 +146,9 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         this.startTime = 0;
         this.tickTime = 0;
         this.lastDelay = 0;
+
+        // Чистимся от drift составляющих
+        this.drift = 0;
 
         // Чистим performance.now
         this.performance = 0;
@@ -184,8 +193,18 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         // Коррекция event loop lag
         const lags = this._calculateLags();
 
+        // Следующее время шага
+        const nextTargetTime = this.insideTime + this.drift - lags;
+
         // Запускаем шаг
-        this._runTimeout(this.insideTime - lags, this._stepCycle);
+        this._runTimeout(nextTargetTime, () => {
+            const tickStart = this.time;
+            this._stepCycle();
+            const tickEnd = this.time;
+
+            // Сглаживание дрейфа
+            this.drift = this._compensator(0.9999, this.drift, tickEnd - tickStart);
+        });
     };
 
     /**
@@ -227,7 +246,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         this.performance = performanceNow;
 
         // Смягчение event loop lag
-        return this.prevEventLoopLag = this.prevEventLoopLag !== undefined ? this._compensator(0.99, this.prevEventLoopLag, driftEvent) : driftEvent;
+        return this.prevEventLoopLag = this.prevEventLoopLag !== undefined ? this._compensator(0.9999, this.prevEventLoopLag, driftEvent) : driftEvent;
     };
 
     /**
