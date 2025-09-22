@@ -1,6 +1,6 @@
-import { CacheUtility } from "#core/player/utils/cache";
-import { ControllerQueues, Queue } from "#core/queue";
 import { DiscordClient, DJSVoice } from "#structures/discord";
+import { ControllerQueues, type Queue } from "#core/queue";
+import { CacheUtility } from "#core/player/utils/cache";
 import { env } from "#app/env";
 
 // Database modules

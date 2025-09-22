@@ -350,11 +350,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Пред загрузка трека, если конечно это возможно
      * @param position - Позиция трека
      */
-    protected _preloadTrack = async (position: number): Promise<false | string | Error> => {
+    protected _preloadTrack = async (position: number): Promise<string | Error> => {
         const track = this._tracks.get(position);
 
         // Если нет трека в очереди
-        if (!track) return false;
+        if (!track) return new Error("TrackError\n - Do not found track in queue");
 
         // Получаем данные
         const path = await track?.resource;
@@ -389,7 +389,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const resource = await this._preloadTrack(index);
 
             // Если получена ошибка вместо исходника
-            if (!resource || resource instanceof Error) {
+            if (resource instanceof Error) {
                 this.emit("player/error", this, `${resource}`, { skip: true, position: index });
                 return;
             }
@@ -400,42 +400,34 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             // Если нельзя создать аудио поток, поскольку создается другой
             if (!stream) return;
 
-            // Действия при готовности
-            const handleReady = () => {
-                // Производим явную синхронизацию времени
-                if (this._audio.current) stream.seek = this._audio.current.duration;
-
-                // Переводим плеер в состояние чтения аудио
-                this.status = "player/playing";
-
-                // Меняем позицию если удачно
-                this._tracks.position = index;
-
-                // Если трек включен в 1 раз
-                if (seek === 0) {
-                    const queue = db.queues.get(this.id);
-                    db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно
-                }
-
-                // Заставляем плеер запускаться самостоятельно
-                this.cycle = "on";
-            };
-
             // Подключаем события для отслеживания работы потока (временные)
             (stream as BufferedAudioResource)
-
                 // Если чтение возможно
                 .once("readable", () => {
+                    // Действия при готовности
+                    const handleReady = () => {
+                        // Переводим плеер в состояние чтения аудио
+                        this.status = "player/playing";
+
+                        // Заставляем плеер запускаться самостоятельно
+                        this.cycle = "on";
+
+                        // Меняем позицию если удачно
+                        this._tracks.position = index;
+
+                        // Если трек включен в 1 раз
+                        if (seek === 0) {
+                            const queue = db.queues.get(this.id);
+                            db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно
+                        }
+                    };
+
                     // Время паузы плеера
                     const pauseTimeout = Math.max(this._timer.timeout - Date.now(), timeout, 0);
 
                     // Если включить трек сейчас не выйдет
-                    if (pauseTimeout) {
-                        this._timer.timer = setTimeout(handleReady, pauseTimeout);
-                        return;
-                    }
-
-                    return handleReady();
+                    pauseTimeout ? this._timer.timer = setTimeout(handleReady, pauseTimeout) : handleReady();
+                    return null;
                 })
 
                 // Если была получена ошибка при чтении

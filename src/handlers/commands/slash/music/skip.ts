@@ -67,7 +67,7 @@ class BackPositionCommand extends SubCommand {
         const {name, url, api} = track;
 
         // Переходим к позиции
-        player.play(0, 0, number).catch(console.error);
+        await player.play(0, 0, number);
 
         return ctx.reply({
             embeds: [
@@ -147,7 +147,7 @@ class SkipPositionCommand extends SubCommand {
         const {name, url, api} = track;
 
         // Переходим к позиции
-        player.play(0, 0, number).catch(console.error);
+        await player.play(0, 0, number);
 
         return ctx.reply({
             embeds: [
@@ -230,7 +230,7 @@ class ToPositionCommand extends SubCommand {
         const {name, url, api} = track;
 
         // Переходим к позиции
-        player.play(0, 0, number).catch(console.error);
+        await player.play(0, 0, number);
 
         return ctx.reply({
             embeds: [

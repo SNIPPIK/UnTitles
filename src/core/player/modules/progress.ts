@@ -1,5 +1,24 @@
-import { RestServerSide } from "#handler/rest";
+import type { RestServerSide } from "#handler/rest";
 import { env } from "#app/env";
+import { db } from "#app/db";
+
+/**
+ * @author SNIPPIK
+ * @description Функция для отложенной загрузки кнопок
+ * @function initButtons
+ * @private
+ */
+function initButtons() {
+    buttons = db.api.platforms.array.reduce((acc, api) => {
+        const platform = api.name.toLowerCase();
+        const inEnv = env.get(`progress.button.${platform}`, null);
+
+        if (inEnv) acc[`button_${platform}`] = inEnv;
+        return acc;
+    }, {
+        button: env.get("progress.button"),
+    });
+}
 
 /**
  * @author SNIPPIK
@@ -23,43 +42,15 @@ const emoji = {
         left: env.get("progress.not_empty.left"),
         center: env.get("progress.not_empty.center"),
         right: env.get("progress.not_empty.right")
-    },
+    }
+};
 
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button: env.get("progress.button"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_vk: env.get("progress.button.vk"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_yandex: env.get("progress.button.yandex"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_youtube: env.get("progress.button.youtube"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_spotify: env.get("progress.button.spotify"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_soundcloud: env.get("progress.button.soundcloud"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_deezer: env.get("progress.button.deezer")
-}
+/**
+ * @author SNIPPIK
+ * @description Все найденные кнопки платформ
+ * @private
+ */
+let buttons: { [key: string]: string; } = null;
 
 /**
  * @author SNIPPIK
@@ -82,8 +73,10 @@ export class PlayerProgress {
      * @public
      */
     public bar = ({ duration, platform }: PlayerProgressInput): string => {
+        if (!buttons) initButtons();
+
         const { current, total } = duration;
-        const button = emoji[`button_${platform.toLowerCase()}`] || emoji.button;
+        const button = buttons[`button_${platform.toLowerCase()}`] ?? buttons["button"];
 
         // Если live-трек
         if (total === 0) {

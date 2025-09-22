@@ -106,7 +106,7 @@ export class ClientSRTPSocket {
         if (this.sequence > MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было превышения int 16
         if (this.timestamp > MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было превышения int 32
 
-        // Получаем текущий зашоловок
+        // Получаем текущий заголовок
         const RTPHead = this._RTP_HEAD;
 
         // Записываем новую последовательность

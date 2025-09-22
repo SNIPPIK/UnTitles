@@ -85,8 +85,18 @@
       "en-US": "Mixes both stereo channels into a single mono output.",
       "ru": "Объединяет оба стерео канала в один моно сигнал."
     },
-    "unsupported": ["8d"],
+    "unsupported": ["8d", "swap_stereo"],
     "filter": "pan=mono|c0=.5*c0+.5*c1",
+    "args": false
+  },
+  {
+    "name": "swap_stereo",
+    "locale": {
+      "en-US": "Switch left channel to right and right channel to left.",
+      "ru": "Переключить левый канал на правый и правый канал на левый."
+    },
+    "unsupported": ["mono", "8d"],
+    "filter": "pan=stereo|c0=c1|c1=c0",
     "args": false
   },
   {
@@ -145,7 +155,7 @@
       "en-US": "Simulates 3D spatial audio by rotating sound around the listener.",
       "ru": "Имитирует 3D-пространство, вращая звук вокруг слушателя."
     },
-    "unsupported": ["mono"],
+    "unsupported": ["mono", "swap_stereo"],
     "filter": "apulsator=hz=0.09",
     "args": false
   },

@@ -196,7 +196,7 @@ export class Queue {
                 "accent_color": api.color,
                 "components": [
                     {
-                        "type": 9,
+                        "type": 9, // Block
                         "components": [
                             {
                                 "type": 10,

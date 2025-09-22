@@ -69,7 +69,7 @@ export class Process {
             shell: false
         });
 
-        // дДобавляем события к процессу
+        // Добавляем события к процессу
         for (let event of ["end", "error", "exit"]) {
             this._process.once(event, this.destroy);
         }

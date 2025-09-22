@@ -6,6 +6,72 @@ import type { CompeteInteraction } from "#structures/discord";
 
 /**
  * @author SNIPPIK
+ * @description Декоратор создающий заголовок команды
+ * @decorator
+ */
+export function Declare(options: DeclareOptionsChatInput | DeclareOptionsUser) {
+    const CommandType = options.type ?? ApplicationCommandType.ChatInput;
+
+    const [nameKey] = Object.keys(options.names) as Locale[];
+    const [descKey] = CommandType === 1 ? Object.keys(options["descriptions"]) as Locale[] : [null];
+
+    // Загружаем данные в класс
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            name = options.names[nameKey];
+            name_localizations = options.names;
+
+            description = CommandType === 1 ? options["descriptions"][descKey] : null;
+            description_localizations = CommandType === 1 ? options["descriptions"] : null;
+
+            integration_types = options.integration_types?.map(x => x === "GUILD_INSTALL" ? 0 : 1) ?? [0];
+            contexts = options.contexts?.map(x => x === "GUILD" ? 0 : x === "BOT_DM" ? 1 : 2) ?? [0];
+            owner = options.owner ?? false;
+            type = CommandType;
+        }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Декоратор под команд
+ * @decorator
+ */
+export function Options(options: (new () => SubCommand)[] | OptionsRecord) {
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            options: SubCommand[] | AutocompleteCommandOption | ChoiceOption[] = Array.isArray(options)
+                ? options.map(x => new x())
+                : Object.values(options).map(normalizeOption);
+        };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Декоратор ограничений
+ * @decorator
+ */
+export function Middlewares(cbs: RegisteredMiddlewares[]) {
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            middlewares = cbs;
+        };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Декоратор ограничений
+ * @decorator
+ */
+export function Permissions(permissions: BaseCommand["permissions"]) {
+    return <T extends { new (...args: any[]): object }>(target: T) =>
+        class extends target {
+            permissions = permissions;
+        };
+}
+
+
+/**
+ * @author SNIPPIK
  * @description Параметры декоратора команды по умолчанию
  * @usage Только как компонент для остальных
  * @type DeclareOptionsBase
@@ -82,32 +148,6 @@ type DeclareOptionsUser = DeclareOptionsBase & {
     type: ApplicationCommandType.User | ApplicationCommandType.Message;
 };
 
-/**
- * @author SNIPPIK
- * @description Декоратор создающий заголовок команды
- * @decorator
- */
-export function Declare(options: DeclareOptionsChatInput | DeclareOptionsUser) {
-    const CommandType = options.type ?? ApplicationCommandType.ChatInput;
-
-    const [nameKey] = Object.keys(options.names) as Locale[];
-    const [descKey] = CommandType === 1 ? Object.keys(options["descriptions"]) as Locale[] : [null];
-
-    // Загружаем данные в класс
-    return <T extends { new (...args: any[]): object }>(target: T) =>
-        class extends target {
-            name = options.names[nameKey];
-            name_localizations = options.names;
-
-            description = CommandType === 1 ? options["descriptions"][descKey] : null;
-            description_localizations = CommandType === 1 ? options["descriptions"] : null;
-
-            integration_types = options.integration_types?.map(x => x === "GUILD_INSTALL" ? 0 : 1) ?? [0];
-            contexts = options.contexts?.map(x => x === "GUILD" ? 0 : x === "BOT_DM" ? 1 : 2) ?? [0];
-            owner = options.owner ?? false;
-            type = CommandType;
-        }
-}
 
 /**
  * @author SNIPPIK
@@ -130,6 +170,7 @@ export interface Choice {
      */
     nameLocalizations?: LocalizationMap;
 }
+
 
 /**
  * @author SNIPPIK
@@ -241,42 +282,4 @@ function normalizeOption(opt: BaseCommandOption) {
         descriptionLocalizations: opt.descriptions,
         options: opt.options?.map(normalizeOption)
     };
-}
-
-/**
- * @author SNIPPIK
- * @description Декоратор под команд
- * @decorator
- */
-export function Options(options: (new () => SubCommand)[] | OptionsRecord) {
-    return <T extends { new (...args: any[]): object }>(target: T) =>
-        class extends target {
-            options: SubCommand[] | AutocompleteCommandOption | ChoiceOption[] = Array.isArray(options)
-                ? options.map(x => new x())
-                : Object.values(options).map(normalizeOption);
-        };
-}
-
-/**
- * @author SNIPPIK
- * @description Декоратор ограничений
- * @decorator
- */
-export function Middlewares(cbs: RegisteredMiddlewares[]) {
-    return <T extends { new (...args: any[]): object }>(target: T) =>
-        class extends target {
-            middlewares = cbs;
-        };
-}
-
-/**
- * @author SNIPPIK
- * @description Декоратор ограничений
- * @decorator
- */
-export function Permissions(permissions: BaseCommand["permissions"]) {
-    return <T extends { new (...args: any[]): object }>(target: T) =>
-        class extends target {
-            permissions = permissions;
-        };
 }

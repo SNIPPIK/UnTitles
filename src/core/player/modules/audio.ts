@@ -103,17 +103,19 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
 
         // Отслеживаем аудио поток на готовность к чтению
         (stream as BufferedAudioResource).once("readable", async () => {
-            const oldStream = this._audio;
-
             // Удаляем таймер
             clearTimeout(this._timeout);
+
+            // Если есть активный поток
+            if (this._audio) {
+                // Производим явную синхронизацию времени
+                stream.seek = this._audio.duration;
+                this._audio.destroy();
+            }
 
             // Перезаписываем текущий поток
             this._audio = stream;
             this._pre_audio = null;
-
-            // Если есть активный поток
-            if (oldStream) oldStream.destroy();
         });
     };
 

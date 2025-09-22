@@ -175,6 +175,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
     /**
      * @description Удаляем UDP подключение
+     * @returns void
      * @private
      */
     private reset = () => {

@@ -100,13 +100,14 @@ class PlayerStop extends SubCommand {
 class PlayerVolume extends SubCommand {
     async run({ctx, args}: CommandContext) {
         const { player } = db.queues.get(ctx.guildId);
+        const seek: number = player.audio.current?.duration ?? 0;
 
         // Изменение громкости
         player.audio.volume = parseInt(args[0]);
 
         // Если можно изменить громкость сейчас
-        if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
-            player.play(player.audio.current.duration).catch(console.error);
+        if (seek < player.tracks.track.time.total - db.queues.options.optimization) {
+            await player.play(seek);
 
             // Отправляем сообщение о переключение громкости сейчас
             return ctx.reply({

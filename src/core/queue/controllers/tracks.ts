@@ -111,6 +111,7 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public set repeat(type) {
+        if (type === this._repeat) return;
         this._repeat = type;
     };
 
@@ -274,17 +275,17 @@ export enum RepeatType {
     /**
      * @description Повтор выключен
      */
-    None = 0,
+    None,
 
     /**
      * @description Повтор одного трека
      */
-    Song = 1,
+    Song,
 
     /**
      * @description Повтор всех треков
      */
-    Songs = 2,
+    Songs,
 
     /**
      * @description Бесконечный музыкальный поток
