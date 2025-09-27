@@ -51,7 +51,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
     private consecutiveFailures = 0;
 
     /** Количество последовательных сбоев, необходимое для попытки восстановления */
-    private readonly failureTolerance: number = DEFAULT_DECRYPTION_FAILURE_TOLERANCE;
+    private failureTolerance: number = DEFAULT_DECRYPTION_FAILURE_TOLERANCE;
 
     /** Выполняется ли повторная инициализация сеанса из-за недопустимого перехода */
     public reinitializing = false;
@@ -363,6 +363,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         this.pendingTransition = null;
         this.downgraded = null;
         this.pendingTransition = null;
+        this.failureTolerance = null;
     };
 }
 

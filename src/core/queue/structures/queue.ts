@@ -243,7 +243,7 @@ export class Queue {
         Logger.log("DEBUG", `[Queue/${this.message.guild_id}] has cleanup`);
 
         // Останавливаем плеер
-        if (this._player) this._player.cleanup();
+        this._player.cleanup();
 
         // Для удаления динамического сообщения
         this._cleanupOldMessage();
@@ -259,7 +259,7 @@ export class Queue {
         Logger.log("LOG", `[Queue/${this.message.guild_id}] has destroyed`);
 
         // Удаляем плеер
-        if (this._player) this._player.destroy();
+        this._player.destroy();
         this._tracks.clear();
 
         this._tracks = null;

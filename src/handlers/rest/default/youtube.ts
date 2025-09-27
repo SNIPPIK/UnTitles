@@ -1,7 +1,127 @@
-import {httpsClient, locale, Logger, SimpleWorker} from "#structures";
-import { DeclareRest, RestServerSide } from "#handler/rest";
+import {DeclareRest, OptionsRest, RestServerSide} from "#handler/rest";
+import { httpsClient, locale } from "#structures";
 import { Track } from "#core/queue";
 import { db } from "#app/db";
+
+/**
+ * @author SNIPPIK
+ * @description Все допустимые заголовки
+ * @const Clients
+ */
+const Clients = {
+    /**
+     * @description Запрос страницы, требуется указывать время для правильного запроса
+     * @audio true - without sig
+     */
+    "ANDROID": {
+        request: {
+            cpn: generateClientPlaybackNonce(16),
+            context: {
+                client: {
+                    clientName: "ANDROID",
+                    clientVersion: "19.44.38",
+                    platform: "MOBILE",
+                    osName: "Android",
+                    osVersion: "11",
+                    androidSdkVersion: "30",
+                    hl: "en",
+                    gl: "US",
+                    utcOffsetMinutes: -240,
+                },
+                request: {
+                    internalExperimentFlags: [],
+                    useSsl: true,
+                },
+                user: {
+                    lockedSafetyMode: false,
+                },
+                "contentPlaybackContext": {
+                    "html5Preference": "HTML5_PREF_WANTS"
+                }
+            },
+            contentCheckOk: true,
+            racyCheckOk: true
+        },
+        headers: {
+            "Content-Type": "application/json",
+            "User-Agent": `com.google.android.youtube/19.44.38 (Linux; U; Android 11) gzip`,
+            "X-Goog-Api-Format-Version": "2"
+        }
+    },
+
+    /**
+     * @description Запрос страницы, требуется указывать время для правильного запроса
+     * @audio true - without sig
+     */
+    "IOS": {
+        request: {
+            cpn: generateClientPlaybackNonce(16),
+            contentCheckOk: true,
+            racyCheckOk: true,
+            context: {
+                client: {
+                    clientName: "IOS",
+                    clientVersion: "19.45.4",
+                    deviceMake: "Apple",
+                    deviceModel: "iPhone16,2",
+                    platform: "MOBILE",
+                    osName: "iOS",
+                    osVersion: "17.5.1.21F90",
+                    hl: "en",
+                    gl: "US",
+                    utcOffsetMinutes: -240,
+                },
+                request: {
+                    internalExperimentFlags: [],
+                    useSsl: true,
+                },
+                user: {
+                    lockedSafetyMode: false,
+                },
+            }
+        },
+        headers: {
+            "Content-Type": "application/json",
+            "User-Agent": `com.google.ios.youtube/19.45.4(iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)`,
+            "X-Goog-Api-Format-Version": "2",
+        }
+    },
+
+    /**
+     * @description Запрос страницы, требуется указывать время для правильного запроса
+     * @audio true
+     */
+    "WEB": {
+        request: {
+            "context": {
+                "client": {
+                    "hl": "en",
+                    "gl": "US",
+                    "clientName": "WEB",
+                    "clientVersion": "2.20250927.00.00"
+                }
+            }
+        }
+    },
+
+    /**
+     * @description Запрос страницы урезанной
+     * @audio false
+     */
+    "WEB_EMBEDDED": {
+        request: {
+            "context": {
+                client: {
+                    clientName: "WEB_EMBEDDED_PLAYER",
+                    clientVersion: "1.20240723.01.00",
+                    hl: "en",
+                    timeZone: "UTC",
+                    utcOffsetMinutes: 0
+                }
+            }
+        }
+    }
+};
 
 /**
  * @author SNIPPIK
@@ -15,6 +135,11 @@ import { db } from "#app/db";
     filter: /https?:\/\/(?:youtu\.be|(?:(?:www|m|music|gaming)\.)?youtube\.com)/i,
     audio: true,
     color: 16711680
+})
+@OptionsRest({
+    AIzaKey: generateFakeApiKey(),
+    //@ts-ignore
+    detect_is_bot: [] as keyof typeof Clients,
 })
 class RestYouTubeAPI extends RestServerSide.API {
     readonly requests: RestServerSide.API["requests"] = [
@@ -33,7 +158,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     // Если ID плейлиста не удалось извлечь из ссылки
                     if (!ID) return locale.err("api.request.id.playlist");
 
-                    const api = await this.API(`https://www.youtube.com/${ID}`)
+                    const api = await this.pAPI(`https://${this.url}/${ID}`)
 
                     // Если при запросе была получена ошибка
                     if (api instanceof Error) return api;
@@ -85,7 +210,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                 const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
 
                 try {
-                    const api = await this.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
+                    const api = await this.pAPI(`https://${this.url}/watch?v=${ID}&hl=en&has_verified=1`);
                     if (api instanceof Error) return api;
 
                     const related = api.contents?.twoColumnWatchNextResults?.secondaryResults?.secondaryResults?.results ?? [];
@@ -159,7 +284,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                         }
                     }
 
-                    const api = await this.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
+                    const api = await this.API(ID, options.audio);
 
                     // Если при получении данных возникла ошибка
                     if (api instanceof Error) return api;
@@ -185,14 +310,8 @@ class RestYouTubeAPI extends RestServerSide.API {
                         // dashManifestUrl, hlsManifestUrl
                         if (data["hlsManifestUrl"]) track.audio = data["hlsManifestUrl"];
                         else {
-                            // Если нет форматов
-                            if (!data["formats"]) return locale.err("api.request.audio.fail", [this.name]);
-
-                            // Расшифровываем аудио формат
-                            const format = await this.extractFormat(data, api.html);
-
                             // Если есть расшифровка ссылки видео
-                            if (format) track.audio = format["url"];
+                            if (data["formats"][0]) track.audio = data["formats"][0]["url"];
                         }
                     }
 
@@ -224,7 +343,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     else ID = `channel/${url.split("channel/")[1]}`;
 
                     // Создаем запрос
-                    const details = await this.API(`https://www.youtube.com/${ID}/videos`);
+                    const details = await this.pAPI(`https://${this.url}/${ID}/videos`);
 
                     if (details instanceof Error) return details;
 
@@ -241,7 +360,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                             url: `https://youtu.be/${video["videoId"]}`,
                             title: video.title["runs"][0].text,
                             duration: {full: video["lengthText"]["simpleText"]},
-                            author: {url: `https://www.youtube.com${ID}`, title: author.title}
+                            author: {url: `https://${this.url}/${ID}`, title: author.title}
                         }
                     });
                 } catch (e) {
@@ -259,7 +378,7 @@ class RestYouTubeAPI extends RestServerSide.API {
             execute: async (query: string, {limit}) => {
                 try {
                     // Создаем запрос
-                    const details = await this.API(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=QgIIAQ%3D%3D`);
+                    const details = await this.pAPI(`https://${this.url}/results?search_query=${encodeURIComponent(query)}&sp=QgIIAQ%3D%3D`);
 
                     // Если при получении данных возникла ошибка
                     if (details instanceof Error) return details;
@@ -286,10 +405,9 @@ class RestYouTubeAPI extends RestServerSide.API {
      * @param url - Ссылка на видео или ID видео
      * @protected
      */
-    protected API = (url: string): Promise<Error | json> => {
+    protected pAPI = (url: string): Promise<Error | json> => {
         return new Promise((resolve) => {
-            new httpsClient({
-                url,
+            new httpsClient({ url,
                 userAgent: true,
                 headers: {
                     "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
@@ -305,7 +423,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     if (api instanceof Error) return resolve(locale.err("api.request.fail"));
 
                     // Ищем данные на странице
-                    const data = this.extractInitialDataResponse(api);
+                    const data = this._extractResponse(api);
 
                     // Если возникает ошибка при поиске на странице
                     if (data instanceof Error) return resolve(data);
@@ -319,85 +437,45 @@ class RestYouTubeAPI extends RestServerSide.API {
     };
 
     /**
-     * @description Получаем аудио дорожки
-     * @param data - <videoData>.streamingData все форматы видео, будет выбран оптимальный
-     * @param html - Ссылка на html плеер
+     * @description Получаем страницу с данными
+     * @param ID - ID видео
+     * @param audio - нужно ли получить аудио
      * @protected
      */
-    protected extractFormat = (data: json, html: string) => {
-        // Запускаем мусорный Signature extractor, очень много мусора за собой оставляет
+    protected API = (ID: string, audio: boolean): Promise<Error | json> => {
+        const client = audio ? Clients.ANDROID : Clients.WEB_EMBEDDED;
+
         return new Promise((resolve) => {
-            SimpleWorker.create<string>({
-                file: "src/handlers/rest/signature/index.youtube",
-                postMessage: {
-                    formats: data["formats"],
-                    html
+            new httpsClient({
+                method: "POST",
+                url: `https://www.youtube.com/youtubei/v1/player?key=${this.options.AIzaKey}`,
+                headers: {
+                    "Content-Type": "application/json",
+                    ...client["headers"] ? client["headers"] : {}
                 },
-                options: {
-                    execArgv: ["-r", "tsconfig-paths/register"],
-                    workerData: null
-                },
-                callback: (data) => resolve(data)
-            }).once("error", (err) => {
-                Logger.log("ERROR", err);
-                return resolve(err);
-            });
+                body: JSON.stringify({
+                    ...client.request,
+                    "videoId": ID
+                })
+            })
+                // Получаем исходную страницу
+                .toJson
+
+                // Получаем результат из Promise
+                .then((api) => {
+                    // Если возникает ошибка при получении страницы
+                    if (api instanceof Error) return resolve(locale.err("api.request.fail"));
+
+                    // Если указано аудио, но его нет!
+                    else if (audio && !api["streamingData"]?.["formats"]) return resolve(locale.err("api.request.fail"));
+
+                    // Отдаем данные
+                    return resolve(api);
+                })
+
+                // Если происходит ошибка
+                .catch((err) => resolve(Error(`[APIs]: ${err}`)));
         });
-    };
-
-    /**
-     * @description Получаем данные из страницы
-     * @param input - Страница
-     * @protected
-     */
-    protected extractInitialDataResponse = (input: string): json | Error => {
-        if (typeof input !== "string") return locale.err("api.request.fail");
-
-        // Путь плеера (необходим для расшифровки)
-        const html5Player = /<script\s+src="([^"]+)"(?:\s+type="text\/javascript")?\s+name="player_ias\/base"\s*>|"jsUrl":"([^"]+)"/.exec(input);
-
-        let endData: json = {
-            html: `https://www.youtube.com${html5Player ? html5Player[1] || html5Player[2] : null}`
-        };
-
-        // Попытка найти ytInitialData JSON
-        const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
-        if (initialDataMatch) {
-            try {
-                endData = { ...endData, ...JSON.parse(initialDataMatch[1]) };
-            } catch {
-                // Игнорируем ошибку парсинга initialData
-            }
-        }
-
-        // Определяем, какой паттерн искать дальше: playerResponse или initialData
-        const startPattern = input.includes("var ytInitialPlayerResponse = ")
-            ? "var ytInitialPlayerResponse = "
-            : "var ytInitialData = ";
-
-        const startIndex = input.indexOf(startPattern);
-        const endIndex = input.indexOf("};", startIndex + startPattern.length);
-
-        // Если не нашли нужный участок с JSON — возвращаем ошибку
-        if (startIndex === -1 || endIndex === -1) return locale.err("api.request.fail");
-
-        try {
-            const jsonStr = input.substring(startIndex + startPattern.length, endIndex + 1);
-            const parsedData = JSON.parse(jsonStr);
-            // Объединяем данные, playerResponse имеет приоритет
-            endData = { ...endData, ...parsedData };
-        } catch {
-            return locale.err("api.request.fail");
-        }
-
-        // Проверяем статус playabilityStatus, если есть
-        const status = endData.playabilityStatus?.status;
-        if (status && status !== "OK") {
-            const reason = endData.playabilityStatus?.reason || "Not found status error";
-            return new Error(locale._(locale.language, "api.request.fail.msg", [reason]));
-        }
-
-        return endData;
     };
 
     /**
@@ -409,11 +487,8 @@ class RestYouTubeAPI extends RestServerSide.API {
     protected getChannel = ({ id, name }: { id: string, name?: string }): Promise<Track.artist> => {
         return new Promise<Track.artist>((resolve) => {
             new httpsClient({
-                url: `https://www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`,
-                headers: {
-                    "x-youtube-client-name": "1",
-                    "x-youtube-client-version": "2.20201021.03.00"
-                }
+                url: `https:/www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`,
+                headers: Clients.WEB.request.context.client
             }).toJson.then((channel) => {
                 if (channel instanceof Error) return resolve(null);
 
@@ -466,8 +541,89 @@ class RestYouTubeAPI extends RestServerSide.API {
             }
         }
     };
+
+    /**
+     * @description Получаем данные из страницы
+     * @param input - Страница
+     * @protected
+     */
+    protected _extractResponse = (input: string): json | Error => {
+        if (typeof input !== "string") return locale.err("api.request.fail");
+
+        let endData: json = {};
+
+        // Попытка найти ytInitialData JSON
+        const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
+        if (initialDataMatch) {
+            try {
+                endData = JSON.parse(initialDataMatch[1]);
+            } catch {
+                // Игнорируем ошибку парсинга initialData
+            }
+        }
+
+        // Определяем, какой паттерн искать дальше: playerResponse или initialData
+        const startPattern = input.includes("var ytInitialPlayerResponse = ")
+            ? "var ytInitialPlayerResponse = "
+            : "var ytInitialData = ";
+
+        const startIndex = input.indexOf(startPattern);
+        const endIndex = input.indexOf("};", startIndex + startPattern.length);
+
+        // Если не нашли нужный участок с JSON — возвращаем ошибку
+        if (startIndex === -1 || endIndex === -1) return locale.err("api.request.fail");
+
+        try {
+            const jsonStr = input.substring(startIndex + startPattern.length, endIndex + 1);
+            const parsedData = JSON.parse(jsonStr);
+            // Объединяем данные, playerResponse имеет приоритет
+            endData = { ...endData, ...parsedData };
+        } catch {
+            return locale.err("api.request.fail");
+        }
+
+        // Проверяем статус playabilityStatus, если есть
+        const status = endData.playabilityStatus?.status;
+        if (status && status !== "OK") {
+            const reason = endData.playabilityStatus?.reason || "Not found status error";
+            return new Error(locale._(locale.language, "api.request.fail.msg", [reason]));
+        }
+
+        return endData;
+    };
 }
 
+/**
+ * @author SNIPPIK
+ * @description Допустимые символы, буквы, цифры для работы с youtube на более похожем уровне api
+ * @const CPN_CHARS
+ */
+const CPN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+/**
+ * @author SNIPPIK
+ * @description Генерируем уникальный индикатор устройства, фейковый конечно
+ * @param length - Размер
+ * @private
+ */
+function generateClientPlaybackNonce(length: number): string {
+    return Array.from({ length }, () => CPN_CHARS[Math.floor(Math.random() * CPN_CHARS.length)]).join("");
+}
+
+/**
+ * @author SNIPPIK
+ * @description Генерируем фейковые ключи для плеера
+ * @param totalLength - Глобальный размер ключа
+ */
+function generateFakeApiKey(totalLength = 34): string {
+    let key = "AIzaSyAO_";
+
+    for (let i = 0; i < totalLength - 4; i++) {
+        key += CPN_CHARS.charAt(Math.floor(Math.random() * CPN_CHARS.length));
+    }
+
+    return key;
+}
 
 /**
  * @export default

@@ -153,6 +153,7 @@ type DeclareOptionsUser = DeclareOptionsBase & {
  * @author SNIPPIK
  * @description Оригинальный элемент выбора
  * @interface Choice
+ * @public
  */
 export interface Choice {
     /**

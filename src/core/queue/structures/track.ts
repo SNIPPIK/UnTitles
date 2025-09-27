@@ -113,7 +113,7 @@ export class Track {
         const { username, id, avatar } = author;
 
         // Если нет автора трека, то автором станет сам пользователь
-        if (!this.artist) this._track.artist = {
+        if (!this._track.artist) this._track.artist = {
             url: `https://discordapp.com/users/${id}`,
             title: username
         };

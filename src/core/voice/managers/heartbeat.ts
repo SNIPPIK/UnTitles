@@ -144,6 +144,22 @@ export class HeartbeatManager {
     public increaseReconnect = () => {
         this.reconnects++;
     };
+
+    /**
+     * @description Останавливаем все heartbeat процессы и удаляем все данные
+     * @returns void
+     * @public
+     */
+    public destroy = () => {
+        this.stop();
+
+        this.misses = null;
+        this.lastAckTime = null;
+        this.lastSentTime = null;
+        this.misses = null;
+        this.reconnects = null;
+        this.intervalMs = null;
+    };
 }
 
 /**

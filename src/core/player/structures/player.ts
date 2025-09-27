@@ -299,6 +299,14 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const queue = db.queues.get(player.id);
             const current = player.tracks.position;
 
+
+            // Позиция трека для сообщения
+            const position = skip?.position !== undefined ? skip?.position : current;
+
+            // Выводим сообщение об ошибке
+            db.events.emitter.emit("message/error", queue, error, position);
+
+
             // Если надо пропустить трек
             if (skip) {
                 // Если надо пропустить текущую позицию
@@ -313,12 +321,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                 player.tracks.remove(skip.position);
             }
-
-            // Позиция трека для сообщения
-            const position = skip?.position !== undefined ? skip?.position : current;
-
-            // Выводим сообщение об ошибке
-            db.events.emitter.emit("message/error", queue, error, position);
         });
     };
 

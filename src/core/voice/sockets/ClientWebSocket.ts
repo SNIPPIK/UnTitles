@@ -376,10 +376,11 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.reset();
         super.destroy();
         this.sequence = null;
-        this._heartbeat.stop();
-        this._heartbeat = null;
         this._endpoint = null;
         this._status = null;
+
+        this._heartbeat.destroy();
+        this._heartbeat = null;
     };
 }
 

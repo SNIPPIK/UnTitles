@@ -91,10 +91,10 @@ export class Process {
             this._process.removeAllListeners();
             // Убиваем процесс
             this._process.kill("SIGKILL");
-
-            // Удаляем данные процесса
-            this._process = null;
         }
+
+        // Удаляем данные процесса
+        this._process = null;
     };
 }
 

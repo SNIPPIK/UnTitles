@@ -20,7 +20,7 @@
     "ws": "^8.18.3"
   },
   "optionalDependencies": {
-    "@snazzah/davey": "^0.1.6"
+    "@snazzah/davey": "^0.1.7"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

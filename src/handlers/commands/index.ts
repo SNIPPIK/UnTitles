@@ -75,6 +75,8 @@ export class Commands extends handler<Command> {
 
     /**
      * @description Загружаем класс вместе с дочерним
+     * @constructor
+     * @public
      */
     public constructor() {
         super("src/handlers/commands");
@@ -253,7 +255,7 @@ export abstract class BaseCommand {
      * @description Отдаем данные в формате JSON и только необходимые
      * @public
      */
-    toJSON() {
+    public toJSON() {
         return {
             name: this.name,
             type: this.type,
@@ -291,7 +293,7 @@ export abstract class Command extends BaseCommand {
      * @description Отдаем данные в формате JSON и только необходимые
      * @public
      */
-    toJSON = () => {
+    public toJSON = () => {
         const options: ApplicationCommandOption[] = [];
 
         for (const i of this.options ?? []) {
@@ -327,7 +329,7 @@ export abstract class SubCommand extends BaseCommand {
      * @description Отдаем данные в формате JSON и только необходимые
      * @public
      */
-    toJSON() {
+    public toJSON = () => {
         return {
             ...super.toJSON(),
 
