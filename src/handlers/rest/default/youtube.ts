@@ -5,6 +5,13 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
+ * @description Допустимые символы, буквы, цифры для работы с youtube на более похожем уровне api
+ * @const CPN_CHARS
+ */
+const CPN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+/**
+ * @author SNIPPIK
  * @description Все допустимые заголовки
  * @const Clients
  */
@@ -592,13 +599,6 @@ class RestYouTubeAPI extends RestServerSide.API {
         return endData;
     };
 }
-
-/**
- * @author SNIPPIK
- * @description Допустимые символы, буквы, цифры для работы с youtube на более похожем уровне api
- * @const CPN_CHARS
- */
-const CPN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 /**
  * @author SNIPPIK
