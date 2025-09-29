@@ -188,7 +188,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                         const authorData = author[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
 
                         // Получаем истинные данные об авторе плейлиста
-                        artist = await this.getChannel({
+                        artist = await this.restArtist({
                             id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"],
                             name: authorData.title["runs"][0].text
                         });
@@ -318,7 +318,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                         if (data["hlsManifestUrl"]) track.audio = data["hlsManifestUrl"];
                         else {
                             // Если есть расшифровка ссылки видео
-                            if (data["formats"][0]) track.audio = data["formats"][0]["url"];
+                            if (data["formats"]) track.audio = data["formats"][0]["url"];
                         }
                     }
 
@@ -408,42 +408,6 @@ class RestYouTubeAPI extends RestServerSide.API {
     ];
 
     /**
-     * @description Получаем страницу и ищем на ней данные
-     * @param url - Ссылка на видео или ID видео
-     * @protected
-     */
-    protected pAPI = (url: string): Promise<Error | json> => {
-        return new Promise((resolve) => {
-            new httpsClient({ url,
-                userAgent: true,
-                headers: {
-                    "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
-                    "accept-encoding": "gzip, compress, deflate, br"
-                }
-            })
-                // Получаем исходную страницу
-                .toString
-
-                // Получаем результат из Promise
-                .then((api) => {
-                    // Если возникает ошибка при получении страницы
-                    if (api instanceof Error) return resolve(locale.err("api.request.fail"));
-
-                    // Ищем данные на странице
-                    const data = this._extractResponse(api);
-
-                    // Если возникает ошибка при поиске на странице
-                    if (data instanceof Error) return resolve(data);
-
-                    return resolve(data);
-                })
-
-                // Если происходит ошибка
-                .catch((err) => resolve(Error(`[APIs]: ${err}`)));
-        });
-    };
-
-    /**
      * @description Получаем страницу с данными
      * @param ID - ID видео
      * @param audio - нужно ли получить аудио
@@ -486,33 +450,6 @@ class RestYouTubeAPI extends RestServerSide.API {
     };
 
     /**
-     * @description Получаем данные об авторе видео
-     * @param id - ID канала
-     * @param name - Название канала, если не будет найден канал будет возвращено название
-     * @protected
-     */
-    protected getChannel = ({ id, name }: { id: string, name?: string }): Promise<Track.artist> => {
-        return new Promise<Track.artist>((resolve) => {
-            new httpsClient({
-                url: `https:/www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`,
-                headers: Clients.WEB.request.context.client
-            }).toJson.then((channel) => {
-                if (channel instanceof Error) return resolve(null);
-
-                const data = channel[1]?.response ?? channel?.response ?? null as any;
-                const info = data?.header?.["c4TabbedHeaderRenderer"], Channel = data?.metadata?.["channelMetadataRenderer"],
-                    avatar = info?.avatar;
-
-                return resolve({
-                    title: Channel?.title ?? name ?? "Not found name",
-                    url: `https://www.youtube.com/channel/${id}`,
-                    image: avatar?.["thumbnails"].pop() ?? null
-                });
-            }).catch(() => resolve(null));
-        });
-    };
-
-    /**
      * @description Подготавливаем трек к отправке
      * @param track - Данные видео
      * @protected
@@ -547,6 +484,69 @@ class RestYouTubeAPI extends RestServerSide.API {
                 audio: track?.format?.url || undefined
             }
         }
+    };
+
+    /**
+     * @description Получаем страницу и ищем на ней данные
+     * @param url - Ссылка на видео или ID видео
+     * @protected
+     */
+    protected pAPI = (url: string): Promise<Error | json> => {
+        return new Promise((resolve) => {
+            new httpsClient({ url,
+                userAgent: true,
+                headers: {
+                    "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "accept-encoding": "gzip, compress, deflate, br"
+                }
+            })
+                // Получаем исходную страницу
+                .toString
+
+                // Получаем результат из Promise
+                .then((api) => {
+                    // Если возникает ошибка при получении страницы
+                    if (api instanceof Error) return resolve(locale.err("api.request.fail"));
+
+                    // Ищем данные на странице
+                    const data = this._extractResponse(api);
+
+                    // Если возникает ошибка при поиске на странице
+                    if (data instanceof Error) return resolve(data);
+
+                    return resolve(data);
+                })
+
+                // Если происходит ошибка
+                .catch((err) => resolve(Error(`[APIs]: ${err}`)));
+        });
+    };
+
+    /**
+     * @description Получаем данные об авторе видео
+     * @param id - ID канала
+     * @param name - Название канала, если не будет найден канал будет возвращено название
+     * @protected
+     */
+    protected restArtist = ({ id, name }: { id: string, name?: string }): Promise<Track.artist> => {
+        return new Promise<Track.artist>((resolve) => {
+            new httpsClient({
+                url: `https:/www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`,
+                headers: Clients.WEB.request.context.client
+            }).toJson.then((channel) => {
+                if (channel instanceof Error) return resolve(null);
+
+                const data = channel[1]?.response ?? channel?.response ?? null as any;
+                const info = data?.header?.["c4TabbedHeaderRenderer"], Channel = data?.metadata?.["channelMetadataRenderer"],
+                    avatar = info?.avatar;
+
+                return resolve({
+                    title: Channel?.title ?? name ?? "Not found name",
+                    url: `https://www.youtube.com/channel/${id}`,
+                    image: avatar?.["thumbnails"].pop() ?? null
+                });
+            }).catch(() => resolve(null));
+        });
     };
 
     /**

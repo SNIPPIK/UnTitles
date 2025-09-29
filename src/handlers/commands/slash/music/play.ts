@@ -33,7 +33,7 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
         if (Array.isArray(rest)) {
             items.push(...rest.map((track) => {
                 return {
-                    name: `🎵 (${track.time.split}) | ${track.artist.title.slice(0, 20)} - ${track.name.slice(0, 60)}`,
+                    name: `🎵 (${track.time.split}) | ${track.artist.title?.slice(0, 20)} - ${track.name?.slice(0, 60)}`,
                     value: track.url,
                 }
             }));
@@ -41,14 +41,14 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
 
         // Показываем плейлист
         else if ("items" in rest) items.push({
-            name: `🎶 [${rest.items.length}] - ${rest.title.slice(0, 70)}`,
+            name: `🎶 [${rest.items.length}] - ${rest.title?.slice(0, 70)}`,
             value: search
         });
 
         // Показываем трек
         else {
             items.push({
-                name: `🎵 (${rest.time.split}) | ${rest.artist.title.slice(0, 20)} - ${rest.name.slice(0, 60)}`,
+                name: `🎵 (${rest.time.split}) | ${rest.artist.title?.slice(0, 20)} - ${rest.name?.slice(0, 60)}`,
                 value: search
             });
         }
@@ -306,6 +306,7 @@ class PlayCommand extends Command {
         return null;
     };
 }
+
 
 /**
  * @export default

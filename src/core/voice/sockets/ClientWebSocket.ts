@@ -41,16 +41,16 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     private _endpoint: string;
 
     /**
-     * @description Клиент wss
-     * @private
-     */
-    private ws: WebSocket;
-
-    /**
      * @description Менеджер жизни подключения
      * @private
      */
     private _heartbeat: HeartbeatManager;
+
+    /**
+     * @description Клиент wss
+     * @private
+     */
+    private ws: WebSocket;
 
     /**
      * @description Последовательность запроса
@@ -301,7 +301,6 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Получение статуса готовности
             case VoiceOpcodes.Ready: {
                 this.emit("ready", payload);
-                this._heartbeat.resetReconnects(); // Сбросить счётчик при успешном подключении
                 break;
             }
 

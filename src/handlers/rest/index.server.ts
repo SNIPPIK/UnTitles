@@ -55,16 +55,19 @@ export namespace RestServerSide {
     export interface APIBase {
         /**
          * @description Название платформы
+         * @readonly
          */
         readonly name: RestAPIS_Names;
 
         /**
          * @description Ссылка на платформу
+         * @readonly
          */
         readonly url: string;
 
         /**
          * @description Цвет платформы, в стиле discord
+         * @readonly
          */
         readonly color: number;
     }
@@ -77,44 +80,71 @@ export namespace RestServerSide {
     export class API implements APIBase {
         /**
          * @description Название платформы
+         * @readonly
          */
         readonly name: RestAPIS_Names;
 
         /**
          * @description Ссылка на платформу
+         * @readonly
          */
         readonly url: string;
 
         /**
          * @description Цвет платформы, в стиле discord
+         * @readonly
          */
         readonly color: number;
 
         /**
          * @description Может ли платформа получать аудио сама. Аудио получается через запрос к track
+         * @readonly
          */
         readonly audio: boolean;
 
         /**
          * @description Если ли данные для авторизации
          * @default undefined - данные не требуются
+         * @readonly
          */
         readonly auth?: string;
 
         /**
          * @description Regexp для поиска платформы
+         * @readonly
          */
         readonly filter: RegExp;
 
         /**
          * @description Запросы к данных платформы
+         * @readonly
          */
         readonly requests: (RequestDef<"track"> | RequestDef<"search"> | RequestDef<"artist"> | RequestDef<"related"> | RequestDef<"album"> | RequestDef<"playlist">)[];
 
         /**
          * @description Доп параметры
+         * @readonly
          */
         readonly options: any;
+
+        /**
+         * @description Функция запроса данных с сервера
+         * @constructor
+         * @protected
+         */
+        protected async API(...args: any): Promise<Error | json> {
+            return new Error(`Not found method API | ${args}`);
+        };
+
+        /**
+         * @description Функция подготовки данных трека
+         * @param _ - Данные трека
+         * @constructor
+         * @protected
+         */
+        protected track(_: json): APIRequestsRaw["track"] {
+            return null;
+        };
     }
 
     /**

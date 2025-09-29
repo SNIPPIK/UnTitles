@@ -28,9 +28,6 @@ export class HeartbeatManager {
     /** Количество пропущенных ACK */
     private misses = 0;
 
-    /** Количество переподключений подряд */
-    private reconnects = 0;
-
     /** Интервал между heartbeat-сообщениями */
     public intervalMs = 0;
 
@@ -48,14 +45,6 @@ export class HeartbeatManager {
      */
     public get missed() {
         return this.misses;
-    };
-
-    /**
-     * @description Получаем количество подрядных попыток переподключения
-     * @public
-     */
-    public get reconnectAttempts() {
-        return this.reconnects;
     };
 
     /**
@@ -128,24 +117,6 @@ export class HeartbeatManager {
     };
 
     /**
-     * @description Сбросить счётчик reconnect'ов
-     * @returns void
-     * @public
-     */
-    public resetReconnects = () => {
-        this.reconnects = 0;
-    };
-
-    /**
-     * @description Увеличить счётчик reconnect'ов (на 1)
-     * @returns void
-     * @public
-     */
-    public increaseReconnect = () => {
-        this.reconnects++;
-    };
-
-    /**
      * @description Останавливаем все heartbeat процессы и удаляем все данные
      * @returns void
      * @public
@@ -157,7 +128,6 @@ export class HeartbeatManager {
         this.lastAckTime = null;
         this.lastSentTime = null;
         this.misses = null;
-        this.reconnects = null;
         this.intervalMs = null;
     };
 }

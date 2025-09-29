@@ -4,10 +4,9 @@ import { SILENT_FRAME } from "#core/audio";
 
 /**
  * @author SNIPPIK
- * @description Версия протокола dave
- * @public
+ * @description Текущая версия протокола dave
  */
-let DAVE_PROTOCOL_VERSION: number = 0;
+let MAX_DAVE_PROTOCOL: number = 0;
 
 /**
  * @author SNIPPIK
@@ -50,9 +49,6 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
     /** Количество последовательных сбоев, возникших при дешифровании */
     private consecutiveFailures = 0;
 
-    /** Количество последовательных сбоев, необходимое для попытки восстановления */
-    private failureTolerance: number = DEFAULT_DECRYPTION_FAILURE_TOLERANCE;
-
     /** Выполняется ли повторная инициализация сеанса из-за недопустимого перехода */
     public reinitializing = false;
 
@@ -60,13 +56,11 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
     public session: SessionMethods;
 
     /**
-     * @description Доступная версия DAVE
+     * @description Максимальная доступная версия протокола
      * @returns number
-     * @public
-     * @static
      */
     public static get version(): number {
-        return DAVE_PROTOCOL_VERSION;
+        return MAX_DAVE_PROTOCOL;
     };
 
     /**
@@ -75,6 +69,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @public
      */
     public set externalSender(externalSender: Buffer) {
+        // Если нет запущенной сессии
         if (!this.session) throw new Error("No session available");
         this.session.setExternalSender(externalSender);
         this.emit("debug", "Set MLS external sender");
@@ -87,10 +82,27 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public set prepareEpoch(data: VoiceDavePrepareEpochData) {
         this.emit("debug", `Preparing for epoch (${data.epoch})`);
+
+        // Если есть идентификатор
         if (data.epoch === 1) {
             this.protocolVersion = data.protocol_version;
             this.reinit();
         }
+    };
+
+    /**
+     * @description Восстановление после недопустимого перехода путем повторной инициализации.
+     * @param transitionId - Идентификатор перехода для аннулирования
+     * @returns void
+     * @public
+     */
+    public set recoverFromInvalidTransition(transitionId: number) {
+        if (this.reinitializing) return;
+        this.emit("debug", `Invalidating transition ${transitionId}`);
+        this.reinitializing = true;
+        this.consecutiveFailures = 0;
+        this.emit("invalidateTransition", transitionId);
+        this.reinit();
     };
 
     /**
@@ -117,6 +129,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @public
      */
     public reinit = (): void => {
+        // Если можно создать сессию
         if (this.protocolVersion > 0 && this.user_id && this.channel_id) {
             // Если сессия уже есть
             if (this.session) {
@@ -130,11 +143,12 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
                 this.emit("debug", `Session initialized for protocol version ${this.protocolVersion}`);
             }
 
-            // Даем немного времени для отправки ключа
-            setImmediate(() => {
-                this.emit("key", this.session.getSerializedKeyPackage());
-            });
-        } else if (this.session) {
+            // Отправляем ключ
+            this.emit("key", this.session.getSerializedKeyPackage());
+        }
+
+        // Если уже есть сессия
+        else if (this.session) {
             this.session.reset();
             this.session.setPassthroughMode(true, TRANSITION_EXPIRY);
             this.emit("debug", "Session reset");
@@ -169,6 +183,8 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public executeTransition = (transition_id: number) => {
         this.emit("debug", `Executing transition (${transition_id})`);
+
+        // Если нет данных для смены версии DAVE
         if (!this.pendingTransition) {
             this.emit("debug", `Received execute transition, but we don't have a pending transition for ${transition_id}`);
             return null;
@@ -189,35 +205,19 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
                 this.emit("debug", "Session upgraded");
             }
 
-            // В будущем мы также хотели бы подать сигнал DAVESession о переходе, но на данный момент поддерживается только версия v1.
+            // В будущем можно будет подать сигнал DAVESession о переходе, но на данный момент поддерживается только версия v1.
             transitioned = true;
             this.reinitializing = false;
             this.lastTransition_id = transition_id;
             this.emit("debug", `Transition executed (v${oldVersion} -> v${this.protocolVersion}, id: ${transition_id})`);
         } else {
-            this.emit(
-                "debug",
+            this.emit("debug",
                 `Received execute transition for an unexpected transition id (expected: ${this.pendingTransition.transition_id}, actual: ${transition_id})`,
             );
         }
 
         this.pendingTransition = undefined;
         return transitioned;
-    };
-
-    /**
-     * @description Восстановление после недопустимого перехода путем повторной инициализации.
-     * @param transitionId - Идентификатор перехода для аннулирования
-     * @returns void
-     * @public
-     */
-    public recoverFromInvalidTransition = (transitionId: number): void => {
-        if (this.reinitializing) return;
-        this.emit("debug", `Invalidating transition ${transitionId}`);
-        this.reinitializing = true;
-        this.consecutiveFailures = 0;
-        this.emit("invalidateTransition", transitionId);
-        this.reinit();
     };
 
     /**
@@ -231,7 +231,6 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         if (!this.session) throw new Error("No session available");
 
         this.emit("debug", "MLS proposals processed");
-
         const { commit, welcome } = this.session.processProposals(
             payload.readUInt8(0) as 0 | 1,
             payload.subarray(1),
@@ -255,16 +254,24 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         try {
             this.session.processCommit(payload.subarray(2));
 
+            // Если Dave отключен
             if (transition_id === 0) {
                 this.reinitializing = false;
                 this.lastTransition_id = transition_id;
-            } else this.pendingTransition = { transition_id, protocol_version: this.protocolVersion };
+            }
+            // Если Dave снова включен
+            else {
+                this.pendingTransition = {
+                    transition_id,
+                    protocol_version: this.protocolVersion
+                };
+            }
 
             this.emit("debug", `MLS commit processed (transition id: ${transition_id})`);
             return { transition_id, success: true };
         } catch (error) {
             this.emit("debug", `MLS commit errored from transition ${transition_id}: ${error}`);
-            this.recoverFromInvalidTransition(transition_id);
+            this.recoverFromInvalidTransition = transition_id;
             return { transition_id, success: false };
         }
     };
@@ -281,16 +288,25 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
 
         try {
             this.session.processWelcome(payload.subarray(2));
+
+            // Если Dave отключен
             if (transition_id === 0) {
                 this.reinitializing = false;
                 this.lastTransition_id = transition_id;
-            } else this.pendingTransition = { transition_id, protocol_version: this.protocolVersion };
+            }
+            // Если Dave снова включен
+            else {
+                this.pendingTransition = {
+                    transition_id,
+                    protocol_version: this.protocolVersion
+                };
+            }
 
             this.emit("debug", `MLS welcome processed (transition id: ${transition_id})`);
             return { transition_id, success: true };
         } catch (error) {
             this.emit("debug", `MLS welcome errored from transition ${transition_id}: ${error}`);
-            this.recoverFromInvalidTransition(transition_id);
+            this.recoverFromInvalidTransition = transition_id;
             return { transition_id, success: false };
         }
     };
@@ -302,6 +318,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @public
      */
     public encrypt = (packet: Buffer) => {
+        // Если невозможно зашифровать opus frame
         if (this.protocolVersion === 0 || !this.session?.ready || packet.equals(SILENT_FRAME)) return packet;
         return this.session.encryptOpus(packet);
     };
@@ -315,6 +332,8 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public decrypt = (packet: Buffer, userId: string) => {
         const canDecrypt = this.session?.ready && (this.protocolVersion !== 0 || this.session?.canPassthrough(userId));
+
+        // Если невозможно расшифровать opus frame
         if (packet.equals(SILENT_FRAME) || !canDecrypt || !this.session) return packet;
 
         try {
@@ -326,8 +345,8 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
                 this.consecutiveFailures++;
                 this.emit("debug", `Failed to decrypt a packet (${this.consecutiveFailures} consecutive fails)`);
 
-                if (this.consecutiveFailures > this.failureTolerance) {
-                    if (this.lastTransition_id) this.recoverFromInvalidTransition(this.lastTransition_id);
+                if (this.consecutiveFailures > DEFAULT_DECRYPTION_FAILURE_TOLERANCE) {
+                    if (this.lastTransition_id) this.recoverFromInvalidTransition = this.lastTransition_id;
                     else throw error;
                 }
             } else if (this.reinitializing) {
@@ -353,7 +372,9 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
 
         try {
             this.session?.reset?.();
-        } catch {}
+        } catch (error) {
+            Logger.log("ERROR", `Failed to destroy DAVE session: ${error}`);
+        }
 
         this.session = null;
         this.reinitializing = null;
@@ -363,7 +384,6 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         this.pendingTransition = null;
         this.downgraded = null;
         this.pendingTransition = null;
-        this.failureTolerance = null;
     };
 }
 
@@ -527,7 +547,7 @@ let loaded_lib: any = null;
             const library = await import(name);
             delete require.cache[require.resolve(name)];
 
-            DAVE_PROTOCOL_VERSION = library?.DAVE_PROTOCOL_VERSION as number;
+            MAX_DAVE_PROTOCOL = library?.DAVE_PROTOCOL_VERSION as number;
             loaded_lib = library;
             return;
         } catch {}
