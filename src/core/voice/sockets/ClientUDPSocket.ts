@@ -20,17 +20,10 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /** Параметр подключения */
     private isConnected = false;
 
-    /**
-     * @description Уничтожен ли класс
-     * @private
-     */
+    /** Уничтожен ли класс */
     private destroyed = false;
 
-    /**
-     * @description Socket UDP подключения
-     * @readonly
-     * @private
-     */
+    /** Socket UDP подключения */
     private socket: Socket;
 
     /**
@@ -204,6 +197,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         clearInterval(this.keepAlive.interval);
         clearTimeout(this.keepAlive.timeout);
 
+        this.removeAllListeners();
         this.socket.removeAllListeners();
         super.destroy();
 

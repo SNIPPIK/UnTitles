@@ -1,4 +1,5 @@
 import * as process from "node:process";
+import { inspect } from "node:util";
 import { env } from "#app/env";
 import path from "node:path";
 import fs from "node:fs";
@@ -109,7 +110,7 @@ export class Logger {
 
         // Если объект
         else if (typeof text === "object") {
-            text = JSON.stringify(text);
+            text = inspect(text, { depth: 3, colors: false });
         }
 
         // Игнорируем debug сообщения

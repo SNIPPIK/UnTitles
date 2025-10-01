@@ -25,10 +25,10 @@ export const OPUS_FRAME_SIZE = 20;
 
 /**
  * @author SNIPPIK
- * @description Размер opus аудио пакета
- * @const OPUS_FRAME_LENGTH
+ * @description Максимальная длина сегмента по спецификации OGG
+ * @const MAX_SEGMENT_LENGTH
  */
-const OPUS_FRAME_LENGTH = 255;
+const MAX_SEGMENT_LENGTH = 255;
 
 /**
  * @author SNIPPIK
@@ -136,7 +136,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             payloadOffset += segmentLength;
 
             // Если сегмент меньше 255 — пакет окончен
-            if (segmentLength < OPUS_FRAME_LENGTH) {
+            if (segmentLength < MAX_SEGMENT_LENGTH) {
                 const packet = Buffer.concat(currentPacket);
                 currentPacket = [];
 

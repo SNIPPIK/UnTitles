@@ -1,6 +1,6 @@
-import { DiscordGatewayAdapterCreator } from "#core/voice/adapter";
-import { VoiceConnection } from "#core/voice/connection";
+import type { DiscordGatewayAdapterCreator } from "#core/voice/adapter";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
+import { VoiceConnection } from "#core/voice/connection";
 import { Collection } from "#structures";
 
 // Voice Sockets

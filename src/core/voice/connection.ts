@@ -1,6 +1,6 @@
-import { APIVoiceState, GatewayVoiceServerUpdateDispatchData } from "discord-api-types/v10";
-import { DiscordGatewayAdapterCreator, VoiceAdapter } from "./adapter";
-import { GatewayCloseCodes, WebSocketOpcodes } from "#core/voice";
+import type { APIVoiceState, GatewayVoiceServerUpdateDispatchData } from "discord-api-types/v10";
+import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./adapter";
+import { GatewayCloseCodes, type WebSocketOpcodes } from "#core/voice";
 import { VoiceReceiver } from "#core/voice/managers/receiver";
 import { ClientSRTPSocket } from "./sockets/ClientSRTPSocket";
 import { ClientWebSocket } from "./sockets/ClientWebSocket";

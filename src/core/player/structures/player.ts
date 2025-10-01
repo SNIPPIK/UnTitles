@@ -1,4 +1,4 @@
-import { BufferedAudioResource, PipeAudioResource, SILENT_FRAME } from "#core/audio";
+import {BufferedAudioResource, PipeAudioResource, SILENT_FRAME} from "#core/audio";
 import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue";
 import { AudioFilter, AudioPlayerEvents, ControllerFilters } from "#core/player";
 import { PlayerProgress } from "../modules/progress";
@@ -336,14 +336,22 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если другой аудио поток загружается, то запрещаем включение
         if (this._audio.preloaded) return null;
 
+        const stream = this._audio.current, filters = this._filters.toString(time, this._audio.volume, stream && stream?.packets > 0);
+
+        // Если есть текущее аудио и оно является буферным
+        if (stream && stream instanceof BufferedAudioResource) {
+            // Если фильтры совпадают и время проигрывания
+            if (stream.input_data.options.filters === filters && !stream.input_data.options.seek && !seek) {
+                stream.refresh();
+                return stream;
+            }
+        }
+
         // Выбираем и создаем класс для предоставления аудио потока
         return this._audio.preload = new (time > PLAYER_BUFFERED_TIME || time === 0 ? PipeAudioResource : BufferedAudioResource)(
             {
                 path,
-                options: {
-                    seek,
-                    filters: this._filters.toString(time, this._audio.volume, this._audio.current && this._audio.current?.packets > 0)
-                }
+                options: { seek, filters }
             }
         );
     };

@@ -369,6 +369,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public destroy = () => {
         super.destroy();
+        this.removeAllListeners();
 
         try {
             this.session?.reset?.();

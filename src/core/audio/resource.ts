@@ -130,7 +130,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @constructor
      * @protected
      */
-    protected constructor(protected input_data: AudioResourceOptions) {
+    protected constructor(public input_data: AudioResourceOptions) {
         super();
         this._seek = (input_data.options.seek * 1e3) / OPUS_FRAME_SIZE;
     };
@@ -245,7 +245,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public set seek(seek: number) {
-        this._buffer.position = (seek * 1e3 + OPUS_FRAME_SIZE) / OPUS_FRAME_SIZE;
+        this._buffer.position = (seek * 1e3) / OPUS_FRAME_SIZE;
     };
 
     /**
@@ -280,10 +280,8 @@ export class BufferedAudioResource extends BaseAudioResource {
             decode: (input) => {
                 input.on("frame", (packet: Buffer) => {
                     if (this._buffer) {
-                        setImmediate(() => {
-                            // Сообщаем что поток можно начать читать
-                            if (!this._buffer?.position) this.emit("readable");
-                        });
+                        // Сообщаем что поток можно начать читать
+                        if (!this._readable) setImmediate(() => { this.emit("readable");});
 
                         // Если создал класс буфера, начинаем кеширование пакетов
                         if (packet) this._buffer.packet = packet;
@@ -428,7 +426,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @public
      */
     public set seek(seek: number) {
-        let steps = (seek * 1e3 + OPUS_FRAME_SIZE) / OPUS_FRAME_SIZE;
+        let steps = (seek * 1e3) / OPUS_FRAME_SIZE;
 
         // Если диапазон слишком мал или большой
         if (steps >= 0 || steps > this.packets) return;

@@ -1,7 +1,7 @@
-import { WebSocketOpcodes, GatewayCloseCodes } from "#core/voice";
+import { type WebSocketOpcodes, GatewayCloseCodes } from "#core/voice";
+import { WebSocket, type MessageEvent, type Data } from "ws";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
 import { HeartbeatManager } from "../managers/heartbeat";
-import { WebSocket, MessageEvent, Data } from "ws";
 import { Logger, TypedEmitter } from "#structures";
 import { version, name } from "package.json";
 import os from "node:os";
@@ -363,7 +363,9 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         this.ws = null;
-        this._heartbeat.stop();
+
+        // Если есть менеджер жизни ws
+        if (this._heartbeat) this._heartbeat.stop();
     };
 
     /**
@@ -378,8 +380,10 @@ export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this._endpoint = null;
         this._status = null;
 
-        this._heartbeat.destroy();
-        this._heartbeat = null;
+        if (this._heartbeat) {
+            this._heartbeat.destroy();
+            this._heartbeat = null;
+        }
     };
 }
 

@@ -42,34 +42,19 @@ const MAX_32BIT = 2 ** 32;
  * @public
  */
 export class ClientSRTPSocket {
-    /**
-     * @description Пустой заголовок RTP, для использования внутри класса
-     * @private
-     */
+    /** Пустой заголовок RTP, для использования внутри класса */
     private _RTP_HEAD = Buffer.alloc(12);
 
-    /**
-     * @description Пустой буфер
-     * @private
-     */
+    /** Пустой буфер */
     private _nonce: Buffer = Buffer.from(Encryption.nonce);
 
-    /**
-     * @description Порядковый номер пустого буфера
-     * @private
-     */
+    /** Порядковый номер пустого буфера */
     private _nonceSize : number;
 
-    /**
-     * @description Последовательность opus фреймов
-     * @private
-     */
+    /** Последовательность opus фреймов */
     private sequence: number;
 
-    /**
-     * @description Время проигрывания opus фреймов (+960)
-     * @private
-     */
+    /** Время проигрывания opus фреймов (+960) */
     private timestamp: number;
 
     /**
@@ -87,13 +72,13 @@ export class ClientSRTPSocket {
      * @public
      */
     public get nonceSize() {
-        // Проверяем что-бы не было превышения int 32
-        if (this._nonceSize > MAX_32BIT) this._nonceSize = 0;
+        if (!this._nonce || !Encryption.nonce) {
+            this._nonce = Buffer.alloc(Encryption.nonce?.length ?? 12);
+        }
 
-        // Записываем в буфер
-        this._nonce.writeUInt32BE(this._nonceSize, 0);
-
-        this._nonceSize++; // Добавляем к размеру
+        // пишем счетчик в первые 4 байта (или в нужную позицию)
+        this._nonce.writeUInt32BE(this._nonceSize >>> 0, 0);
+        this._nonceSize = (this._nonceSize + 1) >>> 0;
         return this._nonce;
     };
 
@@ -103,8 +88,8 @@ export class ClientSRTPSocket {
      * @private
      */
     private get header() {
-        if (this.sequence > MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было превышения int 16
-        if (this.timestamp > MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было превышения int 32
+        if (this.sequence >= MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было превышения int 16
+        if (this.timestamp >= MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было превышения int 32
 
         // Получаем текущий заголовок
         const RTPHead = this._RTP_HEAD;
@@ -168,7 +153,7 @@ export class ClientSRTPSocket {
         // Получаем nonce буфер 12-24 бит
         if (!nonce) nonce = this.nonceSize;
 
-        // Получаем первые 4 байта из буфера
+        // Одноразовый код размера RTP: первые 4 байта в соответствии с соглашением Discord «rtpsize».
         const nonceBuffer = nonce.subarray(0, 4);
 
         // Шифровка aead_aes256_gcm
@@ -195,16 +180,12 @@ export class ClientSRTPSocket {
      * @private
      */
     private randomNBit = (bits: number) => {
-        const max = 2 ** bits;
         const size = Math.ceil(bits / 8);
-        const maxGenerated = 2 ** (size * 8);
-        let rand: number;
-
-        do {
-            rand = crypto.randomBytes(size).readUIntBE(0, size);
-        } while (rand >= maxGenerated - (maxGenerated % max));
-
-        return rand % max;
+        const buf = crypto.randomBytes(size);
+        if (size === 2) return buf.readUInt16BE(0);
+        if (size === 4) return buf.readUInt32BE(0);
+        // fallback for odd sizes
+        return buf.readUIntBE(0, size) % (2 ** bits);
     };
 
     /**
@@ -284,7 +265,6 @@ let loaded_lib: Methods.current = {};
                 const library = await import(name);
                 if (typeof library?.ready?.then === "function") await library.ready;
                 Object.assign(loaded_lib, support_libs[name](library));
-                delete require.cache[require.resolve(name)];
                 return;
             } catch {}
         }
