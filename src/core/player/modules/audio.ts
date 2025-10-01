@@ -80,7 +80,7 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
      */
     public set preload(stream: T) {
         // Если уже есть пред-загруженное аудио
-        if (this._pre_audio) this._pre_audio?.destroy();
+        if (this._pre_audio) this._pre_audio.destroy();
 
         // Записываем аудио в пред-загруженные
         this._pre_audio = stream;
@@ -92,7 +92,7 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
         }, 10e3);
 
         // Отслеживаем аудио поток на ошибки
-        (stream as BufferedAudioResource).once("error", async () => {
+        (stream as BufferedAudioResource).once("error", () => {
             // Удаляем таймер
             clearTimeout(this._timeout);
 
@@ -102,14 +102,14 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
         });
 
         // Отслеживаем аудио поток на готовность к чтению
-        (stream as BufferedAudioResource).once("readable", async () => {
+        (stream as BufferedAudioResource).once("readable", () => {
             // Удаляем таймер
             clearTimeout(this._timeout);
 
             // Если есть активный поток
             if (this._audio) {
                 // Производим явную синхронизацию времени
-                stream.seek = this._audio.duration;
+                stream.seek = this._audio.duration - this._audio._startTime - stream._startTime;
                 this._audio.destroy();
             }
 

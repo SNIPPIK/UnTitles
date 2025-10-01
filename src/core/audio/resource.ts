@@ -86,6 +86,9 @@ class AudioBuffer {
  * @abstract
  */
 abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
+    /** Время создания аудио для синхронизации аудио потока */
+    public _startTime = Date.now();
+
     /**
      * @description Можно ли читать поток
      * @protected
@@ -175,6 +178,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
         this._readable = null;
         this._seek = null;
         this.input_data = null;
+        this._startTime = null;
     };
 }
 
