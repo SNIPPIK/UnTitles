@@ -73,7 +73,7 @@ class QueueList extends SubCommand {
             }
         );
 
-        const {artist, url, name, image, api, ID, time, user, link} = track;
+        const { artist, url, name, image, api, ID, time, user, link } = track;
 
         // Отправляем данные о выбранном треке
         return ctx.reply({
@@ -85,7 +85,7 @@ class QueueList extends SubCommand {
                         icon_url: artist.image.url
                     },
                     thumbnail: image,
-                    description: `[${name}](${url})\n - ${ID}\n - ${time.split}` + (link && link.startsWith("http") ? `\n - 💽: ❌` : link ? "\n - 💽: ✅" : ""),
+                    description: `[${name}](${url})\n - ${ID}\n - ${time.split}` + (link && link.startsWith("http") ? `\n - 🗃: ❌` : link ? "\n - 🗃: ✅" : ""),
                     color: api.color,
 
                     footer: {

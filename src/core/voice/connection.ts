@@ -238,11 +238,14 @@ export class VoiceConnection {
              * @description Регистрирует пакет `VOICE_STATE_UPDATE` для голосового соединения. Самое главное, он сохраняет идентификатор
              * канала, к которому подключен клиент.
              * @param packet - Полученный пакет `VOICE_STATE_UPDATE`
-             * @private
              */
             onVoiceStateUpdate: (packet) => {
                 this.adapter.packet.state = packet;
             },
+
+            /**
+             * @description Регистрируем удаление данных из класса голосового подключения
+             */
             destroy: this.destroy
         });
 
@@ -250,7 +253,7 @@ export class VoiceConnection {
         this.adapter.sendPayload(this.configuration);
         this._status = VoiceConnectionStatus.connected;
 
-        // Если включен звук бота
+        // Если включен микрофон бота тогда запускаем класс слушатель
         if (!configuration.self_deaf) {
             this.receiver = new VoiceReceiver(this);
         }

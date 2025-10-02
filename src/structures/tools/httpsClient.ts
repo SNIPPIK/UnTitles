@@ -235,7 +235,7 @@ export class httpsClient extends Request {
             try {
                 const body = await this.toString;
 
-                // Если при получении страници произошла ошибка
+                // Если при получении страниц произошла ошибка
                 if (body instanceof Error) return new Error("Not found XML data!");
 
                 const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/gi);

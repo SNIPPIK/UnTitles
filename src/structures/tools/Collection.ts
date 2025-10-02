@@ -5,11 +5,7 @@
  * @public
  */
 export class Collection<K, T = string> {
-    /**
-     * @description База Map для взаимодействия с объектами через идентификатор
-     * @readonly
-     * @private
-     */
+    /** База Map для взаимодействия с объектами через идентификатор */
     private _map = new Map<T, K>();
 
     /**

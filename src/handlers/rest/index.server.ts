@@ -20,7 +20,7 @@ export namespace RestServerSide {
      * @description Пример класса с типами
      * @type APIs
      */
-    export type APIs = Record<API['name'], API>
+    export type APIs = Record<RestAPIS_Names, API>;
 
     /**
      * @description Данные для валидного запроса параллельном процессу
@@ -194,5 +194,11 @@ export namespace RestServerSide {
          * @protected
          */
         block: RestAPIS_Names[];
+
+        /**
+         * @description Поддерживаемые платформы в array формате, для экономии памяти
+         * @private
+         */
+        array?: RestServerSide.API[]
     }
 }

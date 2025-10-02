@@ -52,7 +52,7 @@ export class HeartbeatManager {
      * @constructor
      * @public
      */
-    public constructor(private readonly hooks: HeartbeatHooks) {}
+    public constructor(private hooks: HeartbeatHooks) {}
 
     /**
      * @description Запускаем heartbeat с заданным интервалом
@@ -129,6 +129,7 @@ export class HeartbeatManager {
         this.lastSentTime = null;
         this.misses = null;
         this.intervalMs = null;
+        this.hooks = null;
     };
 }
 

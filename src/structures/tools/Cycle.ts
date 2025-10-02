@@ -10,46 +10,25 @@ import { SetArray } from "#structures";
  * @private
  */
 abstract class BaseCycle<T = unknown> extends SetArray<T> {
-    /**
-     * @description Последний записанное значение performance.now(), нужно для улавливания event loop lags
-     * @private
-     */
+    /** Последний записанное значение performance.now(), нужно для улавливания event loop lags */
     private performance: number = 0;
 
-    /**
-     * @description Последний записанное значение performance.now(), нужно для сглаживания лага
-     * @private
-     */
+    /** Последний записанное значение performance.now(), нужно для сглаживания лага */
     private prevEventLoopLag: number = 0;
 
-    /**
-     * @description Последний сохраненный временной интервал
-     * @private
-     */
+    /** Последний сохраненный временной интервал */
     private lastDelay: number = 0;
 
-    /**
-     * @description Следующее запланированное время запуска (в ms, с плавающей точкой)
-     * @private
-     */
+    /** Следующее запланированное время запуска (в ms, с плавающей точкой) */
     private startTime: number = 0;
 
-    /**
-     * @description Время для высчитывания
-     * @private
-     */
+    /** Время для высчитывания */
     private tickTime: number = 0;
 
-    /**
-     * @description Временное число отставания цикла в миллисекундах
-     * @private
-     */
+    /** Временное число отставания цикла в миллисекундах */
     private drift: number = 0;
 
-    /**
-     * @description Таймер или функция ожидания
-     * @private
-     */
+    /** Таймер или функция ожидания */
     private timeout: NodeJS.Timeout | NodeJS.Immediate;
 
     /**

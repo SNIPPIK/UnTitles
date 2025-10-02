@@ -10,12 +10,8 @@ import fs from "node:fs";
  * @public
  */
 export abstract class handler<T = unknown> {
-    /**
-     * @description Загруженные файлы, именно файлы не пути к файлам
-     * @readonly
-     * @private
-     */
-    private readonly _files = new SetArray<T>();
+    /** Загруженные файлы, именно файлы не пути к файлам */
+    private _files = new SetArray<T>();
 
     /**
      * @description Выдаем все загруженные файлы
@@ -38,7 +34,7 @@ export abstract class handler<T = unknown> {
      * @param directory - Имя директории
      * @protected
      */
-    protected constructor(private readonly directory: string) {};
+    protected constructor(private directory: string) {};
 
     /**
      * @description Загружаем директории полностью, за исключением index файлов

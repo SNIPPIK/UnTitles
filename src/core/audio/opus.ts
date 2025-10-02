@@ -46,16 +46,10 @@ const EMPTY_FRAME =  Buffer.alloc(0);
  * @private
  */
 class BaseEncoder extends TypedEmitter<EncoderEvents> {
-    /**
-     * @description Не отправлен ли 1 аудио пакет
-     * @private
-     */
+    /** Не отправлен ли 1 аудио пакет */
     private _first = true;
 
-    /**
-     * @description Временный буфер, для общения между функциями
-     * @private
-     */
+    /** Временный буфер, для общения между функциями */
     public _buffer: Buffer = EMPTY_FRAME;
 
     /**
@@ -63,7 +57,8 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @private
      */
     public parseAvailablePages = (chunk: Buffer) => {
-        const frame = Buffer.concat([this._buffer, chunk]);
+        const prev = this._buffer;
+        const frame = prev.length === 0 ? chunk : Buffer.concat([prev, chunk], prev.length + chunk.length);
 
         // Начинаем обработку буфера с начала
         const size = frame.length;
@@ -128,34 +123,29 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @private
      */
     private extractPackets = (segmentTable: Buffer, payload: Buffer) => {
-        let currentPacket: Buffer[] = [], payloadOffset = 0;
+        let packetStartOffset = 0;         // Старт текущего пакета в payload
+        let currentPacketLength = 0;       // Длина текущего пакета
 
-        // Проверяем все фреймы
-        for (const segmentLength of segmentTable) {
-            currentPacket.push(payload.subarray(payloadOffset, payloadOffset + segmentLength));
-            payloadOffset += segmentLength;
+        for (let i = 0; i < segmentTable.length; i++) {
+            const segmentLength = segmentTable[i];
+            currentPacketLength += segmentLength;
 
             // Если сегмент меньше 255 — пакет окончен
             if (segmentLength < MAX_SEGMENT_LENGTH) {
-                const packet = Buffer.concat(currentPacket);
-                currentPacket = [];
+                const packet = Buffer.allocUnsafe(currentPacketLength);
+                payload.copy(packet, 0, packetStartOffset, packetStartOffset + currentPacketLength);
 
-                // Если найден заголовок
-                // 19   - Head frame
-                if (isOpusHead(packet)) continue;
+                // Обновляем старт следующего пакета
+                packetStartOffset += currentPacketLength;
+                currentPacketLength = 0;
 
-                // Если найден тег
-                // 296  - Tags frame
-                else if (isOpusTags(packet)) continue;
-
-                // Если не отправлен 1 opus frame
+                // Обрабатываем пакет
+                if (isOpusHead(packet)) this.emit("head", packet);
+                else if (isOpusTags(packet)) this.emit("tags", packet);
                 else if (this._first) {
                     this.emit("frame", SILENT_FRAME);
                     this._first = false;
-                }
-
-                // Отправляем пакет
-                this.emit("frame", packet);
+                } else this.emit("frame", packet);
             }
         }
     };
@@ -201,6 +191,8 @@ export class BufferedEncoder extends Writable {
     public constructor(options: WritableOptions = { autoDestroy: true }) {
         super(options);
         this.encoder.on("frame", this.emit.bind(this, "frame"));
+        this.encoder.on("head", (frame) => this.emit("head", frame));
+        this.encoder.on("tags", (frame) => this.emit("tags", frame));
     };
 
     /**
@@ -249,6 +241,8 @@ export class PipeEncoder extends Transform {
     public constructor(options: TransformOptions = { autoDestroy: true }) {
         super(Object.assign(options, { readableObjectMode: true }));
         this.encoder.on("frame", this.push.bind(this));
+        this.encoder.on("head", (frame) => this.emit("head", frame));
+        this.encoder.on("tags", (frame) => this.emit("tags", frame));
     };
 
     /**

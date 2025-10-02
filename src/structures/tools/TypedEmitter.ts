@@ -37,10 +37,7 @@ interface EventBucket {
  * @usage Если требуется ответ в событиях once использовать async!
  */
 export class TypedEmitter<L extends Record<string, any>> {
-    /**
-     * @description Локальной список событий, функций в map
-     * @private
-     */
+    /** Локальной список событий, функций в map */
     private _set = new Map<string, EventBucket[]>();
 
     /**

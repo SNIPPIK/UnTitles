@@ -1,4 +1,4 @@
-import { BufferedAudioResource, PipeAudioResource } from "#core/audio";
+import type { BufferedAudioResource, PipeAudioResource } from "#core/audio";
 import { db } from "#app/db";
 
 /**
@@ -41,11 +41,8 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
      * @public
      */
     public set volume(vol: number) {
-        if (vol > 200) vol = 200;
-        else if (vol < 10) vol = 10;
-
         // Меняем параметр
-        this._volume = vol;
+        this._volume = vol > 200 ? 200 : vol < 1 ? 10 : vol;
     };
 
     /**
@@ -80,7 +77,11 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
      */
     public set preload(stream: T) {
         // Если уже есть пред-загруженное аудио
-        if (this._pre_audio) this._pre_audio.destroy();
+        if (this._pre_audio) {
+            clearTimeout(this._timeout);
+            this._pre_audio.destroy();
+            this._pre_audio = null;
+        }
 
         // Записываем аудио в пред-загруженные
         this._pre_audio = stream;
@@ -109,7 +110,7 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
             // Если есть активный поток
             if (this._audio) {
                 // Производим явную синхронизацию времени
-                stream.seek = this._audio.duration - this._audio._startTime - stream._startTime;
+                stream.seek = this._audio.duration;
                 this._audio.destroy();
             }
 

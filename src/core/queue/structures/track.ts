@@ -20,7 +20,7 @@ export class Track {
      * @description Параметр для сохранения lyrics
      * @protected
      */
-    protected _lyrics: string;
+    protected _lyrics: string | null;
 
     /**
      * @description Пользователя включивший трек
@@ -346,7 +346,6 @@ interface TrackDuration {
      */
     total: number;
 }
-
 
 /**
  * @author SNIPPIK

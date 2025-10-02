@@ -165,7 +165,7 @@ class CacheAudio extends PromiseCycle<Track> {
      * @constructor
      * @public
      */
-    public constructor(private readonly cache_dir: string) {
+    public constructor(private cache_dir: string) {
         super({
             drift: true,
             custom: {

@@ -80,19 +80,13 @@ export class RestObject {
      * @description Последний уникальный ID запроса
      * @private
      */
-    private lastID = 0;
+    private lastID: number;
 
     /**
      * @description База с платформами
      * @public
      */
-    public platforms: RestServerSide.Data & {
-        /**
-         * @description Поддерживаемые платформы в array формате, для экономии памяти
-         * @private
-         */
-        array?: RestServerSide.API[]
-    };
+    public platforms: RestServerSide.Data;
 
     /**
      * @description Получаем список всех доступных платформ
@@ -133,7 +127,7 @@ export class RestObject {
         }
 
         // Если большое кол-во запросов
-        if (this.lastID >= 2 ** 16) this.generateUniqueId(true);
+        else if (this.lastID >= 2 ** 16) this.generateUniqueId(true);
 
         this.lastID += 1;
         return this.lastID;
@@ -145,8 +139,6 @@ export class RestObject {
      * @public
      */
     public startWorker = async (): Promise<boolean> => {
-        this.generateUniqueId(true);
-
         return new Promise(resolve => {
             const worker = this.worker = SimpleWorker.create<RestServerSide.Data>({
                 file: __dirname + "/index.worker",
@@ -158,13 +150,19 @@ export class RestObject {
                 not_destroyed: true,
                 callback: (data) => {
                     this.platforms = data;
+
+                    // Сбрасываем уникальный id запроса
+                    this.generateUniqueId(true);
                     return resolve(true);
                 }
             });
 
             // Если возникнет ошибка, пересоздадим worker
             worker.once("error", (error) => {
-                console.log(error);
+                if (this.lastID >= 5) throw error;
+                else console.log(error);
+
+                this.lastID++;
                 return this.startWorker();
             });
         });
@@ -365,7 +363,7 @@ export class RestObject {
      * @returns Promise<APIRequests[T] | Error>
      * @protected
      */
-    protected request_worker<T extends keyof APIRequests>({platform, payload, options}: RestClientSide.ClientOptions): Promise<APIRequests[T] | Error> {
+    protected request_worker<T extends keyof APIRequests>({platform, payload, options, type}: RestClientSide.ClientOptions): Promise<APIRequests[T] | Error> {
         return new Promise((resolve) => {
             const requestId = this.generateUniqueId(); // Генерируем номер запроса
 
@@ -414,7 +412,7 @@ export class RestObject {
             this.worker.on("message", onMessage);
 
             // Отправляем запрос
-            this.worker.postMessage({ platform: platform.name, payload, options, requestId });
+            this.worker.postMessage({ platform: platform.name, payload, options, requestId, type });
         });
     };
 }

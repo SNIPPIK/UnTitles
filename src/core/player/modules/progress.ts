@@ -1,4 +1,4 @@
-import type { RestServerSide } from "#handler/rest";
+import type { RestAPIS_Names } from "#handler/rest/index.decorator";
 import { env } from "#app/env";
 import { db } from "#app/db";
 
@@ -115,7 +115,7 @@ interface PlayerProgressInput {
      * @description Название платформы
      * @readonly
      */
-    platform: RestServerSide.API["name"];
+    platform: RestAPIS_Names;
 
     /**
      * @description Данные о времени трека

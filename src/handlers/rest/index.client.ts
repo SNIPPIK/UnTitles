@@ -14,10 +14,12 @@ export namespace RestClientSide {
      * @interface ClientOptions
      */
     export interface ClientOptions {
-        requestId: string
-        platform: RestServerSide.APIBase
-        payload: string
-        options?: { audio?: boolean; limit?: number }
+        platform: RestServerSide.APIBase;
+        type: keyof APIRequests;
+
+        requestId: string;
+        payload: string;
+        options?: { audio?: boolean; limit?: number };
     }
 
     /**
@@ -85,23 +87,23 @@ export namespace RestClientSide {
          */
         public request<T extends keyof APIRequests>(payload: string, options?: { audio: boolean }) {
             const api  = this._api;
+            const type = api.requests.find((item) => {
+                return item.name === payload || typeof payload === "string" && payload.startsWith("http") && item.filter?.test(payload) || item.name === "search"
+            })?.name;
 
             return {
                 // Получение типа запроса
-                type: api.requests.find((item) => {
-                    return item.name === payload || typeof payload === "string" && payload.startsWith("http") && item.filter?.test(payload) || item.name === "search"
-                })?.name,
+                type,
 
                 // Функция запроса на Worker для получения данных
                 request: () => db.api["request_worker"]<T>(
                     {
                         // Присваивается в request_worker
                         requestId: null,
-                        platform: api, payload, options
+                        platform: api, payload, options, type
                     }
                 )
             }
-
         };
     }
 }

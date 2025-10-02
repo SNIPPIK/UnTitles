@@ -1,6 +1,6 @@
-import {BufferedAudioResource, PipeAudioResource, SILENT_FRAME} from "#core/audio";
+import { type AudioFilter, type AudioPlayerEvents, ControllerFilters } from "#core/player";
+import { BufferedAudioResource, PipeAudioResource, SILENT_FRAME } from "#core/audio";
 import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue";
-import { AudioFilter, AudioPlayerEvents, ControllerFilters } from "#core/player";
 import { PlayerProgress } from "../modules/progress";
 import { Logger, TypedEmitter } from "#structures";
 import type { VoiceConnection } from "#core/voice";
@@ -37,7 +37,7 @@ const PLAYER_PAUSE_OFFSET = 3000;
  * @const PLAYER_TIMEOUT_OFFSET
  * @private
  */
-const PLAYER_TIMEOUT_OFFSET = 2000;
+const PLAYER_TIMEOUT_OFFSET = 1200;
 
 /**
  * @author SNIPPIK
