@@ -58,7 +58,14 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      */
     public parseAvailablePages = (chunk: Buffer) => {
         const prev = this._buffer;
-        const frame = prev.length === 0 ? chunk : Buffer.concat([prev, chunk], prev.length + chunk.length);
+        let frame: Buffer;
+
+        if (prev.length === 0) frame = chunk;
+        else {
+            frame = Buffer.allocUnsafe(prev.length + chunk.length);
+            prev.copy(frame, 0);
+            chunk.copy(frame, prev.length);
+        }
 
         // Начинаем обработку буфера с начала
         const size = frame.length;

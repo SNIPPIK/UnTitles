@@ -237,8 +237,12 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
             Array.from(connectedClients),
         );
 
-        if (!commit) return null;
-        return welcome ? Buffer.concat([commit, welcome]) : commit;
+        if (!welcome) return commit;
+
+        const result = Buffer.allocUnsafe(commit.length + welcome.length);
+        commit.copy(result, 0);
+        welcome.copy(result, commit.length);
+        return result;
     };
 
     /**

@@ -150,27 +150,37 @@ export class ClientSRTPSocket {
         // Получаем тип шифрования
         const mode = ClientSRTPSocket.mode;
 
-        // Получаем nonce буфер 12-24 бит
-        if (!nonce) nonce = this.nonceSize;
-
         // Одноразовый код размера RTP: первые 4 байта в соответствии с соглашением Discord «rtpsize».
         const nonceBuffer = nonce.subarray(0, 4);
 
-        // Шифровка aead_aes256_gcm
+        // Определяем длину итогового буфера
+        const totalLength = RTPHead.length + nonceBuffer.length + packet.length + 16;
+
+        // Создаём итоговый буфер
+        const result = Buffer.allocUnsafe(totalLength);
+        let offset = 0;
+
+        // RTPHead
+        RTPHead.copy(result, offset);
+        offset += RTPHead.length;
+
+        // Зашифрованные данные
         if (mode === "aead_aes256_gcm_rtpsize") {
             const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce, { authTagLength: 16 });
             cipher.setAAD(RTPHead);
-            return Buffer.concat([RTPHead, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
-        }
-
-        // Шифровка через библиотеку
-        else if (mode === "aead_xchacha20_poly1305_rtpsize") {
+            const encrypted = Buffer.concat([cipher.update(packet), cipher.final(), cipher.getAuthTag()]);
+            encrypted.copy(result, offset);
+            offset += encrypted.length;
+        } else if (mode === "aead_xchacha20_poly1305_rtpsize") {
             const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, RTPHead, nonce, this.options.key);
-            return Buffer.concat([RTPHead, cryptoPacket, nonceBuffer]);
+            cryptoPacket.copy(result, offset);
+            offset += cryptoPacket.length;
         }
 
-        // Если нет больше вариантов шифровки
-        throw new Error(`[Encryption Error]: Unsupported encryption mode "${mode}".`);
+        // nonceBuffer
+        nonceBuffer.copy(result, offset);
+
+        return result;
     };
 
     /**

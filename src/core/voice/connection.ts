@@ -529,7 +529,14 @@ export class VoiceConnection {
             // Предложения MLS, которые будут добавлены или отозваны
             else if (op === VoiceOpcodes.DaveMlsProposals) {
                 const dd = this.clientDave.processProposals(payload, this._clients);
-                if (dd) this.websocket.packet = Buffer.concat([new Uint8Array([VoiceOpcodes.DaveMlsCommitWelcome]), dd]);
+
+                // Если есть смысл менять протокол
+                if (dd) {
+                    const buf = Buffer.allocUnsafe(1 + dd.length);
+                    buf[0] = VoiceOpcodes.DaveMlsCommitWelcome;
+                    dd.copy(buf, 1);
+                    this.websocket.packet = buf;
+                }
             }
 
             // MLS Commit будет обработан для предстоящего перехода
@@ -565,8 +572,12 @@ export class VoiceConnection {
          * @event
          */
         session.on("key", (key) => {
+            // Если голосовое подключение готово
             if (this._status === VoiceConnectionStatus.ready || this._status === VoiceConnectionStatus.SessionDescription) {
-                this.websocket.packet = Buffer.concat([new Uint8Array([VoiceOpcodes.DaveMlsKeyPackage]), key]);
+                const buf = Buffer.allocUnsafe(1 + key.length);
+                buf[0] = VoiceOpcodes.DaveMlsKeyPackage;
+                key.copy(buf, 1);
+                this.websocket.packet = buf;
             }
         });
 
@@ -575,6 +586,7 @@ export class VoiceConnection {
          * @event
          */
         session.on("invalidateTransition", (transitionId) => {
+            // Если голосовое подключение готово
             if (this._status === VoiceConnectionStatus.ready || this._status === VoiceConnectionStatus.SessionDescription) {
                 this.websocket.packet = {
                     op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,
