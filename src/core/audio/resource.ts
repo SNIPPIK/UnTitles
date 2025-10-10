@@ -245,7 +245,15 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public set seek(seek: number) {
-        this._buffer.position = (seek * 1e3) / OPUS_FRAME_SIZE;
+        const index = (seek * 1e3) / OPUS_FRAME_SIZE;
+
+        // Если указано неподходящие значение
+        if (index > this._buffer.size || index < this._buffer.size) {
+            this._buffer.position = 0;
+            return;
+        }
+
+        this._buffer.position = index + 1;
     };
 
     /**
@@ -426,7 +434,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @public
      */
     public set seek(seek: number) {
-        let steps = (seek * 1e3) / OPUS_FRAME_SIZE;
+        let steps = ((seek * 1e3) / OPUS_FRAME_SIZE) + 1;
 
         // Если диапазон слишком мал или большой
         if (steps >= 0 || steps > this.packets) return;

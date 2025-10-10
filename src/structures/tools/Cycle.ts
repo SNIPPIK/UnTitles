@@ -3,6 +3,13 @@ import { SetArray } from "#structures";
 
 /**
  * @author SNIPPIK
+ * @description Кривая точности цикла, чем больше тем точнее, но при сильных нагрузках это будет слышно!
+ * @const AMPLITUDE_CYCLE_OFFSET
+ */
+const AMPLITUDE_CYCLE_OFFSET = 0.95;
+
+/**
+ * @author SNIPPIK
  * @description Базовый класс цикла
  * @class BaseCycle
  * @extends SetArray
@@ -97,16 +104,11 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @public
      */
     public add(item: T): this {
-        const existing = this.has(item);
-
-        // Если добавляется уже существующий объект
-        if (existing) this.delete(item);
-
+        if (this.has(item)) this.delete(item);
         super.add(item);
 
-        // Запускаем цикл, если добавлен первый объект
-        if (this.size === 1 && this.startTime === 0) {
-            // Записываем время
+        // Запускаем цикл сразу после добавления первого элемента
+        if (this.size === 1 && !this.startTime) {
             this.startTime = this.time;
             process.nextTick(this._stepCycle);
         }
@@ -134,10 +136,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         this.prevEventLoopLag = 0;
 
         // Если есть таймер
-        if (this.timeout) {
-            if ("close" in this.timeout) clearTimeout(this.timeout);
-            else clearImmediate(this.timeout);
-        }
+        if (this.timeout) this._clearTimeout();
     };
 
     /**
@@ -182,7 +181,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
             const tickEnd = this.time;
 
             // Сглаживание дрейфа
-            this.drift = this._compensator(0.9999, this.drift, tickEnd - tickStart);
+            this.drift = this._compensator(AMPLITUDE_CYCLE_OFFSET, this.drift, tickEnd - tickStart);
         });
     };
 
@@ -198,10 +197,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         const delay = Math.max(0, actualTime - this.time);
 
         // Если есть таймер
-        if (this.timeout) {
-            if ("close" in this.timeout) clearTimeout(this.timeout);
-            else clearImmediate(this.timeout);
-        }
+        if (this.timeout) this._clearTimeout();
 
         // Если требуется запустить шаг немедленно
         if (delay === 0) process.nextTick(callback);
@@ -221,11 +217,23 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
     protected _calculateLags = () => {
         // Коррекция event loop lag
         const performanceNow = performance.now();
-        const driftEvent = this.performance ? Math.max(0, (performanceNow - this.performance)) : -this.lastDelay;
+        const driftEvent = this.performance ? Math.max(0, performanceNow - this.performance) : -this.lastDelay;
         this.performance = performanceNow;
 
         // Смягчение event loop lag
-        return this.prevEventLoopLag = this.prevEventLoopLag !== undefined ? this._compensator(0.9999, this.prevEventLoopLag, driftEvent) : driftEvent;
+        this.prevEventLoopLag = this._compensator(AMPLITUDE_CYCLE_OFFSET, this.prevEventLoopLag, driftEvent);
+        return this.prevEventLoopLag;
+    };
+
+    /**
+     * @description Удаляем таймер или Immediate
+     * @protected
+     */
+    protected _clearTimeout = ()=> {
+        if (!this.timeout) return;
+        if ('hasRef' in this.timeout) clearTimeout(this.timeout as NodeJS.Timeout);
+        else clearImmediate(this.timeout as NodeJS.Immediate);
+        this.timeout = undefined;
     };
 
     /**

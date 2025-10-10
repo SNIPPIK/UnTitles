@@ -123,7 +123,7 @@ setInterval(() => {
 #### ⚙️ Внутренние инструменты
 - [`SetArray`](src/structures/tools/SetArray.ts) - 2 в одном Array и Set в один класс
 - [`Cycle`](src/structures/tools/Cycle.ts) - Управляет системой обновления сообщений и отправкой аудио пакетов
-- [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - типизированный `EventEmitterAsyncResource`
+- [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - Пользовательский объект на основе `object`
 - [`SimpleWorker`](src/structures/tools/SimpleWorker.ts) - Класс для работы с потоками
 
 ---

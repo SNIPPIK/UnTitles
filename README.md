@@ -121,7 +121,7 @@ while (performance.now() - startBlock < 100) {}
 #### ⚙️ Internal tools
 - [`SetArray`](src/structures/tools/SetArray.ts) - 2 in one Array and Set in one class
 - [`Cycle`](src/structures/tools/Cycle.ts) - Manages the message update system and sending audio packets
-- [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - typed `EventEmitterAsyncResource`
+- [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - Custom event emitter based object
 - [`SimpleWorker`](src/structures/tools/SimpleWorker.ts) - Class for working with threads
 
 ---
