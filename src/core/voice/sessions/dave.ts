@@ -1,6 +1,5 @@
 import type { VoiceDavePrepareEpochData, VoiceDavePrepareTransitionData } from "discord-api-types/voice/v8";
 import { Logger, TypedEmitter } from "#structures";
-import { SILENT_FRAME } from "#core/audio";
 
 /**
  * @author SNIPPIK
@@ -227,7 +226,8 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
             Array.from(connectedClients),
         );
 
-        if (!welcome) return commit;
+        // Если нет буфера ответа от discord udp
+        if (!welcome) return null;
 
         const result = Buffer.allocUnsafe(commit.length + welcome.length);
         commit.copy(result, 0);
@@ -307,7 +307,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public encrypt = (packet: Buffer) => {
         // Если невозможно зашифровать opus frame
-        if (this.protocolVersion === 0 || !this.session?.ready || packet.equals(SILENT_FRAME)) return packet;
+        if (this.protocolVersion === 0 || !this.session?.ready) return null;
         return this.session.encryptOpus(packet);
     };
 
@@ -322,7 +322,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         const canDecrypt = this.session?.ready && (this.protocolVersion !== 0 || this.session?.canPassthrough(userId));
 
         // Если невозможно расшифровать opus frame
-        if (packet.equals(SILENT_FRAME) || !canDecrypt || !this.session) return packet;
+        if (!canDecrypt || !this.session) return null;
 
         try {
             const buffer = this.session.decrypt(userId, loaded_lib.MediaType.AUDIO, packet);
