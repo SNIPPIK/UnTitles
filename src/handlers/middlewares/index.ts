@@ -1,5 +1,5 @@
-import { ButtonInteraction, AnySelectMenuInteraction } from "discord.js";
-import { CommandInteraction } from "#structures/discord";
+import {CommandInteraction, SelectMenuInteract} from "#structures/discord";
+import { ButtonInteraction } from "discord.js";
 import { handler } from "#handler";
 
 /**
@@ -17,7 +17,7 @@ export type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "playe
  * @extends handler
  * @public
  */
-export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction | AnySelectMenuInteraction>> extends handler<T> {
+export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction | SelectMenuInteract>> extends handler<T> {
     /**
      * @description Производим поиск по функции
      * @public

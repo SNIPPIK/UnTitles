@@ -43,7 +43,7 @@ const MAX_32BIT = 2 ** 32;
  */
 export class ClientSRTPSocket {
     /** Пустой заголовок RTP, для использования внутри класса */
-    private _RTP_HEAD = Buffer.alloc(12);
+    private _RTP_HEAD = Buffer.allocUnsafe(12);
 
     /** Пустой буфер */
     private _nonce: Buffer = Buffer.from(Encryption.nonce);
@@ -149,35 +149,57 @@ export class ClientSRTPSocket {
     public decodeAudioBuffer = (RTPHead: Buffer, packet: Buffer, nonce?: Buffer) => {
         // Получаем тип шифрования
         const mode = ClientSRTPSocket.mode;
+        if (!nonce) nonce = this.nonceSize;
 
-        // Одноразовый код размера RTP: первые 4 байта в соответствии с соглашением Discord «rtpsize».
-        const nonceBuffer = nonce.subarray(0, 4);
+        // Готовим буферы
+        let encrypted: Buffer;
+        let totalLength = RTPHead.length; // стартовая длина
 
-        // Определяем длину итогового буфера
-        const totalLength = RTPHead.length + nonceBuffer.length + packet.length + 16;
-
-        // Создаём итоговый буфер
-        const result = Buffer.allocUnsafe(totalLength);
-        let offset = 0;
-
-        // RTPHead
-        RTPHead.copy(result, offset);
-        offset += RTPHead.length;
-
-        // Зашифрованные данные
+        // Шифрование aead_aes256_gcm
         if (mode === "aead_aes256_gcm_rtpsize") {
             const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce, { authTagLength: 16 });
             cipher.setAAD(RTPHead);
-            const encrypted = Buffer.concat([cipher.update(packet), cipher.final(), cipher.getAuthTag()]);
-            encrypted.copy(result, offset);
-            offset += encrypted.length;
-        } else if (mode === "aead_xchacha20_poly1305_rtpsize") {
-            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, RTPHead, nonce, this.options.key);
-            cryptoPacket.copy(result, offset);
-            offset += cryptoPacket.length;
+
+            const enc = cipher.update(packet);
+            const fin = cipher.final();
+            const tag = cipher.getAuthTag();
+
+            totalLength += enc.length + fin.length + tag.length;
+            encrypted = Buffer.allocUnsafe(enc.length + fin.length + tag.length);
+
+            let off = 0;
+            enc.copy(encrypted, off); off += enc.length;
+            fin.copy(encrypted, off); off += fin.length;
+            tag.copy(encrypted, off);
         }
 
-        // nonceBuffer
+        // Шифрование aead_xchacha20_poly1305
+        else if (mode === "aead_xchacha20_poly1305_rtpsize") {
+            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, RTPHead, nonce, this.options.key);
+            encrypted = cryptoPacket;
+            totalLength += cryptoPacket.length;
+        }
+
+        // если появятся другие режимы
+        else {
+            encrypted = packet;
+            totalLength += packet.length;
+        }
+
+        // Одноразовый код размера RTP: первые 4 байта
+        const nonceBuffer = nonce.subarray(0, 4);
+        totalLength += nonceBuffer.length;
+
+        // Финальный результат без Buffer.concat
+        const result = Buffer.allocUnsafe(totalLength);
+        let offset = 0;
+
+        RTPHead.copy(result, offset);
+        offset += RTPHead.length;
+
+        encrypted.copy(result, offset);
+        offset += encrypted.length;
+
         nonceBuffer.copy(result, offset);
 
         return result;
@@ -205,11 +227,11 @@ export class ClientSRTPSocket {
      */
     public destroy = () => {
         this._nonceSize = null;
-        this._nonce = null;
+        this._nonce = undefined;
         this.timestamp = null;
         this.sequence = null;
         this.options = null;
-        this._RTP_HEAD = null;
+        this._RTP_HEAD = undefined;
     };
 }
 

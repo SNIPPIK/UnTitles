@@ -1,4 +1,4 @@
-import { CycleInteraction } from "#structures/discord";
+import type { CycleInteraction } from "#structures/discord";
 import { Logger, TaskCycle } from "#structures";
 import { OPUS_FRAME_SIZE } from "#core/audio";
 import { AudioPlayer } from "#core/player";

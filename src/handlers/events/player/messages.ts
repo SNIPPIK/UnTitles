@@ -1,5 +1,5 @@
-import { Colors } from "#structures/discord";
 import { Assign, locale } from "#structures";
+import { Colors } from "#structures/discord";
 import { Event } from "#handler/events";
 import { Track } from "#core/queue";
 import { db } from "#app/db";

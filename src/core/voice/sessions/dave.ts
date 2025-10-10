@@ -41,7 +41,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
     public lastTransition_id?: number;
 
     /** Ожидаемый переход */
-    private pendingTransition?: VoiceDavePrepareTransitionData;
+    private pendingTransitions = new Map<number, number>();
 
     /** Был ли данный сеанс ранее понижен в рейтинге */
     private downgraded = false;
@@ -163,7 +163,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public prepareTransition = (data: VoiceDavePrepareTransitionData) => {
         this.emit("debug", `Preparing for transition (${data.transition_id}, v${data.protocol_version})`);
-        this.pendingTransition = data;
+        this.pendingTransitions.set(data.transition_id, data.protocol_version);
 
         // Если включенный идентификатор перехода равен 0, переход предназначен для (повторной) инициализации и может быть выполнен немедленно.
         if (data.transition_id === 0) this.executeTransition(data.transition_id);
@@ -185,39 +185,29 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         this.emit("debug", `Executing transition (${transition_id})`);
 
         // Если нет данных для смены версии DAVE
-        if (!this.pendingTransition) {
+        if (!this.pendingTransitions.has(transition_id)) {
             this.emit("debug", `Received execute transition, but we don't have a pending transition for ${transition_id}`);
-            return null;
+            return false;
         }
 
-        let transitioned = false;
-        if (transition_id === this.pendingTransition.transition_id) {
-            const oldVersion = this.protocolVersion;
-            this.protocolVersion = this.pendingTransition.protocol_version;
+        const oldVersion = this.protocolVersion;
+        this.protocolVersion = this.pendingTransitions.get(transition_id)!;
 
-            // Управляйте обновлениями и откладывайте понижения
-            if (oldVersion !== this.protocolVersion && this.protocolVersion === 0) {
-                this.downgraded = true;
-                this.emit("debug", "Session downgraded");
-            } else if (transition_id > 0 && this.downgraded) {
-                this.downgraded = false;
-                this.session?.setPassthroughMode(true, TRANSITION_EXPIRY);
-                this.emit("debug", "Session upgraded");
-            }
-
-            // В будущем можно будет подать сигнал DAVESession о переходе, но на данный момент поддерживается только версия v1.
-            transitioned = true;
-            this.reinitializing = false;
-            this.lastTransition_id = transition_id;
-            this.emit("debug", `Transition executed (v${oldVersion} -> v${this.protocolVersion}, id: ${transition_id})`);
-        } else {
-            this.emit("debug",
-                `Received execute transition for an unexpected transition id (expected: ${this.pendingTransition.transition_id}, actual: ${transition_id})`,
-            );
+        // Управление обновлениями и понижение версии
+        if (oldVersion !== this.protocolVersion && this.protocolVersion === 0) {
+            this.downgraded = true;
+            this.emit("debug", "Session downgraded");
+        } else if (transition_id > 0 && this.downgraded) {
+            this.downgraded = false;
+            this.session?.setPassthroughMode(true, TRANSITION_EXPIRY);
+            this.emit("debug", "Session upgraded");
         }
 
-        this.pendingTransition = undefined;
-        return transitioned;
+        // В будущем можно будет подать сигнал DAVESession о переходе, но на данный момент поддерживается только версия v1.
+        this.lastTransition_id = transition_id;
+        this.emit("debug", `Transition executed (v${oldVersion} -> v${this.protocolVersion}, id: ${transition_id})`);
+        this.pendingTransitions.delete(transition_id);
+        return true;
     };
 
     /**
@@ -265,10 +255,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
             }
             // Если Dave снова включен
             else {
-                this.pendingTransition = {
-                    transition_id,
-                    protocol_version: this.protocolVersion
-                };
+                this.pendingTransitions.set(transition_id, this.protocolVersion);
             }
 
             this.emit("debug", `MLS commit processed (transition id: ${transition_id})`);
@@ -300,10 +287,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
             }
             // Если Dave снова включен
             else {
-                this.pendingTransition = {
-                    transition_id,
-                    protocol_version: this.protocolVersion
-                };
+                this.pendingTransitions.set(transition_id, this.protocolVersion);
             }
 
             this.emit("debug", `MLS welcome processed (transition id: ${transition_id})`);
@@ -345,7 +329,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
             this.consecutiveFailures = 0;
             return buffer;
         } catch (error) {
-            if (!this.reinitializing && !this.pendingTransition) {
+            if (!this.reinitializing && this.pendingTransitions.size === 0) {
                 this.consecutiveFailures++;
                 this.emit("debug", `Failed to decrypt a packet (${this.consecutiveFailures} consecutive fails)`);
 
@@ -355,11 +339,8 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
                 }
             } else if (this.reinitializing) {
                 this.emit("debug", 'Failed to decrypt a packet (reinitializing session)');
-            } else if (this.pendingTransition) {
-                this.emit(
-                    "debug",
-                    `Failed to decrypt a packet (pending transition ${this.pendingTransition.transition_id} to v${this.pendingTransition.protocol_version})`,
-                );
+            } else if (this.pendingTransitions.size > 0) {
+                this.emit('debug', `Failed to decrypt a packet (${this.pendingTransitions.size} pending transition[s])`);
             }
         }
 
@@ -386,9 +367,9 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         this.user_id = null;
         this.channel_id = null;
         this.lastTransition_id = null;
-        this.pendingTransition = null;
+        this.pendingTransitions.clear();
+        this.pendingTransitions = null;
         this.downgraded = null;
-        this.pendingTransition = null;
     };
 }
 

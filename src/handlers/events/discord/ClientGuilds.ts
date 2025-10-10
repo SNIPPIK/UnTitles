@@ -28,7 +28,7 @@ class GuildCreate extends Assign<Event<Events.GuildCreate>> {
             type: "client",
             once: false,
             execute: (guild) => {
-                const id = guild.client.shard?.ids[0] ?? 0;
+                const id = guild.client.shard?.["ids"][0] ?? 0;
                 Logger.log("LOG", `[Core/${id}] has ${Logger.color(32, `added a new guild ${guild.id}`)}`);
 
                 const channel = guild.channels.cache.find((ch): ch is TextChannel => {
@@ -145,7 +145,7 @@ class GuildRemove extends Assign<Event<Events.GuildDelete>> {
             type: "client",
             once: false,
             execute: async (guild) => {
-                const id = guild.client.shard?.ids[0] ?? 0;
+                const id = 0//guild.client.shard?.["ids"][0] ?? 0;
                 Logger.log("LOG", `[Core/${id}] has ${Logger.color(31, `remove a guild ${guild.id}`)}`);
 
                 // Получаем очередь

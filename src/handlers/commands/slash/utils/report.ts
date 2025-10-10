@@ -31,7 +31,7 @@ class ReportCommand extends Command {
         const lang = ctx.locale;
 
         // Отправляем сообщение в текстовый канал
-        const msg= await ctx.reply({
+        const msg = await ctx.reply({
             flags: "IsComponentsV2",
             components: [
                 {

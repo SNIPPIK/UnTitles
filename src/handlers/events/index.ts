@@ -1,5 +1,5 @@
-import { DiscordClient } from "#structures/discord";
-import { AudioPlayerEvents } from "#core/player";
+import type { DiscordClient } from "#structures/discord";
+import type { AudioPlayerEvents } from "#core/player";
 import { TypedEmitter } from "#structures";
 import { QueueEvents } from "#core/queue";
 import { ClientEvents } from "discord.js";
@@ -38,6 +38,7 @@ export class Events extends handler<Event<keyof ClientEvents>> {
 
             // Отключаем только загруженные события
             for (let item of this.files) {
+                //@ts-ignore
                 client.off(item.name as any, item.execute);
             }
         }

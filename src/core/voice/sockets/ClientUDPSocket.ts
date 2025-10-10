@@ -214,7 +214,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     private discoveryBuffer = (ssrc: number) => {
-        const packet = Buffer.alloc(74);
+        const packet = Buffer.allocUnsafe(74);
         packet.writeUInt16BE(1, 0);
         packet.writeUInt16BE(70, 2);
         packet.writeUInt32BE(ssrc, 4);

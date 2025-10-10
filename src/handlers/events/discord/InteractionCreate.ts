@@ -1,5 +1,5 @@
-import type { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { CommandInteraction, Colors, DiscordClient } from "#structures/discord";
+import type { AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
+import { CommandInteraction, Colors, SelectMenuInteract } from "#structures/discord";
 import { ChannelType, Events, InteractionType } from "discord.js";
 import { Assign, Logger, locale } from "#structures";
 import { SubCommand } from "#handler/commands";
@@ -96,7 +96,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         // Если нет команды
         // Если пользователь пытается использовать команду разработчика
         if (!command || (command.owner && !db.owner.ids.includes(ctx.member.user.id))) {
-            db.commands.remove(ctx.client as DiscordClient, ctx.commandGuildId, ctx.commandId);
+            db.commands.remove(ctx.client as any, ctx.commandGuildId, ctx.commandId);
 
             return ctx.reply({
                 flags: "Ephemeral",
@@ -170,7 +170,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @readonly
      * @private
      */
-    private readonly SelectComponent = (ctx: ButtonInteraction | AnySelectMenuInteraction) => {
+    private readonly SelectComponent = (ctx: ButtonInteraction | SelectMenuInteract) => {
         const component = db.components.get(ctx.customId);
 
         // Если не найден такой компонент

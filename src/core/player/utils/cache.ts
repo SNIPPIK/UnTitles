@@ -1,5 +1,6 @@
 import { PLAYER_BUFFERED_TIME } from "#core/player";
 import { Logger, PromiseCycle } from "#structures";
+import { isMainThread } from "node:worker_threads";
 import { Process } from "#core/audio";
 import { Track } from "#core/queue";
 import afs from "node:fs/promises";
@@ -52,7 +53,7 @@ export class CacheUtility {
         /**
          * @description Класс кеширования аудио файлов
          */
-        audio: this.inFile ? new CacheAudio(this._options.dirname) : null as CacheAudio
+        audio: this.inFile && isMainThread ? new CacheAudio(this._options.dirname) : null as CacheAudio
     };
 
     /**

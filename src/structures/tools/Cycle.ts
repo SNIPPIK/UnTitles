@@ -36,9 +36,9 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @returns number
      * @public
      */
-    public get drifting(): number {
+    /*public get drifting(): number {
         return this.drift + this.lastDelay;
-    };
+    };*/
 
     /**
      * @description Время циклической системы изнутри
@@ -54,9 +54,9 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
      * @returns number
      * @public
      */
-    public get delay(): number {
+    /*public get delay(): number {
         return this.lastDelay;
-    };
+    };*/
 
     /**
      * @description Высчитываем задержку шага

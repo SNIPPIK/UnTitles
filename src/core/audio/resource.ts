@@ -71,10 +71,10 @@ class AudioBuffer {
      * @public
      */
     public clear = () => {
-        // Удаляем буферы
+        for (const chunk of this._chunks) chunk.fill(0);
         this._chunks.length = 0;
+        (this as any)._chunks = undefined;
         this._position = null;
-        this._chunks = null;
     };
 }
 
@@ -168,6 +168,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 
         // Чистим все потоки от мусора
         this.emit("close");
+        this.removeAllListeners();
 
         // Удаляем все вызовы функций
         super.destroy();

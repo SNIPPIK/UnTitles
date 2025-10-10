@@ -1,7 +1,7 @@
 import { Component, DeclareComponent } from "#handler/components";
 import { Middlewares } from "#handler/commands";
-import { Colors } from "#structures/discord";
 import { locale, Logger } from "#structures";
+import { Colors } from "#structures/discord";
 import { db } from "#app/db";
 
 /**

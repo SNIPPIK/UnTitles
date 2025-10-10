@@ -1,6 +1,6 @@
 import { ControllerTracks, ControllerVoice } from "#core/queue";
 import { QueueMessage, QueueButtons } from "../modules/message";
-import type { CommandInteraction } from "#structures/discord";
+import { CommandInteraction } from "#structures/discord";
 import { VoiceConnection } from "#core/voice";
 import { AudioPlayer } from "#core/player";
 import { Logger } from "#structures";

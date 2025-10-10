@@ -1,5 +1,5 @@
-import { CommandInteraction, CycleInteraction, DiscordClient } from "#structures/discord";
 import { ActionRowBuilder, EmbedData, StringSelectMenuBuilder } from "discord.js";
+import { CommandInteraction, CycleInteraction } from "#structures/discord";
 import filters from "#core/player/filters.json";
 import type { AudioPlayer } from "#core/player";
 import { RepeatType } from "#core/queue";
@@ -108,7 +108,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public get client() {
-        return this._original.client as DiscordClient;
+        return this._original.client as any;
     };
 
     /**

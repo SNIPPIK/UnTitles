@@ -1,6 +1,5 @@
+import { buttonInteraction, SelectMenuInteract } from "#structures/discord";
 import { RegisteredMiddlewares } from "#handler/middlewares";
-import { buttonInteraction } from "#structures/discord";
-import { AnySelectMenuInteraction } from "discord.js";
 import { handler } from "#handler";
 
 // Export decorator
@@ -64,7 +63,7 @@ export type SupportComponent<T = "button" | "selector"> = {
      * @description Функция выполнения кнопки
      * @param msg - Сообщение пользователя
      */
-    callback?: (ctx: T extends "button" ? buttonInteraction : AnySelectMenuInteraction) => any;
+    callback?: (ctx: T extends "button" ? buttonInteraction : SelectMenuInteract) => any;
 
     /**
      * @description Права для использования той или иной команды

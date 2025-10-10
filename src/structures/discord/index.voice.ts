@@ -1,0 +1,42 @@
+import type { DiscordClient } from "#structures/discord/index.client";
+import { VoiceAdapters } from "#core/voice/adapter";
+
+/**
+ * @author SNIPPIK
+ * @description Класс реализации адаптера
+ * @class DJSVoice
+ * @extends VoiceAdapters
+ * @public
+ */
+export class DJSVoice<T extends DiscordClient = DiscordClient> extends VoiceAdapters<DiscordClient> {
+    public constructor(client: T) {
+        super(client);
+
+        //@ts-ignore
+        client.ws.on("VOICE_SERVER_UPDATE", (data) => {
+            this.onVoiceServer(data);
+        });
+
+        //@ts-ignore
+        client.ws.on("VOICE_STATE_UPDATE", (data) => {
+            this.onVoiceStateUpdate(data);
+        });
+    };
+    public voiceAdapterCreator = (guildID: string) => {
+        const id = this.client.shardID;
+
+        return methods => {
+            this.adapters.set(guildID, methods);
+
+            return {
+                sendPayload: (data) => {
+                    this.client.ws.shards.get(id).send(data);
+                    return true;
+                },
+                destroy: () => {
+                    this.adapters.delete(guildID);
+                }
+            };
+        };
+    };
+}

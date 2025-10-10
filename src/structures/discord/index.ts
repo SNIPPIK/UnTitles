@@ -1,13 +1,9 @@
-import {
-    ChatInputCommandInteraction,
-    AutocompleteInteraction,
-    CacheType,
-    ButtonInteraction, Message
-} from "discord.js";
-import { DiscordClient } from "#structures/discord";
+import type { ChatInputCommandInteraction, AutocompleteInteraction, CacheType, ButtonInteraction, Message, AnySelectMenuInteraction } from "discord.js";
+import type { DiscordClient } from "#structures/discord/index.client";
 
-export * from "./index.client";
 export * from "./index.manager";
+export * from "./index.client";
+export * from "./index.voice";
 
 /**
  * @description Тип входящих данных для команд
@@ -29,6 +25,13 @@ export type CompeteInteraction = AutocompleteInteraction<CacheType>;
  * @public
  */
 export type buttonInteraction = ButtonInteraction<CacheType>;
+
+/**
+ * @description Тип входящих данных для циклической системы
+ * @type buttonInteraction
+ * @public
+ */
+export type SelectMenuInteract = AnySelectMenuInteraction;
 
 /**
  * @description Тип входящих данных для циклической системы
@@ -84,6 +87,7 @@ declare module "discord.js" {
         member: GuildMember;
     }
 
+    //@ts-ignore
     export interface GuildMemberManager {
         client: DiscordClient;
     }

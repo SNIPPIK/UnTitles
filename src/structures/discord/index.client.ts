@@ -1,6 +1,5 @@
 import { Client, Options, Partials } from "discord.js";
 import { ActivityType } from "discord-api-types/v10";
-import { VoiceAdapters } from "#core/voice/adapter";
 import { version } from "package.json";
 import { Logger } from "#structures";
 import { env } from "#app/env";
@@ -44,7 +43,6 @@ export class DiscordClient extends Client {
 
                 // Отправление сообщений
                 "GuildMessages",
-                "DirectMessages",
 
                 // Нужен для голосовой системы
                 "GuildVoiceStates",
@@ -65,6 +63,18 @@ export class DiscordClient extends Client {
             // Задаем параметры кеша
             makeCache: Options.cacheWithLimits({
                 ...Options.DefaultMakeCacheSettings,
+                ...Options.DefaultSweeperSettings,
+                MessageManager: {
+                    maxSize: 200, //@ts-ignore
+                    keepOverLimit: (value, key, collection) => value.createdAt > Date.now() + 60e3 * 10
+                },
+                GuildScheduledEventManager: 0,
+                GuildTextThreadManager: 0,
+                BaseGuildEmojiManager: 0,
+                ReactionManager: 0,
+                ReactionUserManager: 0,
+                EntitlementManager: 0,
+                StageInstanceManager: 0,
                 GuildBanManager: 0,
                 GuildForumThreadManager: 0,
                 AutoModerationRuleManager: 0,
@@ -76,6 +86,8 @@ export class DiscordClient extends Client {
                 ThreadMemberManager: 0,
             })
         });
+
+        // Ограничиваем кол-во событий
         this.setMaxListeners(10);
         this.ws.setMaxListeners(10);
 
@@ -89,7 +101,7 @@ export class DiscordClient extends Client {
      * @readonly
      * @private
      */
-    private readonly IntervalStatus = (): void => {
+    private IntervalStatus = (): void => {
         // Время обновления статуса
         const timeout = parseInt(env.get("client.presence.interval", "120"));
         const arrayUpdate = parseInt(env.get("client.presence.array.update", "3600")) * 1e3;
@@ -137,7 +149,7 @@ export class DiscordClient extends Client {
      * @readonly
      * @private
      */
-    private readonly parseStatuses = (): ActivityOptions[] => {
+    private parseStatuses = (): ActivityOptions[] => {
         const statuses: ActivityOptions[] = [];
         const guilds = this.guilds.cache.size;
         const users = this.users.cache.size;
@@ -167,47 +179,6 @@ export class DiscordClient extends Client {
         }
 
         return statuses;
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Класс реализации адаптера
- * @class DJSVoice
- * @extends VoiceAdapters
- * @public
- */
-export class DJSVoice<T extends DiscordClient = DiscordClient> extends VoiceAdapters<DiscordClient> {
-    public constructor(client: T) {
-        super(client);
-
-        //@ts-ignore
-        client.ws.on("VOICE_SERVER_UPDATE", (data) => {
-            this.onVoiceServer(data);
-        });
-
-        //@ts-ignore
-        client.ws.on("VOICE_STATE_UPDATE", (data) => {
-            this.onVoiceStateUpdate(data);
-        });
-    };
-
-    public voiceAdapterCreator = (guildID: string) => {
-        const id = this.client.shardID;
-
-        return methods => {
-            this.adapters.set(guildID, methods);
-
-            return {
-                sendPayload: (data) => {
-                    this.client.ws.shards.get(id).send(data);
-                    return true;
-                },
-                destroy: () => {
-                    this.adapters.delete(guildID);
-                }
-            };
-        };
     };
 }
 

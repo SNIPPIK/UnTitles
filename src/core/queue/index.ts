@@ -28,14 +28,14 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @readonly
      * @public
      */
-    public readonly cycles = new ControllerCycles();
+    public cycles = new ControllerCycles();
 
     /**
      * @description Здесь хранятся модификаторы аудио
      * @readonly
      * @public
      */
-    public readonly options = {
+    public options = {
         optimization: parseInt(env.get("duration.optimization")),
         volume: parseInt(env.get("audio.volume")),
         swapFade: parseInt(env.get("audio.swap.fade")),

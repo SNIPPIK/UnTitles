@@ -11,7 +11,7 @@ import os from "node:os";
  * @description Версия user agent для WebSocket
  * @const user_agent
  */
-const user_agent = `SNPK Team (${os.arch()}; ${os.version()}) ${version}/${name}`;
+const user_agent = `WTK Voice System (${os.arch()}; ${os.version()}) ${version}/${name}`;
 
 /**
  * @author SNIPPIK

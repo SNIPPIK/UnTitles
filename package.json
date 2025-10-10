@@ -15,15 +15,15 @@
     "node": ">=23.0.0"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.26",
-    "discord.js": "^14.22.1",
+    "discord-api-types": "^0.38.29",
+    "discord.js": "14.23.2",
     "ws": "^8.18.3"
   },
   "optionalDependencies": {
     "@snazzah/davey": "^0.1.7"
   },
   "devDependencies": {
-    "@types/node": "^24.6.1",
+    "@types/node": "^24.7.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
   },
