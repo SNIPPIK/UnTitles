@@ -43,6 +43,18 @@ export class SetArray<T> extends Set<T> {
     };
 
     /**
+     * @description Получаем объект из списка
+     * @param item - оригинальный объект
+     * @public
+     */
+    public get(item: T) {
+        const array = this.array;
+        const index = array.indexOf(item);
+
+        return index > -1 ? array[index] : null;
+    };
+
+    /**
      * @description Производим фильтрацию по функции
      * @param predicate - Функция поиска
      * @returns T[]

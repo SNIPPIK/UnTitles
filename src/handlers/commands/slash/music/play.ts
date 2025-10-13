@@ -232,7 +232,7 @@ class PlayRelatedCommand extends SubCommand {
 @Options([PlaySearchCommand, PlayRelatedCommand])
 @Middlewares(["cooldown", "voice", "another_voice"])
 @Permissions({
-    client: ["Speak", "SendMessages", "ViewChannel"]
+    client: ["Connect", "Speak", "SendMessages", "ViewChannel"]
 })
 class PlayAdvancedCommand extends Command {
     async run() {}
@@ -277,7 +277,7 @@ class PlayAdvancedCommand extends Command {
 })
 @Middlewares(["cooldown", "voice", "another_voice"])
 @Permissions({
-    client: ["Speak", "SendMessages", "ViewChannel"],
+    client: ["Connect", "Speak", "SendMessages", "ViewChannel"],
 })
 class PlayCommand extends Command {
     async run({ctx, args}: CommandContext) {

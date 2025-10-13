@@ -72,6 +72,7 @@ export class ClientSRTPSocket {
      * @public
      */
     public get nonceSize() {
+        // Если по какой-то причине нет nonce буфера
         if (!this._nonce || !Encryption.nonce) {
             this._nonce = Buffer.alloc(Encryption.nonce?.length ?? 12);
         }

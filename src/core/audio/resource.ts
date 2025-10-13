@@ -253,7 +253,7 @@ export class BufferedAudioResource extends BaseAudioResource {
             return;
         }
 
-        this._buffer.position = index + 1;
+        this._buffer.position = index;
     };
 
     /**
@@ -342,10 +342,10 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @description Обновление потока, без потерь
      * @public
      */
-    public refresh = () => {
-        this._seek = 0;
+    /*public refresh = () => {
         this._buffer.position = 0;
-    };
+        this._seek = 0;
+    };*/
 
     /**
      * @description Удаляем ненужные данные
@@ -353,7 +353,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      */
     public destroy = () => {
         super.destroy();
-        this._buffer.clear();
+        this._buffer?.clear();
         this._buffer = null;
     };
 }

@@ -1,8 +1,16 @@
-import type { CycleInteraction } from "#structures/discord";
+import type { CycleInteraction, MessageComponent } from "#structures/discord";
 import { Logger, TaskCycle } from "#structures";
 import { OPUS_FRAME_SIZE } from "#core/audio";
 import { AudioPlayer } from "#core/player";
 import { db } from "#app/db";
+
+
+/**
+ * @author SNIPPIK
+ * @description Время обновления сообщения, только после этого времени можно будет пересоздать сообщение
+ * @const MESSAGE_UPDATE_TIME
+ */
+const MESSAGE_UPDATE_TIME = 60e3 * 10;
 
 /**
  * @author SNIPPIK
@@ -145,21 +153,16 @@ export class ControllerCycles {
                 // Кастомные функции (если хочется немного изменить логику выполнения)
                 custom: {
                     remove: async (item) => {
-                        try {
-                            await item.delete();
-                        } catch {
-                            Logger.log("ERROR", `Failed delete message in cycle!`);
-                        }
+                        try { await item.delete(); } catch { Logger.log("ERROR", `Failed delete message in cycle!`); }
                     },
                     push: (item) => {
                         const old = this.find(msg => msg.guildId === item.guildId);
-                        // Удаляем прошлое сообщение
                         if (old) this.delete(old);
                     }
                 },
 
                 // Функция проверки
-                filter: (message) => !!message.edit && message.createdTimestamp + 10e3 < Date.now(),
+                filter: (message) => !!message.edit && message.editedTimestamp + 5e3 < Date.now(),
 
                 // Функция обновления сообщения
                 execute: async (message) => {
@@ -168,27 +171,55 @@ export class ControllerCycles {
                     // Если нет очереди
                     if (!queue) this.delete(message);
 
-                    // Если есть поток в плеере
-                    else if (queue.player.audio?.current && queue.player.audio.current.duration > 1) {
-                        const component = queue.components;
+                    const component = queue.components;
 
-                        // Если не получен embed
-                        if (!component) {
-                            this.delete(message);
-                            return;
-                        }
-
-                        try {
-                            await message.edit({ components: component });
-                        } catch (error) {
-                            Logger.log("ERROR", `Failed to edit message in cycle: ${error instanceof Error ? error.message : error}`);
-
-                            // Если при обновлении произошла ошибка
-                            this.delete(message);
-                        }
+                    // Если не получен embed
+                    if (!component) {
+                        this.delete(message);
+                        return;
                     }
+
+                    return this.update(message, component);
                 }
             });
         };
+
+        /**
+         * @description Обновление сообщения принудительно
+         * @param message - Сообщение
+         * @param component - Данные для обновления
+         * @public
+         */
+        public update = async (message: T, component: MessageComponent) => {
+            try {
+                await message.edit({ components: component });
+            } catch (error) {
+                Logger.log("ERROR", `Failed to edit message in cycle: ${error instanceof Error ? error.message : error}`);
+
+                // Если при обновлении произошла ошибка
+                this.delete(message);
+            }
+        };
+
+        /**
+         * @description Гарантирует, что сообщение существует и не устарело
+         * @public
+         */
+        public ensure = async (guildId: string, factory: () => Promise<T>): Promise<T | null> => {
+            let message = this.find(m => m.guildId === guildId);
+
+            // Если нет сообщения в цикле
+            if (!message) {
+                this.add(await factory());
+                return null;
+            }
+
+            // Если время позволяет пересоздать сообщение о проигрывании
+            else if (Date.now() - message.createdTimestamp > MESSAGE_UPDATE_TIME) {
+                await message.delete().catch(() => null);
+            }
+
+            return message;
+        }
     };
 }

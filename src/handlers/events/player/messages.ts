@@ -126,21 +126,16 @@ class message_playing extends Assign<Event<"message/playing">> {
             type: "player",
             once: false,
             execute: async (queue) => {
-                // Отправляем сообщение
-                const message = await queue.message.send({
-                    components: queue.components,
-                    withResponse: true,
-                    flags: "IsComponentsV2"
+                const message = await db.queues.cycles.messages.ensure(queue.message.guild_id, async () => {
+                    return await queue.message.send({
+                        components: queue.components,
+                        withResponse: true,
+                        flags: "IsComponentsV2"
+                    });
                 });
 
-                // Если есть ответ от отправленного сообщения
-                if (message) {
-                    // Добавляем новое сообщение в базу с сообщениями, для последующего обновления
-                    if (!db.queues.cycles.messages.has(message)) {
-                        // Добавляем сообщение в базу для обновления
-                        db.queues.cycles.messages.add(message);
-                    }
-                }
+                // Если есть сообщение
+                if (message) db.queues.cycles.messages.update(message, queue.components).catch(() => null);
             }
         });
     };

@@ -197,8 +197,8 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         clearInterval(this.keepAlive.interval);
         clearTimeout(this.keepAlive.timeout);
 
-        this.removeAllListeners();
-        this.socket.removeAllListeners();
+        this?.removeAllListeners();
+        this.socket?.removeAllListeners();
         super.destroy();
 
         this.keepAlive.buffer = null;

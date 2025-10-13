@@ -212,14 +212,14 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public constructor(
-        /**
-         * @description Уникальный идентификатор сервера, для привязки плеера к серверу
-         * @protected
-         * @abstract
-         */
+        /** Ссылка на класс с треками */
         protected _tracks: ControllerTracks<Track>,
+
+        /** Ссылка на класс с голосовым подключением */
         protected _voice: ControllerVoice<VoiceConnection>,
-        protected id?: string,
+
+        /** Уникальный id плеера */
+        public id: string,
     ) {
         super();
 
@@ -336,16 +336,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если другой аудио поток загружается, то запрещаем включение
         if (this._audio.preloaded) return null;
 
-        const stream = this._audio.current, filters = this._filters.toString(time, this._audio.volume, stream && stream?.packets > 0);
-
-        // Если есть текущее аудио и оно является буферным
-        if (stream && stream instanceof BufferedAudioResource) {
-            // Если фильтры совпадают и время проигрывания
-            if (stream.input_data.options.filters === filters && !stream.input_data.options.seek && !seek) {
-                stream.refresh();
-                return stream;
-            }
-        }
+        const stream = this._audio.current,
+            filters: string = this._filters.toString(time, this._audio.volume, stream && stream?.packets > 0);
 
         // Выбираем и создаем класс для предоставления аудио потока
         return this._audio.preload = new (time > PLAYER_BUFFERED_TIME || time === 0 ? PipeAudioResource : BufferedAudioResource)(
@@ -414,29 +406,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             (stream as BufferedAudioResource)
                 // Если чтение возможно
                 .once("readable", () => {
-                    // Действия при готовности
-                    const handleReady = () => {
-                        // Переводим плеер в состояние чтения аудио
-                        this.status = "player/playing";
-
-                        // Заставляем плеер запускаться самостоятельно
-                        this.cycle = "on";
-
-                        // Меняем позицию если удачно
-                        this._tracks.position = index;
-
-                        // Если трек включен в 1 раз
-                        if (seek === 0) {
-                            const queue = db.queues.get(this.id);
-                            db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно
-                        }
-                    };
-
                     // Время паузы плеера
                     const pauseTimeout = Math.max(this._timer.timeout - Date.now(), timeout, 0);
 
                     // Если включить трек сейчас не выйдет
-                    pauseTimeout ? this._timer.timer = setTimeout(handleReady, pauseTimeout) : handleReady();
+                    pauseTimeout ? this._timer.timer = setTimeout(() => onPlayerReadable(this, index, seek), pauseTimeout) : onPlayerReadable(this, index, seek);
                     return null;
                 })
 
@@ -512,10 +486,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public stop = (): Promise<void> | void => {
         if (this._status === "player/wait") return;
-        this.status = "player/wait";
 
         // Отправляем silent frame в голосовое соединение для паузы звука
         this._voice.connection.packet = SILENT_FRAME;
+
+        this.status = "player/wait";
     };
 
     /**
@@ -618,4 +593,29 @@ class AudioPlayerTimeout {
         this._pauseTimestamp = null;
         this.timer = null;
     };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @param player - Плеер
+ * @param index - Номер нового трека
+ * @param seek - Время перехода к позиции аудио трека
+ * @private
+ */
+function onPlayerReadable(player: AudioPlayer, index: number, seek: number) {
+    // Переводим плеер в состояние чтения аудио
+    player.status = "player/playing";
+
+    // Заставляем плеер запускаться самостоятельно
+    player["cycle"] = "on";
+
+    // Меняем позицию если удачно
+    player.tracks.position = index;
+
+    // Если трек включен в 1 раз
+    if (seek === 0) {
+        const queue = db.queues.get(player.id);
+        db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно
+    }
 }

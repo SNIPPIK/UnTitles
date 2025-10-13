@@ -227,7 +227,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         );
 
         // Если нет буфера ответа от discord udp
-        if (!welcome) return null;
+        if (!welcome && !commit) return null;
 
         const result = Buffer.allocUnsafe(commit.length + welcome.length);
         commit.copy(result, 0);
@@ -244,19 +244,19 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
     public processCommit = (payload: Buffer): TransitionResult => {
         if (!this.session) throw new Error("No session available");
         const transition_id = payload.readUInt16BE(0);
+        const flag = payload.subarray(2);
 
         try {
-            this.session.processCommit(payload.subarray(2));
+            this.session.processCommit(flag);
 
             // Если Dave отключен
             if (transition_id === 0) {
                 this.reinitializing = false;
                 this.lastTransition_id = transition_id;
             }
+
             // Если Dave снова включен
-            else {
-                this.pendingTransitions.set(transition_id, this.protocolVersion);
-            }
+            else this.pendingTransitions.set(transition_id, this.protocolVersion);
 
             this.emit("debug", `MLS commit processed (transition id: ${transition_id})`);
             return { transition_id, success: true };
@@ -276,19 +276,19 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
     public processWelcome = (payload: Buffer): TransitionResult => {
         if (!this.session) throw new Error("No session available");
         const transition_id = payload.readUInt16BE(0);
+        const flag = payload.subarray(2);
 
         try {
-            this.session.processWelcome(payload.subarray(2));
+            this.session.processWelcome(flag);
 
             // Если Dave отключен
             if (transition_id === 0) {
                 this.reinitializing = false;
                 this.lastTransition_id = transition_id;
             }
+
             // Если Dave снова включен
-            else {
-                this.pendingTransitions.set(transition_id, this.protocolVersion);
-            }
+            else this.pendingTransitions.set(transition_id, this.protocolVersion);
 
             this.emit("debug", `MLS welcome processed (transition id: ${transition_id})`);
             return { transition_id, success: true };

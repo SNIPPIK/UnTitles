@@ -41,6 +41,13 @@ export type SelectMenuInteract = AnySelectMenuInteraction;
 export type CycleInteraction = Message<boolean>;
 
 /**
+ * @description Тип входящих данных для циклической системы
+ * @type MessageComponent
+ * @public
+ */
+export type MessageComponent = any;
+
+/**
  * @author SNIPPIK
  * @description Все цвета для embed сообщений
  * @enum Colors

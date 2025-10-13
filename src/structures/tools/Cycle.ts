@@ -3,10 +3,17 @@ import { SetArray } from "#structures";
 
 /**
  * @author SNIPPIK
- * @description Кривая точности цикла, чем больше тем точнее, но при сильных нагрузках это будет слышно!
- * @const AMPLITUDE_CYCLE_OFFSET
+ * @description Кривая точности event loop цикла, чем больше тем точнее, но при сильных нагрузках это будет слышно!
+ * @const AMPLITUDE_EL_CYCLE_OFFSET
  */
-const AMPLITUDE_CYCLE_OFFSET = 0.95;
+const AMPLITUDE_EL_CYCLE_OFFSET = 0.95;
+
+/**
+ * @author SNIPPIK
+ * @description Кривая точности drift цикла, чем больше тем точнее, но при сильных нагрузках это будет слышно!
+ * @const AMPLITUDE_DRIFT_CYCLE_OFFSET
+ */
+const AMPLITUDE_DRIFT_CYCLE_OFFSET = 0.95;
 
 /**
  * @author SNIPPIK
@@ -181,7 +188,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
             const tickEnd = this.time;
 
             // Сглаживание дрейфа
-            this.drift = this._compensator(AMPLITUDE_CYCLE_OFFSET, this.drift, tickEnd - tickStart);
+            this.drift = this._compensator(AMPLITUDE_DRIFT_CYCLE_OFFSET, this.drift, tickEnd - tickStart);
         });
     };
 
@@ -221,7 +228,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
         this.performance = performanceNow;
 
         // Смягчение event loop lag
-        this.prevEventLoopLag = this._compensator(AMPLITUDE_CYCLE_OFFSET, this.prevEventLoopLag, driftEvent);
+        this.prevEventLoopLag = this._compensator(AMPLITUDE_EL_CYCLE_OFFSET, this.prevEventLoopLag, driftEvent);
         return this.prevEventLoopLag;
     };
 
