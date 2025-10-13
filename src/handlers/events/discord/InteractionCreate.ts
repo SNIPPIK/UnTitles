@@ -1,5 +1,5 @@
 import type { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { CommandInteraction, Colors, DiscordClient } from "#structures/discord";
+import { CommandInteraction, Colors } from "#structures/discord";
 import { ChannelType, Events, InteractionType } from "discord.js";
 import { Assign, Logger, locale } from "#structures";
 import { SubCommand } from "#handler/commands";
