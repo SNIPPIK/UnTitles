@@ -93,10 +93,10 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
     private readonly SelectCommand = (ctx: ChatInputCommandInteraction) => {
         const command = db.commands.get(ctx.commandName);
 
-        /// Если нет команды
+        // Если нет команды
         // Если пользователь пытается использовать команду разработчика
         if (!command || (command.owner && !db.owner.ids.includes(ctx.member.user.id))) {
-            db.commands.remove(ctx.client as DiscordClient, ctx.commandGuildId, ctx.commandId);
+            db.commands.remove(ctx.client as any, ctx.commandGuildId, ctx.commandId);
 
             return ctx.reply({
                 flags: "Ephemeral",
@@ -108,23 +108,27 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         }
 
         // Проверка middleware
-        else if (command.middlewares?.length > 0) {
+        if (command.middlewares?.length > 0) {
             for (const rule of db.middlewares.array) {
                 if (command.middlewares.includes(rule.name) && !rule.callback(ctx)) return null;
             }
         }
 
         // Проверка прав
-        else if (command.permissions && isBased(ctx) === "guild") {
+        if (command.permissions && isBased(ctx) === "guild") {
             const { user: userPerms, client: botPerms } = command.permissions;
 
             // Проверка прав пользователя
-            if (userPerms?.length && !userPerms.every(perm => ctx.member?.permissions?.has(perm))) {
+            if (userPerms?.length &&
+                !userPerms.every(perm => ctx.member?.permissions?.has(perm))
+            ) {
                 return ctx.reply(locale._(ctx.locale, "interaction.permission.user", [ctx.member]));
             }
 
             // Проверка прав бота
-            if (botPerms?.length && !botPerms.every(perm => ctx.guild?.members.me?.permissionsIn(ctx.channel)?.has(perm))) {
+            if (botPerms?.length &&
+                !botPerms.every(perm => ctx.guild?.members.me?.permissionsIn(ctx.channel)?.has(perm) && ctx.member.voice.channel ? ctx.guild?.members.me?.permissionsIn(ctx.member.voice.channel)?.has(perm) : true)
+            ) {
                 return ctx.reply(locale._(ctx.locale, "interaction.permission.client", [ctx.member]));
             }
         }
