@@ -191,7 +191,7 @@ export class VoiceConnection {
      */
     public set swapChannel(ID: string) {
         // Прописываем новый id канала
-        this.configuration = {...this.configuration, channel_id: ID};
+        this.configuration.channel_id = ID;
         this.adapter.sendPayload(this.configuration);
     };
 
@@ -228,7 +228,7 @@ export class VoiceConnection {
              * @param packet - Полученный пакет `VOICE_SERVER_UPDATE`
              */
             onVoiceServerUpdate: (packet) => {
-                this.adapter.packet.server = packet;
+                if (this.adapter) this.adapter.packet.server = packet;
 
                 // Если есть точка подключения
                 if (packet.endpoint) this.createWebSocket(packet.endpoint);
@@ -240,7 +240,7 @@ export class VoiceConnection {
              * @param packet - Полученный пакет `VOICE_STATE_UPDATE`
              */
             onVoiceStateUpdate: (packet) => {
-                this.adapter.packet.state = packet;
+                if (this.adapter) this.adapter.packet.state = packet;
             },
 
             /**
@@ -250,7 +250,7 @@ export class VoiceConnection {
         });
 
         // Инициализируем подключение
-        this.adapter.sendPayload(this.configuration);
+        if (this.adapter) this.adapter.sendPayload(this.configuration);
         this._status = VoiceConnectionStatus.connected;
 
         // Если включен микрофон бота тогда запускаем класс слушатель
@@ -269,7 +269,7 @@ export class VoiceConnection {
         this.websocket.connect(endpoint, code); // Подключаемся к endpoint
 
         // Если включен debug режим
-        this.websocket.on("debug", (status, text) => Logger.log("DEBUG", `${status} ${JSON.stringify(text)}`));
+        this.websocket.on("debug", (status, text) => Logger.log("DEBUG", `${status} ${text}`));
         this.websocket.on("warn", (status) => Logger.log("DEBUG", status));
 
         /**
@@ -364,7 +364,7 @@ export class VoiceConnection {
             // Подключения больше не существует
             else if (code === 4006 || code === 4003) {
                 this.serverState.endpoint = null;
-                this.voiceState.session_id = null;
+                //this.voiceState.session_id = null;
                 this.adapter.sendPayload(this.configuration);
                 return; // Здесь происходит пересоздание ws подключения
             }
@@ -430,6 +430,8 @@ export class VoiceConnection {
                     }
                 }
             };
+
+            this.speaking = this.defaultSpeaker;
         });
 
         /**

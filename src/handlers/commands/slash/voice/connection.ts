@@ -104,24 +104,33 @@ class VoiceJoinCommand extends SubCommand {
     }
 })
 class VoiceLeaveCommand extends SubCommand {
-    async run({ctx, args}: CommandContext) {
+    async run({ctx}: CommandContext) {
         const { guildId } = ctx;
-
-        const voiceConnection = db.voice.get(guildId);
+        const VoiceConnection = db.voice.get(guildId);
         const queue = db.queues.get(guildId);
-        const VoiceChannel = args[0] ?? ctx.member.voice.channel;
+
+        // Если бот не подключен к голосовому каналу
+        if (!VoiceConnection) {
+            return ctx.reply({
+                embeds: [
+                    {
+                        color: Colors.Green,
+                        description: locale._(ctx.locale, "voice.leave.fail", [`<#${VoiceConnection.configuration.channel_id}>`])
+                    }
+                ],
+                flags: "Ephemeral"
+            });
+        }
 
         /// Если есть очередь, то удаляем ее!
-        if (queue) queue.cleanup();
+        else if (queue) queue.cleanup();
 
-        // Отключаемся от голосового канала
-        if (!voiceConnection.disconnect) return null;
-
+        db.voice.remove(guildId);
         return ctx.reply({
             embeds: [
                 {
                     color: Colors.Green,
-                    description: locale._(ctx.locale, "voice.leave", [VoiceChannel])
+                    description: locale._(ctx.locale, "voice.leave", [`<#${VoiceConnection.configuration.channel_id}>`])
                 }
             ],
             flags: "Ephemeral"

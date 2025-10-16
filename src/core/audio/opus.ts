@@ -30,13 +30,6 @@ export const OPUS_FRAME_SIZE = 20;
  */
 const MAX_SEGMENT_LENGTH = 255;
 
-/**
- * @author SNIPPIK
- * @description Пустой фрейм для предотвращения чтения null
- * @const EMPTY_FRAME
- */
-const EMPTY_FRAME =  Buffer.alloc(0);
-
 
 /**
  * @author SNIPPIK
@@ -49,8 +42,8 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
     /** Не отправлен ли 1 аудио пакет */
     private _first = true;
 
-    /** Временный буфер, для общения между функциями */
-    public _buffer: Buffer = EMPTY_FRAME;
+    /** Временный буфер, для объединения буферов */
+    public _buffer: Buffer = Buffer.allocUnsafe(0);
 
     /**
      * @description Функция ищущая актуальный для взятия фрагмент
@@ -167,7 +160,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
         // Сброс состояния
         this._first = true;           // возвращаем в исходное состояние
-        this._buffer = EMPTY_FRAME;   // очищаем ссылку на буфер
+        this._buffer = null;          // очищаем ссылку на буфер
 
         // Освобождаем emitter
         this.removeAllListeners();

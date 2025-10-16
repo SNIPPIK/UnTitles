@@ -271,6 +271,11 @@
     "ru": "{ARGUMENT} | Я покинул голосовой канал"
   },
 
+  "voice.leave.fail": {
+    "en-US": "{ARGUMENT} | I can't leave the voice channel, I'm not even connected!",
+    "ru": "{ARGUMENT} | Я не могу покинуть голосовой канал, я даже не подключен!"
+  },
+
   "voice.join": {
     "en-US": "{ARGUMENT} | Join success",
     "ru": "{ARGUMENT} | Произведено подключение"
