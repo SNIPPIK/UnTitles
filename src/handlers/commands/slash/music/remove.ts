@@ -55,13 +55,12 @@ import { db } from "#app/db";
 
             const tracks = queue.tracks.array(maxSuggestions, startIndex);
             const highlightIndex = index - startIndex;
-
-            const results = tracks.map((track, i) => ({
-                name: `${startIndex + i + 1}. ${i === highlightIndex ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
-                value: startIndex + i + 1
-            }));
-
-            return ctx.respond(results);
+            return ctx.respond(
+                tracks.map((track, i) => ({
+                    name: `${startIndex + i + 1}. ${i === highlightIndex ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                    value: startIndex + i + 1
+                }))
+            );
         },
     }
 })
@@ -90,15 +89,15 @@ class RemoveTracksCommand extends Command {
 
         const {name, url, api} = track;
 
-        // Удаляем трек и очереди
-        queue.tracks.remove(number);
-
         // Если выбран текущий трек
-        if (number === queue.tracks.position) {
+        if (number === queue.tracks.position || queue.tracks.total === 1) {
             // Если треков нет в очереди
-            if (!queue.tracks.total) return queue.cleanup();
+            if (!queue.tracks.total || queue.tracks.total === 1) return queue.cleanup();
             await queue.player.play(0, 0, queue.tracks.position);
         }
+
+        // Удаляем трек и очереди
+        queue.tracks.remove(number);
 
         return ctx.reply({
             embeds: [

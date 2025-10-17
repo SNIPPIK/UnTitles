@@ -307,7 +307,7 @@ class RestYandexAPI extends RestServerSide.API {
         for (let i = 0; i <= 3; i++) {
             // Если достигли максимума
             if (i === 3) {
-                Logger.log("ERROR", Error("Max requests getAudio in yandex"));
+                Logger.log("WARN", Error("Max requests getAudio in yandex"));
                 return locale.err("api.request.fail.msg", ["Fail getting audio url"]);
             }
 

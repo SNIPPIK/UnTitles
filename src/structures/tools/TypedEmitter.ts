@@ -128,13 +128,18 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @returns this
      * @public
      */
-    public removeListener<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
-    public removeListener<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
+    public removeListener<E extends keyof ListenerSignature<L>>(event: E, listener?: ListenerSignature<L>[E]): this;
+    public removeListener<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener?: DefaultListener): this;
     public removeListener(event: string, listener: (...args: any[]) => any): this {
-        this._set.delete(event);
+        if (!listener) {
+            this._set.delete(event);
+            return this;
+        }
 
-        // Если есть событие с таким именем
-        if (listener) listener();
+        const arr = this._set.get(event);
+        if (!arr) return this;
+
+        this._set.set(event, arr.filter(l => l.listener !== listener));
         return this;
     };
 

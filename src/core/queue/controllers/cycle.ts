@@ -217,6 +217,7 @@ export class ControllerCycles {
             // Если время позволяет пересоздать сообщение о проигрывании
             else if (Date.now() - message.createdTimestamp > MESSAGE_UPDATE_TIME) {
                 await message.delete().catch(() => null);
+                return null;
             }
 
             return message;

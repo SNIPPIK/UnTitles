@@ -80,6 +80,8 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @public
      */
     public set prepareEpoch(data: VoiceDavePrepareEpochData) {
+        if (this.reinitializing) return;
+
         this.emit("debug", `Preparing for epoch (${data.epoch})`);
 
         // Если есть идентификатор
@@ -218,7 +220,6 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public processProposals = (payload: Buffer, connectedClients: Set<string>): Buffer | undefined => {
         if (!this.session) throw new Error("No session available");
-
         this.emit("debug", "MLS proposals processed");
         const { commit, welcome } = this.session.processProposals(
             payload.readUInt8(0) as 0 | 1,
@@ -226,8 +227,8 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
             Array.from(connectedClients),
         );
 
-        // Если нет буфера ответа от discord udp
-        if (!welcome && !commit) return null;
+        const total = (commit?.length ?? 0) + (welcome?.length ?? 0);
+        if (total === 0) return null;
 
         const result = Buffer.allocUnsafe(commit.length + welcome.length);
         commit.copy(result, 0);
@@ -319,7 +320,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @public
      */
     public decrypt = (packet: Buffer, userId: string) => {
-        const canDecrypt = this.session?.ready && (this.protocolVersion !== 0 || this.session?.canPassthrough(userId));
+        const canDecrypt = this.session?.ready && (this.protocolVersion !== 0 || this.session.canPassthrough(userId));
 
         // Если невозможно расшифровать opus frame
         if (!canDecrypt || !this.session) return null;

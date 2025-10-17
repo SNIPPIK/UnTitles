@@ -350,14 +350,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
     /**
      * @description Пред загрузка трека, если конечно это возможно
-     * @param position - Позиция трека
+     * @param track - Трек
      */
-    protected _preloadTrack = async (position: number): Promise<string | Error> => {
-        const track = this._tracks.get(position);
-
-        // Если нет трека в очереди
-        if (!track) return new Error("TrackError\n - Do not found track in queue");
-
+    protected _preloadTrack = async (track: Track): Promise<string | Error> => {
         // Получаем данные
         const path = await track?.resource;
 
@@ -379,16 +374,25 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public play = async (seek: number = 0, timeout: number = 0, position: number = null): Promise<void> => {
-        const index = typeof position === "number" ? position : this._tracks.indexOf(this._tracks.track);
+        let track: Track, index: number;
 
-        // Получаем трек следуя позиции
-        const track = this._tracks.get(index);
+        // Если указана позиция
+        if (position) {
+            track = this._tracks.get(position);
+            index = position;
+        }
+
+        // Если не указана позиция
+        else {
+            track = this._tracks.track;
+            index = this._tracks.position;
+        }
 
         // Если нет такого трека или статуса
         if (!track || this._status === null) return;
 
         try {
-            const resource = await this._preloadTrack(index);
+            const resource = await this._preloadTrack(track);
 
             // Если получена ошибка вместо исходника
             if (resource instanceof Error) {

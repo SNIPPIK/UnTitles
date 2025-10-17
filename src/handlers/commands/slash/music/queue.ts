@@ -35,8 +35,8 @@ import { db } from "#app/db";
         autocomplete: ({ ctx, args }) => {
             const { tracks } = db.queues.get(ctx.guildId);
             const { position } = tracks;
-            const center = args[0] ?? position;
 
+            const center = position < 3 ? args[0] : position / 2;
             const before = tracks.array(-10, center);
             const after = tracks.array(10, center);
 
@@ -47,8 +47,8 @@ import { db } from "#app/db";
                     const Selected = (args[0] - 1) === index;
 
                     return {
-                        name: `${index + 1}. ${isCurrent && !Selected ? "🎵" : Selected && !isCurrent ? "➡️" : Selected && isCurrent ? "➡ 🎵️" : "🎶"} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
-                        value: index
+                        name: `${position === 1 ? index : index + 1}. ${isCurrent && !Selected ? "🎵" : Selected && !isCurrent ? "➡️" : Selected && isCurrent ? "➡ 🎵️" : "🎶"} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
+                        value: position === 1 ? index - 1 : index,
                     };
                 })
             );

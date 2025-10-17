@@ -24,7 +24,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             name: Events.InteractionCreate,
             type: "client",
             once: false,
-            execute: (ctx) => {
+            execute: async (ctx) => {
                 // Если включен режим белого списка
                 if (db.whitelist.toggle) {
                     // Если нет пользователя в списке просто его игнорируем
@@ -90,7 +90,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @readonly
      * @private
      */
-    private readonly SelectCommand = (ctx: ChatInputCommandInteraction) => {
+    private readonly SelectCommand = async (ctx: ChatInputCommandInteraction) => {
         const command = db.commands.get(ctx.commandName);
 
         // Если нет команды
@@ -149,7 +149,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @readonly
      * @private
      */
-    private readonly SelectAutocomplete = (ctx: AutocompleteInteraction) => {
+    private readonly SelectAutocomplete = async (ctx: AutocompleteInteraction) => {
         const command = db.commands.get(ctx.commandName);
 
         // Если не найдена команда
@@ -174,7 +174,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @readonly
      * @private
      */
-    private readonly SelectComponent = (ctx: ButtonInteraction | SelectMenuInteract) => {
+    private readonly SelectComponent = async (ctx: ButtonInteraction | SelectMenuInteract) => {
         const component = db.components.get(ctx.customId);
 
         // Если не найден такой компонент

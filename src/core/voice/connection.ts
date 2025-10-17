@@ -267,6 +267,7 @@ export class VoiceConnection {
      */
     private createWebSocket = (endpoint: string, code?: GatewayCloseCodes) => {
         this.websocket.connect(endpoint, code); // Подключаемся к endpoint
+        this.websocket.removeAllListeners();
 
         // Если включен debug режим
         this.websocket.on("debug", (status, text) => Logger.log("DEBUG", `${status} ${text}`));
@@ -412,6 +413,7 @@ export class VoiceConnection {
      */
     private createUDPSocket = (d: WebSocketOpcodes.ready["d"]) => {
         this.clientUDP.connect(d); // Подключаемся по UDP к серверу
+        this.clientUDP.removeAllListeners();
 
         /**
          * @description Передаем реальный ip, port для общения с discord
@@ -474,7 +476,21 @@ export class VoiceConnection {
      */
     private createDaveSession = (version: number) => {
         const { user_id, channel_id } = this.adapter.packet.state;
-        const session = this.clientDave = new ClientDAVE(version, user_id, channel_id);
+        let session: ClientDAVE;
+
+        // Отключаем все события от ws
+        this.websocket.removeListener("daveSession");
+        this.websocket.removeListener("binary");
+
+        // Если уже есть активная сессия
+        if (this.clientDave) {
+            this.clientDave.destroy();
+            this.clientDave = null;
+            session = this.clientDave = new ClientDAVE(version, user_id, channel_id);
+        }
+
+        // Если сессии нет
+        else session = this.clientDave = new ClientDAVE(version, user_id, channel_id);
 
         /**
          * @description Получаем коды dave от WebSocket
@@ -502,6 +518,7 @@ export class VoiceConnection {
                 else if (op === VoiceOpcodes.DavePrepareEpoch) session.prepareEpoch = d;
             } catch (err) {
                 Logger.log("ERROR", `[Voice/${this.configuration.guild_id}] DAVE error: ${err}`);
+                const transitionId = typeof d === "object" && d ? d["transition_id"] ?? 0 : 0;
 
                 // Optional: попробовать сбросить сессию или пересоздать DAVE
                 try {
@@ -509,7 +526,7 @@ export class VoiceConnection {
                     this.websocket.packet = {
                         op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,
                         d: {
-                            transition_id: d["transition_id"] ?? 0
+                            transition_id: transitionId
                         }
                     };
                 } catch (fallbackErr) {
@@ -523,8 +540,6 @@ export class VoiceConnection {
          * @code 21-31
          */
         this.websocket.on("binary", ({op, payload}) => {
-            if (this._status !== VoiceConnectionStatus.ready && !this.clientDave) return;
-
             // Учетные данные и открытый ключ для внешнего отправителя MLS
             if (op === VoiceOpcodes.DaveMlsExternalSender) this.clientDave.externalSender = payload;
 
@@ -594,7 +609,7 @@ export class VoiceConnection {
                     op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,
                     d: {
                         transition_id: transitionId
-                    },
+                    }
                 };
             }
         });

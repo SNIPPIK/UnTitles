@@ -34,16 +34,14 @@ export class Events extends handler<Event<keyof ClientEvents>> {
      */
     public register = (client: DiscordClient) => {
         if (this.size > 0) {
-            this.emitter.removeAllListeners();
-
             // Отключаем только загруженные события
             for (let item of this.files) {
-                //@ts-ignore
                 client.off(item.name as any, item.execute);
             }
         }
 
         // Загружаем события заново
+        this.emitter.removeAllListeners();
         this.load();
 
         // Проверяем ивенты
