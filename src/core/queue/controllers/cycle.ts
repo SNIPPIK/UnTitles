@@ -162,7 +162,7 @@ export class ControllerCycles {
                 },
 
                 // Функция проверки
-                filter: (message) => !!message.edit && message.editedTimestamp + 5e3 < Date.now(),
+                filter: (message) => !!message.edit && message.editable && message.editedTimestamp + 5e3 < Date.now(),
 
                 // Функция обновления сообщения
                 execute: async (message) => {
@@ -192,7 +192,7 @@ export class ControllerCycles {
          */
         public update = async (message: T, component: MessageComponent) => {
             try {
-                await message.edit({ components: component });
+                if (message.editable) await message.edit({ components: component });
             } catch (error) {
                 Logger.log("ERROR", `Failed to edit message in cycle: ${error instanceof Error ? error.message : error}`);
 
@@ -216,7 +216,8 @@ export class ControllerCycles {
 
             // Если время позволяет пересоздать сообщение о проигрывании
             else if (Date.now() - message.createdTimestamp > MESSAGE_UPDATE_TIME) {
-                await message.delete().catch(() => null);
+                this.delete(message);
+                this.add(await factory());
                 return null;
             }
 

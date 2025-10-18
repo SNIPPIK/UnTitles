@@ -126,8 +126,8 @@ class message_playing extends Assign<Event<"message/playing">> {
             type: "player",
             once: false,
             execute: async (queue) => {
-                const message = await db.queues.cycles.messages.ensure(queue.message.guild_id, async () => {
-                    return await queue.message.send({
+                const message = await db.queues.cycles.messages.ensure(queue.message.guild_id, () => {
+                    return queue.message.send({
                         components: queue.components,
                         withResponse: true,
                         flags: "IsComponentsV2"
