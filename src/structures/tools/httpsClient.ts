@@ -1,6 +1,7 @@
 import { type BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, type Deflate, type Gunzip } from "node:zlib";
 import { request as httpsRequest, type RequestOptions } from "node:https";
 import { type IncomingMessage, request as httpRequest } from "node:http";
+import {Logger} from "#structures/logger";
 
 /**
  * @author SNIPPIK
@@ -45,7 +46,7 @@ abstract class Request {
         // Пользовательский User-Agent
         userAgent?: string | boolean;
     } & RequestOptions = {
-        timeout: 3e3,
+        timeout: 5e3,
         headers: {},
         maxVersion: "TLSv1.3"
     };
@@ -94,6 +95,7 @@ abstract class Request {
              * @description Если получена ошибка
              */
             request.once("error", (err) => {
+                Logger.log("ERROR", err);
                 return resolve(Error(`[httpsClient]: Connection Error: ${err}`));
             });
 
