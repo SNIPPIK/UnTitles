@@ -29,7 +29,7 @@ const Clients = {
                     clientVersion: "19.44.38",
                     platform: "MOBILE",
                     osName: "Android",
-                    osVersion: "11",
+                    osVersion: "13",
                     androidSdkVersion: "30",
                     hl: "en",
                     gl: "US",
@@ -58,44 +58,6 @@ const Clients = {
 
     /**
      * @description Запрос страницы, требуется указывать время для правильного запроса
-     * @audio true - without sig
-     */
-    "IOS": {
-        request: {
-            cpn: generateClientPlaybackNonce(16),
-            contentCheckOk: true,
-            racyCheckOk: true,
-            context: {
-                client: {
-                    clientName: "IOS",
-                    clientVersion: "19.45.4",
-                    deviceMake: "Apple",
-                    deviceModel: "iPhone16,2",
-                    platform: "MOBILE",
-                    osName: "iOS",
-                    osVersion: "17.5.1.21F90",
-                    hl: "en",
-                    gl: "US",
-                    utcOffsetMinutes: -240,
-                },
-                request: {
-                    internalExperimentFlags: [],
-                    useSsl: true,
-                },
-                user: {
-                    lockedSafetyMode: false,
-                },
-            }
-        },
-        headers: {
-            "Content-Type": "application/json",
-            "User-Agent": `com.google.ios.youtube/19.45.4(iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)`,
-            "X-Goog-Api-Format-Version": "2",
-        }
-    },
-
-    /**
-     * @description Запрос страницы, требуется указывать время для правильного запроса
      * @audio true
      */
     "WEB": {
@@ -117,7 +79,7 @@ const Clients = {
      */
     "WEB_EMBEDDED": {
         request: {
-            "context": {
+            context: {
                 client: {
                     clientName: "WEB_EMBEDDED_PLAYER",
                     clientVersion: "1.20240723.01.00",

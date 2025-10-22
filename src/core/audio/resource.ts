@@ -313,6 +313,7 @@ export class BufferedAudioResource extends BaseAudioResource {
 
                 // Указываем формат аудио (ogg/opus)
                 "-acodec", "libopus",
+                "-frame_duration", "20",
                 "-f", "opus",
                 "pipe:"
             ]),
@@ -493,6 +494,7 @@ export class PipeAudioResource extends BaseAudioResource {
 
                 // Указываем формат аудио (ogg/opus)
                 "-acodec", "libopus",
+                "-frame_duration", "20",
                 "-f", "opus",
                 "pipe:"
             ]),

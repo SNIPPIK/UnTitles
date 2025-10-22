@@ -127,6 +127,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
             this.emit("error", err);
         });
 
+        // Если получен ответ от сервера
         socket.on("message", (msg) => {
             this.isConnected = true;
             this.emit("message", msg);

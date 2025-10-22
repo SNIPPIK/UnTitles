@@ -6,7 +6,7 @@ import { SetArray } from "#structures";
  * @description Кривая точности event loop цикла, чем больше тем точнее, но при сильных нагрузках это будет слышно!
  * @const AMPLITUDE_EL_CYCLE_OFFSET
  */
-const AMPLITUDE_EL_CYCLE_OFFSET = 0.98;
+const AMPLITUDE_EL_CYCLE_OFFSET = 0.95;
 
 /**
  * @author SNIPPIK

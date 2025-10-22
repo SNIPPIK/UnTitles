@@ -270,7 +270,7 @@ export class VoiceConnection {
         this.websocket.removeAllListeners();
 
         // Если включен debug режим
-        this.websocket.on("debug", (status, text) => Logger.log("DEBUG", `${status} ${text}`));
+        this.websocket.on("debug", (status, text) => Logger.log("DEBUG", `${status} ${JSON.stringify(text)}`));
         this.websocket.on("warn", (status) => Logger.log("DEBUG", status));
 
         /**
@@ -433,6 +433,7 @@ export class VoiceConnection {
                 }
             };
 
+            // Включаем спикер
             this.speaking = this.defaultSpeaker;
         });
 
@@ -444,11 +445,11 @@ export class VoiceConnection {
             // Если голосовое подключение полностью отключено
             if (this._status === VoiceConnectionStatus.disconnected) return;
 
+            // Предупреждение о закрытии и запуске заново
+            this.websocket.emit("warn", `UDP Close. Reinitializing UDP socket...`);
+
             // Пересоздаем подключение
             this.createUDPSocket(d);
-
-            // Debug
-            this.websocket.emit("warn", `UDP Close. Reinitializing UDP socket...`);
         });
 
         /**

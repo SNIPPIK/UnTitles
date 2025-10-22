@@ -227,8 +227,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
             Array.from(connectedClients),
         );
 
-        const total = (commit?.length ?? 0) + (welcome?.length ?? 0);
-        if (total === 0) return null;
+        if (!commit) return null;
 
         const result = Buffer.allocUnsafe(commit.length + welcome.length);
         commit.copy(result, 0);

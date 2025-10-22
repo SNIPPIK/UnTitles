@@ -136,11 +136,13 @@ abstract class Request {
 
                 // Генерируем новый
             } else {
-                const revision = `${(140).random(130)}.0`;
-                const OS = ["(X11; Linux x86_64;", "(Windows NT 10.0; Win64; x64;"];
+                const revision = `${(141).random(139)}`;
+                const OS = ["X11; Linux x86_64", "Windows NT 10.0; Win64; x64", "X11; Linux i686"];
 
                 this.data.headers = { ...this.data.headers,
-                    "User-Agent": `Mozilla/5.0 ${OS[(OS.length - 1).random(0)]} rv:${revision}) Gecko/20100101 Firefox/${revision}`
+                    "User-Agent":
+                    //`Mozilla/5.0 (${OS[(OS.length - 1).random(0)]}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${revision}.0.0.0 Safari/537.36`
+                    `Mozilla/5.0 (${OS[(OS.length - 1).random(0)]}; rv:${revision}.0) Gecko/20100101 Firefox/${revision}.0`
                 };
             }
         }
