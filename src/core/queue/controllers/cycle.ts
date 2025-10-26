@@ -87,7 +87,7 @@ export class ControllerCycles {
                 },
 
                 // Функция проверки
-                filter: (item) => item.playing && item.voice.connection.ready,
+                filter: (item) => item.playing && item.voice.connection.hasSendFrames,
 
                 // Функция отправки аудио фрейма
                 execute: (player) => {

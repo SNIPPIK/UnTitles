@@ -98,7 +98,7 @@ export class VoiceAdapter {
          * @description Пакет текущего голосового состояния
          * @public
          */
-        state: undefined  as GatewayVoiceStateUpdateDispatchData
+        state: undefined as GatewayVoiceStateUpdateDispatchData
     };
 
     /**

@@ -165,7 +165,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (this._status === "player/wait" || this._status === "player/pause") return false;
 
         // Если голосовое состояние не позволяет отправлять пакеты
-        else if (!this._voice.connection || !this._voice.connection?.ready) return false;
+        else if (!this._voice.connection || !this._voice.connection?.hasSendFrames) return false;
 
         // Если поток не читается, переходим в состояние ожидания
         else if (!this._audio.current && this._audio.current?.packets > 0 || !this._audio.current?.readable) {

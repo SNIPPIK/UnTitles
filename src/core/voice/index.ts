@@ -4,9 +4,9 @@ import { VoiceConnection } from "#core/voice/connection";
 import { Collection } from "#structures";
 
 // Voice Sockets
-export * from "./sockets/ClientWebSocket";
-export * from "./sockets/ClientUDPSocket";
-export * from "./sockets/ClientSRTPSocket";
+export * from "./modules/VoiceWebSocket";
+export * from "./modules/VoiceUDPSocket";
+export * from "./modules/VoiceRTPSocket";
 export * from "./connection";
 
 
@@ -35,7 +35,7 @@ export class Voices extends Collection<VoiceConnection> {
         }
 
         // Если голосовое соединение не может принимать пакеты
-        else if (!connection.ready || connection.status === "disconnected") {
+        else if (!connection.hasSendFrames || connection.status === "disconnected") {
             this.remove(config.guild_id);
             connection = new VoiceConnection(config, adapterCreator);
             this.set(config.guild_id, connection);

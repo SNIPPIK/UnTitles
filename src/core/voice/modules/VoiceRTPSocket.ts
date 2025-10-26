@@ -38,10 +38,10 @@ const MAX_32BIT = 2 ** 32;
 /**
  * @author SNIPPIK
  * @description Класс для шифрования данных через библиотеки sodium или нативным способом
- * @class ClientSRTPSocket
+ * @class VoiceRTPSocket
  * @public
  */
-export class ClientSRTPSocket {
+export class VoiceRTPSocket {
     /** Пустой заголовок RTP, для использования внутри класса */
     private _RTP_HEAD = Buffer.allocUnsafe(12);
 
@@ -149,7 +149,7 @@ export class ClientSRTPSocket {
      */
     public decodeAudioBuffer = (RTPHead: Buffer, packet: Buffer, nonce?: Buffer) => {
         // Получаем тип шифрования
-        const mode = ClientSRTPSocket.mode;
+        const mode = VoiceRTPSocket.mode;
         if (!nonce) nonce = this.nonceSize;
 
         // Готовим буферы

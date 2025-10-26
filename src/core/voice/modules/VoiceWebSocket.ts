@@ -23,11 +23,12 @@ const GatewayCloseCodesIgnore: GatewayCloseCodes[] = [4014, 4022];
 /**
  * @author SNIPPIK
  * @description Клиент для взаимодействия с discord, по методу wss
- * @class ClientWebSocket
+ * @class VoiceWebSocket
  * @extends TypedEmitter
  * @public
  */
-export class ClientWebSocket extends TypedEmitter<ClientWebSocketEvents> {
+export class VoiceWebSocket
+    extends TypedEmitter<ClientWebSocketEvents> {
     /**
      * @description Текущий статус подключения клиента
      * @private

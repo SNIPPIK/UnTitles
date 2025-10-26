@@ -68,7 +68,7 @@ class VoiceJoinCommand extends SubCommand {
             }
 
             // Смена канала
-            voiceConnection.swapChannel = VoiceChannel.id;
+            voiceConnection.channel = VoiceChannel.id;
         }
 
         // Подключаемся к голосовому каналу без очереди

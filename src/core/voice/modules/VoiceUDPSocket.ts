@@ -13,15 +13,11 @@ const MAX_SIZE_VALUE = 2 ** 32 - 1;
 /**
  * @author SNIPPIK
  * @description Создает udp подключение к Discord Gateway
- * @class ClientUDPSocket
+ * @class VoiceUDPSocket
  * @public
  */
-export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
-    /** Параметр подключения */
-    private isConnected = false;
-
-    /** Уничтожен ли класс */
-    private destroyed = false;
+export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
+    private _status: VoiceUDPSocketStatuses;
 
     /** Socket UDP подключения */
     private socket: Socket;
@@ -87,11 +83,11 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
     };
 
     /**
-     * @description Подключен ли UDP к серверу
+     * @description Получаем текущий статус подключения
      * @public
      */
-    public get connected() {
-        return this.isConnected;
+    public get status() {
+        return this._status;
     };
 
     /**
@@ -118,6 +114,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         const socket = this.socket = createSocket({
             type: isIPv4(options.ip) ? "udp4" : "udp6"
         });
+        this._status = VoiceUDPSocketStatuses.connecting;
 
         // Отправляем пакет данных для получения реального ip, port
         this.discovery(options.ssrc);
@@ -129,13 +126,13 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
         // Если получен ответ от сервера
         socket.on("message", (msg) => {
-            this.isConnected = true;
+            this._status = VoiceUDPSocketStatuses.connected;
             this.emit("message", msg);
         });
 
         // Если подключение оборвалось
         socket.once("close", () => {
-            this.isConnected = false;
+            this._status = VoiceUDPSocketStatuses.disconnected;
             this.emit("close");
         });
 
@@ -162,6 +159,7 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
                     return;
                 }
 
+                this._status = VoiceUDPSocketStatuses.connected;
                 this.emit("connected", { ip, port });
             }
         });
@@ -191,8 +189,8 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public destroy = () => {
-        if (this.destroyed) return;
-        this.destroyed = true;
+        if (this._status === "disconnected") return;
+        this._status = VoiceUDPSocketStatuses.disconnected;
 
         // Уничтожаем интервал активности
         clearInterval(this.keepAlive.interval);
@@ -204,8 +202,6 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
         this.keepAlive.buffer = null;
         this.keepAlive = null;
-        this.destroyed = null;
-
         this.reset();
     };
 
@@ -253,6 +249,18 @@ export class ClientUDPSocket extends TypedEmitter<UDPSocketEvents> {
         // Выставляем таймер возобновления KeepAlive
         this.keepAlive.timeout = setTimeout(() => this.manageKeepAlive(), 2e3);
     };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Состояния подключения
+ * @enum VoiceUDPSocketStatuses
+ */
+enum VoiceUDPSocketStatuses {
+    connected = "connected",
+    connecting = "connecting",
+    disconnected = "disconnected",
 }
 
 /**

@@ -39,9 +39,6 @@ const MAX_SEGMENT_LENGTH = 255;
  * @private
  */
 class BaseEncoder extends TypedEmitter<EncoderEvents> {
-    /** Не отправлен ли 1 аудио пакет */
-    private _first = true;
-
     /** Временный буфер, для объединения буферов */
     public _buffer: Buffer = Buffer.allocUnsafe(0);
 
@@ -142,10 +139,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
                 // Обрабатываем пакет
                 if (isOpusHead(packet)) this.emit("head", packet);
                 else if (isOpusTags(packet)) this.emit("tags", packet);
-                else if (this._first) {
-                    this.emit("frame", SILENT_FRAME);
-                    this._first = false;
-                } else this.emit("frame", packet);
+                else this.emit("frame", packet);
             }
         }
     };
@@ -155,12 +149,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @public
      */
     public destroy() {
-        // Финальный тихий пакет, чтобы downstream понял завершение
-        this.emit("frame", SILENT_FRAME);
-
-        // Сброс состояния
-        this._first = true;           // возвращаем в исходное состояние
-        this._buffer = null;          // очищаем ссылку на буфер
+        this._buffer = null;
 
         // Освобождаем emitter
         this.removeAllListeners();

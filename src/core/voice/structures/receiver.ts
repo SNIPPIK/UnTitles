@@ -52,17 +52,17 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
         super();
 
         // Задаем SSRC
-        voice["websocket"].on("speaking", ({d}) => {
+        voice.websocket.on("speaking", ({d}) => {
             this.ssrc = d.ssrc;
         });
 
         // Если подключается новый пользователь
-        voice["websocket"].on("ClientConnect", ({d}) => {
+        voice.websocket.on("ClientConnect", ({d}) => {
             this._users = d.user_ids;
         });
 
         // Если отключается пользователь
-        voice["websocket"].on("ClientDisconnect", ({d}) => {
+        voice.websocket.on("ClientDisconnect", ({d}) => {
             const index = this._users.indexOf(d.user_id);
 
             // Если есть пользователь
@@ -72,7 +72,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
         });
 
         // Слушаем UDP подключение
-        voice["clientUDP"].on("message", (message) => {
+        voice.udp.on("message", (message) => {
             // Если сообщение меньше размера SSRC
             if (message.length <= 8) return;
 
@@ -80,7 +80,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
 
             if (this.ssrc === ssrc) {
                 // Копируем последние 4 байта незаполненного одноразового значения в заполнение (12 - 4) или (24 - 4) байтов.
-                message.copy(voice["clientSRTP"]["_nonceBuffer"], 0, message.length - UNPADDED_NONCE_LENGTH);
+                message.copy(voice["sRTP"]["_nonceBuffer"], 0, message.length - UNPADDED_NONCE_LENGTH);
                 const audio = this.parsePacket(message);
 
                 this.emit("speaking", this._users, ssrc, audio);
@@ -112,7 +112,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
         );
          */
 
-        let packet = this.voice["clientSRTP"].decodeAudioBuffer(header, encrypted, this.voice["clientSRTP"]["_nonce"]);
+        let packet = this.voice["sRTP"].decodeAudioBuffer(header, encrypted, this.voice["sRTP"]["_nonce"]);
 
         // Если нет аудио
         if (!packet) return null;

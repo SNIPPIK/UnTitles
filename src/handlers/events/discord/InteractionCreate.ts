@@ -176,7 +176,6 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      */
     private readonly SelectComponent = async (ctx: ButtonInteraction | SelectMenuInteract) => {
         const component = db.components.get(ctx.customId);
-
         // Если не найден такой компонент
         if (!component) return null;
 

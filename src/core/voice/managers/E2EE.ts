@@ -5,7 +5,7 @@ import { Logger, TypedEmitter } from "#structures";
  * @author SNIPPIK
  * @description Текущая версия протокола dave
  */
-let MAX_DAVE_PROTOCOL: number = 0;
+let MAX_E2EE_PROTOCOL: number = 0;
 
 /**
  * @author SNIPPIK
@@ -26,27 +26,27 @@ const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 24;
  * @description Количество пакетов, для которых допускается сбой дешифрования, пока мы не сочтем переход неудачным и не выполним повторную инициализацию.
  * @const DEFAULT_DECRYPTION_FAILURE_TOLERANCE
  */
-const DEFAULT_DECRYPTION_FAILURE_TOLERANCE = 36;
+//const DEFAULT_DECRYPTION_FAILURE_TOLERANCE = 36;
 
 /**
  * @author SNIPPIK
  * @description Управляет сеансом группы протокола DAVE.
- * @class ClientDAVE
+ * @class E2EESession
  * @extends TypedEmitter
  * @public
  */
-export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
+export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
     /** Последний выполненный идентификатор перехода */
     public lastTransition_id?: number;
 
     /** Ожидаемый переход */
     private pendingTransitions = new Map<number, number>();
 
+    /** Количество последовательных сбоев, возникших при дешифровании */
+    //private consecutiveFailures = 0;
+
     /** Был ли данный сеанс ранее понижен в рейтинге */
     private downgraded = false;
-
-    /** Количество последовательных сбоев, возникших при дешифровании */
-    private consecutiveFailures = 0;
 
     /** Выполняется ли повторная инициализация сеанса из-за недопустимого перехода */
     public reinitializing = false;
@@ -59,7 +59,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @returns number
      */
     public static get version(): number {
-        return MAX_DAVE_PROTOCOL;
+        return MAX_E2EE_PROTOCOL;
     };
 
     /**
@@ -86,7 +86,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
 
         // Если есть идентификатор
         if (data.epoch === 1) {
-            this.protocolVersion = data.protocol_version;
+            this.version = data.protocol_version;
             this.reinit();
         }
     };
@@ -101,7 +101,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         if (this.reinitializing) return;
         this.emit("debug", `Invalidating transition ${transitionId}`);
         this.reinitializing = true;
-        this.consecutiveFailures = 0;
+        //this.consecutiveFailures = 0;
         this.emit("invalidateTransition", transitionId);
         this.reinit();
     };
@@ -113,7 +113,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public constructor(
         /** Используемая версия протокола DAVE */
-        private protocolVersion: number,
+        private version: number,
 
         /** Идентификатор пользователя, представленный этим сеансом. */
         private user_id: string,
@@ -131,17 +131,17 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      */
     public reinit = (): void => {
         // Если можно создать сессию
-        if (this.protocolVersion > 0 && this.user_id && this.channel_id) {
+        if (this.version > 0 && this.user_id && this.channel_id) {
             // Если сессия уже есть
             if (this.session) {
-                this.session.reinit(this.protocolVersion, this.user_id, this.channel_id);
-                this.emit("debug", `Session reinitialized for protocol version ${this.protocolVersion}`);
+                this.session.reinit(this.version, this.user_id, this.channel_id);
+                this.emit("debug", `Session reinitialized for protocol version ${this.version}`);
             }
 
             // Если сессии еще нет
             else {
-                this.session = new loaded_lib.DAVESession(this.protocolVersion, this.user_id, this.channel_id);
-                this.emit("debug", `Session initialized for protocol version ${this.protocolVersion}`);
+                this.session = new loaded_lib.DAVESession(this.version, this.user_id, this.channel_id);
+                this.emit("debug", `Session initialized for protocol version ${this.version}`);
             }
 
             // Отправляем ключ
@@ -166,14 +166,9 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         this.emit("debug", `Preparing for transition (${data.transition_id}, v${data.protocol_version})`);
         this.pendingTransitions.set(data.transition_id, data.protocol_version);
 
-        // Если включенный идентификатор перехода равен 0, переход предназначен для (повторной) инициализации и может быть выполнен немедленно.
         if (data.transition_id === 0) this.executeTransition(data.transition_id);
-        else {
-            if (data.protocol_version === 0) this.session?.setPassthroughMode(true, TRANSITION_EXPIRY_PENDING_DOWNGRADE);
-            return true;
-        }
-
-        return false;
+        else if (data.protocol_version === 0) this.session?.setPassthroughMode(true, TRANSITION_EXPIRY_PENDING_DOWNGRADE);
+        return data.transition_id !== 0;
     };
 
     /**
@@ -191,11 +186,11 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
             return false;
         }
 
-        const oldVersion = this.protocolVersion;
-        this.protocolVersion = this.pendingTransitions.get(transition_id)!;
+        const oldVersion = this.version;
+        this.version = this.pendingTransitions.get(transition_id)!;
 
         // Управление обновлениями и понижение версии
-        if (oldVersion !== this.protocolVersion && this.protocolVersion === 0) {
+        if (oldVersion !== this.version && this.version === 0) {
             this.downgraded = true;
             this.emit("debug", "Session downgraded");
         } else if (transition_id > 0 && this.downgraded) {
@@ -206,7 +201,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
 
         // В будущем можно будет подать сигнал DAVESession о переходе, но на данный момент поддерживается только версия v1.
         this.lastTransition_id = transition_id;
-        this.emit("debug", `Transition executed (v${oldVersion} -> v${this.protocolVersion}, id: ${transition_id})`);
+        this.emit("debug", `Transition executed (v${oldVersion} -> v${this.version}, id: ${transition_id})`);
         this.pendingTransitions.delete(transition_id);
         return true;
     };
@@ -218,7 +213,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @returns Buffer
      * @public
      */
-    public processProposals = (payload: Buffer, connectedClients: Set<string>): Buffer | undefined => {
+    public processProposals = (payload: Buffer, connectedClients: Set<string>): Buffer | null => {
         if (!this.session) throw new Error("No session available");
         this.emit("debug", "MLS proposals processed");
         const { commit, welcome } = this.session.processProposals(
@@ -237,63 +232,28 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
 
     /**
      * @description Обрабатывает фиксацию из группы MLS.
+     * @param type - Тип вызова
      * @param payload - Полезная нагрузка
      * @returns TransitionResult
      * @public
      */
-    public processCommit = (payload: Buffer): TransitionResult => {
+    public processMLSTransit = (type: "commit" | "welcome", payload: Buffer): TransitionResult => {
         if (!this.session) throw new Error("No session available");
         const transition_id = payload.readUInt16BE(0);
         const flag = payload.subarray(2);
 
         try {
-            this.session.processCommit(flag);
+            this.session[type === "commit" ? "processCommit" : "processWelcome"](flag);
 
-            // Если Dave отключен
             if (transition_id === 0) {
                 this.reinitializing = false;
                 this.lastTransition_id = transition_id;
-            }
+            } else this.pendingTransitions.set(transition_id, this.version);
 
-            // Если Dave снова включен
-            else this.pendingTransitions.set(transition_id, this.protocolVersion);
-
-            this.emit("debug", `MLS commit processed (transition id: ${transition_id})`);
+            this.emit("debug", `MLS ${type} processed (transition id: ${transition_id})`);
             return { transition_id, success: true };
         } catch (error) {
-            this.emit("debug", `MLS commit errored from transition ${transition_id}: ${error}`);
-            this.recoverFromInvalidTransition = transition_id;
-            return { transition_id, success: false };
-        }
-    };
-
-    /**
-     * @description Обрабатывает приветствие от группы MLS.
-     * @param payload - Полезная нагрузка
-     * @returns TransitionResult
-     * @public
-     */
-    public processWelcome = (payload: Buffer): TransitionResult => {
-        if (!this.session) throw new Error("No session available");
-        const transition_id = payload.readUInt16BE(0);
-        const flag = payload.subarray(2);
-
-        try {
-            this.session.processWelcome(flag);
-
-            // Если Dave отключен
-            if (transition_id === 0) {
-                this.reinitializing = false;
-                this.lastTransition_id = transition_id;
-            }
-
-            // Если Dave снова включен
-            else this.pendingTransitions.set(transition_id, this.protocolVersion);
-
-            this.emit("debug", `MLS welcome processed (transition id: ${transition_id})`);
-            return { transition_id, success: true };
-        } catch (error) {
-            this.emit("debug", `MLS welcome errored from transition ${transition_id}: ${error}`);
+            this.emit("debug", `MLS ${type} errored from transition ${transition_id}: ${error}`);
             this.recoverFromInvalidTransition = transition_id;
             return { transition_id, success: false };
         }
@@ -306,9 +266,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @public
      */
     public encrypt = (packet: Buffer) => {
-        // Если невозможно зашифровать opus frame
-        if (this.protocolVersion === 0 || !this.session?.ready) return null;
-        return this.session.encryptOpus(packet);
+        return (this.version === 0 || !this.session?.ready) ? null : this.session.encryptOpus(packet);
     };
 
     /**
@@ -318,8 +276,8 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
      * @returns Buffer
      * @public
      */
-    public decrypt = (packet: Buffer, userId: string) => {
-        const canDecrypt = this.session?.ready && (this.protocolVersion !== 0 || this.session.canPassthrough(userId));
+    /*public decrypt = (packet: Buffer, userId: string) => {
+        const canDecrypt = this.session?.ready && (this.version !== 0 || this.session.canPassthrough(userId));
 
         // Если невозможно расшифровать opus frame
         if (!canDecrypt || !this.session) return null;
@@ -345,7 +303,7 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
         }
 
         return null;
-    };
+    };*/
 
     /**
      * @description Сбрасывает сеанс и удаляет его
@@ -376,9 +334,9 @@ export class ClientDAVE extends TypedEmitter<ClientDAVEEvents> {
 /**
  * @author SNIPPIK
  * @description События класса DAVESession
- * @interface ClientDAVE
+ * @interface E2EESession
  */
-export interface ClientDAVEEvents {
+export interface ClientE2EEEvents {
     // Ошибка?! Какая ошибка
     "error": (error: Error) => void
 
@@ -533,7 +491,7 @@ let loaded_lib: any = null;
             const library = await import(name);
             delete require.cache[require.resolve(name)];
 
-            MAX_DAVE_PROTOCOL = library?.DAVE_PROTOCOL_VERSION as number;
+            MAX_E2EE_PROTOCOL = library?.DAVE_PROTOCOL_VERSION as number;
             loaded_lib = library;
             return;
         } catch {}

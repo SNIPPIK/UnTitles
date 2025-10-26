@@ -18,12 +18,12 @@ const AMPLITUDE_DRIFT_CYCLE_OFFSET = 0.95;
 /**
  * @author SNIPPIK
  * @description Базовый класс цикла
- * @class BaseCycle
+ * @class DefaultCycleSystem
  * @extends SetArray
  * @abstract
  * @private
  */
-abstract class BaseCycle<T = unknown> extends SetArray<T> {
+abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     /** Последний записанное значение performance.now(), нужно для улавливания event loop lags */
     private performance: number = 0;
 
@@ -271,7 +271,7 @@ abstract class BaseCycle<T = unknown> extends SetArray<T> {
  * @abstract
  * @public
  */
-export abstract class TaskCycle<T = unknown> extends BaseCycle<T> {
+export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
     /**
      * @description Создаем класс и добавляем параметры
      * @param options - Параметры для работы класса
@@ -349,7 +349,7 @@ export abstract class TaskCycle<T = unknown> extends BaseCycle<T> {
  * @abstract
  * @public
  */
-export abstract class PromiseCycle<T = unknown> extends BaseCycle<T> {
+export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
     /**
      * @description Создаем класс и добавляем параметры
      * @param options - Параметры для работы класса
@@ -422,7 +422,7 @@ export abstract class PromiseCycle<T = unknown> extends BaseCycle<T> {
 
 /**
  * @author SNIPPIK
- * @description Интерфейс для опций BaseCycle
+ * @description Интерфейс для опций DefaultCycleSystem
  * @private
  */
 interface BaseCycleConfig<T> {
