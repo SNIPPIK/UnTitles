@@ -2,17 +2,6 @@ import crypto from "node:crypto";
 
 /**
  * @author SNIPPIK
- * @description Поддерживаемые типы шифрования
- * @const Encryption
- * @private
- */
-const Encryption: { name: EncryptionModes, nonce: Buffer } = {
-    name: null,
-    nonce: null
-};
-
-/**
- * @author SNIPPIK
  * @description Время до следующей проверки жизни
  * @const TIMESTAMP_INC
  * @private
@@ -43,7 +32,7 @@ const MAX_32BIT = 2 ** 32;
  */
 export class VoiceRTPSocket {
     /** Пустой заголовок RTP, для использования внутри класса */
-    private _RTP_HEAD = Buffer.allocUnsafe(12);
+    private head = Buffer.allocUnsafe(12);
 
     /** Пустой буфер */
     private _nonce: Buffer = Buffer.from(Encryption.nonce);
@@ -77,9 +66,12 @@ export class VoiceRTPSocket {
             this._nonce = Buffer.alloc(Encryption.nonce?.length ?? 12);
         }
 
-        // пишем счетчик в первые 4 байта (или в нужную позицию)
-        this._nonce.writeUInt32BE(this._nonceSize >>> 0, 0);
-        this._nonceSize = (this._nonceSize + 1) >>> 0;
+        this._nonceSize++;
+        if (this._nonceSize > MAX_32BIT - 1) this._nonceSize = 0;
+
+        // Пишем счетчик в первые 4 байта (или в нужную позицию)
+        this._nonce.writeUInt32BE(this._nonceSize, 0);
+
         return this._nonce;
     };
 
@@ -92,16 +84,18 @@ export class VoiceRTPSocket {
         if (this.sequence >= MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было превышения int 16
         if (this.timestamp >= MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было превышения int 32
 
+        else if (this.timestamp + TIMESTAMP_INC > MAX_32BIT) this.timestamp = MAX_32BIT - TIMESTAMP_INC;
+
         // Получаем текущий заголовок
-        const RTPHead = this._RTP_HEAD;
+        const RTPHead = this.head;
 
         // Записываем новую последовательность
         RTPHead.writeUInt16BE(this.sequence, 2);
-        this.sequence = (this.sequence + 1) & 0xFFFF;
+        this.sequence = this.sequence + 1;
 
         // Временная метка
         RTPHead.writeUInt32BE(this.timestamp, 4);
-        this.timestamp = (this.timestamp + TIMESTAMP_INC) >>> 0;
+        this.timestamp = this.timestamp + TIMESTAMP_INC;
 
         // SSRC
         RTPHead.writeUInt32BE(this.options.ssrc, 8);
@@ -115,12 +109,12 @@ export class VoiceRTPSocket {
      * @public
      */
     public constructor(private options: EncryptorOptions) {
-        this.sequence = this.randomNBit(16);
-        this.timestamp = this.randomNBit(32);
-        this._nonceSize = this.randomNBit(32);
+        this.sequence = randomNBit(16);
+        this.timestamp = randomNBit(32);
+        this._nonceSize = randomNBit(32);
 
         // Version + Flags, Payload Type 120 (Opus)
-        [this._RTP_HEAD[0], this._RTP_HEAD[1]] = [0x80, 0x78];
+        [this.head[0], this.head[1]] = [0x80, 0x78];
     };
 
     /**
@@ -131,94 +125,47 @@ export class VoiceRTPSocket {
      */
     public packet = (frame: Buffer) => {
         // Получаем заголовок RTP
-        const RTPHead = this.header;
+        const head = this.header;
 
         // Получаем nonce буфер 12-24 бит
         const nonce = this.nonceSize;
 
-        return this.decodeAudioBuffer(RTPHead, frame, nonce);
+        // Получаем тип шифрования
+        const mode = VoiceRTPSocket.mode;
+
+        if (mode === "aead_aes256_gcm_rtpsize") return this.encryptNative(head, frame, nonce);
+        return this.encryptLibs(head, frame, nonce);
     };
 
     /**
-     * @description Глубокая кодировка дает возможность шифровать из вне!
-     * @param RTPHead       - Заголовок
+     * @description Шифрование аудио через crypto методом aead_aes256_gcm
+     * @param head       - Заголовок
      * @param packet        - Аудио пакет
      * @param nonce         - Размер nonce
      * @returns Buffer
      * @public
      */
-    public decodeAudioBuffer = (RTPHead: Buffer, packet: Buffer, nonce?: Buffer) => {
-        // Получаем тип шифрования
-        const mode = VoiceRTPSocket.mode;
-        if (!nonce) nonce = this.nonceSize;
-
-        // Готовим буферы
-        let encrypted: Buffer;
-        let totalLength = RTPHead.length; // стартовая длина
-
-        // Шифрование aead_aes256_gcm
-        if (mode === "aead_aes256_gcm_rtpsize") {
-            const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce, { authTagLength: 16 });
-            cipher.setAAD(RTPHead);
-
-            const enc = cipher.update(packet);
-            const fin = cipher.final();
-            const tag = cipher.getAuthTag();
-
-            totalLength += enc.length + fin.length + tag.length;
-            encrypted = Buffer.allocUnsafe(enc.length + fin.length + tag.length);
-
-            let off = 0;
-            enc.copy(encrypted, off); off += enc.length;
-            fin.copy(encrypted, off); off += fin.length;
-            tag.copy(encrypted, off);
-        }
-
-        // Шифрование aead_xchacha20_poly1305
-        else if (mode === "aead_xchacha20_poly1305_rtpsize") {
-            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, RTPHead, nonce, this.options.key);
-            encrypted = cryptoPacket;
-            totalLength += cryptoPacket.length;
-        }
-
-        // если появятся другие режимы
-        else {
-            encrypted = packet;
-            totalLength += packet.length;
-        }
-
-        // Одноразовый код размера RTP: первые 4 байта
+    private encryptNative = (head: Buffer, packet: Buffer, nonce?: Buffer) => {
+        // Получаем первые 4 байта из буфера
         const nonceBuffer = nonce.subarray(0, 4);
-        totalLength += nonceBuffer.length;
-
-        // Финальный результат без Buffer.concat
-        const result = Buffer.allocUnsafe(totalLength);
-        let offset = 0;
-
-        RTPHead.copy(result, offset);
-        offset += RTPHead.length;
-
-        encrypted.copy(result, offset);
-        offset += encrypted.length;
-
-        nonceBuffer.copy(result, offset);
-
-        return result;
+        const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce, { authTagLength: 16 });
+        cipher.setAAD(head);
+        return Buffer.concat([head, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
     };
 
     /**
-     * @description Возвращает случайное число, находящееся в диапазоне n бит
-     * @param bits - Количество бит
-     * @returns number
-     * @private
+     * @description Шифрование аудио через crypto методом aead_aes256_gcm
+     * @param head       - Заголовок
+     * @param packet        - Аудио пакет
+     * @param nonce         - Размер nonce
+     * @returns Buffer
+     * @public
      */
-    private randomNBit = (bits: number) => {
-        const size = Math.ceil(bits / 8);
-        const buf = crypto.randomBytes(size);
-        if (size === 2) return buf.readUInt16BE(0);
-        if (size === 4) return buf.readUInt32BE(0);
-        // fallback for odd sizes
-        return buf.readUIntBE(0, size) % (2 ** bits);
+    private encryptLibs = (head: Buffer, packet: Buffer, nonce?: Buffer) => {
+        // Получаем первые 4 байта из буфера
+        const nonceBuffer = nonce.subarray(0, 4);
+        const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, head, nonce, this.options.key);
+        return Buffer.concat([head, cryptoPacket, nonceBuffer]);
     };
 
     /**
@@ -232,9 +179,24 @@ export class VoiceRTPSocket {
         this.timestamp = null;
         this.sequence = null;
         this.options = null;
-        this._RTP_HEAD = undefined;
+        this.head.fill(0);
     };
 }
+
+/**
+ * @description Возвращает случайное число, находящееся в диапазоне n бит
+ * @param bits - Количество бит
+ * @returns number
+ * @private
+ */
+function randomNBit(bits: number){
+    const size = Math.ceil(bits / 8);
+    const buf = crypto.randomBytes(size);
+    if (size === 2) return buf.readUInt16BE(0);
+    if (size === 4) return buf.readUInt32BE(0);
+    return buf.readUIntBE(0, size) % (2 ** bits);
+}
+
 
 /**
  * @author SNIPPIK
@@ -242,6 +204,17 @@ export class VoiceRTPSocket {
  * @private
  */
 let loaded_lib: Methods.current = {};
+
+/**
+ * @author SNIPPIK
+ * @description Поддерживаемые типы шифрования
+ * @const Encryption
+ * @private
+ */
+const Encryption: { name: EncryptionModes, nonce: Buffer } = {
+    name: null,
+    nonce: null
+};
 
 /**
  * @author SNIPPIK

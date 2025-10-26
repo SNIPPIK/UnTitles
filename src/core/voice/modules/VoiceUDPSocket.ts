@@ -2,6 +2,7 @@ import { createSocket, type Socket } from "node:dgram";
 import { type WebSocketOpcodes } from "#core/voice";
 import { TypedEmitter } from "#structures";
 import { isIPv4 } from "node:net";
+import {HeartbeatManager} from "#core/voice/managers/heartbeat";
 
 /**
  * @author SNIPPIK
@@ -22,31 +23,17 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /** Socket UDP подключения */
     private socket: Socket;
 
-    /**
-     * @description Данные для поддержания udp соединения
-     * @private
-     */
-    private keepAlive = {
-        /**
-         * @description Интервал для предотвращения разрыва
-         * @readonly
-         * @private
-         */
-        interval: null as NodeJS.Timeout,
+    /** Менеджер жизни подключения */
+    private _heartbeat: HeartbeatManager;
 
+    /** Данные для поддержания udp соединения */
+    private keepAlive = {
         /**
          * @description Интервал для предотвращения разрыва в миллисекундах
          * @readonly
          * @private
          */
         intervalMs: 0,
-
-        /**
-         * @description Таймер по истечению которого будет запущен интервал
-         * @readonly
-         * @private
-         */
-        timeout: null as NodeJS.Timeout,
 
         /**
          * @description Буфер, используемый для записи счетчика активности
@@ -62,10 +49,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         counter: 0
     };
 
-    /**
-     * @description Данные подключения, полные данные пакета ready.d
-     * @public
-     */
+    /** Данные подключения, полные данные пакета ready.d */
     public options: WebSocketOpcodes.ready["d"];
 
     /**
@@ -79,7 +63,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
             if (err) this.emit("error", err);
         });
 
-        this.resetKeepAliveInterval();
+        this._heartbeat.ack();
     };
 
     /**
@@ -88,6 +72,21 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      */
     public get status() {
         return this._status;
+    };
+
+    /**
+     * @description Создаем класс и задаем параметры
+     * @public
+     */
+    public constructor() {
+        super();
+        this._heartbeat = new HeartbeatManager({
+            onTimeout: () => {
+                if (this.keepAlive.counter >= MAX_SIZE_VALUE) this.keepAlive.counter = 0;
+                this.keepAlive.buffer.writeUInt32BE(this.keepAlive.counter++, 0);
+                this.packet = this.keepAlive.buffer;
+            }
+        });
     };
 
     /**
@@ -136,16 +135,22 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
             this.emit("close");
         });
 
-        this.manageKeepAlive();
+        // Запускаем менеджер жизни UDP
+        this._heartbeat.start(options.heartbeat_interval);
     };
 
     /**
-     * @description Подключаемся к серверу через UDP подключение
+     * @description Просим указать путь до конечной точки
      * @returns void
      * @public
      */
     public discovery = (ssrc: number) => {
-        this.packet = this.discoveryBuffer(ssrc);
+        const packet = Buffer.allocUnsafe(74);
+        packet.writeUInt16BE(1, 0);
+        packet.writeUInt16BE(70, 2);
+        packet.writeUInt32BE(ssrc, 4);
+
+        this.packet = packet;
 
         // Ждем получения сообщения после отправки код, для подключения UDP
         this.socket.once("message", (packet) => {
@@ -192,75 +197,18 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         if (this._status === "disconnected") return;
         this._status = VoiceUDPSocketStatuses.disconnected;
 
-        // Уничтожаем интервал активности
-        clearInterval(this.keepAlive.interval);
-        clearTimeout(this.keepAlive.timeout);
-
         this?.removeAllListeners();
         this.socket?.removeAllListeners();
         super.destroy();
+
+        this._heartbeat.stop();
+        this._heartbeat.destroy();
+        this._heartbeat = null;
 
         this.keepAlive.buffer = null;
         this.keepAlive = null;
         this.reset();
     };
-
-    /**
-     * @description Пакет для создания UDP соединения
-     * @returns Buffer
-     * @public
-     */
-    private discoveryBuffer = (ssrc: number) => {
-        const packet = Buffer.allocUnsafe(74);
-        packet.writeUInt16BE(1, 0);
-        packet.writeUInt16BE(70, 2);
-        packet.writeUInt32BE(ssrc, 4);
-
-        return packet;
-    };
-
-    /**
-     * @description Функция для запуска интервала для поддержания соединения
-     * @returns void
-     * @private
-     */
-    private manageKeepAlive = () => {
-        if (this.keepAlive.interval) clearInterval(this.keepAlive.interval);
-        if (this.keepAlive.timeout) clearTimeout(this.keepAlive.timeout);
-
-        // Запускаем интервал (по-умолчанию)
-        this.keepAlive.interval = setInterval(() => {
-            if (this.keepAlive.counter > MAX_SIZE_VALUE) this.keepAlive.counter = 0;
-
-            this.keepAlive.buffer.writeUInt32BE(this.keepAlive.counter++, 0);
-            this.packet = this.keepAlive.buffer;
-        }, this.keepAlive.intervalMs);
-    };
-
-    /**
-     * @description Сброс таймера для поддерживания KeepAlive
-     * @returns void
-     * @private
-     */
-    private resetKeepAliveInterval = () => {
-        if (this.keepAlive.interval) clearInterval(this.keepAlive.interval);
-        if (this.keepAlive.timeout) clearTimeout(this.keepAlive.timeout);
-
-        // Выставляем таймер возобновления KeepAlive
-        this.keepAlive.timeout = setTimeout(() => this.manageKeepAlive(), 2e3);
-    };
-}
-
-
-/**
- * @author SNIPPIK
- * @description Состояния подключения
- * @enum VoiceUDPSocketStatuses
- */
-enum VoiceUDPSocketStatuses {
-    connected = "connected",
-    connecting = "connecting",
-    disconnected = "disconnected",
 }
 
 /**
@@ -291,4 +239,15 @@ export interface UDPSocketEvents {
      * @description Событие при котором будет возращены данные для подключения
      */
     readonly "connected": (info: { ip: string; port: number; }) => void;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Состояния подключения
+ * @enum VoiceUDPSocketStatuses
+ */
+enum VoiceUDPSocketStatuses {
+    connected = "connected",
+    connecting = "connecting",
+    disconnected = "disconnected",
 }

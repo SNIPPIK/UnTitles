@@ -67,7 +67,7 @@ export class HeartbeatManager {
         // Устанавливаем интервал отправки heartbeat
         this.interval = setInterval(() => {
             this.lastSentTime = Date.now();
-            this.hooks.send(); // отправляем heartbeat
+            this.hooks?.send?.(); // отправляем heartbeat
             this.setTimeout(); // запускаем ожидание ack
         }, this.intervalMs);
     };
@@ -99,7 +99,7 @@ export class HeartbeatManager {
         this.misses = 0;
         if (this.timeout) clearTimeout(this.timeout);
 
-        this.hooks.onAck(latency); // передаём задержку наружу
+        this.hooks?.onAck?.(latency); // передаём задержку наружу
     };
 
     /**
@@ -144,7 +144,7 @@ type HeartbeatHooks = {
      * @readonly
      * @private
      */
-    readonly send: () => void;
+    readonly send?: () => void;
 
     /**
      * @description Метод вызывается, если не получен HEARTBEAT_ACK вовремя
@@ -159,5 +159,5 @@ type HeartbeatHooks = {
      * @readonly
      * @private
      */
-    readonly onAck: (latency: number) => void;
+    readonly onAck?: (latency: number) => void;
 };

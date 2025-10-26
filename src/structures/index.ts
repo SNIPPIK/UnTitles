@@ -1,4 +1,3 @@
-
 /**
  * @description Все prototype объектов
  * @remark
@@ -52,7 +51,7 @@ const prototypes: { type: any, name: string, value: any}[] = [
         value: function (min = 0) {
             return Math.floor(Math.random() * ((this as any) - min) + min);
         }
-    },
+    }
 ];
 
 /**
