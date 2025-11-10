@@ -75,25 +75,24 @@ class RemoveTracksCommand extends Command {
         const track = queue.tracks.get(number);
 
         // Если указан трек которого нет
-        if (!track) {
-            return ctx.reply({
-                embeds: [
-                    {
-                        description: locale._(ctx.locale, "command.remove.track.fail", [ctx.member]),
-                        color: Colors.DarkRed
-                    }
-                ],
-                flags: "Ephemeral"
-            });
-        }
+        if (!track) return ctx.reply({
+            embeds: [
+                {
+                    description: locale._(ctx.locale, "command.remove.track.fail", [ctx.member]),
+                    color: Colors.DarkRed
+                }
+            ],
+            flags: "Ephemeral"
+        });
 
-        const {name, url, api} = track;
+
+        const { name, url, api } = track;
 
         // Если выбран текущий трек
         if (number === queue.tracks.position || queue.tracks.total === 1) {
             // Если треков нет в очереди
             if (!queue.tracks.total || queue.tracks.total === 1) return queue.cleanup();
-            await queue.player.play(0, 0, queue.tracks.position);
+            setImmediate(() => queue.player.play(0, 0, queue.tracks.position));
         }
 
         // Удаляем трек и очереди

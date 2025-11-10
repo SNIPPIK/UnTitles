@@ -129,7 +129,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             if (botPerms?.length &&
                 !botPerms.every(perm => ctx.guild?.members.me?.permissionsIn(ctx.channel)?.has(perm) && ctx.member.voice.channel ? ctx.guild?.members.me?.permissionsIn(ctx.member.voice.channel)?.has(perm) : true)
             ) {
-                return ctx.reply(locale._(ctx.locale, "interaction.permission.client", [ctx.member]));
+                return ctx.member.send(locale._(ctx.locale, "interaction.permission.client", [`<@${ctx.client.user.id}>`]));
             }
         }
 

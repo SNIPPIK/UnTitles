@@ -19,7 +19,7 @@ export class DiscordClient extends Client {
      * @public
      */
     public get shardID(): number {
-        return this.shard?.ids[0] ?? 0;
+        return this.shard.count - 1;
     };
 
     /**
@@ -29,9 +29,7 @@ export class DiscordClient extends Client {
      */
     public constructor() {
         super({
-            // Данный раздел не трогать, иначе вы нарушите лицензию BSD-3
             presence: {
-                afk: false,
                 status: "online",
                 activities: [{name: " 💫 Startup...", type: 4}]
             },
@@ -65,8 +63,7 @@ export class DiscordClient extends Client {
                 ...Options.DefaultMakeCacheSettings,
                 ...Options.DefaultSweeperSettings,
                 MessageManager: {
-                    maxSize: 200, //@ts-ignore
-                    keepOverLimit: (value, key, collection) => value.createdAt > Date.now() + 60e3 * 10
+                    keepOverLimit: (value) => value.createdTimestamp > (Date.now() + 60e3 * 10)
                 },
                 GuildScheduledEventManager: 0,
                 GuildTextThreadManager: 0,
@@ -92,7 +89,7 @@ export class DiscordClient extends Client {
         this.ws.setMaxListeners(10);
 
         // Запускаем статусы после инициализации клиента
-        this.once("clientReady", this.IntervalStatus);
+        this.once("clientReady", this.initSwapStatus);
     };
 
     /**
@@ -101,13 +98,13 @@ export class DiscordClient extends Client {
      * @readonly
      * @private
      */
-    private IntervalStatus = (): void => {
+    private initSwapStatus = (): void => {
         // Время обновления статуса
         const timeout = parseInt(env.get("client.presence.interval", "120"));
         const arrayUpdate = parseInt(env.get("client.presence.array.update", "3600")) * 1e3;
         const clientID = this.shardID;
 
-        let array = this.parseStatuses();
+        let array = this.prepareStatuses();
         let size = array.length - 1;
         let i = 0, lastDate = Date.now() + arrayUpdate ;
 
@@ -118,11 +115,11 @@ export class DiscordClient extends Client {
         }
 
         // Интервал для обновления статуса
-        setInterval(async () => {
+        setInterval(() => {
             // Обновляем статусы
             if (lastDate < Date.now()) {
                 // Обновляем статусы
-                array = this.parseStatuses();
+                array = this.prepareStatuses();
 
                 // Обновляем время для следующего обновления
                 lastDate = Date.now() + arrayUpdate;
@@ -149,7 +146,7 @@ export class DiscordClient extends Client {
      * @readonly
      * @private
      */
-    private parseStatuses = (): ActivityOptions[] => {
+    private prepareStatuses = (): ActivityOptions[] => {
         const statuses: ActivityOptions[] = [];
         const guilds = this.guilds.cache.size;
         const users = this.users.cache.size;

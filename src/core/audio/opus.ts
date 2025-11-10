@@ -14,7 +14,7 @@ const OGG_MAGIC = Buffer.from("OggS");
  * @const SILENT_FRAME
  * @public
  */
-export const SILENT_FRAME = Buffer.from([0xf8, 0xff, 0xfe]);
+export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
 
 /**
  * @author SNIPPIK

@@ -185,10 +185,11 @@ class RestYandexAPI extends RestServerSide.API {
          */
         {
             name: "playlist",
-            filter: /(playlists\/[a0-Z9.-]*)/i,
+            filter: /(playlists\/[0-9a-f-]+)/i,
             execute: async (url, {limit}) => {
-                const ID = /(playlists\/[a0-Z9.-]*)/i.exec(url)[0].split("/")[1];
+                const ID = /(playlists\/[0-9a-f-]+)/i.exec(url)[0].split("/")[1];
 
+                // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err("api.request.id.playlist");
 
                 try {
@@ -204,7 +205,8 @@ class RestYandexAPI extends RestServerSide.API {
                     const songs = tracks.map(({track}) => this.track(track));
 
                     return {
-                        url, title: api.title, image: image, items: songs,
+                        url: `https://music.yandex.ru/playlists/${ID}`,
+                        title: api.title, image: image, items: songs,
                         artist: {
                             title: api.owner.name,
                             url: `https://music.yandex.ru/users/${ID[1]}`
@@ -406,7 +408,7 @@ class RestYandexAPI extends RestServerSide.API {
     protected track = (track: any) => {
         const author = track["artists"]?.length ? track["artists"]?.pop() : track["artists"];
         const album = track["albums"]?.length ? track["albums"][0] : track["albums"];
-        const image = this.parseImage({image: album?.["ogImage"] ?? album?.["coverUri"] ?? track?.["ogImage"] ?? track?.["coverUri"]}) ?? null
+        const image = this.parseImage({image: album?.["ogImage"] ?? album?.["coverUri"] ?? track?.["ogImage"] ?? track?.["coverUri"]}) ?? null;
 
         return {
             id: `${album.id}_${track.id}`,

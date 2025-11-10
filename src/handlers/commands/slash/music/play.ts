@@ -42,14 +42,14 @@ async function allAutoComplete(message: CompeteInteraction, platform: RestClient
         // Показываем плейлист
         else if ("items" in rest) items.push({
             name: `🎶 [${rest.items.length}] - ${rest.title?.slice(0, 70)}`,
-            value: search
+            value: rest.url
         });
 
         // Показываем трек
         else {
             items.push({
                 name: `🎵 (${rest.time.split}) | ${rest.artist.title?.slice(0, 20)} - ${rest.name?.slice(0, 60)}`,
-                value: search
+                value: rest.url
             });
         }
 
@@ -148,7 +148,7 @@ class PlaySearchCommand extends SubCommand {
     descriptions: {
         "en-US": "Endless track playback mode!",
         "ru": "Добавление себе подобных треков!"
-    },
+    }
 })
 @Options({
     select: {

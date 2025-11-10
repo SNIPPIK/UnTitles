@@ -13,14 +13,10 @@ export class DJSVoice<T extends DiscordClient = DiscordClient> extends VoiceAdap
         super(client);
 
         //@ts-ignore
-        client.ws.on("VOICE_SERVER_UPDATE", (data) => {
-            this.onVoiceServer(data);
-        });
+        client.ws.on("VOICE_SERVER_UPDATE", this.onVoiceServer);
 
         //@ts-ignore
-        client.ws.on("VOICE_STATE_UPDATE", (data) => {
-            this.onVoiceStateUpdate(data);
-        });
+        client.ws.on("VOICE_STATE_UPDATE", this.onVoiceStateUpdate);
     };
     public voiceAdapterCreator = (guildID: string) => {
         const id = this.client.shardID;

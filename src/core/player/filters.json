@@ -6,7 +6,7 @@
       "ru": "Нормализует и стабилизирует громкость для постоянного уровня звука."
     },
     "unsupported": [],
-    "filter": "loudnorm",
+    "filter": "dynaudnorm=p=0.9:s=5",
     "args": false
   },
   {
@@ -15,8 +15,8 @@
       "en-US": "Speeds up playback by 20% and raises pitch for a nightcore effect.",
       "ru": "Ускоряет воспроизведение на 20% и повышает тональность для эффекта nightcore."
     },
-    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl"],
-    "filter": "asetrate=48000*1.20,aresample=128000",
+    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl", "stable"],
+    "filter": "asetrate=48000*1.25,aresample=128000",
     "args": false
   },
   {
@@ -25,7 +25,7 @@
       "en-US": "Slows down playback and lowers pitch, creating a vaporwave atmosphere.",
       "ru": "Замедляет воспроизведение и понижает тональность, создавая атмосферу vaporwave."
     },
-    "unsupported": ["nightcore", "demonic", "speed", "treble", "reverse", "vinyl"],
+    "unsupported": ["nightcore", "demonic", "speed", "treble", "reverse", "vinyl", "stable"],
     "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1",
     "args": false
   },
@@ -35,7 +35,7 @@
       "en-US": "Deep, distorted effect with echoes — makes a track sound demonic.",
       "ru": "Глубокий и искажённый эффект с эхо — превращает трек в демонический."
     },
-    "unsupported": ["stable", "nightcore", "vaporwave", "bass", "speed", "vinyl"],
+    "unsupported": ["stable", "nightcore", "vaporwave", "bass", "speed", "vinyl", "stable"],
     "filter": "loudnorm=I=-16:TP=-1.5:LRA=11,asetrate=48000*1.20,aresample=128000,bass=g=5,aecho=0.8:0.9:1000:0.3",
     "args": false
   },
@@ -45,7 +45,7 @@
       "en-US": "Adds vinyl record hiss, crackle, and a retro lo-fi effect.",
       "ru": "Добавляет шипение, потрескивания и ретро lo-fi эффект винила."
     },
-    "unsupported": ["nightcore", "demonic", "vaporwave"],
+    "unsupported": ["nightcore", "demonic", "vaporwave", "stable"],
     "filter": "acrusher=bits=8:mode=log:mix=0.7,highpass=f=200,lowpass=f=5000",
     "args": false
   },

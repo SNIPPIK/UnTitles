@@ -21,9 +21,7 @@ export class ShardManager extends ShardingManager {
             execArgv: ["-r", "tsconfig-paths/register", "--expose-gc", "--optimize_for_size"],
             token: token,
             mode: "process",
-            respawn: true,
-            totalShards: "auto",
-            shardList: "auto"
+            respawn: true
         });
 
         // Слушаем событие для создания осколка

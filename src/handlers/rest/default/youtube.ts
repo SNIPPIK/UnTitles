@@ -26,11 +26,11 @@ const Clients = {
             context: {
                 client: {
                     clientName: "ANDROID",
-                    clientVersion: "19.44.38",
+                    clientVersion: "19.35.36",
                     platform: "MOBILE",
                     osName: "Android",
                     osVersion: "13",
-                    androidSdkVersion: "30",
+                    androidSdkVersion: "33",
                     hl: "en",
                     gl: "US",
                     utcOffsetMinutes: -240,
@@ -51,7 +51,7 @@ const Clients = {
         },
         headers: {
             "Content-Type": "application/json",
-            "User-Agent": `com.google.android.youtube/19.44.38 (Linux; U; Android 11) gzip`,
+            "User-Agent": `com.google.android.youtube/19.35.36(Linux; U; Android 13; en_US; SM-S908E Build/TP1A.220624.014) gzip`,
             "X-Goog-Api-Format-Version": "2"
         }
     },
@@ -253,10 +253,16 @@ class RestYouTubeAPI extends RestServerSide.API {
                         }
                     }
 
-                    const api = await this.API(ID, options.audio);
+                    let api = await this.API(ID, options.audio);
 
                     // Если при получении данных возникла ошибка
-                    if (api instanceof Error) return api;
+                    if (api instanceof Error || api["playabilityStatus"]["status"] !== "OK") {
+                        // Пробуем получить страницу нативно без API
+                        api = await this.pAPI(url);
+
+                        // Если все равно возникает ошибка
+                        if (api instanceof Error) return api;
+                    }
 
                     // Класс трека
                     const track = this.track(api["videoDetails"]);
@@ -284,7 +290,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                         }
                     }
 
-                    if (!cache) setImmediate(() => {
+                    if (!cache && !api?.["videoDetails"]?.["isLive"]) setImmediate(() => {
                         // Сохраняем кеш в системе
                         db.cache.set(track, this.url);
                     });

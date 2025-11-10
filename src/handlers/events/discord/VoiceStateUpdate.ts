@@ -13,7 +13,7 @@ const temple_db = new Map<string, NodeJS.Timeout>();
  * @author SNIPPIK
  * @description Время для отключения бота от голосового канала
  */
-const timeout = 15;
+const timeout = 30;
 
 /**
  * @author SNIPPIK

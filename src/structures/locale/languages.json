@@ -531,13 +531,13 @@
   },
 
   "command.filter.push.argument": {
-    "en-US": "An argument must be in the range from {ARGUMENT} to {ARGUMENT}!",
-    "ru": "Необходимо указать аргумент в диапазоне от {ARGUMENT} до {ARGUMENT}!"
+    "en-US": "An argument must be in the range from **{ARGUMENT}** to **{ARGUMENT}**!",
+    "ru": "Необходимо указать аргумент в диапазоне от **{ARGUMENT}** до **{ARGUMENT}**!"
   },
 
   "command.filter.push.unsupported": {
-    "en-US": "This filter {ARGUMENT} is not compatible with {ARGUMENT}, it must be disabled!",
-    "ru": "Этот фильтр {ARGUMENT} не совместим с {ARGUMENT}, его необходимо необходимо отключить!"
+    "en-US": "This filter **{ARGUMENT}** is not compatible with **{ARGUMENT}**, it must be disabled!",
+    "ru": "Этот фильтр **{ARGUMENT}** не совместим с **{ARGUMENT}**, его необходимо отключить!"
   },
 
   "command.filter.push.before": {

@@ -127,13 +127,17 @@ export class Logger {
      * @static
      */
     private static saveLog = (text: string) => {
-        if (!this._createFiles) return;
+        try {
+            if (!this._createFiles) return;
 
-        // Если нет пути сохранения
-        else if (!fs.existsSync(this._path)) fs.mkdirSync(this._path);
+            // Если нет пути сохранения
+            else if (!fs.existsSync(this._path)) fs.mkdirSync(this._path);
 
-        // Сохраняем данные в файл
-        fs.appendFileSync(`${this._path}/${_timestamp}.txt`, text + "\n", "utf8");
+            // Сохраняем данные в файл
+            fs.appendFileSync(`${this._path}/${_timestamp}.txt`, text + "\n", "utf8");
+        } catch {
+            return;
+        }
     };
 
     /**

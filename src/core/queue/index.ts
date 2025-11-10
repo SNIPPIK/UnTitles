@@ -107,13 +107,13 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @param item    - Добавляемый объект
      * @private
      */
-    public create = (message: CommandInteraction, item: Track.list | Track | Track[]) => {
+    public create = (message: CommandInteraction, item: Track.list | Track | Track[]): void => {
         const items = this._prepareGettingData(item);
 
         // Если данных нет
         if (!items.length) {
             db.events.emitter.emit("rest/error", message, locale._(message.locale, "player.search.fail"));
-            return null;
+            return;
         }
 
         let queue = this.get(message.guildId);
@@ -137,17 +137,13 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
         }
 
         // Отправляем сообщение о добавлении треков
-        if (!Array.isArray(item)) {
-            db.events.emitter.emit("message/push", queue, message.member, item);
-        }
+        if (!Array.isArray(item)) db.events.emitter.emit("message/push", queue, message.member, item);
 
         // Добавляем треки
         items.forEach(track => {
             track.user = message.member.user;
             queue.tracks.push(track);
         });
-
-        return null;
     };
 
     /**

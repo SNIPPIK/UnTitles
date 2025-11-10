@@ -64,6 +64,14 @@ namespace TrackRaw {
 
 /**
  * @author SNIPPIK
+ * @description Разделение слов в названии трека
+ * @param str - Название
+ * @const normalize
+ */
+const normalize = (str: string) => str.toLowerCase().replace(/[^\w\s:;]|_/gi, "").replace(/\s+/g, " ").trim().split(" ");
+
+/**
+ * @author SNIPPIK
  * @description Коллекция базы данных для взаимодействия с Rest/API
  * @class RestObject
  * @public
@@ -196,7 +204,7 @@ export class RestObject {
         const { name, artist } = track;
 
         // Оригинальный трек по словам
-        const original = name.toLowerCase().replace(/[^\w\s:;]|_/gi, "").replace(/\s+/gi, " ").split(" ");
+        const original = normalize(`${artist.title} ${name}`);
         let link: Track = null, lastError: Error;
 
         // Ищем нужную платформу
@@ -224,11 +232,15 @@ export class RestObject {
             // Ищем нужный трек
             // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
             const findTrack = search.find((song) => {
-                const candidate = song.name.toLowerCase().replace(/[^\w\s:;]|_/gi, "").replace(/\s+/gi, " ").split(" ");
-                const Match = candidate.filter((name, i) => name === original[i]).every((word, i) => word === original[i]);
+                const candidate = normalize(`${song.artist.title} ${song.name}`);
+                const matchCount = candidate.filter(word => original.includes(word)).length;
                 const time = Math.abs(track.time.total - song.time.total);
 
-                return (time <= 5 || time === 0) && Match;
+                return (time <= 5 || time === 0) && // по длительности близко
+                    (
+                        matchCount === candidate.length ||               // полное совпадение
+                        matchCount >= Math.floor(candidate.length * 0.6) // ≥60% слов совпало
+                    );
             });
 
             // Если отфильтровать треки не удалось
@@ -369,16 +381,16 @@ export class RestObject {
 
             // Слушаем сообщение или же ответ
             const onMessage = (message: RestServerSide.Result<T> & { requestId?: string }) => {
-                // Не наш ответ — игнорируем
-                if (message.requestId !== requestId) return;
+                const { result, status } = message;
 
                 // Отписываемся после получения
                 this.worker.off("message", onMessage);
 
-                const { result, status } = message;
+                // Не наш ответ — игнорируем
+                if (message.requestId !== requestId) return;
 
                 // Если получена ошибка
-                if (result instanceof Error) {
+                else if (result instanceof Error) {
                     // Если платформа не отвечает, то отключаем ее!
                     if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
                         this.platforms.block.push(platform.name);

@@ -42,7 +42,7 @@
 - 💡 [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS) — ideas and suggestions
 
 📢 Please report any errors or omissions in [Issues](https://github.com/SNIPPIK/UnTitles/issues)  
-🚫 The bot does not work 24/7 — it may be unavailable!
+🚫 The bot does not work **24/7** — it may be unavailable!
 
 [![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
 [![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
@@ -52,16 +52,21 @@
 > Incorrect use, removal of authorship or appropriation will lead to the closure of the public repository
 
 > [!IMPORTANT]
-> It is strongly recommended to enable caching  
-> `main` — stable, but rarely updated branch  
-> `beta` — newest fixes and features, may be unstable
+> If YouTube doesn't respond, report the bug immediately and don't forget to include the link!
+> `main` — stable, but rarely updated branch
+> `beta` — latest fixes and features, may be unstable
+
+> [!TIP]
+> I recommend enabling the caching system in `.env`, in which case you can include tracks even if the platform is completely blocked  
+> It's impossible to completely bypass `packet lost` due to the `UDP` protocol and other `discord` limitations.
+> But the voice system simply isn't allowed to lose audio packets, even under critical load!
 
 ---
 
 ### ⚠️ Hardware requirements | Data from Ryzen 7 5700x3D | 1 player
-- CPU: 0-0.1%
-- Ram: ~80 MB, it all depends on the number of tracks, the load on the platforms, namely YouTube!
-- Disk: ~50 MB, 200 GB is enough for caching (1.5k tracks ~1.2 GB)
+- CPU: `0-0.1%`
+- RAM: `~80 MB`, it all depends on the number of tracks, platform load, discord cache!
+- Disk: `~50 MB`, `200 GB` is enough for caching (1.5k tracks ~1.2 GB)
 
 ---
 
@@ -75,11 +80,11 @@ while (performance.now() - startBlock < 100) {}
 }, 200);
 ```
 #### 🔊 Voice engine
-- Implementation of [Voice Gateway Version 8](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/core/voice) + [End-to-End Encryption (E2EE 🔐)](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
+- Implementation of [**Voice Gateway Version 8**](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/core/voice) + [**End-to-End Encryption (E2EE 🔐)**](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
 - Full implementation of **SRTP**: `aead_aes256_gcm`, `xchacha20_poly1305` (via libraries)
 - Best audio player compared to **open source** solutions!
 - Does not require any opus encoders/decoders, has its own opus encoder by parsing method!
-- Adaptive system for sending audio packets, its own `Jitter Buffer`!
+- Adaptive `jitter buffer`, takes into account both network delays and process latency!
 - Requires **FFmpeg**, it is responsible for audio and filters!
 - Supported: Autoplay, Repeat, Shuffle, Replay and more functions
 - Works even with strong **event loop lag**!
@@ -87,7 +92,7 @@ while (performance.now() - startBlock < 100) {}
 - It is possible to reuse audio without conversion if it is less than 8 minutes long
 - Smooth **fade-in/fade-out** transition between tracks, even with **skip**, **seek** and **tp**.
 - There is a system of smooth transition from one audio to another `Hot audio swap`
-- 16+ filters, you can add your own without complex digging in the code [filters](src/core/player/filters.json)
+- 16+ filters, you can add your own without complex digging in the code [**filters**](src/core/player/filters.json)
 - There is support for long videos, Live video is still raw.
 - There is an explicit synchronization of the audio stream, without audio filters!
 #### 🌐 Platforms
@@ -100,13 +105,13 @@ while (performance.now() - startBlock < 100) {}
 - Everything is described in detail, there are examples and a bunch of interfaces for typing
 - Easy expansion and addition of new platforms via `Dynamic Loader - Handler`
 #### 🌍 Localization
-- Available languages: `English`, `Russian` ([file with languages](src/structures/locale/languages.json))
+- Available languages: `English`, `Russian` ([**file with languages**](src/structures/locale/languages.json))
 - You can add any language supported by discord
 
 ---
 
 # 🔩 Other functionality
-#### Own system [handlers](src/handlers)
+#### Own system [**handlers**](src/handlers)
 - Universal loader: [`commands`](src/handlers/commands), [`events`](src/handlers/events), [`components`](src/handlers/components), [`middlewares`](src/handlers/middlewares), [`rest`](src/handlers/rest)
 - Own framework for commands, buttons, menu selectors, events
 - Decorators and interfaces are used, including typing
@@ -116,7 +121,7 @@ while (performance.now() - startBlock < 100) {}
 - It is not afraid of **event loop** and **drift**, it just takes them into account not as a problem, but as parameters!
 - The loop can work ahead from 0 to 2 ms to process objects in the loop!
 - Audio sending is built on it!
-- Cycle accuracy `±0.05 ms` with `process.hrtime` + `performance.now`
+- Cycle accuracy `±0.05 ms` with `Date.now` + `performance.now`
 
 #### ⚙️ Internal tools
 - [`SetArray`](src/structures/tools/SetArray.ts) - 2 in one Array and Set in one class
@@ -172,9 +177,8 @@ bun run start-bun
 
 ---
 [![TypeScript](https://img.shields.io/badge/typescript-5.9.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Bun](https://img.shields.io/badge/bun-1.2.25-6DA55F?style=for-the-badge&logo=bun&logoColor=white&color=white)](https://bun.com/)
 [![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/en)
-[![Discord.js](https://img.shields.io/badge/discord.js-14.22.1-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)
+[![Discord.js](https://img.shields.io/badge/discord.js-14.24.2-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)
 [![WS](https://img.shields.io/badge/ws-8.18.3-%23CB3837.svg?style=for-the-badge&logo=socket&logoColor=white)](https://www.npmjs.com/package/ws)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-7.*.*-%23CB3837.svg?style=for-the-badge&logo=ffmpeg&logoColor=white&color)](https://ffmpeg.org/)
 ---

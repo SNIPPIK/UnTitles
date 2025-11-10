@@ -1,5 +1,6 @@
 /**
- * @description Все prototype объектов
+ * @author SNIPPIK
+ * @description Все prototype объектов, для модификации функций
  * @remark
  * Использовать с умом, если попадут не те данные то могут быть ошибки
  */
@@ -55,7 +56,9 @@ const prototypes: { type: any, name: string, value: any}[] = [
 ];
 
 /**
+ * @author SNIPPIK
  * @description Задаем функции для их использования в проекте
+ * @private
  */
 for (const {type, name, value} of prototypes) {
     Object.defineProperty(type, name, { value, writable: true, configurable: true });
@@ -71,7 +74,8 @@ export * from "./tools/httpsClient";
 export * from "./tools/SimpleWorker";
 
 /**
- * @description Декларируем для TS
+ * @author SNIPPIK
+ * @description Декларируем данные для работы с typescript
  * @global
  */
 declare global {
