@@ -391,14 +391,14 @@ export class RestObject {
             const onMessage = (message: RestServerSide.Result<T> & { requestId?: string }) => {
                 const { result, status } = message;
 
-                // Отписываемся после получения
-                this.worker.off("message", onMessage);
-
                 // Не наш ответ — игнорируем
                 if (message.requestId !== requestId) return;
 
+                // Отписываемся после получения
+                this.worker.off("message", onMessage);
+
                 // Если получена ошибка
-                else if (result instanceof Error) {
+                if (result instanceof Error) {
                     // Если платформа не отвечает, то отключаем ее!
                     if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
                         this.platforms.block.push(platform.name);

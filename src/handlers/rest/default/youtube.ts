@@ -158,7 +158,7 @@ class RestYouTubeAPI extends RestServerSide.API {
 
                     return {
                         url, items,
-                        title: playlist.title,
+                        title: playlist.title ?? "Related videos",
                         image: playlist.thumbnail["thumbnails"].pop(),
                         artist: artist ?? items.at(-1).artist
                     };
