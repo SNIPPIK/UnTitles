@@ -166,6 +166,7 @@ export class Queue {
 
     /**
      * @description Удаление динамического сообщения из системы
+     * @returns void
      * @private
      */
     private _cleanupOldMessage = () => {
@@ -182,14 +183,20 @@ export class Queue {
 
     /**
      * @description Выдача компонентов сообщения, такие как кнопки и текст
+     * @returns ComponentV2
      * @public
      */
     public get components() {
-        const buttons = this._buttons.component(this._player);
+        // Если класс кнопок (компонентов был уничтожен)
+        if (!this._buttons) return null;
+
+        const player = this._player, tracks = this._tracks;
+        const buttons = this._buttons?.component(player);
 
         try {
-            const {api, artist, name, image, user} = this._tracks.track;
-            const position = this._tracks.position;
+            const {api, artist, name, image, user} = tracks.track;
+            const textTracks = tracks.total > 1 ? `| ${tracks.position + 1}/${tracks.total} | ${tracks.time}` : "";
+            const latency = `${player.latency}/${player.voice.connection.latency} ms`
 
             return [{
                 "type": 17, // Container
@@ -221,7 +228,7 @@ export class Queue {
                     },
                     {
                         "type": 10, // Text
-                        "content": `-# ${user.username} ● ${getVolumeIndicator(this._player.audio.volume)} ${this._tracks.total > 1 ? `| ${position + 1}/${this._tracks.total} | ${this._tracks.time}` : ""}` + this._player.progress
+                        "content": `-# ${user.username} ● ${getVolumeIndicator(player.audio.volume)} ${textTracks} | ${latency}` + player.progress
                     },
                     ...buttons
                 ]
@@ -236,7 +243,6 @@ export class Queue {
     /**
      * @description Эта функция частично удаляет очередь
      * @warn Автоматически выполняется при удалении через db
-     * @readonly
      * @public
      */
     public cleanup = () => {
@@ -252,8 +258,8 @@ export class Queue {
     /**
      * @description Эта функция полностью удаляет очередь и все сопутствующие данные, используется в другом классе
      * @warn Автоматически удаляется через событие VoiceStateUpdate
+     * @returns void
      * @protected
-     * @readonly
      */
     protected destroy = () => {
         Logger.log("LOG", `[Queue/${this.message.guild_id}] has destroyed`);
@@ -274,8 +280,10 @@ export class Queue {
 }
 
 /**
+ * @description Генератор громкости плеера
  * @param volume - Уровень громкости (0–200)
- * @returns строка-индикатор громкости
+ * @returns string
+ * @private
  */
 function getVolumeIndicator(volume: number): string {
     const clamped = Math.max(0, Math.min(volume, 200));

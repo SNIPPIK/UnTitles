@@ -12,6 +12,7 @@ export namespace RestClientSide {
     /**
      * @description Данные для валидного запроса параллельному процессу
      * @interface ClientOptions
+     * @public
      */
     export interface ClientOptions {
         platform: RestServerSide.APIBase;
@@ -25,7 +26,7 @@ export namespace RestClientSide {
     /**
      * @description Класс для взаимодействия с конкретной платформой
      * @class ClientRestRequest
-     * @private
+     * @public
      */
     export class Request {
         /**

@@ -30,6 +30,7 @@ export class Events extends handler<Event<keyof ClientEvents>> {
 
     /**
      * @description Регистрируем ивенты в эко системе бота
+     * @returns void
      * @public
      */
     public register = (client: DiscordClient) => {
@@ -56,6 +57,7 @@ export class Events extends handler<Event<keyof ClientEvents>> {
  * @author SNIPPIK
  * @description Интерфейс для событий
  * @class Event
+ * @abstract
  * @public
  */
 export abstract class Event<T extends keyof ClientEvents | keyof QueueEvents | keyof AudioPlayerEvents> {

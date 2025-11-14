@@ -18,6 +18,12 @@ export class DJSVoice<T extends DiscordClient = DiscordClient> extends VoiceAdap
         //@ts-ignore
         client.ws.on("VOICE_STATE_UPDATE", this.onVoiceStateUpdate);
     };
+
+    /**
+     * @description Создаем прослойку адаптера голосового соединения
+     * @param guildID - ID сервера
+     * @public
+     */
     public voiceAdapterCreator = (guildID: string) => {
         const id = this.client.shardID;
 

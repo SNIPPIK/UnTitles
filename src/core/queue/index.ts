@@ -176,15 +176,19 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
 export interface QueueEvents {
     /**
      * @description Событие при котором коллекция будет отправлять информацию о добавленном треке или плейлисте, альбоме
-     * @param queue     - Очередь сервера
+     * @param queue      - Очередь сервера
      * @param user       - Пользователь включивший трек
-     * @param items     - Трек или плейлист, альбом
+     * @param items      - Трек или плейлист, альбом
+     * @returns void
+     * @readonly
      */
     readonly "message/push": (queue: Queue, user: CommandInteraction["member"], items: Track | Track.list) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять сообщение о текущем треке
      * @param queue     - Очередь сервера
+     * @returns void
+     * @readonly
      */
     readonly "message/playing": (queue: Queue) => void;
 
@@ -192,6 +196,8 @@ export interface QueueEvents {
      * @description Событие при котором коллекция будет отправлять сообщение об ошибке
      * @param queue     - Очередь сервера
      * @param error     - Ошибка
+     * @returns void
+     * @readonly
      */
     readonly "message/error": (queue: Queue, error?: string | Error, position?: number) => void;
 
@@ -200,6 +206,8 @@ export interface QueueEvents {
      * @param api      - Класс платформы запросов
      * @param message  - Сообщение с сервера
      * @param url      - Ссылка на допустимый объект или текст для поиска
+     * @returns void
+     * @readonly
      */
     readonly "rest/request": (api: RestClientSide.Request, message: CommandInteraction, url: string) => void;
 
@@ -207,6 +215,8 @@ export interface QueueEvents {
      * @description Событие при котором будут отправляться ошибки из системы API
      * @param message    - Сообщение с сервера
      * @param error      - Ошибка
+     * @returns void
+     * @readonly
      */
     readonly "rest/error": (message: CommandInteraction, error: string | Error) => void;
 }

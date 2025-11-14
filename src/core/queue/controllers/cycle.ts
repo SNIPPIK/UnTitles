@@ -4,13 +4,29 @@ import { OPUS_FRAME_SIZE } from "#core/audio";
 import { AudioPlayer } from "#core/player";
 import { db } from "#app/db";
 
+/**
+ * @author SNIPPIK
+ * @description Время через которое будет создано новое сообщение
+ * @const MESSAGE_RESEND_TIME
+ * @private
+ */
+const MESSAGE_RESEND_TIME = 60e3 * 10;
 
 /**
  * @author SNIPPIK
- * @description Время обновления сообщения, только после этого времени можно будет пересоздать сообщение
+ * @description Время через которое можно обновлять сообщение
  * @const MESSAGE_UPDATE_TIME
+ * @private
  */
-const MESSAGE_UPDATE_TIME = 60e3 * 10;
+const MESSAGE_UPDATE_TIME = 1e3 * 15;
+
+/**
+ * @author SNIPPIK
+ * @description Время задержки, при превышении будет добавляться аудио пакет
+ * @const PLAYER_LATENCY_SIZE
+ * @private
+ */
+const PLAYER_LATENCY_SIZE = 75;
 
 /**
  * @author SNIPPIK
@@ -54,7 +70,8 @@ export class ControllerCycles {
                 // Кастомные функции (если хочется немного изменить логику выполнения)
                 custom: {
                     step: () => {
-                        const time = this.time - this.insideTime;
+                        const now = this.time;
+                        const time = now - this.insideTime;
 
                         // === 1. Определяем, нужно ли увеличить длительность шага ===
                         if (time > OPUS_FRAME_SIZE) {
@@ -70,7 +87,6 @@ export class ControllerCycles {
                         }
 
                         // === 2. Плавная коррекция options.duration с задержкой между изменениями ===
-                        const now = this.time;
 
                         if (now - this._lastAdjust >= OPUS_FRAME_SIZE) {
                             // Если текущее время меньше указанного
@@ -79,35 +95,43 @@ export class ControllerCycles {
                             // Если текущее время меньше указанного
                             else if (this.options.duration > this._targetDuration) this.options.duration = Math.max(this.options.duration - OPUS_FRAME_SIZE, this._targetDuration);
                             this._lastAdjust = now;
-
-                            // Для отладки
-                            //console.log(`[step] duration adjusted to ${this.options.duration} ms, target: ${this._targetDuration} ms | ${this.delay}\nTime: ${this.insideTime} - ${this.time} | ${this.drifting}\n`);
                         }
+
+                        // Для отладки
+                        //console.log(`[step] duration adjusted to ${this.options.duration} ms, target: ${this._targetDuration} ms\nTime: ${this.insideTime} - ${this.time} | ${this.drifting}\n`);
                     }
                 },
 
                 // Функция проверки
-                filter: (item) => item.playing && item.voice.connection.hasSendFrames,
+                filter: (item) => item.playing,
 
                 // Функция отправки аудио фрейма
                 execute: (player) => {
-                    const size = this.options.duration / OPUS_FRAME_SIZE;
-                    let i = 0;
+                    // latency - задержка соединения
+                    const latency = player.voice.connection.latency > PLAYER_LATENCY_SIZE ? Math.ceil(player.voice.connection.latency / PLAYER_LATENCY_SIZE) - 1 : 0;
 
-                    /*
-                    // Если цикл держит планку в 20 ms
-                    if (size === 1) {
-                        // Отправляем 1 пакет заранее, для заполнения кольцевого буфера
-                        if (player.audio) {
-                            // Проверяем можно ли отправить пакеты
-                            i = player.audio.current.packets >= 2 ? -1 : 0;
-                        }
-                    }*/
+                    // Количество фреймов в текущей итерации
+                    let size = this.options.duration / OPUS_FRAME_SIZE;
+
+                    // Если есть задержка голосового подключения
+                    if (latency > 0 && size <= latency) {
+                        // Инкремент счётчика
+                        player._counter++;
+
+                        // Проверяем достижение порога
+                        if (player._counter < player._stepCounter) return;
+
+                        // Если достигли — выполняем шаг
+                        player._counter = 0; // сбрасываем
+                        size = player._stepCounter = latency + size;
+                    } else player._stepCounter = size;
 
                     // Отправляем пакет/ы в голосовой канал
+                    let i = 0;
                     do {
                         i++;
-                        player.voice.connection.packet = player.audio.current.packet;
+                        const frame = player.audio.current.packet;
+                        if (frame) player.voice.connection.packet = frame;
                     } while (i < size);
                 }
             });
@@ -148,7 +172,7 @@ export class ControllerCycles {
         public constructor() {
             super({
                 // Время до следующего прогона цикла
-                duration: 20e3,
+                duration: MESSAGE_UPDATE_TIME,
                 drift: true,
                 // Кастомные функции (если хочется немного изменить логику выполнения)
                 custom: {
@@ -188,6 +212,7 @@ export class ControllerCycles {
          * @description Обновление сообщения принудительно
          * @param message - Сообщение
          * @param component - Данные для обновления
+         * @returns Promise<void>
          * @public
          */
         public update = async (message: T, component: MessageComponent) => {
@@ -203,6 +228,7 @@ export class ControllerCycles {
 
         /**
          * @description Гарантирует, что сообщение существует и не устарело
+         * @returns Promise<T | null>
          * @public
          */
         public ensure = async (guildId: string, factory: () => Promise<T>): Promise<T | null> => {
@@ -215,7 +241,7 @@ export class ControllerCycles {
             }
 
             // Если время позволяет пересоздать сообщение о проигрывании
-            else if (Date.now() - message.createdTimestamp > MESSAGE_UPDATE_TIME) {
+            else if (Date.now() - message.createdTimestamp > MESSAGE_RESEND_TIME) {
                 this.delete(message);
                 this.add(await factory());
                 return null;

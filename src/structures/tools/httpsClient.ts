@@ -7,6 +7,7 @@ import {Logger} from "#structures/logger";
  * @author SNIPPIK
  * @description Данные поступающие при head запросе
  * @interface httpsClient_head
+ * @public
  */
 export interface httpsClient_head {
     // Статус код
@@ -263,6 +264,7 @@ export class httpsClient extends Request {
  * @author SNIPPIK
  * @description Парсинг статус-кода и возврат ошибки
  * @class httpsStatusCode
+ * @public
  */
 export class httpsStatusCode {
     /**

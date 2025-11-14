@@ -14,24 +14,32 @@ export interface AudioPlayerEvents {
      * @description Событие при котором плеер начинает завершение текущего трека
      * @param player - Текущий плеер
      * @param seek   - Время пропуска если оно есть
+     * @returns void
+     * @readonly
      */
     readonly "player/ended": (player: AudioPlayer, seek: number) => void;
 
     /**
      * @description Событие при котором плеер ожидает новый трек
      * @param player - Текущий плеер
+     * @returns void
+     * @readonly
      */
     readonly "player/wait": (player: AudioPlayer) => void;
 
     /**
      * @description Событие при котором плеер встает на паузу и ожидает дальнейших действий
      * @param player - Текущий плеер
+     * @returns void
+     * @readonly
      */
     readonly "player/pause": (player: AudioPlayer) => void;
 
     /**
      * @description Событие при котором плеер начинает проигрывание
      * @param player - Текущий плеер
+     * @returns void
+     * @readonly
      */
     readonly "player/playing": (player: AudioPlayer) => void;
 
@@ -41,6 +49,8 @@ export interface AudioPlayerEvents {
      * @param err    - Ошибка в формате string
      * @param skip   - Если надо пропустить трек
      * @param position - Позиция трека в очереди
+     * @returns void
+     * @readonly
      */
     readonly "player/error": (player: AudioPlayer, err: string, track?: {skip: boolean, position: number}) => void;
 }

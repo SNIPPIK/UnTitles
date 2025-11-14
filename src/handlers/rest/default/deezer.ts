@@ -150,7 +150,6 @@ class RestDeezerAPI extends RestServerSide.API {
      * @description Делаем запрос на {data.api}/methods
      * @param method - Метод запроса из api
      * @protected
-     * @static
      */
     protected API = (method: string): Promise<json> => {
         return new Promise<any | Error>((resolve) => {
@@ -171,7 +170,6 @@ class RestDeezerAPI extends RestServerSide.API {
      * @description Из полученных данных подготавливаем трек для Audio<Queue>
      * @param track - Данные трека
      * @protected
-     * @static
      */
     protected track = (track: any) => {
         const author = track["artist"]?.length ? track["artist"]?.pop() : track["artist"];

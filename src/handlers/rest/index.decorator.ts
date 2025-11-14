@@ -10,6 +10,7 @@ export type RestAPIS_Names = "YOUTUBE" | "SPOTIFY" | "VK" | "YANDEX" | "SOUNDCLO
  * @author SNIPPIK
  * @description Параметры запроса
  * @interface RestOptions
+ * @private
  */
 interface RestOptions {
     readonly name: RestAPIS_Names;

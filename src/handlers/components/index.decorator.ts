@@ -4,6 +4,7 @@ import type {SupportButtons, SupportSelector} from "#handler/components/index";
  * @author SNIPPIK
  * @description Декоратор создающий заголовок команды
  * @decorator
+ * @public
  */
 export function DeclareComponent(options: {name: SupportSelector | SupportButtons}) {
     // Загружаем данные в класс

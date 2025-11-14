@@ -151,7 +151,6 @@ class RestSoundCloudAPI extends RestServerSide.API {
      * @description Получаем страницу и ищем на ней данные
      * @param url - Ссылка на видео или ID видео
      * @protected
-     * @static
      */
     protected API = (url: string): Promise<{api: json, ClientID: string} | Error> => {
         return new Promise(async (resolve) => {
@@ -216,11 +215,11 @@ class RestSoundCloudAPI extends RestServerSide.API {
         }
     };
 
-
     /**
      * @description Проходим все этапы для получения ссылки на поток трека
      * @param formats - Зашифрованные форматы аудио
      * @param ClientID - ID клиента
+     * @protected
      */
     protected getFormat = (formats: any[], ClientID: string): Promise<string> => {
         return new Promise<string>(async (resolve) => {
@@ -235,7 +234,6 @@ class RestSoundCloudAPI extends RestServerSide.API {
      * @description Подготавливаем трек к отправке
      * @param track - Данные видео
      * @protected
-     * @static
      */
     protected track = (track: json) => {
         return {

@@ -29,7 +29,7 @@ interface EventBucket {
 
 /**
  * @author SNIPPIK
- * @description Типизированный EventEmitter построенный на Map
+ * @description Типизированный EventEmitter построенный на Object-Map системе, работает чуть быстрее чем vanilla EventEmitter
  * @template L - Интерфейс событий и их типов слушателей
  * @class TypedEmitter
  * @public

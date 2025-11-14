@@ -52,22 +52,18 @@ class AudioFilterPush extends SubCommand {
         const seek: number = player.audio.current?.duration ?? 0;
         const name = args && args?.length > 0 ? args[0] : null;
         const argument = args && args?.length > 1 ? Number(args[1]) : null;
-
         const Filter = filters.find((item) => item.name === name) as AudioFilter;
-        const findFilter = player.filters.find((fl) => fl.name === name);
 
         // Пользователь пытается включить включенный фильтр
-        if (findFilter) {
-            return ctx.reply({
-                embeds: [
-                    {
-                        description: locale._(ctx.locale, "command.filter.push.two"),
-                        color: Colors.Yellow
-                    }
-                ],
-                flags: "Ephemeral"
-            });
-        }
+        if (player.filters.has(Filter)) return ctx.reply({
+            embeds: [
+                {
+                    description: locale._(ctx.locale, "command.filter.push.two"),
+                    color: Colors.Yellow
+                }
+            ],
+            flags: "Ephemeral"
+        });
 
         // Делаем проверку на аргументы
         else if (Filter.args) {
@@ -86,36 +82,19 @@ class AudioFilterPush extends SubCommand {
             }
         }
 
-        // Делаем проверку на совместимость
+        const unsupportedFilters = player.filters.hasUnsupported(Filter);
+
         // Проверяем, не конфликтует ли новый фильтр с уже включёнными
-        for (const enabledFilter of player.filters) {
-            if (!enabledFilter) continue;
-
-            // Новый фильтр несовместим с уже включённым?
-            if (Filter.unsupported.includes(enabledFilter.name)) {
-                return ctx.reply({
-                    embeds: [
-                        {
-                            description: locale._(ctx.locale, "command.filter.push.unsupported", [Filter.name, enabledFilter.name]),
-                            color: Colors.DarkRed
-                        }
-                    ],
-                    flags: "Ephemeral"
-                });
-            }
-
-            // Уже включённый фильтр несовместим с новым?
-            if (enabledFilter.unsupported.includes(Filter.name)) {
-                return ctx.reply({
-                    embeds: [
-                        {
-                            description: locale._(ctx.locale, "command.filter.push.unsupported", [enabledFilter.name, Filter.name]),
-                            color: Colors.DarkRed
-                        }
-                    ],
-                    flags: "Ephemeral"
-                });
-            }
+        if (unsupportedFilters) {
+            return ctx.reply({
+                embeds: [
+                    {
+                        description: locale._(ctx.locale, "command.filter.push.unsupported", unsupportedFilters),
+                        color: Colors.DarkRed
+                    }
+                ],
+                flags: "Ephemeral"
+            });
         }
 
         // Добавляем фильтр
@@ -123,7 +102,7 @@ class AudioFilterPush extends SubCommand {
 
         // Если можно включить фильтр или фильтры сейчас
         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
-            await player.play(seek);
+            player.play(seek).catch(console.error);
 
             // Сообщаем о включении фильтров
             return ctx.reply({
@@ -168,7 +147,7 @@ class AudioFilterPush extends SubCommand {
     }
 })
 class AudioFiltersOff extends SubCommand {
-    async run({ctx}: CommandContext<string>) {
+    async run({ctx}: CommandContext) {
         const queue = db.queues.get(ctx.guildId);
         const player = queue.player;
 
@@ -286,24 +265,22 @@ class AudioFilterRemove extends SubCommand {
         const findFilter = player.filters.find((fl) => fl.name === name);
 
         // Пользователь пытается выключить выключенный фильтр
-        if (!findFilter) {
-            return ctx.reply({
-                embeds: [
-                    {
-                        description: locale._(ctx.locale, "command.filter.remove.two"),
-                        color: Colors.Yellow
-                    }
-                ],
-                flags: "Ephemeral"
-            });
-        }
+        if (!player.filters.has(Filter)) return ctx.reply({
+            embeds: [
+                {
+                    description: locale._(ctx.locale, "command.filter.remove.two"),
+                    color: Colors.Yellow
+                }
+            ],
+            flags: "Ephemeral"
+        });
 
         // Удаляем фильтр
         player.filters.delete(findFilter);
 
         // Если можно выключить фильтр или фильтры сейчас
         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
-            await player.play(seek);
+            player.play(seek).catch(console.error);
 
             // Сообщаем о включении фильтров
             return ctx.reply({

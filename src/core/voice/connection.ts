@@ -1,20 +1,14 @@
 import type { APIVoiceState, GatewayVoiceServerUpdateDispatchData } from "discord-api-types/v10";
+import { SpeakerType, VoiceSpeakerManager } from "#core/voice/modules/Speaker";
 import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./adapter";
 import { GatewayCloseCodes, type WebSocketOpcodes } from "#core/voice";
 import { VoiceReceiver } from "#core/voice/structures/receiver";
-import { VoiceRTPSocket } from "./modules/VoiceRTPSocket";
-import { VoiceWebSocket } from "./modules/VoiceWebSocket";
-import { VoiceUDPSocket } from "./modules/VoiceUDPSocket";
+import { VoiceRTPSocket } from "./protocols/VoiceRTPSocket";
+import { VoiceWebSocket } from "./protocols/VoiceWebSocket";
+import { VoiceUDPSocket } from "./protocols/VoiceUDPSocket";
 import { E2EESession } from "#core/voice/managers/E2EE";
 import { VoiceOpcodes } from "discord-api-types/voice";
 import { Logger } from "#structures";
-
-/**
- * @author SNIPPIK
- * @description Время через которое меняется speaking статус
- * @const KEEP_SWITCH_SPEAKING
- */
-const KEEP_SWITCH_SPEAKING = 5e3;
 
 /**
  * @author SNIPPIK
@@ -35,6 +29,12 @@ export class VoiceConnection {
      * @public
      */
     public adapter: VoiceAdapter | null = new VoiceAdapter();
+
+    /**
+     * @description Менеджер спикера
+     * @private
+     */
+    private speaker: VoiceSpeakerManager | null = new VoiceSpeakerManager(this);
 
     /**
      * @description Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway
@@ -61,28 +61,10 @@ export class VoiceConnection {
     public e2EE: E2EESession | null;
 
     /**
-     * @description Таймер для автоматического отключения Speaking
-     * @private
-     */
-    private speakingTimeout: NodeJS.Timeout | null = null;
-
-    /**
-     * @description Текущее состояние Speaking (включен/выключен)
-     * @private
-     */
-    private _speaking: SpeakerType = SpeakerType.disable;
-
-    /**
-     * @description Список клиентов в голосовом состоянии
-     * @private
-     */
-    private _clients = new Set<string>();
-
-    /**
      * @description Дополнительные данные подключения
      * @private
      */
-    private _attention = {
+    public _attention = {
         ssrc: null as number,
         secret_key: null as number[],
     };
@@ -108,24 +90,47 @@ export class VoiceConnection {
      */
     public set packet(frame: Buffer) {
         if (this._status === VoiceConnectionStatus.ready && frame) {
-            this.speaking = this.defaultSpeaker;
-            this.resetSpeakingTimeout();
+            this.speaker.speaking = this.speaker.default;
 
             // Если есть клиенты для шифрования и отправки
-            if (this.udp && this.sRTP && this.e2EE?.session?.ready) {
-                const audio = this.e2EE?.encrypt(frame) ?? frame;
-                if (audio) this.udp.packet = this.sRTP.packet(audio);
+            if (this.udp && this.sRTP) {
+                // Если есть клиент E2EE
+                if (this.e2EE || this.e2EE?.session?.ready) {
+                    const audio = this.e2EE?.encrypt(frame);
+                    if (audio) this.udp.packet = this.sRTP.packet(audio);
+                    return;
+                }
+
+                this.udp.packet = this.sRTP.packet(frame);
             }
         }
+    };
 
-        else this.speaking = SpeakerType.fake;
+    /**
+     * @description Отправляем нетронутый аудио фрейм
+     * @param frame
+     * @public
+     */
+    public set raw_packet(frame: Buffer) {
+        if (this._status === VoiceConnectionStatus.ready && frame) {
+            // Отправляем не тронутый аудио фрейм
+            if (this.udp) this.udp.packet = frame;
+        }
+    };
+
+    /**
+     * @description Текущая задержка голосового подключения
+     * @public
+     */
+    public get latency() {
+        return this.websocket?.latency || 40;
     };
 
     /**
      * @description Готовность голосового подключения
      * @public
      */
-    public get hasSendFrames(): boolean {
+    public get isReadyToSend(): boolean {
         // Если статус не готовности
         if (this._status !== VoiceConnectionStatus.ready) return false;
 
@@ -140,30 +145,6 @@ export class VoiceConnection {
     };
 
     /**
-     * @description Отправляет пакет голосовому шлюзу, указывающий на то, что клиент начал/прекратил отправку аудио.
-     * @param speaking - Следует ли показывать клиента говорящим или нет
-     * @public
-     */
-    public set speaking(speaking: SpeakerType) {
-        // Если нельзя по состоянию или уже бот говорит
-        if (this._speaking === speaking || !this.websocket) return;
-
-        // Меняем состояние спикера
-        this._speaking = speaking;
-
-        // Обновляем статус голоса
-        this.websocket.packet = {
-            op: VoiceOpcodes.Speaking,
-            d: {
-                speaking: speaking,
-                delay: 0,
-                ssrc: this._attention.ssrc
-            },
-            seq: this.websocket?.sequence ?? -1
-        };
-    };
-
-    /**
      * @description Отключаемся от голосового канала
      * @public
      */
@@ -172,7 +153,7 @@ export class VoiceConnection {
         this.configuration.channel_id = null; // Удаляем id канала
 
         // Отправляем в discord сообщение об отключении бота
-        return this.adapter.sendPayload(this.configuration);
+        return this.adapter?.sendPayload(this.configuration);
     };
 
     /**
@@ -183,7 +164,7 @@ export class VoiceConnection {
     public set channel(ID: string) {
         // Прописываем новый id канала
         this.configuration.channel_id = ID;
-        this.adapter.sendPayload(this.configuration);
+        this.adapter?.sendPayload(this.configuration);
     };
 
     /**
@@ -202,14 +183,6 @@ export class VoiceConnection {
      */
     public get serverState(): GatewayVoiceServerUpdateDispatchData {
         return this.adapter.packet.server;
-    };
-
-    /**
-     * @description Указанный тип спикера
-     * @private
-     */
-    private get defaultSpeaker(): SpeakerType {
-        return this.configuration.self_speaker ?? SpeakerType.enable;
     };
 
     /**
@@ -297,9 +270,6 @@ export class VoiceConnection {
          */
         this.websocket.on("ready", ({d}) => {
             this.createUDPSocket(d);
-
-            // После установки UDP и RTP, включаем speaking
-            this.resetSpeakingTimeout();
         });
 
         /**
@@ -309,7 +279,7 @@ export class VoiceConnection {
          */
         this.websocket.on("sessionDescription", ({d}) => {
             this._status = VoiceConnectionStatus.SessionDescription;
-            this.speaking = SpeakerType.disable;
+            this.speaker.speaking = SpeakerType.disable;
 
             // Если уже есть активный RTP
             if (this.sRTP) {
@@ -342,7 +312,7 @@ export class VoiceConnection {
          * @code 7
          */
         this.websocket.on("resumed", () => {
-            this.speaking = SpeakerType.disable;
+            this.speaker.speaking = SpeakerType.disable;
             this.websocket.packet = {
                 op: VoiceOpcodes.Resume,
                 d: {
@@ -366,7 +336,7 @@ export class VoiceConnection {
             else if (code === 4006 || code === 4003) {
                 this.serverState.endpoint = null;
                 //this.voiceState.session_id = null;
-                this.adapter.sendPayload(this.configuration);
+                this.adapter?.sendPayload(this.configuration);
                 return; // Здесь происходит пересоздание ws подключения
             }
 
@@ -383,7 +353,9 @@ export class VoiceConnection {
          * @description Если websocket получил не предвиденную ошибку, то отключаемся
          * @status WS Error
          */
-        this.websocket.on("error", () => {
+        this.websocket.on("error", (err) => {
+            Logger.log("ERROR", err);
+
             this._status = VoiceConnectionStatus.disconnected;
             this.disconnect;
             this.destroy();
@@ -393,16 +365,11 @@ export class VoiceConnection {
          * @description Если подключились новые клиенты
          * @event ClientConnect
          */
-        this.websocket.on("ClientConnect", ({d}) => {
-            for (const id of d.user_ids) this._clients.add(id);
-        });
-
-        /**
-         * @description Если отключается клиент
-         * @event ClientDisconnect
-         */
-        this.websocket.on("ClientDisconnect", ({d}) => {
-            this._clients.delete(d.user_id);
+        this.websocket.on("UsersRJC", ({d}) => {
+            if ("user_id" in d) this.speaker.clients.delete(d.user_id);
+            else {
+                for (const id of d.user_ids) this.speaker.clients.add(id);
+            }
         });
     };
 
@@ -413,35 +380,36 @@ export class VoiceConnection {
      */
     private createUDPSocket = (d: WebSocketOpcodes.ready["d"]) => {
         this.udp.connect(d); // Подключаемся по UDP к серверу
-        this.udp.removeAllListeners();
 
         /**
-         * @description Передаем реальный ip, port для общения с discord
-         * @status SelectProtocol
-         * @code 1
+         * @description Получаем данные для отправки аудио пакетов
+         * @description RTP discovery
          */
-        this.udp.once("connected", ({ip, port}) => {
-            this.websocket.packet = {
-                op: VoiceOpcodes.SelectProtocol,
-                d: {
-                    protocol: "udp",
-                    data: {
-                        address: ip,
-                        port: port,
-                        mode: VoiceRTPSocket.mode
-                    }
-                }
-            };
+        this.udp.discovery(d.ssrc)
+            .then((data) => {
+                if (data instanceof Error) return this.destroy();
 
-            // Включаем спикер
-            this.speaking = this.defaultSpeaker;
-        });
+                this.websocket.packet = {
+                    op: VoiceOpcodes.SelectProtocol,
+                    d: {
+                        protocol: "udp",
+                        data: {
+                            address: data.ip,
+                            port: data.port,
+                            mode: VoiceRTPSocket.mode
+                        }
+                    }
+                };
+            })
+
+            // Если не удается получить путь до сервера UDP
+            .catch(this.destroy);
 
         /**
          * @description Если UDP подключение разорвет соединение принудительно
          * @event close
          */
-        this.udp.on("close", () => {
+        this.udp.once("close", () => {
             // Если голосовое подключение полностью отключено
             if (this._status === VoiceConnectionStatus.disconnected) return;
 
@@ -456,7 +424,7 @@ export class VoiceConnection {
          * @description Ловим ошибки при отправке пакетов
          * @event error
          */
-        this.udp.on("error", (error) => {
+        this.udp.once("error", (error) => {
             // Если произведена попытка подключения к закрытому каналу
             if (`${error}`.match(/Not found IPv4 address/)) {
                 if (this.disconnect) this.destroy();
@@ -546,7 +514,7 @@ export class VoiceConnection {
 
             // Предложения MLS, которые будут добавлены или отозваны
             else if (op === VoiceOpcodes.DaveMlsProposals) {
-                const dd = this.e2EE.processProposals(payload, this._clients);
+                const dd = this.e2EE.processProposals(payload, this.speaker.clients);
 
                 // Если есть смысл менять протокол
                 if (dd) {
@@ -627,9 +595,6 @@ export class VoiceConnection {
     public destroy = () => {
         Logger.log("DEBUG", `[Voice/${this.configuration.guild_id}] has destroyed`);
 
-        // Если есть таймер спикера
-        if (this.speakingTimeout) clearTimeout(this.speakingTimeout);
-
         // Уничтожаем подключения
         this.websocket?.destroy?.();
         this.udp?.destroy?.();
@@ -653,26 +618,11 @@ export class VoiceConnection {
         this.adapter = null;
 
         // Удаляем данные спикера
-        this.speakingTimeout = null;
-        this._speaking = null;
-
-        // Чистим список клиентов
-        this._clients.clear();
-        this._clients = null;
+        this.speaker.destroy();
+        this.speaker = null;
 
         // Меняем статус
         this._status = null;
-    };
-
-    /**
-     * @description Сброс таймера отключения Speaking
-     * @private
-     */
-    private resetSpeakingTimeout = () => {
-        if (this.speakingTimeout) clearTimeout(this.speakingTimeout);
-
-        // Выставляем таймер смены на false
-        this.speakingTimeout = setTimeout(() => { this.speaking = SpeakerType.disable; }, KEEP_SWITCH_SPEAKING);
     };
 }
 
@@ -697,19 +647,6 @@ enum VoiceConnectionStatus {
 
     // Если происходит переподключение
     reconnecting = "reconnecting"
-}
-
-/**
- * @author SNIPPIK
- * @description Тип спикера
- * @enum SpeakerType
- * @private
- */
-enum SpeakerType {
-    "disable",
-    "enable",
-    "fake",
-    "priority" = 4
 }
 
 /**

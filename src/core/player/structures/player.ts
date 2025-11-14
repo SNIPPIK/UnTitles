@@ -1,5 +1,5 @@
 import { type AudioFilter, type AudioPlayerEvents, ControllerFilters } from "#core/player";
-import { BufferedAudioResource, PipeAudioResource, SILENT_FRAME } from "#core/audio";
+import { BufferedAudioResource, OPUS_FRAME_SIZE, PipeAudioResource, SILENT_FRAME } from "#core/audio";
 import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue";
 import { PlayerProgress } from "../modules/progress";
 import { Logger, TypedEmitter } from "#structures";
@@ -58,6 +58,9 @@ type AudioPlayerAudio = BufferedAudioResource | PipeAudioResource;
  * - Поддерживает hot swap, не ломает jitter buffer (AudioPlayerTimeout)
  */
 export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
+    public _stepCounter: number = 1; // Требуется для подстройки под голосовое соединение
+    public _counter: number = 0; // Требуется для подстройки под голосовое соединение
+
     /**
      * @description Текущий статус плеера, при создании он должен быть в ожидании
      * @private
@@ -156,6 +159,14 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
+     * @description Задержка плеера между отправкой аудио пакетов
+     * @public
+     */
+    public get latency() {
+        return this._stepCounter * OPUS_FRAME_SIZE;
+    };
+
+    /**
      * @description Проверяем играет ли плеер
      * @return boolean
      * @public
@@ -165,7 +176,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (this._status === "player/wait" || this._status === "player/pause") return false;
 
         // Если голосовое состояние не позволяет отправлять пакеты
-        else if (!this._voice.connection || !this._voice.connection?.hasSendFrames) return false;
+        else if (!this._voice.connection || !this._voice.connection?.isReadyToSend) return false;
 
         // Если поток не читается, переходим в состояние ожидания
         else if (!this._audio.current && this._audio.current?.packets > 0 || !this._audio.current?.readable) {
@@ -299,13 +310,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const queue = db.queues.get(player.id);
             const current = player.tracks.position;
 
-
             // Позиция трека для сообщения
             const position = skip?.position !== undefined ? skip?.position : current;
 
             // Выводим сообщение об ошибке
             db.events.emitter.emit("message/error", queue, error, position);
-
 
             // Если надо пропустить трек
             if (skip) {
@@ -336,14 +345,19 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если другой аудио поток загружается, то запрещаем включение
         if (this._audio.preloaded) return null;
 
-        const stream = this._audio.current,
-            filters: string = this._filters.toString(time, this._audio.volume, stream && stream?.packets > 0);
+        const stream = this._audio.current;
 
         // Выбираем и создаем класс для предоставления аудио потока
         return this._audio.preload = new (time > PLAYER_BUFFERED_TIME || time === 0 ? PipeAudioResource : BufferedAudioResource)(
             {
-                path,
-                options: { seek, filters }
+                path, seek,
+                filters: this._filters.toString(
+                    {
+                        isSwap: stream && stream?.packets > 0,
+                        total: time,
+                        volume: this._audio.volume
+                    }
+                )
             }
         );
     };
@@ -433,6 +447,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
     /**
      * @description Приостанавливает воспроизведение плеера
+     * @returns void
      * @public
      */
     public pause = (): void => {
@@ -526,6 +541,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
     /**
      * @description Эта функция полностью удаляет плеер и все сопутствующие данные
+     * @returns void
      * @public
      */
     public destroy = () => {
@@ -563,6 +579,7 @@ class AudioPlayerTimeout {
 
     /**
      * @description Последнее заданное время
+     * @returns number
      * @public
      */
     public get timeout() {
@@ -591,6 +608,7 @@ class AudioPlayerTimeout {
 
     /**
      * @description Удаляем не нужные данные
+     * @returns void
      * @public
      */
     public destroy = () => {
@@ -605,6 +623,7 @@ class AudioPlayerTimeout {
  * @param player - Плеер
  * @param index - Номер нового трека
  * @param seek - Время перехода к позиции аудио трека
+ * @returns void
  * @private
  */
 function onPlayerReadable(player: AudioPlayer, index: number, seek: number) {

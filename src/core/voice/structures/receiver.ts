@@ -5,6 +5,7 @@ import { TypedEmitter } from "#structures";
  * @author SNIPPIK
  * @description Размер тега авторизации
  * @const AUTH_TAG_LENGTH
+ * @private
  */
 const AUTH_TAG_LENGTH = 16;
 
@@ -12,6 +13,7 @@ const AUTH_TAG_LENGTH = 16;
  * @author SNIPPIK
  * @description Размер nonce
  * @const UNPADDED_NONCE_LENGTH
+ * @private
  */
 const UNPADDED_NONCE_LENGTH = 4;
 
@@ -19,6 +21,7 @@ const UNPADDED_NONCE_LENGTH = 4;
  * @author SNIPPIK
  * @description Заголовок discord receive
  * @const HEADER_EXTENSION_BYTE
+ * @private
  */
 const HEADER_EXTENSION_BYTE = Buffer.from([0xbe, 0xde]);
 
@@ -47,6 +50,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
      * @description Запуск класса слушателя, для прослушивания пользователей
      * @param voice - Голосове подключение
      * @constructor
+     * @public
      */
     public constructor(private readonly voice: VoiceConnection) {
         super();
@@ -132,6 +136,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
  * @author SNIPPIK
  * @description События слушателя
  * @interface VoiceReceiverEvents
+ * @private
  */
 interface VoiceReceiverEvents {
     /**

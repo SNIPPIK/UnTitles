@@ -13,6 +13,7 @@ export * from "./index.server";
  * @description Helper: all possible requests across platforms
  * @type APIRequests
  * @helper
+ * @public
  */
 export type APIRequests = {
     track: Track
@@ -27,6 +28,7 @@ export type APIRequests = {
  * @description Helper: all possible requests across platforms
  * @type APIRequestsRaw
  * @helper
+ * @public
  */
 export type APIRequestsRaw = {
     track: TrackRaw.Data
@@ -41,6 +43,7 @@ export type APIRequestsRaw = {
  * @description Сырые типы данных для дальнейшего использования
  * @namespace TrackRaw
  * @helper
+ * @private
  */
 namespace TrackRaw {
     export interface Data {
@@ -67,6 +70,7 @@ namespace TrackRaw {
  * @description Разделение слов в названии трека
  * @param str - Название
  * @const normalize
+ * @private
  */
 const normalize = (str: string) => str.toLowerCase().replace(/[^\w\s:;]|_/gi, "").replace(/\s+/g, " ").trim().split(" ");
 
@@ -79,7 +83,6 @@ const normalize = (str: string) => str.toLowerCase().replace(/[^\w\s:;]|_/gi, ""
 export class RestObject {
     /**
      * @description Второстепенный поток, динамически создается и удаляется когда не требуется
-     * @readonly
      * @private
      */
     private worker: Worker;
@@ -98,6 +101,7 @@ export class RestObject {
 
     /**
      * @description Получаем список всех доступных платформ
+     * @returns RestServerSide.API[]
      * @public
      */
     public get array(): RestServerSide.API[] {
@@ -125,7 +129,9 @@ export class RestObject {
 
     /**
      * @description Генерация уникального ID
-     * @param reset
+     * @param reset - Надо ли делать сброс счетчика
+     * @returns number
+     * @private
      */
     private generateUniqueId = (reset = false) => {
         // Если надо сбросить данные
@@ -178,6 +184,7 @@ export class RestObject {
 
     /**
      * @description Создание класса для взаимодействия с платформой
+     * @returns RestClientSide.Request
      * @public
      */
     public request = (name: RestServerSide.API["name"] | string): RestClientSide.Request => {
@@ -187,6 +194,7 @@ export class RestObject {
     /**
      * @description Получаем платформу
      * @param name - Имя платформы
+     * @returns RestServerSide.API
      * @private
      */
     private platform = (name: RestServerSide.API["name"] | string): RestServerSide.API => {

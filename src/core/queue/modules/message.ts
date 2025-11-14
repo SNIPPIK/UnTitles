@@ -105,6 +105,7 @@ export class QueueMessage<T extends CommandInteraction> {
 
     /**
      * @description Получение класса клиента
+     * @returns require("discord.js").Client
      * @public
      */
     public get client() {
@@ -114,6 +115,7 @@ export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description Параметр отвечает за правильную работу сообщения
      * @example Ответил ли бот пользователю?
+     * @returns boolean
      * @public
      */
     public get replied() {
@@ -123,6 +125,7 @@ export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description Параметр отвечает за правильную работу сообщения
      * @example Можно ли ответить на другое сообщение?
+     * @returns boolean
      * @public
      */
     public get deferred() {
@@ -143,6 +146,7 @@ export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description Авто отправка сообщения
      * @param options - Параметры сообщения
+     * @returns Promise<CycleInteraction>
      * @public
      */
     public send = (options: {embeds?: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
@@ -266,6 +270,7 @@ export class QueueButtons {
     /**
      * @author SNIPPIK
      * @description Проверка и выдача кнопок
+     * @returns ActionRowBuilder
      * @public
      */
     public component = (player: AudioPlayer) => {
@@ -327,9 +332,10 @@ export class QueueButtons {
 
     /**
      * @description Удаляем компоненты когда они уже не нужны
+     * @returns void
      * @public
      */
-    public destroy() {
+    public destroy = () => {
         this._buttons = null;
         this._selector = null;
     };
@@ -338,9 +344,10 @@ export class QueueButtons {
      * @author SNIPPIK
      * @description Делаем проверку id
      * @param name - Название параметра в env
+     * @returns object
      * @private
      */
-    private static checkIDComponent(name: string) {
+    private static checkIDComponent(name: string){
         const id = env.get(name);
         const int = parseInt(id);
 
@@ -352,6 +359,7 @@ export class QueueButtons {
      * @author SNIPPIK
      * @description Создание одной кнопки в одной функции
      * @param options - Параметры для создания кнопки
+     * @returns object
      * @private
      */
     private static createButton(options: any) {

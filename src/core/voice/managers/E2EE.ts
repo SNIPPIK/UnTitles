@@ -224,10 +224,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
 
         if (!commit) return null;
 
-        const result = Buffer.allocUnsafe(commit.length + welcome.length);
-        commit.copy(result, 0);
-        welcome.copy(result, commit.length);
-        return result;
+        return Buffer.concat([commit, welcome]);
     };
 
     /**
@@ -338,10 +335,10 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
  */
 export interface ClientE2EEEvents {
     // Ошибка?! Какая ошибка
-    "error": (error: Error) => void
+    "error": (error: Error) => void;
 
     // Для отладки
-    "debug": (message: string) => void
+    "debug": (message: string) => void;
 
     // Получение ключа
     "key": (message: Buffer) => void;

@@ -19,12 +19,14 @@ export namespace RestServerSide {
     /**
      * @description Пример класса с типами
      * @type APIs
+     * @public
      */
     export type APIs = Record<RestAPIS_Names, API>;
 
     /**
      * @description Данные для валидного запроса параллельном процессу
-     * @interface ServerOptions
+     * @type ServerOptions
+     * @public
      */
     export type ServerOptions = RestClientSide.ClientOptions & {
         platform: RestAPIS_Names;
@@ -75,6 +77,7 @@ export namespace RestServerSide {
     /**
      * @description Создаем класс для итоговой платформы для взаимодействия с APIs
      * @class API
+     * @implements APIBase
      * @public
      */
     export class API implements APIBase {

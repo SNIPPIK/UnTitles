@@ -82,6 +82,7 @@ export class Collection<K, T = string> {
 
     /**
      * @description Удаление всего из set/map
+     * @returns void
      * @public
      */
     public clear = () => {

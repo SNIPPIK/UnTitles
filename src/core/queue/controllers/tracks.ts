@@ -63,7 +63,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Текущая позиция трека в очереди
-     * @return number
+     * @returns number
      * @public
      */
     public get position() {
@@ -72,7 +72,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Получаем текущий трек
-     * @return Track
+     * @returns Track
      * @public
      */
     public get track() {
@@ -81,7 +81,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Кол-во треков в очереди с учетом текущей позиции
-     * @return number
+     * @returns number
      * @public
      */
     public get size() {
@@ -90,7 +90,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Общее кол-во треков в очереди
-     * @return number
+     * @returns number
      * @public
      */
     public get total() {
@@ -99,6 +99,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Получаем данные перетасовки
+     * @returns boolean
      * @public
      */
     public get shuffle(): boolean {
@@ -117,6 +118,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Получаем тип повтора
+     * @returns RepeatType
      * @public
      */
     public get repeat() {
@@ -125,6 +127,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Общее время треков
+     * @returns string
      * @public
      */
     public get time() {

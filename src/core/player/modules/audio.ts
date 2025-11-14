@@ -1,4 +1,4 @@
-import type { BufferedAudioResource, PipeAudioResource } from "#core/audio";
+import { BufferedAudioResource, PipeAudioResource } from "#core/audio";
 import { db } from "#app/db";
 
 /**
@@ -31,18 +31,18 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
 
     /**
      * @description Громкость аудио, по умолчанию берется параметр из db/env
-     * @protected
+     * @private
      */
     private _volume = db.queues.options.volume;
 
     /**
      * @description Изменяем значение громкости у аудио
-     * @param vol - Громкость допустимый диапазон (10-200)
+     * @param volume - Громкость допустимый диапазон (10-200)
      * @public
      */
-    public set volume(vol: number) {
+    public set volume(volume: number) {
         // Меняем параметр
-        this._volume = vol > 200 ? 200 : vol < 1 ? 10 : vol;
+        this._volume = volume > 200 ? 200 : volume < 1 ? 10 : volume;
     };
 
     /**
@@ -90,7 +90,9 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
         this._timeout = setTimeout(() => {
             // Отправляем данные событию для отображения ошибки
             stream.emit("error", new Error("Timeout: the stream has been exceeded!"));
-        }, 10e3);
+        },
+            // Если играет трек, а не live!
+            stream.options.filters ? 8e3 : 13e3);
 
         // Отслеживаем аудио поток на ошибки
         (stream as BufferedAudioResource).once("error", () => {
@@ -108,11 +110,7 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
             clearTimeout(this._timeout);
 
             // Если есть активный поток
-            if (this._audio) {
-                // Производим явную синхронизацию времени
-                stream.seek = this._audio.duration;
-                this._audio.destroy();
-            }
+            if (this._audio) this._audio.destroy();
 
             // Перезаписываем текущий поток
             this._audio = stream;

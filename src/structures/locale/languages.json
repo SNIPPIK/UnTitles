@@ -231,8 +231,8 @@
   },
 
   "player.button.lyrics.fail": {
-    "en-US": "The song lyrics were not found!",
-    "ru": "Текст песни не был найден!"
+    "en-US": "Provider: {ARGUMENT}\n - The song lyrics were not found!",
+    "ru": "Поставщик: {ARGUMENT}\n - Текст песни не был найден!"
   },
 
 

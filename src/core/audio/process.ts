@@ -77,6 +77,7 @@ export class Process {
 
     /**
      * @description Удаляем и отключаемся от процесса
+     * @returns void
      * @private
      */
     public destroy = () => {

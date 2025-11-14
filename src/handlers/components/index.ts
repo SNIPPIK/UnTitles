@@ -20,6 +20,7 @@ export class Components extends handler<SupportComponent> {
 
     /**
      * @description Регистрируем кнопки в эко системе бота
+     * @returns void
      * @public
      */
     public register = () => {
@@ -29,6 +30,7 @@ export class Components extends handler<SupportComponent> {
     /**
      * @description Выдача кнопки из всей базы
      * @param name - Название кнопки
+     * @public
      */
     public get = (name: string) => {
         return this.files.find((button) => button.name === name);
@@ -39,6 +41,7 @@ export class Components extends handler<SupportComponent> {
  * @author SNIPPIK
  * @description Доступные кнопки
  * @type SupportButtons
+ * @public
  */
 export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters";
 
@@ -46,22 +49,26 @@ export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | 
  * @author SNIPPIK
  * @description Доступные селекторы меню
  * @type SupportSelector
+ * @public
  */
 export type SupportSelector = "filter_select";
 
 /**
  * @author SNIPPIK
- * @description
+ * @description Тип поддержки компонента
+ * @public
  */
 export type SupportComponent<T = "button" | "selector"> = {
     /**
      * @description Название кнопки
+     * @public
      */
     name?: T extends "button" ? SupportButtons : SupportSelector;
 
     /**
      * @description Функция выполнения кнопки
      * @param msg - Сообщение пользователя
+     * @public
      */
     callback?: (ctx: T extends "button" ? buttonInteraction : SelectMenuInteract) => any;
 
@@ -77,6 +84,9 @@ export type SupportComponent<T = "button" | "selector"> = {
 /**
  * @author SNIPPIK
  * @description Класс для создания компонентов
+ * @class Component
+ * @implements SupportComponent
+ * @public
  */
 export class Component<T = "button" | "selector"> implements SupportComponent<T> {
     public callback: SupportComponent<T>["callback"];

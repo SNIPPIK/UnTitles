@@ -14,8 +14,8 @@ import { env } from "#app/env";
 class RestServer extends handler<RestServerSide.API> {
     /**
      * @description База с платформами
-     * @protected
      * @readonly
+     * @public
      */
     public readonly platforms: RestServerSide.Data = {
         supported: {} as RestServerSide.APIs,
@@ -29,6 +29,7 @@ class RestServer extends handler<RestServerSide.API> {
      * Лимиты на количество обрабатываемых элементов для различных типов запросов.
      * Значения читаются из переменных окружения.
      * @type {Record<string, number>}
+     * @public
      */
     public readonly limits: Record<string, number> = ((): Record<string, number> => {
         const keys = ["playlist", "album", "search", "author"];
@@ -40,6 +41,7 @@ class RestServer extends handler<RestServerSide.API> {
 
     /**
      * @description Получаем список всех доступных платформ
+     * @returns RestServerSide.API[]
      * @private
      */
     private get array(): RestServerSide.API[] {
@@ -49,6 +51,7 @@ class RestServer extends handler<RestServerSide.API> {
 
     /**
      * @description Исключаем платформы из общего списка
+     * @returns RestServerSide.API[]
      * @public
      */
     public get allow(): RestServerSide.API[] {

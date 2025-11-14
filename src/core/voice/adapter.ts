@@ -14,13 +14,14 @@ export abstract class VoiceAdapters<T extends any> {
     /**
      * @description Коллекция адаптеров для общения голоса с клиентским websocket'ом
      * @readonly
-     * @private
+     * @protected
      */
-    public adapters = new Map<string, DiscordGatewayAdapterLibraryMethods>();
+    protected adapters = new Map<string, DiscordGatewayAdapterLibraryMethods>();
 
     /**
      * @description Создание класса
      * @param client - Класс клиента
+     * @protected
      */
     protected constructor(protected client: T) {};
 
@@ -120,6 +121,7 @@ export class VoiceAdapter {
 /**
  * @description Шлюз Discord Адаптер, шлюза Discord.
  * @interface DiscordGatewayAdapterLibraryMethods
+ * @public
  */
 export interface DiscordGatewayAdapterLibraryMethods {
     /**
@@ -143,6 +145,7 @@ export interface DiscordGatewayAdapterLibraryMethods {
 /**
  * @description Методы, предоставляемые разработчиком адаптера Discord Gateway для DiscordGatewayAdapter.
  * @interface DiscordGatewayAdapterImplementerMethods
+ * @public
  */
 export interface DiscordGatewayAdapterImplementerMethods {
     /**
@@ -164,5 +167,6 @@ export interface DiscordGatewayAdapterImplementerMethods {
  * разработчик вернет некоторые методы, которые может вызывать библиотека - например, для отправки сообщений на
  * шлюз или для подачи сигнала о том, что адаптер может быть удален.
  * @type DiscordGatewayAdapterCreator
+ * @public
  */
 export type DiscordGatewayAdapterCreator = ( methods: DiscordGatewayAdapterLibraryMethods) => DiscordGatewayAdapterImplementerMethods;

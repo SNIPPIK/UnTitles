@@ -23,9 +23,6 @@
     <a href="LICENSE.md">
       <img src="https://img.shields.io/badge/License-BSD3-green?style=for-the-badge" alt="License" />
     </a>
-    <a href="https://github.com/SNIPPIK/Untitles/releases/latest">
-      <img src="https://img.shields.io/github/v/release/SNIPPIK/Untitles?logo=git&style=for-the-badge&include_prereleases&label=Release" alt="Latest release" />
-    </a>
     <a href="https://github.com/SNIPPIK/Untitles/releases">
       <img src="https://img.shields.io/github/downloads/SNIPPIK/Untitles/total?logo=github&style=for-the-badge&label=Downloads" alt="All downloads" />
     </a>
@@ -42,7 +39,7 @@
 - 👤 [`SNIPPIK`](https://github.com/SNIPPIK)
 - 💡 [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS) — идеи и предложения
 
-📢 Об ошибках и недочётах просим сообщать в [Issues](https://github.com/SNIPPIK/UnTitles/issues)  
+📢 Об ошибках и недочётах просим сообщать в [`Issues`](https://github.com/SNIPPIK/UnTitles/issues) или [`Discord`](https://discord.gg/qMf2Sv3)  
 🚫 Бот не работает 24/7 — он может быть недоступен!
 
 [![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
@@ -55,6 +52,8 @@
 
 > [!IMPORTANT]
 > Если нет ответа от YouTube — немедленно сообщите об ошибке и не забудьте прикрепить ссылку!  
+> Из-за действий РКН, возможно будут проблемы с потерями аудио пакетов или прочее!  
+> Если ваш интернет не стабилен потери будут в любом случае.  
 > `main` — стабильная, но редко обновляемая ветка  
 > `beta` — новейшие фиксы и функции, может быть нестабильной
 

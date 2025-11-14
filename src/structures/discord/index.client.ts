@@ -95,7 +95,6 @@ export class DiscordClient extends Client {
     /**
      * @description Функция создания и управления статусом
      * @returns void
-     * @readonly
      * @private
      */
     private initSwapStatus = (): void => {
@@ -143,7 +142,6 @@ export class DiscordClient extends Client {
     /**
      * @description Функция подготавливающая статусы
      * @returns ActivityOptions[]
-     * @readonly
      * @private
      */
     private prepareStatuses = (): ActivityOptions[] => {

@@ -195,17 +195,22 @@ export class Track {
      */
     public get resource(): Promise<string | Error> {
         return new Promise(async (resolve) => {
-            const resource = await _prepareResource(this);
+            for (let i = 0; i <= 2; i++) {
+                const resource = await _prepareResource(this);
 
-            // Если произошла ошибка при получении ресурса
-            if (resource instanceof Error || !resource) {
-                this.link = null;
+                // Если произошла ошибка при получении ресурса
+                if (resource instanceof Error || !resource) {
+                    this.link = null;
 
-                // Если уже нельзя повторить
-                return resolve(resource);
+                    // Если уже нельзя повторить
+                    if (i === 2) return resolve(resource);
+                }
+
+                else {
+                    this.link = resource;
+                    break;
+                }
             }
-
-            else this.link = resource;
 
             // Отдаем ссылку или путь до файла
             return resolve(this.link);
@@ -248,6 +253,14 @@ export class Track {
             // Выдаем впервые текст песни
             return resolve(api?.syncedLyrics || api?.plainLyrics);
         });
+    };
+
+    /**
+     * @description Поставщик текстов песен
+     * @public
+     */
+    public get lyricsProvider() {
+        return "lrclib.net"
     };
 
 

@@ -8,6 +8,7 @@ import type { CompeteInteraction } from "#structures/discord";
  * @author SNIPPIK
  * @description Декоратор создающий заголовок команды
  * @decorator
+ * @public
  */
 export function Declare(options: DeclareOptionsChatInput | DeclareOptionsUser) {
     const CommandType = options.type ?? ApplicationCommandType.ChatInput;
@@ -35,6 +36,7 @@ export function Declare(options: DeclareOptionsChatInput | DeclareOptionsUser) {
  * @author SNIPPIK
  * @description Декоратор под команд
  * @decorator
+ * @public
  */
 export function Options(options: (new () => SubCommand)[] | OptionsRecord) {
     return <T extends { new (...args: any[]): object }>(target: T) =>
@@ -49,6 +51,7 @@ export function Options(options: (new () => SubCommand)[] | OptionsRecord) {
  * @author SNIPPIK
  * @description Декоратор ограничений
  * @decorator
+ * @public
  */
 export function Middlewares(cbs: RegisteredMiddlewares[]) {
     return <T extends { new (...args: any[]): object }>(target: T) =>
@@ -61,6 +64,7 @@ export function Middlewares(cbs: RegisteredMiddlewares[]) {
  * @author SNIPPIK
  * @description Декоратор ограничений
  * @decorator
+ * @public
  */
 export function Permissions(permissions: BaseCommand["permissions"]) {
     return <T extends { new (...args: any[]): object }>(target: T) =>
@@ -75,6 +79,7 @@ export function Permissions(permissions: BaseCommand["permissions"]) {
  * @description Параметры декоратора команды по умолчанию
  * @usage Только как компонент для остальных
  * @type DeclareOptionsBase
+ * @private
  */
 type DeclareOptionsBase = {
     /**
@@ -116,6 +121,7 @@ type DeclareOptionsBase = {
  * @description Параметры декоратора команды
  * @usage Только как основной компонент для создания команд
  * @type DeclareOptionsChatInput
+ * @private
  */
 type DeclareOptionsChatInput = DeclareOptionsBase & {
     /**
@@ -138,6 +144,7 @@ type DeclareOptionsChatInput = DeclareOptionsBase & {
  * @description Параметры декоратора команды
  * @usage Только как основной компонент для создания команд пользователя
  * @type DeclareOptionsUser
+ * @private
  */
 type DeclareOptionsUser = DeclareOptionsBase & {
     /**
@@ -147,7 +154,6 @@ type DeclareOptionsUser = DeclareOptionsBase & {
      */
     type: ApplicationCommandType.User | ApplicationCommandType.Message;
 };
-
 
 /**
  * @author SNIPPIK
@@ -176,6 +182,8 @@ export interface Choice {
 /**
  * @author SNIPPIK
  * @description Параметры параметров autocomplete
+ * @type BaseCommandOption
+ * @private
  */
 type BaseCommandOption = {
     /**
@@ -214,6 +222,8 @@ type BaseCommandOption = {
 /**
  * @author SNIPPIK
  * @description Параметры параметров autocomplete
+ * @type AutocompleteCommandOption
+ * @public
  */
 export type AutocompleteCommandOption = {
     /**
@@ -244,6 +254,8 @@ export type AutocompleteCommandOption = {
 /**
  * @author SNIPPIK
  * @description Параметры параметров autocomplete
+ * @type ChoiceOption
+ * @public
  */
 export type ChoiceOption = {
     /**
@@ -262,6 +274,8 @@ export type ChoiceOption = {
 /**
  * @author SNIPPIK
  * @description Записываем параметры команды в json формат
+ * @type OptionsRecord
+ * @private
  */
 type OptionsRecord = Record<string, AutocompleteCommandOption | ChoiceOption & BaseCommandOption>;
 

@@ -4,11 +4,14 @@ import path from "node:path";
 
 /**
  * @author SNIPPIK
- * @description Класс упрощающий работу с потоками
+ * @description Класс упрощающий работу с потоками, позволяет за несколько сек запускать и удалять потоки
+ * @class SimpleWorker
+ * @public
  */
 export class SimpleWorker {
     /**
      * @description Создаем или заменяем поток
+     * @static
      * @public
      */
     public static create<T>({options, file, callback, postMessage, not_destroyed}: WorkerInput<T>): Worker {
@@ -38,6 +41,7 @@ export class SimpleWorker {
     /**
      * @description Уничтожаем поток
      * @param worker - Поток
+     * @static
      * @private
      */
     private static destroy = async (worker: Worker) => {
@@ -56,6 +60,7 @@ export class SimpleWorker {
  * @author SNIPPIK
  * @description Интерфейс для работы с потоком
  * @interface WorkerInput
+ * @private
  */
 interface WorkerInput<T> {
     file: string;

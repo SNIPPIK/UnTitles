@@ -11,6 +11,7 @@ void main();
  * @description Запуск всего проекта в async режиме
  * @function main
  * @returns void or Promise<void>
+ * @private
  */
 function main() {
     const isManager = process.argv.includes("--ShardManager");
@@ -27,6 +28,7 @@ function main() {
  * @description Если требуется запустить менеджер осколков
  * @function execute_shardManager
  * @returns void
+ * @private
  */
 function execute_shardManager() {
     Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
@@ -39,6 +41,7 @@ function execute_shardManager() {
  * @function execute_shard
  * @returns Promise<void>
  * @async
+ * @private
  */
 async function execute_shard() {
     Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
@@ -92,6 +95,7 @@ async function execute_shard() {
  * @param client - Класс клиента
  * @function init_process_events
  * @returns void
+ * @private
  */
 function init_process_events(client: DiscordClient): void {
     // Необработанная ошибка (внутри синхронного кода)
@@ -129,6 +133,7 @@ function init_process_events(client: DiscordClient): void {
  * @param client - Класс клиента
  * @function init_queue_destroyer
  * @returns boolean
+ * @private
  */
 function init_queue_destroyer(client: DiscordClient): boolean {
     if (db.queues.size > 0) {

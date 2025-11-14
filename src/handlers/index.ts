@@ -15,6 +15,7 @@ export abstract class handler<T = unknown> {
 
     /**
      * @description Выдаем все загруженные файлы
+     * @returns SetArray<T>
      * @protected
      */
     protected get files() {
@@ -23,6 +24,7 @@ export abstract class handler<T = unknown> {
 
     /**
      * @description Кол-во загруженных элементов
+     * @returns number
      * @public
      */
     public get size() {
@@ -32,12 +34,14 @@ export abstract class handler<T = unknown> {
     /**
      * @description Даем классу необходимые данные
      * @param directory - Имя директории
+     * @constructor
      * @protected
      */
     protected constructor(private directory: string) {};
 
     /**
      * @description Загружаем директории полностью, за исключением index файлов
+     * @returns void
      * @protected
      */
     protected load = () => {
@@ -59,6 +63,7 @@ export abstract class handler<T = unknown> {
     /**
      * @description Поиск файлов загрузки
      * @param dirPath - Путь до директории
+     * @returns void
      * @private
      */
     private _loadRecursive = (dirPath: string) => {
@@ -83,6 +88,7 @@ export abstract class handler<T = unknown> {
     /**
      * @description Добавляем загруженный файл в коллекцию файлов
      * @param path - Путь до файла
+     * @returns void
      * @private
      */
     private _push = (path: string) => {

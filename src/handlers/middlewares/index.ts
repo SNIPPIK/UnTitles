@@ -20,6 +20,7 @@ export type RegisteredMiddlewares = "voice" | "queue" | "another_voice" | "playe
 export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction | SelectMenuInteract>> extends handler<T> {
     /**
      * @description Производим поиск по функции
+     * @returns T[]
      * @public
      */
     public get array() {
@@ -28,6 +29,8 @@ export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction |
 
     /**
      * @description Загружаем класс вместе с дочерним
+     * @constructor
+     * @public
      */
     public constructor() {
         super("src/handlers/middlewares");
@@ -35,6 +38,7 @@ export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction |
 
     /**
      * @description Регистрируем в эко системе бота
+     * @returns () => void
      * @public
      */
     public register = this.load;
@@ -42,6 +46,7 @@ export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction |
     /**
      * @description Производим фильтрацию по функции
      * @param predicate - Функция поиска
+     * @returns T[]
      * @public
      */
     public filter(predicate: (item: T) => boolean) {

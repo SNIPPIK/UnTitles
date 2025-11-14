@@ -124,7 +124,6 @@ class RestVKAPI extends RestServerSide.API {
      * @param type {string} Тип запроса
      * @param options {string} Параметры через &
      * @protected
-     * @static
      */
     protected API = (method: "audio" | "execute" | "catalog", type: "getById" | "search" | "getPlaylistById", options: string): Promise<json | Error> => {
         return new Promise((resolve) => {
@@ -149,7 +148,6 @@ class RestVKAPI extends RestServerSide.API {
      * @param track {any} Любой трек из VK
      * @param url - Ссылка на трек
      * @protected
-     * @static
      */
     protected track = (track: json, url: string = null) => {
         const image = track?.album?.["thumb"];
@@ -169,7 +167,6 @@ class RestVKAPI extends RestServerSide.API {
      * @description Из полученных данных подготавливаем данные об авторе для ISong.track
      * @param user {any} Любой автор трека
      * @protected
-     * @static
      */
     protected author = (user: any): Track.artist => {
         const url = `https://vk.com/audio?performer=1&q=${user.artist.replaceAll(" ", "").toLowerCase()}`;

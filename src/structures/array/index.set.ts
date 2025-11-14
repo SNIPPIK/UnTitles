@@ -31,6 +31,7 @@ export class SetArray<T> extends Set<T> {
      * @description Удаляет элемент из массива
      * @param item - объект задачи или item с next
      * @returns true если элемент найден и удалён, иначе false
+     * @public
      */
     public delete(item: T) {
         if (!this.has(item)) {

@@ -1,4 +1,4 @@
-import { BufferedEncoder, OPUS_FRAME_SIZE, PipeEncoder } from "./opus";
+import { BufferedEncoder, OPUS_FRAME_SIZE, PipeEncoder, SILENT_FRAME } from "./opus";
 import { Logger } from "#structures/logger";
 import { TypedEmitter } from "#structures";
 import { Process } from "./process";
@@ -93,12 +93,6 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
     protected _readable = false;
 
     /**
-     * @description Параметр seek, для вычисления времени проигрывания
-     * @protected
-     */
-    protected _seek = 0;
-
-    /**
      * @description Если чтение возможно
      * @public
      */
@@ -126,13 +120,38 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
     public abstract get packets(): number;
 
     /**
+     * @description Создание аргументов для FFmpeg
+     * @private
+     */
+    protected get arguments() {
+        const {seek, filters, path} = this.options;
+
+        return [
+            // Пропуск времени
+            "-ss", `${seek ?? 0}`,
+            "-accurate_seek",
+
+            // Файл или ссылка на ресурс
+            "-i", path,
+
+            // Подключаем фильтры
+            "-af", filters,
+
+            // Указываем формат аудио (ogg/opus)
+            "-acodec", "libopus",
+            "-frame_duration", "20",
+            "-f", "opus",
+            "pipe:"
+        ];
+    };
+
+    /**
      * @description Создаем класс и задаем параметры
      * @constructor
      * @protected
      */
-    protected constructor(public input_data: AudioResourceOptions) {
+    protected constructor(public options: AudioResourceOptions) {
         super();
-        this._seek = (input_data.options.seek * 1e3) / OPUS_FRAME_SIZE;
     };
 
     /**
@@ -168,14 +187,12 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 
         // Чистим все потоки от мусора
         this.emit("close");
-        this.removeAllListeners();
 
         // Удаляем все вызовы функций
         super.destroy();
 
         this._readable = null;
-        this._seek = null;
-        this.input_data = null;
+        this.options = null;
     };
 }
 
@@ -214,8 +231,8 @@ export class BufferedAudioResource extends BaseAudioResource {
     public get duration() {
         if (!this._buffer || !this._buffer?.position) return 0;
 
-        const time = (this._buffer.position + this._seek) * OPUS_FRAME_SIZE;
-        return Math.abs(time / 1e3);
+        const time = this._buffer.position * OPUS_FRAME_SIZE;
+        return time / 1e3 + this.options.seek;
     };
 
     /**
@@ -225,7 +242,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get packet(): Buffer {
-        if (!this._buffer) return null;
+        if (!this._buffer) return SILENT_FRAME;
         return this._buffer.packet;
     };
 
@@ -263,8 +280,6 @@ export class BufferedAudioResource extends BaseAudioResource {
      */
     public constructor(config: AudioResourceOptions) {
         super(config);
-
-        const { path, options } = config;
         const decoder = new BufferedEncoder({
             highWaterMark: 512 * 5 // Буфер на ~1:14
         });
@@ -301,22 +316,7 @@ export class BufferedAudioResource extends BaseAudioResource {
         // Процесс (FFmpeg)
         this.input<Process>({
             // Создание потока
-            input: new Process([
-                // Пропуск времени
-                "-ss", `${options.seek ?? 0}`,
-
-                // Файл или ссылка на ресурс
-                "-i", path,
-
-                // Подключаем фильтры
-                "-af", options.filters,
-
-                // Указываем формат аудио (ogg/opus)
-                "-acodec", "libopus",
-                "-frame_duration", "20",
-                "-f", "opus",
-                "pipe:"
-            ]),
+            input: new Process(this.arguments),
 
             // Управление событиями
             events: {
@@ -424,8 +424,8 @@ export class PipeAudioResource extends BaseAudioResource {
     public get duration() {
         if (!this.played) return 0;
 
-        const time = (this.played + this._seek) * OPUS_FRAME_SIZE;
-        return Math.abs(time / 1e3);
+        const time = this.played * OPUS_FRAME_SIZE;
+        return (time / 1e3) + this.options.seek;
     };
 
     /**
@@ -434,7 +434,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @public
      */
     public set seek(seek: number) {
-        let steps = ((seek * 1e3) / OPUS_FRAME_SIZE) + 1;
+        let steps = ((seek * 1e3) / OPUS_FRAME_SIZE);
 
         // Если диапазон слишком мал или большой
         if (steps >= 0 || steps > this.packets) return;
@@ -453,7 +453,6 @@ export class PipeAudioResource extends BaseAudioResource {
      */
     public constructor(config: AudioResourceOptions) {
         super(config);
-        const {path, options} = config;
 
         // Расшифровщик
         this.input<PipeEncoder>({
@@ -482,22 +481,7 @@ export class PipeAudioResource extends BaseAudioResource {
         // Процесс (FFmpeg)
         this.input<Process>({
             // Создание потока
-            input: new Process([
-                // Пропуск времени
-                "-ss", `${options.seek ?? 0}`,
-
-                // Файл или ссылка на ресурс
-                "-i", path,
-
-                // Подключаем фильтры
-                "-af", options.filters,
-
-                // Указываем формат аудио (ogg/opus)
-                "-acodec", "libopus",
-                "-frame_duration", "20",
-                "-f", "opus",
-                "pipe:"
-            ]),
+            input: new Process(this.arguments),
 
             // Управление событиями
             events: {
@@ -538,10 +522,8 @@ export class PipeAudioResource extends BaseAudioResource {
  */
 interface AudioResourceOptions {
     path: string;
-    options: {
-        seek?: number;
-        filters?: string;
-    }
+    seek?: number;
+    filters?: string;
 }
 
 /**

@@ -40,7 +40,7 @@ class ButtonLyrics extends Component<"button"> {
                                 url: track.url,
                                 icon_url: track.artist.image.url
                             },
-                            description: `\`\`\`css\n${item !== undefined ? item : locale._(ctx.locale, "player.button.lyrics.fail")}\n\`\`\``,
+                            description: `\`\`\`css\n${item !== undefined ? item : locale._(ctx.locale, "player.button.lyrics.fail", [track.lyricsProvider])}\n\`\`\``,
                             timestamp: new Date() as any
                         }
                     ]
@@ -63,7 +63,7 @@ class ButtonLyrics extends Component<"button"> {
                                 url: track.url,
                                 icon_url: track.artist.image.url
                             },
-                            description: `\`\`\`css\n${locale._(ctx.locale, "player.button.lyrics.fail")}\n\`\`\``,
+                            description: `\`\`\`css\n${locale._(ctx.locale, "player.button.lyrics.fail", [track.lyricsProvider])}\n\`\`\``,
                             timestamp: new Date() as any
                         }
                     ]

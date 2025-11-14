@@ -271,7 +271,6 @@ class RestYandexAPI extends RestServerSide.API {
      * @description Делаем запрос на {data.api}/methods
      * @param method - Метод запроса из api
      * @protected
-     * @static
      */
     protected API = (method: string): Promise<json> => {
         return new Promise<any | Error>((resolve) => {
@@ -301,7 +300,6 @@ class RestYandexAPI extends RestServerSide.API {
      * @param ID - ID трека
      * @support MP3, Lossless
      * @protected
-     * @static
      */
     protected getAudio = async (ID: string): Promise<Error | string> => {
         const trackId = ID.split("/")[1];
@@ -392,7 +390,6 @@ class RestYandexAPI extends RestServerSide.API {
      * @param image - Данные о картинке
      * @param size - Размер картинки
      * @protected
-     * @static
      */
     protected parseImage = ({image, size = 1e3}: { image: string, size?: number }): string => {
         if (!image) return null;
@@ -403,7 +400,6 @@ class RestYandexAPI extends RestServerSide.API {
      * @description Из полученных данных подготавливаем трек для Audio<Queue>
      * @param track - Данные трека
      * @protected
-     * @static
      */
     protected track = (track: any) => {
         const author = track["artists"]?.length ? track["artists"]?.pop() : track["artists"];

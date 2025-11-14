@@ -39,6 +39,12 @@ const MAX_SEGMENT_LENGTH = 255;
  * @private
  */
 class BaseEncoder extends TypedEmitter<EncoderEvents> {
+    /**
+     * @description Отправлен ли 1 аудио пакет
+     * @private
+     */
+    private _first = true;
+
     /** Временный буфер, для объединения буферов */
     public _buffer: Buffer = Buffer.allocUnsafe(0);
 
@@ -120,25 +126,25 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @private
      */
     private extractPackets = (segmentTable: Buffer, payload: Buffer) => {
-        let packetStartOffset = 0;         // Старт текущего пакета в payload
-        let currentPacketLength = 0;       // Длина текущего пакета
+        let currentPacket: Buffer[] = [], payloadOffset = 0;
 
-        for (let i = 0; i < segmentTable.length; i++) {
-            const segmentLength = segmentTable[i];
-            currentPacketLength += segmentLength;
+        for (const segmentLength of segmentTable) {
+            currentPacket.push(payload.subarray(payloadOffset, payloadOffset + segmentLength));
+            payloadOffset += segmentLength;
 
             // Если сегмент меньше 255 — пакет окончен
             if (segmentLength < MAX_SEGMENT_LENGTH) {
-                const packet = Buffer.allocUnsafe(currentPacketLength);
-                payload.copy(packet, 0, packetStartOffset, packetStartOffset + currentPacketLength);
-
-                // Обновляем старт следующего пакета
-                packetStartOffset += currentPacketLength;
-                currentPacketLength = 0;
+                const packet = Buffer.concat(currentPacket);
+                currentPacket = [];
 
                 // Обрабатываем пакет
                 if (isOpusHead(packet)) this.emit("head", packet);
                 else if (isOpusTags(packet)) this.emit("tags", packet);
+                // Если не отправлен 1 opus frame
+                else if (this._first) {
+                    this.emit("frame", SILENT_FRAME);
+                    this._first = false;
+                }
                 else this.emit("frame", packet);
             }
         }
@@ -149,6 +155,10 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @public
      */
     public destroy() {
+        // Отправляем пустой пакет последним
+        this.emit("frame", SILENT_FRAME);
+
+        this._first = null;
         this._buffer = null;
 
         // Освобождаем emitter

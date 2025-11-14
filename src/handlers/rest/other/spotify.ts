@@ -220,7 +220,6 @@ class RestSpotifyAPI extends RestServerSide.API {
      * @description Создаем запрос к SPOTIFY API и обновляем токен
      * @param method - Метод запроса из api
      * @protected
-     * @static
      */
     protected API = (method: string): Promise<json | Error> => {
         return new Promise(async (resolve) => {
@@ -270,7 +269,6 @@ class RestSpotifyAPI extends RestServerSide.API {
      * @param track - Трек из Spotify API
      * @param images - Сторонние картинки
      * @protected
-     * @static
      */
     protected track = (track: json, images?: any[]) => {
         const track_images = images?.length > 0 ? images : track?.album?.images || track?.images;
