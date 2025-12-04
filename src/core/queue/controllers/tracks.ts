@@ -9,33 +9,33 @@ import { Track } from "#core/queue";
 export class ControllerTracks<T extends Track> {
     /**
      * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
-     * @private
+     * @protected
      */
-    private _current: T[] = [];
+    protected _current: T[] = [];
 
     /**
      * @description Хранилище треков в оригинальном порядке, необходимо для правильной работы shuffle
-     * @private
+     * @protected
      */
-    private _original: T[] = [];
+    protected _original: T[] = [];
 
     /**
      * @description Текущая позиция в списке
-     * @private
+     * @protected
      */
-    private _position = 0;
+    protected _position = 0;
 
     /**
      * @description Тип повтора
-     * @private
+     * @protected
      */
-    private _repeat = RepeatType.None;
+    protected _repeat = RepeatType.None;
 
     /**
      * @description Смешивание треков
-     * @private
+     * @protected
      */
-    private _shuffle = false;
+    protected _shuffle = false;
 
     /**
      * @description Новая позиция трека в списке
@@ -203,13 +203,12 @@ export class ControllerTracks<T extends Track> {
      * @returns T[]
      * @public
      */
-    public array = (size: number, position?: number): T[] => {
-        const realPosition = position ?? this._position;
-        const startIndex = size < 0 ? realPosition + size : realPosition;
-        const endIndex = size < 0 ? realPosition : realPosition + size;
+    public array = (size: number, position: number): T[] => {
+        const startIndex = size < 0 ? position + size : position;
+        const endIndex = size < 0 ? position : position + size;
 
         // Отдает список треков с учетом позиции
-        return this._current.slice(startIndex, endIndex);
+        return this._current.slice(Math.max(0, startIndex), endIndex);
     };
 
     /**
@@ -239,13 +238,7 @@ export class ControllerTracks<T extends Track> {
         }
 
         // Восстанавливаем оригинальную очередь
-        else {
-            // Меняем треки в текущей очереди на оригинальные
-            this._current = this._original;
-
-            // Удаляем оригинальные треки, поскольку они теперь и основной ветке
-            this._original = [];
-        }
+        else [this._current, this._original] = [this._original, []];
 
         // Меняем переменную
         this._shuffle = bol;

@@ -15,12 +15,12 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.33",
-    "discord.js": "14.24.2",
+    "discord-api-types": "^0.38.36",
+    "discord.js": "14.25.1",
     "ws": "^8.18.3"
   },
   "optionalDependencies": {
-    "@snazzah/davey": "^0.1.7"
+    "@snazzah/davey": "^0.1.8"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
@@ -30,6 +30,8 @@
   "scripts": {
     "start": "cd build && node -r tsconfig-paths/register src --ShardManager --optimize_for_size --expose-gc",
     "start-bun": "bun src",
-    "build": "tsc"
+    "build": "tsc",
+
+    "dev:start": "npm run build && cd build && node -r tsconfig-paths/register src --optimize_for_size --expose-gc"
   }
 }

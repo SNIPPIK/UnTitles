@@ -1,32 +1,38 @@
 {
   "compilerOptions": {
-    "module": "CommonJS",
-    "target": "ESNext",
-    "moduleResolution": "node",
+    /* --- Основные настройки сборки --- */
+    "target": "ES2022",                /* Собираем в современный JS (Node 18+ поддерживает ES2022 полностью) */
+    "module": "NodeNext",              /* Важно для поддержки imports (#core/...) и Top-level await */
+    "moduleResolution": "NodeNext",    /* Современный алгоритм разрешения модулей Node.js */
+    "lib": ["ESNext"],                 /* Включаем новейшие фичи языка */
 
-    "rootDir": "./",
     "baseUrl": "./",
     "outDir": "./build",
 
-    "removeComments": true,
-    "alwaysStrict": true,
     "sourceMap": false,
-    "resolveJsonModule": true,
-    "forceConsistentCasingInFileNames": true,
 
+    /* --- Строгость (Type Checking) --- */
     "strict": true,
-    "esModuleInterop": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "preserveConstEnums": true,
-    "noImplicitAny": false,
+    "alwaysStrict": true,
     "strictNullChecks": false,
     "strictFunctionTypes": true,
+
     "noImplicitThis": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
+    "noImplicitAny": false,
+
+    /* --- Совместимость и производительность --- */
+    "esModuleInterop": true,
     "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "removeComments": true,
+
+    /* --- Декораторы --- */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
 
     "paths": {
       "#core/*": ["./src/core/*"],
@@ -39,7 +45,7 @@
       "#structures": ["./src/structures/index"],
 
       "#app": ["./src/index"],
-      "#app/db": ["./src/database"],
+      "#app/db": ["./src/database/index"],
       "#app/env": ["./src/environment"]
     }
   },

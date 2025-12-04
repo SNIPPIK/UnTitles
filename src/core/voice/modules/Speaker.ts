@@ -90,6 +90,8 @@ export class VoiceSpeakerManager {
      * @param speaking
      */
     public set speaking(speaking: SpeakerType) {
+        this._heartbeat.ack();
+
         // Если нельзя по состоянию или уже бот говорит
         if (this._type === speaking || !this.voice.websocket) return;
 
@@ -106,8 +108,6 @@ export class VoiceSpeakerManager {
             },
             seq: this.voice.websocket?.sequence ?? -1
         };
-
-        this._heartbeat.ack();
     };
 
     /**

@@ -89,11 +89,15 @@ export class VoiceConnection {
      * @public
      */
     public set packet(frame: Buffer) {
-        if (this._status === VoiceConnectionStatus.ready && frame) {
-            this.speaker.speaking = this.speaker.default;
+        if (!frame || frame.length === 0) return;
 
+        // Если статус позволяет отправлять аудио
+        else if (this._status === VoiceConnectionStatus.ready) {
             // Если есть клиенты для шифрования и отправки
             if (this.udp && this.sRTP) {
+                // Меняем состояние спикера
+                this.speaker.speaking = this.speaker.default;
+
                 // Если есть клиент E2EE
                 if (this.e2EE || this.e2EE?.session?.ready) {
                     const audio = this.e2EE?.encrypt(frame);
@@ -170,7 +174,7 @@ export class VoiceConnection {
     /**
      * @description Данные из VOICE_STATE_UPDATE
      * @returns APIVoiceState
-     * @private
+     * @public
      */
     public get voiceState(): APIVoiceState {
         return this.adapter.packet.state;
@@ -179,7 +183,7 @@ export class VoiceConnection {
     /**
      * @description Данные из VOICE_SERVER_UPDATE
      * @returns GatewayVoiceServerUpdateDispatchData
-     * @private
+     * @public
      */
     public get serverState(): GatewayVoiceServerUpdateDispatchData {
         return this.adapter.packet.server;
@@ -660,7 +664,7 @@ export interface VoiceConnectionConfiguration {
      * @description Идентификатор гильдии
      * @private
      */
-    guild_id?: string;
+    guild_id?:    string;
 
     /**
      * @description Идентификатор канала

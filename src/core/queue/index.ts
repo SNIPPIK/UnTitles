@@ -9,10 +9,10 @@ import { Track } from "./structures/track";
 import { env } from "#app/env";
 import { db } from "#app/db";
 
-export * from "./structures/track";
-export * from "./structures/queue";
 export * from "./controllers/tracks";
 export * from "./controllers/voice";
+export * from "./structures/track";
+export * from "./structures/queue";
 
 /**
  * @author SNIPPIK
@@ -38,7 +38,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
     public options = {
         optimization: parseInt(env.get("duration.optimization")),
         volume: parseInt(env.get("audio.volume")),
-        swapFade: parseInt(env.get("audio.swap.fade")),
+        swapFade: parseInt(env.get("audio.swap.fade", "5")),
         fade: parseInt(env.get("audio.fade"))
     };
 

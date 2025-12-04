@@ -119,10 +119,10 @@ while (performance.now() - startBlock < 100) {}
 - It is not afraid of **event loop** and **drift**, it just takes them into account not as a problem, but as parameters!
 - The loop can work ahead from 0 to 2 ms to process objects in the loop!
 - Audio sending is built on it!
-- Cycle accuracy `±0.05 ms` with `Date.now` + `performance.now`
+- Cycle accuracy `±0.05 ms` with `process.hrtime` + `performance.now`
 
 #### ⚙️ Internal tools
-- [`SetArray`](src/structures/tools/SetArray.ts) - 2 in one Array and Set in one class
+- [`SetArray`](src/structures/array/index.set.ts) - 2 in one Array and Set in one class
 - [`Cycle`](src/structures/tools/Cycle.ts) - Manages the message update system and sending audio packets
 - [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - Custom event emitter based object
 - [`SimpleWorker`](src/structures/tools/SimpleWorker.ts) - Class for working with threads
@@ -146,6 +146,7 @@ while (performance.now() - startBlock < 100) {}
 | `/remove` | ✅            | value                           | Delete track       |
 |   `/seek` | ❌            | 00:00, int                      | Seeking time track |
 |   `/skip` | ✅            | (back, to, next)                | Skip tracks        |
+| `/repeat` | ✅            | type                            | Type repeat        |
 |  `/queue` | ✅            | {destroy, list}                 | Queue management   |
 | `/avatar` | ✅            | {user}                          | User avatar        |
 |  `/voice` | ✅            | (join, leave, tribune)          | Voice channel      |

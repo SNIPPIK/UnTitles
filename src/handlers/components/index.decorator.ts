@@ -1,4 +1,4 @@
-import type {SupportButtons, SupportSelector} from "#handler/components/index";
+import type { SupportButtons, SupportSelector } from "#handler/components/index";
 
 /**
  * @author SNIPPIK

@@ -1,87 +1,81 @@
 import type { AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import { CommandInteraction, Colors, SelectMenuInteract } from "#structures/discord";
+import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
 import { ChannelType, Events, InteractionType } from "discord.js";
-import { Assign, Logger, locale } from "#structures";
+import { Logger, locale } from "#structures";
 import { SubCommand } from "#handler/commands";
-import { Event } from "#handler/events";
 import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
  * @description Класс для взаимодействия бота с slash commands, buttons
  * @class InteractionCreate
- * @extends Assign
+ * @extends Event
  * @event Events.InteractionCreate
  * @public
  */
-class Interaction extends Assign<Event<Events.InteractionCreate>> {
-    /**
-     * @description Создание события
-     * @public
-     */
-    public constructor() {
-        super({
-            name: Events.InteractionCreate,
-            type: "client",
-            once: false,
-            execute: async (ctx) => {
-                // Если включен режим белого списка
-                if (db.whitelist.toggle) {
-                    // Если нет пользователя в списке просто его игнорируем
-                    if (db.whitelist.ids.length > 0 && !db.whitelist.ids.includes(ctx.user.id)) {
-                        if (!("reply" in ctx)) return;
+@EventOn()
+@DeclareEvent({
+    name: Events.InteractionCreate,
+    type: "client"
+})
+class Interaction extends Event<Events.InteractionCreate> {
+    run: SupportEventCallback<Events.InteractionCreate> = async (ctx) => {
+        // Если включен режим белого списка
+        if (db.whitelist.toggle) {
+            // Если нет пользователя в списке просто его игнорируем
+            if (db.whitelist.ids.length > 0 && !db.whitelist.ids.includes(ctx.user.id)) {
+                if (!("reply" in ctx)) return;
 
-                        return ctx.reply({
-                            flags: "Ephemeral",
-                            embeds: [
-                                {
-                                    description: locale._(ctx.locale, "interaction.whitelist", [ctx.member]),
-                                    color: Colors.Yellow
-                                }
-                            ]
-                        });
-                    }
-                }
-
-                // Если включен режим черного списка
-                else if (db.blacklist.toggle) {
-                    // Если нет пользователя в списке просто его игнорируем
-                    if (db.blacklist.ids.length > 0 && !db.blacklist.ids.includes(ctx.user.id)) {
-                        if (!("reply" in ctx)) return;
-
-                        return ctx.reply({
-                            flags: "Ephemeral",
-                            embeds: [
-                                {
-                                    description: locale._(ctx.locale, "interaction.blacklist", [ctx.member]),
-                                    color: Colors.Yellow
-                                }
-                            ]
-                        });
-                    }
-                }
-
-                // Если используется функция ответа от бота
-                if (ctx.type === InteractionType.ApplicationCommandAutocomplete) {
-                    Logger.log("DEBUG", `[${ctx.user.username}] run autocomplete ${ctx?.commandName}`);
-                    return this.SelectAutocomplete(ctx);
-                }
-
-                // Если пользователь использует команду
-                else if (ctx.type === InteractionType.ApplicationCommand) {
-                    Logger.log("DEBUG", `[${ctx.user.username}] run command ${ctx?.commandName}`);
-                    return this.SelectCommand(ctx as any);
-                }
-
-                // Действия выбора/кнопок
-                else if (ctx.type == InteractionType.MessageComponent) {
-                    Logger.log("DEBUG", `[${ctx.user.username}] run component ${ctx?.["customId"]}`);
-                    return this.SelectComponent(ctx);
-                }
-
-                return null;
+                return ctx.reply({
+                    flags: "Ephemeral",
+                    embeds: [
+                        {
+                            description: locale._(ctx.locale, "interaction.whitelist", [ctx.member]),
+                            color: Colors.Yellow
+                        }
+                    ]
+                });
             }
-        });
+        }
+
+        // Если включен режим черного списка
+        else if (db.blacklist.toggle) {
+            // Если нет пользователя в списке просто его игнорируем
+            if (db.blacklist.ids.length > 0 && !db.blacklist.ids.includes(ctx.user.id)) {
+                if (!("reply" in ctx)) return;
+
+                return ctx.reply({
+                    flags: "Ephemeral",
+                    embeds: [
+                        {
+                            description: locale._(ctx.locale, "interaction.blacklist", [ctx.member]),
+                            color: Colors.Yellow
+                        }
+                    ]
+                });
+            }
+        }
+
+        // Если используется функция ответа от бота
+        if (ctx.type === InteractionType.ApplicationCommandAutocomplete) {
+            Logger.log("DEBUG", `[${ctx.user.username}] run autocomplete ${ctx?.commandName}`);
+            return this.SelectAutocomplete(ctx);
+        }
+
+        // Если пользователь использует команду
+        else if (ctx.type === InteractionType.ApplicationCommand) {
+            Logger.log("DEBUG", `[${ctx.user.username}] run command ${ctx?.commandName}`);
+            return this.SelectCommand(ctx as any);
+        }
+
+        // Действия выбора/кнопок
+        else if (ctx.type == InteractionType.MessageComponent) {
+            Logger.log("DEBUG", `[${ctx.user.username}] run component ${ctx?.["customId"]}`);
+            return this.SelectComponent(ctx);
+        }
+
+        return null;
     };
 
     /**
@@ -96,7 +90,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         // Если нет команды
         // Если пользователь пытается использовать команду разработчика
         if (!command || (command.owner && !db.owner.ids.includes(ctx.member.user.id))) {
-            db.commands.remove(ctx.client as any, ctx.commandGuildId, ctx.commandId);
+            db.commands.remove(ctx.client, ctx.commandGuildId, ctx.commandId);
 
             return ctx.reply({
                 flags: "Ephemeral",
@@ -137,7 +131,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         const subcommand: SubCommand = command.options?.find((sub) => sub.name === ctx.options["_subcommand"] && "run" in sub) as any;
 
         // Ищем аргументы
-        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
+        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f.name === "type" ? f.value : f[f.name] ?? f.value) ?? [];
 
         // Запускаем команду
         return (subcommand ?? command).run({ ctx, args });
@@ -156,7 +150,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         if (!command) return null;
 
         // Ищем аргументы
-        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
+        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f.name === "type" ? f.value : f[f.name] ?? f.value) ?? [];
         if (args.length === 0 || args.some(a => a === "")) return null;
 
         const subName = ctx.options["_subcommand"];

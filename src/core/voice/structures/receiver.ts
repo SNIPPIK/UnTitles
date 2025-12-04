@@ -84,7 +84,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
 
             if (this.ssrc === ssrc) {
                 // Копируем последние 4 байта незаполненного одноразового значения в заполнение (12 - 4) или (24 - 4) байтов.
-                message.copy(voice["sRTP"]["_nonceBuffer"], 0, message.length - UNPADDED_NONCE_LENGTH);
+                message.copy(voice.sRTP["_nonceBuffer"], 0, message.length - UNPADDED_NONCE_LENGTH);
                 const audio = this.parsePacket(message);
 
                 this.emit("speaking", this._users, ssrc, audio);
@@ -116,7 +116,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
         );
          */
 
-        let packet = this.voice["sRTP"].packet(Buffer.concat([header, encrypted, this.voice["sRTP"]["_nonce"]]));
+        let packet = this.voice.sRTP.packet(Buffer.concat([header, encrypted, this.voice.sRTP["_nonce"]]));
 
         // Если нет аудио
         if (!packet) return null;
@@ -140,7 +140,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
  */
 interface VoiceReceiverEvents {
     /**
-     * @description Событие когда говорит аользователь
+     * @description Событие когда говорит пользователь
      * @param ids - IDs всех говорящих пользователей
      * @param ssrc - SSRC сессии
      * @param audio - Аудио пакет от пользователя

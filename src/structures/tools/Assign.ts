@@ -13,6 +13,6 @@ export abstract class Assign<T extends object> {
      * @protected
      */
     protected constructor(options: T) {
-        Object.assign(this as this & T, options);
+        Object.assign(this, options);
     };
 }

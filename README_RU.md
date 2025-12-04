@@ -85,7 +85,7 @@ setInterval(() => {
 - Полная реализация **SRTP**: `aead_aes256_gcm`, `xchacha20_poly1305` (через библиотеки)
 - Лучший аудио плеер по сравнению с **open source** решениями
 - Не требует никаких opus encoders/decoders, имеет свой opus encoder по методу парсинга!
-- Адаптивный `jitter buffer`, учитываем как сетевые задержки, так и задержку процесса!
+- Свой `jitter buffer`, очень схож с WebRTP по логике!
 - Требуется **FFmpeg**, он отвечает за аудио и фильтры!
 - Поддерживаются: Autoplay, Repeat, Shuffle, Replay и другие функции.
 - Работает даже при сильном **event loop lag**!
@@ -122,10 +122,10 @@ setInterval(() => {
 - Не боится **event loop** и **drift**, он просто учитывает их не как проблему, а как параметры!
 - Цикл может срабатывать на опережение от 0 до 2 ms для обработки объектов в цикле!
 - Аудио отправка построена именно на нем!
-- Точность цикла `±0.05 ms` при `Date.now` + `performance.now`
+- Точность цикла `±0.05 ms` при `process.hrtime` + `performance.now`
 
 #### ⚙️ Внутренние инструменты
-- [`SetArray`](src/structures/tools/SetArray.ts) - 2 в одном Array и Set в один класс
+- [`SetArray`](src/structures/array/index.set.ts) - 2 в одном Array и Set в один класс
 - [`Cycle`](src/structures/tools/Cycle.ts) - Управляет системой обновления сообщений и отправкой аудио пакетов
 - [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - Пользовательский объект на основе `object`
 - [`SimpleWorker`](src/structures/tools/SimpleWorker.ts) - Класс для работы с потоками
@@ -149,6 +149,7 @@ setInterval(() => {
 | `/remove` | ✅            | value                           | Удаление трека           |
 |   `/seek` | ❌            | 00:00, int                      | Перемотка времени трека  |
 |   `/skip` | ✅            | (back, to, next)                | Пропуск треков           |
+| `/repeat` | ✅            | type                            | Тип повтора              |
 |  `/queue` | ✅            | {destroy, list}                 | Управление очередью      |
 | `/avatar` | ✅            | {user}                          | Аватар пользователя      |
 |  `/voice` | ✅            | (join, leave, tribune)          | Голосовой канал          |

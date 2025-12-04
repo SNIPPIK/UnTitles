@@ -1,6 +1,6 @@
 import { DiscordClient, DJSVoice } from "#structures/discord";
 import { ControllerQueues, type Queue } from "#core/queue";
-import { CacheUtility } from "#core/player/utils/cache";
+import { MetaSaver, AudioSaver } from "./index.saver";
 import { env } from "#app/env";
 
 // Database modules
@@ -86,7 +86,8 @@ export class Database {
      * @readonly
      * @public
      */
-    public readonly cache: CacheUtility;
+    public readonly meta_saver: MetaSaver;
+    public readonly audio_saver: AudioSaver;
 
     /**
      * @description Для управления белым списком пользователей
@@ -121,6 +122,8 @@ export class Database {
      * @public
      */
     public constructor(client?: DiscordClient) {
+        const isCaching = env.get("cache") as boolean;
+
         if (client) {
             this.api = new RestObject();
             this.queues = new ControllerQueues();
@@ -159,7 +162,13 @@ export class Database {
             };
         }
 
-        this.cache = new CacheUtility();
+        if (isCaching) {
+            // Нужен для работы Rest/API
+            this.meta_saver = new MetaSaver();
+
+            // Работает в Main
+            this.audio_saver = new AudioSaver();
+        }
     };
 }
 
@@ -174,6 +183,7 @@ export var db: Database;
 /**
  * @author SNIPPIK
  * @description Инициализирует базу данных
+ * @function initDatabase
  * @returns void
  * @public
  */

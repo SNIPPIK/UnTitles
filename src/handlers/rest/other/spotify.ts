@@ -5,6 +5,18 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
+ * @description Взаимодействие с платформой Spotify, динамический плагин
+ * # Types
+ * - Track - Любое трек с платформы
+ * - Playlist - Любой открытый плейлист
+ * - Artist - Популярные треки автора с учетом лимита
+ * - Search - Поиск треков, пока не доступны плейлисты, альбомы, авторы
+ * @Specification Rest Spotify API
+ * @Audio Не доступно нативное получение
+ */
+
+/**
+ * @author SNIPPIK
  * @description Динамически загружаемый класс
  * @class RestSpotifyAPI
  * @public
@@ -47,26 +59,27 @@ class RestSpotifyAPI extends RestServerSide.API {
         /**
          * @description Запрос данных о треке
          * @type "track"
+         * @private
          */
         {
             name: "track",
             filter: /track\/[0-9z]+/i,
             execute: async (url, options) => {
-                const ID = /track\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("track\/")?.pop();
+                const ID = this.getID(/track\/[a-zA-Z0-9]+/, url)?.split("track\/")?.pop();
 
                 //Если ID трека не удалось извлечь из ссылки
                 if (!ID) return locale.err("api.request.id.track");
 
                 // Интеграция с утилитой кеширования
-                const cache = db.cache.get(`${this.url}/${ID}`);
+                const cache = db.meta_saver?.get(`${this.url}/${ID}`);
 
                 // Если трек есть в кеше
                 if (cache) {
                     if (!options.audio) return cache;
 
                     // Если включена утилита кеширования аудио
-                    else if (db.cache.audio) {
-                        const check = db.cache.audio.status(`${this.url}/${ID}`);
+                    else if (db.audio_saver) {
+                        const check = db.audio_saver.status(`${this.url}/${ID}`);
 
                         // Если есть кеш аудио
                         if (check.status === "ended") {
@@ -87,8 +100,8 @@ class RestSpotifyAPI extends RestServerSide.API {
                     // Если указано получение аудио
                     if (options.audio) {
                         // Если включена утилита кеширования
-                        if (db.cache.audio) {
-                            const check = db.cache.audio.status(`${this.url}/${ID}`);
+                        if (db.audio_saver) {
+                            const check = db.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -100,7 +113,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                     setImmediate(() => {
                         // Сохраняем кеш в системе
-                        if (!cache) db.cache.set(track, this.url);
+                        if (!cache) db.meta_saver.set(track, this.url);
                     });
 
                     return track;
@@ -113,12 +126,13 @@ class RestSpotifyAPI extends RestServerSide.API {
         /**
          * @description Запрос данных об альбоме
          * @type "album"
+         * @private
          */
         {
             name: "album",
             filter: /album\/[0-9z]+/i,
             execute: async (url, {limit}) => {
-                const ID = /album\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("album\/")?.pop();
+                const ID = this.getID(/album\/[a-zA-Z0-9]+/, url)?.split("album\/")?.pop();
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.album");
@@ -130,9 +144,16 @@ class RestSpotifyAPI extends RestServerSide.API {
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
 
+                    // Подготавливаем все треки
                     const tracks = api.tracks.items.map((track: any) => this.track(track, api.images));
-
-                    return { url, title: api.name, image: api.images[0], items: tracks, artist: api?.["artists"][0] };
+                    return {
+                        id: ID,
+                        url: `https://open.spotify/album/${ID}`,
+                        title: api.name,
+                        image: api.images[0],
+                        items: tracks,
+                        artist: api?.["artists"][0]
+                    };
                 } catch (e) {
                     return new Error(`[APIs]: ${e}`);
                 }
@@ -142,12 +163,13 @@ class RestSpotifyAPI extends RestServerSide.API {
         /**
          * @description Запрос данных об плейлисте
          * @type "playlist"
+         * @private
          */
         {
             name: "playlist",
             filter: /playlist\/[0-9z]+/i,
             execute: async (url, {limit}) => {
-                const ID = /playlist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("playlist\/")?.pop();
+                const ID = this.getID(/playlist\/[a-zA-Z0-9]+/, url)?.split("playlist\/")?.pop();
 
                 // Если ID плейлиста не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.playlist");
@@ -160,7 +182,12 @@ class RestSpotifyAPI extends RestServerSide.API {
                     if (api instanceof Error) return api;
                     const tracks = api.tracks.items.map(({ track }) => this.track(track));
 
-                    return { url, title: api.name, image: api.images[0], items: tracks };
+                    return {
+                        url: `https://open.spotify/playlist/${ID}`,
+                        title: api.name,
+                        image: api.images[0],
+                        items: tracks
+                    };
                 } catch (e) {
                     return new Error(`[APIs]: ${e}`);
                 }
@@ -170,12 +197,13 @@ class RestSpotifyAPI extends RestServerSide.API {
         /**
          * @description Запрос данных треков артиста
          * @type "author"
+         * @private
          */
         {
             name: "artist",
             filter: /artist\/[0-9z]+/i,
             execute: async (url, {limit}) => {
-                const ID = /artist\/[a-zA-Z0-9]+/.exec(url)?.pop()?.split("artist\/")?.pop();
+                const ID = this.getID(/artist\/[a-zA-Z0-9]+/, url)?.split("artist\/")?.pop();
 
                 // Если ID автора не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.author");
@@ -197,6 +225,7 @@ class RestSpotifyAPI extends RestServerSide.API {
         /**
          * @description Запрос данных по поиску
          * @type "search"
+         * @private
          */
         {
             name: "search",
@@ -223,27 +252,8 @@ class RestSpotifyAPI extends RestServerSide.API {
      */
     protected API = (method: string): Promise<json | Error> => {
         return new Promise(async (resolve) => {
-            const getToken = async () => {
-                const token = await new httpsClient({
-                    url: `${this.options.account}/token`,
-                    headers: {
-                        "Authorization": `Basic ${Buffer.from(`${this.auth}`).toString('base64')}`,
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    },
-                    body: "grant_type=client_credentials",
-                    method: "POST"
-                }).toJson;
-
-                // Если при получении токена была получена ошибка
-                if (token instanceof Error) return resolve(token);
-
-                // Вносим данные авторизации
-                this.options.time = Date.now() + token["expires_in"];
-                this.options.token = token["access_token"];
-            }
-
             // Нужно обновить токен
-            if (!this.options.token || this.options.time <= Date.now()) await getToken();
+            if (!this.options.token || this.options.time <= Date.now()) await this.authorization();
 
             new httpsClient({
                 url: `${this.options.api}/${method}`,
@@ -265,6 +275,33 @@ class RestSpotifyAPI extends RestServerSide.API {
     };
 
     /**
+     * @description Авторизация на spotify
+     * @protected
+     */
+    protected async authorization(): Promise<Error> {
+        const token = await new httpsClient({
+            url: `${this.options.account}/token`,
+            headers: {
+                "Authorization": `Basic ${Buffer.from(`${this.auth}`).toString("base64")}`,
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: "grant_type=client_credentials",
+            method: "POST"
+        }).toJson;
+
+        // Если при получении токена была получена ошибка
+        if (token instanceof Error) {
+            return this.authorization();
+        }
+
+        // Вносим данные авторизации
+        this.options.time = Date.now() + token["expires_in"];
+        this.options.token = token["access_token"];
+
+        return super.authorization();
+    };
+
+    /**
      * @description Собираем трек в готовый образ
      * @param track - Трек из Spotify API
      * @param images - Сторонние картинки
@@ -281,7 +318,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                 title: track["artists"][0].name,
                 url: track["artists"][0]["external_urls"]["spotify"]
             },
-            time: { total: (track["duration_ms"] / 1000).toFixed(0) as any },
+            time: { total: (track["duration_ms"] / 1000).toFixed(0) },
             image: track_images.sort((item1: any, item2: any) => item1.width > item2.width)[0].url,
             audio: null
         };

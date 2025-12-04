@@ -212,6 +212,9 @@ export class Track {
                 }
             }
 
+            // Если не удалось получить аудио ссылку
+            if (!this.link) return resolve(new Error("AudioError\n - Do not getting audio link!"));
+
             // Отдаем ссылку или путь до файла
             return resolve(this.link);
         });
@@ -286,8 +289,8 @@ export class Track {
  */
 async function _prepareResource(track: Track): Promise<string | Error> {
     // Если включено кеширование
-    if (db.cache.audio) {
-        const status = db.cache.audio.status(track);
+    if (db.audio_saver) {
+        const status = db.audio_saver.status(track);
 
         // Если есть кеш аудио, то выдаем его
         if (status.status === "ended") {
@@ -310,7 +313,7 @@ async function _prepareResource(track: Track): Promise<string | Error> {
                 if (error) return error;
 
                 // Добавляем трек в кеширование
-                if (db.cache.audio) db.cache.audio.add(track);
+                if (db.audio_saver) db.audio_saver.add(track);
                 return link;
             } catch (err) { // Если произошла ошибка при проверке статуса
                 return Error(`Unknown error, ${err}`);
@@ -350,7 +353,7 @@ interface TrackDuration {
      * @readonly
      * @private
      */
-    split: string;
+    split?: string;
 
     /**
      * @description Время в секундах
@@ -426,6 +429,12 @@ export namespace Track {
      * @interface list
      */
     export interface list {
+        /**
+         * @description Уникальный id листа
+         * @readonly
+         */
+        readonly id: string;
+
         /**
          * @description Ссылка на плейлист
          * @readonly

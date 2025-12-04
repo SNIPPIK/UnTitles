@@ -46,6 +46,11 @@ export type APIRequestsRaw = {
  * @private
  */
 namespace TrackRaw {
+    /**
+     * @description Сырые данные объекта трека
+     * @interface Data
+     * @public
+     */
     export interface Data {
         readonly id: string;
         title: string;
@@ -56,6 +61,11 @@ namespace TrackRaw {
         audio?: string;
     }
 
+    /**
+     * @description Сырые данные объекта списка
+     * @interface List
+     * @public
+     */
     export interface List {
         readonly url: string;
         readonly title: string;
@@ -143,6 +153,7 @@ export class RestObject {
         // Если большое кол-во запросов
         else if (this.lastID >= 2 ** 16) this.generateUniqueId(true);
 
+        // Добавляем +1 к ID
         this.lastID += 1;
         return this.lastID;
     };
@@ -154,6 +165,7 @@ export class RestObject {
      */
     public startWorker = async (): Promise<boolean> => {
         return new Promise(resolve => {
+            // Создаем поток через менеджер потоков
             const worker = this.worker = SimpleWorker.create<RestServerSide.Data>({
                 file: __dirname + "/index.worker",
                 options: {
@@ -198,7 +210,7 @@ export class RestObject {
      * @private
      */
     private platform = (name: RestServerSide.API["name"] | string): RestServerSide.API => {
-        return this.platforms.supported[name] ?? this.array.find((api) => api.name === name || api.filter.exec(name) || api.name === "YOUTUBE");
+        return this.platforms.supported[name] ?? this.array.find((api) => api.name === name || api.filter.exec(name));
     };
 
     /**
@@ -316,11 +328,13 @@ export class RestObject {
                 return song.link;
             }
 
+            // Ищем похожий трек на другой платформе
             const song = await this.fetch(track, this.arrayAudio);
 
             // Если получена ошибка
             if (song instanceof Error) return song;
 
+            track["_duration"] = song.time;
             return song.link;
         } catch (err) {
             Logger.log("ERROR", `[APIs/fetch] ${err}`);
@@ -384,7 +398,7 @@ export class RestObject {
      * @protected
      */
     protected request_worker<T extends keyof APIRequests>({platform, payload, options, type}: RestClientSide.ClientOptions): Promise<APIRequests[T] | Error> {
-        return new Promise((resolve) => {
+        return new Promise<APIRequests[T] | Error>((resolve) => {
             const requestId = this.generateUniqueId(); // Генерируем номер запроса
 
             // Слушаем сообщение или же ответ
@@ -397,35 +411,46 @@ export class RestObject {
                 // Отписываемся после получения
                 this.worker.off("message", onMessage);
 
-                // Если получена ошибка
-                if (result instanceof Error) {
-                    // Если платформа не отвечает, то отключаем ее!
-                    if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
-                        this.platforms.block.push(platform.name);
+                /**
+                 * @description Слушаем статус ответа другого потока
+                 * @private
+                 */
+                switch (status) {
+                    // Если получен успешный ответ
+                    case "success": {
+                        const parseTrack = (item: TrackRaw.Data) => new Track(item, platform);
+
+                        // Если пришел список треков
+                        if (Array.isArray(result)) {
+                            return resolve(result.map(parseTrack) as APIRequests[T]);
+                        }
+
+                        // Если пришел плейлист
+                        else if (typeof result === "object" && "items" in result) {
+                            return resolve({ ...result, items: result.items.map(parseTrack) } as any);
+                        }
+
+                        // Если просто трек
+                        return resolve(parseTrack(result) as APIRequests[T]);
                     }
 
-                    return resolve(result);
+                    // Если была получена ошибка
+                    case "error": {
+                        // Если платформа не отвечает, то отключаем ее!
+                        if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
+                            this.platforms.block.push(platform.name);
+                        }
+
+                        Logger.log("ERROR", result);
+                        return resolve(result);
+                    }
+
+                    // Если получен неожиданный ответ
+                    default: {
+                        Logger.log("WARN", `An unknown response was received from another thread!`);
+                        return resolve(new Error(`Unknown response!!!`))
+                    }
                 }
-
-                // Если получен успешный ответ
-                else if (status === "success") {
-                    const parseTrack = (item: TrackRaw.Data) => new Track(item, platform);
-
-                    // Если пришел список треков
-                    if (Array.isArray(result)) {
-                        return resolve(result.map(parseTrack) as APIRequests[T]);
-                    }
-
-                    // Если пришел плейлист
-                    else if (typeof result === "object" && "items" in result) {
-                        return resolve({ ...result, items: result.items.map(parseTrack) } as any);
-                    }
-
-                    // Если просто трек
-                    return resolve(parseTrack(result) as APIRequests[T]);
-                }
-
-                return resolve(null);
             };
 
             // Слушаем worker

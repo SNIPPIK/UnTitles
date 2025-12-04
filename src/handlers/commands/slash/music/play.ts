@@ -190,7 +190,7 @@ class PlaySearchCommand extends SubCommand {
 })
 class PlayRelatedCommand extends SubCommand {
     async run({ctx, args}: CommandContext) {
-        const platform = db.api.request(args[0] as any);
+        const platform = db.api.request(args[0]);
         await ctx.deferReply();
 
         // Если платформа заблокирована

@@ -1,7 +1,8 @@
-import { BufferedEncoder, OPUS_FRAME_SIZE, PipeEncoder, SILENT_FRAME } from "./opus";
+import { BufferedEncoder, OPUS_FRAME_SIZE, PipeEncoder } from "./opus";
 import { Logger } from "#structures/logger";
 import { TypedEmitter } from "#structures";
 import { Process } from "./process";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -45,8 +46,7 @@ class AudioBuffer {
      * @public
      */
     public set position(position) {
-        if (position > this.size || position < 0) return;
-        this._position = position;
+        this._position = Math.max(0, Math.min(position, this.size));
     };
 
     /**
@@ -71,9 +71,10 @@ class AudioBuffer {
      * @public
      */
     public clear = () => {
-        for (const chunk of this._chunks) chunk.fill(0);
+        this._chunks = [];
         this._chunks.length = 0;
-        (this as any)._chunks = undefined;
+        this._chunks = null;
+        this._position = null;
         this._position = null;
     };
 }
@@ -90,7 +91,13 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @description Можно ли читать поток
      * @protected
      */
-    protected _readable = false;
+    protected _readable: boolean;
+
+    /**
+     * @description Последнее заданное значение затухания
+     * @protected
+     */
+    protected _afade = 0;
 
     /**
      * @description Если чтение возможно
@@ -123,25 +130,112 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @description Создание аргументов для FFmpeg
      * @private
      */
-    protected get arguments() {
-        const {seek, filters, path} = this.options;
+    protected get arguments(): string[] {
+        const { seek, inputs, old_seek } = this.options;
+        const args = [];
+
+        // Подготавливаем несколько потоков
+        inputs.forEach((url, index) => {
+            // Добавляем пропуск по времени
+            args.push("-accurate_seek");
+
+            // Только для первого потока
+            if (index === 0 && inputs.length > 1) {
+                // Добавляем пропуск по времени
+                args.push("-ss", `${old_seek ? old_seek : seek}`);
+
+                // Увеличиваем разбег для плавности
+                args.push("-t", this._afade);
+            }
+
+            // Если другой поток
+            else {
+                // Добавляем пропуск по времени
+                args.push("-ss", `${seek}`);
+            }
+
+            // Добавляем ссылку
+            args.push("-i", url);
+        });
 
         return [
-            // Пропуск времени
-            "-ss", `${seek ?? 0}`,
-            "-accurate_seek",
+            // Добавляем -nostdin, чтобы предотвратить блокировку FFmpeg
+            "-nostdin",
 
-            // Файл или ссылка на ресурс
-            "-i", path,
-
-            // Подключаем фильтры
-            "-af", filters,
+            ...args,
+            ...this.filters,
 
             // Указываем формат аудио (ogg/opus)
             "-acodec", "libopus",
             "-frame_duration", "20",
+            "-application", "lowdelay",
             "-f", "opus",
-            "pipe:"
+            "pipe:1"
+        ];
+    };
+
+    /**
+     * @description Собираем фильтры для ffmpeg
+     * @protected
+     */
+    protected get filters(): string[] {
+        const { inputs, volume, filters, old_filters, crossfade } = this.options;
+        const afade = [];
+        const args_filters = [
+            `volume=${volume / 150}`
+        ];
+
+        // Если есть используемые фильтры
+        if (filters) args_filters.unshift(filters);
+
+        switch (inputs.length) {
+            // Если поток 1
+            case 1: {
+                // Если можно использовать приглушение
+                if (crossfade.duration) {
+                    afade.push(
+                        `[0:a]afade=t=in:st=0:d=${this._afade}[a1]`,
+                        `[a1]afade=t=out:st=${crossfade.duration - this._afade}:d=${this._afade}[a2]`,
+                        `[a2]${args_filters.join(",")}[final_audio]`,
+                    );
+                }
+
+                // Если можно использовать приглушение, но только в начале
+                else {
+                    afade.push(
+                        `[0:a]afade=t=in:st=0:d=${this._afade}[a1]`,
+                        `[a1]${args_filters.join(",")}[final_audio]`,
+                    );
+                }
+                break;
+            }
+
+            // Если потоков несколько
+            case 2: {
+                // Если есть фильтры прошлого аудио потока
+                if (old_filters) {
+                    afade.push(
+                        `[0:a]afade=t=in:st=0:d=${this._afade}[a0f]`,
+                        `[a0f]${old_filters}[a0]`,
+                        `[1:a]${args_filters.join(",")}[a1]`,
+                        `[a0][a1]acrossfade=d=${this._afade}:curve1=tri:curve2=tri[final_audio]`
+                    );
+                }
+
+                // Если нет фильтров от прошлого аудио потока
+                else afade.push(
+                    `[0:a]afade=t=in:st=0:d=${this._afade}[a0]`,
+                    `[1:a]${args_filters.join(",")}[a1]`,
+                    `[a0][a1]acrossfade=d=${this._afade}:curve1=tri:curve2=tri[final_audio]`
+                );
+                break;
+            }
+        }
+
+        // Отдаем готовые фильтры
+        return [
+            "-filter_complex", afade.join(";"),
+            "-map", "[final_audio]"
         ];
     };
 
@@ -152,6 +246,10 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     protected constructor(public options: AudioResourceOptions) {
         super();
+
+        // Проверяем что-бы ссылка была ссылкой, а не пустышкой
+        this.options.inputs = this.options.inputs.filter(i => i);
+        this._afade =  this.options.inputs.length === 1 ? db.queues.options.fade : db.queues.options.swapFade;
     };
 
     /**
@@ -165,8 +263,8 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
             const path = options.events.path ? options.input[options.events.path] : options.input;
 
             // Запускаем прослушивание события
-            path["once"](event, (err: any) => {
-                if (event === "error") this.emit("error", new Error(`AudioResource get ${err}`));
+            path["once"](event, (err: Error) => {
+                if (event === "error") this.emit("error", Error(`AudioResource get ${err}`));
                 options.events.destroy_callback(options.input);
             });
         }
@@ -242,7 +340,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get packet(): Buffer {
-        if (!this._buffer) return SILENT_FRAME;
+        if (!this._buffer) return null;
         return this._buffer.packet;
     };
 
@@ -332,7 +430,7 @@ export class BufferedAudioResource extends BaseAudioResource {
             },
 
             // Начало кодирования
-            decode: (input: Process) => {
+            decode: (input) => {
                 input.stdout.pipe(decoder);
             },
         });
@@ -425,7 +523,7 @@ export class PipeAudioResource extends BaseAudioResource {
         if (!this.played) return 0;
 
         const time = this.played * OPUS_FRAME_SIZE;
-        return (time / 1e3) + this.options.seek;
+        return time / 1e3 + this.options.seek;
     };
 
     /**
@@ -521,9 +619,22 @@ export class PipeAudioResource extends BaseAudioResource {
  * @interface AudioResourceOptions
  */
 interface AudioResourceOptions {
-    path: string;
+    inputs: string[];
+    volume: number;
+
     seek?: number;
-    filters?: string;
+    old_seek?: number;
+
+    filters: string;
+    old_filters?: string;
+
+    /**
+     * @description Параметры для fade режима
+     * @public
+     */
+    crossfade?: {
+        duration: number
+    };
 }
 
 /**
@@ -584,7 +695,7 @@ interface AudioResourceInput<T> {
          * @description Если надо конкретно откуда-то отслеживать события
          * @readonly
          */
-        path?: string
+        path?: string;
     };
 
     /**

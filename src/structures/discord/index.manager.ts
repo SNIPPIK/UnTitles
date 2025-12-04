@@ -25,7 +25,7 @@ export class ShardManager extends ShardingManager {
         });
 
         // Слушаем событие для создания осколка
-        this.on("shardCreate", async (shard) => {
+        this.on("shardCreate", (shard) => {
             shard.setMaxListeners(3);
             shard.on("spawn", () => Logger.log("LOG", `[Manager/${shard.id}] shard ${Logger.color(36, `added to manager`)}`));
             shard.on("ready", () => Logger.log("LOG", `[Manager/${shard.id}] shard is ${Logger.color(36, `ready`)}`));

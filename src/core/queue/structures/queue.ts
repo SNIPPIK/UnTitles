@@ -1,11 +1,83 @@
-import { ControllerTracks, ControllerVoice } from "#core/queue";
+import { ControllerTracks, ControllerVoice, Track } from "#core/queue";
 import { QueueMessage, QueueButtons } from "../modules/message";
 import { CommandInteraction } from "#structures/discord";
 import { VoiceConnection } from "#core/voice";
 import { AudioPlayer } from "#core/player";
 import { Logger } from "#structures";
-import type { Track } from "./track";
 import { db } from "#app/db";
+
+/**
+ * @author SNIPPIK
+ * @description Класс для управления и хранения плеера
+ * @class ControllerPlayer
+ * @private
+ */
+class ControllerPlayer<T extends AudioPlayer> {
+    /**
+     * @description Текущий экземпляр плеера
+     * @protected
+     */
+    protected _player: T;
+
+    /**
+     * @description Хранилище треков, с умной системой управления
+     * @public
+     */
+    public tracks = new ControllerTracks<Track>();
+
+    /**
+     * @description Голосовое подключение
+     * @public
+     */
+    public voice = new ControllerVoice<VoiceConnection>();
+
+    /**
+     * @description Выдаем плеер привязанный к очереди
+     * @return AudioPlayer
+     * @public
+     */
+    public get player() {
+        // Если плеер уже не доступен
+        if (!this._player) return null;
+        return this._player;
+    };
+
+    /**
+     * @description Создаем класс для управления плеером и составными для проигрывания
+     * @constructor
+     * @public
+     */
+    public constructor({guild_id, channel_id}: initPlayerOptions) {
+        const oldPlayer = this._player;
+
+        // Если есть старый плеер
+        if (oldPlayer) oldPlayer.destroy();
+
+        // Задаем новый плеер
+        this._player = new AudioPlayer(this.tracks, this.voice, guild_id) as T;
+
+        // Подключаемся к голосовому каналу
+        this.voice.connection = db.voice.join({
+            guild_id, channel_id,
+            self_deaf: true,
+            self_mute: false
+        }, db.adapter.voiceAdapterCreator(guild_id));
+    }
+
+    /**
+     * @description Удаляем данные плеера и подмодулей
+     * @public
+     */
+    public destroy() {
+        // Удаляем плеер
+        this._player.destroy();
+        this.tracks.clear();
+
+        this.tracks = null;
+        this.voice = null;
+        this._player = null;
+    };
+}
 
 /**
  * @author SNIPPIK
@@ -13,12 +85,12 @@ import { db } from "#app/db";
  * @class Queue
  * @public
  */
-export class Queue {
+export class Queue extends ControllerPlayer<AudioPlayer> {
     /**
      * @description Время создания очереди
-     * @private
+     * @public
      */
-    private _timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
+    public timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
 
     /**
      * @description Сообщение пользователя
@@ -33,46 +105,12 @@ export class Queue {
     protected _buttons: QueueButtons;
 
     /**
-     * @description Плеер для проигрывания музыки
-     * @protected
-     */
-    protected _player: AudioPlayer;
-
-    /**
-     * @description Хранилище треков, с умной системой управления
-     * @protected
-     */
-    protected _tracks: ControllerTracks<Track> = new ControllerTracks();
-
-    /**
-     * @description Голосовое подключение
-     * @protected
-     */
-    protected _voice: ControllerVoice<VoiceConnection> = new ControllerVoice();
-
-    /**
-     * @description Время создания очереди
-     * @public
-     */
-    public get timestamp() {
-        return this._timestamp;
-    };
-
-    /**
-     * @description Получаем доступ к трекам
-     * @public
-     */
-    public get tracks() {
-        return this._tracks;
-    };
-
-    /**
      * @description Записываем сообщение в базу для дальнейшего использования
      * @param message - Сохраняемое сообщение
      * @public
      */
     public set message(message) {
-        this._cleanupOldMessage();
+        this._message?.delete?.();
         this._message = message;
     };
 
@@ -99,39 +137,6 @@ export class Queue {
     };
 
     /**
-     * @description Выдаем плеер привязанный к очереди
-     * @return AudioPlayer
-     * @public
-     */
-    public set player(player) {
-        const oldPlayer = this._player;
-
-        // Задаем новый плеер
-        this._player = player;
-
-        // Если есть старый плеер
-        if (oldPlayer) oldPlayer.destroy();
-    };
-
-    /**
-     * @description Выдаем голосовой канал
-     * @return VoiceChannel
-     * @public
-     */
-    public get voice() {
-        return this._voice;
-    };
-
-    /**
-     * @description Записываем голосовой канал в базу для дальнейшего использования
-     * @param voice - Сохраняемый голосовой канал
-     * @public
-     */
-    public set voice(voice) {
-        this._voice = voice;
-    };
-
-    /**
      * @description Создаем очередь для дальнейшей работы, все подключение находятся здесь
      * @param message - Опции для создания очереди
      * @constructor
@@ -141,44 +146,22 @@ export class Queue {
         const queue_message = new QueueMessage(message);
         const ID = queue_message.guild_id;
 
+        // Задаем плеер
+        super({
+            guild_id: ID,
+            channel_id: queue_message.voice_id
+        });
+
         // Добавляем очередь в список очередей
         db.queues.set(ID, this);
 
-        // Создаем плеер
-        this.player = new AudioPlayer(this._tracks, this._voice, ID);
-
         // Добавляем данные в класс
         this.message = queue_message;
-
-        // Подключаемся к голосовому каналу
-        this._player.voice.connection = db.voice.join({
-            self_deaf: true,
-            self_mute: false,
-            guild_id: ID,
-            channel_id: queue_message.voice_id
-        }, db.adapter.voiceAdapterCreator(ID));
 
         // Создаем класс для отображения кнопок
         this._buttons = new QueueButtons(queue_message);
 
         Logger.log("LOG", `[Queue/${ID}] has create`);
-    };
-
-    /**
-     * @description Удаление динамического сообщения из системы
-     * @returns void
-     * @private
-     */
-    private _cleanupOldMessage = () => {
-        // Если введено новое сообщение
-        if (this._message && this._message.guild) {
-            // Удаляем старое сообщение, если оно есть
-            const message = db.queues.cycles.messages.find((msg) => {
-                return msg.guildId === this._message.guild_id;
-            });
-
-            if (message) db.queues.cycles.messages.delete(message);
-        }
     };
 
     /**
@@ -190,7 +173,7 @@ export class Queue {
         // Если класс кнопок (компонентов был уничтожен)
         if (!this._buttons) return null;
 
-        const player = this._player, tracks = this._tracks;
+        const player = this._player, tracks = this.tracks;
         const buttons = this._buttons?.component(player);
 
         try {
@@ -252,7 +235,7 @@ export class Queue {
         this._player.cleanup();
 
         // Для удаления динамического сообщения
-        this._cleanupOldMessage();
+        this._message.delete();
     };
 
     /**
@@ -261,21 +244,16 @@ export class Queue {
      * @returns void
      * @protected
      */
-    protected destroy = () => {
+    public destroy = () => {
         Logger.log("LOG", `[Queue/${this.message.guild_id}] has destroyed`);
 
-        // Удаляем плеер
-        this._player.destroy();
-        this._tracks.clear();
-
-        this._tracks = null;
         this._message = null;
-        this._timestamp = null;
-        this._voice = null;
-        this._player = null;
+        this.timestamp = null;
 
         this._buttons.destroy();
         this._buttons = null;
+
+        super.destroy();
     };
 }
 
@@ -288,4 +266,15 @@ export class Queue {
 function getVolumeIndicator(volume: number): string {
     const clamped = Math.max(0, Math.min(volume, 200));
     return `${clamped}%`.padStart(4, " ");
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные для запуска плеера
+ * @interface initPlayerOptions
+ * @private
+ */
+interface initPlayerOptions {
+    guild_id: string;
+    channel_id: string;
 }

@@ -3,6 +3,22 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
+ * @description Время ожидания потока live трека
+ * @const TIMEOUT_STREAM_PIPE
+ * @private
+ */
+const TIMEOUT_STREAM_PIPE = 13000;
+
+/**
+ * @author SNIPPIK
+ * @description Время ожидания потока трека
+ * @const TIMEOUT_STREAM_BUFFERED
+ * @private
+ */
+const TIMEOUT_STREAM_BUFFERED = 8000;
+
+/**
+ * @author SNIPPIK
  * @description Класс для управления включенным потоком, хранит в себе все данные потока
  * @class PlayerAudio
  * @public
@@ -15,19 +31,19 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
      * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
      * @private
      */
-    private _audio: T | null = null;
+    private _audio: T | null;
 
     /**
      * @description Поток, находящийся в ожидании загрузки и проигрывания
      * @private
      */
-    private _pre_audio: T | null = null;
+    private _pre_audio: T | null;
 
     /**
      * @description Таймер чтения аудио потока, для авто удаления
      * @private
      */
-    private _timeout: NodeJS.Timeout | null = null;
+    private _timeout: NodeJS.Timeout | null;
 
     /**
      * @description Громкость аудио, по умолчанию берется параметр из db/env
@@ -80,19 +96,16 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
         if (this._pre_audio) {
             clearTimeout(this._timeout);
             this._pre_audio.destroy();
-            this._pre_audio = null;
         }
 
         // Записываем аудио в пред-загруженные
         this._pre_audio = stream;
 
-        // Если аудио поток не ответил в течении указанного времени
+        // Установка таймера ожидания
+        const waitTime = stream.options.crossfade.duration !== 0 ? TIMEOUT_STREAM_BUFFERED : TIMEOUT_STREAM_PIPE;
         this._timeout = setTimeout(() => {
-            // Отправляем данные событию для отображения ошибки
-            stream.emit("error", new Error("Timeout: the stream has been exceeded!"));
-        },
-            // Если играет трек, а не live!
-            stream.options.filters ? 8e3 : 13e3);
+            stream.emit("error", Error("Timeout: the stream has been exceeded!"));
+        }, waitTime);
 
         // Отслеживаем аудио поток на ошибки
         (stream as BufferedAudioResource).once("error", () => {
@@ -110,7 +123,11 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
             clearTimeout(this._timeout);
 
             // Если есть активный поток
-            if (this._audio) this._audio.destroy();
+            if (this._audio) {
+                // Догоняем ожидание аудио потока
+                //stream.seek = this._audio.duration + 1;
+                this._audio.destroy();
+            }
 
             // Перезаписываем текущий поток
             this._audio = stream;

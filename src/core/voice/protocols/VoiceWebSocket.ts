@@ -12,7 +12,7 @@ import os from "node:os";
  * @const user_agent
  * @private
  */
-const user_agent = `WTK Voice System (${os.arch()}; ${os.version()}) ${version}/${name}`;
+const user_agent = `Node.js (${os.arch()}; ${os.version()}) ${version}/${name}`;
 
 /**
  * @author SNIPPIK
@@ -93,7 +93,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 // Если ws упал
                 if (`${err}`.match(/Cannot read properties of null/)) {
                     // Пробуем подключится заново
-                    this.connect(this._endpoint, 4001);
+                    this.connect(this._endpoint, 4000);
                     return;
                 }
 
@@ -123,17 +123,8 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Если не получен HEARTBEAT_ACK вовремя
             onTimeout: () => {
-                if (this._heartbeat.missed === 3) {
-                    this._heartbeat.stop();
-
-                    // Если текущий статус не является подключенным
-                    if (this._status !== "connected") {
-                        this.emit("close", 1001, "HEARTBEAT_ACK timeout");
-                        this.emit("warn", "HEARTBEAT_ACK timeout x3, reconnecting...");
-                    }
-                } else {
-                    this.emit("warn", "HEARTBEAT_ACK not received in time");
-                }
+                this.emit("close", 4000, "HEARTBEAT_ACK timeout");
+                this.emit("warn", "HEARTBEAT_ACK timeout, reconnecting...");
             },
 
             // Получен HEARTBEAT_ACK
@@ -294,7 +285,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Получение heartbeat_interval
             case VoiceOpcodes.Hello: {
-                this._heartbeat.start(d["heartbeat_interval"]);
+                this._heartbeat.start(d.heartbeat_interval);
                 break;
             }
 
@@ -373,7 +364,13 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         if (this.ws) {
             this.ws.removeAllListeners();
             this.ws.close();
-            this.ws.terminate();
+
+            // 100 мс достаточно для вежливого закрытия
+            setTimeout(() => {
+                if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
+                    this.ws.terminate();
+                }
+            }, 100);
         }
 
         this.ws = null;

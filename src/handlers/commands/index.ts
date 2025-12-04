@@ -1,4 +1,7 @@
-import { ApplicationCommandOption, ApplicationCommandOptionType, ApplicationCommandType, PermissionsString, Routes } from "discord.js";
+import {
+    ApplicationCommandOption, ApplicationCommandOptionType, ApplicationCommandType,
+    Client, PermissionsString, Routes
+} from "discord.js";
 import type {AutocompleteCommandOption, Choice, ChoiceOption} from "./index.decorator";
 import type { LocalizationMap, Permissions } from "discord-api-types/v10";
 import { CommandInteraction, DiscordClient } from "#structures/discord";
@@ -103,7 +106,7 @@ export class Commands extends handler<Command> {
      * @param guildID - ID сервера
      * @param CommandID - ID Команды
      */
-    public remove = (client: DiscordClient, guildID: string, CommandID: string) => {
+    public remove = (client: DiscordClient | Client, guildID: string, CommandID: string) => {
         // Удаление приватной команды
         if (guildID) client.rest.delete(Routes.applicationGuildCommand(client.user.id, guildID, CommandID))
             .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed in guild ${guildID}`))

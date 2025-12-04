@@ -8,7 +8,7 @@ import { env } from "#app/env";
  * @author SNIPPIK
  * @description Коллекция для взаимодействия с APIs
  * @class RestServer
- * @extends handler
+ * @extends handler<RestServerSide.API>
  * @private
  */
 class RestServer extends handler<RestServerSide.API> {
@@ -29,6 +29,7 @@ class RestServer extends handler<RestServerSide.API> {
      * Лимиты на количество обрабатываемых элементов для различных типов запросов.
      * Значения читаются из переменных окружения.
      * @type {Record<string, number>}
+     * @readonly
      * @public
      */
     public readonly limits: Record<string, number> = ((): Record<string, number> => {
@@ -94,7 +95,7 @@ class RestServer extends handler<RestServerSide.API> {
             this.platforms.supported = {
                 ...this.platforms.supported,
                 [file.name]: file
-            }
+            };
         }
     };
 }
@@ -126,14 +127,18 @@ if (parentPort && workerData.rest) {
 
     // Если возникнет непредвиденная ошибка
     process.on("unhandledRejection", (err) => {
-        parentPort?.postMessage({ status: "fatal", result: String(err) });
+        parentPort?.postMessage({ status: "error", result: err });
     });
 }
 
-function stripFunctions<T extends object>(obj: T): Partial<T> {
-    return Object.fromEntries(
-        Object.entries(obj).filter(([_, v]) => typeof v !== "function")
-    ) as Partial<T>;
+/**
+ * @author SNIPPIK
+ * @description Удаление функций для SharedMemory
+ * @param obj - Данные запроса из Rest API
+ * @private
+ */
+function stripFunctions<T extends object>(obj: T) {
+    return Object.fromEntries(Object.entries(obj).filter(([_, v]) => typeof v !== "function")) as RestServerSide.Serializable<T>;
 }
 
 /**
@@ -158,6 +163,20 @@ async function fetchFromPlatform(api: RestServerSide.ServerOptions) {
         // Если не найдена функция вызова
         if (!callback) return parentPort.postMessage({requestId, status: "error", result: Error(`Callback not found for platform: ${platform}`)});
 
+        const result = await callback.execute(payload, {
+            audio: options?.audio !== undefined ? options.audio : true,
+            limit: rest.limits[callback.name]
+        });
+
+        // Если была получена ошибка
+        if (result instanceof Error) {
+            return parentPort.postMessage({ requestId,
+                status: "error",
+                result
+            });
+        }
+
+        // Если запрос успешен
         return parentPort.postMessage({ requestId,
             type: callback.name,
             status: "success",
@@ -188,6 +207,7 @@ async function fetchPlatforms() {
         requests: (api.requests ?? []).map(stripFunctions)
     }));
 
+    // Отдаем данные в другой поток
     parentPort?.postMessage({
         supported: fakeReq,
         authorization: fakeReq.filter(api => api.auth !== null).map(api => api.name),

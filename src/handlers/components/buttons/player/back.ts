@@ -21,6 +21,24 @@ class ButtonBack extends Component<"button"> {
         const repeat = queue.tracks.repeat;
         const position = queue.tracks.position;
 
+        // Если трек уже какое-то время играет
+        if (queue.player.audio.current.duration >= db.queues.options.optimization) {
+            // Запускаем проигрывание текущего трека
+            queue.player.play(0, 0, queue.player.tracks.position).catch(console.error);
+
+            // Сообщаем о том что музыка начата с начала
+            return ctx.reply({
+                flags: "Ephemeral",
+                embeds: [
+                    {
+                        description: locale._(ctx.locale, "player.button.replay", [queue.tracks.track.name]),
+                        color: Colors.Green
+                    }
+                ]
+            });
+        }
+
+
         // Делаем повтор временным
         if (repeat === RepeatType.None) queue.tracks.repeat = RepeatType.Songs;
 

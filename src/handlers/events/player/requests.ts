@@ -1,7 +1,7 @@
+import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
 import { Colors, type CommandInteraction } from "#structures/discord";
-import { Logger, Assign, locale } from "#structures";
 import type { RestClientSide} from "#handler/rest";
-import type { Event } from "#handler/events";
+import { Logger, locale } from "#structures";
 import type { Track } from "#core/queue";
 import { db } from "#app/db";
 
@@ -9,55 +9,53 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Выполнение запроса пользователя через внутреннее API
  * @class rest_request
- * @extends Assign
+ * @extends Event
  * @event rest/request
  * @public
  */
-class rest_request extends Assign<Event<"rest/request">> {
-    public constructor() {
-        super({
-            name: "rest/request",
-            type: "player",
-            once: false,
-            execute: async (platform, ctx, url) => {
-                // Получаем функцию запроса данных с платформы
-                const api = platform.request(url);
+@EventOn()
+@DeclareEvent({
+    name: "rest/request",
+    type: "player"
+})
+class rest_request extends Event<"rest/request"> {
+   run: SupportEventCallback<"rest/request"> = async (platform, ctx, url) => {
+       // Получаем функцию запроса данных с платформы
+       const api = platform.request(url);
 
-                // Проверка поддержки запроса
-                if (!api?.type) return db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.support"));
+       // Проверка поддержки запроса
+       if (!api?.type) return db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.support"));
 
-                // Предупреждение о запуске запроса
-                const message = await this._sendRequestMessage(ctx, platform, api.type);
+       // Предупреждение о запуске запроса
+       const message = await this._sendRequestMessage(ctx, platform, api.type);
 
-                let rest: Error | Track[] | Track.list | Track;
-                try {
-                    rest = await Promise.race(
-                        [
-                            // Делаем запрос к платформе
-                            api.request(),
+       let rest: Error | Track[] | Track.list | Track;
+       try {
+           rest = await Promise.race(
+               [
+                   // Делаем запрос к платформе
+                   api.request(),
 
-                            // Создаем обертку с таймером по достижению которого будет выдана ошибка вместо запроса
-                            new Promise<Error>((resolve) => {
-                                setTimeout(() => resolve(new Error(locale._(ctx.locale, "api.platform.timeout"))), 15e3)
-                            })
-                        ]
-                    );
+                   // Создаем обертку с таймером по достижению которого будет выдана ошибка вместо запроса
+                   new Promise<Error>((resolve) => {
+                       setTimeout(() => resolve(new Error(locale._(ctx.locale, "api.platform.timeout"))), 15e3)
+                   })
+               ]
+           );
 
-                    if (message) message();
-                } catch (err) {
-                    if (message) message();
-                    Logger.log("ERROR", err as Error);
-                    return db.events.emitter.emit("rest/error", ctx,`**${platform.platform}.${api.type}**\n**❯** **${err}**`);
-                }
+           if (message) message();
+       } catch (err) {
+           if (message) message();
+           Logger.log("ERROR", err as Error);
+           return db.events.emitter.emit("rest/error", ctx,`**${platform.platform}.${api.type}**\n**❯** **${err}**`);
+       }
 
-                // Обработка результата
-                if (rest instanceof Error) return db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.error", [rest]));
+       // Обработка результата
+       if (rest instanceof Error) return db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.error", [rest]));
 
-                // Добавление в очередь
-                return db.queues.create(ctx, rest);
-            }
-        });
-    };
+       // Добавление в очередь
+       return db.queues.create(ctx, rest);
+   }
 
     /**
      * @description Отправка сообщение о начале запроса
@@ -96,43 +94,41 @@ class rest_request extends Assign<Event<"rest/request">> {
  * @author SNIPPIK
  * @description Если при выполнении запроса пользователя произошла ошибка
  * @class rest_error
- * @extends Assign
+ * @extends Event
  * @event rest/error
  * @public
  */
-class rest_error extends Assign<Event<"rest/error">> {
-    public constructor() {
-        super({
-            name: "rest/error",
-            type: "player",
-            once: false,
-            execute: async (message, error) => {
-                Logger.log("ERROR", error);
+@EventOn()
+@DeclareEvent({
+    name: "rest/error",
+    type: "player"
+})
+class rest_error extends Event<"rest/error"> {
+    run: SupportEventCallback<"rest/error"> = async (message, error) => {
+        Logger.log("ERROR", error);
 
-                const options = {
-                    embeds: [{
-                        title: locale._(message.locale, "api.error"),
-                        description: `${error}`,
-                        color: Colors.DarkRed
-                    }]
-                };
+        const options = {
+            embeds: [{
+                title: locale._(message.locale, "api.error"),
+                description: `${error}`,
+                color: Colors.DarkRed
+            }]
+        };
 
-                try {
-                    let msg = await message.followUp(options);
-                    setTimeout(() => msg.delete().catch(() => null), 15e3);
-                } catch (err) {
-                    Logger.log("ERROR", err as Error);
+        try {
+            let msg = await message.followUp(options);
+            setTimeout(() => msg.delete().catch(() => null), 15e3);
+        } catch (err) {
+            Logger.log("ERROR", err as Error);
 
-                    try {
-                        let msg = await message.channel.send(options);
-                        setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 15e3);
-                    } catch (err) {
-                        Logger.log("ERROR", err as Error);
-                    }
-                }
+            try {
+                let msg = await message.channel.send(options);
+                setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 15e3);
+            } catch (err) {
+                Logger.log("ERROR", err as Error);
             }
-        });
-    };
+        }
+    }
 }
 
 /**

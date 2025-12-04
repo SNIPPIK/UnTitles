@@ -29,9 +29,19 @@ export namespace RestServerSide {
      * @public
      */
     export type ServerOptions = RestClientSide.ClientOptions & {
+        // Название платформы
         platform: RestAPIS_Names;
+
+        // Надо ли получить данные в ответ
         data?: boolean
-    }
+    };
+
+    /**
+     * @description Рекурсивно проходит по всему объекту, оставляя только сериализуемые
+     * @type Serializable
+     * @public
+     */
+    export type Serializable<T> = T extends Function ? never : T extends object ? { [K in keyof T]: Serializable<T[K]> } : T;
 
     /**
      * @description Передаваемые данные из worker в основной поток
@@ -39,15 +49,9 @@ export namespace RestServerSide {
      * @public
      */
     export type Result<T extends keyof APIRequests = keyof APIRequests> = {
+        // Номер уникального запроса
         requestId: number;
-        status: "success";
-        type: T;
-        result: APIRequestsRaw[T];
-    } | {
-        requestId: number;
-        status: "error";
-        result: Error;
-    }
+    } & (ResultSuccess<T> | ResultError);
 
     /**
      * @description Создаем класс для итоговой платформы для взаимодействия с APIs
@@ -131,12 +135,30 @@ export namespace RestServerSide {
         readonly options: any;
 
         /**
+         * @description Получение ID по ссылке
+         * @param regexp - Как искать ID
+         * @param query - Запрос
+         * @protected
+         */
+        protected getID(regexp: RegExp, query: string): string {
+            return (regexp).exec(query)[0];
+        };
+
+        /**
          * @description Функция запроса данных с сервера
          * @constructor
          * @protected
          */
         protected async API(...args: any): Promise<Error | json> {
             return new Error(`Not found method API | ${args}`);
+        };
+
+        /**
+         * @description Функция авторизации платформы
+         * @protected
+         */
+        protected async authorization(){
+            return null;
         };
 
         /**
@@ -205,3 +227,24 @@ export namespace RestServerSide {
         array?: RestServerSide.API[]
     }
 }
+
+/**
+ * @description Если запрос обработан без ошибок
+ * @type ResultSuccess
+ * @private
+ */
+type ResultSuccess<T extends keyof APIRequests = keyof APIRequests> = {
+    status: "success";
+    type: T;
+    result: APIRequestsRaw[T];
+};
+
+/**
+ * @description Если запрос обработан без ошибок
+ * @type ResultError
+ * @private
+ */
+type ResultError = {
+    status: "error";
+    result: Error;
+};

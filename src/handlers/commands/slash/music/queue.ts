@@ -36,19 +36,19 @@ import { db } from "#app/db";
             const { tracks } = db.queues.get(ctx.guildId);
             const { position } = tracks;
 
-            const center = position < 3 ? args[0] : position / 2;
+            const center = args[0] === "0" ? 1 : args[0] - 1;
             const before = tracks.array(-10, center);
             const after = tracks.array(10, center);
 
             return ctx.respond(
                 [...before, ...after].map((track, i) => {
-                    const index = center - before.length + i;
-                    const isCurrent = index === position;
-                    const Selected = (args[0] - 1) === index;
+                    const value = center - before.length + i;
+                    const isCurrent = value === position;
+                    const Selected = center === value;
 
                     return {
-                        name: `${position === 1 ? index : index + 1}. ${isCurrent && !Selected ? "🎵" : Selected && !isCurrent ? "➡️" : Selected && isCurrent ? "➡ 🎵️" : "🎶"} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
-                        value: position === 1 ? index - 1 : index,
+                        name: `${value + 1}. ${isCurrent && !Selected ? "▶️" : Selected && !isCurrent ? "➡️" : Selected && isCurrent ? "➡ 🎵️" : "🎶"} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
+                        value
                     };
                 })
             );

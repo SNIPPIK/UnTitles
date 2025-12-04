@@ -7,6 +7,7 @@ import { isIPv4 } from "node:net";
  * @author SNIPPIK
  * @description Создает udp подключение к Discord Gateway
  * @class VoiceUDPSocket
+ * @extends TypedEmitter
  * @public
  */
 export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
@@ -24,6 +25,9 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public set packet(packet: Buffer) {
+        // Если статус не позволяет отправить пакет
+        if (!this._status || this._status === "disconnected") return;
+
         // Отправляем аудио или буфер пакет
         this.socket.send(packet, 0, packet.length, this.options.port, this.options.ip, (err) => {
             if (err) this.emit("error", err);
@@ -58,9 +62,10 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
         // Проверяем через какое соединение подключатся
         const socket = this.socket = createSocket({
-            type: isIPv4(options.ip) ? "udp4" : "udp6",
+            type: isIPv4(options.ip) ? "udp4" : "udp6"
         });
 
+        socket.bind(0);
         socket.on("error", this.emit.bind(this, "error"));
         socket.on("message", this.emit.bind(this, "message"));
 
@@ -82,12 +87,20 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         packet.writeUInt16BE(70, 2);
         packet.writeUInt32BE(ssrc, 4);
 
-        this.packet = packet;
         this._status = VoiceUDPSocketStatuses.connecting;
+        this.packet = packet;
 
         return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                this.socket.removeAllListeners("message"); // Удаляем слушателя, чтобы не получить отложенный ответ
+                this.destroy();
+                resolve(Error("IP Discovery timed out after 5 seconds"));
+            }, 5000); // Таймаут 5 секунд
+
             // Ждем получения сообщения после отправки код, для подключения UDP
             this.socket.once("message", (packet) => {
+                clearTimeout(timeout);
+
                 if (packet.readUInt16BE(0) === 2) {
                     const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
                     const port = packet.readUInt16BE(packet.length - 2);
@@ -170,6 +183,7 @@ export interface UDPSocketEvents {
  * @author SNIPPIK
  * @description Состояния подключения
  * @enum VoiceUDPSocketStatuses
+ * @private
  */
 enum VoiceUDPSocketStatuses {
     connected = "connected",

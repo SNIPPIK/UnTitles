@@ -3,6 +3,17 @@ import { httpsClient, locale } from "#structures";
 
 /**
  * @author SNIPPIK
+ * @description Взаимодействие с платформой Deezer, динамический плагин
+ * # Types
+ * - Playlist - Любой открытый плейлист.
+ * - Artist - Популярные треки автора с учетом лимита
+ * - Search - Поиск треков, пока не доступны плейлисты, альбомы, авторы
+ * @Specification Rest Deezer API
+ * @Audio Не доступно нативное получение
+ */
+
+/**
+ * @author SNIPPIK
  * @description Динамически загружаемый класс
  * @class RestDeezerAPI
  * @public
@@ -31,7 +42,7 @@ class RestDeezerAPI extends RestServerSide.API {
             name: "album",
             filter: /(album)\/[0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = /[0-9]+/i.exec(url)?.at(0)?.split("album")?.at(0);
+                const ID = this.getID(/[0-9]+/i, url)?.split("album")?.at(0);
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.album");
@@ -47,6 +58,7 @@ class RestDeezerAPI extends RestServerSide.API {
                     const songs = tracks.map(this.track);
 
                     return {
+                        id: ID,
                         url,
                         title: api.title,
                         items: songs,
@@ -66,7 +78,7 @@ class RestDeezerAPI extends RestServerSide.API {
             name: "playlist",
             filter: /(playlist)\/[0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = /[0-9]+/i.exec(url).pop();
+                const ID = this.getID(/[0-9]+/i, url);
 
                 if (!ID) return locale.err("api.request.id.playlist");
 
@@ -105,7 +117,7 @@ class RestDeezerAPI extends RestServerSide.API {
             name: "artist",
             filter: /(artist)\/[0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = /(artist)\/[0-9]+/i.exec(url)?.at(0)?.split("artist")?.at(0);
+                const ID = this.getID(/(artist)\/[0-9]+/i, url)?.split("artist")?.at(0);
 
                 // Если ID автора не удалось извлечь из ссылки
                 if (!ID) return locale.err("api.request.id.author");

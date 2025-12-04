@@ -367,8 +367,8 @@
   },
 
   "api.platform.error": {
-    "en-US": "**Critical Error:** {ARGUMENT}",
-    "ru": "**Критическая ошибка:** {ARGUMENT}"
+    "en-US": "**Critical Error:**\n{ARGUMENT}",
+    "ru": "**Критическая ошибка:**\n{ARGUMENT}"
   },
 
 

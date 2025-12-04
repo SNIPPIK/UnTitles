@@ -1,5 +1,5 @@
+import { VoiceAdapters, DiscordGatewayAdapterLibraryMethods } from "#core/voice/adapter";
 import type { DiscordClient } from "#structures/discord/index.client";
-import { VoiceAdapters } from "#core/voice/adapter";
 
 /**
  * @author SNIPPIK
@@ -27,12 +27,12 @@ export class DJSVoice<T extends DiscordClient = DiscordClient> extends VoiceAdap
     public voiceAdapterCreator = (guildID: string) => {
         const id = this.client.shardID;
 
-        return methods => {
+        return (methods: DiscordGatewayAdapterLibraryMethods) => {
             this.adapters.set(guildID, methods);
 
             return {
-                sendPayload: (data) => {
-                    this.client.ws.shards.get(id).send(data);
+                sendPayload: (data: object) => {
+                    this.client.ws.shards.get(id)?.send(data);
                     return true;
                 },
                 destroy: () => {

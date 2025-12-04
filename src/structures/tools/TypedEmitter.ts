@@ -65,7 +65,7 @@ export class TypedEmitter<L extends Record<string, any>> {
      */
     public once<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
     public once<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
-    public once(event: string, listener: (...args: any[]) => any): this {
+    public once(event: string, listener: (...args: L[]) => any): this {
         const arr = this._set.get(event) ?? [];
         arr.push({ listener, type: "once" });
         this._set.set(event, arr);
@@ -80,7 +80,7 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @public
      */
     public emit<E extends keyof ListenerSignature<L>>(event: E, ...args: Parameters<ListenerSignature<L>[E]>): boolean;
-    public emit<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, ...args: any[]): boolean;
+    public emit<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, ...args: L[]): boolean;
     public emit(event: string, ...args: any[]): boolean {
         const arr = this._set?.get(event);
         if (!arr?.length) return false;
@@ -95,11 +95,11 @@ export class TypedEmitter<L extends Record<string, any>> {
                     setImmediate(() => { throw err; });
                 }).finally(() => {
                     // Если разовая функция
-                    if (run.type === "once") this.off(event, run.listener as any);
+                    if (run.type === "once") this.off(event, run.listener as ListenerSignature<L>[string]);
                 });
             } else {
                 // Если разовая функция
-                if (run.type === "once") this.off(event, run.listener as any);
+                if (run.type === "once") this.off(event, run.listener as ListenerSignature<L>[string]);
             }
         }
         return true;
@@ -114,7 +114,7 @@ export class TypedEmitter<L extends Record<string, any>> {
      */
     public off<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
     public off<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
-    public off(event: string, listener: (...args: any[]) => any): this {
+    public off(event: string, listener: DefaultListener): this {
         const arr = this._set?.get(event);
         if (!arr) return this;
         this._set.set(event, arr.filter(x => x.listener !== listener));

@@ -1,8 +1,7 @@
-import { PLAYER_BUFFERED_TIME } from "#core/player";
-import { Logger, PromiseCycle } from "#structures";
-import { isMainThread } from "node:worker_threads";
-import { Process } from "#core/audio";
-import { Track } from "#core/queue";
+import { PromiseCycle } from "#structures/tools/Cycle";
+import { Process } from "#core/audio/process";
+import { Logger } from "#structures/logger";
+import type { Track } from "#core/queue";
 import afs from "node:fs/promises";
 import { env } from "#app/env";
 import path from "node:path";
@@ -10,94 +9,50 @@ import fs from "node:fs";
 
 /**
  * @author SNIPPIK
- * @description Класс для кеширования аудио и данных о треках
- * @class CacheUtility
- * @readonly
+ * @description Утилита для скачивания метаданных треков
+ * @class MetaSaver
  * @public
  */
-export class CacheUtility {
+export class MetaSaver {
     /**
-     * @description Параметры утилиты кеширования
-     * @readonly
+     * @description Можно ли сохранять файлы
+     * @returns boolean
+     * @public
+     */
+    public inFile = env.get("cache.file") as boolean;
+
+    /**
+     * @description Путь до директории с кешированными данными
+     * @returns string
      * @private
      */
-    private readonly _options = {
-        /**
-         * @description Путь до директории с кешированными данными
-         * @private
-         */
-        dirname: path.resolve(env.get("cache.dir")),
-
-        /**
-         * @description Можно ли сохранять файлы
-         */
-        inFile: env.get("cache.file"),
-
-        /**
-         * @description Включена ли система кеширования
-         */
-        isOn: env.get("cache")
-    };
+    public _dirname = path.resolve(env.get("cache.dir"));
 
     /**
-     * @description База данных треков
-     * @readonly
+     * @description Бд треков, для повторного использования
      * @private
      */
-    private readonly data = {
-        /**
-         * @description Кешированные треки
-         */
-        tracks: !this.inFile ? new Map<string, Track.data>() : null as Map<string, Track.data>,
-
-        /**
-         * @description Класс кеширования аудио файлов
-         */
-        audio: this.inFile && isMainThread ? new CacheAudio(this._options.dirname) : null as CacheAudio
-    };
+    private tracks: Map<string, Track.data> = !this.inFile ? new Map<string, Track.data>() : null;
 
     /**
-     * @description Выдаем класс для кеширования аудио
-     * @returns CacheAudio
-     * @public
-     */
-    public get audio(): CacheAudio {
-        if (!this._options.inFile) return null;
-        return this.data.audio;
-    };
-
-    /**
-     * @description Путь до директории кеширования
-     * @returns string
-     * @public
-     */
-    public get dirname() { return this._options.dirname; };
-
-    /**
-     * @description Можно ли сохранять кеш в файл
-     * @returns string
-     * @public
-     */
-    public get inFile() { return this._options.inFile; };
-
-    /**
-     * @description Сохраняем данные в класс
+     * @description Сохраняем трек в локальную базу данных
      * @param track - Кешируемый трек
      * @param api - Ссылка на платформу
      * @returns Promise<void>
      * @public
      */
-    public set = async (track: Track.data, api: string) => {
-        if (this.inFile) {
-            const filePath = path.join(this.dirname, "Data", api, `${track.id}.json`);
+    public set = async (track: Track.data, api: string): Promise<void> => {
+        // Если нельзя сохранять в файлы
+        if (!this.inFile) {
+            const Path = path.join(this._dirname, "Data", api, `${track.id}.json`);
 
-            if (!fs.existsSync(filePath)) {
+            if (!fs.existsSync(Path)) {
                 try {
-                    const dirPath = path.dirname(filePath);
+                    const dirPath = path.dirname(Path);
                     await afs.mkdir(dirPath, { recursive: true });
 
                     // Записываем данные в файл
-                    await afs.writeFile(filePath, JSON.stringify(
+                    await afs.writeFile(Path, JSON.stringify(
                         {
                             track: {
                                 ...track,
@@ -109,13 +64,15 @@ export class CacheUtility {
                 }
             }
         } else {
-            const song = this.data.tracks.get(track.id);
+            const song = this.tracks.get(track.id);
 
             // Если уже сохранен трек
-            if (song) return;
+            if (song) return null;
 
-            this.data.tracks.set(track.id, track);
+            this.tracks.set(track.id, track);
         }
+
+        return null;
     };
 
     /**
@@ -125,12 +82,13 @@ export class CacheUtility {
      * @public
      */
     public get = (ID: string): Track.data => {
+        // Если нельзя сохранять в файлы
         if (this.inFile) {
             // Если есть трек в кеше
-            if (fs.existsSync(`${this.dirname}/Data/${ID}.json`)) {
+            if (fs.existsSync(`${this._dirname}/Data/${ID}.json`)) {
                 try {
                     // Если трек кеширован в файл
-                    const json = JSON.parse(fs.readFileSync(`${this.dirname}/Data/${ID}.json`, "utf8"));
+                    const json = JSON.parse(fs.readFileSync(`${this._dirname}/Data/${ID}.json`, "utf8"));
 
                     // Если трек был найден среди файлов
                     if (json) return json.track;
@@ -142,7 +100,7 @@ export class CacheUtility {
 
         // Если включен режим без кеширования в файл
         else {
-            const track = this.data.tracks.get(ID.split("/").at(-1));
+            const track = this.tracks.get(ID.split("/").at(-1));
 
             // Если трек кеширован в память, то выдаем данные
             if (track) return track;
@@ -154,19 +112,20 @@ export class CacheUtility {
 
 /**
  * @author SNIPPIK
- * @description Класс для сохранения аудио файлов
- * @support ogg/opus
- * @class CacheAudio
- * @extends PromiseCycle
- * @private
+ * @description Утилита для скачивания аудио данных
+ * @class AudioSaver
+ * @extends PromiseCycle<Track>
+ * @public
  */
-class CacheAudio extends PromiseCycle<Track> {
+export class AudioSaver extends PromiseCycle<Track> {
     /**
-     * @description Запускаем работу цикла
-     * @constructor
-     * @public
+     * @description Путь до директории с кешированными данными
+     * @returns string
+     * @private
      */
-    public constructor(private cache_dir: string) {
+    public _dirname = path.resolve(env.get("cache.dir"));
+
+    public constructor() {
         super({
             drift: true,
             custom: {
@@ -182,7 +141,7 @@ class CacheAudio extends PromiseCycle<Track> {
                 const names = this.status(item);
 
                 // Если такой трек уже есть в системе кеширования
-                if (names.status === "ended" || item.time.total > PLAYER_BUFFERED_TIME || item.time.total === 0) {
+                if (names.status === "ended" || item.time.total > 500 || item.time.total === 0) {
                     this.delete(item);
                     return false;
                 }
@@ -219,10 +178,10 @@ class CacheAudio extends PromiseCycle<Track> {
 
                     // Если запись была завершена
                     ffmpeg.stdout.once("end", () => {
-                       fs.stat(`${status.path}.opus`, (err, stats) => {
-                           // Если файл не проходит проверку
-                           if (err || stats.size < 10) fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
-                       });
+                        fs.stat(`${status.path}.opus`, (err, stats) => {
+                            // Если файл не проходит проверку
+                            if (err || stats.size < 10) fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
+                        });
 
                         ffmpeg.destroy();
                         this.delete(track);
@@ -231,7 +190,7 @@ class CacheAudio extends PromiseCycle<Track> {
                 });
             }
         });
-    };
+    }
 
     /**
      * @description Получаем статус скачивания и путь до файла
@@ -241,8 +200,8 @@ class CacheAudio extends PromiseCycle<Track> {
     public status = (track: Track | string): { status: "not-ended" | "ended" | "download", path: string } => {
         let file: string;
 
-        if (track instanceof Track) {
-            file = `${this.cache_dir}/Audio/${track.api.url}/${track.ID}`;
+        if (typeof track !== "string") {
+            file = `${this._dirname}/Audio/${track.api.url}/${track.ID}`;
 
             // Если трека нет в очереди, значит он есть
             if (!this.has(track)) {
@@ -253,7 +212,7 @@ class CacheAudio extends PromiseCycle<Track> {
             // Выдаем что ничего нет
             return { status: "not-ended", path: file };
         } else {
-            file = `${this.cache_dir}/Audio/${track}`;
+            file = `${this._dirname}/Audio/${track}`;
 
             // Если файл все таки есть
             if (fs.existsSync(`${file}.opus`)) return {status: "ended", path: `${file}.opus`};

@@ -1,26 +1,24 @@
-import { Assign, Logger } from "#structures";
-import { Event } from "#handler/events";
+import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
 import { Events } from "discord.js";
+import { Logger } from "#structures";
 
 /**
  * @author SNIPPIK
  * @description Класс события ClientReady
  * @class ClientReady
- * @extends Assign
+ * @extends Event
  * @event Events.ClientReady
  * @public
  */
-class ClientReady extends Assign<Event<Events.ClientReady>> {
-    public constructor() {
-        super({
-            name: Events.ClientReady,
-            type: "client",
-            once: false,
-            execute: (client) => {
-                const id = client.shard?.["ids"][0] ?? 0;
-                Logger.log("LOG", `[Core/${id}] on ${Logger.color(32, `${client.guilds.cache.size} guilds`)}`);
-            }
-        });
+@EventOn()
+@DeclareEvent({
+    name: Events.ClientReady,
+    type: "client"
+})
+class ClientReady extends Event<Events.ClientReady> {
+    run: SupportEventCallback<Events.ClientReady> = async (client) => {
+        const id = client.shard?.["ids"][0] ?? 0;
+        Logger.log("LOG", `[Core/${id}] on ${Logger.color(32, `${client.guilds.cache.size} guilds`)}`);
     };
 }
 

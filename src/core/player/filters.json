@@ -1,172 +1,19 @@
 [
-  {
-    "name": "stable",
-    "locale": {
-      "en-US": "Normalizes and stabilizes the volume for consistent loudness.",
-      "ru": "Нормализует и стабилизирует громкость для постоянного уровня звука."
-    },
-    "unsupported": [],
-    "filter": "dynaudnorm=p=0.9:s=5",
-    "args": false
-  },
-  {
-    "name": "nightcore",
-    "locale": {
-      "en-US": "Speeds up playback by 20% and raises pitch for a nightcore effect.",
-      "ru": "Ускоряет воспроизведение на 20% и повышает тональность для эффекта nightcore."
-    },
-    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl", "stable"],
-    "filter": "asetrate=48000*1.25,aresample=128000",
-    "args": false
-  },
-  {
-    "name": "vaporwave",
-    "locale": {
-      "en-US": "Slows down playback and lowers pitch, creating a vaporwave atmosphere.",
-      "ru": "Замедляет воспроизведение и понижает тональность, создавая атмосферу vaporwave."
-    },
-    "unsupported": ["nightcore", "demonic", "speed", "treble", "reverse", "vinyl", "stable"],
-    "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1",
-    "args": false
-  },
-  {
-    "name": "demonic",
-    "locale": {
-      "en-US": "Deep, distorted effect with echoes — makes a track sound demonic.",
-      "ru": "Глубокий и искажённый эффект с эхо — превращает трек в демонический."
-    },
-    "unsupported": ["stable", "nightcore", "vaporwave", "bass", "speed", "vinyl", "stable"],
-    "filter": "loudnorm=I=-16:TP=-1.5:LRA=11,asetrate=48000*1.20,aresample=128000,bass=g=5,aecho=0.8:0.9:1000:0.3",
-    "args": false
-  },
-  {
-    "name": "vinyl",
-    "locale": {
-      "en-US": "Adds vinyl record hiss, crackle, and a retro lo-fi effect.",
-      "ru": "Добавляет шипение, потрескивания и ретро lo-fi эффект винила."
-    },
-    "unsupported": ["nightcore", "demonic", "vaporwave", "stable"],
-    "filter": "acrusher=bits=8:mode=log:mix=0.7,highpass=f=200,lowpass=f=5000",
-    "args": false
-  },
-  {
-    "name": "speed",
-    "locale": {
-      "en-US": "Changes playback speed (1.0 = normal, up to 3x faster).",
-      "ru": "Изменяет скорость воспроизведения (1.0 = нормальная, до 3х быстрее)."
-    },
-    "unsupported": [],
-    "filter": "atempo=",
-    "args": [1, 3]
-  },
-  {
-    "name": "bass",
-    "locale": {
-      "en-US": "Boosts low frequencies for deeper and punchier bass.",
-      "ru": "Усиливает низкие частоты для более глубокого и мощного баса."
-    },
-    "unsupported": ["demonic"],
-    "filter": "bass=g=",
-    "args": [1, 30]
-  },
-  {
-    "name": "sub_boost",
-    "locale": {
-      "en-US": "Emphasizes sub-bass frequencies for a deeper rumble.",
-      "ru": "Подчёркивает саб-бас частоты для более глубокого звучания."
-    },
-    "unsupported": ["demonic"],
-    "filter": "asubboost",
-    "args": false
-  },
-  {
-    "name": "mono",
-    "locale": {
-      "en-US": "Mixes both stereo channels into a single mono output.",
-      "ru": "Объединяет оба стерео канала в один моно сигнал."
-    },
-    "unsupported": ["8d", "swap_stereo"],
-    "filter": "pan=mono|c0=.5*c0+.5*c1",
-    "args": false
-  },
-  {
-    "name": "swap_stereo",
-    "locale": {
-      "en-US": "Switch left channel to right and right channel to left.",
-      "ru": "Переключить левый канал на правый и правый канал на левый."
-    },
-    "unsupported": ["mono", "8d"],
-    "filter": "pan=stereo|c0=c1|c1=c0",
-    "args": false
-  },
-  {
-    "name": "treble",
-    "locale": {
-      "en-US": "Boosts high frequencies up to 20 kHz for brighter sound.",
-      "ru": "Усиливает высокие частоты до 20 kHz для более яркого звука."
-    },
-    "unsupported": [],
-    "filter": "treble=g=5",
-    "args": false
-  },
-  {
-    "name": "reverse",
-    "locale": {
-      "en-US": "Plays the audio track backwards.",
-      "ru": "Воспроизводит аудио трек в обратном направлении."
-    },
-    "unsupported": [],
-    "filter": "areverse",
-    "args": false
-  },
-  {
-    "name": "flanger",
-    "locale": {
-      "en-US": "Creates a sweeping, ‘flying’ sound with time-delayed signal mixing.",
-      "ru": "Создаёт переливающийся «летящий» звук через смешивание с задержкой."
-    },
-    "unsupported": [],
-    "filter": "flanger",
-    "args": false
-  },
-  {
-    "name": "haas",
-    "locale": {
-      "en-US": "Haas effect (precedence) widens stereo image using channel delay.",
-      "ru": "Эффект Хааса (предшествования) расширяет стерео за счёт задержки каналов."
-    },
-    "unsupported": ["mono"],
-    "filter": "haas",
-    "args": false
-  },
-  {
-    "name": "echo",
-    "locale": {
-      "en-US": "Adds multiple repeating echoes to the audio.",
-      "ru": "Добавляет многократные повторяющиеся эхо к звуку."
-    },
-    "unsupported": [],
-    "filter": "aecho=0.8:0.9:1000:0.3",
-    "args": false
-  },
-  {
-    "name": "8d",
-    "locale": {
-      "en-US": "Simulates 3D spatial audio by rotating sound around the listener.",
-      "ru": "Имитирует 3D-пространство, вращая звук вокруг слушателя."
-    },
-    "unsupported": ["mono", "swap_stereo"],
-    "filter": "apulsator=hz=0.09",
-    "args": false
-  },
-  {
-    "name": "phaser",
-    "locale": {
-      "en-US": "Applies a sweeping phase effect, creating a ‘shimmering’ sound.",
-      "ru": "Накладывает фазовый сдвиг, создавая «мерцающий» эффект звучания."
-    },
-    "unsupported": [],
-    "filter": "aphaser=in_gain=0.4",
-    "args": false
-  }
+  { "name": "normalize",   "locale": { "en-US": "Normalizes volume for consistent loudness.", "ru": "Нормализует громкость для равномерного звучания." }, "filter": "dynaudnorm=p=0.9:s=5", "args": false },
+  { "name": "nightcore",   "locale": { "en-US": "Increases speed by 20 % and raises pitch.", "ru": "Ускоряет воспроизведение на 20 % и повышает тональность." }, "unsupported": ["vaporwave","demonic","reverse","phaser","vinyl","normalize"], "filter": "asetrate=48000*1.25,aresample=128000", "args": false },
+  { "name": "vaporwave",   "locale": { "en-US": "Slows down playback and lowers pitch.", "ru": "Замедляет воспроизведение и понижает тональность." }, "unsupported": ["nightcore","demonic","speed","treble","reverse","vinyl","normalize"], "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1", "args": false },
+  { "name": "demonic",     "locale": { "en-US": "Deepens voice with distortion and echo.", "ru": "Понижает голос с добавлением искажения и эха." }, "unsupported": ["normalize","nightcore","vaporwave","bass","speed","vinyl"], "filter": "loudnorm=I=-16:TP=-1.5:LRA=11,asetrate=48000*1.20,aresample=128000,bass=g=5,aecho=0.8:0.9:1000:0.3", "args": false },
+  { "name": "vinyl",       "locale": { "en-US": "Adds vinyl record noise and slight distortion.", "ru": "Добавляет шум и потрескивания виниловой пластинки." }, "unsupported": ["nightcore","demonic","vaporwave","normalize"], "filter": "acrusher=bits=8:mode=log:mix=0.7,highpass=f=200,lowpass=f=5000", "args": false },
+  { "name": "speed",       "locale": { "en-US": "Adjusts playback speed (0.5× – 3×).", "ru": "Изменяет скорость воспроизведения (0.5× – 3×)." }, "filter": "atempo=", "args": [0.5, 3] },
+  { "name": "bass",        "locale": { "en-US": "Boosts low frequencies.", "ru": "Усиливает низкие частоты." }, "unsupported": ["demonic"], "filter": "bass=g=", "args": [1, 30] },
+  { "name": "subboost",    "locale": { "en-US": "Enhances sub-bass frequencies (30–60 Hz).", "ru": "Усиливает суб-бас (30–60 Гц)." }, "unsupported": ["demonic"], "filter": "asubboost", "args": false },
+  { "name": "mono",        "locale": { "en-US": "Converts stereo to mono.", "ru": "Преобразует стерео в моно." }, "unsupported": ["8d","stereo_swap"], "filter": "pan=mono|c0=.5*c0+.5*c1", "args": false },
+  { "name": "stereo_swap", "locale": { "en-US": "Swaps left and right channels.", "ru": "Меняет левый и правый каналы местами." }, "unsupported": ["mono","8d"], "filter": "pan=stereo|c0=c1|c1=c0", "args": false },
+  { "name": "treble",      "locale": { "en-US": "Boosts high frequencies.", "ru": "Усиливает высокие частоты." }, "filter": "treble=g=", "args": [-10, 15] },
+  { "name": "reverse",     "locale": { "en-US": "Plays audio in reverse.", "ru": "Воспроизводит аудио в обратном направлении." }, "filter": "areverse", "args": false },
+  { "name": "flanger",     "locale": { "en-US": "Applies flanger effect.", "ru": "Добавляет эффект фленджера." }, "filter": "flanger", "args": false },
+  { "name": "haas",        "locale": { "en-US": "Widens stereo image using Haas effect.", "ru": "Расширяет стереобазу эффектом Хааса." }, "unsupported": ["mono"], "filter": "haas", "args": false },
+  { "name": "echo",        "locale": { "en-US": "Adds repeating echo.", "ru": "Добавляет повторяющееся эхо." }, "filter": "aecho=0.8:0.9:1000:0.3", "args": false },
+  { "name": "8d",          "locale": { "en-US": "Creates rotating surround effect.", "ru": "Создаёт эффект вращающегося звука вокруг слушателя." }, "unsupported": ["mono","stereo_swap"], "filter": "apulsator=hz=0.09", "args": false },
+  { "name": "phaser",      "locale": { "en-US": "Applies phaser effect.", "ru": "Добавляет эффект фазера." }, "filter": "aphaser=in_gain=0.4", "args": false }
 ]

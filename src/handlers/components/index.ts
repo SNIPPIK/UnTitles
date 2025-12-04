@@ -43,7 +43,7 @@ export class Components extends handler<SupportComponent> {
  * @type SupportButtons
  * @public
  */
-export type SupportButtons = "resume_pause" | "shuffle" | "replay" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters";
+export type SupportButtons = "resume_pause" | "shuffle" | "repeat" | "lyrics" | "queue" | "skip" | "stop" | "back" | "filters";
 
 /**
  * @author SNIPPIK

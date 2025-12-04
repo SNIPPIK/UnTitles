@@ -74,7 +74,7 @@ export class Logger {
      * @private
      * @static
      */
-    private static _createFiles = env.get("cache.file");
+    private static _createFiles = this.debug ? env.get("cache.file") : null;
 
     /**
      * @description Отправляем лог в консоль

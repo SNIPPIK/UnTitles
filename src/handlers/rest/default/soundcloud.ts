@@ -3,6 +3,17 @@ import { httpsClient, locale } from "#structures";
 
 /**
  * @author SNIPPIK
+ * @description Взаимодействие с платформой SoundCloud, динамический плагин
+ * # Types
+ * - Track - Любой трек с платформы. Не получится получить платные видео или 18+
+ * - Playlist - Любой открытый плейлист.
+ * - Search - Поиск треков, пока не доступны плейлисты, альбомы, авторы
+ * @Specification Rest SC API
+ * @Audio Доступно нативное получение
+ */
+
+/**
+ * @author SNIPPIK
  * @description Динамически загружаемый класс
  * @class RestSoundCloudAPI
  * @extends Assign
@@ -39,6 +50,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
         /**
          * @description Запрос данных о треке
          * @type "track"
+         * @private
          */
         {
             name: "track",
@@ -80,6 +92,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
         /**
          * @description Запрос данных о треке
          * @type "playlist"
+         * @private
          */
         {
             name: "playlist",
@@ -184,7 +197,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
 
         try {
             const parsedPage = await new httpsClient({
-                url: "https://soundcloud.com/",
+                url: `https://${this.url}/`,
                 userAgent: true,
                 headers: {
                     "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",

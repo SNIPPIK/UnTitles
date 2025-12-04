@@ -1,8 +1,21 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
-import { httpsClient, locale, Logger } from "#structures";
+import { httpsClient, locale } from "#structures";
 import crypto from "node:crypto";
 import { env } from "#app/env";
 import { db } from "#app/db";
+
+/**
+ * @author SNIPPIK
+ * @description Взаимодействие с платформой Yandex, динамический плагин
+ * # Types
+ * - Track - Любое трек с платформы
+ * - Playlist - Любой открытый плейлист
+ * - Artist - Популярные треки автора с учетом лимита
+ * - Related - Похожее треки, работает через алгоритмы yandex
+ * - Search - Поиск треков, пока не доступны плейлисты, альбомы, авторы
+ * @Specification Rest Yandex API
+ * @Audio Доступно нативное получение
+ */
 
 /**
  * @author SNIPPIK
@@ -29,18 +42,7 @@ import { db } from "#app/db";
      * @description Ключи для расшифровки ссылок
      * @protected
      */
-    keys: ["kzqU4XhfCaY6B6JTHODeq5", "XGRlBW9FXlekgbPrRHuSiA"],
-
-    /**
-     * @description Доступные заголовки
-     */
-    agents: [
-        // Windows Desktop
-        "YandexMusicDesktopAppWindows/5.13.2",
-
-        // Phone Android
-        "YandexMusicAndroid/2025071"
-    ],
+    keys: ["p93jhgh689SBReK6ghtw62", "XGRlBW9FXlekgbPrRHuSiA"],
 })
 class RestYandexAPI extends RestServerSide.API {
     readonly requests: RestServerSide.API["requests"] = [
@@ -52,7 +54,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "related",
             filter: /(track\/[0-9]+)?(list=RD)/,
             execute: async (url) => {
-                const ID = /track\/[0-9]+/gi.exec(url)[0]?.split("track")?.at(1);
+                const ID = this.getID(/track\/[0-9]+/gi, url)?.split("track")?.at(1);
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.album");
@@ -81,21 +83,21 @@ class RestYandexAPI extends RestServerSide.API {
             name: "track",
             filter: /track\/[0-9]+/i,
             execute: async (url, options) => {
-                const ID = /track\/[0-9]+/gi.exec(url)[0]?.split("track")?.at(1);
+                const ID = this.getID(/track\/[0-9]+/gi, url)?.split("track")?.at(1);
 
                 // Если ID трека не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.track");
 
                 // Интеграция с утилитой кеширования
-                const cache = db.cache.get(`${this.url}/${ID}`);
+                const cache = db.meta_saver?.get(`${this.url}/${ID}`);
 
                 // Если трек есть в кеше
                 if (cache) {
                     if (!options.audio) return cache;
 
                     // Если включена утилита кеширования аудио
-                    else if (db.cache.audio) {
-                        const check = db.cache.audio.status(`${this.url}/${ID}`);
+                    else if (db.audio_saver) {
+                        const check = db.audio_saver.status(`${this.url}/${ID}`);
 
                         // Если есть кеш аудио
                         if (check.status === "ended") {
@@ -115,11 +117,11 @@ class RestYandexAPI extends RestServerSide.API {
 
                     const track = this.track(api[0]);
 
-                    // Если указано получение аудио
+                    /// Если указано получение аудио
                     if (options.audio) {
                         // Если включена утилита кеширования
-                        if (db.cache.audio) {
-                            const check = db.cache.audio.status(`${this.url}/${ID}`);
+                        if (db.audio_saver) {
+                            const check = db.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -137,7 +139,7 @@ class RestYandexAPI extends RestServerSide.API {
 
                     setImmediate(() => {
                         // Сохраняем кеш в системе
-                        if (!cache) db.cache.set(track, this.url);
+                        if (!cache) db.meta_saver.set(track, this.url);
                     });
 
                     return track;
@@ -155,7 +157,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "album",
             filter: /(album)\/[0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = /[0-9]+/i.exec(url)?.at(0)?.split("album")?.at(0);
+                const ID = this.getID(/[0-9]+/i, url)?.split("album")?.at(0);
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.album");
@@ -172,7 +174,7 @@ class RestYandexAPI extends RestServerSide.API {
                     const tracks = api["volumes"]?.pop().splice(0, limit);
                     const songs = tracks.map(this.track);
 
-                    return {url, title: api.title, image: AlbumImage, items: songs};
+                    return {id: ID, url, title: api.title, image: AlbumImage, items: songs};
                 } catch (e) {
                     return Error(`[APIs]: ${e}`);
                 }
@@ -187,7 +189,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "playlist",
             filter: /(playlists\/[0-9a-f-]+)/i,
             execute: async (url, {limit}) => {
-                const ID = /(playlists\/[0-9a-f-]+)/i.exec(url)[0].split("/")[1];
+                const ID = this.getID(/(playlists\/[0-9a-f-]+)/i, url).split("/")[1];
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err("api.request.id.playlist");
@@ -198,6 +200,7 @@ class RestYandexAPI extends RestServerSide.API {
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
+                    else if (!api?.tracks) return locale.err("api.request.fail.msg", ["Not found playlist"]);
                     else if (api?.tracks?.length === 0) return locale.err("api.request.fail.msg", ["Not found tracks in playlist"]);
 
                     const image = this.parseImage({image: api?.["ogImage"] ?? api?.["coverUri"]});
@@ -226,7 +229,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "artist",
             filter: /(artist)\/[0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = /(artist)\/[0-9]+/i.exec(url)?.at(0)?.split("artist")?.at(0);
+                const ID = this.getID(/(artist)\/[0-9]+/i, url)?.split("artist")?.at(0);
 
                 // Если ID автора не удалось извлечь из ссылки
                 if (!ID) return locale.err("api.request.id.author");
@@ -277,8 +280,7 @@ class RestYandexAPI extends RestServerSide.API {
             new httpsClient({
                 url: `${this.options.api}/${method}`,
                 headers: {
-                    "Authorization": "OAuth " + this.auth,
-                    "X-Yandex-Music-Client": method?.startsWith("get-file-info") ? this.options.agents[0] : this.options.agents[1]
+                    "Authorization": "OAuth " + this.auth
                 },
                 method: "GET",
             }).toJson.then((req) => {
@@ -305,84 +307,58 @@ class RestYandexAPI extends RestServerSide.API {
         const trackId = ID.split("/")[1];
 
         for (let i = 0; i <= 3; i++) {
-            // Если достигли максимума
+            // Если достигли максимума, возвращаем ошибку
             if (i === 3) {
-                Logger.log("WARN", Error("Max requests getAudio in yandex"));
                 return locale.err("api.request.fail.msg", ["Fail getting audio url"]);
             }
 
-            try { /* Flac Audio handler */
-                const timestamp = Math.floor(Date.now() / 1000);
-                const encoder = new TextEncoder();
-                const keyData = encoder.encode(this.options.keys[0]);
-                const cryptoKey = await crypto.subtle.importKey("raw", keyData, {
-                    name: "HMAC",
-                    hash: {name: "SHA-256"}
-                }, false, ["sign"]);
-                const dataEncoded = encoder.encode(`${timestamp}${trackId}losslessflacaache-aacmp3raw`);
-                const signature = await crypto.subtle.sign("HMAC", cryptoKey, dataEncoded);
-                const sign = btoa(String.fromCharCode(...new Uint8Array(signature)));
-                const params = new URLSearchParams({
-                    ts: `${timestamp}`,
-                    trackId: trackId,
-                    quality: "lossless",
-                    codecs: "flac,aac,he-aac,mp3",
-                    transports: "raw",
-
-                    // Удаляем лишний символ с конца (=)
-                    sign: sign.slice(0, -1)
-                });
-
+            try {
                 // Делаем запрос для получения аудио
-                const api = await this.API(`get-file-info?${params.toString()}`) as {
-                    downloadInfo: { url: string, trackId: string, realId: string }
-                };
+                const api = await new httpsClient({
+                    url: `https://api.music.yandex.net/tracks/${trackId}/download-info`,
+                    headers: {
+                        "Authorization": "OAuth " + this.auth
+                    }
+                }).toJson;
+
+                // Если на этапе получение данных получена одна из ошибок
+                if (!api) return locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]);
+                else if (api instanceof Error) return api;
+                else if (api?.result?.length === 0) return locale.err("api.request.fail.msg", ["Fail getting audio file, api.size as 0"]);
+
+                const url = api?.result.find((data: any) => data.codec !== "aac") as { downloadInfoUrl: string };
+
+                // Если нет ссылки на xml
+                if (!url) return locale.err("api.request.fail.msg", ["Fail getting audio url"]);
 
                 // Если yandex пытается подсунуть рекламу вместо реального аудио
-                if (api.downloadInfo.trackId !== trackId || api.downloadInfo.realId !== trackId) continue;
+                else if (`${url.downloadInfoUrl.split(".").at(-1)!.split("/")[0]}` !== trackId) continue;
 
-                return api.downloadInfo.url;
-            } catch { /* MP3 Audio handler */
-                try {
-                    // Делаем запрос для получения аудио
-                    const api = await this.API(`tracks/${trackId}/download-info`);
+                // Расшифровываем xml страницу на фрагменты
+                const xml = await new httpsClient({
+                    url: url["downloadInfoUrl"],
+                    headers: {
+                        "Authorization": "OAuth " + this.auth
+                    }
+                }).toXML;
 
-                    // Если на этапе получение данных получена одна из ошибок
-                    if (!api) return locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]);
-                    else if (api instanceof Error) return api;
-                    else if (api.length === 0) return locale.err("api.request.fail.msg", ["Fail getting audio file, api.size as 0"]);
+                // Если произошла ошибка при получении xml
+                if (xml instanceof Error) return locale.err("api.request.fail.msg", ["Fail parsing xml page"]);
 
-                    const url = api.find((data: any) => data.codec !== "aac") as { downloadInfoUrl: string };
+                const path = xml[1];
+                const sign = crypto.createHash("md5").update(this.options.keys[1] + path.slice(1) + xml[4]).digest("hex");
 
-                    // Если нет ссылки на xml
-                    if (!url) return locale.err("api.request.fail.msg", ["Fail getting audio url"]);
+                // Успех, возвращаем результат и прерываем цикл
+                return `https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`;
 
-                    // Если yandex пытается подсунуть рекламу вместо реального аудио
-                    else if (`${url.downloadInfoUrl.split(".").at(-1).split("/")[0]}` !== trackId) continue;
-
-                    // Расшифровываем xml страницу на фрагменты
-                    new httpsClient({
-                        url: url["downloadInfoUrl"],
-                        headers: {
-                            "X-Yandex-Music-Client": this.options.agents[1]
-                        }
-                    }).toXML.then((xml) => {
-                        if (xml instanceof Error) return xml;
-
-                        const path = xml[1];
-                        const sign = crypto.createHash("md5").update(this.options.keys[1] + path.slice(1) + xml[4]).digest("hex");
-
-                        return `https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`;
-                    }).catch((e) => {
-                        return e instanceof Error ? e : Error(String(e));
-                    });
-                } catch (err) {
-                    return Error(err as string);
-                }
+            } catch (mp3Error) {
+                // Если MP3 handler также бросил ошибку, выводим её и продолжаем цикл (i++)
+                console.error("MP3 Handler Failed. Retrying...", mp3Error);
             }
         }
 
-        return null;
+        // Достичь этого return-а в рабочем цикле невозможно, но добавлен для соответствия сигнатуре Promise<T>
+        return locale.err("api.request.fail.msg", ["Failed to retrieve audio after all retries."]);
     };
 
     /**
@@ -411,7 +387,7 @@ class RestYandexAPI extends RestServerSide.API {
             title: `${track?.title ?? track?.name}` + (track.version ? ` - ${track.version}` : ""),
             image,
             url: `https://${this.url}/album/${album.id}/track/${track.id}`,
-            time: { total: (track["durationMs"] / 1000).toFixed(0) ?? "250" as any },
+            time: { total: (track["durationMs"] / 1000).toFixed(0) ?? "250" },
 
             artist: track.author ?? {
                 title: author?.name,

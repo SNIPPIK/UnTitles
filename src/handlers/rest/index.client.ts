@@ -18,9 +18,9 @@ export namespace RestClientSide {
         platform: RestServerSide.APIBase;
         type: keyof APIRequests;
 
-        requestId: string;
+        requestId?: string;
         payload: string;
-        options?: { audio?: boolean; limit?: number };
+        options?: { audio?: boolean; };
     }
 
     /**
@@ -87,8 +87,8 @@ export namespace RestClientSide {
          * @param options - Параметры для отправки
          */
         public request<T extends keyof APIRequests>(payload: string, options?: { audio: boolean }) {
-            const api  = this._api;
-            const type = api.requests.find((item) => {
+            const platform  = this._api;
+            const type = platform.requests.find((item) => {
                 return item.name === payload || typeof payload === "string" && payload.startsWith("http") && item.filter?.test(payload) || item.name === "search"
             })?.name;
 
@@ -99,9 +99,7 @@ export namespace RestClientSide {
                 // Функция запроса на Worker для получения данных
                 request: () => db.api["request_worker"]<T>(
                     {
-                        // Присваивается в request_worker
-                        requestId: null,
-                        platform: api, payload, options, type
+                        platform, payload, options, type
                     }
                 )
             }

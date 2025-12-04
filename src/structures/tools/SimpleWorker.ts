@@ -32,7 +32,7 @@ export class SimpleWorker {
             delete require.cache[require.resolve(file)];
 
             // Если поток должен остаться активным
-            if (!not_destroyed) this.destroy(worker);
+            if (!not_destroyed) this.destroy(worker).catch(console.error);
         });
 
         return worker;

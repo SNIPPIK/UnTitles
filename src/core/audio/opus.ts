@@ -5,6 +5,7 @@ import { TypedEmitter } from "#structures";
  * @author SNIPPIK
  * @description Заголовок для поиска opus
  * @const OGG_MAGIC
+ * @private
  */
 const OGG_MAGIC = Buffer.from("OggS");
 
@@ -20,6 +21,7 @@ export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
  * @author SNIPPIK
  * @description Длительность opus фрейма в ms
  * @const OPUS_FRAME_SIZE
+ * @public
  */
 export const OPUS_FRAME_SIZE = 20;
 
@@ -27,9 +29,9 @@ export const OPUS_FRAME_SIZE = 20;
  * @author SNIPPIK
  * @description Максимальная длина сегмента по спецификации OGG
  * @const MAX_SEGMENT_LENGTH
+ * @private
  */
 const MAX_SEGMENT_LENGTH = 255;
-
 
 /**
  * @author SNIPPIK
@@ -39,12 +41,6 @@ const MAX_SEGMENT_LENGTH = 255;
  * @private
  */
 class BaseEncoder extends TypedEmitter<EncoderEvents> {
-    /**
-     * @description Отправлен ли 1 аудио пакет
-     * @private
-     */
-    private _first = true;
-
     /** Временный буфер, для объединения буферов */
     public _buffer: Buffer = Buffer.allocUnsafe(0);
 
@@ -72,7 +68,10 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
         while (offset + 27 <= size) {
             // Проверяем, соответствует ли текущая позиция сигнатуре "OggS" (OGG_MAGIC)
             // Это "магическая строка", которая всегда должна быть в начале страницы
-            if (!frame.subarray(offset, offset + 4).equals(OGG_MAGIC)) {
+            if (frame[offset] !== OGG_MAGIC[0] ||
+                frame[offset + 1] !== OGG_MAGIC[1] ||
+                frame[offset + 2] !== OGG_MAGIC[2] ||
+                frame[offset + 3] !== OGG_MAGIC[3]) {
                 // Если не совпадает, пытаемся найти ближайшую следующую сигнатуру OGG
                 const next = frame.indexOf(OGG_MAGIC, offset + 1);
 
@@ -99,14 +98,21 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
             // Проверяем, получена ли вся страница
             // Если нет — выход из цикла до прихода полной страницы
-            const segmentTable = frame.subarray(offset + 27, offset + 27 + pageSegments);
-            const totalSegmentLength = segmentTable.reduce((sum, val) => sum + val, 0);
+            let totalSegmentLength = 0;
+            const segmentTableStart = offset + 27;
+            const segmentTableEnd = segmentTableStart + pageSegments;
+
+            for (let i = segmentTableStart; i < segmentTableEnd; i++) {
+                totalSegmentLength += frame[i];
+            }
+
             const fullPageLength = headerLength + totalSegmentLength;
 
             // Извлекаем содержимое страницы — начиная с конца таблицы и до конца страницы
             if (offset + fullPageLength > size) break;
 
             // Передаём таблицу сегментов и payload в обработчике, который выделяет Opus-пакеты
+            const segmentTable = frame.subarray(segmentTableStart, segmentTableEnd);
             const payload = frame.subarray(offset + headerLength, offset + fullPageLength);
             this.extractPackets(segmentTable, payload);
 
@@ -126,28 +132,34 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @private
      */
     private extractPackets = (segmentTable: Buffer, payload: Buffer) => {
-        let currentPacket: Buffer[] = [], payloadOffset = 0;
+        let packetStart = 0;
+        let packetLength = 0;
 
-        for (const segmentLength of segmentTable) {
-            currentPacket.push(payload.subarray(payloadOffset, payloadOffset + segmentLength));
-            payloadOffset += segmentLength;
+        // Ищем нужный opus frame
+        for (let i = 0; i < segmentTable.length; i++) {
+            const segmentLength = segmentTable[i];
+            packetLength += segmentLength;
 
-            // Если сегмент меньше 255 — пакет окончен
             if (segmentLength < MAX_SEGMENT_LENGTH) {
-                const packet = Buffer.concat(currentPacket);
-                currentPacket = [];
-
-                // Обрабатываем пакет
-                if (isOpusHead(packet)) this.emit("head", packet);
-                else if (isOpusTags(packet)) this.emit("tags", packet);
-                // Если не отправлен 1 opus frame
-                else if (this._first) {
-                    this.emit("frame", SILENT_FRAME);
-                    this._first = false;
-                }
-                else this.emit("frame", packet);
+                // Пакет завершён — отправляем одним куском
+                const packet = payload.subarray(packetStart, packetStart + packetLength);
+                this._emitting(packet);
+                packetStart += packetLength;
+                packetLength = 0;
             }
         }
+    };
+
+    /**
+     * @description Обрабатываем аудио пакет
+     * @param packet - Аудио пакет
+     * @private
+     */
+    private _emitting = (packet: Buffer) => {
+        // Обрабатываем пакет
+        if (isOpusHead(packet)) this.emit("head", packet);
+        else if (isOpusTags(packet)) this.emit("tags", packet);
+        else this.emit("frame", packet);
     };
 
     /**
@@ -155,10 +167,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @public
      */
     public destroy() {
-        // Отправляем пустой пакет последним
-        this.emit("frame", SILENT_FRAME);
-
-        this._first = null;
+        this._buffer.fill(0);
         this._buffer = null;
 
         // Освобождаем emitter
@@ -272,6 +281,7 @@ export class PipeEncoder extends Transform {
  * @author SNIPPIK
  * @description По строковый расчет opusHead
  * @param packet
+ * @private
  */
 function isOpusHead(packet: Buffer): boolean {
     // "OpusHead" в ASCII: 0x4F 0x70 0x75 0x73 0x48 0x65 0x61 0x64
@@ -288,6 +298,7 @@ function isOpusHead(packet: Buffer): boolean {
  * @author SNIPPIK
  * @description По строковый расчет opusTags
  * @param packet
+ * @private
  */
 function isOpusTags(packet: Buffer): boolean {
     // "OpusTags" в ASCII: 0x4F 0x70 0x75 0x73 0x54 0x61 0x67 0x73
@@ -304,6 +315,7 @@ function isOpusTags(packet: Buffer): boolean {
  * @author SNIPPIK
  * @description События для типизации декодера
  * @interface EncoderEvents
+ * @private
  */
 interface EncoderEvents {
     /**

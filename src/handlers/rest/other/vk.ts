@@ -6,6 +6,16 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
+ * @description Взаимодействие с платформой VK, динамический плагин
+ * # Types
+ * - Track - Любое трек с платформы
+ * - Search - Поиск треков, пока не доступны плейлисты, альбомы, авторы
+ * @Specification Rest VK API
+ * @Audio Доступно нативное получение только в RU регионе
+ */
+
+/**
+ * @author SNIPPIK
  * @description Динамически загружаемый класс
  * @class RestVKAPI
  * @public
@@ -35,21 +45,21 @@ class RestVKAPI extends RestServerSide.API {
             name: "track",
             filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i,
             execute: async (url, options) => {
-                const ID = /([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i.exec(url).pop();
+                const ID = this.getID(/([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i, url);
 
                 //Если ID трека не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.track");
 
                 // Интеграция с утилитой кеширования
-                const cache = db.cache.get(`${this.url}/${ID}`);
+                const cache = db.meta_saver?.get(`${this.url}/${ID}`);
 
                 // Если трек есть в кеше
                 if (cache) {
                     if (!options.audio) return cache;
 
                     // Если включена утилита кеширования аудио
-                    else if (db.cache.audio) {
-                        const check = db.cache.audio.status(`${this.url}/${ID}`);
+                    else if (db.audio_saver) {
+                        const check = db.audio_saver.status(`${this.url}/${ID}`);
 
                         // Если есть кеш аудио
                         if (check.status === "ended") {
@@ -71,8 +81,8 @@ class RestVKAPI extends RestServerSide.API {
                     // Если указано получение аудио
                     if (options.audio) {
                         // Если включена утилита кеширования
-                        if (db.cache.audio) {
-                            const check = db.cache.audio.status(`${this.url}/${ID}`);
+                        if (db.audio_saver) {
+                            const check = db.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -87,7 +97,7 @@ class RestVKAPI extends RestServerSide.API {
 
                     setImmediate(() => {
                         // Сохраняем кеш в системе
-                        if (!cache) db.cache.set(track, this.url);
+                        if (!cache) db.meta_saver?.set(track, this.url);
                     });
 
                     return track;

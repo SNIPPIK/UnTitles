@@ -1,12 +1,26 @@
-import {DeclareRest, OptionsRest, RestServerSide} from "#handler/rest";
+import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
 import { Track } from "#core/queue";
 import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
+ * @description Взаимодействие с платформой YouTube, динамический плагин
+ * # Types
+ * - Video - Любое видео с платформы. Не получится получить спонсорские видео или 18+
+ * - Playlist - Любой открытый плейлист.
+ * - Artist - Последние видео автора с учетом лимита
+ * - Related - Похожее треки, работает через алгоритмы youtube
+ * - Search - Поиск видео, пока не доступны плейлисты, альбомы, авторы
+ * @Specification Rest YT API
+ * @Audio Доступно нативное получение
+ */
+
+/**
+ * @author SNIPPIK
  * @description Допустимые символы, буквы, цифры для работы с youtube на более похожем уровне api
  * @const CPN_CHARS
+ * @private
  */
 const CPN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -14,6 +28,7 @@ const CPN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678
  * @author SNIPPIK
  * @description Все допустимые заголовки
  * @const Clients
+ * @private
  */
 const Clients = {
     /**
@@ -106,28 +121,27 @@ const Clients = {
     color: 16711680
 })
 @OptionsRest({
-    AIzaKey: generateFakeApiKey(),
-    //@ts-ignore
-    detect_is_bot: [] as keyof typeof Clients,
+    AIzaKey: generateFakeApiKey()
 })
 class RestYouTubeAPI extends RestServerSide.API {
     readonly requests: RestServerSide.API["requests"] = [
         /**
          * @description Запрос данных об плейлисте
          * @type "playlist"
+         * @private
          */
         {
             name: "playlist",
             filter: /playlist\?list=[a-zA-Z0-9-_]+/i,
             execute: async (url, { limit }) => {
-                const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/i).pop();
+                const ID = this.getID(/playlist\?list=[a-zA-Z0-9-_]+/i, url);
                 let artist = null;
 
                 try {
                     // Если ID плейлиста не удалось извлечь из ссылки
                     if (!ID) return locale.err("api.request.id.playlist");
 
-                    const api = await this.pAPI(`https://${this.url}/${ID}`)
+                    const api = await this.pAPI(ID);
 
                     // Если при запросе была получена ошибка
                     if (api instanceof Error) return api;
@@ -163,6 +177,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                         artist: artist ?? items.at(-1).artist
                     };
                 } catch (e) {
+                    console.error(e);
                     return new Error(`[APIs]: ${e}`);
                 }
             }
@@ -171,15 +186,16 @@ class RestYouTubeAPI extends RestServerSide.API {
         /**
          * @description Запрос треков из волны, для выполнения требуется указать list=RD в ссылке
          * @type "related"
+         * @private
          */
         {
             name: "related",
             filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})?(list=RD)/,
             execute: async (url) => {
-                const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
+                const ID = this.getID(/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/, url);
 
                 try {
-                    const api = await this.pAPI(`https://${this.url}/watch?v=${ID}&hl=en&has_verified=1`);
+                    const api = await this.pAPI(`watch?v=${ID}&hl=en&has_verified=1`);
                     if (api instanceof Error) return api;
 
                     const related = api.contents?.twoColumnWatchNextResults?.secondaryResults?.secondaryResults?.results ?? [];
@@ -216,6 +232,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                         artist: null,
                     };
                 } catch (e) {
+                    console.error(e);
                     return new Error(`[APIs]: ${e}`);
                 }
             }
@@ -224,26 +241,27 @@ class RestYouTubeAPI extends RestServerSide.API {
         /**
          * @description Запрос данных о треке
          * @type "track"
+         * @private
          */
         {
             name: "track",
             filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
-            execute: async (url: string, options) => {
-                const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
+            execute: async (url, options) => {
+                const ID = this.getID(/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/, url)
 
                 try {
                     // Если ID видео не удалось извлечь из ссылки
                     if (!ID) return locale.err("api.request.id.track");
 
-                    const cache = db.cache.get(`${this.url}/${ID}`);
+                    const cache = db.meta_saver.get(`${this.url}/${ID}`);
 
                     // Если трек есть в кеше
                     if (cache) {
                         if (!options.audio) return cache;
 
                         // Если включена утилита кеширования аудио
-                        else if (db.cache.audio) {
-                            const check = db.cache.audio.status(`${this.url}/${ID}`);
+                        else if (db.audio_saver) {
+                            const check = db.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -270,8 +288,8 @@ class RestYouTubeAPI extends RestServerSide.API {
                     // Если указано получение аудио
                     if (options.audio) {
                         // Если включена утилита кеширования
-                        if (db.cache.audio) {
-                            const check = db.cache.audio.status(`${this.url}/${ID}`);
+                        if (db.audio_saver) {
+                            const check = db.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -292,11 +310,12 @@ class RestYouTubeAPI extends RestServerSide.API {
 
                     if (!cache && !api?.["videoDetails"]?.["isLive"]) setImmediate(() => {
                         // Сохраняем кеш в системе
-                        db.cache.set(track, this.url);
+                        db.meta_saver?.set(track, this.url);
                     });
 
                     return track;
                 } catch (e) {
+                    console.error(e);
                     return new Error(`[APIs]: ${e}`);
                 }
             }
@@ -305,20 +324,20 @@ class RestYouTubeAPI extends RestServerSide.API {
         /**
          * @description Запрос данных треков артиста
          * @type "artist"
+         * @private
          */
         {
             name: "artist",
             filter: /\/(channel)?(@)/i,
-            execute: async (url: string, {limit}) => {
-                try {
-                    let ID: string;
+            execute: async (url, {limit}) => {
+                const ID = this.getID(/^(?:@([^\/]+)|([a-zA-Z0-9_-]+))\/?/, url);
 
-                    // Получаем истинное id канала
-                    if (url.match(/@/)) ID = `@${url.split("@")[1].split("/")[0]}`;
-                    else ID = `channel/${url.split("channel/")[1]}`;
+                try {
+                    // Если ID автора не удалось извлечь из ссылки
+                    if (!ID) return locale.err("api.request.id.author");
 
                     // Создаем запрос
-                    const details = await this.pAPI(`https://${this.url}/${ID}/videos`);
+                    const details = await this.pAPI(`${ID}/videos`);
 
                     if (details instanceof Error) return details;
 
@@ -339,6 +358,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                         }
                     });
                 } catch (e) {
+                    console.error(e);
                     return new Error(`[APIs]: ${e}`);
                 }
             },
@@ -347,13 +367,14 @@ class RestYouTubeAPI extends RestServerSide.API {
         /**
          * @description Запрос данных по поиску
          * @type "search"
+         * @private
          */
         {
             name: "search",
             execute: async (query: string, {limit}) => {
                 try {
                     // Создаем запрос
-                    const details = await this.pAPI(`https://${this.url}/results?search_query=${encodeURIComponent(query)}&sp=QgIIAQ%3D%3D`);
+                    const details = await this.pAPI(`results?search_query=${encodeURIComponent(query)}&sp=QgIIAQ%3D%3D`);
 
                     // Если при получении данных возникла ошибка
                     if (details instanceof Error) return details;
@@ -369,6 +390,7 @@ class RestYouTubeAPI extends RestServerSide.API {
 
                     return videos;
                 } catch (e) {
+                    console.error(e);
                     return new Error(`[APIs]: ${e}`);
                 }
             }
@@ -456,12 +478,12 @@ class RestYouTubeAPI extends RestServerSide.API {
 
     /**
      * @description Получаем страницу и ищем на ней данные
-     * @param url - Ссылка на видео или ID видео
+     * @param method - Ссылка на видео или ID видео
      * @protected
      */
-    protected pAPI = (url: string): Promise<Error | json> => {
+    protected pAPI = (method: string): Promise<Error | json> => {
         return new Promise((resolve) => {
-            new httpsClient({ url,
+            new httpsClient({ url: `https://${this.url}/${method}`,
                 userAgent: true,
                 headers: {
                     "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
@@ -499,18 +521,18 @@ class RestYouTubeAPI extends RestServerSide.API {
     protected restArtist = ({ id, name }: { id: string, name?: string }): Promise<Track.artist> => {
         return new Promise<Track.artist>((resolve) => {
             new httpsClient({
-                url: `https:/www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`,
+                url: `https:/${this.url}/channel/${id}/channels?flow=grid&view=0&pbj=1`,
                 headers: Clients.WEB.request.context.client
             }).toJson.then((channel) => {
                 if (channel instanceof Error) return resolve(null);
 
-                const data = channel[1]?.response ?? channel?.response ?? null as any;
+                const data = channel[1]?.response ?? channel?.response ?? null;
                 const info = data?.header?.["c4TabbedHeaderRenderer"], Channel = data?.metadata?.["channelMetadataRenderer"],
                     avatar = info?.avatar;
 
                 return resolve({
                     title: Channel?.title ?? name ?? "Not found name",
-                    url: `https://www.youtube.com/channel/${id}`,
+                    url: `https://${this.url}/channel/${id}`,
                     image: avatar?.["thumbnails"].pop() ?? null
                 });
             }).catch(() => resolve(null));
@@ -582,6 +604,7 @@ function generateClientPlaybackNonce(length: number): string {
  * @author SNIPPIK
  * @description Генерируем фейковые ключи для плеера
  * @param totalLength - Глобальный размер ключа
+ * @private
  */
 function generateFakeApiKey(totalLength = 34): string {
     let key = "AIzaSyAO_";

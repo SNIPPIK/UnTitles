@@ -20,7 +20,9 @@ class ButtonLyrics extends Component<"button"> {
         const track = queue.tracks.track;
 
         // Ожидаем ответа от кода со стороны Discord
-        await ctx.deferReply().catch(() => {});
+        await ctx.deferReply();
+
+        // Сообщение
         let msg: CycleInteraction;
 
         // Получаем текст песни
@@ -71,7 +73,7 @@ class ButtonLyrics extends Component<"button"> {
             })
 
 
-        setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 40e3);
+        if (msg) setTimeout(() => msg?.deletable ? msg.delete().catch(() => null) : null, 40e3);
     };
 }
 /**

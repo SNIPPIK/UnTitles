@@ -1,9 +1,10 @@
+import { CommandInteraction, CycleInteraction, DiscordClient } from "#structures/discord";
 import { ActionRowBuilder, EmbedData, StringSelectMenuBuilder } from "discord.js";
-import { CommandInteraction, CycleInteraction } from "#structures/discord";
 import filters from "#core/player/filters.json";
 import type { AudioPlayer } from "#core/player";
 import { RepeatType } from "#core/queue";
 import { env } from "#app/env";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -14,31 +15,27 @@ import { env } from "#app/env";
 export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description ID сервера, привязанный к сообщению
-     * @readonly
-     * @private
+     * @public
      */
-    private readonly _guild_id: string;
+    public guild_id: string;
 
     /**
      * @description ID канала, привязанный к сообщению
-     * @readonly
-     * @private
+     * @public
      */
-    private readonly _channel_id: string;
+    public channel_id: string;
 
     /**
      * @description ID канала, привязанный к голосовому каналу
-     * @readonly
-     * @private
+     * @public
      */
-    private readonly _voice_id: string;
+    public voice_id: string;
 
     /**
      * @description Ответил ли бот на сообщение
-     * @readonly
      * @private
      */
-    private _deferred = false;
+    private _deferred: boolean;
 
     /**
      * @description Язык сообщения
@@ -59,30 +56,12 @@ export class QueueMessage<T extends CommandInteraction> {
     };
 
     /**
-     * @description Получение ID сервера
-     * @returns string
-     * @public
-     */
-    public get guild_id() {
-        return this._guild_id;
-    };
-
-    /**
      * @description Получение текущего текстового канала
      * @returns TextChannel
      * @public
      */
     public get channel() {
         return this._original.channel;
-    };
-
-    /**
-     * @description Получение ID текстового канала
-     * @returns string
-     * @public
-     */
-    public get channel_id() {
-        return this._channel_id;
     };
 
     /**
@@ -95,21 +74,12 @@ export class QueueMessage<T extends CommandInteraction> {
     };
 
     /**
-     * @description Получение ID голосового канала
-     * @returns string
-     * @public
-     */
-    public get voice_id() {
-        return this._voice_id;
-    };
-
-    /**
      * @description Получение класса клиента
      * @returns require("discord.js").Client
      * @public
      */
     public get client() {
-        return this._original.client as any;
+        return this._original.client as DiscordClient;
     };
 
     /**
@@ -138,9 +108,23 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public constructor(private _original: T) {
-        this._voice_id = _original.member.voice.channelId;
-        this._channel_id = _original.channelId;
-        this._guild_id = _original.guildId;
+        this.voice_id = _original.member.voice.channelId;
+        this.channel_id = _original.channelId;
+        this.guild_id = _original.guildId;
+    };
+
+    /**
+     * @description Удаление динамического сообщения из системы
+     * @returns void
+     * @public
+     */
+    public delete = () => {
+        // Удаляем старое сообщение, если оно есть
+        const message = db.queues.cycles.messages.find((msg) => {
+            return msg.guildId === this.guild_id;
+        });
+
+        if (message) db.queues.cycles.messages.delete(message);
     };
 
     /**
@@ -176,12 +160,11 @@ export class QueueMessage<T extends CommandInteraction> {
     };
 }
 
-
 /**
  * @author SNIPPIK
  * @description Класс для создания компонентов-кнопок
  * @class QueueButtons
- * @private
+ * @public
  */
 export class QueueButtons {
     /**
@@ -209,7 +192,7 @@ export class QueueButtons {
                 QueueButtons.createButton({env: "shuffle", disabled: true}),
 
                 // Кнопка назад
-                QueueButtons.createButton({env: "back", disabled: true}),
+                QueueButtons.createButton({env: "back"}),
 
                 // Кнопка паузы/продолжить
                 QueueButtons.createButton({emoji: QueueButtons.button.pause, id: "resume_pause"}),
@@ -234,10 +217,7 @@ export class QueueButtons {
                 QueueButtons.createButton({env: "stop", style: 4}),
 
                 // Кнопка текущих фильтров
-                QueueButtons.createButton({env: "filters", disabled: true}),
-
-                // Кнопка повтора текущего трека
-                QueueButtons.createButton({env: "replay"})
+                QueueButtons.createButton({env: "filters", disabled: true})
             ]
         }
     ];
@@ -297,7 +277,6 @@ export class QueueButtons {
 
         // ⏮ Prev
         setButton(firstRow[1], {
-            disabled: !isMultipleTracks,
             style: isMultipleTracks ? 1 : 2,
         });
 

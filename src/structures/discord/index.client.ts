@@ -19,7 +19,11 @@ export class DiscordClient extends Client {
      * @public
      */
     public get shardID(): number {
-        return this.shard.count - 1;
+        try {
+            return this.shard?.count - 1;
+        } catch {
+            return 0;
+        }
     };
 
     /**
@@ -151,7 +155,7 @@ export class DiscordClient extends Client {
 
         // Получаем пользовательские статусы
         try {
-            const presence = (JSON.parse(`[${env.get("client.presence.array")}]`) as ActivityOptions[]);
+            const presence = (JSON.parse(`[${env.get("client.presence.array")}]`) as ActivityOptionsRaw[]);
             const envPresents = presence.map((status) => {
                 const edited = status.name
                     .replace(/{shard}/g, `${this.shardID + 1}`)
@@ -162,7 +166,7 @@ export class DiscordClient extends Client {
 
                 return {
                     name: edited,
-                    type: ActivityType[status.type] as any,
+                    type: ActivityType[status.type],
                     shardId: this.shardID
                 }
             });
@@ -181,6 +185,7 @@ export class DiscordClient extends Client {
  * @author SNIPPIK
  * @description Параметры показа статуса
  * @interface ActivityOptions
+ * @private
  */
 interface ActivityOptions {
     name: string;
@@ -188,4 +193,15 @@ interface ActivityOptions {
     url?: string;
     type?: ActivityType;
     shardId?: number | readonly number[];
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные статуса бота из env
+ * @interface ActivityOptionsRaw
+ * @private
+ */
+//@ts-ignore
+interface ActivityOptionsRaw extends ActivityOptions {
+    type?: string;
 }

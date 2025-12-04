@@ -127,43 +127,7 @@ export class VoiceRTPSocket {
 
         // Получаем nonce буфер 12-24 бит
         const nonce = this.nonceFrame;
-
-        // Получаем тип шифрования
-        const mode = VoiceRTPSocket.mode;
-
-        if (mode === "aead_aes256_gcm_rtpsize") return this.encryptNative(head, frame, nonce);
-        return this.encryptLibs(head, frame, nonce);
-    };
-
-    /**
-     * @description Шифрование аудио через crypto методом aead_aes256_gcm
-     * @param head          - Заголовок
-     * @param packet        - Аудио пакет
-     * @param nonce         - nonce frame
-     * @returns Buffer
-     * @public
-     */
-    private encryptNative = (head: Buffer, packet: Buffer, nonce?: Buffer) => {
-        // Получаем первые 4 байта из буфера
-        const nonceBuffer = nonce.subarray(0, 4);
-        const cipher = crypto.createCipheriv("aes-256-gcm", this.options.key, nonce, { authTagLength: 16 });
-        cipher.setAAD(head);
-        return Buffer.concat([head, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
-    };
-
-    /**
-     * @description Шифрование аудио через crypto методом aead_aes256_gcm
-     * @param head          - Заголовок
-     * @param packet        - Аудио пакет
-     * @param nonce         - nonce frame
-     * @returns Buffer
-     * @public
-     */
-    private encryptLibs = (head: Buffer, packet: Buffer, nonce?: Buffer) => {
-        // Получаем первые 4 байта из буфера
-        const nonceBuffer = nonce.subarray(0, 4);
-        const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, head, nonce, this.options.key);
-        return Buffer.concat([head, cryptoPacket, nonceBuffer]);
+        return Encryption.encrypt(frame, head, nonce, this.options.key);
     };
 
     /**
@@ -173,15 +137,20 @@ export class VoiceRTPSocket {
      */
     public destroy = () => {
         this._nonceFrame = null;
-        this._nonce = undefined;
         this.timestamp = null;
         this.sequence = null;
         this.options = null;
+
+        this._nonce.fill(0);
+        this._nonce = null;
+
         this.head.fill(0);
+        this.head = null;
     };
 }
 
 /**
+ * @author SNIPPIK
  * @description Возвращает случайное число, находящееся в диапазоне n бит
  * @param bits - Количество бит
  * @returns number
@@ -194,7 +163,6 @@ function randomNBit(bits: number){
     if (size === 4) return buf.readUInt32BE(0);
     return buf.readUIntBE(0, size) % (2 ** bits);
 }
-
 
 /**
  * @author SNIPPIK
@@ -209,29 +177,38 @@ let loaded_lib: Methods.current = {};
  * @const Encryption
  * @private
  */
-const Encryption: { name: EncryptionModes, nonce: Buffer } = {
-    name: null,
-    nonce: null
-};
+const Encryption: {
+    name: EncryptionModes,
+    nonce: Buffer,
+    encrypt(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: Uint8Array): Buffer;
+} = { name: null, nonce: null, encrypt: null };
 
 /**
  * @author SNIPPIK
- * @description Делаем проверку на наличие поддержки sodium
+ * @description Подготавливаем данные для шифрования sodium
  */
 (async () => {
     // Если поддерживается нативная расшифровка
     if (crypto.getCiphers().includes("aes-256-gcm")) {
         Encryption.name = "aead_aes256_gcm_rtpsize";
         Encryption.nonce = Buffer.alloc(12);
+        Encryption.encrypt = (packet, head, nonce, key) => {
+            // Получаем первые 4 байта из буфера
+            const nonceBuffer = nonce.subarray(0, 4);
+            const cipher = crypto.createCipheriv("aes-256-gcm", key, nonce);
+
+            // !! ВАЖНО !!: Устанавливаем заголовок RTP (head) как AAD (Associated Data).
+            // Это гарантирует, что RTP-заголовок будет аутентифицирован (защищен от подделки),
+            // но не зашифрован, что соответствует SRTP.
+            cipher.setAAD(head);
+            return Buffer.concat([head, cipher.update(packet), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
+        }
         return;
     }
 
     // Если нет нативной поддержки шифрования
     else {
-        /**
-         * @author SNIPPIK
-         * @description Поддерживаемые библиотеки
-         */
+        // Поддерживаемые библиотеки
         const support_libs: Methods.supported = {
             sodium: (lib) => ({
                 crypto_aead_xchacha20poly1305_ietf_encrypt:(plaintext: Buffer, additionalData: Buffer, nonce: Buffer, key: ArrayBufferLike) => {
@@ -262,6 +239,12 @@ const Encryption: { name: EncryptionModes, nonce: Buffer } = {
         // Добавляем тип шифрования
         Encryption.name = "aead_xchacha20_poly1305_rtpsize";
         Encryption.nonce = Buffer.alloc(24);
+        Encryption.encrypt = (packet, head, nonce, key) => {
+            // Получаем первые 4 байта из буфера
+            const nonceBuffer = nonce.subarray(0, 4);
+            const cryptoPacket = loaded_lib.crypto_aead_xchacha20poly1305_ietf_encrypt(packet, head, nonce, key);
+            return Buffer.concat([head, cryptoPacket, nonceBuffer]);
+        }
 
         // Делаем проверку всех доступных библиотек
         for await (const name of names) {

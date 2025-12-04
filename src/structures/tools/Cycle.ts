@@ -1,19 +1,4 @@
-import { performance } from "perf_hooks";
-import { SetArray } from "#structures";
-
-/**
- * @author SNIPPIK
- * @description Кривая точности event loop цикла, чем больше тем точнее, но при сильных нагрузках это будет слышно!
- * @const AMPLITUDE_EL_CYCLE_OFFSET
- */
-const AMPLITUDE_EL_CYCLE_OFFSET = 0.95;
-
-/**
- * @author SNIPPIK
- * @description Кривая точности drift цикла, чем больше тем точнее, но при сильных нагрузках это будет слышно!
- * @const AMPLITUDE_DRIFT_CYCLE_OFFSET
- */
-const AMPLITUDE_DRIFT_CYCLE_OFFSET = 0.95;
+import { SetArray } from "#structures/array";
 
 /**
  * @author SNIPPIK
@@ -24,12 +9,6 @@ const AMPLITUDE_DRIFT_CYCLE_OFFSET = 0.95;
  * @private
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Последний записанное значение performance.now(), нужно для улавливания event loop lags */
-    private performance: number = 0;
-
-    /** Последний записанное значение performance.now(), нужно для сглаживания лага */
-    private prevEventLoopLag: number = 0;
-
     /** Последний сохраненный временной интервал */
     private lastDelay: number = 0;
 
@@ -39,20 +18,29 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     /** Время для высчитывания */
     private tickTime: number = 0;
 
-    /** Временное число отставания цикла в миллисекундах */
-    private drift: number = 0;
+    /** Задержка функции _stepCycle */
+    private _driftStep: number = 0;
+    private _miss: number = 0;
 
     /** Таймер или функция ожидания */
-    private timeout: NodeJS.Timeout | NodeJS.Immediate;
+    private timeout: NodeJS.Timeout;
 
     /**
      * @description Последний зафиксированный разбег во времени
      * @returns number
      * @public
      */
-    /*public get drifting(): number {
-        return this.drift + this.lastDelay;
-    };*/
+    public get drifting(): number {
+        return this._driftStep;
+    };
+
+    /**
+     * @description Упущенные шаги функции выполнения
+     * @public
+     */
+    public get misses(): number {
+        return this._miss;
+    };
 
     /**
      * @description Время циклической системы изнутри
@@ -60,39 +48,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @public
      */
     public get insideTime(): number {
-        return this.startTime + this.tickTime;
-    };
-
-    /**
-     * @description Последний зафиксированный промежуток выполнения
-     * @returns number
-     * @public
-     */
-    /*public get delay(): number {
-        return this.lastDelay;
-    };*/
-
-    /**
-     * @description Высчитываем задержку шага
-     * @param duration - Истинное время шага
-     * @private
-     */
-    private set delay(duration: number) {
-        // ожидаемое время следующего запуска (без учета drift/lag)
-        const expectedNext = this.startTime + this.tickTime + duration;
-        const now = this.time;
-
-        // сколько шагов "пропустили" по времени (если any)
-        let missedSteps = 1;
-        if (now > expectedNext) {
-            // (now - expectedNext) может быть > duration * N
-            const over = (now - expectedNext) / duration;
-            missedSteps = Math.max(1, over);
-        }
-
-        const correction = missedSteps * duration;
-        this.tickTime += correction;
-        this.lastDelay = correction;
+        return (this.startTime + this.tickTime) - this._driftStep;
     };
 
     /**
@@ -102,7 +58,55 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected get time(): number {
-        return Number(process.hrtime.bigint()) / 1e6;
+        const hr = process.hrtime.bigint();
+        return Math.floor(Number(hr / 1_000_000n));
+    };
+
+    /**
+     * @description Последний зафиксированный промежуток выполнения
+     * @returns number
+     * @public
+     */
+    public get delay(): number {
+        return this.lastDelay;
+    };
+
+    /**
+     * @description Высчитываем задержку шага
+     * @param duration - Истинное время шага
+     * @private
+     */
+    private set delay(duration: number) {
+        // Ожидаемое время следующего запуска (без учета _driftStep/lag)
+        const expectedNext = this.startTime + this.tickTime + duration;
+        const now = this.time;
+
+        // Сколько шагов "пропустили" по времени (если any)
+        if (now > expectedNext) {
+            // (now - expectedNext) может быть > duration * N
+            const over = (now - expectedNext) / duration;
+            this._miss = over * duration;
+        }
+
+        this.tickTime += duration;
+        this.lastDelay = duration;
+    };
+
+    /**
+     * @description Функция выполнения шага с вычетом задержки
+     * @protected
+     */
+    protected get _onceStep() {
+        return () => {
+            const now = performance.now();
+
+            try {
+                this._stepCycle();
+            } finally {
+                // Фиксируем задержку выполнения функции
+                this._driftStep = Math.max(0, now - performance.now());
+            }
+        };
     };
 
     /**
@@ -117,7 +121,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         // Запускаем цикл сразу после добавления первого элемента
         if (this.size === 1 && !this.startTime) {
             this.startTime = this.time;
-            process.nextTick(this._stepCycle);
+            setImmediate(this._onceStep);
         }
 
         return this;
@@ -130,17 +134,20 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public reset(): void {
         this.clear(); // Удаляем все объекты
+        this.reboot();
+    };
 
+    /**
+     * @description Подготовка данных цикла для повторного использования
+     * @private
+     */
+    private reboot = () => {
         this.startTime = 0;
         this.tickTime = 0;
         this.lastDelay = 0;
 
-        // Чистимся от drift составляющих
-        this.drift = 0;
-
-        // Чистим performance.now
-        this.performance = 0;
-        this.prevEventLoopLag = 0;
+        // Дрифт, он высчитываем задержку выполнения функции
+        this._driftStep = 0;
 
         // Если есть таймер
         if (this.timeout) this._clearTimeout();
@@ -150,46 +157,16 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @description Проверяем время для запуска цикла повторно, без учета дрифта
      * @returns void
      * @protected
-     * @readonly
      */
     protected _stepCheckTimeCycle = (duration: number): void => {
         // Проверяем цикл на наличие объектов
-        if (this.size === 0) return this.reset();
+        if (this.size === 0 || isNaN(duration)) return this.reset();
 
         // Высчитываем время шага
         this.delay = duration;
 
         // Запускаем таймер
-        return this._runTimeout(this.insideTime, this._stepCycle);
-    };
-
-    /**
-     * @description Проверяем время для запуска цикла повторно с учетом дрифта цикла
-     * @returns void
-     * @protected
-     * @readonly
-     */
-    protected _stepCheckTimeCycleDrift = (duration: number): void => {
-        if (this.size === 0) return this.reset();
-
-        // Высчитываем время шага
-        this.delay = duration;
-
-        // Коррекция event loop lag
-        const lags = this._calculateLags();
-
-        // Следующее время шага
-        const nextTargetTime = this.insideTime + this.drift - lags;
-
-        // Запускаем шаг
-        this._runTimeout(nextTargetTime, () => {
-            const tickStart = this.time;
-            this._stepCycle();
-            const tickEnd = this.time;
-
-            // Сглаживание дрейфа
-            this.drift = this._compensator(AMPLITUDE_DRIFT_CYCLE_OFFSET, this.drift, tickEnd - tickStart);
-        });
+        return this._runTimeout(this.insideTime, this._onceStep);
     };
 
     /**
@@ -198,61 +175,24 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @param callback    - Функция для высчитывания
      * @returns void
      * @protected
-     * @readonly
      */
     protected _runTimeout = (actualTime: number, callback: () => void): void => {
         const delay = Math.max(0, actualTime - this.time);
-
-        // Если есть таймер
-        if (this.timeout) this._clearTimeout();
-
-        // Если требуется запустить шаг немедленно
-        if (delay === 0) process.nextTick(callback);
-
-        // Суб миллисекундный шаг
-        else if (delay < 4) this.timeout = setImmediate(callback);
+        this._clearTimeout();
 
         // Запускаем стандартный шаг
-        else this.timeout = setTimeout(callback, Math.ceil(delay));
-    };
-
-    /**
-     * @description Высчитываем задержки event loop
-     * @protected
-     * @readonly
-     */
-    protected _calculateLags = () => {
-        // Коррекция event loop lag
-        const performanceNow = performance.now();
-        const driftEvent = this.performance ? Math.max(0, performanceNow - this.performance) : -this.lastDelay;
-        this.performance = performanceNow;
-
-        // Смягчение event loop lag
-        this.prevEventLoopLag = this._compensator(AMPLITUDE_EL_CYCLE_OFFSET, this.prevEventLoopLag, driftEvent);
-        return this.prevEventLoopLag;
+        this.timeout = setTimeout(callback, delay);
     };
 
     /**
      * @description Удаляем таймер или Immediate
      * @protected
      */
-    protected _clearTimeout = ()=> {
+    protected _clearTimeout = () => {
         if (!this.timeout) return;
-        if ('hasRef' in this.timeout) clearTimeout(this.timeout as NodeJS.Timeout);
-        else clearImmediate(this.timeout as NodeJS.Immediate);
-        this.timeout = undefined;
-    };
 
-    /**
-     * @description Сглаживание дрифта времени, смягчает новый по сравнению со старым
-     * @param alpha - Значение для сглаживания
-     * @param old - Старое время
-     * @param current - Новое время
-     * @private
-     */
-    private _compensator = (alpha: number, old: number, current: number) => {
-        if (old < 0 || current < 0) return 0;
-        return alpha * old + (1 - alpha) * current;
+        clearTimeout(this.timeout);
+        this.timeout = null;
     };
 
     /**
@@ -278,7 +218,7 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @constructor
      * @protected
      */
-    protected constructor(public readonly options: TaskCycleConfig<T>) {
+    protected constructor(public options: TaskCycleConfig<T>) {
         super();
     };
 
@@ -337,8 +277,7 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
         }
 
         // Запускаем цикл повторно
-        if (this.options.drift) return this._stepCheckTimeCycle(this.options.duration);
-        return this._stepCheckTimeCycleDrift(this.options.duration);
+        return this._stepCheckTimeCycle(this.options.duration);
     };
 }
 
@@ -350,13 +289,17 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
  * @public
  */
 export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
+    protected get time() {
+        return Date.now();
+    };
+
     /**
      * @description Создаем класс и добавляем параметры
      * @param options - Параметры для работы класса
      * @constructor
      * @protected
      */
-    protected constructor(public readonly options: PromiseCycleConfig<T>) {
+    protected constructor(public options: PromiseCycleConfig<T>) {
         super();
     };
 
@@ -415,14 +358,14 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
         }
 
         // Запускаем цикл повторно
-        if (this.options.drift) return this._stepCheckTimeCycle(30e3);
-        return this._stepCheckTimeCycleDrift(30e3);
+        return this._stepCheckTimeCycle(30e3);
     };
 }
 
 /**
  * @author SNIPPIK
  * @description Интерфейс для опций DefaultCycleSystem
+ * @interface BaseCycleConfig
  * @private
  */
 interface BaseCycleConfig<T> {
@@ -473,7 +416,8 @@ interface BaseCycleConfig<T> {
 
 /**
  * @author SNIPPIK
- * @description Интерфейс для опций SyncCycle
+ * @description Интерфейс для опций TaskCycle
+ * @interface TaskCycleConfig
  * @private
  */
 interface TaskCycleConfig<T> extends BaseCycleConfig<T> {
@@ -494,7 +438,8 @@ interface TaskCycleConfig<T> extends BaseCycleConfig<T> {
 
 /**
  * @author SNIPPIK
- * @description Интерфейс для опций AsyncCycle
+ * @description Интерфейс для опций PromiseCycle
+ * @interface PromiseCycleConfig
  * @private
  */
 interface PromiseCycleConfig<T> extends BaseCycleConfig<T> {
