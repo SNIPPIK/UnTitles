@@ -100,6 +100,20 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
     protected _afade = 0;
 
     /**
+     * @description Модификатор скорости фильтров
+     * @protected
+     */
+    protected _afade_modificator = 1;
+
+    /**
+     * @description Модификатор скорости высчитанный из фильтров
+     * @public
+     */
+    public get speed() {
+        return this._afade_modificator;
+    };
+
+    /**
      * @description Если чтение возможно
      * @public
      */
@@ -145,7 +159,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
                 args.push("-ss", `${old_seek ? old_seek : seek}`);
 
                 // Увеличиваем разбег для плавности
-                args.push("-t", this._afade);
+                args.push("-t", this._afade * this._afade_modificator);
             }
 
             // Если другой поток
@@ -249,7 +263,22 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 
         // Проверяем что-бы ссылка была ссылкой, а не пустышкой
         this.options.inputs = this.options.inputs.filter(i => i);
-        this._afade =  this.options.inputs.length === 1 ? db.queues.options.fade : db.queues.options.swapFade;
+
+        // Ищем модификатор скорости (asetrate, tempo)
+        let modificator: number = 1.0;
+
+        try {
+            // Проверяем старые фильтры
+            if (options.old_filters) modificator = Math.max(1.0, getSpeedMultiplier(options.old_filters));
+
+            // Иначе проверяем текущие фильтры
+            else if (options.filters) modificator = Math.max(1.0, getSpeedMultiplier(options.filters));
+        } catch (error) {
+            console.log(error);
+        }
+
+        this._afade_modificator = modificator;
+        this._afade = this.options.inputs.length === 1 ? db.queues.options.fade : db.queues.options.swapFade;
     };
 
     /**
@@ -611,6 +640,80 @@ export class PipeAudioResource extends BaseAudioResource {
 }
 
 
+/**
+ * @author SNIPPIK
+ * @description Регулярное выражение для захвата числового множителя из строки 'asetrate=48000*X'.
+ * @example "asetrate=48000*1.2" -> "1.2"
+ * @const ASSETRATE_MULTIPLIER_PATTERN
+ * @private
+ */
+const ASSETRATE_MULTIPLIER_PATTERN = /^asetrate=48000\*([\d\.]+)(?:,.*)?$/;
+
+/**
+ * @author SNIPPIK
+ * @description Регулярное выражение для захвата числового множителя из строки 'atempo=X'.
+ * @example "atempo=2" -> "2"
+ * @const ATEMPO_MULTIPLIER_PATTERN
+ * @private
+ */
+const ATEMPO_MULTIPLIER_PATTERN = /^atempo=([\d\.]+)(?:,.*)?$/;
+
+/**
+ * @author SNIPPIK
+ * @description Извлекает числовой множитель (rate) из фильтра asetrate.
+ * @param filtersString Строка фильтров FFmpeg.
+ * @returns Извлеченное значение как строка, или null.
+ * @function extractAsetrateMultiplier
+ * @private
+ */
+function extractAsetrateMultiplier(filtersString: string): string | null {
+    const match = filtersString.match(ASSETRATE_MULTIPLIER_PATTERN);
+    return match ? match[1] : null;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Извлекает числовой множитель (rate) из фильтра atempo.
+ * @param filtersString Строка фильтров FFmpeg.
+ * @returns Извлеченное значение как строка, или null.
+ * @function extractAtempoMultiplier
+ * @private
+ */
+function extractAtempoMultiplier(filtersString: string): string | null {
+    const match = filtersString.match(ATEMPO_MULTIPLIER_PATTERN);
+    return match ? match[1] : null;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Центральная функция для получения множителя скорости (Speed Multiplier)
+ * из строки фильтров, проверяя сначала asetrate, затем atempo.
+ * @param filtersString Строка фильтров FFmpeg.
+ * @returns Числовой множитель скорости или 1.0, если не найден.
+ * @function getSpeedMultiplier
+ * @private
+ */
+function getSpeedMultiplier(filtersString: string): number {
+    if (!filtersString) return 1.0;
+
+    // Извлекаем множитель asetrate
+    const asetrateStr = extractAsetrateMultiplier(filtersString);
+
+    // Конвертируем в число. Если не найдено, используем 1.0 (нет изменения)
+    const asetrateMultiplier = asetrateStr ? parseFloat(asetrateStr) : 1.0;
+
+    // Извлекаем множитель atempo
+    const atempoStr = extractAtempoMultiplier(filtersString);
+
+    // Конвертируем в число. Если не найдено, используем 1.0 (нет изменения)
+    const atempoMultiplier = atempoStr ? parseFloat(atempoStr) : 1.0;
+
+    // Общий множитель - это произведение (умножение) двух эффектов.
+    const totalMultiplier = asetrateMultiplier * atempoMultiplier;
+
+    // Проверка на NaN и возврат результата.
+    return isNaN(totalMultiplier) ? 1.0 : totalMultiplier;
+}
 
 
 /**

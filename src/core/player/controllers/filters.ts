@@ -71,7 +71,7 @@ export class ControllerFilters<T extends AudioFilter> extends SetArray<T> {
         // Проверяем, не конфликтует ли новый фильтр с уже включёнными
         for (const enabledFilter of this) {
             // Новый фильтр несовместим с уже включённым?
-            if (filter.unsupported.includes(enabledFilter.name)) return [filter.name, enabledFilter.name];
+            if (filter.unsupported && filter.unsupported?.includes(enabledFilter.name)) return [filter.name, enabledFilter.name];
 
             // Уже включённый фильтр несовместим с новым?
             else if (enabledFilter.unsupported.includes(filter.name)) return [enabledFilter.name, filter.name];
