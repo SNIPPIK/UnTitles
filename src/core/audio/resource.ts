@@ -209,7 +209,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
                 if (crossfade.duration) {
                     afade.push(
                         `[0:a]afade=t=in:st=0:d=${this._afade}[a1]`,
-                        `[a1]afade=t=out:st=${crossfade.duration - this._afade}:d=${this._afade}[a2]`,
+                        `[a1]afade=t=out:st=${crossfade.duration - db.queues.options.fade}:d=${db.queues.options.fade}[a2]`,
                         `[a2]${args_filters.join(",")}[final_audio]`,
                     );
                 }

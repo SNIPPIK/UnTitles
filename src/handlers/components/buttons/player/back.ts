@@ -1,7 +1,7 @@
 import { Component, DeclareComponent } from "#handler/components";
 import { Middlewares } from "#handler/commands";
-import { RepeatType } from "#core/queue";
 import { Colors } from "#structures/discord";
+import { RepeatType } from "#core/queue";
 import { locale } from "#structures";
 import { db } from "#app/db";
 
@@ -38,17 +38,13 @@ class ButtonBack extends Component<"button"> {
             });
         }
 
-
         // Делаем повтор временным
         if (repeat === RepeatType.None) queue.tracks.repeat = RepeatType.Songs;
 
         // Если позиция меньше или равна 0
         if (position <= 0) {
-            // Переключаем на 0 позицию
-            queue.tracks.position = queue.tracks.total - 1;
-
             // Переключаемся на последний трек
-            queue.player.play(0, 0, queue.tracks.position).catch(console.error);
+            queue.player.play(0, 0, queue.tracks.total - 1).catch(console.error);
         }
 
         else {

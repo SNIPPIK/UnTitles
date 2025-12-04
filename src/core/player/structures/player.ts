@@ -336,13 +336,15 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const current = player.tracks.position;
 
             // Позиция трека для сообщения
-            const position = skip?.position !== undefined ? skip?.position : current;
+            const position = skip?.position ? skip?.position : current;
 
             // Выводим сообщение об ошибке
             db.events.emitter.emit("message/error", queue, error, position);
 
             // Если надо пропустить трек
             if (skip) {
+                player.tracks.remove(skip.position);
+
                 // Если надо пропустить текущую позицию
                 if (skip.position === current) {
                     // Если плеер играет, то не пропускаем
@@ -352,8 +354,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                 // Если следующих треков нет
                 else if (player.tracks.size === 0) return queue.cleanup();
-
-                player.tracks.remove(skip.position);
             }
         });
     };
@@ -374,22 +374,35 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Выбираем и создаем класс для предоставления аудио потока
         return this._audio.preload = new (time > PLAYER_BUFFERED_TIME || time === 0 ? PipeAudioResource : BufferedAudioResource)(
-            {
-                seek,
-                old_seek: stream ? stream.duration : 0,
-                volume: this._audio.volume,
+            // Если начался новый трек
+            stream && stream.packets === 0 ?
+                {
+                    seek,
+                    filters: this._filters.filters,
+                    volume: this._audio.volume,
+                    inputs: [
+                        path
+                    ],
+                    crossfade: {
+                        duration: time
+                    }
+                } :
 
-                filters: this._filters.filters,
-                old_filters: stream ? stream.options.filters : null,
-
-                inputs: [
-                    stream ? stream.options.inputs.pop() : null,
-                    path
-                ],
-                crossfade: {
-                    duration: stream ? (stream.packets * OPUS_FRAME_SIZE) / 1e3 : time
+            // Если произошла смена аудио потока
+                {
+                    seek,
+                    filters: this._filters.filters,
+                    volume: this._audio.volume,
+                    old_seek: stream ? stream.duration : 0,
+                    old_filters: stream ? stream.options.filters : null,
+                    inputs: [
+                        stream ? stream.options.inputs.pop() : null,
+                        path
+                    ],
+                    crossfade: {
+                        duration: stream ? (stream.packets * OPUS_FRAME_SIZE) / 1e3 : time
+                    }
                 }
-            }
         );
     };
 
@@ -533,19 +546,19 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @private
      */
     private _onPlayerReadable = (index: number, seek: number) => {
-        // Передаем плеер в цикл
-        this.cycle = true;
-
         // Переводим плеер в состояние чтения аудио
         this.status = "player/playing";
 
+        // Передаем плеер в цикл
+        this.cycle = true;
+
         // Меняем позицию если удачно
-        this.tracks.position = index;
+        this._tracks.position = index;
 
         // Если трек включен в 1 раз
         if (seek === 0) {
-            // Отправляем пустышку для смягчения
-            this.voice.connection.packet = SILENT_FRAME;
+            // Отправляем пустышку для смягчения если нет аудио
+            if (!this._audio.current) this._voice.connection.packet = SILENT_FRAME;
 
             const queue = db.queues.get(this.id);
             if (queue) db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно

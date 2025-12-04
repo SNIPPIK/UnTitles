@@ -105,8 +105,6 @@ class rest_request extends Event<"rest/request"> {
 })
 class rest_error extends Event<"rest/error"> {
     run: SupportEventCallback<"rest/error"> = async (message, error) => {
-        Logger.log("ERROR", error);
-
         const options = {
             embeds: [{
                 title: locale._(message.locale, "api.error"),
