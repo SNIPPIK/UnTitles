@@ -180,10 +180,7 @@ async function fetchFromPlatform(api: RestServerSide.ServerOptions) {
         return parentPort.postMessage({ requestId,
             type: callback.name,
             status: "success",
-            result: await callback.execute(payload, {
-                audio: options?.audio !== undefined ? options.audio : true,
-                limit: rest.limits[callback.name]
-            })
+            result
         });
     } catch (err: any) {
         parentPort.postMessage({
