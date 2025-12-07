@@ -68,9 +68,6 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
     /** Временный буфер, для объединения буферов */
     public _buffer: Buffer = Buffer.allocUnsafe(0);
 
-    /** Флаг, указывающий, что мы уже отправили заголовок OpusHead */
-    private _headEmitted: boolean = false;
-
     /**
      * @description Функция ищущая актуальный для взятия фрагмент
      * @public
@@ -194,9 +191,6 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
 
         // Проверяем сигнатуру является ли это заголовок
         if (signature.equals(OGG_CONSTANTS.OPUS_HEAD)) {
-            // Заголовок идентификации
-            this._headEmitted = true;
-
             // Мы не пушим OpusHead в readable аудио данных, обычно это метаданные.
             this.emit("head", packet);
         } else if (signature.equals(OGG_CONSTANTS.OPUS_TAGS)) {
@@ -205,9 +199,7 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
         } else {
             // Это аудио данные. Отправляем дальше.
             // Обычно первый пакет после заголовков должен быть отправлен.
-            if (this._headEmitted) {
-                this.emit("frame", packet);
-            }
+            this.emit("frame", packet);
         }
     };
 
