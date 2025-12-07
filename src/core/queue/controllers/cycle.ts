@@ -78,7 +78,6 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
         super({
             // Время до следующего прогона цикла
             duration: OPUS_FRAME_SIZE,
-            drift: false,
 
             // Кастомные функции (если хочется немного изменить логику выполнения)
             custom: {
@@ -184,7 +183,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
         super({
             // Время до следующего прогона цикла
             duration: MESSAGE_UPDATE_TIME,
-            drift: true,
+
             // Кастомные функции (если хочется немного изменить логику выполнения)
             custom: {
                 remove: async (item) => {

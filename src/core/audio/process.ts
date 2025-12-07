@@ -82,7 +82,7 @@ export class Process {
             // Отключаем события
             this._process.removeAllListeners();
             // Убиваем процесс
-            this._process.kill("SIGTERM");
+            this._process.kill("SIGKILL");
         }
 
         // Удаляем данные процесса

@@ -15,7 +15,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     /** Следующее запланированное время запуска (в ms, с плавающей точкой) */
     private startTime: number = 0;
 
-    /** Время для высчитывания */
+    /** Накопленное время тиков */
     private tickTime: number = 0;
 
     /** Задержка функции _stepCycle */
@@ -23,10 +23,10 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     private _miss: number = 0;
 
     /** Таймер или функция ожидания */
-    private timeout: NodeJS.Timeout;
+    private timeout: NodeJS.Timeout | null = null;
 
     /**
-     * @description Последний зафиксированный разбег во времени
+     * @description Последний зафиксированный разбег во времени (дрифт)
      * @returns number
      * @public
      */
@@ -43,17 +43,17 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     };
 
     /**
-     * @description Время циклической системы изнутри
+     * @description Время циклической системы изнутри (расчетное время следующего тика - дрифт)
      * @returns number
      * @public
      */
     public get insideTime(): number {
-        return (this.startTime + this.tickTime) - this._driftStep;
+        return this.startTime + this.tickTime;
     };
 
     /**
      * @description Метод получения времени для обновления времени цикла
-     * @default Date.now
+     * @default process.hrtime
      * @returns number
      * @protected
      */
@@ -72,21 +72,24 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     };
 
     /**
-     * @description Высчитываем задержку шага
+     * @description Высчитываем задержку шага и пропуски
      * @param duration - Истинное время шага
      * @private
      */
     private set delay(duration: number) {
-        // Ожидаемое время следующего запуска (без учета _driftStep/lag)
+        // Ожидаемое время следующего запуска
         const expectedNext = this.startTime + this.tickTime + duration;
         const now = this.time;
 
-        // Сколько шагов "пропустили" по времени (если any)
+        // Если текущее время больше ожидаемого, значит мы пропустили шаги
         if (now > expectedNext) {
-            // (now - expectedNext) может быть > duration * N
-            const over = (now - expectedNext) / duration;
+            const diff = now - expectedNext;
+            // Считаем сколько полных интервалов пропустили
+            const over = Math.floor(diff / duration);
             this._miss = over * duration;
         }
+        // Если время сходится
+        else this._miss = 0;
 
         this.tickTime += duration;
         this.lastDelay = duration;
@@ -103,8 +106,9 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
             try {
                 this._stepCycle();
             } finally {
-                // Фиксируем задержку выполнения функции
-                this._driftStep = Math.max(0, now - performance.now());
+                // Фиксируем задержку выполнения функции (Дрифт)
+                // FIX: Было (now - performance.now()), что давало отрицательное число
+                this._driftStep = Math.max(0, performance.now() - now);
             }
         };
     };
@@ -118,9 +122,10 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         if (this.has(item)) this.delete(item);
         super.add(item);
 
-        // Запускаем цикл сразу после добавления первого элемента
+        // Запускаем цикл сразу после добавления первого элемента, если он еще не запущен
         if (this.size === 1 && !this.startTime) {
             this.startTime = this.time;
+            // Используем setImmediate для асинхронного старта
             setImmediate(this._onceStep);
         }
 
@@ -148,21 +153,20 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
         // Дрифт, он высчитываем задержку выполнения функции
         this._driftStep = 0;
-
-        // Если есть таймер
-        if (this.timeout) this._clearTimeout();
+        this._miss = 0;
+        this._clearTimeout();
     };
 
     /**
-     * @description Проверяем время для запуска цикла повторно, без учета дрифта
+     * @description Проверяем время для запуска цикла повторно
      * @returns void
      * @protected
      */
     protected _stepCheckTimeCycle = (duration: number): void => {
-        // Проверяем цикл на наличие объектов
-        if (this.size === 0 || isNaN(duration)) return this.reset();
+        // Проверяем цикл на наличие объектов и валидность duration
+        if (this.size === 0 || isNaN(duration) || duration <= 0) return this.reset();
 
-        // Высчитываем время шага
+        // Высчитываем время шага и обновляем tickTime
         this.delay = duration;
 
         // Запускаем таймер
@@ -170,34 +174,32 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     };
 
     /**
-     * @description Функция запуска timeout или immediate функции
+     * @description Функция запуска timeout
      * @param actualTime  - Внутренне время с учетом прошлого тика
-     * @param callback    - Функция для высчитывания
+     * @param callback    - Функция для выполнения
      * @returns void
      * @protected
      */
     protected _runTimeout = (actualTime: number, callback: () => void): void => {
-        const delay = Math.max(0, actualTime - this.time);
+        // Рассчитываем реальную задержку до следующего тика
+        const delay = Math.max(0, actualTime - this.time - this._driftStep);
         this._clearTimeout();
 
-        // Запускаем стандартный шаг
         this.timeout = setTimeout(callback, delay);
     };
 
     /**
-     * @description Удаляем таймер или Immediate
+     * @description Удаляем таймер
      * @protected
      */
     protected _clearTimeout = () => {
         if (!this.timeout) return;
-
         clearTimeout(this.timeout);
         this.timeout = null;
     };
 
     /**
-     * @description Выполняет шаг цикла с учётом точного времени следующего запуска
-     * @returns void
+     * @description Абстрактный метод самого цикла
      * @protected
      * @abstract
      */
@@ -206,19 +208,19 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
 /**
  * @author SNIPPIK
- * @description Класс для удобного управления циклами
+ * @description Класс для удобного управления циклами (синхронный запуск задач)
  * @class TaskCycle
  * @abstract
  * @public
  */
-export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
+export class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
     /**
      * @description Создаем класс и добавляем параметры
      * @param options - Параметры для работы класса
      * @constructor
-     * @protected
+     * @public
      */
-    protected constructor(public options: TaskCycleConfig<T>) {
+    public constructor(public options: TaskCycleConfig<T>) {
         super();
     };
 
@@ -229,8 +231,8 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @public
      */
     public add = (item: T): this => {
-        if (this.options.custom?.push) this.options.custom?.push(item);
-        else if (this.has(item)) this.delete(item);
+        if (this.options.custom?.push) this.options.custom.push(item);
+        if (this.has(item)) this.delete(item);
 
         super.add(item);
         return this;
@@ -243,19 +245,18 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @public
      */
     public delete = (item: T) => {
-        const index = this.has(item);
-
-        // Если есть объект в базе
-        if (index) {
+        // Проверяем наличие перед удалением
+        if (this.has(item)) {
             if (this.options.custom?.remove) this.options.custom.remove(item);
             super.delete(item);
+            return true;
         }
 
-        return true;
+        return false;
     };
 
     /**
-     * @description Здесь будет выполнен прогон объектов для выполнения execute
+     * @description Здесь будет выполнен прогон объектов
      * @returns Promise<void>
      * @readonly
      * @private
@@ -265,30 +266,40 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
 
         // Запускаем цикл
         for (const item of this) {
-            // Если объект не готов
+            // Если объект не проходит фильтр, пропускаем
             if (!this.options.filter(item)) continue;
 
             try {
-                this.options.execute(item);
+                // В TaskCycle задачи запускаются без await (fire-and-forget внутри цикла),
+                // либо синхронно, если execute не возвращает Promise.
+                // Ошибки внутри execute должны быть пойманы там же, или пойманы здесь.
+                const result = this.options.execute(item);
+                if (result instanceof Promise) {
+                    result.catch(err => {
+                        console.error("Task execution error:", err);
+                        this.delete(item);
+                    });
+                }
             } catch (error) {
+                console.error("Task synchronous error:", error);
                 this.delete(item);
-                console.log(error);
             }
         }
 
-        // Запускаем цикл повторно
+        // Запускаем цикл повторно через заданный интервал
         return this._stepCheckTimeCycle(this.options.duration);
     };
 }
 
 /**
  * @author SNIPPIK
- * @description Класс для удобного управления promise циклами
+ * @description Класс для удобного управления promise циклами (последовательное выполнение)
  * @class PromiseCycle
  * @abstract
  * @public
  */
-export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
+export class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
+    // Переопределяем time для использования Date.now() (менее точно, но быстрее)
     protected get time() {
         return Date.now();
     };
@@ -297,21 +308,18 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @description Создаем класс и добавляем параметры
      * @param options - Параметры для работы класса
      * @constructor
-     * @protected
+     * @public
      */
-    protected constructor(public options: PromiseCycleConfig<T>) {
+    public constructor(public options: PromiseCycleConfig<T>) {
         super();
     };
 
-    /**
-     * @description Добавляем элемент в очередь
-     * @param item - Объект T
-     * @returns this
-     * @public
-     */
     public add = (item: T): this => {
-        if (this.options.custom?.push) this.options.custom?.push(item);
-        else if (this.has(item)) this.delete(item);
+        if (this.options.custom?.push) {
+            this.options.custom.push(item);
+        } else if (this.has(item)) {
+            this.delete(item);
+        }
 
         super.add(item);
         return this;
@@ -324,63 +332,50 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @public
      */
     public delete = (item: T) => {
-        const index = this.has(item);
-
-        // Если есть объект в базе
-        if (index) {
+        if (this.has(item)) {
             if (this.options.custom?.remove) this.options.custom.remove(item);
             super.delete(item);
+            return true;
         }
-
-        return true;
+        return false;
     };
 
     /**
-     * @description Здесь будет выполнен прогон объектов для выполнения execute
+     * @description Прогон объектов с ожиданием (await) каждого шага
      * @returns Promise<void>
      * @readonly
      * @private
      */
     protected _stepCycle = async (): Promise<void> => {
+        this.options?.custom?.step?.();
+
         for (const item of this) {
             // Если объект не готов
             if (!this.options.filter(item)) continue;
 
             try {
-                const bool  = await this.options.execute(item);
+                // Ждем выполнения задачи
+                const success = await this.options.execute(item);
 
-                // Если ответ был получен
-                if (!bool) this.delete(item);
+                // Если execute вернул false, считаем, что задача завершена или провалена окончательно
+                if (!success) this.delete(item);
             } catch (error) {
+                console.error("Promise cycle error:", error);
                 this.delete(item);
-                console.log(error);
             }
         }
 
         // Запускаем цикл повторно
-        return this._stepCheckTimeCycle(30e3);
+        return this._stepCheckTimeCycle(this.options.duration ?? 30000);
     };
 }
 
 /**
- * @author SNIPPIK
- * @description Интерфейс для опций DefaultCycleSystem
+ * @description Общий интерфейс конфигурации
  * @interface BaseCycleConfig
  * @private
  */
 interface BaseCycleConfig<T> {
-    /**
-     * @description Допустим ли drift, если требуется учитывать дрифт для стабилизации цикла
-     * @readonly
-     * @public
-     */
-    readonly drift: boolean;
-
-    /**
-     * @description Как фильтровать объекты, вдруг объект еще не готов
-     * @readonly
-     * @public
-     */
     readonly filter: (item: T) => boolean;
 
     /**
@@ -449,4 +444,10 @@ interface PromiseCycleConfig<T> extends BaseCycleConfig<T> {
      * @public
      */
     readonly execute: (item: T) => Promise<boolean>;
+
+    /**
+     * @description Время паузы между проходами всего цикла
+     * @default 30000
+     */
+    duration?: number;
 }

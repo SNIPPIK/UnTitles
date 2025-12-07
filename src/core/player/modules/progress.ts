@@ -22,6 +22,28 @@ function initButtons() {
 
 /**
  * @author SNIPPIK
+ * @description Доступные элементы для создания прогресс бара
+ * @type Elements
+ * @private
+ */
+type Elements = "left" | "center" | "right";
+
+/**
+ * @author SNIPPIK
+ * @description Получение списка для создания прогресс бара
+ * @param type - Тип элемента
+ * @private
+ */
+function initElement(type: "empty" | "not_empty") {
+    const keys = ["left", "center", "right"];
+    return keys.reduce((acc, key) => {
+        acc[key] = env.get(`progress.${type}.${key}`);
+        return acc;
+    }, {} as Record<Elements, string>);
+}
+
+/**
+ * @author SNIPPIK
  * @description Эмодзи в качестве дизайнерского решения
  * @private
  */
@@ -29,20 +51,12 @@ const emoji = {
     /**
      * @description Пустой прогресс бар
      */
-    empty: {
-        left: env.get("progress.empty.left"),
-        center: env.get("progress.empty.center"),
-        right: env.get("progress.empty.right")
-    },
+    empty: initElement("empty"),
 
     /**
      * @description Не пустой прогресс бар
      */
-    upped: {
-        left: env.get("progress.not_empty.left"),
-        center: env.get("progress.not_empty.center"),
-        right: env.get("progress.not_empty.right")
-    }
+    upped: initElement("not_empty")
 };
 
 /**

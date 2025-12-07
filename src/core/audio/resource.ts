@@ -1,6 +1,7 @@
 import { BufferedEncoder, OPUS_FRAME_SIZE, PipeEncoder } from "./opus";
 import { Logger } from "#structures/logger";
 import { TypedEmitter } from "#structures";
+import type { Track } from "#core/queue";
 import { Process } from "./process";
 import { db } from "#app/db";
 
@@ -117,7 +118,9 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @description Если чтение возможно
      * @public
      */
-    public abstract get readable(): boolean;
+    public get readable(): boolean {
+        return this._readable;
+    };
 
     /**
      * @description Duration в секундах с учётом текущей позиции в буфере и seek-а (предыдущего смещения)
@@ -142,47 +145,23 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 
     /**
      * @description Создание аргументов для FFmpeg
-     * @private
+     * @protected
      */
     protected get arguments(): string[] {
-        const { seek, inputs, old_seek } = this.options;
-        const args = [];
+        const { seek, track } = this.options;
+        const args = [
+            "-ss", `${seek ?? 0}`,
+            "-i", track.link,
+        ];
 
-        // Подготавливаем несколько потоков
-        inputs.forEach((url, index) => {
-            // Добавляем пропуск по времени
-            args.push("-accurate_seek");
-
-            // Только для первого потока
-            if (index === 0 && inputs.length > 1) {
-                // Добавляем пропуск по времени
-                args.push("-ss", `${old_seek ? old_seek : seek}`);
-
-                // Увеличиваем разбег для плавности
-                args.push("-t", this._afade * this._afade_modificator);
-            }
-
-            // Если другой поток
-            else {
-                // Добавляем пропуск по времени
-                args.push("-ss", `${seek}`);
-            }
-
-            // Добавляем ссылку
-            args.push("-i", url);
-        });
+        if (track.isBuffered) args.unshift("-accurate_seek");
 
         return [
-            // Добавляем -nostdin, чтобы предотвратить блокировку FFmpeg
-            "-nostdin",
-
+            "-vn",
             ...args,
             ...this.filters,
 
             // Указываем формат аудио (ogg/opus)
-            "-acodec", "libopus",
-            "-frame_duration", "20",
-            "-application", "lowdelay",
             "-f", "opus",
             "pipe:1"
         ];
@@ -193,63 +172,27 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @protected
      */
     protected get filters(): string[] {
-        const { inputs, volume, filters, old_filters, crossfade } = this.options;
-        const afade = [];
-        const args_filters = [
+        const { volume, filters, track, seek } = this.options;
+        const afade = [
             `volume=${volume / 150}`
         ];
 
         // Если есть используемые фильтры
-        if (filters) args_filters.unshift(filters);
+        if (filters) afade.unshift(filters);
 
-        switch (inputs.length) {
-            // Если поток 1
-            case 1: {
-                // Если можно использовать приглушение
-                if (crossfade.duration) {
-                    afade.push(
-                        `[0:a]afade=t=in:st=0:d=${this._afade}[a1]`,
-                        `[a1]afade=t=out:st=${crossfade.duration - db.queues.options.fade}:d=${db.queues.options.fade}[a2]`,
-                        `[a2]${args_filters.join(",")}[final_audio]`,
-                    );
-                }
+        // Добавляем стартовое время приглушения
+        afade.push(`afade=t=in:st=0:d=${this._afade}`);
 
-                // Если можно использовать приглушение, но только в начале
-                else {
-                    afade.push(
-                        `[0:a]afade=t=in:st=0:d=${this._afade}[a1]`,
-                        `[a1]${args_filters.join(",")}[final_audio]`,
-                    );
-                }
-                break;
-            }
-
-            // Если потоков несколько
-            case 2: {
-                // Если есть фильтры прошлого аудио потока
-                if (old_filters) {
-                    afade.push(
-                        `[0:a]afade=t=in:st=0:d=${this._afade}[a0f]`,
-                        `[a0f]${old_filters}[a0]`,
-                        `[1:a]${args_filters.join(",")}[a1]`,
-                        `[a0][a1]acrossfade=d=${this._afade}:curve1=tri:curve2=tri[final_audio]`
-                    );
-                }
-
-                // Если нет фильтров от прошлого аудио потока
-                else afade.push(
-                    `[0:a]afade=t=in:st=0:d=${this._afade}[a0]`,
-                    `[1:a]${args_filters.join(",")}[a1]`,
-                    `[a0][a1]acrossfade=d=${this._afade}:curve1=tri:curve2=tri[final_audio]`
-                );
-                break;
-            }
+        // Если можно использовать приглушение
+        if (track.time.total > 0) {
+            afade.push(
+                `afade=t=out:st=${Math.max(track.time.total, seek - track.time.total - db.queues.options.fade)}:d=${db.queues.options.fade}`
+            );
         }
 
         // Отдаем готовые фильтры
         return [
-            "-filter_complex", afade.join(";"),
-            "-map", "[final_audio]"
+            "-af", afade.join(",")
         ];
     };
 
@@ -260,25 +203,18 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     protected constructor(public options: AudioResourceOptions) {
         super();
-
-        // Проверяем что-бы ссылка была ссылкой, а не пустышкой
-        this.options.inputs = this.options.inputs.filter(i => i);
-
         // Ищем модификатор скорости (asetrate, tempo)
         let modificator: number = 1.0;
 
         try {
-            // Проверяем старые фильтры
-            if (options.old_filters) modificator = Math.max(1.0, getSpeedMultiplier(options.old_filters));
-
             // Иначе проверяем текущие фильтры
-            else if (options.filters) modificator = Math.max(1.0, getSpeedMultiplier(options.filters));
+            if (options.filters) modificator = Math.max(1.0, getSpeedMultiplier(options.filters));
         } catch (error) {
             console.log(error);
         }
 
         this._afade_modificator = modificator;
-        this._afade = this.options.inputs.length === 1 ? db.queues.options.fade : db.queues.options.swapFade;
+        this._afade = !this.options.swapped ? db.queues.options.fade : db.queues.options.swapFade;
     };
 
     /**
@@ -293,7 +229,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 
             // Запускаем прослушивание события
             path["once"](event, (err: Error) => {
-                if (event === "error") this.emit("error", Error(`AudioResource get ${err}`));
+                if (event === "error") this.emit("error", new Error(`AudioResource get ${err}`));
                 options.events.destroy_callback(options.input);
             });
         }
@@ -512,14 +448,6 @@ export class PipeAudioResource extends BaseAudioResource {
     private played = 0;
 
     /**
-     * @description Если чтение возможно
-     * @public
-     */
-    public get readable(): boolean {
-        return this._readable;
-    };
-
-    /**
      * @description Выдаем фрагмент потока
      * @help (время пакета 20ms)
      * @return Buffer
@@ -634,7 +562,6 @@ export class PipeAudioResource extends BaseAudioResource {
      */
     public destroy = () => {
         super.destroy();
-        this.played = null;
         this.encoder = null;
     };
 }
@@ -720,30 +647,45 @@ function getSpeedMultiplier(filtersString: string): number {
  * @author SNIPPIK
  * @description Параметры для создания класса AudioResource
  * @interface AudioResourceOptions
+ * @private
  */
 interface AudioResourceOptions {
-    inputs: string[];
-    volume: number;
-
-    seek?: number;
-    old_seek?: number;
-
-    filters: string;
-    old_filters?: string;
-
     /**
-     * @description Параметры для fade режима
+     * @description Трек который нало включить
      * @public
      */
-    crossfade?: {
-        duration: number
-    };
+    track: Track;
+
+    /**
+     * @description Громкость аудио потока
+     * @public
+     */
+    volume: number;
+
+    /**
+     * @description Время пропуска, с этой временной точки включится аудио
+     * @public
+     */
+    seek?: number;
+
+    /**
+     * @description Фильтры ffmpeg для включения через filter_complex
+     * @public
+     */
+    filters: string;
+
+    /**
+     * @description Смена аудио потока?
+     * @public
+     */
+    swapped: boolean;
 }
 
 /**
  * @author SNIPPIK
  * @description События аудио потока
  * @interface AudioResourceEvents
+ * @private
  */
 interface AudioResourceEvents {
     /**
@@ -775,6 +717,7 @@ interface AudioResourceEvents {
  * @author SNIPPIK
  * @description Параметры для функции совмещения потоков
  * @interface AudioResourceInput
+ * @private
  */
 interface AudioResourceInput<T> {
     /**
@@ -805,5 +748,5 @@ interface AudioResourceInput<T> {
      * @description Как начать передавать данные из потока
      * @readonly
      */
-    readonly decode: (input: T) => void;
+    readonly decode?: (input: T) => void;
 }

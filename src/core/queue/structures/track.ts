@@ -5,6 +5,14 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
+ * @description Безопасное время для буферизации трека
+ * @const TRACK_BUFFERED_TIME
+ * @public
+ */
+const TRACK_BUFFERED_TIME = 500;
+
+/**
+ * @author SNIPPIK
  * @description Класс трека, реализует другой класс <BaseTrack>
  * @class Track
  * @public
@@ -266,6 +274,14 @@ export class Track {
         return "lrclib.net"
     };
 
+    /**
+     * @description Трек может быть буферизирован?
+     * @public
+     */
+    public get isBuffered() {
+        const current = this._duration.total;
+        return current < TRACK_BUFFERED_TIME && current !== 0;
+    };
 
     /**
      * @description Создаем трек

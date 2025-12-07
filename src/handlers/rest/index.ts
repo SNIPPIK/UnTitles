@@ -9,6 +9,15 @@ export * from "./index.decorator";
 export * from "./index.client";
 export * from "./index.server";
 
+
+/**
+ * @author SNIPPIK
+ * @description Типы запросов с лимитом кол-ва треков при запросе
+ * @type APIRequestsLimits
+ * @public
+ */
+export type APIRequestsLimits = "playlist" | "album" | "search" | "artist" | "related";
+
 /**
  * @description Helper: all possible requests across platforms
  * @type APIRequests
@@ -324,7 +333,6 @@ export class RestObject {
                 // Если получили ошибку
                 if (song instanceof Error) return null;
 
-                track["_duration"] = song.time;
                 return song.link;
             }
 
@@ -398,11 +406,11 @@ export class RestObject {
      * @protected
      */
     protected request_worker<T extends keyof APIRequests>({platform, payload, options, type}: RestClientSide.ClientOptions): Promise<APIRequests[T] | Error> {
-        return new Promise<APIRequests[T] | Error>((resolve) => {
+        return new Promise<APIRequests[T] | Error>(async (resolve) => {
             const requestId = this.generateUniqueId(); // Генерируем номер запроса
 
             // Слушаем сообщение или же ответ
-            const onMessage = (message: RestServerSide.Result<T> & { requestId?: string }) => {
+            const onMessage = async (message: RestServerSide.Result<T> & { requestId?: string }) => {
                 const { result, status } = message;
 
                 // Не наш ответ — игнорируем

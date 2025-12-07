@@ -1,4 +1,5 @@
 import { BufferedAudioResource, PipeAudioResource } from "#core/audio";
+import { Logger } from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -7,7 +8,7 @@ import { db } from "#app/db";
  * @const TIMEOUT_STREAM_PIPE
  * @private
  */
-const TIMEOUT_STREAM_PIPE = 13000;
+const TIMEOUT_STREAM_PIPE = 15e3;
 
 /**
  * @author SNIPPIK
@@ -15,7 +16,7 @@ const TIMEOUT_STREAM_PIPE = 13000;
  * @const TIMEOUT_STREAM_BUFFERED
  * @private
  */
-const TIMEOUT_STREAM_BUFFERED = 8000;
+const TIMEOUT_STREAM_BUFFERED = 10e3;
 
 /**
  * @author SNIPPIK
@@ -101,20 +102,16 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
         // Записываем аудио в пред-загруженные
         this._pre_audio = stream;
 
-        // Установка таймера ожидания
-        const waitTime = stream.options.crossfade.duration !== 0 ? TIMEOUT_STREAM_BUFFERED : TIMEOUT_STREAM_PIPE;
-        this._timeout = setTimeout(() => {
-            stream.emit("error", Error("Timeout: the stream has been exceeded!"));
-        }, waitTime);
-
         // Отслеживаем аудио поток на ошибки
-        (stream as BufferedAudioResource).once("error", () => {
+        (stream as BufferedAudioResource).once("error", (error) => {
             // Удаляем таймер
             clearTimeout(this._timeout);
 
             // Уничтожаем новый аудио поток
             stream.destroy();
             this._pre_audio = null;
+
+            Logger.log("ERROR", error);
         });
 
         // Отслеживаем аудио поток на готовность к чтению
@@ -124,8 +121,6 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
 
             // Если есть активный поток
             if (this._audio) {
-                // Догоняем ожидание аудио потока
-                //stream.seek = this._audio.duration + 1;
                 this._audio.destroy();
             }
 
@@ -133,6 +128,12 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
             this._audio = stream;
             this._pre_audio = null;
         });
+
+        // Установка таймера ожидания
+        const waitTime = stream.options.track.isBuffered ? TIMEOUT_STREAM_BUFFERED : TIMEOUT_STREAM_PIPE;
+        this._timeout = setTimeout(() => {
+            stream.emit("error", Error("Timeout: the stream has been exceeded!"));
+        }, waitTime);
     };
 
     /**

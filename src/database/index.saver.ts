@@ -43,7 +43,7 @@ export class MetaSaver {
      */
     public set = async (track: Track.data, api: string): Promise<void> => {
         // Если нельзя сохранять в файлы
-        if (!this.inFile) {
+        if (this.inFile) {
             const Path = path.join(this._dirname, "Data", api, `${track.id}.json`);
 
             if (!fs.existsSync(Path)) {
@@ -64,7 +64,7 @@ export class MetaSaver {
                 }
             }
         } else {
-            const song = this.tracks.get(track.id);
+            const song = this.tracks?.get?.(track.id);
 
             // Если уже сохранен трек
             if (song) return null;
@@ -100,7 +100,7 @@ export class MetaSaver {
 
         // Если включен режим без кеширования в файл
         else {
-            const track = this.tracks.get(ID.split("/").at(-1));
+            const track = this.tracks?.get?.(ID.split("/").at(-1));
 
             // Если трек кеширован в память, то выдаем данные
             if (track) return track;
@@ -127,7 +127,6 @@ export class AudioSaver extends PromiseCycle<Track> {
 
     public constructor() {
         super({
-            drift: true,
             custom: {
                 push: (track) => {
                     // Защита от повторного добавления

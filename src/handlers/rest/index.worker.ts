@@ -1,5 +1,6 @@
 import { parentPort, workerData } from "node:worker_threads";
 import type { RestServerSide } from "./index.server";
+import type { APIRequestsLimits } from "#handler/rest";
 import { initDatabase } from "#app/db";
 import { handler } from "#handler";
 import { env } from "#app/env";
@@ -28,16 +29,15 @@ class RestServer extends handler<RestServerSide.API> {
     /**
      * Лимиты на количество обрабатываемых элементов для различных типов запросов.
      * Значения читаются из переменных окружения.
-     * @type {Record<string, number>}
      * @readonly
      * @public
      */
-    public readonly limits: Record<string, number> = ((): Record<string, number> => {
-        const keys = ["playlist", "album", "search", "author"];
+    public readonly limits = (() => {
+        const keys: APIRequestsLimits[] = ["playlist", "album", "search", "artist", "related"];
         return keys.reduce((acc, key) => {
-            acc[key] = parseInt(env.get(`APIs.limit.${key}`));
+            acc[key] = parseInt(env.get(`APIs.limit.${key}`, "10"));
             return acc;
-        }, {} as Record<string, number>);
+        }, {} as Record<APIRequestsLimits, number>);
     })();
 
     /**
@@ -45,7 +45,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @returns RestServerSide.API[]
      * @private
      */
-    private get array(): RestServerSide.API[] {
+    private get array() {
         if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported).sort((a, b) => a.name.localeCompare(b.name));
         return this.platforms.array;
     };
@@ -55,7 +55,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get allow(): RestServerSide.API[] {
+    public get allow() {
         return this.array.filter(api => api.auth !== null && !this.platforms.block.includes(api.name));
     };
 
@@ -64,7 +64,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get allowRelated(): RestServerSide.API[] {
+    public get allowRelated() {
         return this.array.filter(api => api.auth !== null && api.requests.some((apis) => apis.name === "related"));
     };
 
@@ -117,12 +117,18 @@ if (parentPort && workerData.rest) {
     rest = new RestServer();
 
     // Получаем ответ от основного потока
-    parentPort.on("message", (message: RestServerSide.ServerOptions): Promise<void> | void => {
+    parentPort.on("message", async (message: RestServerSide.ServerOptions) => {
         // Если запрос к платформе
         if (message.platform) return fetchFromPlatform(message);
 
         // Если надо выдать данные о загруженных платформах
         else if (message.data) return fetchPlatforms();
+
+        parentPort.postMessage({
+            status: "error",
+            requestId: undefined,
+            result: Error("Dont support this request")
+        });
     });
 
     // Если возникнет непредвиденная ошибка

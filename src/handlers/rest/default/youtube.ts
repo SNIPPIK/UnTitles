@@ -247,7 +247,7 @@ class RestYouTubeAPI extends RestServerSide.API {
             name: "track",
             filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
             execute: async (url, options) => {
-                const ID = this.getID(/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/, url)
+                const ID = this.getID(/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/, url);
 
                 try {
                     // Если ID видео не удалось извлечь из ссылки
@@ -276,7 +276,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     // Если при получении данных возникла ошибка
                     if (api instanceof Error || api["playabilityStatus"]["status"] !== "OK") {
                         // Пробуем получить страницу нативно без API
-                        api = await this.pAPI(url);
+                        api = await this.pAPI(`watch?v=${ID}`);
 
                         // Если все равно возникает ошибка
                         if (api instanceof Error) return api;

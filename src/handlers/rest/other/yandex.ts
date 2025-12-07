@@ -117,7 +117,7 @@ class RestYandexAPI extends RestServerSide.API {
 
                     const track = this.track(api[0]);
 
-                    /// Если указано получение аудио
+                    // Если указано получение аудио
                     if (options.audio) {
                         // Если включена утилита кеширования
                         if (db.audio_saver) {
@@ -229,7 +229,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "artist",
             filter: /(artist)\/[0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = this.getID(/(artist)\/[0-9]+/i, url)?.split("artist")?.at(0);
+                const ID = this.getID(/[0-9]+/i, url);
 
                 // Если ID автора не удалось извлечь из ссылки
                 if (!ID) return locale.err("api.request.id.author");
@@ -318,7 +318,8 @@ class RestYandexAPI extends RestServerSide.API {
                     url: `https://api.music.yandex.net/tracks/${trackId}/download-info`,
                     headers: {
                         "Authorization": "OAuth " + this.auth
-                    }
+                    },
+                    method: "GET",
                 }).toJson;
 
                 // Если на этапе получение данных получена одна из ошибок
@@ -339,7 +340,8 @@ class RestYandexAPI extends RestServerSide.API {
                     url: url["downloadInfoUrl"],
                     headers: {
                         "Authorization": "OAuth " + this.auth
-                    }
+                    },
+                    method: "GET",
                 }).toXML;
 
                 // Если произошла ошибка при получении xml

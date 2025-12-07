@@ -1,13 +1,39 @@
-import { Writable, Transform, TransformOptions, WritableOptions } from "node:stream";
+import { Transform, TransformOptions, Writable, WritableOptions } from "node:stream";
 import { TypedEmitter } from "#structures";
 
 /**
  * @author SNIPPIK
- * @description Заголовок для поиска opus
- * @const OGG_MAGIC
+ * @description Вспомогательная функция для создания буфера из строки
+ * @const fromString
  * @private
  */
-const OGG_MAGIC = Buffer.from("OggS");
+const fromString = (str: string): Buffer => Buffer.from(str);
+
+/**
+ * @author SNIPPIK
+ * @description Константы и сигнатуры Ogg/Opus
+ * @const OGG_CONSTANTS
+ * @private
+ */
+const OGG_CONSTANTS = {
+    // Магическая сигнатура "OggS"
+    CAPTURE_PATTERN: fromString("OggS"),
+    // Заголовки Opus
+    OPUS_HEAD: fromString("OpusHead"),
+    OPUS_TAGS: fromString("OpusTags"),
+    // Размеры фиксированных частей заголовка
+    PAGE_HEADER_SIZE: 27,
+    // Смещения в заголовке Ogg
+    OFFSET_VERSION: 4,
+    OFFSET_TYPE: 5,
+    OFFSET_GRANULE: 6,
+    OFFSET_SERIAL: 14,
+    OFFSET_SEQ: 18,
+    OFFSET_CRC: 22,
+    OFFSET_SEGMENTS_COUNT: 26,
+    OFFSET_SEGMENT_TABLE: 27,
+};
+
 
 /**
  * @author SNIPPIK
@@ -27,139 +53,162 @@ export const OPUS_FRAME_SIZE = 20;
 
 /**
  * @author SNIPPIK
- * @description Максимальная длина сегмента по спецификации OGG
- * @const MAX_SEGMENT_LENGTH
- * @private
- */
-const MAX_SEGMENT_LENGTH = 255;
-
-/**
- * @author SNIPPIK
  * @description Базовый класс декодера, ищет opus фрагменты в ogg потоке
  * @class BaseEncoder
  * @extends TypedEmitter<EncoderEvents>
  * @private
  */
 class BaseEncoder extends TypedEmitter<EncoderEvents> {
+    /** Остаток данных от предыдущего чанка, который не удалось обработать */
+    private _remainder: Buffer | null = null;
+
+    /** Серийный номер битового потока, к которому мы "привязались" */
+    private _bitstreamSerial: number | null = null;
+
     /** Временный буфер, для объединения буферов */
     public _buffer: Buffer = Buffer.allocUnsafe(0);
 
+    /** Флаг, указывающий, что мы уже отправили заголовок OpusHead */
+    private _headEmitted: boolean = false;
+
     /**
      * @description Функция ищущая актуальный для взятия фрагмент
-     * @private
+     * @public
      */
     public parseAvailablePages = (chunk: Buffer) => {
-        const prev = this._buffer;
-        let frame: Buffer;
+        // Объединяем входящий чанк с остатком от предыдущего (если есть)
+        let buffer = this._remainder
+            ? Buffer.concat([this._remainder, chunk])
+            : chunk;
 
-        if (prev.length === 0) frame = chunk;
-        else {
-            frame = Buffer.allocUnsafe(prev.length + chunk.length);
-            prev.copy(frame, 0);
-            chunk.copy(frame, prev.length);
-        }
-
-        // Начинаем обработку буфера с начала
-        const size = frame.length;
         let offset = 0;
+        const totalLength = buffer.length;
 
-        // Основной цикл обработки страниц в OGG-потоке
-        // Цикл продолжается, пока доступно хотя бы 27 байт — минимальный размер заголовка страницы
-        while (offset + 27 <= size) {
-            // Проверяем, соответствует ли текущая позиция сигнатуре "OggS" (OGG_MAGIC)
-            // Это "магическая строка", которая всегда должна быть в начале страницы
-            if (frame[offset] !== OGG_MAGIC[0] ||
-                frame[offset + 1] !== OGG_MAGIC[1] ||
-                frame[offset + 2] !== OGG_MAGIC[2] ||
-                frame[offset + 3] !== OGG_MAGIC[3]) {
-                // Если не совпадает, пытаемся найти ближайшую следующую сигнатуру OGG
-                const next = frame.indexOf(OGG_MAGIC, offset + 1);
+        // 2. Цикл обработки страниц Ogg внутри буфера
+        while (true) {
+            // Проверка: хватает ли данных хотя бы на минимальный заголовок страницы (27 байт)
+            if (totalLength - offset < OGG_CONSTANTS.PAGE_HEADER_SIZE) {
+                break;
+            }
 
-                // Если ничего не найдено — выходим из цикла, т.к. Не можем синхронизироваться
-                if (next === -1) break;
+            // Проверка сигнатуры "OggS"
+            // Мы используем subarray для сравнения без копирования памяти
+            if (!buffer.subarray(offset, offset + 4).equals(OGG_CONSTANTS.CAPTURE_PATTERN)) {
+                // Критическая ошибка: потеряна синхронизация или неверный формат.
+                // В продакшене можно попробовать найти следующее вхождение "OggS" (resync),
+                // но для простоты выбрасываем ошибку.
+                this.emit("error", new Error("OggS capture pattern not found. Stream might be corrupted."));
+                return;
+            }
 
-                // Перемещаемся к найденной сигнатуре и пробуем снова
-                offset = next;
+            // Читаем версию структуры (должна быть 0)
+            const version = buffer.readUInt8(offset + OGG_CONSTANTS.OFFSET_VERSION);
+            if (version !== 0) {
+                this.emit("error", new Error(`Unsupported Ogg stream structure version: ${version}`));
+                return;
+            }
+
+            // Получаем количество сегментов в этой странице
+            const pageSegmentsCount = buffer.readUInt8(offset + OGG_CONSTANTS.OFFSET_SEGMENTS_COUNT);
+
+            // Проверка: хватает ли данных на таблицу сегментов
+            // Заголовок (27) + Таблица сегментов (N байт)
+            if (totalLength - offset < OGG_CONSTANTS.PAGE_HEADER_SIZE + pageSegmentsCount) {
+                break;
+            }
+
+            // Читаем таблицу сегментов (Lacing values) для расчета размера данных
+            let pageDataSize = 0;
+            const segmentTableStart = offset + OGG_CONSTANTS.PAGE_HEADER_SIZE;
+
+            for (let i = 0; i < pageSegmentsCount; i++) {
+                pageDataSize += buffer.readUInt8(segmentTableStart + i);
+            }
+
+            // Полный размер страницы = Заголовок + Таблица сегментов + Сами данные
+            const totalPageSize = OGG_CONSTANTS.PAGE_HEADER_SIZE + pageSegmentsCount + pageDataSize;
+
+            // Проверка: загружена ли вся страница целиком?
+            if (totalLength - offset < totalPageSize) {
+                break;
+            }
+
+            // --- ОБРАБОТКА СТРАНИЦЫ ---
+
+            // Проверяем Serial Number. Если это первая страница, запоминаем его.
+            const serial = buffer.readUInt32BE(offset + OGG_CONSTANTS.OFFSET_SERIAL);
+
+            if (this._bitstreamSerial === null) this._bitstreamSerial = serial;
+            else if (this._bitstreamSerial !== serial) {
+                // Это страница из другого логического потока (мультиплексирование), пропускаем её
+                offset += totalPageSize;
                 continue;
             }
 
-                // Проверяем, доступен ли весь заголовок страницы (27 байт)
-            // Бывает, что заголовок ещё не весь пришёл — тогда ждём следующих данных
-            else if (offset + 27 > size) break;
+            // Извлекаем пакеты данных
+            let dataStart = segmentTableStart + pageSegmentsCount;
+            let packetSize = 0;
 
-            // Байты [offset + 26] содержит количество сегментов (Lacing Table Entries)
-            // Каждая запись определяет длину одного Opus-пакета (фрагмента)
-            const pageSegments = frame.readUInt8(offset + 26);
-            const headerLength = 27 + pageSegments;
+            // Итерируемся по таблице сегментов снова, чтобы собрать пакеты
+            for (let i = 0; i < pageSegmentsCount; i++) {
+                const segmentSize = buffer.readUInt8(segmentTableStart + i);
+                packetSize += segmentSize;
 
-            // Проверяем, пришла ли вся сегментная таблица
-            // Если нет — выходим, ждём следующих данных
-            if (offset + headerLength > size) break;
+                // Если размер сегмента < 255, это конец логического пакета
+                if (segmentSize < 255) {
+                    const packet = buffer.subarray(dataStart, dataStart + packetSize);
+                    this.extractPackets(packet);
 
-            // Проверяем, получена ли вся страница
-            // Если нет — выход из цикла до прихода полной страницы
-            let totalSegmentLength = 0;
-            const segmentTableStart = offset + 27;
-            const segmentTableEnd = segmentTableStart + pageSegments;
-
-            for (let i = segmentTableStart; i < segmentTableEnd; i++) {
-                totalSegmentLength += frame[i];
+                    // Сдвигаем указатель данных на следующий пакет
+                    dataStart += packetSize;
+                    packetSize = 0;
+                }
             }
 
-            const fullPageLength = headerLength + totalSegmentLength;
-
-            // Извлекаем содержимое страницы — начиная с конца таблицы и до конца страницы
-            if (offset + fullPageLength > size) break;
-
-            // Передаём таблицу сегментов и payload в обработчике, который выделяет Opus-пакеты
-            const segmentTable = frame.subarray(segmentTableStart, segmentTableEnd);
-            const payload = frame.subarray(offset + headerLength, offset + fullPageLength);
-            this.extractPackets(segmentTable, payload);
-
-            // Смещаем offset на конец текущей страницы и продолжаем со следующей
-            offset += fullPageLength;
+            // Сдвигаем глобальный offset на размер обработанной страницы
+            offset += totalPageSize;
         }
 
-        // После выхода из цикла: обрезаем буфер, удаляя обработанные байты
-        // Это важно, чтобы избежать переполнения и сохранить только "хвост", который ещё не разобран
-        this._buffer = frame.subarray(offset);
+        // Сохраняем необработанный остаток для следующего вызова _transform
+        if (offset < totalLength) {
+            // Копируем остаток в новый буфер, чтобы не удерживать ссылку на огромный старый chunk
+            this._remainder = Buffer.from(buffer.subarray(offset));
+        }
+
+        // Удаляем память от прошлых фреймов
+        else this._remainder = null;
     };
 
     /**
-     * @description Функция выделяющая opus пакет для отправки и передается через событие frame
-     * @param segmentTable - Буфер сегментов
-     * @param payload - Данные для корректного поиска сегмента
+     * @description Обработка и маршрутизация извлеченного пакета
+     * @param packet - Аудио данные
      * @private
      */
-    private extractPackets = (segmentTable: Buffer, payload: Buffer) => {
-        let packetStart = 0;
-        let packetLength = 0;
+    private extractPackets(packet: Buffer): void {
+        // Защита от пустых пакетов
+        if (packet.length < 8) {
+            return;
+        }
 
-        // Ищем нужный opus frame
-        for (let i = 0; i < segmentTable.length; i++) {
-            const segmentLength = segmentTable[i];
-            packetLength += segmentLength;
+        const signature = packet.subarray(0, 8);
 
-            if (segmentLength < MAX_SEGMENT_LENGTH) {
-                // Пакет завершён — отправляем одним куском
-                const packet = payload.subarray(packetStart, packetStart + packetLength);
-                this._emitting(packet);
-                packetStart += packetLength;
-                packetLength = 0;
+        // Проверяем сигнатуру является ли это заголовок
+        if (signature.equals(OGG_CONSTANTS.OPUS_HEAD)) {
+            // Заголовок идентификации
+            this._headEmitted = true;
+
+            // Мы не пушим OpusHead в readable аудио данных, обычно это метаданные.
+            this.emit("head", packet);
+        } else if (signature.equals(OGG_CONSTANTS.OPUS_TAGS)) {
+            // Теги комментариев
+            this.emit("tags", packet);
+        } else {
+            // Это аудио данные. Отправляем дальше.
+            // Обычно первый пакет после заголовков должен быть отправлен.
+            if (this._headEmitted) {
+                this.emit("frame", packet);
             }
         }
-    };
-
-    /**
-     * @description Обрабатываем аудио пакет
-     * @param packet - Аудио пакет
-     * @private
-     */
-    private _emitting = (packet: Buffer) => {
-        // Обрабатываем пакет
-        if (isOpusHead(packet)) this.emit("head", packet);
-        else if (isOpusTags(packet)) this.emit("tags", packet);
-        else this.emit("frame", packet);
     };
 
     /**
@@ -167,8 +216,11 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
      * @public
      */
     public destroy() {
-        this._buffer.fill(0);
+        this.emit("frame", SILENT_FRAME);
+
+        this._remainder = null;
         this._buffer = null;
+        this._bitstreamSerial = null;
 
         // Освобождаем emitter
         this.removeAllListeners();
@@ -276,41 +328,6 @@ export class PipeEncoder extends Transform {
     };
 }
 
-
-/**
- * @author SNIPPIK
- * @description По строковый расчет opusHead
- * @param packet
- * @private
- */
-function isOpusHead(packet: Buffer): boolean {
-    // "OpusHead" в ASCII: 0x4F 0x70 0x75 0x73 0x48 0x65 0x61 0x64
-    return (
-        packet.length >= 8 &&
-        packet[4] === 0x48 && // 'H'
-        packet[5] === 0x65 && // 'e'
-        packet[6] === 0x61 && // 'a'
-        packet[7] === 0x64    // 'd'
-    );
-}
-
-/**
- * @author SNIPPIK
- * @description По строковый расчет opusTags
- * @param packet
- * @private
- */
-function isOpusTags(packet: Buffer): boolean {
-    // "OpusTags" в ASCII: 0x4F 0x70 0x75 0x73 0x54 0x61 0x67 0x73
-    return (
-        packet.length >= 8 &&
-        packet[4] === 0x54 && // 'T'
-        packet[5] === 0x61 && // 'a'
-        packet[6] === 0x67 && // 'g'
-        packet[7] === 0x73    // 's'
-    );
-}
-
 /**
  * @author SNIPPIK
  * @description События для типизации декодера
@@ -335,4 +352,10 @@ interface EncoderEvents {
      * @param frame - Основной фрагмент opus потока
      */
     "frame": (frame: Buffer) => void;
+
+    /**
+     * @description Получение ошибки при конвертировании аудио
+     * @param error - ошибка
+     */
+    "error": (error: Error) => void;
 }

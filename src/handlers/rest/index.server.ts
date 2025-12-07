@@ -1,13 +1,14 @@
-import type { APIRequests, APIRequestsRaw } from "./index";
+import type { APIRequests, APIRequestsRaw, APIRequestsLimits } from "./index";
 import type { RestAPIS_Names } from "./index.decorator";
 import type { RestClientSide } from "./index.client";
 
 /**
- * @description Тип параметров для каждого запроса
+ * @author SNIPPIK
+ * @description Тип параметров функции вызова для каждого запроса
  * @type ExecuteParams
  * @helper
  */
-type ExecuteParams<T extends keyof APIRequests = keyof APIRequests> = T extends "track" ? { audio: boolean } : T extends "playlist" | "album" | "artist" | "related" | "search" ? { limit: number } : never;
+type ExecuteParams<T extends keyof APIRequests = keyof APIRequests> = T extends "track" ? { audio: boolean } : T extends APIRequestsLimits ? { limit: number } : never;
 
 /**
  * @author SNIPPIK
@@ -178,8 +179,8 @@ export namespace RestServerSide {
      * @public
      */
     export interface RequestDef<T extends keyof APIRequests = keyof APIRequests> {
-        name: T
-        filter?: RegExp
+        name: T;
+        filter?: RegExp;
         execute: (url: string, options: ExecuteParams<T>) => Promise<APIRequestsRaw[T] | Error>;
     }
 
