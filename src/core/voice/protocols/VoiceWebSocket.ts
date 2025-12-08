@@ -365,12 +365,10 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this.ws.removeAllListeners();
             this.ws.close();
 
-            // 100 мс достаточно для вежливого закрытия
-            setTimeout(() => {
-                if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
-                    this.ws.terminate();
-                }
-            }, 100);
+
+            if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
+                this.ws.terminate();
+            }
         }
 
         this.ws = null;
