@@ -166,7 +166,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         // Проверяем цикл на наличие объектов и валидность duration
         if (this.size === 0 || isNaN(duration) || duration <= 0) return this.reset();
 
-        // Высчитываем время шага и обновляем tickTime
+        // Добавляем тик
         this.delay = duration;
 
         // Запускаем таймер
@@ -376,6 +376,11 @@ export class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
  * @private
  */
 interface BaseCycleConfig<T> {
+    /**
+     * @description Как проверять объект на допуск к выполнению шага
+     * @readonly
+     * @public
+     */
     readonly filter: (item: T) => boolean;
 
     /**

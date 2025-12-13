@@ -35,7 +35,12 @@ export class DiscordClient extends Client {
         super({
             presence: {
                 status: "online",
-                activities: [{name: " 💫 Startup...", type: 4}]
+                activities: [
+                    {
+                        name: " 💫 Startup...",
+                        type: 4
+                    }
+                ]
             },
 
             // Права бота

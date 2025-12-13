@@ -28,7 +28,7 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "start": "cd build && node -r tsconfig-paths/register src --ShardManager --optimize_for_size --expose-gc",
+    "start": "cd build && node -r tsconfig-paths/register src --ShardManager --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache",
     "start-bun": "bun src",
     "build": "tsc",
 

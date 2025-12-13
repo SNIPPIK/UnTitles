@@ -49,6 +49,12 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public _counter: number = 0; // Требуется для подстройки под голосовое соединение
 
     /**
+     * @description Надо ли стабилизировать аудио при помощи 2 аудио фрейма
+     * @public
+     */
+    public _sliceFrame: boolean = false;
+
+    /**
      * @description Текущий статус плеера, при создании он должен быть в ожидании
      * @private
      */
@@ -165,8 +171,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если голосовое состояние не позволяет отправлять пакеты
         else if (!this._voice.connection?.isReadyToSend) return false;
 
-        // Если поток не читается, переходим в состояние ожидания
         const currentAudio = this._audio.current;
+
+        // Если поток не читается, переходим в состояние ожидания
         if (!currentAudio && currentAudio.packets > 0 || !currentAudio.readable) {
             this.status = "player/wait";
             this.cycle = false;
@@ -223,7 +230,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         super();
 
         // Используем arrow function чтобы не потерять контекст и обработать ошибку
-        setImmediate(() => this.play().catch(err => this.emit("player/error", this, err)));
+        process.nextTick(() => this.play().catch(err => this.emit("player/error", this, err)));
 
         /**
          * @description Событие смены позиции плеера
@@ -281,6 +288,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     }
                 }
             }
+
+            this._sliceFrame = false;
 
             // Через время запускаем трек, что-бы не нарушать работу VoiceSocket
             // Что будет если нарушить работу VoiceSocket, пинг >=1000
@@ -365,7 +374,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                     seek,
                     filters: this._filters.filters,
                     volume: this._audio.volume,
-                    swapped: !!this._audio.current,
+                    swapped: this._audio.current?.packets > 0,
                     track
                 }
             );
@@ -470,15 +479,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @private
      */
     private _onPlayerReadable = (index: number, seek: number) => {
-        // Переводим плеер в состояние чтения аудио
-        this.status = "player/playing";
-
-        // Передаем плеер в цикл
-        this.cycle = true;
-
-        // Меняем позицию если удачно
-        this._tracks.position = index;
-
         // Если трек включен в 1 раз
         if (seek === 0) {
             // Отправляем пустышку для смягчения если нет аудио
@@ -487,6 +487,15 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const queue = db.queues.get(this.id);
             if (queue) db.events.emitter.emit("message/playing", queue); // Отправляем сообщение, если можно
         }
+
+        // Переводим плеер в состояние чтения аудио
+        this.status = "player/playing";
+
+        // Передаем плеер в цикл
+        this.cycle = true;
+
+        // Меняем позицию если удачно
+        this._tracks.position = index;
     }
 
     /**

@@ -58,25 +58,20 @@ export const OPUS_FRAME_SIZE = 20;
  * @extends TypedEmitter<EncoderEvents>
  * @private
  */
-class BaseEncoder extends TypedEmitter<EncoderEvents> {
-    /** Остаток данных от предыдущего чанка, который не удалось обработать */
+class OggOpusParser extends TypedEmitter<EncoderEvents> {
+    /** Остаток данных от предыдущего фрейма, который не удалось обработать */
     private _remainder: Buffer | null = null;
 
     /** Серийный номер битового потока, к которому мы "привязались" */
     private _bitstreamSerial: number | null = null;
-
-    /** Временный буфер, для объединения буферов */
-    public _buffer: Buffer = Buffer.allocUnsafe(0);
 
     /**
      * @description Функция ищущая актуальный для взятия фрагмент
      * @public
      */
     public parseAvailablePages = (chunk: Buffer) => {
-        // Объединяем входящий чанк с остатком от предыдущего (если есть)
-        let buffer = this._remainder
-            ? Buffer.concat([this._remainder, chunk])
-            : chunk;
+        // Объединяем входящий фрейм с остатком от предыдущего (если есть)
+        let buffer = this._remainder ? Buffer.concat([this._remainder, chunk]) : chunk;
 
         let offset = 0;
         const totalLength = buffer.length;
@@ -166,14 +161,11 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
             offset += totalPageSize;
         }
 
-        // Сохраняем необработанный остаток для следующего вызова _transform
+        // Сохраняем необработанный остаток для следующего вызова
         if (offset < totalLength) {
             // Копируем остаток в новый буфер, чтобы не удерживать ссылку на огромный старый chunk
             this._remainder = Buffer.from(buffer.subarray(offset));
         }
-
-        // Удаляем память от прошлых фреймов
-        else this._remainder = null;
     };
 
     /**
@@ -211,7 +203,6 @@ class BaseEncoder extends TypedEmitter<EncoderEvents> {
         this.emit("frame", SILENT_FRAME);
 
         this._remainder = null;
-        this._buffer = null;
         this._bitstreamSerial = null;
 
         // Освобождаем emitter
@@ -233,7 +224,7 @@ export class BufferedEncoder extends Writable {
      * @description Базовый класс декодера
      * @private
      */
-    public encoder = new BaseEncoder();
+    public parser = new OggOpusParser();
 
     /**
      * @description Создаем класс
@@ -242,17 +233,18 @@ export class BufferedEncoder extends Writable {
      */
     public constructor(options: WritableOptions = { autoDestroy: true }) {
         super(options);
-        this.encoder.on("frame", this.emit.bind(this, "frame"));
-        this.encoder.on("head", (frame) => this.emit("head", frame));
-        this.encoder.on("tags", (frame) => this.emit("tags", frame));
+        this.parser.on("frame", this.emit.bind(this, "frame"));
+        this.parser.on("head", (frame) => this.emit("head", frame));
+        this.parser.on("tags", (frame) => this.emit("tags", frame));
+        this.parser.on("error", (err) => this.emit("error", err));
     };
 
     /**
      * @description Функция для работы чтения
      * @protected
      */
-    public _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
-        this.encoder.parseAvailablePages(chunk);
+    public async _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void) {
+        this.parser.parseAvailablePages(chunk);
         return callback();
     };
 
@@ -262,8 +254,8 @@ export class BufferedEncoder extends Writable {
      * @public
      */
     public _destroy(error: Error) {
-        this.encoder.destroy();
-        this.encoder = null;
+        this.parser.destroy();
+        this.parser = null;
 
         this.removeAllListeners();
         super.destroy(error);
@@ -283,7 +275,7 @@ export class PipeEncoder extends Transform {
      * @description Базовый класс декодера
      * @private
      */
-    private encoder = new BaseEncoder();
+    private parser = new OggOpusParser();
 
     /**
      * @description Создаем класс
@@ -292,17 +284,18 @@ export class PipeEncoder extends Transform {
      */
     public constructor(options: TransformOptions = { autoDestroy: true }) {
         super(Object.assign(options, { readableObjectMode: true }));
-        this.encoder.on("frame", this.push.bind(this));
-        this.encoder.on("head", (frame) => this.emit("head", frame));
-        this.encoder.on("tags", (frame) => this.emit("tags", frame));
+        this.parser.on("frame", this.push.bind(this));
+        this.parser.on("head", (frame) => this.emit("head", frame));
+        this.parser.on("tags", (frame) => this.emit("tags", frame));
+        this.parser.on("error", (err) => this.emit("error", err));
     };
 
     /**
      * @description При получении данных через pipe или write, модифицируем их для одобрения со стороны discord
      * @public
      */
-    public _transform = (chunk: Buffer, _: any, done: () => any) => {
-        this.encoder.parseAvailablePages(chunk);
+    public _transform = async (chunk: Buffer, _: any, done: () => any) => {
+        this.parser.parseAvailablePages(chunk);
         return done();
     };
 
@@ -312,8 +305,8 @@ export class PipeEncoder extends Transform {
      * @public
      */
     public _destroy(error: Error) {
-        this.encoder.destroy();
-        this.encoder = null;
+        this.parser.destroy();
+        this.parser = null;
 
         this.removeAllListeners();
         super.destroy(error);

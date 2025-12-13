@@ -6,12 +6,14 @@ import { VoiceConnection } from "#core/voice";
  * @author SNIPPIK
  * @description Время через которое делается проверка speaking статус
  * @const KEEP_SWITCH_SPEAKING
+ * @private
  */
-const KEEP_SWITCH_SPEAKING = 60e3;
+const KEEP_SWITCH_SPEAKING = 10e3;
 
 /**
  * @author SNIPPIK
  * @description Максимальное значение счетчика активности
+ * @const MAX_SIZE_VALUE
  * @private
  */
 const MAX_SIZE_VALUE = 2 ** 32 - 1;

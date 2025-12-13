@@ -56,7 +56,7 @@
 
 > [!TIP]
 > I recommend enabling the caching system in `.env`, in which case you can include tracks even if the platform is completely blocked  
-> It's impossible to completely bypass `packet lost` due to the `UDP` protocol and other `discord` limitations.
+> It is not possible to completely bypass `packet lost`, due to the `UDP` protocol and other `discord` limitations  
 > But the voice system simply isn't allowed to lose audio packets, even under critical load!
 
 ---
@@ -83,6 +83,7 @@ while (performance.now() - startBlock < 100) {}
 - Best audio player compared to **open source** solutions!
 - Does not require any opus encoders/decoders, has its own opus encoder by parsing method!
 - Adaptive `jitter buffer`, takes into account both network delays and process latency!
+- Automatic voice connection delay calibration to maintain network delays.
 - Requires **FFmpeg**, it is responsible for audio and filters!
 - Supported: Autoplay, Repeat, Shuffle, Replay and more functions
 - Works even with strong **event loop lag**!
@@ -94,14 +95,14 @@ while (performance.now() - startBlock < 100) {}
 - There is support for long videos, Live video is still raw.
 - There is an explicit synchronization of the audio stream, without audio filters!
 #### 🌐 Platforms
-- Supported: `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
-- Audio: `YouTube`, `VK`, `Yandex-Music` **(MP3 + Lossless)**, `SoundCloud`
-- Precise search in the absence of audio, by time and names by syllables
-- There is a search on other platforms in the absence of audio!
-- There is support for `related`(**related tracks**), inclusion of similar tracks
-- Platforms work in a separate **worker** (thread) for performance
-- Everything is described in detail, there are examples and a bunch of interfaces for typing
-- Easy expansion and addition of new platforms via `Dynamic Loader - Handler`
+- Supported platforms: `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
+- Audio: `YouTube`, `VK`, `Yandex-Music` (MP3 + Lossless), `SoundCloud`
+- Audio search on other platforms is available, even if the platform refuses to serve audio!
+- Completely `fallback` system: a track missing on one platform will be found on another! Errors are not a problem!
+- Related support `(including related tracks)` is available.
+- Platforms run in a separate worker `(thread)` for performance.
+- Everything is described in detail, with examples and a ton of interfaces for typing.
+- Easy extension and addition of new platforms via the `Dynamic Loader - Handler`.
 #### 🌍 Localization
 - Available languages: `English`, `Russian` ([**file with languages**](src/structures/locale/languages.json))
 - You can add any language supported by discord

@@ -37,16 +37,18 @@ const db = {
  * @description Функция создания локального времени
  * @private
  */
-const createDate = (ms: boolean = false) => {
+const createDate = () => {
     const local_date = new Date();
-    return `${local_date.getDate().toZero()}.${(local_date.getMonth() + 1).toZero()}.${local_date.getFullYear()} ${local_date.getHours().toZero()}:${local_date.getMinutes().toZero()}` + (ms ? `.${local_date.getMilliseconds().toZero(4)}` : "");
+    const DMY = `${local_date.getDate()}.${(local_date.getMonth() + 1)}.${local_date.getFullYear()}`;
+    const time = (local_date.getHours() * 3600 + local_date.getMinutes() * 60 + local_date.getSeconds() + local_date.getMilliseconds() / 1e3).duration(true);
+    return `${DMY} ` + time;
 }
 
 /**
  * @description Время запуска процесса
  * @private
  */
-const _timestamp = createDate(true);
+const _timestamp = createDate();
 
 /**
  * @author SNIPPIK
@@ -88,7 +90,7 @@ export class Logger {
         // Получаем память в мегабайтах с двумя знаками после запятой
         const mem = process.memoryUsage();
         const memUsedMB = ((mem.heapUsed + mem.external + mem.arrayBuffers) / 1024 / 1024).toFixed(2);
-        const time = createDate(true);
+        const time = createDate();
 
         // Если пришел текст
         if (typeof text === "string") {

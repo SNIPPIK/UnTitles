@@ -9,42 +9,106 @@ const prototypes: { type: any, name: string, value: any}[] = [
     {
         type: String.prototype, name: "duration",
         value: function () {
-            // Если требуется преобразовать число из строки в число
-            if ((this as any).match(/^\d+$/)) return parseInt(this as any);
+            const str = String(this).trim();
+            if (!str) return 0;
 
-            // Если надо разобрать строковое время в число
-            else if (!(this as any).match(":")) {
-                let hours = 0, minutes = 0, seconds = 0;
+            // Формат "HH:MM:SS" или "MM:SS"
+            if (str.includes(":")) {
+                // Разбираем строку по ":" и конвертируем в числа
+                const parts = str.split(":").map(Number);
 
-                const h = (this as any).match(/(\d+)\s*(?:hour|hours|hr|hrs)/i);
-                const m = (this as any).match(/(\d+)\s*(?:minute|minutes|min|mins)/i);
-                const s = (this as any).match(/(\d+)\s*(?:second|seconds|sec|secs)/i);
+                // Если parts.length = 3 (HH:MM:SS), parts = [H, M, S]
+                // Если parts.length = 2 (MM:SS), parts = [M, S]
+                // Если parts.length = 1 (S), parts = [S]
 
-                if (h) hours = parseInt(h[1], 10);
-                if (m) minutes = parseInt(m[1], 10);
-                if (s) seconds = parseInt(s[1], 10);
+                let seconds = 0;
 
-                return seconds + (minutes * 60) + (hours * 3600);
+                // Начинаем с конца и умножаем на 60 в соответствующей степени
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[parts.length - 1 - i]; // S, M, H
+                    // (S * 60^0) + (M * 60^1) + (H * 60^2)
+                    seconds += part * (60 ** i);
+                }
+                return seconds;
             }
 
-            // Если указан формат HH:MM:SS
-            const time = this?.["split"](":").map(Number);
-            return time.length === 1 ? time[0] : time.reduce((acc: number, val: number) => acc * 60 + val);
+            // Если строка содержит только цифры, преобразуем в целое число (считаем секундами)
+            if (/^\d+$/.test(str)) {
+                return parseInt(str, 10);
+            }
+
+            // Формат "1h 30m 5s" (с использованием регулярных выражений)
+            let totalSeconds = 0;
+
+            // Регулярное выражение для поиска H, M, S с их сокращениями
+            const regex = /(?:(\d+)\s*(?:hours?|hr|hrs|h))?\s*(?:(\d+)\s*(?:minutes?|min|mins|m))?\s*(?:(\d+)\s*(?:seconds?|sec|secs|s))?/i;
+            const match = str.match(regex);
+
+            if (match) {
+                const hours = parseInt(match[1] || '0', 10);
+                const minutes = parseInt(match[2] || '0', 10);
+                const seconds = parseInt(match[3] || '0', 10);
+
+                totalSeconds += seconds;
+                totalSeconds += minutes * 60;
+                totalSeconds += hours * 3600;
+            }
+
+            return totalSeconds;
         }
     },
 
     // Number
     {
         type: Number.prototype, name: "duration",
-        value: function () {
-            const t = Number(this), days = ~~(t / 86400), hours = ~~(t % 86400 / 3600), min = ~~(t % 3600 / 60), sec = ~~(t % 60);
-            return [days && days, (days || hours) && hours.toZero(), min.toZero(), sec.toZero()].filter(Boolean).join(":");
-        }
-    },
-    {
-        type: Number.prototype, name: "toZero",
-        value: function (size: number = 2) {
-            return String(this).padStart(size, "0");
+        value: function (ms: boolean = false) {
+            const t = Number(this);
+            if (isNaN(t) || t < 0) return "00:00";
+
+            // Внутренняя функция для добавления ведущего нуля
+            const toZero = (val: number) => String(val).padStart(2, '0');
+
+            // Выделяем дни, часы, минуты, секунды
+            const days = Math.floor(t / 86400); // 86400 = 24 * 3600
+            let remainder = t % 86400;
+
+            const hours = Math.floor(remainder / 3600);
+            remainder %= 3600;
+
+            const minutes = Math.floor(remainder / 60);
+            const seconds = Math.floor(remainder % 60);
+
+            // Форматируем части
+            const parts: (string | number)[] = [];
+
+            if (days > 0) parts.push(`${days}d`);
+
+            // Часы показываем, только если есть дни ИЛИ если это самый большой элемент
+            // (например, "01:30:00" а не "30:00")
+            if (days > 0 || hours > 0) {
+                // Если есть дни, форматируем часы с нулем, иначе просто числом
+                parts.push(days > 0 ? toZero(hours) : hours);
+            }
+
+            // Минуты и секунды обязательны
+            parts.push(toZero(minutes), toZero(seconds));
+
+            // Соединяем
+            let result = parts
+                .filter(Boolean) // Удаляем потенциальные нули
+                .join(":");
+
+            // Если надо указать миллисекунды
+            if (ms) {
+                // Добавляем миллисекунды (если число было дробным)
+                const milliseconds = Math.round((t - Math.floor(t)) * 1000);
+                if (milliseconds > 0) {
+                    // Оставляем только 3 знака после запятой
+                    result += `.${String(milliseconds).padStart(3, '0')}`;
+                }
+            }
+
+            return result;
         }
     },
     {
@@ -97,7 +161,7 @@ declare global {
          * @description Превращаем число в 00:00
          * @returns string
          */
-        duration(): string;
+        duration(ms?: boolean): string;
 
         /**
          * @prototype Number
@@ -105,12 +169,5 @@ declare global {
          * @param min {number} Мин число
          */
         random(min?: number): number;
-
-        /**
-         * @prototype Number
-         * @description Функция превращающая число в строку с добавлением 0
-         * @param size - Размер ряда, 2 = 00
-         */
-        toZero(size?: number): number;
     }
 }

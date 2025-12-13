@@ -13,7 +13,7 @@ const TRACK_BUFFERED_TIME = 500;
 
 /**
  * @author SNIPPIK
- * @description Класс трека, реализует другой класс <BaseTrack>
+ * @description Базовый класс трека, для использования трека. Трек не привязан к чему либо!
  * @class Track
  * @public
  */

@@ -18,7 +18,13 @@ export class ShardManager extends ShardingManager {
      */
     public constructor(file: string, token: string) {
         super(file, {
-            execArgv: ["-r", "tsconfig-paths/register", "--expose-gc", "--optimize_for_size"],
+            execArgv: [
+                "-r", "tsconfig-paths/register",
+                "--expose-gc",
+                "--optimize_for_size",
+                "--experimental-require-module",
+                "--no-compilation-cache"
+            ],
             token: token,
             mode: "process",
             respawn: true
@@ -39,6 +45,11 @@ export class ShardManager extends ShardingManager {
         this.setMaxListeners(1);
 
         // Создаем дубликат
-        this.spawn({amount: "auto", delay: -1}).catch((err: Error) => Logger.log("ERROR", err));
+        this.spawn({
+            amount: "auto",
+            delay: -1
+        })
+            // Перехватываем ошибку
+            .catch((err: Error) => Logger.log("ERROR", err));
     };
 }

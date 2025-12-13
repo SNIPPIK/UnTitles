@@ -17,7 +17,7 @@ export class ControllerCycles {
      * @class AudioPlayers
      * @public
      */
-    public readonly players = new AudioPlayers();
+    public players = new AudioPlayers();
 
     /**
      * @author SNIPPIK
@@ -25,29 +25,40 @@ export class ControllerCycles {
      * @class Messages
      * @public
      */
-    public messages = new Messages
+    public messages = new Messages();
 }
 
 /**
  * @author SNIPPIK
- * @description раз в N ms пробуем уменьшить
+ * @description Раз в N ms пробуем уменьшить Jitter Buffer
  * @const PLAYER_INTERVAL
+ * @private
  */
-const PLAYER_INTERVAL = 5000;
+const PLAYER_INTERVAL = 10e3;
 
 /**
  * @author SNIPPIK
- * @description если уменьшение неудачно — ждать
+ * @description Время сброса Jitter Buffer
  * @const PLAYER_DELAY_COOLDOWN
+ * @private
  */
-const PLAYER_DELAY_COOLDOWN = 5000;
+const PLAYER_DELAY_COOLDOWN = 10e3;
 
 /**
  * @author SNIPPIK
- * @description верхний предел duration
+ * @description Максимальный размер задержки Jitter Buffer
  * @const PLAYER_MAX_DELAY
+ * @private
  */
 const PLAYER_MAX_DELAY = 1000;
+
+/**
+ * @author SNIPPIK
+ * @description Время задержки, при превышении будет добавляться аудио пакет
+ * @const PLAYER_LATENCY_SIZE
+ * @private
+ */
+//const PLAYER_LATENCY_SIZE = 75;
 
 /**
  * @author SNIPPIK
@@ -85,17 +96,20 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                     const now = this.time;
                     const time = Math.max(0, now - this.insideTime);
 
-                    // === 1) Лимит роста: duration может быть максимум time + FRAME ===
-                    const stepLimit = Math.min(PLAYER_MAX_DELAY, Math.floor(time / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE);
+                    // === Лимит роста: duration может быть максимум time + FRAME ===
+                    const stepLimit = Math.min(PLAYER_MAX_DELAY,
+                        // Округляем время для стабильного аудио потока
+                        Math.floor(time / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE
+                    );
 
-                    // === 2) Рост +20, если duration ниже лимита ===
+                    // === Рост +20, если duration ниже лимита ===
                     if (this.options.duration < stepLimit) {
                         this.options.duration = stepLimit;
                         return;
                     }
 
-                    // === 3) Попытка уменьшения (–20) раз в decreaseInterval ===
-                    if (
+                    // === Попытка уменьшения (–20) раз в decreaseInterval ===
+                    else if (
                         (now - this._lastDecrease >= PLAYER_INTERVAL) &&
                         (this.options.duration > OPUS_FRAME_SIZE) &&
                         (now - this._lastDecreaseFailed >= PLAYER_DELAY_COOLDOWN)
@@ -117,15 +131,41 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
 
             // Функция отправки аудио фрейма
             execute: (player) => {
+                // latency - задержка соединения
+                //const latency = player.voice.connection.latency > PLAYER_LATENCY_SIZE ? Math.ceil(player.voice.connection.latency / PLAYER_LATENCY_SIZE) - 1 : 0;
+
                 // Количество фреймов в текущей итерации
                 let size = this.options.duration / OPUS_FRAME_SIZE;
-                player._stepCounter = size;
 
+                // Если нет склейки 2 аудио фрейма при старте
+                if (!player._sliceFrame) {
+                    player._sliceFrame = true;
+                    size++;
+                }
+
+                // Если есть задержка голосового подключения
+                /*if (latency > 0 && size <= latency) {
+                    // Инкремент счётчика
+                    player._counter++;
+
+                    // Проверяем достижение порога
+                    if (player._counter < player._stepCounter) return;
+
+                    // Если достигли — выполняем шаг
+                    player._counter = 0; // сбрасываем
+                    size = latency + size;
+                }*/
+
+                // Отправляем пакет/ы в голосовой канал
                 let i = 0;
                 do {
                     i++;
-                    player.voice.connection.packet = player.audio.current.packet;
+                    const frame = player.audio.current.packet;
+                    if (frame) player.voice.connection.packet = frame;
                 } while (i < size);
+
+                // Указываем кол-во аудио пакетов
+                player._stepCounter = size;
             }
         });
     };
@@ -141,7 +181,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
         // Запускаем Garbage Collector
         setImmediate(() => {
             if (typeof global.gc === "function") {
-                Logger.log("DEBUG", "[Node] running Garbage Collector - running player cycle");
+                Logger.log("DEBUG", "[Node] running Garbage Collector - running in player cycle");
                 global.gc();
             }
         });
@@ -187,7 +227,11 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
             // Кастомные функции (если хочется немного изменить логику выполнения)
             custom: {
                 remove: async (item) => {
-                    try { await item.delete(); } catch { Logger.log("ERROR", `Failed delete message in cycle!`); }
+                    try {
+                        if (item.deletable) await item.delete();
+                    } catch {
+                        Logger.log("ERROR", `Failed delete message in cycle!`);
+                    }
                 },
                 push: (item) => {
                     const old = this.find(msg => msg.guildId === item.guildId);
@@ -229,7 +273,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
         try {
             if (message.editable) await message.edit({ components: component });
         } catch (error) {
-            Logger.log("ERROR", `Failed to edit message in cycle: ${error instanceof Error ? error.message : error}`);
+            Logger.log("ERROR", `Failed to edit message in cycle\n${error instanceof Error ? error.stack : error}`);
 
             // Если при обновлении произошла ошибка
             this.delete(message);

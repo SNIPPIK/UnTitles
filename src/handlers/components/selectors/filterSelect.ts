@@ -71,8 +71,7 @@ class FilterSelector extends Component<"selector"> {
             flags: "Ephemeral"
         });
 
-
-        /* Включаем фильтр */
+        /* Добавляем фильтр */
         player.filters.add(Filter);
 
         // Если можно включить фильтр или фильтры сейчас

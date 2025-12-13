@@ -62,10 +62,13 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
         // Проверяем через какое соединение подключатся
         const socket = this.socket = createSocket({
-            type: isIPv4(options.ip) ? "udp4" : "udp6"
+            type: isIPv4(options.ip) ? "udp4" : "udp6",
+            sendBufferSize: 1024 * 1024 * 5, // 5 MB
+            reuseAddr: true
         });
+        // Позволяет процессу умереть, даже если сокет жив
+        socket.unref();
 
-        socket.bind(0);
         socket.on("error", this.emit.bind(this, "error"));
         socket.on("message", this.emit.bind(this, "message"));
 
@@ -92,7 +95,10 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
         return new Promise((resolve) => {
             const timeout = setTimeout(() => {
-                this.socket.removeAllListeners("message"); // Удаляем слушателя, чтобы не получить отложенный ответ
+                // Удаляем слушателя, чтобы не получить отложенный ответ
+                this.socket.removeAllListeners("message");
+                this.socket.removeAllListeners("error");
+
                 this.destroy();
                 resolve(Error("IP Discovery timed out after 5 seconds"));
             }, 5000); // Таймаут 5 секунд
@@ -113,6 +119,13 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
                 }
 
                 return resolve(Error("Failed to connect from UDP protocol"));
+            });
+
+            // Если не удалось получить данные для отправки аудио на UDP сервер
+            this.socket.once("error", (err) => {
+                clearTimeout(timeout);
+                this.destroy();
+                resolve(Error(`UDP Error: ${err.message}`));
             });
         });
     };

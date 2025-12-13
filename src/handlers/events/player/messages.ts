@@ -23,7 +23,7 @@ class message_error extends Event<"message/error"> {
         if (!queue || !queue?.tracks || !queue?.tracks!.track) return null;
 
         // Данные трека
-        const {api, artist, image, user, name} = position ? queue.tracks.get(position) : queue.tracks.track;
+        const { api, artist, image, user, name } = position ? queue.tracks.get(position) : queue.tracks.track;
 
         // Создаем сообщение
         const message = await queue.message.send({

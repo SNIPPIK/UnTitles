@@ -91,7 +91,7 @@ namespace TrackRaw {
  * @const normalize
  * @private
  */
-const normalize = (str: string) => str.toLowerCase().replace(/[^\w\s:;]|_/gi, "").replace(/\s+/g, " ").trim().split(" ");
+const normalize = (str: string) => str.toLowerCase().replace(/[*:\/;-]/gi, "").replace(/\s+/g, " ").trim().split(" ");
 
 /**
  * @author SNIPPIK
@@ -230,7 +230,7 @@ export class RestObject {
      * @private
      */
     private fetch = async (track: Track, array: RestServerSide.API[]): Promise<Track | Error> => {
-        const { name, artist } = track;
+        const { name, artist, api } = track;
 
         // Оригинальный трек по словам
         const original = normalize(`${artist.title} ${name}`);
@@ -238,11 +238,14 @@ export class RestObject {
 
         // Ищем нужную платформу
         for (const platform of array) {
+            // Не учитываем платформу трека
+            if (platform.name === api.name) continue;
+
             // Получаем класс для работы с Worker
             const platformAPI = this.request(platform.name);
 
             // Поиск трека
-            const search = await platformAPI.request<"search">(`${name} ${artist.title}`).request();
+            const search = await platformAPI.request<"search">(`${artist.title} ${name}`).request();
 
             // Если при получении треков произошла ошибка
             if (search instanceof Error) {
@@ -261,7 +264,7 @@ export class RestObject {
             // Ищем нужный трек
             // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
             const findTrack = search.find((song) => {
-                const candidate = normalize(`${song.artist.title} ${song.name}`);
+                const candidate = normalize(`${song.artist.title} - ${song.name}`);
                 const matchCount = candidate.filter(word => original.includes(word)).length;
                 const time = Math.abs(track.time.total - song.time.total);
 
@@ -316,7 +319,7 @@ export class RestObject {
     };
 
     /**
-     * @description Если надо обновить ссылку на трек или аудио недоступно у платформы
+     * @description Если надо обновить ссылку на трек или аудио недоступно у платформы, получаем с другой
      * @param track - Трек у которого надо получить ссылку на исходный файл
      * @returns Promise<string | Error>
      * @public
@@ -330,10 +333,11 @@ export class RestObject {
             if (authorization.includes(api.name) && audio.includes(api.name) && !block.includes(api.name)) {
                 const song = await this.request(api.name).request<"track">(url, { audio: true }).request();
 
-                // Если получили ошибку
-                if (song instanceof Error) return null;
-
-                return song.link;
+                // Если удалось получить аудио
+                if (!(song instanceof Error)) {
+                    track.link = song.link;
+                    return song.link;
+                }
             }
 
             // Ищем похожий трек на другой платформе
@@ -343,6 +347,7 @@ export class RestObject {
             if (song instanceof Error) return song;
 
             track["_duration"] = song.time;
+            track.link = song.link;
             return song.link;
         } catch (err) {
             Logger.log("ERROR", `[APIs/fetch] ${err}`);
@@ -426,6 +431,7 @@ export class RestObject {
                 switch (status) {
                     // Если получен успешный ответ
                     case "success": {
+                        Logger.log("DEBUG", `[Rest/API |${type}| GET - ${platform.name}]: ${payload}`);
                         const parseTrack = (item: TrackRaw.Data) => new Track(item, platform);
 
                         // Если пришел список треков
@@ -444,12 +450,12 @@ export class RestObject {
 
                     // Если была получена ошибка
                     case "error": {
+                        Logger.log("ERROR", result);
+
                         // Если платформа не отвечает, то отключаем ее!
                         if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
                             this.platforms.block.push(platform.name);
                         }
-
-                        Logger.log("ERROR", result);
                         return resolve(result);
                     }
 
@@ -466,6 +472,7 @@ export class RestObject {
 
             // Отправляем запрос
             this.worker.postMessage({ platform: platform.name, payload, options, requestId, type });
+            Logger.log("DEBUG", `[Rest/API |${type}| SEND - ${platform.name}]: ${payload}`);
         });
     };
 }

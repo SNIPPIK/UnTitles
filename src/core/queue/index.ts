@@ -98,7 +98,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
         if (player.status === "player/pause") player.resume();
 
         // Запускаем функцию воспроизведения треков
-        (() => player.play())();
+        process.nextTick(player.play);
     };
 
     /**

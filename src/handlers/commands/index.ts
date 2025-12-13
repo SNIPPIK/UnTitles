@@ -2,12 +2,12 @@ import {
     ApplicationCommandOption, ApplicationCommandOptionType, ApplicationCommandType,
     Client, PermissionsString, Routes
 } from "discord.js";
-import type {AutocompleteCommandOption, Choice, ChoiceOption} from "./index.decorator";
+import type { AutocompleteCommandOption, Choice, ChoiceOption } from "./index.decorator";
+import { type CommandInteraction, DiscordClient } from "#structures/discord";
 import type { LocalizationMap, Permissions } from "discord-api-types/v10";
-import { CommandInteraction, DiscordClient } from "#structures/discord";
-import { RegisteredMiddlewares } from "#handler/middlewares";
+import type { RegisteredMiddlewares } from "#handler/middlewares";
 import filters from "#core/player/filters.json";
-import { AudioFilter } from "#core/player";
+import type { AudioFilter } from "#core/player";
 import { Logger } from "#structures";
 import { handler } from "#handler";
 import { env } from "#app/env";

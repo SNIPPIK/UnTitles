@@ -1,5 +1,5 @@
-import {CommandInteraction, SelectMenuInteract} from "#structures/discord";
-import { ButtonInteraction } from "discord.js";
+import type { CommandInteraction, SelectMenuInteract } from "#structures/discord";
+import type { ButtonInteraction } from "discord.js";
 import { handler } from "#handler";
 
 /**

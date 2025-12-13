@@ -18,6 +18,12 @@ import { Logger } from "#structures";
  */
 export class VoiceConnection {
     /**
+     * @description Таймер переподключения
+     * @private
+     */
+    private _reconnectTimer: NodeJS.Timeout | null = null;
+
+    /**
      * @description Класс слушателя, если надо слушать пользователей
      * @usage нужно указать self_deaf = false
      * @public
@@ -89,25 +95,18 @@ export class VoiceConnection {
      * @public
      */
     public set packet(frame: Buffer) {
-        if (!frame || frame.length === 0) return;
-
         // Если статус позволяет отправлять аудио
-        else if (this._status === VoiceConnectionStatus.ready) {
-            // Если есть клиенты для шифрования и отправки
-            if (this.udp && this.sRTP) {
-                // Меняем состояние спикера
-                this.speaker.speaking = this.speaker.default;
+        if (!frame || this._status !== VoiceConnectionStatus.ready) return;
 
-                // Если есть клиент E2EE
-                if (this.e2EE || this.e2EE?.session?.ready) {
-                    const audio = this.e2EE?.encrypt(frame);
-                    if (audio) this.udp.packet = this.sRTP.packet(audio);
-                    return;
-                }
+        // Если есть клиенты для шифрования и отправки
+        else if (!this.udp || !this.sRTP) return;
 
-                this.udp.packet = this.sRTP.packet(frame);
-            }
-        }
+        // Меняем состояние спикера
+        this.speaker.speaking = this.speaker.default;
+
+        // Возможно ли использовать E2EE
+        const encrypted = this.e2EE.encrypt(frame) ?? frame;
+        this.udp.packet = this.sRTP.packet(encrypted);
     };
 
     /**
@@ -143,6 +142,11 @@ export class VoiceConnection {
 
         // Если что-то не так с websocket подключением
         else if (this.websocket && this.websocket.status !== "connected") return false;
+
+        // Если есть E2EE шифрование
+        else if (E2EESession.version > 0) {
+            if (!this.e2EE?.session?.ready) return false;
+        }
 
         // Если основных данных нет
         return this.udp.status === "connected";
@@ -334,7 +338,15 @@ export class VoiceConnection {
          * @code 1000-4022
          */
         this.websocket.on("close", (code, reason) => {
-            if (code >= 1000 && code <= 1002 || code === 4002 || this._status === VoiceConnectionStatus.reconnecting) return this.destroy();
+            // Очищаем предыдущий таймер если он был
+            if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+
+            const fatalCodes = [4002, 4004, 4011, 4012, 4014, 4016];
+            const isFatal = (code >= 1000 && code <= 1002) || fatalCodes.includes(code);
+
+            if (isFatal || this._status === VoiceConnectionStatus.reconnecting) {
+                return this.destroy();
+            }
 
             // Подключения больше не существует
             else if (code === 4006 || code === 4003) {
@@ -347,7 +359,7 @@ export class VoiceConnection {
             // Меняем статус на переподключение
             this._status = VoiceConnectionStatus.reconnecting;
 
-            setTimeout(() => {
+            this._reconnectTimer = setTimeout(() => {
                 this.websocket?.emit("debug", `[${code}/${reason}]`, `Voice Connection reconstruct ws... 500 ms`);
                 this.createWebSocket(this.serverState.endpoint, code);
             }, 500);
@@ -513,45 +525,48 @@ export class VoiceConnection {
          * @code 21-31
          */
         this.websocket.on("binary", ({op, payload}) => {
-            // Учетные данные и открытый ключ для внешнего отправителя MLS
-            if (op === VoiceOpcodes.DaveMlsExternalSender) this.e2EE.externalSender = payload;
-
-            // Предложения MLS, которые будут добавлены или отозваны
-            else if (op === VoiceOpcodes.DaveMlsProposals) {
-                const dd = this.e2EE.processProposals(payload, this.speaker.clients);
-
-                // Если есть смысл менять протокол
-                if (dd) {
-                    const buf = Buffer.allocUnsafe(1 + dd.length);
-                    buf[0] = VoiceOpcodes.DaveMlsCommitWelcome;
-                    dd.copy(buf, 1);
-                    this.websocket.packet = buf;
+            switch (op) {
+                // Учетные данные и открытый ключ для внешнего отправителя MLS
+                case VoiceOpcodes.DaveMlsExternalSender: {
+                    this.e2EE.externalSender = payload;
+                    return;
                 }
-            }
 
-            // MLS Commit будет обработан для предстоящего перехода
-            else if (op === VoiceOpcodes.DaveMlsAnnounceCommitTransition) {
-                const { transition_id, success } = this.e2EE.processMLSTransit("commit", payload);
+                // Предложения MLS, которые будут добавлены или отозваны
+                case VoiceOpcodes.DaveMlsProposals: {
+                    const dd = this.e2EE.processProposals(payload, this.speaker.clients);
 
-                // Если успешно
-                if (success) {
-                    if (transition_id !== 0) this.websocket.packet = {
-                        op: VoiceOpcodes.DaveTransitionReady,
-                        d: { transition_id },
-                    };
+                    // Если есть смысл менять протокол
+                    if (dd) this.websocket.packet = Buffer.concat([OPCODE_DAVE_MLS_WELCOME, dd]);
+                    return;
                 }
-            }
 
-            // MLS Добро пожаловать в группу для предстоящего перехода
-            else if (op === VoiceOpcodes.DaveMlsWelcome) {
-                const { transition_id, success } = this.e2EE.processMLSTransit("welcome", payload);
+                // MLS Commit будет обработан для предстоящего перехода
+                case VoiceOpcodes.DaveMlsAnnounceCommitTransition: {
+                    const { transition_id, success } = this.e2EE.processMLSTransit("commit", payload);
 
-                // Если успешно
-                if (success) {
-                    if (transition_id !== 0) this.websocket.packet = {
-                        op: VoiceOpcodes.DaveTransitionReady,
-                        d: { transition_id },
-                    };
+                    // Если успешно
+                    if (success) {
+                        if (transition_id !== 0) this.websocket.packet = {
+                            op: VoiceOpcodes.DaveTransitionReady,
+                            d: { transition_id },
+                        };
+                    }
+
+                    return;
+                }
+
+                // MLS Добро пожаловать в группу для предстоящего перехода
+                case VoiceOpcodes.DaveMlsWelcome: {
+                    const { transition_id, success } = this.e2EE.processMLSTransit("welcome", payload);
+
+                    // Если успешно
+                    if (success) {
+                        if (transition_id !== 0) this.websocket.packet = {
+                            op: VoiceOpcodes.DaveTransitionReady,
+                            d: { transition_id },
+                        };
+                    }
                 }
             }
         });
@@ -564,10 +579,7 @@ export class VoiceConnection {
         session.on("key", (key) => {
             // Если голосовое подключение готово
             if (this._status === VoiceConnectionStatus.ready || this._status === VoiceConnectionStatus.SessionDescription) {
-                const buf = Buffer.allocUnsafe(1 + key.length);
-                buf[0] = VoiceOpcodes.DaveMlsKeyPackage;
-                key.copy(buf, 1);
-                this.websocket.packet = buf;
+                this.websocket.packet = Buffer.concat([OPCODE_DAVE_MLS_KEY, key]);
             }
         });
 
@@ -599,33 +611,28 @@ export class VoiceConnection {
     public destroy = () => {
         Logger.log("DEBUG", `[Voice/${this.configuration.guild_id}] has destroyed`);
 
-        // Уничтожаем подключения
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
+        }
+
+        // Использование Optional Chaining для безопасного вызова
         this.websocket?.destroy?.();
         this.udp?.destroy?.();
         this.sRTP?.destroy?.();
         this.e2EE?.destroy?.();
+        this.adapter?.adapter?.destroy();
+        this.speaker?.destroy();
+        this.receiver?.removeAllListeners();
 
-        // Если есть класс слушателя
-        if (this.receiver) {
-            this.receiver?.removeAllListeners();
-            this.receiver = null;
-        }
-
-        // Удаляем адаптер
-        this.adapter.adapter?.destroy();
-
-        // Удаляем клиентов
+        // Nullify
+        this.receiver = null;
         this.sRTP = null;
         this.websocket = null;
         this.udp = null;
         this.e2EE = null;
         this.adapter = null;
-
-        // Удаляем данные спикера
-        this.speaker.destroy();
         this.speaker = null;
-
-        // Меняем статус
         this._status = null;
     };
 }
@@ -696,3 +703,19 @@ export interface VoiceConnectionConfiguration {
      */
     self_speaker?: SpeakerType;
 }
+
+/**
+ * @author SNIPPIK
+ * @description Opcode dave mls приветствия
+ * @const OPCODE_DAVE_MLS_WELCOME
+ * @private
+ */
+const OPCODE_DAVE_MLS_WELCOME = new Uint8Array([VoiceOpcodes.DaveMlsCommitWelcome]);
+
+/**
+ * @author SNIPPIK
+ * @description Opcode dave mls ключа пакета
+ * @const OPCODE_DAVE_MLS_KEY
+ * @private
+ */
+const OPCODE_DAVE_MLS_KEY = new Uint8Array([VoiceOpcodes.DaveMlsKeyPackage]);

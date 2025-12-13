@@ -325,6 +325,7 @@ class RestYandexAPI extends RestServerSide.API {
                 // Если на этапе получение данных получена одна из ошибок
                 if (!api) return locale.err("api.request.fail.msg", ["Fail getting audio file, api as 0"]);
                 else if (api instanceof Error) return api;
+                else if (api?.result?.name === "track-download-info-error") return locale.err("api.request.fail.msg", ["Fail getting audio file, blocked from provider"]);
                 else if (api?.result?.length === 0) return locale.err("api.request.fail.msg", ["Fail getting audio file, api.size as 0"]);
 
                 const url = api?.result.find((data: any) => data.codec !== "aac") as { downloadInfoUrl: string };

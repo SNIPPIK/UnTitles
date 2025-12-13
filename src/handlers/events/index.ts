@@ -1,8 +1,8 @@
 import type { DiscordClient } from "#structures/discord";
 import type { AudioPlayerEvents } from "#core/player";
+import type { ClientEvents } from "discord.js";
+import type { QueueEvents } from "#core/queue";
 import { TypedEmitter } from "#structures";
-import { QueueEvents } from "#core/queue";
-import { ClientEvents } from "discord.js";
 import { handler } from "#handler";
 
 // Export decorator

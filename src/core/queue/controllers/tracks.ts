@@ -38,6 +38,12 @@ export class ControllerTracks<T extends Track> {
     protected _shuffle = false;
 
     /**
+     * @description Общее время треков, считается только при добавлении и удалении треков
+     * @protected
+     */
+    protected _totalTime = 0;
+
+    /**
      * @description Новая позиция трека в списке
      * @param number - Позиция трека
      * @public
@@ -131,7 +137,9 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public get time() {
-        return this._current.reduce((total, track) => total + (track.time?.total || 0), 0).duration();
+        // Если класс уже удален
+        if (!this._totalTime) return "00:00";
+        return this._totalTime.duration();
     };
 
     /**
@@ -146,6 +154,9 @@ export class ControllerTracks<T extends Track> {
 
         // Добавляем трек в текущую очередь
         this._current.push(track);
+
+        // Высчитываем время проигрывания
+        this._totalTime += track.time.total;
     };
 
     /**
@@ -165,6 +176,11 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public remove = (position: number) => {
+        const track = this._current[position];
+
+        // Высчитываем время проигрывания
+        this._totalTime -= track.time.total;
+
         // Если трек удаляем из виртуально очереди, то и из оригинальной
         if (this._shuffle) {
             const index = this._original.indexOf(this._current[position]);
@@ -254,6 +270,7 @@ export class ControllerTracks<T extends Track> {
         this._original.length = 0;
         this._current = null;
         this._original = null;
+        this._totalTime = null;
 
         this._position = null;
         this._repeat = null;

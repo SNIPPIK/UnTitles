@@ -162,6 +162,8 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
             ...this.filters,
 
             // Указываем формат аудио (ogg/opus)
+            "-acodec", "libopus",
+            "-frame_duration", "20",
             "-f", "opus",
             "pipe:1"
         ];
@@ -651,7 +653,7 @@ function getSpeedMultiplier(filtersString: string): number {
  */
 interface AudioResourceOptions {
     /**
-     * @description Трек который нало включить
+     * @description Трек который надо включить
      * @public
      */
     track: Track;

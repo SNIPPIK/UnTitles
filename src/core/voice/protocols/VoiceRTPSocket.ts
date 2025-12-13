@@ -35,7 +35,7 @@ export class VoiceRTPSocket {
     private head = Buffer.allocUnsafe(12);
 
     /** Пустой буфер */
-    private _nonce: Buffer = Buffer.from(Encryption.nonce);
+    private nonce: Buffer = Buffer.from(Encryption.nonce);
 
     /** Порядковый номер пустого буфера */
     private _nonceFrame : number;
@@ -61,18 +61,9 @@ export class VoiceRTPSocket {
      * @public
      */
     public get nonceFrame() {
-        // Если по какой-то причине нет nonce буфера
-        if (!this._nonce || !Encryption.nonce) {
-            this._nonce = Buffer.alloc(Encryption.nonce?.length ?? 12);
-        }
-
-        this._nonceFrame++;
-        if (this._nonceFrame > MAX_32BIT - 1) this._nonceFrame = 0;
-
-        // Пишем счетчик в первые 4 байта (или в нужную позицию)
-        this._nonce.writeUInt32BE(this._nonceFrame, 0);
-
-        return this._nonce;
+        this._nonceFrame = (this._nonceFrame + 1) % MAX_32BIT;
+        this.nonce.writeUInt32BE(this._nonceFrame, 0);
+        return this.nonce;
     };
 
     /**
@@ -140,11 +131,7 @@ export class VoiceRTPSocket {
         this.timestamp = null;
         this.sequence = null;
         this.options = null;
-
-        this._nonce.fill(0);
-        this._nonce = null;
-
-        this.head.fill(0);
+        this.nonce = null;
         this.head = null;
     };
 }
@@ -161,7 +148,7 @@ function randomNBit(bits: number){
     const buf = crypto.randomBytes(size);
     if (size === 2) return buf.readUInt16BE(0);
     if (size === 4) return buf.readUInt32BE(0);
-    return buf.readUIntBE(0, size) % (2 ** bits);
+    return buf.readUIntBE(0, size) % (2 ** bits) || 1;
 }
 
 /**

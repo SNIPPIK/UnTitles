@@ -57,25 +57,34 @@ class Interaction extends Event<Events.InteractionCreate> {
             }
         }
 
-        // Если используется функция ответа от бота
-        if (ctx.type === InteractionType.ApplicationCommandAutocomplete) {
-            Logger.log("DEBUG", `[${ctx.user.username}] run autocomplete ${ctx?.commandName}`);
-            return this.SelectAutocomplete(ctx);
-        }
+        /**
+         * @description Смотрим тип запроса
+         * @protected
+         */
+        switch (ctx.type) {
+            // Если используется функция ответа от бота
+            case InteractionType.ApplicationCommandAutocomplete: {
+                Logger.log("DEBUG", `[${ctx.user.username}] run autocomplete ${ctx?.commandName}`);
+                return this.SelectAutocomplete(ctx);
+            }
 
-        // Если пользователь использует команду
-        else if (ctx.type === InteractionType.ApplicationCommand) {
-            Logger.log("DEBUG", `[${ctx.user.username}] run command ${ctx?.commandName}`);
-            return this.SelectCommand(ctx as any);
-        }
+            // Если пользователь использует команду
+            case InteractionType.ApplicationCommand: {
+                Logger.log("DEBUG", `[${ctx.user.username}] run command ${ctx?.commandName}`);
+                return this.SelectCommand(ctx as any);
+            }
 
-        // Действия выбора/кнопок
-        else if (ctx.type == InteractionType.MessageComponent) {
-            Logger.log("DEBUG", `[${ctx.user.username}] run component ${ctx?.["customId"]}`);
-            return this.SelectComponent(ctx);
-        }
+            // Действия выбора/кнопок
+            case InteractionType.MessageComponent: {
+                Logger.log("DEBUG", `[${ctx.user.username}] run component ${ctx.customId} | ${ctx?.["values"]}`);
+                return this.SelectComponent(ctx);
+            }
 
-        return null;
+            default: {
+                Logger.log("WARN", `User: ${ctx.user.username}, used unsupported type ${ctx.type}`);
+                ctx.deleteReply("@original").catch(() => null);
+            }
+        }
     };
 
     /**
@@ -104,7 +113,10 @@ class Interaction extends Event<Events.InteractionCreate> {
         // Проверка middleware
         if (command.middlewares?.length > 0) {
             for (const rule of db.middlewares.array) {
-                if (command.middlewares.includes(rule.name) && !rule.callback(ctx)) return null;
+                if (command.middlewares.includes(rule.name) && !rule.callback(ctx)) {
+                    Logger.log("DEBUG", `[${ctx.user.username}] ${rule.name} has dont entered`);
+                    return null;
+                }
             }
         }
 
@@ -178,7 +190,10 @@ class Interaction extends Event<Events.InteractionCreate> {
         // Делаем проверку ограничений
         if (middlewares?.length > 0) {
             for (const rule of db.middlewares.array) {
-                if (middlewares.includes(rule.name) && !rule.callback(ctx)) return null;
+                if (middlewares.includes(rule.name) && !rule.callback(ctx)) {
+                    Logger.log("DEBUG", `[${ctx.user.username}] ${rule.name} has dont entered`);
+                    return null;
+                }
             }
         }
 

@@ -22,7 +22,12 @@ class ButtonBack extends Component<"button"> {
         const position = queue.tracks.position;
 
         // Если трек уже какое-то время играет
-        if (queue.player.audio.current.duration >= db.queues.options.optimization) {
+        if (
+            // Если есть аудио поток
+            queue.player.audio.current &&
+            // Если время аудио позволяет вернутся
+            (queue.player.audio.current?.duration > db.queues.options.optimization)
+        ) {
             // Запускаем проигрывание текущего трека
             queue.player.play(0, 0, queue.player.tracks.position).catch(console.error);
 

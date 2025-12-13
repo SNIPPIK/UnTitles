@@ -149,13 +149,12 @@ abstract class Request {
             };
         }
 
-        // Установка User-Agent
+        // Устанавливаем User-Agent
         if (options.userAgent !== undefined) {
             let ua: string;
 
-            if (typeof options.userAgent === "string") {
-                ua = options.userAgent;
-            } else {
+            if (typeof options.userAgent === "string") ua = options.userAgent;
+            else {
                 // Генерируем новый User-Agent
                 const revision = Math.floor(Math.random() * 2) + 140; // Генерация числа около 140
                 const OS = ["X11; Linux x86_64", "Windows NT 10.0; Win64; x64", "X11; Linux i686"];
@@ -272,11 +271,8 @@ export class httpsClient extends Request {
                 // Если при получении страниц произошла ошибка
                 if (body instanceof Error) return resolve(body);
 
-                // ⚡️ Оптимизация: Более строгий и эффективный RegExp для извлечения текста между тегами
-                // В некоторых случаях это может быть быстрее, чем общий парсинг.
+                // Более строгий и эффективный RegExp для извлечения текста между тегами
                 // Регулярное выражение: /<[^<>]+>([^<>]+)<\/[^<>]+>/g
-                // Оно ищет: <тег>СОДЕРЖАНИЕ</тег> и захватывает СОДЕРЖАНИЕ.
-                // Флаг `g` обязателен для `.match()`
                 const items = body.match(/<[^<>]+>([^<>]+)<\/[^<>]+>/gi);
 
                 // Если нет данных xml в странице

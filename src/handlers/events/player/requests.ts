@@ -105,28 +105,41 @@ class rest_request extends Event<"rest/request"> {
 })
 class rest_error extends Event<"rest/error"> {
     run: SupportEventCallback<"rest/error"> = async (message, error) => {
-        const options = {
-            embeds: [{
-                title: locale._(message.locale, "api.error"),
-                description: `${error}`,
-                color: Colors.DarkRed
-            }]
-        };
-
         try {
-            let msg = await message.followUp(options);
-            setTimeout(() => msg.delete().catch(() => null), 15e3);
-        } catch (err) {
-            Logger.log("ERROR", err as Error);
+            const msg = await message.channel.send({
+                components: [{
+                    "type": 17, // Container
+                    "accent_color": Colors.DarkRed,
+                    components: [
+                        {
+                            "type": 9, // Block
+                            "components": [
+                                {
+                                    "type": 10,
+                                    "content": locale._(message.locale, "api.error")
+                                },
+                                {
+                                    "type": 10,
+                                    "content": `\`\`\`css\n${error}\n\`\`\``
+                                }
+                            ],
+                            "accessory": {
+                                "type": 11,
+                                "media": {
+                                    "url": message.client.user.avatarURL()
+                                }
+                            }
+                        },
+                    ]
+                }],
+                flags: "IsComponentsV2"
+            });
 
-            try {
-                let msg = await message.channel.send(options);
-                setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 15e3);
-            } catch (err) {
-                Logger.log("ERROR", err as Error);
-            }
+            if (msg && msg?.deletable) setTimeout(() => msg.delete().catch(() => null), 15e3);
+        } catch (error) {
+            Logger.log("ERROR", error as Error);
         }
-    }
+    };
 }
 
 /**
