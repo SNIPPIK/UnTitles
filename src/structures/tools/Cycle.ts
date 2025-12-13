@@ -1,3 +1,4 @@
+import { performance } from "node:perf_hooks";
 import { SetArray } from "#structures/array";
 
 /**
@@ -9,8 +10,8 @@ import { SetArray } from "#structures/array";
  * @private
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Последний сохраненный временной интервал */
-    private lastDelay: number = 0;
+    /** Последний записанное значение performance.now(), нужно для улавливания event loop lags */
+    private performance: number = 0;
 
     /** Следующее запланированное время запуска (в ms, с плавающей точкой) */
     private startTime: number = 0;
@@ -20,7 +21,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
     /** Задержка функции _stepCycle */
     private _driftStep: number = 0;
-    private _miss: number = 0;
 
     /** Таймер или функция ожидания */
     private timeout: NodeJS.Timeout | null = null;
@@ -32,14 +32,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public get drifting(): number {
         return this._driftStep;
-    };
-
-    /**
-     * @description Упущенные шаги функции выполнения
-     * @public
-     */
-    public get misses(): number {
-        return this._miss;
     };
 
     /**
@@ -58,59 +50,16 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected get time(): number {
-        const hr = process.hrtime.bigint();
-        return Math.floor(Number(hr / 1_000_000n));
+        return Math.floor(Number(process.hrtime.bigint() / 1_000_000n));
     };
 
     /**
-     * @description Последний зафиксированный промежуток выполнения
-     * @returns number
-     * @public
-     */
-    public get delay(): number {
-        return this.lastDelay;
-    };
-
-    /**
-     * @description Высчитываем задержку шага и пропуски
+     * @description Высчитываем задержку шага, самая важная часть цикла
      * @param duration - Истинное время шага
      * @private
      */
     private set delay(duration: number) {
-        // Ожидаемое время следующего запуска
-        const expectedNext = this.startTime + this.tickTime + duration;
-        const now = this.time;
-
-        // Если текущее время больше ожидаемого, значит мы пропустили шаги
-        if (now > expectedNext) {
-            const diff = now - expectedNext;
-            // Считаем сколько полных интервалов пропустили
-            const over = Math.floor(diff / duration);
-            this._miss = over * duration;
-        }
-        // Если время сходится
-        else this._miss = 0;
-
         this.tickTime += duration;
-        this.lastDelay = duration;
-    };
-
-    /**
-     * @description Функция выполнения шага с вычетом задержки
-     * @protected
-     */
-    protected get _onceStep() {
-        return () => {
-            const now = performance.now();
-
-            try {
-                this._stepCycle();
-            } finally {
-                // Фиксируем задержку выполнения функции (Дрифт)
-                // FIX: Было (now - performance.now()), что давало отрицательное число
-                this._driftStep = Math.max(0, performance.now() - now);
-            }
-        };
     };
 
     /**
@@ -126,7 +75,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         if (this.size === 1 && !this.startTime) {
             this.startTime = this.time;
             // Используем setImmediate для асинхронного старта
-            setImmediate(this._onceStep);
+            process.nextTick(this._stepCycle);
         }
 
         return this;
@@ -139,21 +88,10 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public reset(): void {
         this.clear(); // Удаляем все объекты
-        this.reboot();
-    };
 
-    /**
-     * @description Подготовка данных цикла для повторного использования
-     * @private
-     */
-    private reboot = () => {
         this.startTime = 0;
         this.tickTime = 0;
-        this.lastDelay = 0;
-
-        // Дрифт, он высчитываем задержку выполнения функции
-        this._driftStep = 0;
-        this._miss = 0;
+        this.performance = 0;
         this._clearTimeout();
     };
 
@@ -169,8 +107,11 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         // Добавляем тик
         this.delay = duration;
 
+        // Вычисляем лаги Event loop
+        const lags = this._calculateLags(duration);
+
         // Запускаем таймер
-        return this._runTimeout(this.insideTime, this._onceStep);
+        return this._runTimeout(this.insideTime + lags, this._stepCycle);
     };
 
     /**
@@ -181,11 +122,37 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected _runTimeout = (actualTime: number, callback: () => void): void => {
-        // Рассчитываем реальную задержку до следующего тика
-        const delay = Math.max(0, actualTime - this.time - this._driftStep);
+        const delay = Math.max(0, (actualTime - this.time) - this._driftStep); // Время до следующего тика
+        const onceCallback = () => {
+            this._driftStep = Math.max(0, this.time - actualTime); // Измеряем реальный дрифт
+
+            return callback();
+        };
+
+        // Чистим если есть прошлый таймер
         this._clearTimeout();
 
-        this.timeout = setTimeout(callback, delay);
+        // Если надо срочно выполнить шаг цикла
+        if (delay < 1) process.nextTick(onceCallback);
+
+        // Запускаем обычный таймер шага
+        else this.timeout = setTimeout(callback, delay);
+    };
+
+    /**
+     * @description Высчитываем задержки event loop
+     * @param duration - Размер шага
+     * @protected
+     * @readonly
+     */
+    protected _calculateLags = (duration: number) => {
+        // Коррекция event loop lag
+        const performanceNow = performance.now();
+        const driftEvent = this.performance ? Math.max(0, (performanceNow - this.performance) - duration) : 0;
+        this.performance = performanceNow;
+
+        // Смягчение event loop lag
+        return driftEvent;
     };
 
     /**
