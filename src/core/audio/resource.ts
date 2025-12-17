@@ -1,7 +1,9 @@
 import { BufferedEncoder, OPUS_FRAME_SIZE, PipeEncoder } from "./opus";
 import { Logger } from "#structures/logger";
 import { TypedEmitter } from "#structures";
+import type { Track } from "#core/queue";
 import { Process } from "./process";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -45,8 +47,7 @@ class AudioBuffer {
      * @public
      */
     public set position(position) {
-        if (position > this.size || position < 0) return;
-        this._position = position;
+        this._position = Math.max(0, Math.min(position, this.size));
     };
 
     /**
@@ -71,10 +72,11 @@ class AudioBuffer {
      * @public
      */
     public clear = () => {
-        // Удаляем буферы
+        this._chunks = [];
         this._chunks.length = 0;
-        this._position = null;
         this._chunks = null;
+        this._position = null;
+        this._position = null;
     };
 }
 
@@ -90,19 +92,35 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @description Можно ли читать поток
      * @protected
      */
-    protected _readable = false;
+    protected _readable: boolean;
 
     /**
-     * @description Параметр seek, для вычисления времени проигрывания
+     * @description Последнее заданное значение затухания
      * @protected
      */
-    protected _seek = 0;
+    protected _afade = 0;
+
+    /**
+     * @description Модификатор скорости фильтров
+     * @protected
+     */
+    protected _afade_modificator = 1;
+
+    /**
+     * @description Модификатор скорости высчитанный из фильтров
+     * @public
+     */
+    public get speed() {
+        return this._afade_modificator;
+    };
 
     /**
      * @description Если чтение возможно
      * @public
      */
-    public abstract get readable(): boolean;
+    public get readable(): boolean {
+        return this._readable;
+    };
 
     /**
      * @description Duration в секундах с учётом текущей позиции в буфере и seek-а (предыдущего смещения)
@@ -126,13 +144,79 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
     public abstract get packets(): number;
 
     /**
+     * @description Создание аргументов для FFmpeg
+     * @protected
+     */
+    protected get arguments(): string[] {
+        const { seek, track } = this.options;
+        const args = [
+            "-ss", `${seek ?? 0}`,
+            "-i", track.link,
+        ];
+
+        if (track.isBuffered) args.unshift("-accurate_seek");
+
+        return [
+            "-vn",
+            ...args,
+            ...this.filters,
+
+            // Указываем формат аудио (ogg/opus)
+            "-acodec", "libopus",
+            "-frame_duration", "20",
+            "-f", "opus",
+            "pipe:1"
+        ];
+    };
+
+    /**
+     * @description Собираем фильтры для ffmpeg
+     * @protected
+     */
+    protected get filters(): string[] {
+        const { volume, filters, track, seek } = this.options;
+        const afade = [
+            `volume=${volume / 150}`
+        ];
+
+        // Если есть используемые фильтры
+        if (filters) afade.unshift(filters);
+
+        // Добавляем стартовое время приглушения
+        afade.push(`afade=t=in:st=0:d=${this._afade}`);
+
+        // Если можно использовать приглушение
+        if (track.time.total > 0) {
+            afade.push(
+                `afade=t=out:st=${Math.max(track.time.total, seek - track.time.total - db.queues.options.fade)}:d=${db.queues.options.fade}`
+            );
+        }
+
+        // Отдаем готовые фильтры
+        return [
+            "-af", afade.join(",")
+        ];
+    };
+
+    /**
      * @description Создаем класс и задаем параметры
      * @constructor
      * @protected
      */
-    protected constructor(protected input_data: AudioResourceOptions) {
+    protected constructor(public options: AudioResourceOptions) {
         super();
-        this._seek = (input_data.options.seek * 1e3) / OPUS_FRAME_SIZE;
+        // Ищем модификатор скорости (asetrate, tempo)
+        let modificator: number = 1.0;
+
+        try {
+            // Иначе проверяем текущие фильтры
+            if (options.filters) modificator = Math.max(1.0, getSpeedMultiplier(options.filters));
+        } catch (error) {
+            console.log(error);
+        }
+
+        this._afade_modificator = modificator;
+        this._afade = !this.options.swapped ? db.queues.options.fade : db.queues.options.swapFade;
     };
 
     /**
@@ -146,7 +230,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
             const path = options.events.path ? options.input[options.events.path] : options.input;
 
             // Запускаем прослушивание события
-            path["once"](event, (err: any) => {
+            path["once"](event, (err: Error) => {
                 if (event === "error") this.emit("error", new Error(`AudioResource get ${err}`));
                 options.events.destroy_callback(options.input);
             });
@@ -173,8 +257,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
         super.destroy();
 
         this._readable = null;
-        this._seek = null;
-        this.input_data = null;
+        this.options = null;
     };
 }
 
@@ -193,8 +276,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 export class BufferedAudioResource extends BaseAudioResource {
     /**
      * @description Список аудио буферов, для временного хранения
-     * @protected
-     * @readonly
+     * @private
      */
     private _buffer = new AudioBuffer();
 
@@ -214,8 +296,8 @@ export class BufferedAudioResource extends BaseAudioResource {
     public get duration() {
         if (!this._buffer || !this._buffer?.position) return 0;
 
-        const time = (this._buffer.position + this._seek) * OPUS_FRAME_SIZE;
-        return Math.abs(time / 1e3);
+        const time = this._buffer.position * OPUS_FRAME_SIZE;
+        return time / 1e3 + this.options.seek;
     };
 
     /**
@@ -245,7 +327,15 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public set seek(seek: number) {
-        this._buffer.position = (seek * 1e3 + OPUS_FRAME_SIZE) / OPUS_FRAME_SIZE;
+        const index = (seek * 1e3) / OPUS_FRAME_SIZE;
+
+        // Если указано неподходящие значение
+        if (index > this._buffer.size || index < this._buffer.size) {
+            this._buffer.position = 0;
+            return;
+        }
+
+        this._buffer.position = index;
     };
 
     /**
@@ -255,8 +345,6 @@ export class BufferedAudioResource extends BaseAudioResource {
      */
     public constructor(config: AudioResourceOptions) {
         super(config);
-
-        const { path, options } = config;
         const decoder = new BufferedEncoder({
             highWaterMark: 512 * 5 // Буфер на ~1:14
         });
@@ -280,10 +368,8 @@ export class BufferedAudioResource extends BaseAudioResource {
             decode: (input) => {
                 input.on("frame", (packet: Buffer) => {
                     if (this._buffer) {
-                        setImmediate(() => {
-                            // Сообщаем что поток можно начать читать
-                            if (!this._buffer.position) this.emit("readable");
-                        });
+                        // Сообщаем что поток можно начать читать
+                        if (!this._readable) setImmediate(() => { this.emit("readable");});
 
                         // Если создал класс буфера, начинаем кеширование пакетов
                         if (packet) this._buffer.packet = packet;
@@ -295,22 +381,7 @@ export class BufferedAudioResource extends BaseAudioResource {
         // Процесс (FFmpeg)
         this.input<Process>({
             // Создание потока
-            input: new Process([
-                // Пропуск времени
-                "-ss", `${options.seek ?? 0}`,
-
-                // Файл или ссылка на ресурс
-                "-i", path,
-
-                // Подключаем фильтры
-                "-af", options.filters,
-
-                // Указываем формат аудио (ogg/opus)
-                "-acodec", "libopus",
-                "-frame_duration", "20",
-                "-f", "opus",
-                "pipe:"
-            ]),
+            input: new Process(this.arguments),
 
             // Управление событиями
             events: {
@@ -326,7 +397,7 @@ export class BufferedAudioResource extends BaseAudioResource {
             },
 
             // Начало кодирования
-            decode: (input: Process) => {
+            decode: (input) => {
                 input.stdout.pipe(decoder);
             },
         });
@@ -336,10 +407,10 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @description Обновление потока, без потерь
      * @public
      */
-    public refresh = () => {
-        this._seek = 0;
+    /*public refresh = () => {
         this._buffer.position = 0;
-    };
+        this._seek = 0;
+    };*/
 
     /**
      * @description Удаляем ненужные данные
@@ -347,7 +418,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      */
     public destroy = () => {
         super.destroy();
-        this._buffer.clear();
+        this._buffer?.clear();
         this._buffer = null;
     };
 }
@@ -377,14 +448,6 @@ export class PipeAudioResource extends BaseAudioResource {
      * @private
      */
     private played = 0;
-
-    /**
-     * @description Если чтение возможно
-     * @public
-     */
-    public get readable(): boolean {
-        return this.encoder.readable;
-    };
 
     /**
      * @description Выдаем фрагмент потока
@@ -418,8 +481,8 @@ export class PipeAudioResource extends BaseAudioResource {
     public get duration() {
         if (!this.played) return 0;
 
-        const time = (this.played + this._seek) * OPUS_FRAME_SIZE;
-        return Math.abs(time / 1e3);
+        const time = this.played * OPUS_FRAME_SIZE;
+        return time / 1e3 + this.options.seek;
     };
 
     /**
@@ -428,7 +491,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @public
      */
     public set seek(seek: number) {
-        let steps = (seek * 1e3 + OPUS_FRAME_SIZE) / OPUS_FRAME_SIZE;
+        let steps = ((seek * 1e3) / OPUS_FRAME_SIZE);
 
         // Если диапазон слишком мал или большой
         if (steps >= 0 || steps > this.packets) return;
@@ -447,7 +510,6 @@ export class PipeAudioResource extends BaseAudioResource {
      */
     public constructor(config: AudioResourceOptions) {
         super(config);
-        const {path, options} = config;
 
         // Расшифровщик
         this.input<PipeEncoder>({
@@ -476,22 +538,7 @@ export class PipeAudioResource extends BaseAudioResource {
         // Процесс (FFmpeg)
         this.input<Process>({
             // Создание потока
-            input: new Process([
-                // Пропуск времени
-                "-ss", `${options.seek ?? 0}`,
-
-                // Файл или ссылка на ресурс
-                "-i", path,
-
-                // Подключаем фильтры
-                "-af", options.filters,
-
-                // Указываем формат аудио (ogg/opus)
-                "-acodec", "libopus",
-                "-frame_duration", "20",
-                "-f", "opus",
-                "pipe:"
-            ]),
+            input: new Process(this.arguments),
 
             // Управление событиями
             events: {
@@ -517,31 +564,130 @@ export class PipeAudioResource extends BaseAudioResource {
      */
     public destroy = () => {
         super.destroy();
-        this.played = null;
         this.encoder = null;
     };
 }
 
 
+/**
+ * @author SNIPPIK
+ * @description Регулярное выражение для захвата числового множителя из строки 'asetrate=48000*X'.
+ * @example "asetrate=48000*1.2" -> "1.2"
+ * @const ASSETRATE_MULTIPLIER_PATTERN
+ * @private
+ */
+const ASSETRATE_MULTIPLIER_PATTERN = /^asetrate=48000\*([\d\.]+)(?:,.*)?$/;
+
+/**
+ * @author SNIPPIK
+ * @description Регулярное выражение для захвата числового множителя из строки 'atempo=X'.
+ * @example "atempo=2" -> "2"
+ * @const ATEMPO_MULTIPLIER_PATTERN
+ * @private
+ */
+const ATEMPO_MULTIPLIER_PATTERN = /^atempo=([\d\.]+)(?:,.*)?$/;
+
+/**
+ * @author SNIPPIK
+ * @description Извлекает числовой множитель (rate) из фильтра asetrate.
+ * @param filtersString Строка фильтров FFmpeg.
+ * @returns Извлеченное значение как строка, или null.
+ * @function extractAsetrateMultiplier
+ * @private
+ */
+function extractAsetrateMultiplier(filtersString: string): string | null {
+    const match = filtersString.match(ASSETRATE_MULTIPLIER_PATTERN);
+    return match ? match[1] : null;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Извлекает числовой множитель (rate) из фильтра atempo.
+ * @param filtersString Строка фильтров FFmpeg.
+ * @returns Извлеченное значение как строка, или null.
+ * @function extractAtempoMultiplier
+ * @private
+ */
+function extractAtempoMultiplier(filtersString: string): string | null {
+    const match = filtersString.match(ATEMPO_MULTIPLIER_PATTERN);
+    return match ? match[1] : null;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Центральная функция для получения множителя скорости (Speed Multiplier)
+ * из строки фильтров, проверяя сначала asetrate, затем atempo.
+ * @param filtersString Строка фильтров FFmpeg.
+ * @returns Числовой множитель скорости или 1.0, если не найден.
+ * @function getSpeedMultiplier
+ * @private
+ */
+function getSpeedMultiplier(filtersString: string): number {
+    if (!filtersString) return 1.0;
+
+    // Извлекаем множитель asetrate
+    const asetrateStr = extractAsetrateMultiplier(filtersString);
+
+    // Конвертируем в число. Если не найдено, используем 1.0 (нет изменения)
+    const asetrateMultiplier = asetrateStr ? parseFloat(asetrateStr) : 1.0;
+
+    // Извлекаем множитель atempo
+    const atempoStr = extractAtempoMultiplier(filtersString);
+
+    // Конвертируем в число. Если не найдено, используем 1.0 (нет изменения)
+    const atempoMultiplier = atempoStr ? parseFloat(atempoStr) : 1.0;
+
+    // Общий множитель - это произведение (умножение) двух эффектов.
+    const totalMultiplier = asetrateMultiplier * atempoMultiplier;
+
+    // Проверка на NaN и возврат результата.
+    return isNaN(totalMultiplier) ? 1.0 : totalMultiplier;
+}
 
 
 /**
  * @author SNIPPIK
  * @description Параметры для создания класса AudioResource
  * @interface AudioResourceOptions
+ * @private
  */
 interface AudioResourceOptions {
-    path: string;
-    options: {
-        seek?: number;
-        filters?: string;
-    }
+    /**
+     * @description Трек который надо включить
+     * @public
+     */
+    track: Track;
+
+    /**
+     * @description Громкость аудио потока
+     * @public
+     */
+    volume: number;
+
+    /**
+     * @description Время пропуска, с этой временной точки включится аудио
+     * @public
+     */
+    seek?: number;
+
+    /**
+     * @description Фильтры ffmpeg для включения через filter_complex
+     * @public
+     */
+    filters: string;
+
+    /**
+     * @description Смена аудио потока?
+     * @public
+     */
+    swapped: boolean;
 }
 
 /**
  * @author SNIPPIK
  * @description События аудио потока
  * @interface AudioResourceEvents
+ * @private
  */
 interface AudioResourceEvents {
     /**
@@ -573,6 +719,7 @@ interface AudioResourceEvents {
  * @author SNIPPIK
  * @description Параметры для функции совмещения потоков
  * @interface AudioResourceInput
+ * @private
  */
 interface AudioResourceInput<T> {
     /**
@@ -596,12 +743,12 @@ interface AudioResourceInput<T> {
          * @description Если надо конкретно откуда-то отслеживать события
          * @readonly
          */
-        path?: string
+        path?: string;
     };
 
     /**
      * @description Как начать передавать данные из потока
      * @readonly
      */
-    readonly decode: (input: T) => void;
+    readonly decode?: (input: T) => void;
 }

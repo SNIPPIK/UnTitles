@@ -1,6 +1,6 @@
 {
   "name": "untitles",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "homepage": "https://github.com/SNIPPIK/UnTitles",
   "bugs": "https://github.com/SNIPPIK/UnTitles/issues",
   "author": {
@@ -12,25 +12,26 @@
   "engineStrict": true,
   "types": "src/index.ts",
   "engines": {
-    "node": ">=23.0.0"
+    "node": ">=24.0.0"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.26",
-    "discord.js": "^14.22.1",
+    "discord-api-types": "^0.38.36",
+    "discord.js": "14.25.1",
     "ws": "^8.18.3"
   },
   "optionalDependencies": {
-    "@snazzah/davey": "^0.1.6"
+    "@snazzah/davey": "^0.1.8"
   },
   "devDependencies": {
-    "@types/node": "^24.5.2",
+    "@types/node": "^24.10.1",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   },
   "scripts": {
+    "start": "cd build && node -r tsconfig-paths/register src --ShardManager --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache",
     "start-bun": "bun src",
-    "start": "cd build && node -r tsconfig-paths/register src --ShardManager --optimize_for_size --expose-gc",
-    "auto": "npm run build && npm run start",
-    "build": "tsc"
+    "build": "tsc",
+
+    "dev:start": "npm run build && cd build && node -r tsconfig-paths/register src --optimize_for_size --expose-gc"
   }
 }

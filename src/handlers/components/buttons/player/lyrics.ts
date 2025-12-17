@@ -20,7 +20,9 @@ class ButtonLyrics extends Component<"button"> {
         const track = queue.tracks.track;
 
         // Ожидаем ответа от кода со стороны Discord
-        await ctx.deferReply().catch(() => {});
+        await ctx.deferReply();
+
+        // Сообщение
         let msg: CycleInteraction;
 
         // Получаем текст песни
@@ -40,7 +42,7 @@ class ButtonLyrics extends Component<"button"> {
                                 url: track.url,
                                 icon_url: track.artist.image.url
                             },
-                            description: `\`\`\`css\n${item !== undefined ? item : locale._(ctx.locale, "player.button.lyrics.fail")}\n\`\`\``,
+                            description: `\`\`\`css\n${item !== undefined ? item : locale._(ctx.locale, "player.button.lyrics.fail", [track.lyricsProvider])}\n\`\`\``,
                             timestamp: new Date() as any
                         }
                     ]
@@ -63,7 +65,7 @@ class ButtonLyrics extends Component<"button"> {
                                 url: track.url,
                                 icon_url: track.artist.image.url
                             },
-                            description: `\`\`\`css\n${locale._(ctx.locale, "player.button.lyrics.fail")}\n\`\`\``,
+                            description: `\`\`\`css\n${locale._(ctx.locale, "player.button.lyrics.fail", [track.lyricsProvider])}\n\`\`\``,
                             timestamp: new Date() as any
                         }
                     ]
@@ -71,7 +73,7 @@ class ButtonLyrics extends Component<"button"> {
             })
 
 
-        setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 40e3);
+        if (msg) setTimeout(() => msg?.deletable ? msg.delete().catch(() => null) : null, 40e3);
     };
 }
 /**

@@ -1,0 +1,499 @@
+import type { VoiceDavePrepareEpochData, VoiceDavePrepareTransitionData } from "discord-api-types/voice/v8";
+import { Logger, TypedEmitter } from "#structures";
+
+/**
+ * @author SNIPPIK
+ * @description Текущая версия протокола dave
+ */
+let MAX_E2EE_PROTOCOL: number = 0;
+
+/**
+ * @author SNIPPIK
+ * @description Количество секунд, в течение которых предыдущая транзакция должна быть действительна
+ * @const TRANSITION_EXPIRY
+ */
+const TRANSITION_EXPIRY = 10;
+
+/**
+ * @author SNIPPIK
+ * @description Произвольное количество секунд, позволяющее выполнить транзитную передачу для понижения рейтинга в середине.
+ * @const TRANSITION_EXPIRY_PENDING_DOWNGRADE
+ */
+const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 24;
+
+/**
+ * @author SNIPPIK
+ * @description Количество пакетов, для которых допускается сбой дешифрования, пока мы не сочтем переход неудачным и не выполним повторную инициализацию.
+ * @const DEFAULT_DECRYPTION_FAILURE_TOLERANCE
+ */
+//const DEFAULT_DECRYPTION_FAILURE_TOLERANCE = 36;
+
+/**
+ * @author SNIPPIK
+ * @description Управляет сеансом группы протокола DAVE.
+ * @class E2EESession
+ * @extends TypedEmitter
+ * @public
+ */
+export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
+    /** Последний выполненный идентификатор перехода */
+    public lastTransition_id?: number;
+
+    /** Ожидаемый переход */
+    private pendingTransitions = new Map<number, number>();
+
+    /** Количество последовательных сбоев, возникших при дешифровании */
+    //private consecutiveFailures = 0;
+
+    /** Был ли данный сеанс ранее понижен в рейтинге */
+    private downgraded = false;
+
+    /** Выполняется ли повторная инициализация сеанса из-за недопустимого перехода */
+    public reinitializing = false;
+
+    /** Базовый сеанс DAVE этой оболочки */
+    public session: SessionMethods;
+
+    /**
+     * @description Максимальная доступная версия протокола
+     * @returns number
+     */
+    public static get version(): number {
+        return MAX_E2EE_PROTOCOL;
+    };
+
+    /**
+     * @description Установите внешнего отправителя для этого сеанса.
+     * @param externalSender - Внешний отправитель
+     * @public
+     */
+    public set externalSender(externalSender: Buffer) {
+        // Если нет запущенной сессии
+        if (!this.session) throw new Error("No session available");
+        this.session.setExternalSender(externalSender);
+        this.emit("debug", "Set MLS external sender");
+    };
+
+    /**
+     * Приготовьтесь к новой epoch
+     * @param data - Данные epoch
+     * @public
+     */
+    public set prepareEpoch(data: VoiceDavePrepareEpochData) {
+        if (this.reinitializing) return;
+
+        this.emit("debug", `Preparing for epoch (${data.epoch})`);
+
+        // Если есть идентификатор
+        if (data.epoch === 1) {
+            this.version = data.protocol_version;
+            this.reinit();
+        }
+    };
+
+    /**
+     * @description Восстановление после недопустимого перехода путем повторной инициализации.
+     * @param transitionId - Идентификатор перехода для аннулирования
+     * @returns void
+     * @public
+     */
+    public set recoverFromInvalidTransition(transitionId: number) {
+        if (this.reinitializing) return;
+        this.emit("debug", `Invalidating transition ${transitionId}`);
+        this.reinitializing = true;
+        //this.consecutiveFailures = 0;
+        this.emit("invalidateTransition", transitionId);
+        this.reinit();
+    };
+
+    /**
+     * @description Создаем класс для управления сеансом DAVE
+     * @constructor
+     * @public
+     */
+    public constructor(
+        /** Используемая версия протокола DAVE */
+        private version: number,
+
+        /** Идентификатор пользователя, представленный этим сеансом. */
+        private user_id: string,
+
+        /** Канал в котором будет произведено сквозное шифрование */
+        private channel_id: string
+    ) {
+        super();
+    };
+
+    /**
+     * @description Повторно инициализирует базовый сеанс
+     * @returns void
+     * @public
+     */
+    public reinit = (): void => {
+        // Если можно создать сессию
+        if (this.version > 0 && this.user_id && this.channel_id) {
+            // Если сессия уже есть
+            if (this.session) {
+                this.session.reinit(this.version, this.user_id, this.channel_id);
+                this.emit("debug", `Session reinitialized for protocol version ${this.version}`);
+            }
+
+            // Если сессии еще нет
+            else {
+                this.session = new loaded_lib.DAVESession(this.version, this.user_id, this.channel_id);
+                this.emit("debug", `Session initialized for protocol version ${this.version}`);
+            }
+
+            // Отправляем ключ
+            this.emit("key", this.session.getSerializedKeyPackage());
+        }
+
+        // Если уже есть сессия
+        else if (this.session) {
+            this.session.reset();
+            this.session.setPassthroughMode(true, TRANSITION_EXPIRY);
+            this.emit("debug", "Session reset");
+        }
+    };
+
+    /**
+     * @description Подготовьтесь к переходу.
+     * @param data - Данные о переходе
+     * @returns boolean
+     * @public
+     */
+    public prepareTransition = (data: VoiceDavePrepareTransitionData) => {
+        this.emit("debug", `Preparing for transition (${data.transition_id}, v${data.protocol_version})`);
+        this.pendingTransitions.set(data.transition_id, data.protocol_version);
+
+        if (data.transition_id === 0) this.executeTransition(data.transition_id);
+        else if (data.protocol_version === 0) this.session?.setPassthroughMode(true, TRANSITION_EXPIRY_PENDING_DOWNGRADE);
+        return data.transition_id !== 0;
+    };
+
+    /**
+     * @description Выполнить переход.
+     * @param transition_id - Идентификатор перехода для выполнения
+     * @returns boolean
+     * @public
+     */
+    public executeTransition = (transition_id: number) => {
+        this.emit("debug", `Executing transition (${transition_id})`);
+
+        // Если нет данных для смены версии DAVE
+        if (!this.pendingTransitions.has(transition_id)) {
+            this.emit("debug", `Received execute transition, but we don't have a pending transition for ${transition_id}`);
+            return false;
+        }
+
+        const oldVersion = this.version;
+        this.version = this.pendingTransitions.get(transition_id)!;
+
+        // Управление обновлениями и понижение версии
+        if (oldVersion !== this.version && this.version === 0) {
+            this.downgraded = true;
+            this.emit("debug", "Session downgraded");
+        } else if (transition_id > 0 && this.downgraded) {
+            this.downgraded = false;
+            this.session?.setPassthroughMode(true, TRANSITION_EXPIRY);
+            this.emit("debug", "Session upgraded");
+        }
+
+        // В будущем можно будет подать сигнал DAVESession о переходе, но на данный момент поддерживается только версия v1.
+        this.lastTransition_id = transition_id;
+        this.emit("debug", `Transition executed (v${oldVersion} -> v${this.version}, id: ${transition_id})`);
+        this.pendingTransitions.delete(transition_id);
+        return true;
+    };
+
+    /**
+     * @description Обрабатывает предложения от группы MLS.
+     * @param payload - Полезная нагрузка двоичного сообщения
+     * @param connectedClients - Набор подключенных идентификаторов клиентов
+     * @returns Buffer
+     * @public
+     */
+    public processProposals = (payload: Buffer, connectedClients: Set<string>): Buffer | null => {
+        if (!this.session) throw new Error("No session available");
+        this.emit("debug", "MLS proposals processed");
+        const { commit, welcome } = this.session.processProposals(
+            payload.readUInt8(0) as 0 | 1,
+            payload.subarray(1),
+            Array.from(connectedClients),
+        );
+
+        if (!commit) return null;
+
+        return Buffer.concat([commit, welcome]);
+    };
+
+    /**
+     * @description Обрабатывает фиксацию из группы MLS.
+     * @param type - Тип вызова
+     * @param payload - Полезная нагрузка
+     * @returns TransitionResult
+     * @public
+     */
+    public processMLSTransit = (type: "commit" | "welcome", payload: Buffer): TransitionResult => {
+        if (!this.session) throw new Error("No session available");
+        const transition_id = payload.readUInt16BE(0);
+        const flag = payload.subarray(2);
+
+        try {
+            this.session[type === "commit" ? "processCommit" : "processWelcome"](flag);
+
+            if (transition_id === 0) {
+                this.reinitializing = false;
+                this.lastTransition_id = transition_id;
+            } else this.pendingTransitions.set(transition_id, this.version);
+
+            this.emit("debug", `MLS ${type} processed (transition id: ${transition_id})`);
+            return { transition_id, success: true };
+        } catch (error) {
+            this.emit("debug", `MLS ${type} errored from transition ${transition_id}: ${error}`);
+            this.recoverFromInvalidTransition = transition_id;
+            return { transition_id, success: false };
+        }
+    };
+
+    /**
+     * @description Зашифруйте пакет, используя сквозное шифрование.
+     * @param packet - Пакет для шифрования
+     * @returns Buffer
+     * @public
+     */
+    public encrypt = (packet: Buffer) => {
+        return (this.version === 0 || !this.session?.ready) ? null : this.session.encryptOpus(packet);
+    };
+
+    /**
+     * @description Расшифровать пакет, используя сквозное шифрование.
+     * @param packet - Пакет для расшифровки
+     * @param userId - Идентификатор пользователя, отправившего пакет
+     * @returns Buffer
+     * @public
+     */
+    /*public decrypt = (packet: Buffer, userId: string) => {
+        const canDecrypt = this.session?.ready && (this.version !== 0 || this.session.canPassthrough(userId));
+
+        // Если невозможно расшифровать opus frame
+        if (!canDecrypt || !this.session) return null;
+
+        try {
+            const buffer = this.session.decrypt(userId, loaded_lib.MediaType.AUDIO, packet);
+            this.consecutiveFailures = 0;
+            return buffer;
+        } catch (error) {
+            if (!this.reinitializing && this.pendingTransitions.size === 0) {
+                this.consecutiveFailures++;
+                this.emit("debug", `Failed to decrypt a packet (${this.consecutiveFailures} consecutive fails)`);
+
+                if (this.consecutiveFailures > DEFAULT_DECRYPTION_FAILURE_TOLERANCE) {
+                    if (this.lastTransition_id) this.recoverFromInvalidTransition = this.lastTransition_id;
+                    else throw error;
+                }
+            } else if (this.reinitializing) {
+                this.emit("debug", 'Failed to decrypt a packet (reinitializing session)');
+            } else if (this.pendingTransitions.size > 0) {
+                this.emit('debug', `Failed to decrypt a packet (${this.pendingTransitions.size} pending transition[s])`);
+            }
+        }
+
+        return null;
+    };*/
+
+    /**
+     * @description Сбрасывает сеанс и удаляет его
+     * @returns void
+     * @public
+     */
+    public destroy = () => {
+        super.destroy();
+        this.removeAllListeners();
+
+        try {
+            this.session?.reset?.();
+        } catch (error) {
+            Logger.log("ERROR", `Failed to destroy DAVE session: ${error}`);
+        }
+
+        this.session = null;
+        this.reinitializing = null;
+        this.user_id = null;
+        this.channel_id = null;
+        this.lastTransition_id = null;
+        this.pendingTransitions.clear();
+        this.pendingTransitions = null;
+        this.downgraded = null;
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description События класса DAVESession
+ * @interface E2EESession
+ */
+export interface ClientE2EEEvents {
+    // Ошибка?! Какая ошибка
+    "error": (error: Error) => void;
+
+    // Для отладки
+    "debug": (message: string) => void;
+
+    // Получение ключа
+    "key": (message: Buffer) => void;
+
+    // Если ключ больше не действителен
+    "invalidateTransition": (transitionId: number) => void;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Все методы сессии
+ * @interface SessionMethods
+ */
+interface SessionMethods {
+    /**
+     * @description Проверяет, может ли пользователь с указанным userId пропускать данные без дополнительного шифрования.
+     * @param user_id - Идентификатор пользователя Discord.
+     * @returns `true`, если пропуск разрешён, иначе `false`.
+     */
+    canPassthrough(user_id: string): boolean;
+
+    /**
+     * @description Расшифровывает входящий пакет голосовых данных для указанного пользователя и типа медиа.
+     * @param user_id - Идентификатор пользователя Discord.
+     * @param mediaType - Тип медиа: 0 для аудио, 1 для видео.
+     * @param frame - Буфер с зашифрованными данными.
+     * @returns Расшифрованный буфер данных.
+     */
+    decrypt(user_id: string, mediaType: 0 | 1, frame: Buffer): Buffer;
+
+    /**
+     * @description Шифрует пакет Opus аудио для отправки.
+     * @param frame - Буфер с аудио данными Opus.
+     * @returns Шифрованный буфер.
+     */
+    encryptOpus(frame: Buffer): Buffer;
+
+    /**
+     * @description Получает сериализованный ключевой пакет для обмена ключами.
+     * @returns Буфер с сериализованным ключевым пакетом.
+     */
+    getSerializedKeyPackage(): Buffer;
+
+    /**
+     * @description Получает код верификации для указанного пользователя.
+     * Используется для подтверждения подлинности ключей.
+     * @param user_id - Идентификатор пользователя Discord.
+     * @returns Промис, который разрешается строкой с кодом верификации.
+     */
+    getVerificationCode(user_id: string): Promise<string>;
+
+    /**
+     * @description Обрабатывает commit пакет, содержащий подтверждение ключей.
+     * @param commit - Буфер с данными commit.
+     */
+    processCommit(commit: Buffer): void;
+
+    /**
+     * Обрабатывает предложения (proposals) по ключам.
+     * @param type - Тип медиа: 0 для аудио, 1 для видео.
+     * @param proposals - Буфер с предложениями.
+     * @param recognizedUserIds - Опциональный список userId, которые распознаны.
+     * @returns Результат обработки предложений.
+     */
+    processProposals(type: 0 | 1, proposals: Buffer, recognizedUserIds?: string[]): ProposalsResult;
+
+    /**
+     * @description Обрабатывает пакет welcome — инициализирующее сообщение сессии.
+     * @param welcome - Буфер с данными welcome.
+     */
+    processWelcome(welcome: Buffer): void;
+
+    /**
+     * @description Статус готовности сессии к работе.
+     */
+    ready: boolean;
+
+    /**
+     * @description Переинициализирует сессию с новым протоколом, пользователем и каналом.
+     * @param protocolVersion - Версия протокола.
+     * @param user_id - Идентификатор пользователя Discord.
+     * @param channel_id - Идентификатор голосового канала Discord.
+     */
+    reinit(protocolVersion: number, user_id: string, channel_id: string): void;
+
+    /**
+     * @description Сбрасывает текущее состояние сессии и очищает данные.
+     */
+    reset(): void;
+
+    /**
+     * @description Устанавливает внешний отправитель данных (например, для мультикаста).
+     * @param externalSender - Буфер с идентификатором внешнего отправителя.
+     */
+    setExternalSender(externalSender: Buffer): void;
+
+    /**
+     * @description Включает или выключает режим пропуска (passthrough) для передачи данных напрямую.
+     * @param passthrough - Флаг включения режима пропуска.
+     * @param expiry - Время истечения действия режима в миллисекундах.
+     */
+    setPassthroughMode(passthrough: boolean, expiry: number): void;
+
+    /**
+     * @description Код голосовой приватности, используемый для шифрования.
+     */
+    voicePrivacyCode: string;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Результат предложений
+ * @interface ProposalsResult
+ */
+interface ProposalsResult {
+    commit?: Buffer;
+    welcome?: Buffer;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Результат перехода
+ * @interface TransitionResult
+ */
+interface TransitionResult {
+    success: boolean;
+    transition_id: number;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
+ * @private
+ */
+let loaded_lib: any = null;
+
+/**
+ * @author SNIPPIK
+ * @description Делаем проверку на наличие FFmpeg
+ */
+(async () => {
+    const names = ["@snazzah/davey"];
+
+    // Делаем проверку всех доступных библиотек
+    for (const name of names) {
+        try {
+            const library = await import(name);
+            delete require.cache[require.resolve(name)];
+
+            MAX_E2EE_PROTOCOL = library?.DAVE_PROTOCOL_VERSION as number;
+            loaded_lib = library;
+            return;
+        } catch {}
+    }
+
+    // Выдаем предупреждение если нет библиотеки dave
+    Logger.log("WARN", `[DAVE]: has not found library: @snazzah/davey`);
+})();

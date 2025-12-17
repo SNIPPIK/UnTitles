@@ -1,9 +1,12 @@
-import { DiscordClient } from "#structures/discord";
-import { AudioPlayerEvents } from "#core/player";
+import type { DiscordClient } from "#structures/discord";
+import type { AudioPlayerEvents } from "#core/player";
+import type { ClientEvents } from "discord.js";
+import type { QueueEvents } from "#core/queue";
 import { TypedEmitter } from "#structures";
-import { QueueEvents } from "#core/queue";
-import { ClientEvents } from "discord.js";
 import { handler } from "#handler";
+
+// Export decorator
+export * from "./index.decorator";
 
 /**
  * @author SNIPPIK
@@ -12,7 +15,7 @@ import { handler } from "#handler";
  * @extends handler
  * @public
  */
-export class Events extends handler<Event<keyof ClientEvents>> {
+export class Events extends handler<Event<SupportKeysOfEvents>> {
     /**
      * @description Вспомогательный класс для событий, по умолчанию используется для players, queues
      * @readonly
@@ -30,27 +33,67 @@ export class Events extends handler<Event<keyof ClientEvents>> {
 
     /**
      * @description Регистрируем ивенты в эко системе бота
+     * @returns void
      * @public
      */
     public register = (client: DiscordClient) => {
         if (this.size > 0) {
-            this.emitter.removeAllListeners();
-
             // Отключаем только загруженные события
             for (let item of this.files) {
-                client.off(item.name as any, item.execute);
+                client.off(item.name as any, item.run);
             }
         }
 
         // Загружаем события заново
+        this.emitter.removeAllListeners();
         this.load();
 
         // Проверяем ивенты
         for (let item of this.files) {
-            if (item?.type === "client") client[item.once ? "once" : "on"](item.name as any, item.execute);
-            else this.emitter[item.once ? "once" : "on"](item.name, item.execute);
+            if (item?.type === "client") client[item.once ? "once" : "on"](item.name as any, item.run);
+            else this.emitter[item.once ? "once" : "on"](item.name as any, item.run);
         }
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Поддерживаемые названия событий
+ * @type SupportKeysOfEvents
+ * @public
+ */
+export type SupportKeysOfEvents = keyof ClientEvents | keyof QueueEvents | keyof AudioPlayerEvents;
+
+/**
+ * @author SNIPPIK
+ * @description Функция выполнение с типами данных
+ * @type SupportEventCallback
+ * @public
+ */
+export type SupportEventCallback<T> = T extends keyof QueueEvents ? QueueEvents[T] : T extends keyof AudioPlayerEvents ? AudioPlayerEvents[T] : T extends keyof ClientEvents ? (...args: ClientEvents[T]) => void : never;
+
+/**
+ * @author SNIPPIK
+ * @description Декоратор события
+ * @type SupportEvent
+ * @public
+ */
+export type SupportEvent<T extends SupportKeysOfEvents> = {
+    /**
+     * @description Название событие
+     * @default null
+     * @readonly
+     * @public
+     */
+    name?: T extends keyof QueueEvents ? keyof QueueEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
+
+    /**
+     * @description Тип события
+     * @default null
+     * @readonly
+     * @public
+     */
+    type?: T extends keyof QueueEvents | keyof AudioPlayerEvents ? "player" : "client";
 }
 
 /**
@@ -59,14 +102,14 @@ export class Events extends handler<Event<keyof ClientEvents>> {
  * @class Event
  * @public
  */
-export abstract class Event<T extends keyof ClientEvents | keyof QueueEvents | keyof AudioPlayerEvents> {
+export abstract class Event<T extends keyof ClientEvents | keyof QueueEvents | keyof AudioPlayerEvents> implements SupportEvent<T> {
     /**
      * @description Название событие
      * @default null
      * @readonly
      * @public
      */
-    readonly name: T extends keyof QueueEvents ? keyof QueueEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEvents;
+    public name: SupportEvent<T>["name"];
 
     /**
      * @description Тип события
@@ -74,10 +117,10 @@ export abstract class Event<T extends keyof ClientEvents | keyof QueueEvents | k
      * @readonly
      * @public
      */
-    readonly type?: T extends keyof QueueEvents | keyof AudioPlayerEvents ? "player" : "client";
+    public type: SupportEvent<T>["type"];
 
     /**
-     * @description Тип выполнения события
+     * @description Логика выполнения события
      * @default null
      * @readonly
      * @public
@@ -90,5 +133,5 @@ export abstract class Event<T extends keyof ClientEvents | keyof QueueEvents | k
      * @readonly
      * @public
      */
-    readonly execute: T extends keyof QueueEvents ? QueueEvents[T] : T extends keyof AudioPlayerEvents ? AudioPlayerEvents[T] : T extends keyof ClientEvents ? (...args: ClientEvents[T]) => void : never;
+    run: SupportEventCallback<T>
 }

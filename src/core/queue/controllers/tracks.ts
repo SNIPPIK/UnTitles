@@ -9,35 +9,39 @@ import { Track } from "#core/queue";
 export class ControllerTracks<T extends Track> {
     /**
      * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
-     * @readonly
-     * @private
+     * @protected
      */
-    private _current: T[] = [];
+    protected _current: T[] = [];
 
     /**
      * @description Хранилище треков в оригинальном порядке, необходимо для правильной работы shuffle
-     * @readonly
-     * @private
+     * @protected
      */
-    private _original: T[] = [];
+    protected _original: T[] = [];
 
     /**
      * @description Текущая позиция в списке
-     * @private
+     * @protected
      */
-    private _position = 0;
+    protected _position = 0;
 
     /**
      * @description Тип повтора
-     * @private
+     * @protected
      */
-    private _repeat = RepeatType.None;
+    protected _repeat = RepeatType.None;
 
     /**
      * @description Смешивание треков
-     * @private
+     * @protected
      */
-    private _shuffle = false;
+    protected _shuffle = false;
+
+    /**
+     * @description Общее время треков, считается только при добавлении и удалении треков
+     * @protected
+     */
+    protected _totalTime = 0;
 
     /**
      * @description Новая позиция трека в списке
@@ -65,7 +69,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Текущая позиция трека в очереди
-     * @return number
+     * @returns number
      * @public
      */
     public get position() {
@@ -74,7 +78,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Получаем текущий трек
-     * @return Track
+     * @returns Track
      * @public
      */
     public get track() {
@@ -83,7 +87,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Кол-во треков в очереди с учетом текущей позиции
-     * @return number
+     * @returns number
      * @public
      */
     public get size() {
@@ -92,7 +96,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Общее кол-во треков в очереди
-     * @return number
+     * @returns number
      * @public
      */
     public get total() {
@@ -101,6 +105,7 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Получаем данные перетасовки
+     * @returns boolean
      * @public
      */
     public get shuffle(): boolean {
@@ -113,11 +118,13 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public set repeat(type) {
+        if (type === this._repeat) return;
         this._repeat = type;
     };
 
     /**
      * @description Получаем тип повтора
+     * @returns RepeatType
      * @public
      */
     public get repeat() {
@@ -126,10 +133,13 @@ export class ControllerTracks<T extends Track> {
 
     /**
      * @description Общее время треков
+     * @returns string
      * @public
      */
     public get time() {
-        return this._current.reduce((total, track) => total + (track.time?.total || 0), 0).duration();
+        // Если класс уже удален
+        if (!this._totalTime) return "00:00";
+        return this._totalTime.duration();
     };
 
     /**
@@ -144,6 +154,9 @@ export class ControllerTracks<T extends Track> {
 
         // Добавляем трек в текущую очередь
         this._current.push(track);
+
+        // Высчитываем время проигрывания
+        this._totalTime += track.time.total;
     };
 
     /**
@@ -163,6 +176,11 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public remove = (position: number) => {
+        const track = this._current[position];
+
+        // Высчитываем время проигрывания
+        this._totalTime -= track.time.total;
+
         // Если трек удаляем из виртуально очереди, то и из оригинальной
         if (this._shuffle) {
             const index = this._original.indexOf(this._current[position]);
@@ -173,12 +191,14 @@ export class ControllerTracks<T extends Track> {
         this._current.splice(position, 1);
 
         // Корректируем позицию, если она больше длины или не равна нулю
-        if (this._position > position) {
-            this._position--;
-        } else if (this._position >= this._current.length) {
+        if (this._position > position) this._position--;
+
+        // Если позиция больше максимальной
+        else if (this._position >= this._current.length) {
             this._position = this._current.length - 1;
         }
 
+        // Если позиция менее 0
         if (this._position < 0) this._position = 0;
     };
 
@@ -199,12 +219,12 @@ export class ControllerTracks<T extends Track> {
      * @returns T[]
      * @public
      */
-    public array = (size: number, position?: number): T[] => {
-        const realPosition = position ?? this._position;
-        const startIndex = size < 0 ? realPosition + size : realPosition;
-        const endIndex = size < 0 ? realPosition : realPosition + size;
+    public array = (size: number, position: number): T[] => {
+        const startIndex = size < 0 ? position + size : position;
+        const endIndex = size < 0 ? position : position + size;
 
-        return this._current.slice(startIndex, endIndex);
+        // Отдает список треков с учетом позиции
+        return this._current.slice(Math.max(0, startIndex), endIndex);
     };
 
     /**
@@ -234,13 +254,7 @@ export class ControllerTracks<T extends Track> {
         }
 
         // Восстанавливаем оригинальную очередь
-        else {
-            // Меняем треки в текущей очереди на оригинальные
-            this._current = this._original;
-
-            // Удаляем оригинальные треки, поскольку они теперь и основной ветке
-            this._original = [];
-        }
+        else [this._current, this._original] = [this._original, []];
 
         // Меняем переменную
         this._shuffle = bol;
@@ -252,10 +266,11 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public clear = () => {
-        this._current.length = null;
-        this._original.length = null;
+        this._current.length = 0;
+        this._original.length = 0;
         this._current = null;
         this._original = null;
+        this._totalTime = null;
 
         this._position = null;
         this._repeat = null;
@@ -273,17 +288,17 @@ export enum RepeatType {
     /**
      * @description Повтор выключен
      */
-    None = 0,
+    None,
 
     /**
      * @description Повтор одного трека
      */
-    Song = 1,
+    Song,
 
     /**
      * @description Повтор всех треков
      */
-    Songs = 2,
+    Songs,
 
     /**
      * @description Бесконечный музыкальный поток

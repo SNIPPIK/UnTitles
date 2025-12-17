@@ -1,7 +1,7 @@
-import { Colors, CommandInteraction } from "#structures/discord";
-import { Logger, Assign, locale } from "#structures";
-import type { RestClientSide } from "#handler/rest";
-import type { Event } from "#handler/events";
+import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
+import { Colors, type CommandInteraction } from "#structures/discord";
+import type { RestClientSide} from "#handler/rest";
+import { Logger, locale } from "#structures";
 import type { Track } from "#core/queue";
 import { db } from "#app/db";
 
@@ -9,49 +9,53 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Выполнение запроса пользователя через внутреннее API
  * @class rest_request
- * @extends Assign
+ * @extends Event
  * @event rest/request
  * @public
  */
-class rest_request extends Assign<Event<"rest/request">> {
-    public constructor() {
-        super({
-            name: "rest/request",
-            type: "player",
-            once: false,
-            execute: async (platform, ctx, url) => {
-                // Получаем функцию запроса данных с платформы
-                const api = platform.request(url);
+@EventOn()
+@DeclareEvent({
+    name: "rest/request",
+    type: "player"
+})
+class rest_request extends Event<"rest/request"> {
+   run: SupportEventCallback<"rest/request"> = async (platform, ctx, url) => {
+       // Получаем функцию запроса данных с платформы
+       const api = platform.request(url);
 
-                // Проверка поддержки запроса
-                if (!api?.type) return db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.support"));
+       // Проверка поддержки запроса
+       if (!api?.type) return db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.support"));
 
-                // Предупреждение о запуске запроса
-                const message = await this._sendRequestMessage(ctx, platform, api.type);
+       // Предупреждение о запуске запроса
+       const message = await this._sendRequestMessage(ctx, platform, api.type);
 
-                let rest: Error | Track[] | Track.list | Track;
-                try {
-                    rest = await Promise.race([api.request(),
-                        new Promise<Error>((resolve) => {
-                            setTimeout(() => resolve(new Error(locale._(ctx.locale, "api.platform.timeout"))), 15e3)
-                        })
-                    ]);
+       let rest: Error | Track[] | Track.list | Track;
+       try {
+           rest = await Promise.race(
+               [
+                   // Делаем запрос к платформе
+                   api.request(),
 
-                    if (message) message();
-                } catch (err) {
-                    if (message) message();
-                    Logger.log("ERROR", err as Error);
-                    return db.events.emitter.emit("rest/error", ctx,`**${platform.platform}.${api.type}**\n**❯** **${err}**`);
-                }
+                   // Создаем обертку с таймером по достижению которого будет выдана ошибка вместо запроса
+                   new Promise<Error>((resolve) => {
+                       setTimeout(() => resolve(new Error(locale._(ctx.locale, "api.platform.timeout"))), 15e3)
+                   })
+               ]
+           );
 
-                // Обработка результата
-                if (rest instanceof Error) return db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.error", [rest]));
+           if (message) message();
+       } catch (err) {
+           if (message) message();
+           Logger.log("ERROR", err as Error);
+           return db.events.emitter.emit("rest/error", ctx,`**${platform.platform}.${api.type}**\n**❯** **${err}**`);
+       }
 
-                // Добавление в очередь
-                return db.queues.create(ctx, rest);
-            }
-        });
-    };
+       // Обработка результата
+       if (rest instanceof Error) return db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.error", [rest]));
+
+       // Добавление в очередь
+       return db.queues.create(ctx, rest);
+   }
 
     /**
      * @description Отправка сообщение о начале запроса
@@ -90,35 +94,51 @@ class rest_request extends Assign<Event<"rest/request">> {
  * @author SNIPPIK
  * @description Если при выполнении запроса пользователя произошла ошибка
  * @class rest_error
- * @extends Assign
+ * @extends Event
  * @event rest/error
  * @public
  */
-class rest_error extends Assign<Event<"rest/error">> {
-    public constructor() {
-        super({
-            name: "rest/error",
-            type: "player",
-            once: false,
-            execute: async (message, error) => {
-                Logger.log("ERROR", `[Rest/API] ${error}`);
+@EventOn()
+@DeclareEvent({
+    name: "rest/error",
+    type: "player"
+})
+class rest_error extends Event<"rest/error"> {
+    run: SupportEventCallback<"rest/error"> = async (message, error) => {
+        try {
+            const msg = await message.channel.send({
+                components: [{
+                    "type": 17, // Container
+                    "accent_color": Colors.DarkRed,
+                    components: [
+                        {
+                            "type": 9, // Block
+                            "components": [
+                                {
+                                    "type": 10,
+                                    "content": locale._(message.locale, "api.error")
+                                },
+                                {
+                                    "type": 10,
+                                    "content": `\`\`\`css\n${error}\n\`\`\``
+                                }
+                            ],
+                            "accessory": {
+                                "type": 11,
+                                "media": {
+                                    "url": message.client.user.avatarURL()
+                                }
+                            }
+                        },
+                    ]
+                }],
+                flags: "IsComponentsV2"
+            });
 
-                const options = {
-                    embeds: [{
-                        title: locale._(message.locale, "api.error"),
-                        description: error,
-                        color: Colors.DarkRed
-                    }]
-                }
-
-                try {
-                    let msg = await message.channel.send(options);
-                    setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 15e3);
-                } catch (err) {
-                    console.error(err);
-                }
-            }
-        });
+            if (msg && msg?.deletable) setTimeout(() => msg.delete().catch(() => null), 15e3);
+        } catch (error) {
+            Logger.log("ERROR", error as Error);
+        }
     };
 }
 

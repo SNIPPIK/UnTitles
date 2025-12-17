@@ -1,5 +1,46 @@
-import { RestServerSide } from "#handler/rest";
+import type { RestAPIS_Names } from "#handler/rest/index.decorator";
 import { env } from "#app/env";
+import { db } from "#app/db";
+
+/**
+ * @author SNIPPIK
+ * @description Функция для отложенной загрузки кнопок
+ * @function initButtons
+ * @private
+ */
+function initButtons() {
+    buttons = db.api.platforms.array.reduce((acc, api) => {
+        const platform = api.name.toLowerCase();
+        const inEnv = env.get(`progress.button.${platform}`, null);
+
+        if (inEnv) acc[`button_${platform}`] = inEnv;
+        return acc;
+    }, {
+        button: env.get("progress.button"),
+    });
+}
+
+/**
+ * @author SNIPPIK
+ * @description Доступные элементы для создания прогресс бара
+ * @type Elements
+ * @private
+ */
+type Elements = "left" | "center" | "right";
+
+/**
+ * @author SNIPPIK
+ * @description Получение списка для создания прогресс бара
+ * @param type - Тип элемента
+ * @private
+ */
+function initElement(type: "empty" | "not_empty") {
+    const keys = ["left", "center", "right"];
+    return keys.reduce((acc, key) => {
+        acc[key] = env.get(`progress.${type}.${key}`);
+        return acc;
+    }, {} as Record<Elements, string>);
+}
 
 /**
  * @author SNIPPIK
@@ -10,56 +51,20 @@ const emoji = {
     /**
      * @description Пустой прогресс бар
      */
-    empty: {
-        left: env.get("progress.empty.left"),
-        center: env.get("progress.empty.center"),
-        right: env.get("progress.empty.right")
-    },
+    empty: initElement("empty"),
 
     /**
      * @description Не пустой прогресс бар
      */
-    upped: {
-        left: env.get("progress.not_empty.left"),
-        center: env.get("progress.not_empty.center"),
-        right: env.get("progress.not_empty.right")
-    },
+    upped: initElement("not_empty")
+};
 
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button: env.get("progress.button"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_vk: env.get("progress.button.vk"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_yandex: env.get("progress.button.yandex"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_youtube: env.get("progress.button.youtube"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_spotify: env.get("progress.button.spotify"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_soundcloud: env.get("progress.button.soundcloud"),
-
-    /**
-     * @description Разделение прогресс бара, поддерживает платформы
-     */
-    button_deezer: env.get("progress.button.deezer")
-}
+/**
+ * @author SNIPPIK
+ * @description Все найденные кнопки платформ
+ * @private
+ */
+let buttons: { [key: string]: string; } = null;
 
 /**
  * @author SNIPPIK
@@ -74,7 +79,7 @@ export class PlayerProgress {
      * @constructor
      * @public
      */
-    public constructor(private readonly size: number = 15) {};
+    public constructor(private size: number = 15) {};
 
     /**
      * @description Получаем готовый прогресс бар
@@ -82,8 +87,10 @@ export class PlayerProgress {
      * @public
      */
     public bar = ({ duration, platform }: PlayerProgressInput): string => {
+        if (!buttons) initButtons();
+
         const { current, total } = duration;
-        const button = emoji[`button_${platform.toLowerCase()}`] || emoji.button;
+        const button = buttons[`button_${platform.toLowerCase()}`] ?? buttons["button"];
 
         // Если live-трек
         if (total === 0) {
@@ -116,16 +123,18 @@ export class PlayerProgress {
  * @author SNIPPIK
  * @description Данные для создания прогресс бара
  * @interface PlayerProgressInput
+ * @private
  */
 interface PlayerProgressInput {
     /**
      * @description Название платформы
-     * @readonly
+     * @public
      */
-    platform: RestServerSide.API["name"];
+    platform: RestAPIS_Names;
 
     /**
      * @description Данные о времени трека
+     * @public
      */
     duration: {
         // Текущее время

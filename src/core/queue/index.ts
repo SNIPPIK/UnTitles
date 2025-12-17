@@ -9,10 +9,10 @@ import { Track } from "./structures/track";
 import { env } from "#app/env";
 import { db } from "#app/db";
 
-export * from "./structures/track";
-export * from "./structures/queue";
 export * from "./controllers/tracks";
 export * from "./controllers/voice";
+export * from "./structures/track";
+export * from "./structures/queue";
 
 /**
  * @author SNIPPIK
@@ -28,17 +28,17 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @readonly
      * @public
      */
-    public readonly cycles = new ControllerCycles();
+    public cycles = new ControllerCycles();
 
     /**
      * @description Здесь хранятся модификаторы аудио
      * @readonly
      * @public
      */
-    public readonly options = {
+    public options = {
         optimization: parseInt(env.get("duration.optimization")),
         volume: parseInt(env.get("audio.volume")),
-        swapFade: parseInt(env.get("audio.swap.fade")),
+        swapFade: parseInt(env.get("audio.swap.fade", "5")),
         fade: parseInt(env.get("audio.fade"))
     };
 
@@ -81,7 +81,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
             queue.player.removeAllListeners();
 
             // Тихо удаляем очередь
-            this.remove(queue.message.guildID, true);
+            this.remove(queue.message.guild_id, true);
         }
 
         Logger.log("DEBUG", `[Queues] has getting max timeout: ${timeout} ms`);
@@ -98,7 +98,7 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
         if (player.status === "player/pause") player.resume();
 
         // Запускаем функцию воспроизведения треков
-        (() => player.play())();
+        process.nextTick(player.play);
     };
 
     /**
@@ -107,13 +107,13 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
      * @param item    - Добавляемый объект
      * @private
      */
-    public create = (message: CommandInteraction, item: Track.list | Track | Track[]) => {
+    public create = (message: CommandInteraction, item: Track.list | Track | Track[]): void => {
         const items = this._prepareGettingData(item);
 
         // Если данных нет
         if (!items.length) {
             db.events.emitter.emit("rest/error", message, locale._(message.locale, "player.search.fail"));
-            return null;
+            return;
         }
 
         let queue = this.get(message.guildId);
@@ -126,35 +126,24 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
                 setImmediate(() => {
                     // Установка позиции воспроизведения в зависимости от типа добавленного item
                     queue.tracks.position = items.length ? queue.tracks.total - items.length : 0;
-
-                    // Если разные текстовые каналы
-                    if (queue.message.channelID !== message.channelId) {
-                        // Меняем текстовый канал
-                        queue.message = new QueueMessage(message);
-                    }
-
                     this.restart_player = queue.player;
                 });
             }
 
             // Если текстовый канал изменился — обновляем привязку
-            else if (queue.message.channelID !== message.channelId) {
+            if (queue.message.channel_id !== message.channelId) {
                 queue.message = new QueueMessage(message);
             }
         }
 
         // Отправляем сообщение о добавлении треков
-        if (!Array.isArray(item)) {
-            db.events.emitter.emit("message/push", queue, message.member, item);
-        }
+        if (!Array.isArray(item)) db.events.emitter.emit("message/push", queue, message.member, item);
 
         // Добавляем треки
         items.forEach(track => {
             track.user = message.member.user;
             queue.tracks.push(track);
         });
-
-        return null;
     };
 
     /**
@@ -187,22 +176,28 @@ export class ControllerQueues<T extends Queue> extends Collection<T> {
 export interface QueueEvents {
     /**
      * @description Событие при котором коллекция будет отправлять информацию о добавленном треке или плейлисте, альбоме
-     * @param queue     - Очередь сервера
+     * @param queue      - Очередь сервера
      * @param user       - Пользователь включивший трек
-     * @param items     - Трек или плейлист, альбом
+     * @param items      - Трек или плейлист, альбом
+     * @returns void
+     * @readonly
      */
     readonly "message/push": (queue: Queue, user: CommandInteraction["member"], items: Track | Track.list) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять сообщение о текущем треке
      * @param queue     - Очередь сервера
+     * @returns void
+     * @readonly
      */
     readonly "message/playing": (queue: Queue) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять сообщение об ошибке
      * @param queue     - Очередь сервера
-     * @param error     - Ошибка в формате string или в типе Error
+     * @param error     - Ошибка
+     * @returns void
+     * @readonly
      */
     readonly "message/error": (queue: Queue, error?: string | Error, position?: number) => void;
 
@@ -211,13 +206,17 @@ export interface QueueEvents {
      * @param api      - Класс платформы запросов
      * @param message  - Сообщение с сервера
      * @param url      - Ссылка на допустимый объект или текст для поиска
+     * @returns void
+     * @readonly
      */
     readonly "rest/request": (api: RestClientSide.Request, message: CommandInteraction, url: string) => void;
 
     /**
      * @description Событие при котором будут отправляться ошибки из системы API
      * @param message    - Сообщение с сервера
-     * @param error      - Ошибка в формате string
+     * @param error      - Ошибка
+     * @returns void
+     * @readonly
      */
-    readonly "rest/error": (message: CommandInteraction, error: string) => void;
+    readonly "rest/error": (message: CommandInteraction, error: string | Error) => void;
 }

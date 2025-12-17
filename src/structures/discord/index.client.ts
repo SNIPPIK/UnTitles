@@ -1,0 +1,212 @@
+import { Client, Options, Partials } from "discord.js";
+import { ActivityType } from "discord-api-types/v10";
+import { version } from "package.json";
+import { Logger } from "#structures";
+import { env } from "#app/env";
+import { db } from "#app/db";
+
+/**
+ * @author SNIPPIK
+ * @description Класс клиента
+ * @class DiscordClient
+ * @extends Client
+ * @public
+ */
+export class DiscordClient extends Client {
+    /**
+     * @description Номер осколка
+     * @returns number
+     * @public
+     */
+    public get shardID(): number {
+        try {
+            return this.shard?.count - 1;
+        } catch {
+            return 0;
+        }
+    };
+
+    /**
+     * @description Создание стандартного осколка
+     * @constructor
+     * @public
+     */
+    public constructor() {
+        super({
+            presence: {
+                status: "online",
+                activities: [
+                    {
+                        name: " 💫 Startup...",
+                        type: 4
+                    }
+                ]
+            },
+
+            // Права бота
+            intents: [
+                // Доступ к серверам
+                "Guilds",
+
+                // Отправление сообщений
+                "GuildMessages",
+
+                // Нужен для голосовой системы
+                "GuildVoiceStates",
+            ],
+
+            // Позволяет обрабатывать частичные данные
+            partials: [
+                Partials.Channel,
+                Partials.GuildMember,
+                Partials.SoundboardSound,
+                Partials.Message,
+                Partials.Reaction,
+                Partials.User,
+                Partials.GuildScheduledEvent,
+                Partials.ThreadMember,
+            ],
+
+            // Задаем параметры кеша
+            makeCache: Options.cacheWithLimits({
+                ...Options.DefaultMakeCacheSettings,
+                ...Options.DefaultSweeperSettings,
+                MessageManager: {
+                    keepOverLimit: (value) => value.createdTimestamp > (Date.now() + 60e3 * 10)
+                },
+                GuildScheduledEventManager: 0,
+                GuildTextThreadManager: 0,
+                BaseGuildEmojiManager: 0,
+                ReactionManager: 0,
+                ReactionUserManager: 0,
+                EntitlementManager: 0,
+                StageInstanceManager: 0,
+                GuildBanManager: 0,
+                GuildForumThreadManager: 0,
+                AutoModerationRuleManager: 0,
+                DMMessageManager: 0,
+                GuildInviteManager: 0,
+                GuildEmojiManager: 0,
+                GuildStickerManager: 0,
+                ThreadManager: 0,
+                ThreadMemberManager: 0,
+            })
+        });
+
+        // Ограничиваем кол-во событий
+        this.setMaxListeners(10);
+        this.ws.setMaxListeners(10);
+
+        // Запускаем статусы после инициализации клиента
+        this.once("clientReady", this.initSwapStatus);
+    };
+
+    /**
+     * @description Функция создания и управления статусом
+     * @returns void
+     * @private
+     */
+    private initSwapStatus = (): void => {
+        // Время обновления статуса
+        const timeout = parseInt(env.get("client.presence.interval", "120"));
+        const arrayUpdate = parseInt(env.get("client.presence.array.update", "3600")) * 1e3;
+        const clientID = this.shardID;
+
+        let array = this.prepareStatuses();
+        let size = array.length - 1;
+        let i = 0, lastDate = Date.now() + arrayUpdate ;
+
+        // Если нет статусов
+        if (!array.length) return;
+        else {
+            Logger.log("LOG", `[Core/${clientID}] Success loading custom ${Logger.color(34, `${array.length} statuses`)}`);
+        }
+
+        // Интервал для обновления статуса
+        setInterval(() => {
+            // Обновляем статусы
+            if (lastDate < Date.now()) {
+                // Обновляем статусы
+                array = this.prepareStatuses();
+
+                // Обновляем время для следующего обновления
+                lastDate = Date.now() + arrayUpdate;
+            }
+
+            // Запрещаем выходить за диапазон допустимого значения
+            if (i > size) i = 0;
+            const activity = array[i];
+
+            // Задаем статус боту
+            this.user.setPresence({
+                status: env.get("client.status", "online"),
+                activities: [activity] as ActivityOptions[],
+                shardId: clientID
+            });
+
+            i++;
+        }, timeout * 1e3);
+    };
+
+    /**
+     * @description Функция подготавливающая статусы
+     * @returns ActivityOptions[]
+     * @private
+     */
+    private prepareStatuses = (): ActivityOptions[] => {
+        const statuses: ActivityOptions[] = [];
+        const guilds = this.guilds.cache.size;
+        const users = this.users.cache.size;
+
+        // Получаем пользовательские статусы
+        try {
+            const presence = (JSON.parse(`[${env.get("client.presence.array")}]`) as ActivityOptionsRaw[]);
+            const envPresents = presence.map((status) => {
+                const edited = status.name
+                    .replace(/{shard}/g, `${this.shardID + 1}`)
+                    .replace(/{queues}|{players}/g, `${db.queues.size}`)
+                    .replace(/{version}/g, `${version}`)
+                    .replace(/{guilds}/g, `${guilds}`)
+                    .replace(/{users}/g, `${users}`)
+
+                return {
+                    name: edited,
+                    type: ActivityType[status.type],
+                    shardId: this.shardID
+                }
+            });
+
+            // Добавляем пользовательские статусы
+            statuses.push(...envPresents);
+        } catch (e) {
+            Logger.log("ERROR", `[Core/${this.shardID}] Failed to parse env statuses. ${e}`);
+        }
+
+        return statuses;
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Параметры показа статуса
+ * @interface ActivityOptions
+ * @private
+ */
+interface ActivityOptions {
+    name: string;
+    state?: string;
+    url?: string;
+    type?: ActivityType;
+    shardId?: number | readonly number[];
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные статуса бота из env
+ * @interface ActivityOptionsRaw
+ * @private
+ */
+//@ts-ignore
+interface ActivityOptionsRaw extends ActivityOptions {
+    type?: string;
+}

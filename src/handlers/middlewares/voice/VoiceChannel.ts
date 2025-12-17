@@ -74,7 +74,7 @@ class OtherVoiceChannel extends Assign<middleware<CommandInteraction>> {
                             // Если нет пользователей в голосовом канале очереди
                             if (users.size === 0) {
                                 queue.message = new QueueMessage(ctx);
-                                queue.voice.connection.swapChannel = VoiceChannel.id;
+                                queue.voice.connection.channel = VoiceChannel.id;
 
                                 // Сообщаем о подключении к другому каналу
                                 ctx.channel.send({

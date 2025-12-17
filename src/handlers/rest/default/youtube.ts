@@ -1,8 +1,111 @@
-import { httpsClient, locale, SimpleWorker } from "#structures";
-import { DeclareRest, RestServerSide } from "#handler/rest";
-import { Track } from "#core/queue";
-import { db } from "#app/db";
-import fs from "node:fs";
+import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
+import { httpsClient, locale } from "#structures";
+import type { Track } from "#core/queue";
+import { sdb } from "#worker/db";
+
+/**
+ * @author SNIPPIK
+ * @description Взаимодействие с платформой YouTube, динамический плагин
+ * # Types
+ * - Video - Любое видео с платформы. Не получится получить спонсорские видео или 18+
+ * - Playlist - Любой открытый плейлист.
+ * - Artist - Последние видео автора с учетом лимита
+ * - Related - Похожее треки, работает через алгоритмы youtube
+ * - Search - Поиск видео, пока не доступны плейлисты, альбомы, авторы
+ * @Specification Rest YT API
+ * @Audio Доступно нативное получение
+ */
+
+/**
+ * @author SNIPPIK
+ * @description Допустимые символы, буквы, цифры для работы с youtube на более похожем уровне api
+ * @const CPN_CHARS
+ * @private
+ */
+const CPN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+/**
+ * @author SNIPPIK
+ * @description Все допустимые заголовки
+ * @const Clients
+ * @private
+ */
+const Clients = {
+    /**
+     * @description Запрос страницы, требуется указывать время для правильного запроса
+     * @audio true - without sig
+     */
+    "ANDROID": {
+        request: {
+            cpn: generateClientPlaybackNonce(16),
+            context: {
+                client: {
+                    clientName: "ANDROID",
+                    clientVersion: "19.35.36",
+                    platform: "MOBILE",
+                    osName: "Android",
+                    osVersion: "13",
+                    androidSdkVersion: "33",
+                    hl: "en",
+                    gl: "US",
+                    utcOffsetMinutes: -240,
+                },
+                request: {
+                    internalExperimentFlags: [],
+                    useSsl: true,
+                },
+                user: {
+                    lockedSafetyMode: false,
+                },
+                "contentPlaybackContext": {
+                    "html5Preference": "HTML5_PREF_WANTS"
+                }
+            },
+            contentCheckOk: true,
+            racyCheckOk: true
+        },
+        headers: {
+            "Content-Type": "application/json",
+            "User-Agent": `com.google.android.youtube/19.35.36(Linux; U; Android 13; en_US; SM-S908E Build/TP1A.220624.014) gzip`,
+            "X-Goog-Api-Format-Version": "2"
+        }
+    },
+
+    /**
+     * @description Запрос страницы, требуется указывать время для правильного запроса
+     * @audio true
+     */
+    "WEB": {
+        request: {
+            "context": {
+                "client": {
+                    "hl": "en",
+                    "gl": "US",
+                    "clientName": "WEB",
+                    "clientVersion": "2.20250927.00.00"
+                }
+            }
+        }
+    },
+
+    /**
+     * @description Запрос страницы урезанной
+     * @audio false
+     */
+    "WEB_EMBEDDED": {
+        request: {
+            context: {
+                client: {
+                    clientName: "WEB_EMBEDDED_PLAYER",
+                    clientVersion: "1.20240723.01.00",
+                    hl: "en",
+                    timeZone: "UTC",
+                    utcOffsetMinutes: 0
+                }
+            }
+        }
+    }
+};
 
 /**
  * @author SNIPPIK
@@ -17,312 +120,318 @@ import fs from "node:fs";
     audio: true,
     color: 16711680
 })
+@OptionsRest({
+    AIzaKey: generateFakeApiKey()
+})
 class RestYouTubeAPI extends RestServerSide.API {
     readonly requests: RestServerSide.API["requests"] = [
         /**
          * @description Запрос данных об плейлисте
          * @type "playlist"
+         * @private
          */
         {
             name: "playlist",
             filter: /playlist\?list=[a-zA-Z0-9-_]+/i,
-            execute: (url, { limit }) => {
-                const ID = url.match(/playlist\?list=[a-zA-Z0-9-_]+/i).pop();
+            execute: async (url, { limit }) => {
+                const ID = this.getID(/playlist\?list=[a-zA-Z0-9-_]+/i, url);
                 let artist = null;
 
-                return new Promise(async (resolve) => {
-                    try {
-                        // Если ID плейлиста не удалось извлечь из ссылки
-                        if (!ID) return resolve(locale.err("api.request.id.playlist"));
+                try {
+                    // Если ID плейлиста не удалось извлечь из ссылки
+                    if (!ID) return locale.err("api.request.id.playlist");
 
-                        const api = await RestYouTubeAPI.API(`https://www.youtube.com/${ID}`)
+                    const api = await this.pAPI(ID);
 
-                        // Если при запросе была получена ошибка
-                        if (api instanceof Error) return resolve(api);
+                    // Если при запросе была получена ошибка
+                    if (api instanceof Error) return api;
 
-                        // Данные о плейлисте
-                        const playlist = api["microformat"]["microformatDataRenderer"];
+                    // Данные о плейлисте
+                    const playlist = api["microformat"]["microformatDataRenderer"];
 
-                        // Необработанные видео
-                        const videos: any[] = api["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]
-                            .content["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"];
+                    // Необработанные видео
+                    const videos: any[] = api["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]
+                        .content["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"];
 
-                        // Все доступные видео в плейлисте
-                        const items = videos.splice(0, limit).map(({playlistVideoRenderer}) => RestYouTubeAPI.track(playlistVideoRenderer));
+                    // Все доступные видео в плейлисте
+                    const items = videos.splice(0, limit).map(({playlistVideoRenderer}) => this.track(playlistVideoRenderer));
 
-                        // Раздел с данными автора
-                        const author = api["sidebar"]["playlistSidebarRenderer"]["items"];
+                    // Раздел с данными автора
+                    const author = api["sidebar"]["playlistSidebarRenderer"]["items"];
 
-                        // Если авторов в плейлисте больше 1
-                        if (author.length > 1) {
-                            const authorData = author[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
+                    // Если авторов в плейлисте больше 1
+                    if (author.length > 1) {
+                        const authorData = author[1]["playlistSidebarSecondaryInfoRenderer"]["videoOwner"]["videoOwnerRenderer"];
 
-                            // Получаем истинные данные об авторе плейлиста
-                            artist = await RestYouTubeAPI.getChannel({
-                                id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"],
-                                name: authorData.title["runs"][0].text
-                            });
-                        }
-
-                        return resolve({
-                            url, items,
-                            title: playlist.title,
-                            image: playlist.thumbnail["thumbnails"].pop(),
-                            artist: artist ?? items.at(-1).artist
+                        // Получаем истинные данные об авторе плейлиста
+                        artist = await this.restArtist({
+                            id: authorData["navigationEndpoint"]["browseEndpoint"]["browseId"],
+                            name: authorData.title["runs"][0].text
                         });
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
                     }
-                });
+
+                    return {
+                        url, items,
+                        title: playlist.title ?? "Related videos",
+                        image: playlist.thumbnail["thumbnails"].pop(),
+                        artist: artist ?? items.at(-1).artist
+                    };
+                } catch (e) {
+                    console.error(e);
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         },
 
         /**
          * @description Запрос треков из волны, для выполнения требуется указать list=RD в ссылке
          * @type "related"
+         * @private
          */
         {
             name: "related",
             filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})?(list=RD)/,
-            execute: (url) => {
-                return new Promise(async (resolve) => {
-                    const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
+            execute: async (url) => {
+                const ID = this.getID(/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/, url);
 
-                    try {
-                        const api = await RestYouTubeAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
-                        if (api instanceof Error) return api;
+                try {
+                    const api = await this.pAPI(`watch?v=${ID}&hl=en&has_verified=1`);
+                    if (api instanceof Error) return api;
 
-                        const related = api.contents?.twoColumnWatchNextResults?.secondaryResults?.secondaryResults?.results ?? [];
-                        const relatedVideos = [];
+                    const related = api.contents?.twoColumnWatchNextResults?.secondaryResults?.secondaryResults?.results ?? [];
+                    const relatedVideos = [];
 
-                        // Подготавливаем данные треков (video)
-                        for (const item of related) {
-                            const render = item.compactVideoRenderer || item.lockupViewModel;
+                    // Подготавливаем данные треков (video)
+                    for (const item of related) {
+                        const render = item.compactVideoRenderer || item.lockupViewModel;
 
-                            // Если есть недопустимые типы контента
-                            if (!render?.contentType || render?.contentType !== "LOCKUP_CONTENT_TYPE_VIDEO") continue;
+                        // Если есть недопустимые типы контента
+                        if (!render?.contentType || render?.contentType !== "LOCKUP_CONTENT_TYPE_VIDEO") continue;
 
-                            const title = render?.rendererContext.accessibilityContext?.label ?? render?.metadata?.lockupMetadataViewModel.title.content;
-                            const duration = (title as string).duration();
+                        const title = render?.rendererContext.accessibilityContext?.label ?? render?.metadata?.lockupMetadataViewModel.title.content;
+                        const duration = (title as string).duration();
 
-                            // Если время слишком много
-                            if (duration > 800 && !title.match(/album|ALBUM|Album/)) continue;
+                        // Если время слишком много
+                        if (duration > 800 && !title.match(/album|ALBUM|Album/)) continue;
 
-                            relatedVideos.push(RestYouTubeAPI.track({
-                                videoId: render.contentId,
-                                title: render?.metadata?.lockupMetadataViewModel.title.content,
-                                channelId: "null",
-                                lengthSeconds: duration.duration(),
-                                author: render?.metadata?.lockupMetadataViewModel.metadata?.contentMetadataViewModel.metadataRows[0].metadataParts[0].text.content.split(",")[0],
-                                format: { audio: null }
-                            }));
-                        }
-
-                        return resolve({
-                            url,
-                            items: relatedVideos,
-                            title: null,
-                            image: null,
-                            artist: null,
-                        });
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`));
+                        relatedVideos.push(this.track({
+                            videoId: render.contentId,
+                            title: render?.metadata?.lockupMetadataViewModel.title.content,
+                            channelId: "null",
+                            lengthSeconds: duration.duration(),
+                            author: render?.metadata?.lockupMetadataViewModel.metadata?.contentMetadataViewModel.metadataRows[0].metadataParts[0].text.content.split(",")[0],
+                            format: {audio: null}
+                        }));
                     }
-                });
+
+                    return {
+                        url,
+                        items: relatedVideos,
+                        title: null,
+                        image: null,
+                        artist: null,
+                    };
+                } catch (e) {
+                    console.error(e);
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         },
 
         /**
          * @description Запрос данных о треке
          * @type "track"
+         * @private
          */
         {
             name: "track",
             filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
-            execute: (url: string, options) => {
-                const ID = (/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/).exec(url)[0];
+            execute: async (url, options) => {
+                const ID = this.getID(/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/, url);
 
-                return new Promise(async (resolve) => {
-                    try {
-                        // Если ID видео не удалось извлечь из ссылки
-                        if (!ID) return resolve(locale.err("api.request.id.track"));
+                try {
+                    // Если ID видео не удалось извлечь из ссылки
+                    if (!ID) return locale.err("api.request.id.track");
 
-                        const cache = db.cache.get(`${this.url}/${ID}`);
+                    const cache = sdb.meta_saver.get(`${this.url}/${ID}`);
 
-                        // Если трек есть в кеше
-                        if (cache) {
-                            if (!options.audio) return resolve(cache);
+                    // Если трек есть в кеше
+                    if (cache) {
+                        if (!options.audio) return cache;
 
-                            // Если включена утилита кеширования аудио
-                            else if (db.cache.audio) {
-                                const check = db.cache.audio.status(`${this.url}/${ID}`);
+                        // Если включена утилита кеширования аудио
+                        else if (sdb.audio_saver) {
+                            const check = sdb.audio_saver.status(`${this.url}/${ID}`);
 
-                                // Если есть кеш аудио
-                                if (check.status === "ended") {
-                                    cache.audio = check.path;
-                                    return resolve(cache);
-                                }
+                            // Если есть кеш аудио
+                            if (check.status === "ended") {
+                                cache.audio = check.path;
+                                return cache;
                             }
                         }
-
-                        const api = await RestYouTubeAPI.API(`https://www.youtube.com/watch?v=${ID}&hl=en&has_verified=1`);
-
-                        // Если при получении данных возникла ошибка
-                        if (api instanceof Error) return resolve(api);
-
-                        // Класс трека
-                        const track = RestYouTubeAPI.track(api["videoDetails"]);
-
-                        setImmediate(() => {
-                            // Сохраняем кеш в системе
-                            if (!cache) db.cache.set(track, this.url);
-                        });
-
-                        // Если указано получение аудио
-                        if (options.audio) {
-                            // Если включена утилита кеширования
-                            if (db.cache.audio) {
-                                const check = db.cache.audio.status(`${this.url}/${ID}`);
-
-                                // Если есть кеш аудио
-                                if (check.status === "ended") {
-                                    track.audio = check.path;
-                                    return resolve(track);
-                                }
-                            }
-
-                            const data = api["streamingData"];
-
-                            // dashManifestUrl, hlsManifestUrl
-                            if (data["hlsManifestUrl"]) track.audio = data["hlsManifestUrl"];
-                            else {
-                                // Если нет форматов
-                                if (!data["formats"]) return resolve(locale.err("api.request.audio.fail", [this.name]));
-
-                                // Расшифровываем аудио формат
-                                const format = await RestYouTubeAPI.extractFormat(data, api.html, url);
-
-                                // Если есть расшифровка ссылки видео
-                                if (format) track.audio = format["url"];
-                            }
-                        }
-
-                        return resolve(track);
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
                     }
-                });
+
+                    let api = await this.API(ID, options.audio);
+
+                    // Если при получении данных возникла ошибка
+                    if (api instanceof Error || api["playabilityStatus"]["status"] !== "OK") {
+                        // Пробуем получить страницу нативно без API
+                        api = await this.pAPI(`watch?v=${ID}`);
+
+                        // Если все равно возникает ошибка
+                        if (api instanceof Error) return api;
+                    }
+
+                    // Класс трека
+                    const track = this.track(api["videoDetails"]);
+
+                    // Если указано получение аудио
+                    if (options.audio) {
+                        // Если включена утилита кеширования
+                        if (sdb.audio_saver) {
+                            const check = sdb.audio_saver.status(`${this.url}/${ID}`);
+
+                            // Если есть кеш аудио
+                            if (check.status === "ended") {
+                                track.audio = check.path;
+                                return track;
+                            }
+                        }
+
+                        const data = api["streamingData"];
+
+                        // dashManifestUrl, hlsManifestUrl
+                        if (data["hlsManifestUrl"]) track.audio = data["hlsManifestUrl"];
+                        else {
+                            // Если есть расшифровка ссылки видео
+                            if (data["formats"]) track.audio = data["formats"][0]["url"];
+                        }
+                    }
+
+                    if (!cache && !api?.["videoDetails"]?.["isLive"]) setImmediate(() => {
+                        // Сохраняем кеш в системе
+                        sdb.meta_saver?.set(track, this.url);
+                    });
+
+                    return track;
+                } catch (e) {
+                    console.error(e);
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         },
 
         /**
          * @description Запрос данных треков артиста
          * @type "artist"
+         * @private
          */
         {
             name: "artist",
             filter: /\/(channel)?(@)/i,
-            execute: (url: string, {limit}) => {
-                return new Promise(async (resolve) => {
-                    try {
-                        let ID: string;
+            execute: async (url, {limit}) => {
+                const ID = this.getID(/^(?:@([^\/]+)|([a-zA-Z0-9_-]+))\/?/, url);
 
-                        // Получаем истинное id канала
-                        if (url.match(/@/)) ID = `@${url.split("@")[1].split("/")[0]}`;
-                        else ID = `channel/${url.split("channel/")[1]}`;
+                try {
+                    // Если ID автора не удалось извлечь из ссылки
+                    if (!ID) return locale.err("api.request.id.author");
 
-                        // Создаем запрос
-                        const details = await RestYouTubeAPI.API(`https://www.youtube.com/${ID}/videos`);
+                    // Создаем запрос
+                    const details = await this.pAPI(`${ID}/videos`);
 
-                        if (details instanceof Error) return resolve(details);
+                    if (details instanceof Error) return details;
 
-                        const author = details["microformat"]["microformatDataRenderer"];
-                        const tabs: any[] = details?.["contents"]?.["twoColumnBrowseResultsRenderer"]?.["tabs"];
-                        const contents = (tabs[1] ?? tabs[2])["tabRenderer"]?.content?.["richGridRenderer"]?.["contents"]
-                            ?.filter((video: any) => video?.["richItemRenderer"]?.content?.["videoRenderer"])?.splice(0, limit);
+                    const author = details["microformat"]["microformatDataRenderer"];
+                    const tabs: any[] = details?.["contents"]?.["twoColumnBrowseResultsRenderer"]?.["tabs"];
+                    const contents = (tabs[1] ?? tabs[2])["tabRenderer"]?.content?.["richGridRenderer"]?.["contents"]
+                        ?.filter((video: any) => video?.["richItemRenderer"]?.content?.["videoRenderer"])?.splice(0, limit);
 
-                        // Модифицируем видео
-                        const videos = contents.map(({richItemRenderer}: any) => {
-                            const video = richItemRenderer?.content?.["videoRenderer"];
+                    // Модифицируем видео
+                    return contents.map(({richItemRenderer}: any) => {
+                        const video = richItemRenderer?.content?.["videoRenderer"];
 
-                            return {
-                                url: `https://youtu.be/${video["videoId"]}`, title: video.title["runs"][0].text, duration: { full: video["lengthText"]["simpleText"] },
-                                author: { url: `https://www.youtube.com${ID}`, title: author.title }
-                            }
-                        });
-
-                        return resolve(videos);
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                        return {
+                            url: `https://youtu.be/${video["videoId"]}`,
+                            title: video.title["runs"][0].text,
+                            duration: {full: video["lengthText"]["simpleText"]},
+                            author: {url: `https://${this.url}/${ID}`, title: author.title}
+                        }
+                    });
+                } catch (e) {
+                    console.error(e);
+                    return new Error(`[APIs]: ${e}`);
+                }
             },
         },
 
         /**
          * @description Запрос данных по поиску
          * @type "search"
+         * @private
          */
         {
             name: "search",
-            execute: (query: string, {limit}) => {
-                return new Promise(async (resolve) => {
-                    try {
-                        // Создаем запрос
-                        const details = await RestYouTubeAPI.API(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=QgIIAQ%3D%3D`);
+            execute: async (query: string, {limit}) => {
+                try {
+                    // Создаем запрос
+                    const details = await this.pAPI(`results?search_query=${encodeURIComponent(query)}&sp=QgIIAQ%3D%3D`);
 
-                        // Если при получении данных возникла ошибка
-                        if (details instanceof Error) return resolve(details);
+                    // Если при получении данных возникла ошибка
+                    if (details instanceof Error) return details;
 
-                        // Найденные видео
-                        const vanilla_videos = details["contents"]?.["twoColumnSearchResultsRenderer"]?.["primaryContents"]?.["sectionListRenderer"]?.["contents"][0]?.["itemSectionRenderer"]?.["contents"];
+                    // Найденные видео
+                    const vanilla_videos = details["contents"]?.["twoColumnSearchResultsRenderer"]?.["primaryContents"]?.["sectionListRenderer"]?.["contents"][0]?.["itemSectionRenderer"]?.["contents"];
 
-                        // Проверяем на наличие видео
-                        if (vanilla_videos?.length === 0 || !vanilla_videos) return resolve(locale.err("api.request.fail"));
+                    // Проверяем на наличие видео
+                    if (vanilla_videos?.length === 0 || !vanilla_videos) return locale.err("api.request.fail");
 
-                        const filtered_ = vanilla_videos?.filter((video: json) => video && video?.["videoRenderer"])?.splice(0, limit);
-                        const videos: Track.data[] = filtered_.map(({ videoRenderer }: json) => RestYouTubeAPI.track(videoRenderer));
+                    const filtered_ = vanilla_videos?.filter((video: json) => video && video?.["videoRenderer"])?.splice(0, limit);
+                    const videos: Track.data[] = filtered_.map(({ videoRenderer }: json) => this.track(videoRenderer));
 
-                        return resolve(videos);
-                    } catch (e) {
-                        return resolve(new Error(`[APIs]: ${e}`))
-                    }
-                });
+                    return videos;
+                } catch (e) {
+                    console.error(e);
+                    return new Error(`[APIs]: ${e}`);
+                }
             }
         }
     ];
 
     /**
-     * @description Получаем страницу и ищем на ней данные
-     * @param url - Ссылка на видео или ID видео
+     * @description Получаем страницу с данными
+     * @param ID - ID видео
+     * @param audio - нужно ли получить аудио
      * @protected
-     * @static
      */
-    protected static API = (url: string): Promise<Error | json> => {
+    protected API = (ID: string, audio: boolean): Promise<Error | json> => {
+        const client = audio ? Clients.ANDROID : Clients.WEB_EMBEDDED;
+
         return new Promise((resolve) => {
             new httpsClient({
-                url,
-                userAgent: true,
+                method: "POST",
+                url: `https://www.youtube.com/youtubei/v1/player?key=${this.options.AIzaKey}`,
                 headers: {
-                    "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
-                    "accept-encoding": "gzip, compress, deflate, br"
-                }
+                    "Content-Type": "application/json",
+                    ...client["headers"] ? client["headers"] : {}
+                },
+                body: JSON.stringify({
+                    ...client.request,
+                    "videoId": ID
+                })
             })
                 // Получаем исходную страницу
-                .toString
+                .toJson
 
                 // Получаем результат из Promise
                 .then((api) => {
                     // Если возникает ошибка при получении страницы
                     if (api instanceof Error) return resolve(locale.err("api.request.fail"));
 
-                    // Ищем данные на странице
-                    const data = RestYouTubeAPI.extractInitialDataResponse(api);
+                    // Если указано аудио, но его нет!
+                    else if (audio && !api["streamingData"]?.["formats"]) return resolve(locale.err("api.request.fail"));
 
-                    // Если возникает ошибка при поиске на странице
-                    if (data instanceof Error) return resolve(data);
-
-                    return resolve(data);
+                    // Отдаем данные
+                    return resolve(api);
                 })
 
                 // Если происходит ошибка
@@ -331,137 +440,11 @@ class RestYouTubeAPI extends RestServerSide.API {
     };
 
     /**
-     * @description Получаем аудио дорожки
-     * @param data - <videoData>.streamingData все форматы видео, будет выбран оптимальный
-     * @param html - Ссылка на html плеер
-     * @param url - Ссылка на видео
-     * @protected
-     * @static
-     */
-    protected static extractFormat = async (data: json, html: string, url: string) => {
-        // Если установлен wrapper ytdlp
-        if (fs.existsSync("node_modules/ytdlp-nodejs")) {
-            const { YtDlp } = require("ytdlp-nodejs");
-            const ytdlp = new YtDlp();
-
-            const result = await ytdlp.getInfoAsync(url);
-            return (result.requested_formats).find((format) => !format.fps)
-        }
-
-        // Запускаем мусорный Signature extractor, очень много мусора за собой оставляет
-        return new Promise((resolve) => {
-            SimpleWorker.create<string>({
-                file: "src/workers/YouTubeSignatureExtractor.js",
-                postMessage: {
-                    formats: data["formats"],
-                    html
-                },
-                options: {
-                    execArgv: ["-r", "tsconfig-paths/register"],
-                    workerData: null
-                },
-                callback: (data) => resolve(data)
-            });
-        });
-    };
-
-    /**
-     * @description Получаем данные из страницы
-     * @param input - Страница
-     */
-    protected static extractInitialDataResponse = (input: string): json | Error => {
-        if (typeof input !== "string") return locale.err("api.request.fail");
-
-        // Путь плеера (необходим для расшифровки)
-        const html5Player = /<script\s+src="([^"]+)"(?:\s+type="text\/javascript")?\s+name="player_ias\/base"\s*>|"jsUrl":"([^"]+)"/.exec(input);
-
-        let endData: json = {
-            html: `https://www.youtube.com${html5Player ? html5Player[1] || html5Player[2] : null}`
-        };
-
-        // Попытка найти ytInitialData JSON
-        const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
-        if (initialDataMatch) {
-            try {
-                endData = { ...endData, ...JSON.parse(initialDataMatch[1]) };
-            } catch {
-                // Игнорируем ошибку парсинга initialData
-            }
-        }
-
-        // Определяем, какой паттерн искать дальше: playerResponse или initialData
-        const startPattern = input.includes("var ytInitialPlayerResponse = ")
-            ? "var ytInitialPlayerResponse = "
-            : "var ytInitialData = ";
-
-        const startIndex = input.indexOf(startPattern);
-        const endIndex = input.indexOf("};", startIndex + startPattern.length);
-
-        // Если не нашли нужный участок с JSON — возвращаем ошибку
-        if (startIndex === -1 || endIndex === -1) return locale.err("api.request.fail");
-
-        try {
-            const jsonStr = input.substring(startIndex + startPattern.length, endIndex + 1);
-            const parsedData = JSON.parse(jsonStr);
-            // Объединяем данные, playerResponse имеет приоритет
-            endData = { ...endData, ...parsedData };
-        } catch {
-            return locale.err("api.request.fail");
-        }
-
-        // Проверяем статус playabilityStatus, если есть
-        const status = endData.playabilityStatus?.status;
-        if (status) {
-            if (status === "LOGIN_REQUIRED") {
-                return new Error(locale._(locale.language, "api.request.login"));
-            } else if (status !== "OK") {
-                const reason = endData.playabilityStatus?.reason || "Not found status error";
-                return new Error(locale._(locale.language, "api.request.fail.msg", [reason]));
-            }
-        }
-
-        return endData;
-    };
-
-
-    /**
-     * @description Получаем данные об авторе видео
-     * @param id - ID канала
-     * @param name - Название канала, если не будет найден канал будет возвращено название
-     * @protected
-     * @static
-     */
-    protected static getChannel = ({ id, name }: { id: string, name?: string }): Promise<Track.artist> => {
-        return new Promise<Track.artist>((resolve) => {
-            new httpsClient({
-                url: `https://www.youtube.com/channel/${id}/channels?flow=grid&view=0&pbj=1`,
-                headers: {
-                    "x-youtube-client-name": "1",
-                    "x-youtube-client-version": "2.20201021.03.00"
-                }
-            }).toJson.then((channel) => {
-                if (channel instanceof Error) return resolve(null);
-
-                const data = channel[1]?.response ?? channel?.response ?? null as any;
-                const info = data?.header?.["c4TabbedHeaderRenderer"], Channel = data?.metadata?.["channelMetadataRenderer"],
-                    avatar = info?.avatar;
-
-                return resolve({
-                    title: Channel?.title ?? name ?? "Not found name",
-                    url: `https://www.youtube.com/channel/${id}`,
-                    image: avatar?.["thumbnails"].pop() ?? null
-                });
-            }).catch(() => resolve(null));
-        });
-    };
-
-    /**
      * @description Подготавливаем трек к отправке
      * @param track - Данные видео
      * @protected
-     * @static
      */
-    protected static track = (track: json) => {
+    protected track = (track: json) => {
         const title = track.title?.simpleText ?? track.title?.["runs"]?.[0]?.text ?? track.title;
         const author = track["shortBylineText"]?.["runs"]?.[0]?.text ?? track.author;
         const id = track?.["videoId"] ?? track?.["inlinePlaybackEndpoint"]?.["watchEndpoint"]?.["videoId"] ?? track.contentId;
@@ -492,8 +475,146 @@ class RestYouTubeAPI extends RestServerSide.API {
             }
         }
     };
+
+    /**
+     * @description Получаем страницу и ищем на ней данные
+     * @param method - Ссылка на видео или ID видео
+     * @protected
+     */
+    protected pAPI = (method: string): Promise<Error | json> => {
+        return new Promise((resolve) => {
+            new httpsClient({ url: `https://${this.url}/${method}`,
+                userAgent: true,
+                headers: {
+                    "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "accept-encoding": "gzip, compress, deflate, br"
+                }
+            })
+                // Получаем исходную страницу
+                .toString
+
+                // Получаем результат из Promise
+                .then((api) => {
+                    // Если возникает ошибка при получении страницы
+                    if (api instanceof Error) return resolve(locale.err("api.request.fail"));
+
+                    // Ищем данные на странице
+                    const data = this._extractResponse(api);
+
+                    // Если возникает ошибка при поиске на странице
+                    if (data instanceof Error) return resolve(data);
+
+                    return resolve(data);
+                })
+
+                // Если происходит ошибка
+                .catch((err) => resolve(Error(`[APIs]: ${err}`)));
+        });
+    };
+
+    /**
+     * @description Получаем данные об авторе видео
+     * @param id - ID канала
+     * @param name - Название канала, если не будет найден канал будет возвращено название
+     * @protected
+     */
+    protected restArtist = ({ id, name }: { id: string, name?: string }): Promise<Track.artist> => {
+        return new Promise<Track.artist>((resolve) => {
+            new httpsClient({
+                url: `https:/${this.url}/channel/${id}/channels?flow=grid&view=0&pbj=1`,
+                headers: Clients.WEB.request.context.client
+            }).toJson.then((channel) => {
+                if (channel instanceof Error) return resolve(null);
+
+                const data = channel[1]?.response ?? channel?.response ?? null;
+                const info = data?.header?.["c4TabbedHeaderRenderer"], Channel = data?.metadata?.["channelMetadataRenderer"],
+                    avatar = info?.avatar;
+
+                return resolve({
+                    title: Channel?.title ?? name ?? "Not found name",
+                    url: `https://${this.url}/channel/${id}`,
+                    image: avatar?.["thumbnails"].pop() ?? null
+                });
+            }).catch(() => resolve(null));
+        });
+    };
+
+    /**
+     * @description Получаем данные из страницы
+     * @param input - Страница
+     * @protected
+     */
+    protected _extractResponse = (input: string): json | Error => {
+        if (typeof input !== "string") return locale.err("api.request.fail");
+
+        let endData: json = {};
+
+        // Попытка найти ytInitialData JSON
+        const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
+        if (initialDataMatch) {
+            try {
+                endData = JSON.parse(initialDataMatch[1]);
+            } catch {
+                // Игнорируем ошибку парсинга initialData
+            }
+        }
+
+        // Определяем, какой паттерн искать дальше: playerResponse или initialData
+        const startPattern = input.includes("var ytInitialPlayerResponse = ")
+            ? "var ytInitialPlayerResponse = "
+            : "var ytInitialData = ";
+
+        const startIndex = input.indexOf(startPattern);
+        const endIndex = input.indexOf("};", startIndex + startPattern.length);
+
+        // Если не нашли нужный участок с JSON — возвращаем ошибку
+        if (startIndex === -1 || endIndex === -1) return locale.err("api.request.fail");
+
+        try {
+            const jsonStr = input.substring(startIndex + startPattern.length, endIndex + 1);
+            const parsedData = JSON.parse(jsonStr);
+            // Объединяем данные, playerResponse имеет приоритет
+            endData = { ...endData, ...parsedData };
+        } catch {
+            return locale.err("api.request.fail");
+        }
+
+        // Проверяем статус playabilityStatus, если есть
+        const status = endData.playabilityStatus?.status;
+        if (status && status !== "OK") {
+            const reason = endData.playabilityStatus?.reason || "Not found status error";
+            return new Error(locale._(locale.language, "api.request.fail.msg", [reason]));
+        }
+
+        return endData;
+    };
 }
 
+/**
+ * @author SNIPPIK
+ * @description Генерируем уникальный индикатор устройства, фейковый конечно
+ * @param length - Размер
+ * @private
+ */
+function generateClientPlaybackNonce(length: number): string {
+    return Array.from({ length }, () => CPN_CHARS[Math.floor(Math.random() * CPN_CHARS.length)]).join("");
+}
+
+/**
+ * @author SNIPPIK
+ * @description Генерируем фейковые ключи для плеера
+ * @param totalLength - Глобальный размер ключа
+ * @private
+ */
+function generateFakeApiKey(totalLength = 34): string {
+    let key = "AIzaSyAO_";
+
+    for (let i = 0; i < totalLength - 4; i++) {
+        key += CPN_CHARS.charAt(Math.floor(Math.random() * CPN_CHARS.length));
+    }
+
+    return key;
+}
 
 /**
  * @export default

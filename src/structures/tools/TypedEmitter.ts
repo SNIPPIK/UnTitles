@@ -29,7 +29,7 @@ interface EventBucket {
 
 /**
  * @author SNIPPIK
- * @description Типизированный EventEmitter построенный на Map
+ * @description Типизированный EventEmitter построенный на Object-Map системе, работает чуть быстрее чем vanilla EventEmitter
  * @template L - Интерфейс событий и их типов слушателей
  * @class TypedEmitter
  * @public
@@ -37,10 +37,7 @@ interface EventBucket {
  * @usage Если требуется ответ в событиях once использовать async!
  */
 export class TypedEmitter<L extends Record<string, any>> {
-    /**
-     * @description Локальной список событий, функций в map
-     * @private
-     */
+    /** Локальной список событий, функций в map */
     private _set = new Map<string, EventBucket[]>();
 
     /**
@@ -68,7 +65,7 @@ export class TypedEmitter<L extends Record<string, any>> {
      */
     public once<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
     public once<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
-    public once(event: string, listener: (...args: any[]) => any): this {
+    public once(event: string, listener: (...args: L[]) => any): this {
         const arr = this._set.get(event) ?? [];
         arr.push({ listener, type: "once" });
         this._set.set(event, arr);
@@ -83,7 +80,7 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @public
      */
     public emit<E extends keyof ListenerSignature<L>>(event: E, ...args: Parameters<ListenerSignature<L>[E]>): boolean;
-    public emit<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, ...args: any[]): boolean;
+    public emit<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, ...args: L[]): boolean;
     public emit(event: string, ...args: any[]): boolean {
         const arr = this._set?.get(event);
         if (!arr?.length) return false;
@@ -98,11 +95,11 @@ export class TypedEmitter<L extends Record<string, any>> {
                     setImmediate(() => { throw err; });
                 }).finally(() => {
                     // Если разовая функция
-                    if (run.type === "once") this.off(event, run.listener as any);
+                    if (run.type === "once") this.off(event, run.listener as ListenerSignature<L>[string]);
                 });
             } else {
                 // Если разовая функция
-                if (run.type === "once") this.off(event, run.listener as any);
+                if (run.type === "once") this.off(event, run.listener as ListenerSignature<L>[string]);
             }
         }
         return true;
@@ -117,7 +114,7 @@ export class TypedEmitter<L extends Record<string, any>> {
      */
     public off<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
     public off<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
-    public off(event: string, listener: (...args: any[]) => any): this {
+    public off(event: string, listener: DefaultListener): this {
         const arr = this._set?.get(event);
         if (!arr) return this;
         this._set.set(event, arr.filter(x => x.listener !== listener));
@@ -131,13 +128,18 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @returns this
      * @public
      */
-    public removeListener<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
-    public removeListener<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
+    public removeListener<E extends keyof ListenerSignature<L>>(event: E, listener?: ListenerSignature<L>[E]): this;
+    public removeListener<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener?: DefaultListener): this;
     public removeListener(event: string, listener: (...args: any[]) => any): this {
-        this._set.delete(event);
+        if (!listener) {
+            this._set.delete(event);
+            return this;
+        }
 
-        // Если есть событие с таким именем
-        if (listener) listener();
+        const arr = this._set.get(event);
+        if (!arr) return this;
+
+        this._set.set(event, arr.filter(l => l.listener !== listener));
         return this;
     };
 

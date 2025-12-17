@@ -1,4 +1,5 @@
 import * as process from "node:process";
+import { inspect } from "node:util";
 import { env } from "#app/env";
 import path from "node:path";
 import fs from "node:fs";
@@ -36,16 +37,18 @@ const db = {
  * @description Функция создания локального времени
  * @private
  */
-const createDate = (ms: boolean = false) => {
+const createDate = () => {
     const local_date = new Date();
-    return `${local_date.getDate().toZero()}.${(local_date.getMonth() + 1).toZero()}.${local_date.getFullYear()} ${local_date.getHours().toZero()}:${local_date.getMinutes().toZero()}` + (ms ? `.${local_date.getMilliseconds().toZero(4)}` : "");
+    const DMY = `${local_date.getDate()}.${(local_date.getMonth() + 1)}.${local_date.getFullYear()}`;
+    const time = (local_date.getHours() * 3600 + local_date.getMinutes() * 60 + local_date.getSeconds() + local_date.getMilliseconds() / 1e3).duration(true);
+    return `${DMY} ` + time;
 }
 
 /**
  * @description Время запуска процесса
  * @private
  */
-const _timestamp = createDate(true);
+let _timestamp = null;
 
 /**
  * @author SNIPPIK
@@ -73,7 +76,7 @@ export class Logger {
      * @private
      * @static
      */
-    private static _createFiles = env.get("cache.file");
+    private static _createFiles = this.debug ? env.get("cache.file") : null;
 
     /**
      * @description Отправляем лог в консоль
@@ -82,42 +85,45 @@ export class Logger {
      * @static
      */
     public static log = (status: keyof typeof db.status, text: string | Error): void => {
-        const extStatus = db.status[status];
+        setImmediate(() => {
+            const extStatus = db.status[status];
 
-        // Получаем память в мегабайтах с двумя знаками после запятой
-        const mem = process.memoryUsage();
-        const memUsedMB = ((mem.heapUsed + mem.external + mem.arrayBuffers) / 1024 / 1024).toFixed(2);
-        const time = createDate(true);
+            // Получаем память в мегабайтах с двумя знаками после запятой
+            const mem = process.memoryUsage();
+            const memUsedMB = ((mem.heapUsed + mem.external + mem.arrayBuffers) / 1024 / 1024).toFixed(2);
+            const time = createDate();
 
-        // Если пришел текст
-        if (typeof text === "string") {
-            // Сохраняем логи
-            this.saveLog(`[RAM ${memUsedMB} MB] ${time} | ${status} - ${text}`);
-            text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
-        }
+            // Если пришел текст
+            if (typeof text === "string") {
+                // Сохраняем логи
+                this.saveLog(`[RAM ${memUsedMB} MB] ${time} | ${status} - ${text}`);
+                text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
+            }
 
-        // Если вместо текста пришла ошибка
-        else if (text instanceof Error) {
-            text = `Uncaught Exception\n` +
-                `┌ Name:    ${text.name}\n` +
-                `├ Message: ${text.message}\n` +
-                `├ Origin:  ${text}\n` +
-                `└ Stack:   ${text.stack}`;
+            // Если вместо текста пришла ошибка
+            else if (text instanceof Error) {
+                text = `Uncaught Exception\n` +
+                    `┌ Name:    ${text.name}\n` +
+                    `├ Message: ${text.message}\n` +
+                    `└ Stack:   ${text.stack}`;
 
-            // Сохраняем логи
-            this.saveLog(`[RAM ${memUsedMB} MB] ${time} | ${status} - ${text}`);
-        }
+                // Сохраняем логи
+                this.saveLog(`[RAM ${memUsedMB} MB] ${time} | ${status} - ${text}`);
+            }
 
-        // Если объект
-        else if (typeof text === "object") {
-            text = JSON.stringify(text);
-        }
+            // Если объект
+            else if (typeof text === "object") {
+                text = inspect(text, {depth: 3, colors: false});
+            }
 
-        // Игнорируем debug сообщения
-        if (status === "DEBUG" && !this.debug) return;
+            // Игнорируем debug сообщения
+            if (status === "DEBUG" && !this.debug) return;
 
-        // Отправляем лог
-        process.stdout.write(`\x1b[35m[RAM ${memUsedMB} MB]\x1b[0m \x1b[90m${time}\x1b[0m |\x1b[0m ${extStatus} `  + `${db.colors[status]} - ${text}\n`);
+            // Отправляем лог
+            process.stdout.write(`\x1b[35m[RAM ${memUsedMB} MB]\x1b[0m \x1b[90m${time}\x1b[0m |\x1b[0m ${extStatus} ` + `${db.colors[status]} - ${text}\n`);
+
+            if (!_timestamp) _timestamp = time;
+        });
     };
 
     /**
@@ -127,13 +133,17 @@ export class Logger {
      * @static
      */
     private static saveLog = (text: string) => {
-        if (!this._createFiles) return;
+        try {
+            if (!this._createFiles) return;
 
-        // Если нет пути сохранения
-        else if (!fs.existsSync(this._path)) fs.mkdirSync(this._path);
+            // Если нет пути сохранения
+            else if (!fs.existsSync(this._path)) fs.mkdirSync(this._path);
 
-        // Сохраняем данные в файл
-        fs.appendFileSync(`${this._path}/${_timestamp}.txt`, text + "\n", "utf8");
+            // Сохраняем данные в файл
+            fs.appendFileSync(`${this._path}/${_timestamp}.txt`, text + "\n", "utf8");
+        } catch {
+            return;
+        }
     };
 
     /**

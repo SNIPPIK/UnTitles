@@ -1,12 +1,12 @@
-import { DiscordGatewayAdapterCreator } from "#core/voice/adapter";
-import { VoiceConnection } from "#core/voice/connection";
+import type { DiscordGatewayAdapterCreator } from "#core/voice/adapter";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
+import { VoiceConnection } from "#core/voice/connection";
 import { Collection } from "#structures";
 
 // Voice Sockets
-export * from "./sockets/ClientWebSocket";
-export * from "./sockets/ClientUDPSocket";
-export * from "./sockets/ClientSRTPSocket";;
+export * from "./protocols/VoiceWebSocket";
+export * from "./protocols/VoiceUDPSocket";
+export * from "./protocols/VoiceRTPSocket";
 export * from "./connection";
 
 
@@ -15,6 +15,7 @@ export * from "./connection";
  * @description Класс для хранения голосовых подключений
  * @class Voices
  * @extends Collection
+ * @public
  */
 export class Voices extends Collection<VoiceConnection> {
     /**
@@ -35,7 +36,7 @@ export class Voices extends Collection<VoiceConnection> {
         }
 
         // Если голосовое соединение не может принимать пакеты
-        else if (!connection.ready || connection.status === "disconnected") {
+        else if (!connection.isReadyToSend || connection.status === "disconnected") {
             this.remove(config.guild_id);
             connection = new VoiceConnection(config, adapterCreator);
             this.set(config.guild_id, connection);
@@ -50,6 +51,7 @@ export class Voices extends Collection<VoiceConnection> {
  * @author SNIPPIK
  * @description Все коды голосового состояния
  * @namespace WebSocketOpcodes
+ * @public
  */
 export namespace WebSocketOpcodes {
     /**

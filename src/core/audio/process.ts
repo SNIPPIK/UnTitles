@@ -43,7 +43,6 @@ export class Process {
      */
     public constructor(args: string[], name: string = ffmpeg_path) {
         const index_resource = args.indexOf("-i");
-        const index_seek = args.indexOf("-ss");
 
         // Проверяем на наличие ссылки в пути
         if (index_resource !== -1) {
@@ -53,14 +52,7 @@ export class Process {
             if (isLink) args.unshift("-reconnect", "1", "-reconnect_delay_max", "5", "-reconnect_on_network_error", "1");
         }
 
-        // Проверяем на наличие пропуска времени
-        if (index_seek !== -1) {
-            const seek = parseInt(args.at(index_seek + 1));
-
-            // Если указано не число
-            if (isNaN(seek) || !seek) args.splice(index_seek, 2);
-        }
-
+        // Добавляем аргументы отключения видео и логирования
         args.unshift("-vn", "-loglevel", "error", "-hide_banner");
         this._process = spawn(name, args, {
             env: { PATH: process.env.PATH },
@@ -68,26 +60,33 @@ export class Process {
             shell: false
         });
 
+        // Добавляем события к процессу
         for (let event of ["end", "error", "exit"]) {
-            this._process.once(event, this.destroy);
+            if (this._process) this._process.once(event, this.destroy);
         }
     };
 
     /**
      * @description Удаляем и отключаемся от процесса
+     * @returns void
      * @private
      */
     public destroy = () => {
         if (this._process) {
+            // Отключаем все точки данных и удаляем их
             for (const std of [this._process.stdout, this._process.stderr, this._process.stdin]) {
                 std.removeAllListeners();
                 std.destroy();
             }
 
+            // Отключаем события
             this._process.removeAllListeners();
+            // Убиваем процесс
             this._process.kill("SIGKILL");
-            this._process = null;
         }
+
+        // Удаляем данные процесса
+        this._process = null;
     };
 }
 

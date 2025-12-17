@@ -4,6 +4,7 @@ import filters from "#core/player/filters.json";
 import type { AudioPlayer } from "#core/player";
 import { RepeatType } from "#core/queue";
 import { env } from "#app/env";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -12,10 +13,29 @@ import { env } from "#app/env";
  * @public
  */
 export class QueueMessage<T extends CommandInteraction> {
-    private readonly _guildID: string;
-    private readonly _channelID: string;
-    private readonly _voiceID: string;
-    private _deferred = false;
+    /**
+     * @description ID сервера, привязанный к сообщению
+     * @public
+     */
+    public guild_id: string;
+
+    /**
+     * @description ID канала, привязанный к сообщению
+     * @public
+     */
+    public channel_id: string;
+
+    /**
+     * @description ID канала, привязанный к голосовому каналу
+     * @public
+     */
+    public voice_id: string;
+
+    /**
+     * @description Ответил ли бот на сообщение
+     * @private
+     */
+    private _deferred: boolean;
 
     /**
      * @description Язык сообщения
@@ -36,30 +56,12 @@ export class QueueMessage<T extends CommandInteraction> {
     };
 
     /**
-     * @description Получение ID сервера
-     * @returns string
-     * @public
-     */
-    public get guildID() {
-        return this._guildID;
-    };
-
-    /**
      * @description Получение текущего текстового канала
      * @returns TextChannel
      * @public
      */
     public get channel() {
         return this._original.channel;
-    };
-
-    /**
-     * @description Получение ID текстового канала
-     * @returns string
-     * @public
-     */
-    public get channelID() {
-        return this._channelID;
     };
 
     /**
@@ -72,16 +74,8 @@ export class QueueMessage<T extends CommandInteraction> {
     };
 
     /**
-     * @description Получение ID голосового канала
-     * @returns string
-     * @public
-     */
-    public get voiceID() {
-        return this._voiceID;
-    };
-
-    /**
      * @description Получение класса клиента
+     * @returns require("discord.js").Client
      * @public
      */
     public get client() {
@@ -91,6 +85,7 @@ export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description Параметр отвечает за правильную работу сообщения
      * @example Ответил ли бот пользователю?
+     * @returns boolean
      * @public
      */
     public get replied() {
@@ -100,6 +95,7 @@ export class QueueMessage<T extends CommandInteraction> {
     /**
      * @description Параметр отвечает за правильную работу сообщения
      * @example Можно ли ответить на другое сообщение?
+     * @returns boolean
      * @public
      */
     public get deferred() {
@@ -111,48 +107,64 @@ export class QueueMessage<T extends CommandInteraction> {
      * @constructor
      * @public
      */
-    public constructor(private readonly _original: T) {
-        this._voiceID = _original.member.voice.channelId;
-        this._channelID = _original.channelId;
-        this._guildID = _original.guildId;
+    public constructor(private _original: T) {
+        this.voice_id = _original.member.voice.channelId;
+        this.channel_id = _original.channelId;
+        this.guild_id = _original.guildId;
+    };
+
+    /**
+     * @description Удаление динамического сообщения из системы
+     * @returns void
+     * @public
+     */
+    public delete = () => {
+        // Удаляем старое сообщение, если оно есть
+        const message = db.queues.cycles.messages.find((msg) => {
+            return msg.guildId === this.guild_id;
+        });
+
+        if (message) db.queues.cycles.messages.delete(message);
     };
 
     /**
      * @description Авто отправка сообщения
      * @param options - Параметры сообщения
+     * @returns Promise<CycleInteraction>
      * @public
      */
     public send = (options: {embeds?: EmbedData[], components?: any[], withResponse: boolean, flags?: "Ephemeral" | "IsComponentsV2"}): Promise<CycleInteraction> => {
+        const ctx = this._original;
+
         try {
             // Если бот уже ответил на сообщение
             if (this.replied && !this.deferred) {
                 this._deferred = true;
-                return this._original.followUp(options as any) as any;
+                return ctx.followUp(options as any);
             }
 
             // Если можно дать ответ на сообщение
             else if (!this.deferred && !this.replied) {
                 this._deferred = true;
-                return this._original.reply(options as any) as any;
+                return ctx.reply(options as any) as any;
             }
 
             // Отправляем обычное сообщение
-            return this._original.channel.send(options as any);
+            return ctx.channel.send(options as any);
         } catch {
             this._deferred = false;
 
             // Отправляем обычное сообщение
-            return this._original.channel.send(options as any);
+            return ctx.channel.send(options as any);
         }
     };
 }
-
 
 /**
  * @author SNIPPIK
  * @description Класс для создания компонентов-кнопок
  * @class QueueButtons
- * @private
+ * @public
  */
 export class QueueButtons {
     /**
@@ -180,7 +192,7 @@ export class QueueButtons {
                 QueueButtons.createButton({env: "shuffle", disabled: true}),
 
                 // Кнопка назад
-                QueueButtons.createButton({env: "back", disabled: true}),
+                QueueButtons.createButton({env: "back"}),
 
                 // Кнопка паузы/продолжить
                 QueueButtons.createButton({emoji: QueueButtons.button.pause, id: "resume_pause"}),
@@ -205,10 +217,7 @@ export class QueueButtons {
                 QueueButtons.createButton({env: "stop", style: 4}),
 
                 // Кнопка текущих фильтров
-                QueueButtons.createButton({env: "filters", disabled: true}),
-
-                // Кнопка повтора текущего трека
-                QueueButtons.createButton({env: "replay"})
+                QueueButtons.createButton({env: "filters", disabled: true})
             ]
         }
     ];
@@ -241,6 +250,7 @@ export class QueueButtons {
     /**
      * @author SNIPPIK
      * @description Проверка и выдача кнопок
+     * @returns ActionRowBuilder
      * @public
      */
     public component = (player: AudioPlayer) => {
@@ -267,7 +277,6 @@ export class QueueButtons {
 
         // ⏮ Prev
         setButton(firstRow[1], {
-            disabled: !isMultipleTracks,
             style: isMultipleTracks ? 1 : 2,
         });
 
@@ -285,7 +294,7 @@ export class QueueButtons {
             style: currentRepeatType === RepeatType.None ? 2 : 3,
         });
 
-        // ⏸ / ▶ Pause / Resume
+        // ⏸ / ▶ - Pause / Resume
         setButton(firstRow[2], {
             emoji: isPaused ? QueueButtons.button.resume : QueueButtons.button.pause,
             style: isPaused ? 3 : 1,
@@ -302,9 +311,10 @@ export class QueueButtons {
 
     /**
      * @description Удаляем компоненты когда они уже не нужны
+     * @returns void
      * @public
      */
-    public destroy() {
+    public destroy = () => {
         this._buttons = null;
         this._selector = null;
     };
@@ -313,9 +323,10 @@ export class QueueButtons {
      * @author SNIPPIK
      * @description Делаем проверку id
      * @param name - Название параметра в env
+     * @returns object
      * @private
      */
-    private static checkIDComponent(name: string) {
+    private static checkIDComponent(name: string){
         const id = env.get(name);
         const int = parseInt(id);
 
@@ -327,6 +338,7 @@ export class QueueButtons {
      * @author SNIPPIK
      * @description Создание одной кнопки в одной функции
      * @param options - Параметры для создания кнопки
+     * @returns object
      * @private
      */
     private static createButton(options: any) {

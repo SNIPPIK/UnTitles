@@ -1,87 +1,90 @@
-import type { AnySelectMenuInteraction, AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { CommandInteraction, Colors } from "#structures/discord";
+import type { AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
+import { CommandInteraction, Colors, SelectMenuInteract } from "#structures/discord";
+import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
 import { ChannelType, Events, InteractionType } from "discord.js";
-import { Assign, Logger, locale } from "#structures";
+import { Logger, locale } from "#structures";
 import { SubCommand } from "#handler/commands";
-import { Event } from "#handler/events";
 import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
  * @description Класс для взаимодействия бота с slash commands, buttons
  * @class InteractionCreate
- * @extends Assign
+ * @extends Event
  * @event Events.InteractionCreate
  * @public
  */
-class Interaction extends Assign<Event<Events.InteractionCreate>> {
-    /**
-     * @description Создание события
-     * @public
-     */
-    public constructor() {
-        super({
-            name: Events.InteractionCreate,
-            type: "client",
-            once: false,
-            execute: (ctx) => {
-                // Если включен режим белого списка
-                if (db.whitelist.toggle) {
-                    // Если нет пользователя в списке просто его игнорируем
-                    if (db.whitelist.ids.length > 0 && !db.whitelist.ids.includes(ctx.user.id)) {
-                        if (!("reply" in ctx)) return;
+@EventOn()
+@DeclareEvent({
+    name: Events.InteractionCreate,
+    type: "client"
+})
+class Interaction extends Event<Events.InteractionCreate> {
+    run: SupportEventCallback<Events.InteractionCreate> = async (ctx) => {
+        // Если включен режим белого списка
+        if (db.whitelist.toggle) {
+            // Если нет пользователя в списке просто его игнорируем
+            if (db.whitelist.ids.length > 0 && !db.whitelist.ids.includes(ctx.user.id)) {
+                if (!("reply" in ctx)) return;
 
-                        return ctx.reply({
-                            flags: "Ephemeral",
-                            embeds: [
-                                {
-                                    description: locale._(ctx.locale, "interaction.whitelist", [ctx.member]),
-                                    color: Colors.Yellow
-                                }
-                            ]
-                        });
-                    }
-                }
-
-                // Если включен режим черного списка
-                else if (db.blacklist.toggle) {
-                    // Если нет пользователя в списке просто его игнорируем
-                    if (db.blacklist.ids.length > 0 && !db.blacklist.ids.includes(ctx.user.id)) {
-                        if (!("reply" in ctx)) return;
-
-                        return ctx.reply({
-                            flags: "Ephemeral",
-                            embeds: [
-                                {
-                                    description: locale._(ctx.locale, "interaction.blacklist", [ctx.member]),
-                                    color: Colors.Yellow
-                                }
-                            ]
-                        });
-                    }
-                }
-
-                // Если используется функция ответа от бота
-                if (ctx.type === InteractionType.ApplicationCommandAutocomplete) {
-                    Logger.log("DEBUG", `[${ctx.user.username}] run autocomplete ${ctx?.commandName}`);
-                    return this.SelectAutocomplete(ctx);
-                }
-
-                // Если пользователь использует команду
-                else if (ctx.type === InteractionType.ApplicationCommand) {
-                    Logger.log("DEBUG", `[${ctx.user.username}] run command ${ctx?.commandName}`);
-                    return this.SelectCommand(ctx as any);
-                }
-
-                // Действия выбора/кнопок
-                else if (ctx.type == InteractionType.MessageComponent) {
-                    Logger.log("DEBUG", `[${ctx.user.username}] run component ${ctx?.["customId"]}`);
-                    return this.SelectComponent(ctx);
-                }
-
-                return null;
+                return ctx.reply({
+                    flags: "Ephemeral",
+                    embeds: [
+                        {
+                            description: locale._(ctx.locale, "interaction.whitelist", [ctx.member]),
+                            color: Colors.Yellow
+                        }
+                    ]
+                });
             }
-        });
+        }
+
+        // Если включен режим черного списка
+        else if (db.blacklist.toggle) {
+            // Если нет пользователя в списке просто его игнорируем
+            if (db.blacklist.ids.length > 0 && !db.blacklist.ids.includes(ctx.user.id)) {
+                if (!("reply" in ctx)) return;
+
+                return ctx.reply({
+                    flags: "Ephemeral",
+                    embeds: [
+                        {
+                            description: locale._(ctx.locale, "interaction.blacklist", [ctx.member]),
+                            color: Colors.Yellow
+                        }
+                    ]
+                });
+            }
+        }
+
+        /**
+         * @description Смотрим тип запроса
+         * @protected
+         */
+        switch (ctx.type) {
+            // Если используется функция ответа от бота
+            case InteractionType.ApplicationCommandAutocomplete: {
+                Logger.log("DEBUG", `[${ctx.user.username}] run autocomplete ${ctx?.commandName}`);
+                return this.SelectAutocomplete(ctx);
+            }
+
+            // Если пользователь использует команду
+            case InteractionType.ApplicationCommand: {
+                Logger.log("DEBUG", `[${ctx.user.username}] run command ${ctx?.commandName}`);
+                return this.SelectCommand(ctx as any);
+            }
+
+            // Действия выбора/кнопок
+            case InteractionType.MessageComponent: {
+                Logger.log("DEBUG", `[${ctx.user.username}] run component ${ctx.customId} | ${ctx?.["values"]}`);
+                return this.SelectComponent(ctx);
+            }
+
+            default: {
+                Logger.log("WARN", `User: ${ctx.user.username}, used unsupported type ${ctx.type}`);
+                ctx.deleteReply("@original").catch(() => null);
+            }
+        }
     };
 
     /**
@@ -90,7 +93,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @readonly
      * @private
      */
-    private readonly SelectCommand = (ctx: ChatInputCommandInteraction) => {
+    private readonly SelectCommand = async (ctx: ChatInputCommandInteraction) => {
         const command = db.commands.get(ctx.commandName);
 
         // Если нет команды
@@ -110,7 +113,10 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         // Проверка middleware
         if (command.middlewares?.length > 0) {
             for (const rule of db.middlewares.array) {
-                if (command.middlewares.includes(rule.name) && !rule.callback(ctx)) return null;
+                if (command.middlewares.includes(rule.name) && !rule.callback(ctx)) {
+                    Logger.log("DEBUG", `[${ctx.user.username}] ${rule.name} has dont entered`);
+                    return null;
+                }
             }
         }
 
@@ -129,7 +135,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
             if (botPerms?.length &&
                 !botPerms.every(perm => ctx.guild?.members.me?.permissionsIn(ctx.channel)?.has(perm) && ctx.member.voice.channel ? ctx.guild?.members.me?.permissionsIn(ctx.member.voice.channel)?.has(perm) : true)
             ) {
-                return ctx.reply(locale._(ctx.locale, "interaction.permission.client", [ctx.member]));
+                return ctx.member.send(locale._(ctx.locale, "interaction.permission.client", [`<@${ctx.client.user.id}>`]));
             }
         }
 
@@ -137,7 +143,7 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         const subcommand: SubCommand = command.options?.find((sub) => sub.name === ctx.options["_subcommand"] && "run" in sub) as any;
 
         // Ищем аргументы
-        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
+        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f.name === "type" ? f.value : f[f.name] ?? f.value) ?? [];
 
         // Запускаем команду
         return (subcommand ?? command).run({ ctx, args });
@@ -149,14 +155,14 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @readonly
      * @private
      */
-    private readonly SelectAutocomplete = (ctx: AutocompleteInteraction) => {
+    private readonly SelectAutocomplete = async (ctx: AutocompleteInteraction) => {
         const command = db.commands.get(ctx.commandName);
 
         // Если не найдена команда
         if (!command) return null;
 
         // Ищем аргументы
-        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f[f.name] ?? f.value) ?? [];
+        const args: any[] = ctx.options?.["_hoistedOptions"]?.map(f => f.name === "type" ? f.value : f[f.name] ?? f.value) ?? [];
         if (args.length === 0 || args.some(a => a === "")) return null;
 
         const subName = ctx.options["_subcommand"];
@@ -174,9 +180,8 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
      * @readonly
      * @private
      */
-    private readonly SelectComponent = (ctx: ButtonInteraction | AnySelectMenuInteraction) => {
+    private readonly SelectComponent = async (ctx: ButtonInteraction | SelectMenuInteract) => {
         const component = db.components.get(ctx.customId);
-
         // Если не найден такой компонент
         if (!component) return null;
 
@@ -185,7 +190,10 @@ class Interaction extends Assign<Event<Events.InteractionCreate>> {
         // Делаем проверку ограничений
         if (middlewares?.length > 0) {
             for (const rule of db.middlewares.array) {
-                if (middlewares.includes(rule.name) && !rule.callback(ctx)) return null;
+                if (middlewares.includes(rule.name) && !rule.callback(ctx)) {
+                    Logger.log("DEBUG", `[${ctx.user.username}] ${rule.name} has dont entered`);
+                    return null;
+                }
             }
         }
 

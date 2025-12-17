@@ -1,10 +1,11 @@
 import type { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData } from "discord-api-types/v10";
-import { VoiceConnectionConfiguration } from "#core/voice";
+import type { VoiceConnectionConfiguration } from "#core/voice";
 import { GatewayOpcodes } from "discord-api-types/v10";
 
 /**
  * @author SNIPPIK
  * @description Класс для взаимодействия с клиентским websocket'ом
+ * @supported `@discordjs/voice`, `other`
  * @class VoiceAdapters
  * @abstract
  * @public
@@ -13,25 +14,66 @@ export abstract class VoiceAdapters<T extends any> {
     /**
      * @description Коллекция адаптеров для общения голоса с клиентским websocket'ом
      * @readonly
-     * @private
+     * @protected
      */
-    public readonly adapters = new Map<string, DiscordGatewayAdapterLibraryMethods>();
+    protected adapters = new Map<string, DiscordGatewayAdapterLibraryMethods>();
 
     /**
      * @description Создание класса
      * @param client - Класс клиента
+     * @protected
      */
     protected constructor(protected client: T) {};
 
     /**
-     * @description Адаптер состояния голоса для этой гильдии, который можно использовать с `@discordjs/voice` для воспроизведения звука в голосовых и сценических каналах.
+     * @description Адаптер состояния голоса для этой гильдии
+     * @abstract
      * @public
+     *
+     * ```
+     * public voiceAdapterCreator = (guildID: string) => {
+     *         const id = this.client.shardID;
+     *
+     *         return methods => {
+     *             this.adapters.set(guildID, methods);
+     *
+     *             return {
+     *                 sendPayload: (data) => {
+     *                     this.client.ws.shards.get(id).send(data);
+     *                     return true;
+     *                 },
+     *                 destroy: () => {
+     *                     this.adapters.delete(guildID);
+     *                 }
+     *             };
+     *         };
+     *     };
+     * ```
      */
     public abstract voiceAdapterCreator(guildID: string): DiscordGatewayAdapterCreator;
 
     /**
+     * @description Реализация смены статуса голосового канала
+     * @param channelId - ID голосового канала
+     * @param status - Название заголовка
+     * @abstract
+     * @public
+     *
+     * ```
+     *         this.client.rest.put(`/channels/${channelId}/voice-status`, {
+     *             body: {
+     *                 status: status
+     *             }
+     *         });
+     *
+     * ```
+     */
+    public abstract status(channelId: string, status?: string): void;
+
+    /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_SERVER_UPDATE
      * @param payload - Данные голосового состояния
+     * @public
      */
     public onVoiceServer = (payload: GatewayVoiceServerUpdateDispatchData) => {
         this.adapters.get(payload.guild_id)?.onVoiceServerUpdate(payload);
@@ -40,6 +82,7 @@ export abstract class VoiceAdapters<T extends any> {
     /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_STATE_UPDATE
      * @param payload - Данные голосового состояния
+     * @public
      */
     public onVoiceStateUpdate = (payload: GatewayVoiceStateUpdateDispatchData & { guild_id: string }) => {
         this.adapters.get(payload.guild_id)?.onVoiceStateUpdate(payload);
@@ -74,7 +117,7 @@ export class VoiceAdapter {
          * @description Пакет текущего голосового состояния
          * @public
          */
-        state: undefined  as GatewayVoiceStateUpdateDispatchData
+        state: undefined as GatewayVoiceStateUpdateDispatchData
     };
 
     /**
@@ -96,6 +139,7 @@ export class VoiceAdapter {
 /**
  * @description Шлюз Discord Адаптер, шлюза Discord.
  * @interface DiscordGatewayAdapterLibraryMethods
+ * @public
  */
 export interface DiscordGatewayAdapterLibraryMethods {
     /**
@@ -119,6 +163,7 @@ export interface DiscordGatewayAdapterLibraryMethods {
 /**
  * @description Методы, предоставляемые разработчиком адаптера Discord Gateway для DiscordGatewayAdapter.
  * @interface DiscordGatewayAdapterImplementerMethods
+ * @public
  */
 export interface DiscordGatewayAdapterImplementerMethods {
     /**
@@ -140,5 +185,6 @@ export interface DiscordGatewayAdapterImplementerMethods {
  * разработчик вернет некоторые методы, которые может вызывать библиотека - например, для отправки сообщений на
  * шлюз или для подачи сигнала о том, что адаптер может быть удален.
  * @type DiscordGatewayAdapterCreator
+ * @public
  */
 export type DiscordGatewayAdapterCreator = ( methods: DiscordGatewayAdapterLibraryMethods) => DiscordGatewayAdapterImplementerMethods;

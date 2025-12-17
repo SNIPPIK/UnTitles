@@ -28,9 +28,6 @@ export class HeartbeatManager {
     /** Количество пропущенных ACK */
     private misses = 0;
 
-    /** Количество переподключений подряд */
-    private reconnects = 0;
-
     /** Интервал между heartbeat-сообщениями */
     public intervalMs = 0;
 
@@ -51,19 +48,11 @@ export class HeartbeatManager {
     };
 
     /**
-     * @description Получаем количество подрядных попыток переподключения
-     * @public
-     */
-    public get reconnectAttempts() {
-        return this.reconnects;
-    };
-
-    /**
      * @param hooks - Объект с внешними методами: send, onTimeout, onAck
      * @constructor
      * @public
      */
-    public constructor(private readonly hooks: HeartbeatHooks) {}
+    public constructor(private hooks: HeartbeatHooks) {}
 
     /**
      * @description Запускаем heartbeat с заданным интервалом
@@ -78,7 +67,7 @@ export class HeartbeatManager {
         // Устанавливаем интервал отправки heartbeat
         this.interval = setInterval(() => {
             this.lastSentTime = Date.now();
-            this.hooks.send(); // отправляем heartbeat
+            this.hooks?.send?.(); // отправляем heartbeat
             this.setTimeout(); // запускаем ожидание ack
         }, this.intervalMs);
     };
@@ -110,7 +99,7 @@ export class HeartbeatManager {
         this.misses = 0;
         if (this.timeout) clearTimeout(this.timeout);
 
-        this.hooks.onAck(latency); // передаём задержку наружу
+        this.hooks?.onAck?.(latency); // передаём задержку наружу
     };
 
     /**
@@ -128,21 +117,19 @@ export class HeartbeatManager {
     };
 
     /**
-     * @description Сбросить счётчик reconnect'ов
+     * @description Останавливаем все heartbeat процессы и удаляем все данные
      * @returns void
      * @public
      */
-    public resetReconnects = () => {
-        this.reconnects = 0;
-    };
+    public destroy = () => {
+        this.stop();
 
-    /**
-     * @description Увеличить счётчик reconnect'ов (на 1)
-     * @returns void
-     * @public
-     */
-    public increaseReconnect = () => {
-        this.reconnects++;
+        this.misses = null;
+        this.lastAckTime = null;
+        this.lastSentTime = null;
+        this.misses = null;
+        this.intervalMs = null;
+        this.hooks = null;
     };
 }
 
@@ -157,7 +144,7 @@ type HeartbeatHooks = {
      * @readonly
      * @private
      */
-    readonly send: () => void;
+    readonly send?: () => void;
 
     /**
      * @description Метод вызывается, если не получен HEARTBEAT_ACK вовремя
@@ -172,5 +159,5 @@ type HeartbeatHooks = {
      * @readonly
      * @private
      */
-    readonly onAck: (latency: number) => void;
+    readonly onAck?: (latency: number) => void;
 };

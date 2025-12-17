@@ -1,4 +1,5 @@
 import { DiscordClient, ShardManager } from "#structures/discord";
+import { initSharedDatabase } from "#worker/db";
 import { db, initDatabase } from "#app/db";
 import { Logger } from "#structures";
 import { env } from "#app/env";
@@ -11,24 +12,26 @@ void main();
  * @description Запуск всего проекта в async режиме
  * @function main
  * @returns void or Promise<void>
+ * @private
  */
 function main() {
     const isManager = process.argv.includes("--ShardManager");
 
     // Если включен менеджер осколков
-    if (isManager) return runShardManager();
+    if (isManager) return execute_shardManager();
 
     // Запускаем осколок
-    return runShard();
+    return execute_shard();
 }
 
 /**
  * @author SNIPPIK
  * @description Если требуется запустить менеджер осколков
- * @function runShardManager
+ * @function execute_shardManager
  * @returns void
+ * @private
  */
-function runShardManager() {
+function execute_shardManager() {
     Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
     new ShardManager(__filename, env.get("token.discord"));
 }
@@ -36,11 +39,12 @@ function runShardManager() {
 /**
  * @author SNIPPIK
  * @description Если требуется запустить осколок
- * @function runShard
+ * @function execute_shard
  * @returns Promise<void>
  * @async
+ * @private
  */
-async function runShard() {
+async function execute_shard() {
     Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
 
     const client = new DiscordClient();
@@ -48,13 +52,11 @@ async function runShard() {
 
     // Инициализируем базу данных
     initDatabase(client);
-
-    // Запускаем бота
-    await client.login(env.get("token.discord"));
+    initSharedDatabase();
 
     // Загружаем API
     await db.api.startWorker();
-    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.allow.length} APIs`)}`);
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.array.length} APIs`)}`);
 
     // Загружаем components
     db.components.register();
@@ -63,6 +65,11 @@ async function runShard() {
     // Загружаем middlewares
     db.middlewares.register();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.middlewares.size} middlewares`)}`);
+
+
+    // Запускаем бота
+    await client.login(env.get("token.discord"));
+
 
     // Загружаем events
     db.events.register(client);
@@ -73,7 +80,7 @@ async function runShard() {
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
 
     // Запускаем отслеживание событий процесса
-    initProcessEvents(client);
+    init_process_events(client);
 
     // Запускаем Garbage Collector
     setImmediate(() => {
@@ -82,16 +89,50 @@ async function runShard() {
             global.gc();
         }
     });
+
+
+    // Тест постоянной нагрузки на event loop
+    /*setInterval(() => {
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 60);
+
+    setInterval(() => {
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 80);
+
+    setInterval(() => {
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 120);
+
+    setInterval(() => {
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 100);*/
+
+/*
+    // Тест временной нагрузки на event loop
+    let size = 1000;
+    setInterval(() => {
+        if (size === 0) return;
+        size--;
+
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 100);*/
 }
 
 /**
  * @author SNIPPIK
  * @description Инициализирует события процесса (ошибки, сигналы)
  * @param client - Класс клиента
- * @function initProcessEvents
+ * @function init_process_events
  * @returns void
+ * @private
  */
-function initProcessEvents(client: DiscordClient) {
+function init_process_events(client: DiscordClient): void {
     // Необработанная ошибка (внутри синхронного кода)
     process.on("uncaughtException", (err) => {
         // Скорее всего дело в Discord.js
@@ -113,7 +154,7 @@ function initProcessEvents(client: DiscordClient) {
     // Возможность завершить процесс корректно
     for (const event of ["SIGINT", "SIGTERM"]) {
         process.on(event, () => {
-            if (ProcessQueues(client)) return;
+            if (init_queue_destroyer(client)) return;
 
             Logger.log("WARN", `Received ${event}. Shutting down...`);
             process.exit(0);
@@ -125,10 +166,11 @@ function initProcessEvents(client: DiscordClient) {
  * @author SNIPPIK
  * @description Функция проверяющая состояние очередей, для безопасного выключения
  * @param client - Класс клиента
- * @function ProcessQueues
- * @returns void
+ * @function init_queue_destroyer
+ * @returns boolean
+ * @private
  */
-function ProcessQueues(client: DiscordClient): boolean {
+function init_queue_destroyer(client: DiscordClient): boolean {
     if (db.queues.size > 0) {
         // Отключаем все события от клиента, для предотвращения включения или создания еще очередей
         client.removeAllListeners();
@@ -139,7 +181,7 @@ function ProcessQueues(client: DiscordClient): boolean {
         // Если плееры играют и есть остаток от аудио
         if (timeout > 0) {
             // Ожидаем выключения музыки на других серверах
-            setTimeout(() => { process.exit(0); }, timeout + 1e3);
+            setTimeout(() => { process.exit(0); }, timeout + 1e3).ref();
 
             Logger.log("WARN", `[Queues/${db.queues.size}] Wait other queues. Timeout to restart ${(timeout / 1e3).duration()}`);
             return true;

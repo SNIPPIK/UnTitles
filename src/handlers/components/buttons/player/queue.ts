@@ -1,7 +1,7 @@
 import { Component, DeclareComponent } from "#handler/components";
 import { Middlewares } from "#handler/commands";
-import { Colors } from "#structures/discord";
 import { locale, Logger } from "#structures";
+import { Colors } from "#structures/discord";
 import { db } from "#app/db";
 
 /**
@@ -21,7 +21,7 @@ class ButtonQueue extends Component<"button"> {
         const pageSize = 5;
 
         // Текущая страница (с 1)
-        let page = Math.floor(queue.tracks.position / pageSize);
+        let page = 0;
         // Общее количество страниц (минимум 1)
         const pages = Math.max(1, Math.ceil(queue.tracks.total / pageSize));
 

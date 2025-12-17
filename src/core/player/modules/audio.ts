@@ -1,5 +1,22 @@
 import { BufferedAudioResource, PipeAudioResource } from "#core/audio";
+import { Logger } from "#structures";
 import { db } from "#app/db";
+
+/**
+ * @author SNIPPIK
+ * @description Время ожидания потока live трека
+ * @const TIMEOUT_STREAM_PIPE
+ * @private
+ */
+const TIMEOUT_STREAM_PIPE = 15e3;
+
+/**
+ * @author SNIPPIK
+ * @description Время ожидания потока трека
+ * @const TIMEOUT_STREAM_BUFFERED
+ * @private
+ */
+const TIMEOUT_STREAM_BUFFERED = 10e3;
 
 /**
  * @author SNIPPIK
@@ -15,37 +32,34 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
      * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
      * @private
      */
-    private _audio: T;
+    private _audio: T | null;
 
     /**
      * @description Поток, находящийся в ожидании загрузки и проигрывания
      * @private
      */
-    private _pre_audio: T;
+    private _pre_audio: T | null;
 
     /**
      * @description Таймер чтения аудио потока, для авто удаления
      * @private
      */
-    private _timeout: NodeJS.Timeout | null = null;
+    private _timeout: NodeJS.Timeout | null;
 
     /**
      * @description Громкость аудио, по умолчанию берется параметр из db/env
-     * @protected
+     * @private
      */
     private _volume = db.queues.options.volume;
 
     /**
      * @description Изменяем значение громкости у аудио
-     * @param vol - Громкость допустимый диапазон (10-200)
+     * @param volume - Громкость допустимый диапазон (10-200)
      * @public
      */
-    public set volume(vol: number) {
-        if (vol > 200) vol = 200;
-        else if (vol < 10) vol = 10;
-
+    public set volume(volume: number) {
         // Меняем параметр
-        this._volume = vol;
+        this._volume = volume > 200 ? 200 : volume < 1 ? 10 : volume;
     };
 
     /**
@@ -80,41 +94,46 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
      */
     public set preload(stream: T) {
         // Если уже есть пред-загруженное аудио
-        if (this._pre_audio) this._pre_audio?.destroy();
+        if (this._pre_audio) {
+            clearTimeout(this._timeout);
+            this._pre_audio.destroy();
+        }
 
         // Записываем аудио в пред-загруженные
         this._pre_audio = stream;
 
-        // Если аудио поток не ответил в течении указанного времени
-        this._timeout = setTimeout(() => {
-            // Отправляем данные событию для отображения ошибки
-            stream.emit("error", new Error("Timeout: the stream has been exceeded!"));
-        }, 10e3);
-
         // Отслеживаем аудио поток на ошибки
-        (stream as BufferedAudioResource).once("error", async () => {
+        (stream as BufferedAudioResource).once("error", (error) => {
             // Удаляем таймер
             clearTimeout(this._timeout);
 
             // Уничтожаем новый аудио поток
             stream.destroy();
             this._pre_audio = null;
+
+            Logger.log("ERROR", error);
         });
 
         // Отслеживаем аудио поток на готовность к чтению
-        (stream as BufferedAudioResource).once("readable", async () => {
-            const oldStream = this._audio;
-
+        (stream as BufferedAudioResource).once("readable", () => {
             // Удаляем таймер
             clearTimeout(this._timeout);
+
+            // Если есть активный поток
+            if (this._audio) {
+                this._audio.destroy();
+            }
 
             // Перезаписываем текущий поток
             this._audio = stream;
             this._pre_audio = null;
-
-            // Если есть активный поток
-            if (oldStream) oldStream.destroy();
         });
+
+        // Установка таймера ожидания
+        const waitTime = stream.options.track.isBuffered ? TIMEOUT_STREAM_BUFFERED : TIMEOUT_STREAM_PIPE;
+        this._timeout = setTimeout(() => {
+            stream.emit("error", Error("Timeout: the stream has been exceeded!"));
+        }, waitTime);
     };
 
     /**
