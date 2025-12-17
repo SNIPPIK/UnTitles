@@ -1,7 +1,7 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
+import { sdb } from "#worker/db";
 import { env } from "#app/env";
-import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -71,15 +71,15 @@ class RestSpotifyAPI extends RestServerSide.API {
                 if (!ID) return locale.err("api.request.id.track");
 
                 // Интеграция с утилитой кеширования
-                const cache = db.meta_saver?.get(`${this.url}/${ID}`);
+                const cache = sdb.meta_saver?.get(`${this.url}/${ID}`);
 
                 // Если трек есть в кеше
                 if (cache) {
                     if (!options.audio) return cache;
 
                     // Если включена утилита кеширования аудио
-                    else if (db.audio_saver) {
-                        const check = db.audio_saver.status(`${this.url}/${ID}`);
+                    else if (sdb.audio_saver) {
+                        const check = sdb.audio_saver.status(`${this.url}/${ID}`);
 
                         // Если есть кеш аудио
                         if (check.status === "ended") {
@@ -100,8 +100,8 @@ class RestSpotifyAPI extends RestServerSide.API {
                     // Если указано получение аудио
                     if (options.audio) {
                         // Если включена утилита кеширования
-                        if (db.audio_saver) {
-                            const check = db.audio_saver.status(`${this.url}/${ID}`);
+                        if (sdb.audio_saver) {
+                            const check = sdb.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -113,7 +113,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                     setImmediate(() => {
                         // Сохраняем кеш в системе
-                        if (!cache) db.meta_saver.set(track, this.url);
+                        if (!cache) sdb.meta_saver.set(track, this.url);
                     });
 
                     return track;

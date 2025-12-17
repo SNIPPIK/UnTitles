@@ -49,12 +49,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public _counter: number = 0; // Требуется для подстройки под голосовое соединение
 
     /**
-     * @description Надо ли стабилизировать аудио при помощи 2 аудио фрейма
-     * @public
-     */
-    public _sliceFrame: boolean = false;
-
-    /**
      * @description Текущий статус плеера, при создании он должен быть в ожидании
      * @private
      */
@@ -289,8 +283,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
             }
 
-            this._sliceFrame = false;
-
             // Через время запускаем трек, что-бы не нарушать работу VoiceSocket
             // Что будет если нарушить работу VoiceSocket, пинг >=1000
             return player.play(0, PLAYER_TIMEOUT_OFFSET);
@@ -337,8 +329,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public play = async (seek: number = 0, timeout: number = 500, position: number = null): Promise<void> => {
         let track: Track, index: number;
 
-        // Если указана позиция
-        if (position) {
+        // Если позиция явно указана
+        if (typeof position === "number") {
             track = this._tracks.get(position);
             index = position;
         }

@@ -82,7 +82,7 @@ class message_push extends Event<"message/push"> {
                 },
                 author: {
                     name: artist?.title,
-                    url: artist?.url ?? null,
+                    url: artist?.url,
                     iconURL: db.images.disk
                 },
                 fields: [
@@ -129,6 +129,9 @@ class message_playing extends Event<"message/playing"> {
                 flags: "IsComponentsV2"
             });
         });
+
+        // Меняем статус голосового канала
+        db.adapter.status(queue.message.voice_id, `${db.images.disk_emoji} | ${queue.tracks.track.name}`);
 
         // Если есть сообщение
         if (message) db.queues.cycles.messages.update(message, queue.components).catch(() => null);

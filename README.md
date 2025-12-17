@@ -45,19 +45,16 @@
 [![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
 
 > [!WARNING]
-> ⚠️ WatKLOK (UnTitles) is a complex technical project, which is supported exclusively by 1 author `SNIPPIK`  
-> Incorrect use, removal of authorship or appropriation will lead to the closure of the public repository
-
-> [!IMPORTANT]
-> If YouTube doesn't respond, report the bug immediately and don't forget to include the link!  
-> If your internet is not stable, there will be losses in any case.  
-> `main` — stable, but rarely updated branch  
-> `beta` — latest fixes and features, may be unstable
+> ⚠️ WatKLOK (UnTitles) is a complex technical project maintained exclusively by 1 author, `SNIPPIK`  
+> Incorrect use, removal of authorship, or attribution will result in the closure of the public repository.
+>
+> Audio issues  
+> If your internet connection is unstable, losses will occur regardless.  
+> It is impossible to completely eliminate `packet lost` due to the `UDP` protocol and other `discord` limitations.
 
 > [!TIP]
-> I recommend enabling the caching system in `.env`, in which case you can include tracks even if the platform is completely blocked  
-> It is not possible to completely bypass `packet lost`, due to the `UDP` protocol and other `discord` limitations  
-> But the voice system simply isn't allowed to lose audio packets, even under critical load!
+> I recommend enabling the caching system in `.env`. This will allow tracks to be played even with a complete platform lock.  
+> However, the voice system is simply not allowed to lose audio packets, even under critical load!
 
 ---
 
@@ -119,7 +116,7 @@ while (performance.now() - startBlock < 100) {}
 #### 💡 Adaptive loop
 - It is not afraid of **event loop** and **drift**, it just takes them into account not as a problem, but as parameters!
 - The loop can work ahead from 0 to 2 ms to process objects in the loop!
-- Audio sending is built on it!
+- Works on its own calculations, not on `newTime - oldTime`, calculations of function delay, discrepancies after execution, etc.
 - Cycle accuracy `±0.05 ms` with `process.hrtime` + `performance.now`
 
 #### ⚙️ Internal tools
@@ -155,8 +152,8 @@ while (performance.now() - startBlock < 100) {}
 
 ---
 ## 🚀 Quick start
-> Node.js or Bun is required, as well as FFmpeg installed  
-> All configuration is written in `.env`
+> You need Node.js and FFmpeg installed.  
+> All parameters are specified in `.env`, don't forget to copy it to `.build` and customize it.
 ```shell
 # Clone
 git clone https://github.com/SNIPPIK/UnTitles

@@ -67,7 +67,7 @@ abstract class Request {
      * @public
      */
     public get request(): Promise<IncomingMessage | Error> {
-        return new Promise((resolve, reject) => { // ⚡️ Используем reject для ошибок, это более идиоматично
+        return new Promise((resolve) => {
             // Клонируем данные, чтобы избежать изменения опций при параллельных запросах
             const options = { ...this.data };
 
@@ -88,11 +88,11 @@ abstract class Request {
                         this.data.port = parsedUrl.port;
                     } catch (e) {
                         // Если редирект на некорректный URL, возвращаем ошибку
-                        return reject(Error(`[httpsClient]: Invalid redirect URL: ${newUrl}`));
+                        return resolve(Error(`[httpsClient]: Invalid redirect URL: ${newUrl}`));
                     }
 
                     // Возвращаем промис нового запроса, чтобы продолжить цепочку
-                    return this.request.then(resolve).catch(reject);
+                    return this.request.then(resolve).catch(resolve);
                 }
 
                 return resolve(res);
@@ -109,12 +109,12 @@ abstract class Request {
 
             req.once("timeout", () => {
                 req.destroy(); // Уничтожаем запрос при таймауте
-                return reject(Error(`[httpsClient]: Connection Timeout Exceeded ${options.hostname}:${options.port || 443}`));
+                return resolve(Error(`[httpsClient]: Connection Timeout Exceeded ${options.hostname}:${options.port || 443}`));
             });
 
             req.once("error", (err) => {
                 req.destroy(); // Уничтожаем запрос при ошибке
-                return reject(Error(`[httpsClient]: Connection Error: ${err.message}`));
+                return resolve(Error(`[httpsClient]: Connection Error: ${err.message}`));
             });
 
             req.end();

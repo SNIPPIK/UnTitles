@@ -20,6 +20,20 @@ export class DJSVoice<T extends DiscordClient = DiscordClient> extends VoiceAdap
     };
 
     /**
+     * @description Реализация смены статуса голосового канала
+     * @param channelId - ID голосового канала
+     * @param status - Название заголовка
+     * @public
+     */
+    public status = (channelId: string, status: string = "") => {
+        this.client.rest.put(`/channels/${channelId}/voice-status`, {
+            body: {
+                status: status
+            }
+        }).catch(() => null);
+    };
+
+    /**
      * @description Создаем прослойку адаптера голосового соединения
      * @param guildID - ID сервера
      * @public

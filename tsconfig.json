@@ -46,7 +46,9 @@
 
       "#app": ["./src/index"],
       "#app/db": ["./src/database/index"],
-      "#app/env": ["./src/environment"]
+      "#app/env": ["./src/environment"],
+
+      "#worker/db": ["./src/database/index.worker"]
     }
   },
 

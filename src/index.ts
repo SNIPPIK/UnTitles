@@ -1,4 +1,5 @@
 import { DiscordClient, ShardManager } from "#structures/discord";
+import { initSharedDatabase } from "#worker/db";
 import { db, initDatabase } from "#app/db";
 import { Logger } from "#structures";
 import { env } from "#app/env";
@@ -51,6 +52,7 @@ async function execute_shard() {
 
     // Инициализируем базу данных
     initDatabase(client);
+    initSharedDatabase();
 
     // Загружаем API
     await db.api.startWorker();
@@ -87,6 +89,39 @@ async function execute_shard() {
             global.gc();
         }
     });
+
+
+    // Тест постоянной нагрузки на event loop
+    /*setInterval(() => {
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 60);
+
+    setInterval(() => {
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 80);
+
+    setInterval(() => {
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 120);
+
+    setInterval(() => {
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 100);*/
+
+/*
+    // Тест временной нагрузки на event loop
+    let size = 1000;
+    setInterval(() => {
+        if (size === 0) return;
+        size--;
+
+        const startBlock = performance.now();
+        while (performance.now() - startBlock < 100) {}
+    }, 100);*/
 }
 
 /**
@@ -146,7 +181,7 @@ function init_queue_destroyer(client: DiscordClient): boolean {
         // Если плееры играют и есть остаток от аудио
         if (timeout > 0) {
             // Ожидаем выключения музыки на других серверах
-            setTimeout(() => { process.exit(0); }, timeout + 1e3);
+            setTimeout(() => { process.exit(0); }, timeout + 1e3).ref();
 
             Logger.log("WARN", `[Queues/${db.queues.size}] Wait other queues. Timeout to restart ${(timeout / 1e3).duration()}`);
             return true;

@@ -166,6 +166,10 @@ class OggOpusParser extends TypedEmitter<EncoderEvents> {
             // Копируем остаток в новый буфер, чтобы не удерживать ссылку на огромный старый chunk
             this._remainder = Buffer.from(buffer.subarray(offset));
         }
+
+        // Если нет остатка, тогда просто удаляем его
+        // Ключевая оптимизация, при серьезной нагрузке спасает от OggS capture pattern not found
+        else this._remainder = null;
     };
 
     /**
@@ -174,11 +178,6 @@ class OggOpusParser extends TypedEmitter<EncoderEvents> {
      * @private
      */
     private extractPackets(packet: Buffer): void {
-        // Защита от пустых пакетов
-        if (packet.length < 8) {
-            return;
-        }
-
         const signature = packet.subarray(0, 8);
 
         // Проверяем сигнатуру является ли это заголовок

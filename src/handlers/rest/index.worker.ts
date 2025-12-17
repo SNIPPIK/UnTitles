@@ -1,7 +1,7 @@
 import { parentPort, workerData } from "node:worker_threads";
-import type { RestServerSide } from "./index.server";
 import type { APIRequestsLimits } from "#handler/rest";
-import { initDatabase } from "#app/db";
+import type { RestServerSide } from "./index.server";
+import { initSharedDatabase } from "#worker/db";
 import { handler } from "#handler";
 import { env } from "#app/env";
 
@@ -113,7 +113,7 @@ let rest: RestServer;
  * @private
  */
 if (parentPort && workerData.rest) {
-    initDatabase(null);
+    initSharedDatabase();
     rest = new RestServer();
 
     // Получаем ответ от основного потока

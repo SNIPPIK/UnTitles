@@ -144,11 +144,7 @@ export class VoiceRTPSocket {
  * @private
  */
 function randomNBit(bits: number){
-    const size = Math.ceil(bits / 8);
-    const buf = crypto.randomBytes(size);
-    if (size === 2) return buf.readUInt16BE(0);
-    if (size === 4) return buf.readUInt32BE(0);
-    return buf.readUIntBE(0, size) % (2 ** bits) || 1;
+    return crypto.randomInt(0, 1 << bits);
 }
 
 /**

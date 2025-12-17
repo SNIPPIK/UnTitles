@@ -1,7 +1,7 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
-import { Track } from "#core/queue";
-import { db } from "#app/db";
+import type { Track } from "#core/queue";
+import { sdb } from "#worker/db";
 
 /**
  * @author SNIPPIK
@@ -253,15 +253,15 @@ class RestYouTubeAPI extends RestServerSide.API {
                     // Если ID видео не удалось извлечь из ссылки
                     if (!ID) return locale.err("api.request.id.track");
 
-                    const cache = db.meta_saver.get(`${this.url}/${ID}`);
+                    const cache = sdb.meta_saver.get(`${this.url}/${ID}`);
 
                     // Если трек есть в кеше
                     if (cache) {
                         if (!options.audio) return cache;
 
                         // Если включена утилита кеширования аудио
-                        else if (db.audio_saver) {
-                            const check = db.audio_saver.status(`${this.url}/${ID}`);
+                        else if (sdb.audio_saver) {
+                            const check = sdb.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -288,8 +288,8 @@ class RestYouTubeAPI extends RestServerSide.API {
                     // Если указано получение аудио
                     if (options.audio) {
                         // Если включена утилита кеширования
-                        if (db.audio_saver) {
-                            const check = db.audio_saver.status(`${this.url}/${ID}`);
+                        if (sdb.audio_saver) {
+                            const check = sdb.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -310,7 +310,7 @@ class RestYouTubeAPI extends RestServerSide.API {
 
                     if (!cache && !api?.["videoDetails"]?.["isLive"]) setImmediate(() => {
                         // Сохраняем кеш в системе
-                        db.meta_saver?.set(track, this.url);
+                        sdb.meta_saver?.set(track, this.url);
                     });
 
                     return track;

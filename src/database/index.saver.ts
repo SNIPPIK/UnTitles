@@ -127,6 +127,7 @@ export class AudioSaver extends PromiseCycle<Track> {
 
     public constructor() {
         super({
+            duration: 30e3,
             custom: {
                 push: (track) => {
                     // Защита от повторного добавления

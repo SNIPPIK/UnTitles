@@ -1,6 +1,6 @@
 import { DiscordClient, DJSVoice } from "#structures/discord";
 import { ControllerQueues, type Queue } from "#core/queue";
-import { MetaSaver, AudioSaver } from "./index.saver";
+import { isMainThread } from "node:worker_threads";
 import { env } from "#app/env";
 
 // Database modules
@@ -17,7 +17,7 @@ import { Voices } from "#core/voice";
  * @class Database
  * @public
  */
-export class Database {
+class Database {
     /**
      * @description Загружаем класс для хранения запросов на платформы
      * @readonly
@@ -82,14 +82,6 @@ export class Database {
     public readonly voice: Voices;
 
     /**
-     * @description Класс для кеширования аудио и данных о треках
-     * @readonly
-     * @public
-     */
-    public readonly meta_saver: MetaSaver;
-    public readonly audio_saver: AudioSaver;
-
-    /**
      * @description Для управления белым списком пользователей
      * @readonly
      * @public
@@ -122,53 +114,44 @@ export class Database {
      * @public
      */
     public constructor(client?: DiscordClient) {
-        const isCaching = env.get("cache") as boolean;
+        // Если запуск произведен в другим потоке
+        if (!isMainThread) return;
 
-        if (client) {
-            this.api = new RestObject();
-            this.queues = new ControllerQueues();
-            this.voice = new Voices();
-            this.commands = new Commands();
-            this.components = new Components();
-            this.events = new Events();
-            this.middlewares = new Middlewares();
+        this.api = new RestObject();
+        this.queues = new ControllerQueues();
+        this.voice = new Voices();
+        this.commands = new Commands();
+        this.components = new Components();
+        this.events = new Events();
+        this.middlewares = new Middlewares();
 
-            // Если реально клиент
-            if (client instanceof DiscordClient) {
-                this.adapter = new DJSVoice(client);
-            }
-
-            this.whitelist = {
-                toggle: env.get<boolean>("whitelist", false),
-                ids: env.get("whitelist.list", "").split(",")
-            };
-
-            this.blacklist = {
-                toggle: env.get<boolean>("blacklist", false),
-                ids: env.get("blacklist.list", "").split(",")
-            };
-
-            this.owner = {
-                guildID: env.get("owner.server", ""),
-                ids: env.get("owner.list", "").split(",")
-            };
-
-            this.images = {
-                banner: env.get("image.banner"),
-                disk: env.get("image.currentPlay"),
-                no_image: env.get("image.not"),
-                loading: env.get("loading.emoji"),
-                disk_emoji: env.get("disk.emoji")
-            };
+        // Если реально клиент
+        if (client instanceof DiscordClient) {
+            this.adapter = new DJSVoice(client);
         }
 
-        if (isCaching) {
-            // Нужен для работы Rest/API
-            this.meta_saver = new MetaSaver();
+        this.whitelist = {
+            toggle: env.get<boolean>("whitelist", false),
+            ids: env.get("whitelist.list", "").split(",")
+        };
 
-            // Работает в Main
-            this.audio_saver = new AudioSaver();
-        }
+        this.blacklist = {
+            toggle: env.get<boolean>("blacklist", false),
+            ids: env.get("blacklist.list", "").split(",")
+        };
+
+        this.owner = {
+            guildID: env.get("owner.server", ""),
+            ids: env.get("owner.list", "").split(",")
+        };
+
+        this.images = {
+            banner: env.get("image.banner"),
+            disk: env.get("image.currentPlay"),
+            no_image: env.get("image.not"),
+            loading: env.get("loading.emoji"),
+            disk_emoji: env.get("disk.emoji")
+        };
     };
 }
 
@@ -178,7 +161,7 @@ export class Database {
  * @class Database
  * @public
  */
-export var db: Database;
+export let db: Database;
 
 /**
  * @author SNIPPIK

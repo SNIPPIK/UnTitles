@@ -53,6 +53,24 @@ export abstract class VoiceAdapters<T extends any> {
     public abstract voiceAdapterCreator(guildID: string): DiscordGatewayAdapterCreator;
 
     /**
+     * @description Реализация смены статуса голосового канала
+     * @param channelId - ID голосового канала
+     * @param status - Название заголовка
+     * @abstract
+     * @public
+     *
+     * ```
+     *         this.client.rest.put(`/channels/${channelId}/voice-status`, {
+     *             body: {
+     *                 status: status
+     *             }
+     *         });
+     *
+     * ```
+     */
+    public abstract status(channelId: string, status?: string): void;
+
+    /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_SERVER_UPDATE
      * @param payload - Данные голосового состояния
      * @public

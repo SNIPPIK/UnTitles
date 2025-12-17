@@ -1,6 +1,7 @@
 import { httpsClient, httpsStatusCode } from "#structures";
 import type { RestServerSide } from "#handler/rest";
 import { version, name, homepage } from "package.json";
+import { sdb } from "#worker/db";
 import { db } from "#app/db";
 
 /**
@@ -305,8 +306,8 @@ export class Track {
  */
 async function _prepareResource(track: Track): Promise<string | Error> {
     // Если включено кеширование
-    if (db.audio_saver) {
-        const status = db.audio_saver.status(track);
+    if (sdb.audio_saver) {
+        const status = sdb.audio_saver.status(track);
 
         // Если есть кеш аудио, то выдаем его
         if (status.status === "ended") {
@@ -329,7 +330,7 @@ async function _prepareResource(track: Track): Promise<string | Error> {
                 if (error) return error;
 
                 // Добавляем трек в кеширование
-                if (db.audio_saver) db.audio_saver.add(track);
+                if (sdb.audio_saver) sdb.audio_saver.add(track);
                 return link;
             } catch (err) { // Если произошла ошибка при проверке статуса
                 return Error(`Unknown error, ${err}`);

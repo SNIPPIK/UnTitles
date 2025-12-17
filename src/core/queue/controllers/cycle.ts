@@ -34,7 +34,7 @@ export class ControllerCycles {
  * @const PLAYER_INTERVAL
  * @private
  */
-const PLAYER_INTERVAL = 10e3;
+//const PLAYER_INTERVAL = 10e3;
 
 /**
  * @author SNIPPIK
@@ -42,7 +42,7 @@ const PLAYER_INTERVAL = 10e3;
  * @const PLAYER_DELAY_COOLDOWN
  * @private
  */
-const PLAYER_DELAY_COOLDOWN = 10e3;
+//const PLAYER_DELAY_COOLDOWN = 10e3;
 
 /**
  * @author SNIPPIK
@@ -50,7 +50,7 @@ const PLAYER_DELAY_COOLDOWN = 10e3;
  * @const PLAYER_MAX_DELAY
  * @private
  */
-const PLAYER_MAX_DELAY = 1000;
+//const PLAYER_MAX_DELAY = 1000;
 
 /**
  * @author SNIPPIK
@@ -58,7 +58,8 @@ const PLAYER_MAX_DELAY = 1000;
  * @const PLAYER_LATENCY_SIZE
  * @private
  */
-//const PLAYER_LATENCY_SIZE = 75;
+//const PLAYER_LATENCY_SIZE = 100;
+const PLAYER_AVG_FRAMES = 10
 
 /**
  * @author SNIPPIK
@@ -72,14 +73,18 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
      * @description Время последней успешной попытки уменьшения duration
      * @private
      */
-    private _lastDecrease = 0;
+    //private _lastDecrease = 0;
 
     /**
      * @description Время последнего неудачного уменьшения. Нужен для cooldown
      * @private
      */
-    private _lastDecreaseFailed = 0;
+    //private _lastDecreaseFailed = 0;
 
+    private _avgFrames = [];
+    private _lastBaseInsert = 0;
+    private _lastAdjust = 0;
+    private _targetDuration = 20;
     /**
      * @description Запускаем циклическую систему плееров, весь логический функционал здесь
      * @constructor
@@ -94,34 +99,42 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             custom: {
                 step: () => {
                     const now = this.time;
-                    const time = Math.max(0, now - this.insideTime);
+                    const time = Math.abs(now - this.insideTime);
 
-                    // === Лимит роста: duration может быть максимум time + FRAME ===
-                    const stepLimit = Math.min(PLAYER_MAX_DELAY,
-                        // Округляем время для стабильного аудио потока
-                        Math.floor(time / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE
-                    );
+                    // === Рассчитываем новое значение ===
+                    let frames = OPUS_FRAME_SIZE;
 
-                    // === Рост +20, если duration ниже лимита ===
-                    if (this.options.duration < stepLimit) {
-                        this.options.duration = stepLimit;
-                        return;
+                    // только вверх по 20 ms
+                    if (time > OPUS_FRAME_SIZE) frames = time + OPUS_FRAME_SIZE;
+
+                    // === Контроль записи в массив ===
+                    const canInsertBase = now - this._lastBaseInsert >= 1000; // прошло 1 сек?
+
+                    // разрешено вставлять любое > 20
+                    if (frames > OPUS_FRAME_SIZE) this._avgFrames.push(frames);
+                    else if (frames <= OPUS_FRAME_SIZE && canInsertBase) {
+                        // базовый 20 можно лишь раз в секунду
+                        this._avgFrames.push(OPUS_FRAME_SIZE);
+                        this._lastBaseInsert = now;
                     }
 
-                    // === Попытка уменьшения (–20) раз в decreaseInterval ===
-                    else if (
-                        (now - this._lastDecrease >= PLAYER_INTERVAL) &&
-                        (this.options.duration > OPUS_FRAME_SIZE) &&
-                        (now - this._lastDecreaseFailed >= PLAYER_DELAY_COOLDOWN)
-                    ) {
-                        const old = this.options.duration;
-                        this.options.duration = Math.max(OPUS_FRAME_SIZE, old - OPUS_FRAME_SIZE);
-                        this._lastDecrease = now;
+                    // ограничиваем размер массива
+                    if (this._avgFrames.length > PLAYER_AVG_FRAMES) this._avgFrames.shift();
 
-                        // ВАЖНО:
-                        // Если это было плохое уменьшение — duration сам подскочит
-                        // ближе к stepLimit в следующем шаге.
-                        return;
+                    // === Среднее значение Jitter ===
+                    const avg = this._avgFrames.reduce((a, b) => a + b, 0) / this._avgFrames.length;
+
+                    // === Округление по шагу 20ms ===
+                    let quantized = Math.ceil(avg / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE;
+                    if (quantized < OPUS_FRAME_SIZE) quantized = OPUS_FRAME_SIZE;
+                    this._targetDuration = quantized;
+
+                    // === 5. Плавная коррекция duration ===
+                    if (now - this._lastAdjust >= OPUS_FRAME_SIZE) {
+                        if (this.options.duration < this._targetDuration) this.options.duration = Math.min(this.options.duration + OPUS_FRAME_SIZE, this._targetDuration);
+                        else if (this.options.duration > this._targetDuration) this.options.duration = Math.max(this.options.duration - OPUS_FRAME_SIZE, this._targetDuration);
+
+                        this._lastAdjust = now + 2000;
                     }
                 }
             },
@@ -137,12 +150,6 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 // Количество фреймов в текущей итерации
                 let size = this.options.duration / OPUS_FRAME_SIZE;
 
-                // Если нет склейки 2 аудио фрейма при старте
-                if (!player._sliceFrame) {
-                    player._sliceFrame = true;
-                    size++;
-                }
-
                 // Если есть задержка голосового подключения
                 /*if (latency > 0 && size <= latency) {
                     // Инкремент счётчика
@@ -157,12 +164,9 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 }*/
 
                 // Отправляем пакет/ы в голосовой канал
-                let i = 0;
-                do {
-                    i++;
-                    const frame = player.audio.current.packet;
-                    if (frame) player.voice.connection.packet = frame;
-                } while (i < size);
+                for (let i = 0; i < size; i++) {
+                    player.voice.connection.packet = player.audio.current.packet;
+                }
 
                 // Указываем кол-во аудио пакетов
                 player._stepCounter = size;
