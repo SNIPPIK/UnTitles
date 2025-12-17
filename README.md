@@ -165,11 +165,6 @@ npm install
 # Run via Node.js
 # configure environment variables in build/.env
 npm run build && npm run start
-
-# Run via Bun (does not work now)
-# configure environment variables in ./env
-npm i dotenv
-bun run start-bun
 ```
 
 ---
