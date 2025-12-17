@@ -224,7 +224,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         super();
 
         // Используем arrow function чтобы не потерять контекст и обработать ошибку
-        process.nextTick(() => this.play().catch(err => this.emit("player/error", this, err)));
+        setImmediate(() => this.play().catch(err => this.emit("player/error", this, err)));
 
         /**
          * @description Событие смены позиции плеера
