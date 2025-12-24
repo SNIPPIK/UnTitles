@@ -54,14 +54,14 @@ class RestYandexAPI extends RestServerSide.API {
             name: "related",
             filter: /(track\/[0-9]+)?(list=RD)/,
             execute: async (url) => {
-                const ID = this.getID(/track\/[0-9]+/gi, url)?.split("track")?.at(1);
+                const IDs = this.getID(/[0-9]+\/track\/[0-9]+/gi, url).split("/track/");
 
-                // Если ID альбома не удалось извлечь из ссылки
-                if (!ID) return locale.err( "api.request.id.album");
+                // Если ID трека не удалось извлечь из ссылки
+                if (!IDs) return locale.err( "api.request.id.track");
 
                 try {
                     // Создаем запрос
-                    const api = await this.API(`tracks/${ID}/similar`);
+                    const api = await this.API(`tracks/${IDs[1]}:${IDs[0]}/similar`);
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
@@ -83,13 +83,13 @@ class RestYandexAPI extends RestServerSide.API {
             name: "track",
             filter: /track\/[0-9]+/i,
             execute: async (url, options) => {
-                const ID = this.getID(/track\/[0-9]+/gi, url)?.split("track")?.at(1);
+                const IDs = this.getID(/[0-9]+\/track\/[0-9]+/gi, url).split("/track/");
 
                 // Если ID трека не удалось извлечь из ссылки
-                if (!ID) return locale.err( "api.request.id.track");
+                if (!IDs) return locale.err( "api.request.id.track");
 
                 // Интеграция с утилитой кеширования
-                const cache = sdb.meta_saver?.get(`${this.url}/${ID}`);
+                const cache = sdb.meta_saver?.get(`${this.url}/${IDs[0]}_${IDs[1]}`);
 
                 // Если трек есть в кеше
                 if (cache) {
@@ -97,7 +97,7 @@ class RestYandexAPI extends RestServerSide.API {
 
                     // Если включена утилита кеширования аудио
                     else if (sdb.audio_saver) {
-                        const check = sdb.audio_saver.status(`${this.url}/${ID}`);
+                        const check = sdb.audio_saver.status(`${this.url}/${IDs[0]}_${IDs[1]}`);
 
                         // Если есть кеш аудио
                         if (check.status === "ended") {
@@ -109,19 +109,21 @@ class RestYandexAPI extends RestServerSide.API {
 
                 try {
                     // Делаем запрос
-                    const api = await this.API(`tracks/${ID}`);
+                    const api = await this.API(`tracks/${IDs[1]}:${IDs[0]}/full-info`);
 
                     // Обрабатываем ошибки
                     if (api instanceof Error) return api;
-                    else if (!api[0]) return locale.err( "api.request.fail");
 
-                    const track = this.track(api[0]);
+                    let track = null;
+                    if (api[0]) track = this.track(api[0]);
+                    else if (api?.id) track = this.track(api);
+                    else return locale.err( "api.request.fail");
 
                     // Если указано получение аудио
                     if (options.audio) {
                         // Если включена утилита кеширования
                         if (sdb.audio_saver) {
-                            const check = sdb.audio_saver.status(`${this.url}/${ID}`);
+                            const check = sdb.audio_saver.status(`${this.url}/${IDs[0]}_${IDs[1]}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -130,7 +132,7 @@ class RestYandexAPI extends RestServerSide.API {
                             }
                         }
 
-                        const link = await this.getAudio(ID);
+                        const link = await this.getAudio(IDs[1]);
 
                         // Проверяем не получена ли ошибка при расшифровке ссылки на исходный файл
                         if (link instanceof Error) return link;
@@ -282,14 +284,17 @@ class RestYandexAPI extends RestServerSide.API {
                 headers: {
                     "Authorization": "OAuth " + this.auth
                 },
-                method: "GET",
+                method: "GET"
             }).toJson.then((req) => {
                 // Если на этапе получение данных получена одна из ошибок
                 if (!req || req instanceof Error) return resolve(locale.err("api.request.fail"));
                 else if (req?.error?.name === "session-expired") return resolve(locale.err("api.request.login.session-expired"));
                 else if (req?.error?.name === "not-allowed") return resolve(locale.err("api.request.login.not-allowed"));
 
-                if (req?.result) return resolve(req?.result);
+                if (req?.result) {
+                    if (req?.result?.track) return resolve(req?.result?.track);
+                    return resolve(req?.result);
+                }
                 return resolve(req);
             }).catch((err) => {
                 return resolve(Error(`[APIs]: ${err}`));
@@ -304,8 +309,6 @@ class RestYandexAPI extends RestServerSide.API {
      * @protected
      */
     protected getAudio = async (ID: string): Promise<Error | string> => {
-        const trackId = ID.split("/")[1];
-
         for (let i = 0; i <= 3; i++) {
             // Если достигли максимума, возвращаем ошибку
             if (i === 3) {
@@ -315,11 +318,11 @@ class RestYandexAPI extends RestServerSide.API {
             try {
                 // Делаем запрос для получения аудио
                 const api = await new httpsClient({
-                    url: `https://api.music.yandex.net/tracks/${trackId}/download-info`,
+                    url: `https://api.music.yandex.net/tracks/${ID}/download-info`,
                     headers: {
                         "Authorization": "OAuth " + this.auth
                     },
-                    method: "GET",
+                    method: "GET"
                 }).toJson;
 
                 // Если на этапе получение данных получена одна из ошибок
@@ -334,7 +337,7 @@ class RestYandexAPI extends RestServerSide.API {
                 if (!url) return locale.err("api.request.fail.msg", ["Fail getting audio url"]);
 
                 // Если yandex пытается подсунуть рекламу вместо реального аудио
-                else if (`${url.downloadInfoUrl.split(".").at(-1)!.split("/")[0]}` !== trackId) continue;
+                else if (`${url.downloadInfoUrl.split(".").at(-1)!.split("/")[0]}` !== ID) continue;
 
                 // Расшифровываем xml страницу на фрагменты
                 const xml = await new httpsClient({
@@ -342,7 +345,7 @@ class RestYandexAPI extends RestServerSide.API {
                     headers: {
                         "Authorization": "OAuth " + this.auth
                     },
-                    method: "GET",
+                    method: "GET"
                 }).toXML;
 
                 // Если произошла ошибка при получении xml
