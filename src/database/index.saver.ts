@@ -46,7 +46,7 @@ export class MetaSaver {
         if (this.inFile) {
             const Path = path.join(this._dirname, "Data", api, `${track.id}.json`);
 
-            if (!fs.existsSync(Path)) {
+            if (Path && !fs.existsSync(Path)) {
                 try {
                     const dirPath = path.dirname(Path);
                     await afs.mkdir(dirPath, { recursive: true });
@@ -147,7 +147,7 @@ export class AudioSaver extends PromiseCycle<Track> {
                 }
 
                 // Если нет директории то, создаем ее
-                if (!fs.existsSync(names.path)) {
+                else if (!fs.existsSync(names.path)) {
                     let dirs = names.path.split("/");
                     if (!names.path.endsWith("/")) dirs.splice(dirs.length - 1);
                     fs.mkdirSync(dirs.join("/"), { recursive: true });
@@ -155,40 +155,38 @@ export class AudioSaver extends PromiseCycle<Track> {
 
                 return true;
             },
-            execute: (track) => {
-                return new Promise<boolean>((resolve) => {
-                    const status = this.status(track);
+            execute: (track) => new Promise<boolean>((resolve) => {
+                const status = this.status(track);
 
-                    // Создаем ffmpeg для скачивания трека
-                    const ffmpeg = new Process([
-                        "-i", track.link,
-                        "-f", `opus`,
-                        `${status.path}.opus`
-                    ]);
+                // Создаем ffmpeg для скачивания трека
+                const ffmpeg = new Process([
+                    "-i", track.link,
+                    "-f", `opus`,
+                    `${status.path}.opus`
+                ]);
 
-                    // Если была получена ошибка
-                    ffmpeg.stdout.once("error", () => {
-                        ffmpeg.destroy();
-                        this.delete(track);
+                // Если была получена ошибка
+                ffmpeg.stdout.once("error", () => {
+                    ffmpeg.destroy();
+                    this.delete(track);
 
-                        // Удаляем файл
-                        fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
-                        return resolve(false);
-                    });
-
-                    // Если запись была завершена
-                    ffmpeg.stdout.once("end", () => {
-                        fs.stat(`${status.path}.opus`, (err, stats) => {
-                            // Если файл не проходит проверку
-                            if (err || stats.size < 10) fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
-                        });
-
-                        ffmpeg.destroy();
-                        this.delete(track);
-                        return resolve(true);
-                    });
+                    // Удаляем файл
+                    fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
+                    return resolve(false);
                 });
-            }
+
+                // Если запись была завершена
+                ffmpeg.stdout.once("end", () => {
+                    fs.stat(`${status.path}.opus`, (err, stats) => {
+                        // Если файл не проходит проверку
+                        if (err || stats.size < 10) fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
+                    });
+
+                    ffmpeg.destroy();
+                    this.delete(track);
+                    return resolve(true);
+                });
+            })
         });
     }
 
@@ -198,7 +196,7 @@ export class AudioSaver extends PromiseCycle<Track> {
      * @public
      */
     public status = (track: Track | string): { status: "not-ended" | "ended" | "download", path: string } => {
-        let file: string;
+        let file: string = `${this._dirname}/Audio/${track}`;
 
         if (typeof track !== "string") {
             file = `${this._dirname}/Audio/${track.api.url}/${track.ID}`;
@@ -219,6 +217,9 @@ export class AudioSaver extends PromiseCycle<Track> {
         }
 
         // Выдаем что ничего нет
-        return { status: "not-ended", path: file };
+        return {
+            status: "not-ended",
+            path: file
+        };
     };
 }

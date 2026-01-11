@@ -87,6 +87,9 @@ class RestSpotifyAPI extends RestServerSide.API {
                             return cache;
                         }
                     }
+
+                    // Если нет возможности получить аудио
+                    if (!this.audio) return cache;
                 }
 
                 try {
@@ -109,6 +112,8 @@ class RestSpotifyAPI extends RestServerSide.API {
                                 return track;
                             }
                         }
+
+                        return track;
                     }
 
                     setImmediate(() => {

@@ -1,4 +1,3 @@
-import { performance } from "node:perf_hooks";
 import { SetArray } from "#structures/array";
 
 /**
@@ -10,9 +9,6 @@ import { SetArray } from "#structures/array";
  * @private
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Последний записанное значение performance.now(), нужно для улавливания event loop lags */
-    private performance: number = 0;
-
     /** Последний сохраненный временной интервал */
     private lastDelay: number = 0;
 
@@ -63,38 +59,12 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         // Ожидаемое время следующего запуска (без учета _driftStep/lag)
         const expectedNext = this.startTime + this.tickTime + duration;
         const now = this.time;
+        const missed = Math.floor((now - expectedNext) / duration);
+        const steps = Math.max(1, missed + 1);
 
-        // Сколько шагов "пропустили" по времени (если any)
-        let missedSteps = 1;
-        if (now > expectedNext) {
-            // (now - expectedNext) может быть > duration * N
-            const over = (now - expectedNext) / duration;
-            missedSteps = Math.max(missedSteps, over);
-        }
-
-        const correction = missedSteps * duration;
+        const correction = Math.floor(steps * duration);
         this.tickTime += correction;
         this.lastDelay = correction;
-    };
-
-    /**
-     * @description Высчитываем задержки event loop
-     * @protected
-     */
-    protected get _calculateLags() {
-        const now = performance.now();
-
-        // Если это первый тик — просто инициализация
-        if (!this.performance) {
-            this.performance = now;
-            return 0;
-        }
-
-        const delta = Math.max(0, now - this.performance - this.lastDelay);
-        this.performance = now;
-
-        // Отдаем задержку Event loop
-        return delta;
     };
 
     /**
@@ -119,7 +89,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         // Запускаем цикл сразу после добавления первого элемента
         if (this.size === 1 && !this.startTime) {
             this.startTime = this.time;
-            setImmediate(this._stepCycle);
+            setImmediate(this.step);
         }
 
         return this;
@@ -144,9 +114,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         this.tickTime = 0;
         this.lastDelay = 0;
 
-        // Чистим performance.now
-        this.performance = 0;
-
         // Если есть таймер
         if (this.timeout) this._clearTimeout();
     };
@@ -156,23 +123,15 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @returns void
      * @protected
      */
-    protected _runStepTimeout = (duration: number): void => {
+    private step = (): void => {
         // Проверяем цикл на наличие объектов
-        if (this.size === 0 || isNaN(duration)) return this.reset();
+        if (this.size === 0) return this.reset();
 
-        // Высчитываем время шага
-        this.delay = duration;
+        // === STEP ===
+        this.delay = this._stepCycle();
 
-        // Следующее время шага
-        const nextTargetTime = (this.insideTime + this._calculateLags);
-
-        /* TIMEOUT */
-
-        // Время для выполнения шага
-        const delay = Math.max(0, nextTargetTime - this.time);
-        this._clearTimeout();
-
-        this.timeout = setTimeout(this._stepCycle, delay);
+        const delay = Math.max(0, this.insideTime - this.time);
+        setTimeout(this.step, delay);
     };
 
     /**
@@ -187,12 +146,12 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     };
 
     /**
-     * @description Выполняет шаг цикла с учётом точного времени следующего запуска
-     * @returns void
+     * @description Выполняет шаг цикла с учётом точного времени следующего запуска | Полный запрет на promise
+     * @returns number
      * @protected
      * @abstract
      */
-    protected abstract _stepCycle: () => void;
+    protected abstract _stepCycle: () => number;
 }
 
 /**
@@ -242,7 +201,7 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @readonly
      * @private
      */
-    protected _stepCycle = async (): Promise<void> => {
+    protected _stepCycle = () => {
         this.options?.custom?.step?.();
 
         // Запускаем цикл
@@ -258,7 +217,7 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
             }
         }
 
-        return this._runStepTimeout(this.options.duration);
+        return this.options.duration;
     };
 }
 
@@ -310,23 +269,29 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @readonly
      * @private
      */
-    protected _stepCycle = async (): Promise<void> => {
+    protected _stepCycle = () => {
         for (const item of this) {
-            // Если объект не готов
             if (!this.options.filter(item)) continue;
-
-            try {
-                const bool  = await this.options.execute(item);
-
-                // Если ответ был получен
-                if (!bool) this.delete(item);
-            } catch (error) {
-                this.delete(item);
-                console.log(error);
-            }
+            this.runItem(item);
         }
 
-        return this._runStepTimeout(30e3);
+        return 30_000;
+    };
+
+    /**
+     * @description Обработка обещаний
+     * @param item - объект с обещанием
+     * @private
+     */
+    private runItem(item: T): void {
+        (this.options.execute(item) as Promise<boolean>)
+            .then(ok => {
+                if (!ok) this.delete(item);
+            })
+            .catch(err => {
+                this.delete(item);
+                console.error(err);
+            });
     };
 }
 

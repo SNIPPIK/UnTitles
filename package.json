@@ -23,7 +23,7 @@
     "@snazzah/davey": "^0.1.8"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
+    "@types/node": "^24.10.4",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
   },
@@ -31,7 +31,7 @@
     "start": "cd build && node -r tsconfig-paths/register src --ShardManager --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache",
     "start-bun": "bun src",
     "build": "tsc",
-
-    "dev:start": "npm run build && cd build && node -r tsconfig-paths/register src --optimize_for_size --expose-gc"
+    "dev:start": "npm run build && cd build && node -r tsconfig-paths/register src --optimize_for_size --expose-gc",
+    "dashboard": "npm run build && cd build && node -r tsconfig-paths/register web --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache"
   }
 }

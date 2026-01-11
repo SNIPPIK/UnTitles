@@ -219,7 +219,7 @@ export class RestObject {
      * @private
      */
     private platform = (name: RestServerSide.API["name"] | string): RestServerSide.API => {
-        return this.platforms.supported[name] ?? this.array.find((api) => api.name === name || api.filter.exec(name) || name === "YOUTUBE");
+        return this.array.find((api) => api.name === name || api.filter.test(name) || api.name === "YOUTUBE");
     };
 
     /**

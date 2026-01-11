@@ -177,7 +177,10 @@ class OggOpusParser extends TypedEmitter<EncoderEvents> {
      * @param packet - Аудио данные
      * @private
      */
-    private extractPackets(packet: Buffer): void {
+    private extractPackets = (packet: Buffer): void => {
+        // Если попадается фальшивый фрейм
+        if (packet.length <= 8) return;
+
         const signature = packet.subarray(0, 8);
 
         // Проверяем сигнатуру является ли это заголовок
@@ -199,8 +202,6 @@ class OggOpusParser extends TypedEmitter<EncoderEvents> {
      * @public
      */
     public destroy() {
-        this.emit("frame", SILENT_FRAME);
-
         this._remainder = null;
         this._bitstreamSerial = null;
 

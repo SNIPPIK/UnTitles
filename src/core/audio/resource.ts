@@ -72,11 +72,8 @@ class AudioBuffer {
      * @public
      */
     public clear = () => {
-        this._chunks = [];
         this._chunks.length = 0;
-        this._chunks = null;
-        this._position = null;
-        this._position = null;
+        this._position = 0;
     };
 }
 
@@ -294,7 +291,7 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get duration() {
-        if (!this._buffer || !this._buffer?.position) return 0;
+        if (!this._buffer) return 0;
 
         const time = this._buffer.position * OPUS_FRAME_SIZE;
         return time / 1e3 + this.options.seek;
@@ -330,7 +327,7 @@ export class BufferedAudioResource extends BaseAudioResource {
         const index = (seek * 1e3) / OPUS_FRAME_SIZE;
 
         // Если указано неподходящие значение
-        if (index > this._buffer.size || index < this._buffer.size) {
+        if (index < 0 || index >= this._buffer.size) {
             this._buffer.position = 0;
             return;
         }
@@ -369,7 +366,10 @@ export class BufferedAudioResource extends BaseAudioResource {
                 input.on("frame", (packet: Buffer) => {
                     if (this._buffer) {
                         // Сообщаем что поток можно начать читать
-                        if (!this._readable) setImmediate(() => { this.emit("readable");});
+                        if (!this._readable) {
+                            this._readable = true;
+                            setImmediate(() => this.emit("readable"));
+                        }
 
                         // Если создал класс буфера, начинаем кеширование пакетов
                         if (packet) this._buffer.packet = packet;

@@ -30,35 +30,11 @@ export class ControllerCycles {
 
 /**
  * @author SNIPPIK
- * @description Раз в N ms пробуем уменьшить Jitter Buffer
- * @const PLAYER_INTERVAL
+ * @description Разрешенное кол-во временных интервалов
+ * @const PLAYER_AVG_FRAMES
  * @private
  */
-//const PLAYER_INTERVAL = 10e3;
-
-/**
- * @author SNIPPIK
- * @description Время сброса Jitter Buffer
- * @const PLAYER_DELAY_COOLDOWN
- * @private
- */
-//const PLAYER_DELAY_COOLDOWN = 10e3;
-
-/**
- * @author SNIPPIK
- * @description Максимальный размер задержки Jitter Buffer
- * @const PLAYER_MAX_DELAY
- * @private
- */
-//const PLAYER_MAX_DELAY = 1000;
-
-/**
- * @author SNIPPIK
- * @description Время задержки, при превышении будет добавляться аудио пакет
- * @const PLAYER_LATENCY_SIZE
- * @private
- */
-//const PLAYER_LATENCY_SIZE = 100;
+const PLAYER_LATENCY_SIZE = 100;
 const PLAYER_AVG_FRAMES = 10
 
 /**
@@ -69,18 +45,6 @@ const PLAYER_AVG_FRAMES = 10
  * @private
  */
 class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
-    /**
-     * @description Время последней успешной попытки уменьшения duration
-     * @private
-     */
-    //private _lastDecrease = 0;
-
-    /**
-     * @description Время последнего неудачного уменьшения. Нужен для cooldown
-     * @private
-     */
-    //private _lastDecreaseFailed = 0;
-
     private _avgFrames = [];
     private _lastBaseInsert = 0;
     private _lastAdjust = 0;
@@ -99,13 +63,14 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             custom: {
                 step: () => {
                     const now = this.time;
-                    const time = Math.abs(now - this.insideTime);
+                    const drift = Math.abs(now - this.insideTime);
 
-                    // === Рассчитываем новое значение ===
                     let frames = OPUS_FRAME_SIZE;
 
                     // только вверх по 20 ms
-                    if (time > OPUS_FRAME_SIZE) frames = time + OPUS_FRAME_SIZE;
+                    if (drift > OPUS_FRAME_SIZE) {
+                        frames = drift + OPUS_FRAME_SIZE;
+                    }
 
                     // === Контроль записи в массив ===
                     const canInsertBase = now - this._lastBaseInsert >= 1000; // прошло 1 сек?
@@ -129,12 +94,12 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                     if (quantized < OPUS_FRAME_SIZE) quantized = OPUS_FRAME_SIZE;
                     this._targetDuration = quantized;
 
-                    // === 5. Плавная коррекция duration ===
+                    // === Плавная коррекция duration ===
                     if (now - this._lastAdjust >= OPUS_FRAME_SIZE) {
                         if (this.options.duration < this._targetDuration) this.options.duration = Math.min(this.options.duration + OPUS_FRAME_SIZE, this._targetDuration);
                         else if (this.options.duration > this._targetDuration) this.options.duration = Math.max(this.options.duration - OPUS_FRAME_SIZE, this._targetDuration);
 
-                        this._lastAdjust = now + 2000;
+                        this._lastAdjust = now;
                     }
                 }
             },
@@ -145,13 +110,13 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             // Функция отправки аудио фрейма
             execute: (player) => {
                 // latency - задержка соединения
-                //const latency = player.voice.connection.latency > PLAYER_LATENCY_SIZE ? Math.ceil(player.voice.connection.latency / PLAYER_LATENCY_SIZE) - 1 : 0;
+                const latency = player.voice.connection.latency > PLAYER_LATENCY_SIZE ? Math.ceil(player.voice.connection.latency / PLAYER_LATENCY_SIZE) - 1 : 0;
 
                 // Количество фреймов в текущей итерации
                 let size = this.options.duration / OPUS_FRAME_SIZE;
 
                 // Если есть задержка голосового подключения
-                /*if (latency > 0 && size <= latency) {
+                if (latency > 0 && size <= latency) {
                     // Инкремент счётчика
                     player._counter++;
 
@@ -161,7 +126,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                     // Если достигли — выполняем шаг
                     player._counter = 0; // сбрасываем
                     size = latency + size;
-                }*/
+                }
 
                 // Отправляем пакет/ы в голосовой канал
                 for (let i = 0; i < size; i++) {
@@ -247,7 +212,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
             filter: (message) => !!message.edit && message.editable && message.createdTimestamp + 5e3 < Date.now() && message.editedTimestamp + 5e3 < Date.now(),
 
             // Функция обновления сообщения
-            execute: async (message) => {
+            execute: (message) => {
                 const queue = db.queues.get(message.guildId);
 
                 // Если нет очереди
@@ -273,9 +238,9 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
      * @returns Promise<void>
      * @public
      */
-    public update = async (message: T, component: MessageComponent) => {
+    public update = (message: T, component: MessageComponent) => {
         try {
-            if (message.editable) await message.edit({ components: component });
+            if (message.editable) message.edit({ components: component }).catch(console.error);
         } catch (error) {
             Logger.log("ERROR", `Failed to edit message in cycle\n${error instanceof Error ? error.stack : error}`);
 
@@ -289,7 +254,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
      * @returns Promise<T | null>
      * @public
      */
-    public ensure = async (guildId: string, factory: () => Promise<T>): Promise<T | null> => {
+    public ensure = (guildId: string, factory: () => Promise<T>): T | null => {
         let message = this.find(m => m.guildId === guildId);
 
         // Если нет сообщения в цикле

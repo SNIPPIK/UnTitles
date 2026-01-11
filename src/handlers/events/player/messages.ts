@@ -104,7 +104,7 @@ class message_push extends Event<"message/push"> {
 
         // Если есть ответ от отправленного сообщения
         if (msg) setTimeout(() => msg.deletable ? msg.delete().catch(() => null) : null, 12e3);
-    }
+    };
 }
 
 /**
@@ -122,7 +122,7 @@ class message_push extends Event<"message/push"> {
 })
 class message_playing extends Event<"message/playing"> {
     run: SupportEventCallback<"message/playing"> = async (queue) => {
-        const message = await db.queues.cycles.messages.ensure(queue.message.guild_id, () => {
+        const message = db.queues.cycles.messages.ensure(queue.message.guild_id, () => {
             return queue.message.send({
                 components: queue.components,
                 withResponse: true,
@@ -134,8 +134,8 @@ class message_playing extends Event<"message/playing"> {
         db.adapter.status(queue.message.voice_id, `${db.images.disk_emoji} | ${queue.tracks.track.name}`);
 
         // Если есть сообщение
-        if (message) db.queues.cycles.messages.update(message, queue.components).catch(() => null);
-    }
+        if (message) db.queues.cycles.messages.update(message, queue.components);
+    };
 }
 
 /**

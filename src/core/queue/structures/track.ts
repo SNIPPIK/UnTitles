@@ -291,7 +291,7 @@ export class Track {
      * @public
      */
     public constructor(protected _track: Track.data, protected _api: RestServerSide.APIBase) {
-        this.time = _track.time as any;
+        this.time = _track?.time as any;
 
         // Удаляем мусорные названия из текста
         if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic|[\/()\[\]"]|[:;]/gi, "");

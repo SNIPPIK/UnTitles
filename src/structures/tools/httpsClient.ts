@@ -156,7 +156,7 @@ abstract class Request {
             if (typeof options.userAgent === "string") ua = options.userAgent;
             else {
                 // Генерируем новый User-Agent
-                const revision = Math.floor(Math.random() * 2) + 140; // Генерация числа около 140
+                const revision = Math.floor(Math.random() * 20) + 125;
                 const OS = ["X11; Linux x86_64", "Windows NT 10.0; Win64; x64", "X11; Linux i686"];
                 const randomOS = OS[Math.floor(Math.random() * OS.length)];
 

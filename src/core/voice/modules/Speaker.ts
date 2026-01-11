@@ -26,16 +26,16 @@ const MAX_SIZE_VALUE = 2 ** 32 - 1;
  */
 export class VoiceSpeakerManager {
     /**
+     * @description Список пользователей в голосовом канале, для работы E2EE
+     * @public
+     */
+    public clients = new Set<string>();
+
+    /**
      * @description Текущий тип спикера
      * @private
      */
     private _type: SpeakerType = SpeakerType.disable;
-
-    /**
-     * @description Список клиентов в голосовом состоянии
-     * @private
-     */
-    public clients = new Set<string>();
 
     /**
      * @description Менеджер жизни спикера
@@ -108,7 +108,7 @@ export class VoiceSpeakerManager {
                 delay: 0,
                 ssrc: this.voice._attention.ssrc
             },
-            seq: this.voice.websocket?.sequence ?? -1
+            seq: this.voice.websocket?.sequence || 0
         };
     };
 
