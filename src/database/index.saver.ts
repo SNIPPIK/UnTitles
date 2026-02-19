@@ -1,7 +1,8 @@
-import { PromiseCycle } from "#structures/tools/Cycle";
+import type { APIRequestData } from "#handler/rest";
 import { Process } from "#core/audio/process";
+import { PromiseCycle } from "#native/cycle";
 import { Logger } from "#structures/logger";
-import type { Track } from "#core/queue";
+import { Track } from "#core/queue";
 import afs from "node:fs/promises";
 import { env } from "#app/env";
 import path from "node:path";
@@ -32,7 +33,7 @@ export class MetaSaver {
      * @description Бд треков, для повторного использования
      * @private
      */
-    private tracks: Map<string, Track.data> = !this.inFile ? new Map<string, Track.data>() : null;
+    private tracks: Map<string, APIRequestData.Track> = !this.inFile ? new Map<string, APIRequestData.Track>() : null;
 
     /**
      * @description Сохраняем трек в локальную базу данных
@@ -41,7 +42,7 @@ export class MetaSaver {
      * @returns Promise<void>
      * @public
      */
-    public set = async (track: Track.data, api: string): Promise<void> => {
+    public set = async (track: APIRequestData.Track, api: string): Promise<void> => {
         // Если нельзя сохранять в файлы
         if (this.inFile) {
             const Path = path.join(this._dirname, "Data", api, `${track.id}.json`);
@@ -78,23 +79,20 @@ export class MetaSaver {
     /**
      * @description Выдаем данные из класса
      * @param ID - Идентификатор трека
-     * @returns Track.data
+     * @returns APIRequestData.Track
      * @public
      */
-    public get = (ID: string): Track.data => {
-        // Если нельзя сохранять в файлы
-        if (this.inFile) {
-            // Если есть трек в кеше
-            if (fs.existsSync(`${this._dirname}/Data/${ID}.json`)) {
-                try {
-                    // Если трек кеширован в файл
-                    const json = JSON.parse(fs.readFileSync(`${this._dirname}/Data/${ID}.json`, "utf8"));
+    public get = (ID: string): APIRequestData.Track => {
+        // Если есть трек в кеше
+        if (fs.existsSync(`${this._dirname}/Data/${ID}.json`)) {
+            try {
+                // Если трек кеширован в файл
+                const json = JSON.parse(fs.readFileSync(`${this._dirname}/Data/${ID}.json`, "utf8"));
 
-                    // Если трек был найден среди файлов
-                    if (json) return json.track;
-                } catch {
-                    return null;
-                }
+                // Если трек был найден среди файлов
+                if (json) return json.track;
+            } catch {
+                return null;
             }
         }
 
@@ -157,13 +155,40 @@ export class AudioSaver extends PromiseCycle<Track> {
             },
             execute: (track) => new Promise<boolean>((resolve) => {
                 const status = this.status(track);
-
-                // Создаем ffmpeg для скачивания трека
-                const ffmpeg = new Process([
+                const args = [
                     "-i", track.link,
                     "-f", `opus`,
                     `${status.path}.opus`
-                ]);
+                ];
+
+                // Если платформа не может играть нативно из сети
+                if (track.proxy && track.link.startsWith("http")) {
+                    const proxy = env.get("APIs.proxy", null);
+
+                    // Если есть прокси
+                    if (proxy) {
+                        const isSocks = proxy.startsWith("socks");
+
+                        // Если протокол socks
+                        if (isSocks) {
+                            const path = proxy.split(":/")[1];
+
+                            // Если нашлись данные для входа
+                            if (path.match(/@/)) {
+                                args.unshift("-http_proxy", `http:/${proxy.split(":/")[1].split("@")[1]}`);
+                            }
+
+                            // Если данных для входа нет
+                            else args.unshift("-http_proxy", `http:/${proxy.split(":/")[1]}`);
+                        }
+
+                        // Если протокол http
+                        else args.unshift("-http_proxy", `http:/${proxy.split(":/")[1]}`);
+                    }
+                }
+
+                // Создаем ffmpeg для скачивания трека
+                const ffmpeg = new Process(args);
 
                 // Если была получена ошибка
                 ffmpeg.stdout.once("error", () => {

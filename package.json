@@ -1,6 +1,6 @@
 {
   "name": "untitles",
-  "version": "0.4.1",
+  "version": "0.5.0a",
   "homepage": "https://github.com/SNIPPIK/UnTitles",
   "bugs": "https://github.com/SNIPPIK/UnTitles/issues",
   "author": {
@@ -15,23 +15,24 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.36",
-    "discord.js": "14.25.1",
-    "ws": "^8.18.3"
+    "discord-api-types": "^0.38.39",
+    "http-proxy-agent": "^7.0.2",
+    "node-addon-api": "^8.5.0",
+    "node-gyp": "^12.2.0",
+    "seyfert": "^4.2.2",
+    "socks-proxy-agent": "^8.0.5",
+    "ws": "^8.19.0"
   },
   "optionalDependencies": {
-    "@snazzah/davey": "^0.1.8"
+    "@snazzah/davey": "^0.1.9"
   },
   "devDependencies": {
-    "@types/node": "^24.10.4",
+    "@types/node": "^25.2.3",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "start": "cd build && node -r tsconfig-paths/register src --ShardManager --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache",
-    "start-bun": "bun src",
-    "build": "tsc",
-    "dev:start": "npm run build && cd build && node -r tsconfig-paths/register src --optimize_for_size --expose-gc",
-    "dashboard": "npm run build && cd build && node -r tsconfig-paths/register web --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache"
+    "start": "cd build && node -r tsconfig-paths/register src --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache --interval-stack-size",
+    "build": "npx node-gyp configure build && tsc && node -e \"require('fs').copyFileSync('.env', 'build/.env')\" && node -e \"require('fs').copyFileSync('seyfert.config.mjs', 'build/seyfert.config.mjs')\""
   }
 }

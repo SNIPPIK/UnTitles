@@ -56,7 +56,7 @@ export let sdb: SharedDatabase;
  * @public
  */
 export function initSharedDatabase() {
-    if (sdb || process.argv.includes("--ShardManager")) return;
+    if (sdb) return;
 
     try {
         sdb = new SharedDatabase();

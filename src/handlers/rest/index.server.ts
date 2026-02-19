@@ -1,14 +1,6 @@
-import type { APIRequests, APIRequestsRaw, APIRequestsLimits } from "./index";
-import type { RestAPIS_Names } from "./index.decorator";
+import { type APIExecuteParams, APIPlatformType, type APIRequestsKeys, type APIRequestsRaw, RestAPIAgent } from "./index";
+import type { RestAPINames, RestOptions } from "./index.decorator";
 import type { RestClientSide } from "./index.client";
-
-/**
- * @author SNIPPIK
- * @description Тип параметров функции вызова для каждого запроса
- * @type ExecuteParams
- * @helper
- */
-type ExecuteParams<T extends keyof APIRequests = keyof APIRequests> = T extends "track" ? { audio: boolean } : T extends APIRequestsLimits ? { limit: number } : never;
 
 /**
  * @author SNIPPIK
@@ -22,7 +14,7 @@ export namespace RestServerSide {
      * @type APIs
      * @public
      */
-    export type APIs = Record<RestAPIS_Names, API>;
+    export type APIs = Record<RestAPINames, API>;
 
     /**
      * @description Данные для валидного запроса параллельном процессу
@@ -31,7 +23,7 @@ export namespace RestServerSide {
      */
     export type ServerOptions = RestClientSide.ClientOptions & {
         // Название платформы
-        platform: RestAPIS_Names;
+        platform: RestAPINames;
 
         // Надо ли получить данные в ответ
         data?: boolean
@@ -49,48 +41,23 @@ export namespace RestServerSide {
      * @type Result
      * @public
      */
-    export type Result<T extends keyof APIRequests = keyof APIRequests> = {
+    export type Result<T extends APIRequestsKeys> = {
         // Номер уникального запроса
         requestId: number;
     } & (ResultSuccess<T> | ResultError);
 
     /**
      * @description Создаем класс для итоговой платформы для взаимодействия с APIs
-     * @interface APIBase
-     * @public
-     */
-    export interface APIBase {
-        /**
-         * @description Название платформы
-         * @readonly
-         */
-        readonly name: RestAPIS_Names;
-
-        /**
-         * @description Ссылка на платформу
-         * @readonly
-         */
-        readonly url: string;
-
-        /**
-         * @description Цвет платформы, в стиле discord
-         * @readonly
-         */
-        readonly color: number;
-    }
-
-    /**
-     * @description Создаем класс для итоговой платформы для взаимодействия с APIs
      * @class API
-     * @implements APIBase
+     * @implements RestOptions
      * @public
      */
-    export class API implements APIBase {
+    export class API<T = any> implements RestOptions {
         /**
          * @description Название платформы
          * @readonly
          */
-        readonly name: RestAPIS_Names;
+        readonly name: RestAPINames;
 
         /**
          * @description Ссылка на платформу
@@ -115,7 +82,7 @@ export namespace RestServerSide {
          * @default undefined - данные не требуются
          * @readonly
          */
-        readonly auth?: string;
+        readonly auth?: boolean;
 
         /**
          * @description Regexp для поиска платформы
@@ -127,13 +94,34 @@ export namespace RestServerSide {
          * @description Запросы к данных платформы
          * @readonly
          */
-        readonly requests: (RequestDef<"track"> | RequestDef<"search"> | RequestDef<"artist"> | RequestDef<"related"> | RequestDef<"album"> | RequestDef<"playlist">)[];
+        readonly requests: (RequestDef<"all"> | RequestDef<"track"> | RequestDef<"search"> | RequestDef<"artist"> | RequestDef<"related"> | RequestDef<"album"> | RequestDef<"playlist">)[];
+
+        /**
+         * @description Если надо использовать прокси при запросах
+         * @protected
+         */
+        readonly proxy: boolean;
 
         /**
          * @description Доп параметры
          * @readonly
          */
-        readonly options: any;
+        readonly options: T;
+
+        /**
+         * @description Тип платформы, платформа может быть технической или же прямой
+         * @default APIPlatformType.primary
+         * @readonly
+         */
+        readonly type: APIPlatformType = APIPlatformType.primary;
+
+        /**
+         * @description Выдача прокси агента
+         * @protected
+         */
+        protected get agent() {
+            return this.proxy ? RestAPIAgent : null;
+        };
 
         /**
          * @description Получение ID по ссылке
@@ -141,7 +129,7 @@ export namespace RestServerSide {
          * @param query - Запрос
          * @protected
          */
-        protected getID(regexp: RegExp, query: string): string {
+        protected getID?(regexp: RegExp, query: string): string {
             return (regexp).exec(query)[0];
         };
 
@@ -150,7 +138,7 @@ export namespace RestServerSide {
          * @constructor
          * @protected
          */
-        protected async API(...args: any): Promise<Error | json> {
+        protected async API?(...args: any): Promise<Error | json> {
             return new Error(`Not found method API | ${args}`);
         };
 
@@ -158,7 +146,7 @@ export namespace RestServerSide {
          * @description Функция авторизации платформы
          * @protected
          */
-        protected async authorization(){
+        protected async authorization?(): Promise<string | Error> {
             return null;
         };
 
@@ -168,7 +156,7 @@ export namespace RestServerSide {
          * @constructor
          * @protected
          */
-        protected track(_: json): APIRequestsRaw["track"] {
+        protected track?(_: json): APIRequestsRaw<"track"> {
             return null;
         };
     }
@@ -178,10 +166,10 @@ export namespace RestServerSide {
      * @interface RequestDef
      * @public
      */
-    export interface RequestDef<T extends keyof APIRequests = keyof APIRequests> {
+    export interface RequestDef<T extends APIRequestsKeys> {
         name: T;
         filter?: RegExp;
-        execute: (url: string, options: ExecuteParams<T>) => Promise<APIRequestsRaw[T] | Error>;
+        execute: (url: string, options: APIExecuteParams<T>) => Promise<APIRequestsRaw<T> | Error>;
     }
 
     /**
@@ -200,26 +188,26 @@ export namespace RestServerSide {
          * @description Платформы с данных для авторизации
          * @protected
          */
-        authorization: RestAPIS_Names[];
+        authorization: RestAPINames[];
 
         /**
          * @description Платформы с возможности получить аудио
          * @warn По-умолчанию запрос идет к track
          * @protected
          */
-        audio: RestAPIS_Names[];
+        audio: RestAPINames[];
 
         /**
          * @description Платформы с возможностью получать похожие треки
          * @protected
          */
-        related: RestAPIS_Names[];
+        related: RestAPINames[];
 
         /**
          * @description Заблокированные платформы
          * @protected
          */
-        block: RestAPIS_Names[];
+        block: RestAPINames[];
 
         /**
          * @description Поддерживаемые платформы в array формате, для экономии памяти
@@ -234,10 +222,10 @@ export namespace RestServerSide {
  * @type ResultSuccess
  * @private
  */
-type ResultSuccess<T extends keyof APIRequests = keyof APIRequests> = {
+type ResultSuccess<T extends APIRequestsKeys> = {
     status: "success";
     type: T;
-    result: APIRequestsRaw[T];
+    result: APIRequestsRaw<T>;
 };
 
 /**

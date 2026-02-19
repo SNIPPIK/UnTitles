@@ -53,4 +53,10 @@ export interface AudioPlayerEvents {
      * @readonly
      */
     readonly "player/error": (player: AudioPlayer, err: string, track?: {skip: boolean, position: number}) => void;
+
+    /**
+     * @description Событие при котором плеер получает внутренний лог
+     * @readonly
+     */
+    readonly "player/log": (status: string | Error) => void;
 }

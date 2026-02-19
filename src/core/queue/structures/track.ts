@@ -1,6 +1,6 @@
+import { RestAPIAgent, RestServerSide } from "#handler/rest";
 import { httpsClient, httpsStatusCode } from "#structures";
-import type { RestServerSide } from "#handler/rest";
-import { version, name, homepage } from "package.json";
+import { Colors } from "#structures/discord";
 import { sdb } from "#worker/db";
 import { db } from "#app/db";
 
@@ -14,11 +14,110 @@ const TRACK_BUFFERED_TIME = 500;
 
 /**
  * @author SNIPPIK
+ * @description Резолвер ресурсов с поддержкой экспоненциальной паузы и защитой от утечек
+ * @class ResourceResolver
+ * @private
+ */
+class ResourceProvider {
+    constructor(
+        private readonly prepare: (track: Track) => Promise<string | Error>,
+        private readonly options = { retries: 3, initialDelay: 70 }
+    ) {}
+
+    /**
+     * @description Пытается разрешить путь к ресурсу, плавно увеличивая паузы при ошибках
+     * @public
+     */
+    public async resolve(track: Track): Promise<string | Error> {
+        let lastError: Error | string = "Unknown error";
+
+        for (let attempt = 0; attempt < this.options.retries; attempt++) {
+            // Пытаемся подготовить ресурс
+            const result = await this.prepare(track);
+
+            // Если успех — сразу отдаем результат
+            if (typeof result === "string") {
+                track.link = result;
+                return result;
+            }
+
+            // Если ошибка — логируем и готовимся к следующей попытке
+            lastError = result;
+            track.link = null; // Сбрасываем битую ссылку, чтобы prepare искал заново
+
+            // Если это не последняя попытка — ждем (Exponential Backoff)
+            if (attempt < this.options.retries - 1) {
+                const delay = this.options.initialDelay * Math.pow(2, attempt);
+                await this.sleep(delay);
+            }
+        }
+
+        return lastError instanceof Error
+            ? lastError
+            : new Error(`[ResourceResolver]: Max retries reached. Last error: ${lastError}`);
+    }
+
+    private sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description
+ * @class TrackResolvers
+ * @private
+ */
+class TrackResolvers {
+    protected static providers = {
+        /**
+         * @description Lyrics провайдер для получения текста трека
+         * @public
+         */
+        //lyrics: new LyricsProvider(),
+
+        /**
+         * @description Провайдеры для поддержания аудио и прочего
+         * @public
+         */
+        audio: new ResourceProvider(async (track) => {
+            // Проверка кеша (мгновенно)
+            if (sdb.audio_saver?.status(track).status === "ended") {
+                return sdb.audio_saver?.status?.(track)?.path;
+            }
+
+            // Если ссылки нет — ищем через API
+            if (!track.link) {
+                const song = await db.api.fetchAudioLink(track);
+                if (song instanceof Error) return song;
+                else if (!song) return Error("No link found")
+
+                track.link = song.link;
+                track.proxy = song.api.proxy;
+            }
+
+            // Проверяем HTTP HEAD (если это ссылка)
+            if (track.link.startsWith("http")) {
+                const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null });
+                const status = await client.toHead;
+                const error = httpsStatusCode.parse(status);
+
+                if (error) return error; // Резолвер поймает это, обнулит ссылку и вызовет prepare снова
+                if (sdb.audio_saver) sdb.audio_saver.add(track);
+            }
+
+            return track.link;
+        })
+    };
+}
+
+/**
+ * @author SNIPPIK
  * @description Базовый класс трека, для использования трека. Трек не привязан к чему либо!
  * @class Track
+ * @extends TrackResolvers
  * @public
  */
-export class Track {
+export class Track extends TrackResolvers {
     /**
      * @description Здесь хранятся данные времени трека
      * @protected
@@ -35,7 +134,31 @@ export class Track {
      * @description Пользователя включивший трек
      * @protected
      */
-    protected _user: Track.user;
+    protected _user: {
+        /**
+         * @description ID пользователя
+         * @readonly
+         */
+        readonly id: string;
+
+        /**
+         * @description Имя/ник пользователя
+         * @readonly
+         */
+        readonly username: string;
+
+        /**
+         * @description Ссылка на аватар пользователя
+         * @readonly
+         */
+        readonly avatar?: string | null;
+    };
+
+    /**
+     * @description Можно ли включать трек с другого ip адреса
+     * @public
+     */
+    public proxy: boolean = false;
 
     /**
      * @description Идентификатор трека
@@ -73,7 +196,7 @@ export class Track {
         // Удаляем лишнее скобки
         const title = `[${this._track.title.substring(0, 45)}](${this.url})`;
 
-        if (this._api.name === "YOUTUBE") return `\`\`${this._duration.split}\`\` ${title}`;
+        if (this._api?.name === "YOUTUBE") return `\`\`${this._duration.split}\`\` ${title}`;
         return `\`\`${this._duration.split}\`\` [${this.artist.title}](${this.artist.url}) - ${title}`;
     };
 
@@ -202,31 +325,8 @@ export class Track {
      * @return Promise<string | Error>
      * @public
      */
-    public get resource(): Promise<string | Error> {
-        return new Promise(async (resolve) => {
-            for (let i = 0; i <= 2; i++) {
-                const resource = await _prepareResource(this);
-
-                // Если произошла ошибка при получении ресурса
-                if (resource instanceof Error || !resource) {
-                    this.link = null;
-
-                    // Если уже нельзя повторить
-                    if (i === 2) return resolve(resource);
-                }
-
-                else {
-                    this.link = resource;
-                    break;
-                }
-            }
-
-            // Если не удалось получить аудио ссылку
-            if (!this.link) return resolve(new Error("AudioError\n - Do not getting audio link!"));
-
-            // Отдаем ссылку или путь до файла
-            return resolve(this.link);
-        });
+    public get resource() {
+        return Track.providers.audio.resolve(this);
     };
 
     /**
@@ -234,24 +334,22 @@ export class Track {
      * @return Promise<string | Error>
      * @public
      */
-    public get lyrics(): Promise<string | Error> {
+    public get lyrics() {
         return new Promise(async (resolve) => {
             // Выдаем повторно текст песни
             if (this._lyrics || this._duration.total === 0) return resolve(this._lyrics);
 
-            const api = await Promise.race(
-                [
-                    await new httpsClient({
-                        url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(this._track.artist.title)}&track_name=${encodeURIComponent(this._track.title)}`,
-                        userAgent: `(${name}; ${version}) ${homepage}`
-                    }).toJson,
+            // Если ответ не был получен от сервера
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Timeout server request")), 10e3)
+            );
 
-                    // Если ответ не был получен от сервера
-                    new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error("Timeout server request")), 10e3)
-                    )
-                ]
-            ) as json | Error;
+            let api = await Promise.race([await new httpsClient(
+                {
+                    url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(this.artist.title)}&track_name=${encodeURIComponent(this.name)}`,
+                    userAgent: "UnTitles 0.5.0, Music bot, github.com/SNIPPIK/UnTitles"
+                }
+            ).toJson, timeoutPromise]) as json | Error;
 
             // Если получаем вместо данных ошибку
             if (api instanceof Error) return resolve(api);
@@ -268,14 +366,6 @@ export class Track {
     };
 
     /**
-     * @description Поставщик текстов песен
-     * @public
-     */
-    public get lyricsProvider() {
-        return "lrclib.net"
-    };
-
-    /**
      * @description Трек может быть буферизирован?
      * @public
      */
@@ -287,75 +377,29 @@ export class Track {
     /**
      * @description Создаем трек
      * @param _track - Данные трека с учетом <Song.track>
-     * @param _api   - Данне о платформе
+     * @param _api   - Данные о платформе
      * @public
      */
-    public constructor(protected _track: Track.data, protected _api: RestServerSide.APIBase) {
+    //@ts-ignore
+    public constructor(protected _track: Track.data, protected _api: RestServerSide.API = {
+        name: null,
+        color: Colors.Aqua,
+        url: null,
+        audio: true,
+        filter: null,
+        requests: null,
+        proxy: null,
+        options: null,
+        agent: null
+    }) {
+        super();
         this.time = _track?.time as any;
+        this.proxy = _api?.proxy ?? false;
 
         // Удаляем мусорные названия из текста
         if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic|[\/()\[\]"]|[:;]/gi, "");
         _track.title = `${_track.title}`.replace(/Lyrics Video|[\/()\[\]"]|[:;]/gi, "");
     };
-}
-
-/**
- * @description Функция подготавливающая путь до аудио, так же проверяющая его актуальность
- * @returns Promise<string | Error>
- * @private
- */
-async function _prepareResource(track: Track): Promise<string | Error> {
-    // Если включено кеширование
-    if (sdb.audio_saver) {
-        const status = sdb.audio_saver.status(track);
-
-        // Если есть кеш аудио, то выдаем его
-        if (status.status === "ended") {
-            track.link = status.path;
-            return status.path;
-        }
-    }
-
-    const link = track.link;
-
-    // Если есть данные об исходном файле
-    if (link) {
-        // Проверяем ссылку на актуальность
-        if (link.startsWith("http")) {
-            try {
-                const status = await new httpsClient({url: link}).toHead;
-                const error = httpsStatusCode.parse(status);
-
-                // Если получена ошибка
-                if (error) return error;
-
-                // Добавляем трек в кеширование
-                if (sdb.audio_saver) sdb.audio_saver.add(track);
-                return link;
-            } catch (err) { // Если произошла ошибка при проверке статуса
-                return Error(`Unknown error, ${err}`);
-            }
-        }
-
-        // Скорее всего это файл
-        return link;
-    }
-
-    // Если нет ссылки на исходный файл
-    try {
-        const song = await db.api.fetchAudioLink(track);
-
-        // Если вместо ссылки получили ошибку
-        if (song instanceof Error) return song;
-
-        // Если платформа не хочет давать данные трека
-        else if (!song) return Error(`The platform does not provide a link`);
-
-        track.link = song;
-        return _prepareResource(track);
-    } catch (err) {
-        return Error(`This link track is not available... Fail update link!`);
-    }
 }
 
 /**
@@ -378,152 +422,4 @@ interface TrackDuration {
      * @private
      */
     total: number;
-}
-
-/**
- * @author SNIPPIK
- * @description Все интерфейсы для работы с системой треков
- * @namespace Track
- * @public
- */
-export namespace Track {
-    /**
-     * @description Данные трека для работы класса
-     * @interface data
-     */
-    export interface data {
-        /**
-         * @description Уникальный id трека
-         * @readonly
-         */
-        readonly id: string
-
-        /**
-         * @description Название трека
-         * @readonly
-         */
-        title: string;
-
-        /**
-         * @description Ссылка на трек, именно на трек
-         * @readonly
-         */
-        readonly url: string;
-
-        /**
-         * @description Данные об авторе трека
-         */
-        artist: artist;
-
-        /**
-         * @description База с картинками трека и автора
-         */
-        image: string;
-
-        /**
-         * @description Данные о времени трека
-         */
-        time: {
-            /**
-             * @description Общее время трека
-             */
-            total: string;
-
-            /**
-             * @description Время конвертированное в 00:00
-             */
-            split?: string;
-        }
-
-        /**
-         * @description Данные об исходном файле, он же сам трек
-         */
-        audio?: string;
-    }
-
-    /**
-     * @description Пример получаемого плейлиста
-     * @interface list
-     */
-    export interface list {
-        /**
-         * @description Уникальный id листа
-         * @readonly
-         */
-        readonly id: string;
-
-        /**
-         * @description Ссылка на плейлист
-         * @readonly
-         */
-        readonly url: string;
-
-        /**
-         * @description Название плейлиста
-         * @readonly
-         */
-        readonly title: string;
-
-        /**
-         * @description Что в себе содержит плейлист
-         */
-        items: Track[];
-
-        /**
-         * @description Картинка автора плейлиста
-         */
-        image: string;
-
-        /**
-         * @description Данные об авторе плейлиста
-         */
-        artist?: artist;
-    }
-
-    /**
-     * @description Данные об авторе трека или плейлиста
-     * @interface artist
-     */
-    export interface artist {
-        /**
-         * @description Ник/имя автора трека
-         * @readonly
-         */
-        title: string;
-
-        /**
-         * @description Ссылка на автора трека
-         * @readonly
-         */
-        readonly url: string;
-
-        /**
-         * @description Картинка артиста трека
-         */
-        image?: string;
-    }
-
-    /**
-     * @description Данные о пользователе для отображения об пользователе включившем трек
-     * @interface user
-     */
-    export interface user {
-        /**
-         * @description ID пользователя
-         * @readonly
-         */
-        readonly id: string;
-
-        /**
-         * @description Имя/ник пользователя
-         * @readonly
-         */
-        readonly username: string;
-
-        /**
-         * @description Ссылка на аватар пользователя
-         * @readonly
-         */
-        readonly avatar?: string | null;
-    }
 }

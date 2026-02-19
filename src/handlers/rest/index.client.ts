@@ -1,5 +1,5 @@
 import type { RestServerSide } from "./index.server";
-import type { APIRequests } from "./index";
+import type { APIRequestsKeys } from "./index";
 import { db } from "#app/db";
 
 /**
@@ -15,12 +15,24 @@ export namespace RestClientSide {
      * @public
      */
     export interface ClientOptions {
-        platform: RestServerSide.APIBase;
-        type: keyof APIRequests;
+        // Платформа
+        platform: RestServerSide.API;
 
+        // Тип запроса
+        type: APIRequestsKeys;
+
+        // Номер запроса
         requestId?: string;
+
+        // Данные запроса
         payload: string;
-        options?: { audio?: boolean; };
+
+        // Вспомогательные параметры
+        options?: {
+
+            // Надо ли получить аудио
+            audio?: boolean;
+        };
     }
 
     /**
@@ -86,23 +98,23 @@ export namespace RestClientSide {
          * @param payload - Данные для отправки
          * @param options - Параметры для отправки
          */
-        public request<T extends keyof APIRequests>(payload: string, options?: { audio: boolean }) {
+        public request<T extends APIRequestsKeys>(payload: string, options?: { audio: boolean }) {
             const platform  = this._api;
-            const type = platform.requests.find((item) => {
-                return item.name === payload || typeof payload === "string" && payload.startsWith("http") && item.filter?.test(payload) || item.name === "search"
-            })?.name;
+            const type = platform.requests.find((item) =>
+                item.name === payload || typeof payload === "string" && payload.startsWith("http") && item.filter?.test(payload) || item.name === "search"
+            )?.name || "all";
 
             return {
                 // Получение типа запроса
                 type,
 
                 // Функция запроса на Worker для получения данных
-                request: () => db.api["request_worker"]<T>(
+                request: () => db.api.request_worker<T>(
                     {
                         platform, payload, options, type
                     }
                 )
-            }
+            };
         };
     }
 }

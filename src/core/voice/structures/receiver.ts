@@ -116,7 +116,7 @@ export class VoiceReceiver extends TypedEmitter<VoiceReceiverEvents> {
         );
          */
 
-        let packet = this.voice.sRTP.packet(Buffer.concat([header, encrypted, this.voice.sRTP["_nonce"]]));
+        let packet = this.voice.sRTP.packet(Buffer.concat([header, encrypted, this.voice.sRTP["_nonceBuffer"]]));
 
         // Если нет аудио
         if (!packet) return null;

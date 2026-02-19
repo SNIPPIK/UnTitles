@@ -1,7 +1,6 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
 import { sdb } from "#worker/db";
-import { env } from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -26,8 +25,8 @@ import { env } from "#app/env";
     color: 1420288,
     url: "open.spotify.com",
     audio: false,
-    auth: env.get("token.spotify", null),
-    filter: /^(https?:\/\/)?(open\.)?(m\.)?(spotify\.com|spotify\.?ru)\/.+$/i
+    auth: true,
+    filter: /^(https?:\/\/)?(open\.)?(m\.)?(spotify\.com|spotify\.?ru|spotify)\/.+$/i
 })
 @OptionsRest({
     /**
@@ -63,7 +62,7 @@ class RestSpotifyAPI extends RestServerSide.API {
          */
         {
             name: "track",
-            filter: /track\/[0-9z]+/i,
+            filter: /track\/[a-zA-Z0-9]+/i,
             execute: async (url, options) => {
                 const ID = this.getID(/track\/[a-zA-Z0-9]+/, url)?.split("track\/")?.pop();
 
@@ -135,7 +134,7 @@ class RestSpotifyAPI extends RestServerSide.API {
          */
         {
             name: "album",
-            filter: /album\/[0-9z]+/i,
+            filter: /album\/[a-zA-Z0-9]+/i,
             execute: async (url, {limit}) => {
                 const ID = this.getID(/album\/[a-zA-Z0-9]+/, url)?.split("album\/")?.pop();
 
@@ -144,7 +143,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                 try {
                     // Создаем запрос
-                    const api: Error | any = await this.API(`albums/${ID}?offset=0&limit=${limit}`);
+                    const api: Error | any = await this.API(`albums/${ID}?offset=0&limit=${Math.min(limit, 100)}`);
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
@@ -172,7 +171,7 @@ class RestSpotifyAPI extends RestServerSide.API {
          */
         {
             name: "playlist",
-            filter: /playlist\/[0-9z]+/i,
+            filter: /playlist\/[a-zA-Z0-9]+/i,
             execute: async (url, {limit}) => {
                 const ID = this.getID(/playlist\/[a-zA-Z0-9]+/, url)?.split("playlist\/")?.pop();
 
@@ -181,7 +180,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                 try {
                     // Создаем запрос
-                    const api: Error | any = await this.API(`playlists/${ID}?offset=0&limit=${limit}`);
+                    const api: Error | any = await this.API(`playlists/${ID}?offset=0&limit=${Math.min(limit, 100)}`);
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
@@ -206,7 +205,7 @@ class RestSpotifyAPI extends RestServerSide.API {
          */
         {
             name: "artist",
-            filter: /artist\/[0-9z]+/i,
+            filter: /artist\/[a-zA-Z0-9]+/i,
             execute: async (url, {limit}) => {
                 const ID = this.getID(/artist\/[a-zA-Z0-9]+/, url)?.split("artist\/")?.pop();
 
@@ -255,27 +254,26 @@ class RestSpotifyAPI extends RestServerSide.API {
      * @param method - Метод запроса из api
      * @protected
      */
-    protected API = (method: string): Promise<json | Error> => {
-        return new Promise(async (resolve) => {
-            // Нужно обновить токен
-            if (!this.options.token || this.options.time <= Date.now()) await this.authorization();
+    protected API = async (method: string): Promise<json | Error> => {
+        // Нужно обновить токен
+        if (!this.options.token || this.options.time <= Date.now()) await this.authorization();
 
-            new httpsClient({
-                url: `${this.options.api}/${method}`,
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Authorization": "Bearer " + this.options.token
-                }
-            }).toJson.then((api) => {
-                // Если на этапе получение данных получена одна из ошибок
-                if (!api) return resolve(locale.err("api.request.fail"));
-                else if (api instanceof Error) return resolve(api);
-                else if (api.error) return resolve(locale.err("api.request.fail.msg", [api.error.message]));
+        return new httpsClient({
+            url: `${this.options.api}/${method}`,
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": "Bearer " + this.options.token
+            },
+            agent: this.agent
+        }).toJson.then((api) => {
+            // Если на этапе получение данных получена одна из ошибок
+            if (!api) return locale.err("api.request.fail");
+            else if (api instanceof Error) return api;
+            else if (api.error) return locale.err("api.request.fail.msg", [api.error.message]);
 
-                return resolve(api);
-            }).catch((err) => {
-                return resolve(Error(`[APIs]: ${err}`));
-            });
+            return api;
+        }).catch((err) => {
+            return Error(`[APIs]: ${err}`);
         });
     };
 
@@ -283,7 +281,7 @@ class RestSpotifyAPI extends RestServerSide.API {
      * @description Авторизация на spotify
      * @protected
      */
-    protected async authorization(): Promise<Error> {
+    protected async authorization(): Promise<Error | string> {
         const token = await new httpsClient({
             url: `${this.options.account}/token`,
             headers: {
@@ -291,12 +289,13 @@ class RestSpotifyAPI extends RestServerSide.API {
                 "Content-Type": "application/x-www-form-urlencoded"
             },
             body: "grant_type=client_credentials",
-            method: "POST"
+            method: "POST",
+            agent: this.agent
         }).toJson;
 
         // Если при получении токена была получена ошибка
         if (token instanceof Error) {
-            return this.authorization();
+            return new Error(`[APIs]: ${token}`);
         }
 
         // Вносим данные авторизации

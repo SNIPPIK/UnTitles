@@ -1,10 +1,11 @@
-import { ControllerTracks, ControllerVoice, Track } from "#core/queue";
-import { QueueMessage, QueueButtons } from "../modules/message";
-import { CommandInteraction } from "#structures/discord";
-import { VoiceConnection } from "#core/voice";
-import { AudioPlayer } from "#core/player";
-import { Logger } from "#structures";
-import { db } from "#app/db";
+import {ControllerTracks, ControllerVoice, Track} from "#core/queue";
+import {QueueButtons, QueueMessage} from "../modules/message";
+import {CommandInteraction} from "#structures/discord";
+import {VoiceConnection} from "#core/voice";
+import {AudioPlayer} from "#core/player";
+import {Logger} from "#structures";
+import {db} from "#app/db";
+import {SpeakerType} from "#core/voice/modules/Speaker";
 
 /**
  * @author SNIPPIK
@@ -57,12 +58,16 @@ class ControllerPlayer<T extends AudioPlayer> {
         this._player = new AudioPlayer(this.tracks, this.voice, guild_id) as T;
 
         // Подключаемся к голосовому каналу
-        this.voice.connection = db.voice.join({
+        const voice = db.voice.join({
             guild_id, channel_id,
             self_deaf: true,
-            self_mute: false
+            self_mute: false,
+            self_speaker: SpeakerType.priority
         }, db.adapter.voiceAdapterCreator(guild_id));
-    }
+
+        this.voice.connection = voice;
+        voice.on("log", status => Logger.log("LOG", status));
+    };
 
     /**
      * @description Удаляем данные плеера и подмодулей
@@ -151,9 +156,6 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
             guild_id: ID,
             channel_id: queue_message.voice_id
         });
-
-        // Добавляем очередь в список очередей
-        db.queues.set(ID, this);
 
         // Добавляем данные в класс
         this.message = queue_message;

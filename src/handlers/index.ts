@@ -10,12 +10,15 @@ import fs from "node:fs";
  * @public
  */
 export abstract class handler<T = unknown> {
-    /** Загруженные файлы, именно файлы не пути к файлам */
-    private _files = new SetArray<T>();
+    /**
+     * @description Загруженные файлы, именно файлы не пути к файлам
+     * @readonly
+     * @private
+     */
+    private readonly _files = new SetArray<T>();
 
     /**
      * @description Выдаем все загруженные файлы
-     * @returns SetArray<T>
      * @protected
      */
     protected get files() {
@@ -24,7 +27,6 @@ export abstract class handler<T = unknown> {
 
     /**
      * @description Кол-во загруженных элементов
-     * @returns number
      * @public
      */
     public get size() {
@@ -34,14 +36,12 @@ export abstract class handler<T = unknown> {
     /**
      * @description Даем классу необходимые данные
      * @param directory - Имя директории
-     * @constructor
      * @protected
      */
-    protected constructor(private directory: string) {};
+    protected constructor(private readonly directory: string) {};
 
     /**
      * @description Загружаем директории полностью, за исключением index файлов
-     * @returns void
      * @protected
      */
     protected load = () => {
@@ -63,8 +63,6 @@ export abstract class handler<T = unknown> {
     /**
      * @description Поиск файлов загрузки
      * @param dirPath - Путь до директории
-     * @returns void
-     * @private
      */
     private _loadRecursive = (dirPath: string) => {
         const entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -77,8 +75,11 @@ export abstract class handler<T = unknown> {
 
             // Если это файл
             else if (entry.isFile()) {
-                // Если это не файл ts или js, не загружаем index файлы (они являются загрузочными)
-                if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js") || entry.name.startsWith("index")) continue;
+                // Если это не файл ts или js
+                if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) continue;
+
+                // Не загружаем index файлы (они являются загрузочными)
+                if (entry.name.startsWith("index")) continue;
 
                 this._push(fullPath);
             }
@@ -88,11 +89,9 @@ export abstract class handler<T = unknown> {
     /**
      * @description Добавляем загруженный файл в коллекцию файлов
      * @param path - Путь до файла
-     * @returns void
-     * @private
      */
     private _push = (path: string) => {
-        const imported: { default?: T } | json = require(path);
+        const imported = require(path);
 
         // Удаляем кеш загружаемого файла
         delete require.cache[require.resolve(path)];
@@ -108,7 +107,6 @@ export abstract class handler<T = unknown> {
                 if (obj.prototype) this._files.add(new obj(null));
                 else this._files.add(obj);
             }
-
             return;
         }
 

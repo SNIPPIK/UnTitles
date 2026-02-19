@@ -1,6 +1,5 @@
-import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
+import {APIRequestData, DeclareRest, OptionsRest, RestServerSide} from "#handler/rest";
 import { httpsClient, locale } from "#structures";
-import type { Track } from "#core/queue";
 import { sdb } from "#worker/db";
 
 /**
@@ -118,6 +117,7 @@ const Clients = {
     url: "youtube.com",
     filter: /https?:\/\/(?:youtu\.be|(?:(?:www|m|music|gaming)\.)?youtube\.com)/i,
     audio: true,
+    auth: false,
     color: 16711680
 })
 @OptionsRest({
@@ -389,9 +389,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     if (vanilla_videos?.length === 0 || !vanilla_videos) return locale.err("api.request.fail");
 
                     const filtered_ = vanilla_videos?.filter((video: json) => video && video?.["videoRenderer"])?.splice(0, limit);
-                    const videos: Track.data[] = filtered_.map(({ videoRenderer }: json) => this.track(videoRenderer));
-
-                    return videos;
+                    return filtered_.map(({videoRenderer}: json) => this.track(videoRenderer));
                 } catch (e) {
                     console.error(e);
                     return new Error(`[APIs]: ${e}`);
@@ -420,7 +418,8 @@ class RestYouTubeAPI extends RestServerSide.API {
                 body: JSON.stringify({
                     ...client.request,
                     "videoId": ID
-                })
+                }),
+                agent: this.agent
             })
                 // Получаем исходную страницу
                 .toJson
@@ -521,11 +520,12 @@ class RestYouTubeAPI extends RestServerSide.API {
      * @param name - Название канала, если не будет найден канал будет возвращено название
      * @protected
      */
-    protected restArtist = ({ id, name }: { id: string, name?: string }): Promise<Track.artist> => {
-        return new Promise<Track.artist>((resolve) => {
+    protected restArtist = ({ id, name }: { id: string, name?: string }): Promise<APIRequestData.Artist> => {
+        return new Promise((resolve) => {
             new httpsClient({
                 url: `https:/${this.url}/channel/${id}/channels?flow=grid&view=0&pbj=1`,
-                headers: Clients.WEB.request.context.client
+                headers: Clients.WEB.request.context.client,
+                agent: this.agent
             }).toJson.then((channel) => {
                 if (channel instanceof Error) return resolve(null);
 

@@ -1,8 +1,8 @@
 <div align="center">
-  <h1>🌟 Discord Music Bot 💫</h1>
+  <h1>🌟 Discord Music Bot</h1>
 
 <h4>Incredible bot with its own voice/audio engine, scalable architecture, multiple filters and support for 6 music platforms.</h4>
-<h4>Audio quality surpasses lavalink and used E2EE 🔐, don't believe me? Listen for yourself! Works without any drops even on ARM!</h4>
+<h4>Audio quality surpasses lavalink, don't believe me? Listen for yourself!</h4>
 
   <p>
     English
@@ -22,6 +22,9 @@
     <a href="LICENSE.md">
       <img src="https://img.shields.io/badge/License-BSD3-green?style=for-the-badge" alt="License" />
     </a>
+    <a href="https://github.com/SNIPPIK/Untitles/releases/latest">
+      <img src="https://img.shields.io/github/v/release/SNIPPIK/Untitles?logo=git&style=for-the-badge&include_prereleases&label=Release" alt="Latest release" />
+    </a>
     <a href="https://github.com/SNIPPIK/Untitles/releases">
       <img src="https://img.shields.io/github/downloads/SNIPPIK/Untitles/total?logo=github&style=for-the-badge&label=Downloads" alt="All downloads" />
     </a>
@@ -33,148 +36,148 @@
 
 ---
 
-## 👥 Authors
+## 👥 Contributors
 
 - 👤 [`SNIPPIK`](https://github.com/SNIPPIK)
-- 💡 [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS) — ideas and suggestions
 
-📢 Please report any errors or omissions in [`Issues`](https://github.com/SNIPPIK/UnTitles/issues) or [`Discord`](https://discord.gg/qMf2Sv3)  
-🚫 The bot does not work **24/7** — it may be unavailable!
+📢 Please report any errors or omissions to [`Issues`](https://github.com/SNIPPIK/UnTitles/issues) or [`Discord`](https://discord.gg/qMf2Sv3)
+🚫 The bot doesn't work 24/7 — it may be unavailable!
 
 [![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
 [![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
 
 > [!WARNING]
-> ⚠️ WatKLOK (UnTitles) is a complex technical project maintained exclusively by 1 author, `SNIPPIK`  
+> ⚠️ WatKLOK (UnTitles) is a complex technical project that is supported exclusively by 1 author by `SNIPPIK`
 > Incorrect use, removal of authorship, or attribution will result in the closure of the public repository.
 >
-> Audio issues  
-> If your internet connection is unstable, losses will occur regardless.  
+> Audio issues
+> If your internet connection is unstable, losses will occur regardless.
 > It is impossible to completely eliminate `packet lost` due to the `UDP` protocol and other `discord` limitations.
 
 > [!TIP]
-> I recommend enabling the caching system in `.env`. This will allow tracks to be played even with a complete platform lock.  
+> I recommend enabling the caching system in `.env`. This way, you can play tracks even if the platform is completely blocked.
 > However, the voice system is simply not allowed to lose audio packets, even under critical load!
 
+> [!WARNING]
+> If you use a proxy, keep in mind that `FFmpeg` does not support socks. [`STH`](https://github.com/SNIPPIK/SHS) is available for such tasks.
+> Something may not work if you configured it incorrectly!!!
 ---
 
-### ⚠️ Hardware requirements | Data from Ryzen 7 5700x3D | 1 player
-- CPU: `0-0.1%`
-- RAM: `~80 MB`, it all depends on the number of tracks, platform load, discord cache!
-- Disk: `~50 MB`, `200 GB` is enough for caching (1.5k tracks ~1.2 GB)
+### ⚠️ Hardware Requirements | Data from Ryzen 7 5700x3D | 1 player
+- CPU: 0-0.1%
+- RAM: ~80 MB, depends on the number of tracks, platform load, and Discord cache!
+- Disk: ~50 MB, 200 GB is enough for caching (1.5k tracks ~1.2 GB)
 
 ---
 
-# 🎧 Main features
+# 🎧 Key Features
 #### 🎖️ Features
-- Not afraid of the event loop, even in this case the sound goes smoothly!!!
+- Event loop-resistant, so even in this case, the audio plays smoothly!!!
 ```ts
 setInterval(() => {
-const startBlock = performance.now();
-while (performance.now() - startBlock < 100) {}
-}, 200);
+  const startBlock = performance.now();
+  while (performance.now() - startBlock < 100) {}
+}, 60);
+
+setInterval(() => {
+  const startBlock = performance.now();
+  while (performance.now() - startBlock < 100) {}
+}, 80);
+
+setInterval(() => {
+  const startBlock = performance.now();
+  while (performance.now() - startBlock < 100) {}
+}, 120);
+
+setInterval(() => {
+  const startBlock = performance.now();
+  while (performance.now() - startBlock < 100) {}
+}, 100);
 ```
-#### 🔊 Voice engine
+#### 🔊 Voice Engine
 - Implementation of [**Voice Gateway Version 8**](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/core/voice) + [**End-to-End Encryption (E2EE 🔐)**](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
-- Full implementation of **SRTP**: `aead_aes256_gcm`, `xchacha20_poly1305` (via libraries)
-- Best audio player compared to **open source** solutions!
-- Does not require any opus encoders/decoders, has its own opus encoder by parsing method!
-- Adaptive `jitter buffer`, takes into account both network delays and process latency!
-- Automatic voice connection delay calibration to maintain network delays.
-- Requires **FFmpeg**, it is responsible for audio and filters!
-- Supported: Autoplay, Repeat, Shuffle, Replay and more functions
-- Works even with strong **event loop lag**!
+- Full **SRTP** implementation: `aead_aes256_gcm`, `xchacha20_poly1305` (via libraries)
+- A better audio player compared to **open source** solutions
+- Does not require any opus encoders/decoders, has its own opus encoder using the parsing method!
+- Requires FFmpeg, which is responsible for audio and filters!
+- Supported: Autoplay, Repeat, Shuffle, Replay, and other functions.
+- Works even with severe event loop lag!
 #### 🎵 Audio
-- It is possible to reuse audio without conversion if it is less than 8 minutes long
-- Smooth **fade-in/fade-out** transition between tracks, even with **skip**, **seek** and **tp**.
-- There is a system of smooth transition from one audio to another `Hot audio swap`
-- 16+ filters, you can add your own without complex digging in the code [**filters**](src/core/player/filters.json)
-- There is support for long videos, Live video is still raw.
-- There is an explicit synchronization of the audio stream, without audio filters!
+- Audio can be reused without conversion if it's less than 8 minutes long.
+- Smooth fade-in/fade-out transitions between tracks, even with skip, seek, and other actions.
+- Hot audio swap for smooth transitions from one audio track to another.
+- 16+ filters, you can add your own without digging into the code [**filters**](src/core/player/filters.json)
+- Support for long videos, including Live, is still a bit rough.
+- Explicit audio stream synchronization is present, without audio filters!
 #### 🌐 Platforms
-- Supported platforms: `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
-- Audio: `YouTube`, `VK`, `Yandex-Music` (MP3 + Lossless), `SoundCloud`
-- Audio search on other platforms is available, even if the platform refuses to serve audio!
-- Completely `fallback` system: a track missing on one platform will be found on another! Errors are not a problem!
-- Related support `(including related tracks)` is available.
-- Platforms run in a separate worker `(thread)` for performance.
-- Everything is described in detail, with examples and a ton of interfaces for typing.
-- Easy extension and addition of new platforms via the `Dynamic Loader - Handler`.
+- Supported: YouTube, Spotify, VK, Yandex Music, SoundCloud, Deezer
+- Audio: YouTube, VK, Yandex Music, SoundCloud
+- Audio search on other platforms is available, even if the platform doesn't want to serve audio!
+- Completely fallback system: no track on one platform will be found on another!
+- Related support (including related tracks) is available.
+- Platforms run in a separate worker (thread) for better performance.
+- Everything is described in detail, with examples and a bunch of interfaces for typing.
+- Easy to extend and adding new platforms via the Dynamic Loader - Handler
 #### 🌍 Localization
-- Available languages: `English`, `Russian` ([**file with languages**](src/structures/locale/languages.json))
-- You can add any language supported by discord
-
----
-
-# 🔩 Other functionality
-#### Own system [**handlers**](src/handlers)
-- Universal loader: [`commands`](src/handlers/commands), [`events`](src/handlers/events), [`components`](src/handlers/components), [`middlewares`](src/handlers/middlewares), [`rest`](src/handlers/rest)
-- Own framework for commands, buttons, menu selectors, events
-- Decorators and interfaces are used, including typing
-- Support for "hot" reloading
-
-#### 💡 Adaptive loop
-- It is not afraid of **event loop** and **drift**, it just takes them into account not as a problem, but as parameters!
-- The loop can work ahead from 0 to 2 ms to process objects in the loop!
-- Works on its own calculations, not on `newTime - oldTime`, calculations of function delay, discrepancies after execution, etc.
-- Cycle accuracy `±0.05 ms` with `process.hrtime` + `performance.now`
-
-#### ⚙️ Internal tools
-- [`SetArray`](src/structures/array/index.set.ts) - 2 in one Array and Set in one class
-- [`Cycle`](src/structures/tools/Cycle.ts) - Manages the message update system and sending audio packets
-- [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - Custom event emitter based object
-- [`SimpleWorker`](src/structures/tools/SimpleWorker.ts) - Class for working with threads
+- Available languages: English, Russian ([**language file**](src/structures/locale/languages.json))
+- You can add any language supported by Discord
 
 ---
 
 ## 🎛 Interface
-- Interactive buttons: actions depend on the player state
-- Progress bar support with time codes
-- Responsive UI - does not require reusing commands
+- Interactive buttons: actions depend on the player's state
+- Progress bar support with timecodes
+- Responsive UI - no command reuse required
 
 #### 📚 Commands
-|   Command | Autocomplete | Arguments                       | Description        |
-|----------:|:-------------|:--------------------------------|:-------------------|
-|    `/api` | ❌            | access:(block, unblock)         | API management     |
-|    `/bot` | ❌            | restart:(commands, bot, events) | Restart            |
-| `/filter` | ✅            | (off, push, disable)            | Audio filters      |
-|   `/play` | ✅            | (query)                         | Playback           |
-| `/player` | ✅            | (api, replay, stop, related)    | Advanced playback  |
-| `/volume` | ✅            | value                           | Player volume      |
-| `/remove` | ✅            | value                           | Delete track       |
-|   `/seek` | ❌            | 00:00, int                      | Seeking time track |
-|   `/skip` | ✅            | (back, to, next)                | Skip tracks        |
-| `/repeat` | ✅            | type                            | Type repeat        |
-|  `/queue` | ✅            | {destroy, list}                 | Queue management   |
-| `/avatar` | ✅            | {user}                          | User avatar        |
-|  `/voice` | ✅            | (join, leave, tribune)          | Voice channel      |
-| `/report` | ❌            | (none)                          | Contact developer  |
+|   Command | Autocomplete | Arguments                    | Description       |
+|----------:|:-------------|:-----------------------------|:------------------|
+| `/filter` | ✅            | (off, push, disable)         | Audio filters     |
+|   `/play` | ✅            | (query)                      | Playback          |
+| `/player` | ✅            | (api, replay, stop, related) | Advanced playback |
+| `/volume` | ✅            | value                        | Player volume     |
+| `/remove` | ✅            | value                        | Delete track      |
+|   `/seek` | ❌            | 00:00, int                   | Rewind track      |
+|   `/skip` | ✅            | (back, to, next)             | Skip tracks       |
+| `/repeat` | ✅            | type                         | Repeat type       |
+|  `/queue` | ✅            | {destroy, list}              | Queue management  |
+|  `/voice` | ✅            | (join, leave, tribune)       | Voice channel     |
 
 ---
-## 🚀 Quick start
-> You need Node.js and FFmpeg installed.  
+## 🚀 Quick Start
+> Node.js is required, as well as FFmpeg installed.
 > All parameters are specified in `.env`, don't forget to copy it to `.build` and customize it.
+
+
+> [!WARNING]
+> Since the project uses C++, a compiler will be required. MSVC for windows, CLANG for Linux, Mac or something else 
 ```shell
-# Clone
+# Cloning
 git clone https://github.com/SNIPPIK/UnTitles
 cd UnTitles
 
-# Install dependencies
+# Installing dependencies
 npm install
 
-# Run via Node.js
-# configure environment variables in build/.env
+# Running via Node.js
+# Setting environment variables in build/.env
 npm run build && npm run start
 ```
 
 ---
+<p>
+    <a href="">
+      <img src=".github/images/image.png" alt="Title" />
+    </a>
+</p>
+
 [![TypeScript](https://img.shields.io/badge/typescript-5.9.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/en)
-[![Discord.js](https://img.shields.io/badge/discord.js-14.24.2-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)
+[![Seyfert](https://img.shields.io/badge/seyfert-4.1.0-%23CB3837.svg?style=for-the-badge&logo=seyfert&logoColor=white&color=purple)](https://www.seyfert.dev)
 [![WS](https://img.shields.io/badge/ws-8.18.3-%23CB3837.svg?style=for-the-badge&logo=socket&logoColor=white)](https://www.npmjs.com/package/ws)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-7.*.*-%23CB3837.svg?style=for-the-badge&logo=ffmpeg&logoColor=white&color)](https://ffmpeg.org/)
 ---
 
-# 📊 Diagram of the entire project
-- In case you are interested in how the bot is built
-[<img align="center" alt="Diagram" width="" src=".github/images/src.png" />](.github/images/src.png)
+# 📊 Project Diagram
+- In case you're curious about how the bot is built,
+  [<img align="center" alt="Diagram" width="" src=".github/images/src.png" />](.github/images/src.png)

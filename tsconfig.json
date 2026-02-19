@@ -48,7 +48,10 @@
       "#app/db": ["./src/database/index"],
       "#app/env": ["./src/environment"],
 
-      "#worker/db": ["./src/database/index.worker"]
+      "#worker/db": ["./src/database/index.worker"],
+
+      // Нативные модули написанные на C++
+      "#native/*": ["./src/native/*"]
     }
   },
 

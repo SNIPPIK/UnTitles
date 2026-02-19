@@ -1,8 +1,8 @@
-import { BufferedEncoder, OPUS_FRAME_SIZE, PipeEncoder } from "./opus";
-import { Logger } from "#structures/logger";
+import { PipeEncoder, BufferedEncoder, OPUS_FRAME_SIZE } from "#core/audio";
 import { TypedEmitter } from "#structures";
 import type { Track } from "#core/queue";
 import { Process } from "./process";
+import { env } from "#app/env";
 import { db } from "#app/db";
 
 /**
@@ -63,6 +63,7 @@ class AudioBuffer {
      * @public
      */
     public get packet() {
+        // Если позиция больше допустимой
         if (this._position >= this.size) return null;
         return this._chunks[this._position++];
     };
@@ -72,8 +73,10 @@ class AudioBuffer {
      * @public
      */
     public clear = () => {
+        // Удаляем данные из Array
+        this._chunks = [];
         this._chunks.length = 0;
-        this._position = 0;
+        this._position = null;
     };
 }
 
@@ -153,8 +156,33 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 
         if (track.isBuffered) args.unshift("-accurate_seek");
 
+        // Если платформа не может играть нативно из сети
+        if (this.options.track.proxy && track.link.startsWith("http")) {
+            const proxy = env.get("APIs.proxy", null);
+
+            // Если есть прокси
+            if (proxy) {
+                const isSocks = proxy.startsWith("socks");
+
+                // Если протокол socks
+                if (isSocks) {
+                    const path = proxy.split(":/")[1];
+
+                    // Если нашлись данные для входа
+                    if (path.match(/@/)) {
+                        args.unshift("-http_proxy", `http:/${proxy.split(":/")[1].split("@")[1]}`);
+                    }
+
+                    // Если данных для входа нет
+                    else args.unshift("-http_proxy", `http:/${proxy.split(":/")[1]}`);
+                }
+
+                // Если протокол http
+                else args.unshift("-http_proxy", `http:/${proxy.split(":/")[1]}`);
+            }
+        }
+
         return [
-            "-vn",
             ...args,
             ...this.filters,
 
@@ -245,10 +273,8 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
      * @protected
      */
     public destroy() {
-        Logger.log("DEBUG", `[AudioResource] has destroyed`);
-
         // Чистим все потоки от мусора
-        this.emit("close");
+        this.emit("close", `[AudioResource] has destroyed`);
 
         // Удаляем все вызовы функций
         super.destroy();
@@ -282,7 +308,6 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get readable() {
-        if (!this._buffer) return false;
         return this._buffer.position !== this._buffer.size;
     };
 
@@ -304,7 +329,6 @@ export class BufferedAudioResource extends BaseAudioResource {
      * @public
      */
     public get packet(): Buffer {
-        if (!this._buffer) return null;
         return this._buffer.packet;
     };
 
@@ -319,31 +343,15 @@ export class BufferedAudioResource extends BaseAudioResource {
     };
 
     /**
-     * @description Изменяем время проигрывания трека
-     * @param seek - Время в сек
-     * @public
-     */
-    public set seek(seek: number) {
-        const index = (seek * 1e3) / OPUS_FRAME_SIZE;
-
-        // Если указано неподходящие значение
-        if (index < 0 || index >= this._buffer.size) {
-            this._buffer.position = 0;
-            return;
-        }
-
-        this._buffer.position = index;
-    };
-
-    /**
      * @description Создаем класс и задаем параметры
      * @constructor
      * @public
      */
     public constructor(config: AudioResourceOptions) {
         super(config);
+
         const decoder = new BufferedEncoder({
-            highWaterMark: 512 * 5 // Буфер на ~1:14
+            highWaterMark: 1024 * 5
         });
 
         // Расшифровщик
@@ -364,16 +372,14 @@ export class BufferedAudioResource extends BaseAudioResource {
             // Начало кодирования
             decode: (input) => {
                 input.on("frame", (packet: Buffer) => {
-                    if (this._buffer) {
-                        // Сообщаем что поток можно начать читать
-                        if (!this._readable) {
-                            this._readable = true;
-                            setImmediate(() => this.emit("readable"));
-                        }
-
-                        // Если создал класс буфера, начинаем кеширование пакетов
-                        if (packet) this._buffer.packet = packet;
+                    // Сообщаем что поток можно начать читать
+                    if (!this._readable) {
+                        this._readable = true;
+                        setImmediate(() => this.emit("readable"));
                     }
+
+                    // Если создал класс буфера, начинаем кеширование пакетов
+                    if (packet) this._buffer.packet = packet;
                 });
             }
         });
@@ -404,15 +410,6 @@ export class BufferedAudioResource extends BaseAudioResource {
     };
 
     /**
-     * @description Обновление потока, без потерь
-     * @public
-     */
-    /*public refresh = () => {
-        this._buffer.position = 0;
-        this._seek = 0;
-    };*/
-
-    /**
      * @description Удаляем ненужные данные
      * @public
      */
@@ -440,7 +437,7 @@ export class PipeAudioResource extends BaseAudioResource {
      * @private
      */
     private encoder = new PipeEncoder({
-        highWaterMark: 512 * 5 // Буфер на ~1:14
+        highWaterMark: 1024 * 5
     });
 
     /**
@@ -483,24 +480,6 @@ export class PipeAudioResource extends BaseAudioResource {
 
         const time = this.played * OPUS_FRAME_SIZE;
         return time / 1e3 + this.options.seek;
-    };
-
-    /**
-     * @description Изменяем время проигрывания трека
-     * @param seek - Время в сек
-     * @public
-     */
-    public set seek(seek: number) {
-        let steps = ((seek * 1e3) / OPUS_FRAME_SIZE);
-
-        // Если диапазон слишком мал или большой
-        if (steps >= 0 || steps > this.packets) return;
-
-        // Пропускаем аудио фреймы
-        do {
-            steps--;
-            this.encoder.read();
-        } while (steps > 0)
     };
 
     /**
@@ -576,7 +555,7 @@ export class PipeAudioResource extends BaseAudioResource {
  * @const ASSETRATE_MULTIPLIER_PATTERN
  * @private
  */
-const ASSETRATE_MULTIPLIER_PATTERN = /^asetrate=48000\*([\d\.]+)(?:,.*)?$/;
+const ASSETRATE_MULTIPLIER_PATTERN = /(?:^|,)asetrate=48000\*([\d\.]+)/;
 
 /**
  * @author SNIPPIK
@@ -585,7 +564,7 @@ const ASSETRATE_MULTIPLIER_PATTERN = /^asetrate=48000\*([\d\.]+)(?:,.*)?$/;
  * @const ATEMPO_MULTIPLIER_PATTERN
  * @private
  */
-const ATEMPO_MULTIPLIER_PATTERN = /^atempo=([\d\.]+)(?:,.*)?$/;
+const ATEMPO_MULTIPLIER_PATTERN = /(?:^|,)atempo=([\d\.]+)/;
 
 /**
  * @author SNIPPIK
@@ -706,7 +685,7 @@ interface AudioResourceEvents {
      * @description Событие при котором поток начнет уничтожатся
      * @readonly
      */
-    readonly "close": () => void;
+    readonly "close": (status?: string) => void;
 
     /**
      * @description Событие при котором поток получил ошибку

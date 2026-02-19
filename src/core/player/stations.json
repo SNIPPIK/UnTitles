@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Gachi",
+    "locale": {
+      "ru": "Радио станция со случайными гачи треками",
+      "en-US": "Radio station a randomize gachi tracks"
+    },
+    "url": "https://home.mashup.su/gachi"
+  },
+  {
+    "name": "Ultra",
+    "locale": {
+      "ru": "Радио станция со случайными ... треками",
+      "en-US": "Radio station a randomize ... tracks"
+    },
+    "url": "https://nashe1.hostingradio.ru:80/ultra-192.mp3"
+  },
+  {
+    "name": "Mashup",
+    "locale": {
+      "ru": "Радио станция со случайными ... треками",
+      "en-US": "Radio station a randomize ... tracks"
+    },
+    "url": "https://mashup.su/stream"
+  }
+]

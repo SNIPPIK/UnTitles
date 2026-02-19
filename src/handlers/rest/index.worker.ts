@@ -18,12 +18,13 @@ class RestServer extends handler<RestServerSide.API> {
      * @readonly
      * @public
      */
-    public readonly platforms: RestServerSide.Data = {
+    public readonly platforms: RestServerSide.Data & { array: RestServerSide.API[] } = {
         supported: {} as RestServerSide.APIs,
         authorization: [],
         audio: [],
         related: [],
-        block: []
+        block: [],
+        array: null
     };
 
     /**
@@ -34,10 +35,11 @@ class RestServer extends handler<RestServerSide.API> {
      */
     public readonly limits = (() => {
         const keys: APIRequestsLimits[] = ["playlist", "album", "search", "artist", "related"];
-        return keys.reduce((acc, key) => {
-            acc[key] = parseInt(env.get(`APIs.limit.${key}`, "10"));
-            return acc;
-        }, {} as Record<APIRequestsLimits, number>);
+        const obj = {} as Record<APIRequestsLimits, number>;
+        for (const key of keys) {
+            obj[key] = parseInt(env.get(`APIs.limit.${key}`, "10"));
+        }
+        return obj;
     })();
 
     /**
@@ -92,10 +94,7 @@ class RestServer extends handler<RestServerSide.API> {
             if (file.audio) this.platforms.audio.push(file.name);
             if (file.requests.find((req) => req.name === "related")) this.platforms.related.push(file.name);
 
-            this.platforms.supported = {
-                ...this.platforms.supported,
-                [file.name]: file
-            };
+            this.platforms.supported[file.name] = file;
         }
     };
 }
@@ -160,11 +159,7 @@ async function fetchFromPlatform(api: RestServerSide.ServerOptions) {
 
     try {
         const restPlatform = rest.platforms.supported[platform] as RestServerSide.API;
-
-        // Если нет типа
-        if (!type) return parentPort.postMessage({requestId, status: "error", result: Error(`Unknown request type for payload: ${payload}`)});
-
-        const callback = restPlatform.requests.find((request) => request.name === type);
+        const callback = restPlatform.requests.find((request) => request.name === "all" || request.name === type);
 
         // Если не найдена функция вызова
         if (!callback) return parentPort.postMessage({requestId, status: "error", result: Error(`Callback not found for platform: ${platform}`)});
@@ -210,12 +205,14 @@ async function fetchPlatforms() {
         requests: (api.requests ?? []).map(stripFunctions)
     }));
 
-    // Отдаем данные в другой поток
-    parentPort?.postMessage({
+    const response = {
         supported: fakeReq,
         authorization: fakeReq.filter(api => api.auth !== null).map(api => api.name),
         audio: fakeReq.filter(api => api.audio).map(api => api.name),
         related: rest.allowRelated.map(api => api.name),
         block: []
-    });
+    };
+
+    // Отдаем данные в другой поток
+    parentPort?.postMessage(response);
 }

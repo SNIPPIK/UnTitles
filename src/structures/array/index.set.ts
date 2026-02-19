@@ -49,10 +49,7 @@ export class SetArray<T> extends Set<T> {
      * @public
      */
     public get(item: T) {
-        const array = this.array;
-        const index = array.indexOf(item);
-
-        return index > -1 ? array[index] : null;
+        return this.has(item) ? item : null;
     };
 
     /**

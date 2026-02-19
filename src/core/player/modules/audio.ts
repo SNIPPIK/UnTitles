@@ -8,7 +8,7 @@ import { db } from "#app/db";
  * @const TIMEOUT_STREAM_PIPE
  * @private
  */
-const TIMEOUT_STREAM_PIPE = 15e3;
+const TIMEOUT_STREAM_PIPE = 40e3;
 
 /**
  * @author SNIPPIK
@@ -16,7 +16,7 @@ const TIMEOUT_STREAM_PIPE = 15e3;
  * @const TIMEOUT_STREAM_BUFFERED
  * @private
  */
-const TIMEOUT_STREAM_BUFFERED = 10e3;
+const TIMEOUT_STREAM_BUFFERED = 20e3;
 
 /**
  * @author SNIPPIK

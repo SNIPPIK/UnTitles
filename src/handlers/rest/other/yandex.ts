@@ -2,7 +2,6 @@ import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
 import crypto from "node:crypto";
 import { sdb } from "#worker/db";
-import { env } from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -28,7 +27,7 @@ import { env } from "#app/env";
     color: 16705372,
     url: "music.yandex.ru",
     audio: true,
-    auth: env.get<string>("token.yandex", null),
+    auth: true,
     filter: /^(https?:\/\/)?(music\.)?(yandex\.ru)\/.+$/i
 })
 @OptionsRest({
@@ -42,7 +41,7 @@ import { env } from "#app/env";
      * @description Ключи для расшифровки ссылок
      * @protected
      */
-    keys: ["p93jhgh689SBReK6ghtw62", "XGRlBW9FXlekgbPrRHuSiA"],
+    keys: ["XGRlBW9FXlekgbPrRHuSiA"]
 })
 class RestYandexAPI extends RestServerSide.API {
     readonly requests: RestServerSide.API["requests"] = [
@@ -266,7 +265,6 @@ class RestYandexAPI extends RestServerSide.API {
                     // Обрабатываем ошибки
                     if (api instanceof Error) return api;
                     else if (!api.tracks) return [];
-
                     return api.tracks["results"].splice(0, limit).map(this.track);
                 } catch (e) {
                     return new Error(`[APIs]: ${e}`)
@@ -280,14 +278,15 @@ class RestYandexAPI extends RestServerSide.API {
      * @param method - Метод запроса из api
      * @protected
      */
-    protected API = (method: string): Promise<json> => {
+    protected API = (method: string): Promise<any> => {
         return new Promise<any | Error>((resolve) => {
             new httpsClient({
                 url: `${this.options.api}/${method}`,
                 headers: {
                     "Authorization": "OAuth " + this.auth
                 },
-                method: "GET"
+                method: "GET",
+                agent: this.agent
             }).toJson.then((req) => {
                 // Если на этапе получение данных получена одна из ошибок
                 if (!req || req instanceof Error) return resolve(locale.err("api.request.fail"));
@@ -325,7 +324,7 @@ class RestYandexAPI extends RestServerSide.API {
                     headers: {
                         "Authorization": "OAuth " + this.auth
                     },
-                    method: "GET"
+                    agent: this.agent
                 }).toJson;
 
                 // Если на этапе получение данных получена одна из ошибок
@@ -348,14 +347,15 @@ class RestYandexAPI extends RestServerSide.API {
                     headers: {
                         "Authorization": "OAuth " + this.auth
                     },
-                    method: "GET"
+                    method: "GET",
+                    agent: this.agent
                 }).toXML;
 
                 // Если произошла ошибка при получении xml
                 if (xml instanceof Error) return locale.err("api.request.fail.msg", ["Fail parsing xml page"]);
 
                 const path = xml[1];
-                const sign = crypto.createHash("md5").update(this.options.keys[1] + path.slice(1) + xml[4]).digest("hex");
+                const sign = crypto.createHash("md5").update(this.options.keys[0] + path.slice(1) + xml[4]).digest("hex");
 
                 // Успех, возвращаем результат и прерываем цикл
                 return `https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`;

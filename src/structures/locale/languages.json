@@ -231,8 +231,18 @@
   },
 
   "player.button.lyrics.fail": {
-    "en-US": "Provider: {ARGUMENT}\n - The song lyrics were not found!",
-    "ru": "Поставщик: {ARGUMENT}\n - Текст песни не был найден!"
+    "en-US": "Fail getting lyrics track!",
+    "ru": "Не удалось получить текст трека!"
+  },
+
+  "player.button.terminal.off": {
+    "en-US": "Terminal player has disabled",
+    "ru": "Терминал плеера выключен"
+  },
+
+  "player.button.terminal.on": {
+    "en-US": "Terminal player has enabled",
+    "ru": "Терминал плеера включен"
   },
 
 

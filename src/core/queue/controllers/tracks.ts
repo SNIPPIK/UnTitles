@@ -1,3 +1,4 @@
+import type { APIRequestData } from "#handler/rest";
 import { Track } from "#core/queue";
 
 /**
@@ -145,19 +146,39 @@ export class ControllerTracks<T extends Track> {
     /**
      * @description Добавляем трек в очередь
      * @param track - Сам трек
+     * @param user - Пользователь добавивший трек
      * @returns void
      * @public
      */
-    public push = (track: T) => {
-        // Если включена перетасовка, то добавляем треки в оригинальную очередь
-        if (this._shuffle) this._original.push(track);
+    public push = (track: T | T[] | APIRequestData.List<T>, user: Track["_user"]): void => {
+        // Приводим всё к массиву треков
+        const tracks: T[] =
+            track instanceof Track
+                ? [track as T]
+                : Array.isArray(track)
+                    ? [track[0] as T]
+                    : (track.items as T[]);
 
-        // Добавляем трек в текущую очередь
-        this._current.push(track);
+        // Проставляем пользователя
+        for (const tr of tracks) {
+            tr.user = user;
+        }
 
-        // Высчитываем время проигрывания
-        this._totalTime += track.time.total;
+        // Если включена перетасовка — сохраняем оригинальный порядок
+        if (this._shuffle) {
+            this._original.push(...tracks);
+        }
+
+        // Добавляем в текущую очередь
+        this._current.push(...tracks);
+
+        // Считаем общее время
+        this._totalTime += tracks.reduce(
+            (sum, t) => sum + (t?.time?.total ?? 0),
+            0
+        );
     };
+
 
     /**
      * @description Получаем прошлый трек или текущий в зависимости от позиции

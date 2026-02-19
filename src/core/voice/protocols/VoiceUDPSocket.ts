@@ -11,6 +11,7 @@ import { isIPv4 } from "node:net";
  * @public
  */
 export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
+    /** Текущий статус */
     private _status: VoiceUDPSocketStatuses;
 
     /** Socket UDP подключения */
@@ -19,20 +20,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /** Данные подключения, полные данные пакета ready.d */
     public options: WebSocketOpcodes.ready["d"];
 
-    /**
-     * @description Отправка данных на сервер
-     * @param packet - Отправляемый пакет
-     * @public
-     */
-    public set packet(packet: Buffer) {
-        // Если статус не позволяет отправить пакет
-        if (!this._status || this._status === "disconnected") return;
-
-        // Отправляем аудио или буфер пакет
-        this.socket.send(packet, 0, packet.length, this.options.port, this.options.ip, (err) => {
-            if (err) this.emit("error", err);
-        });
-    };
+    private discoveryTimeout?: NodeJS.Timeout;
 
     /**
      * @description Получаем текущий статус подключения
@@ -40,6 +28,18 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      */
     public get status() {
         return this._status;
+    };
+
+    /**
+     * @description Отправка данных на сервер
+     * @param packet - Отправляемый пакет
+     * @public
+     */
+    public packet(packet: Buffer) {
+        if (!this.socket) return;
+
+        // Отправляем аудио или буфер пакет
+        this.socket.send(packet, 0, packet.length, this.options.port, this.options.ip);
     };
 
     /**
@@ -63,14 +63,33 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         // Проверяем через какое соединение подключатся
         const socket = this.socket = createSocket({
             type: isIPv4(options.ip) ? "udp4" : "udp6",
-            sendBufferSize: 1024 * 1024 * 5, // 5 MB
-            reuseAddr: true
+            sendBufferSize: 1024 * 1024 * 1024,
+            recvBufferSize: 1024 * 1024 * 1024
         });
         // Позволяет процессу умереть, даже если сокет жив
         socket.unref();
 
         socket.on("error", this.emit.bind(this, "error"));
-        socket.on("message", this.emit.bind(this, "message"));
+        socket.on("message", (msg) => {
+            // Пакет discovery
+            if (msg.length === 74 && msg.readUInt16BE(0) === 2) {
+                const ip = msg.subarray(8, msg.indexOf(0, 8)).toString("utf8");
+                const port = msg.readUInt16BE(msg.length - 2);
+
+                if (this.discoveryTimeout) clearTimeout(this.discoveryTimeout);
+
+                if (!isIPv4(ip)) {
+                    this.emit("discovery", new Error("Not found IPv4 address"));
+                } else {
+                    this._status = VoiceUDPSocketStatuses.connected;
+                    this.emit("discovery", { ip, port });
+                }
+                return;
+            }
+
+            // Отправляем данные через событие дальше
+            this.emit("message", msg);
+        });
 
         // Если подключение оборвалось
         socket.once("close", () => {
@@ -84,50 +103,29 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @returns void
      * @public
      */
-    public discovery = async (ssrc: number): Promise<Error | {ip: string; port: number}> => {
+    public discovery = (ssrc: number): Buffer => {
         const packet = Buffer.allocUnsafe(74);
         packet.writeUInt16BE(1, 0);
         packet.writeUInt16BE(70, 2);
         packet.writeUInt32BE(ssrc, 4);
 
+        // Запускаем таймер ожидания
+        if (this.discoveryTimeout) clearTimeout(this.discoveryTimeout);
+
+        this.discoveryTimeout = setTimeout(() => {
+            // Значит подключение удалось!
+            if (this._status === VoiceUDPSocketStatuses.connected) return;
+
+            // Удаляем слушателя, чтобы не получить отложенный ответ
+            this.socket.removeAllListeners("message");
+            this.socket.removeAllListeners("error");
+
+            this.destroy();
+            throw Error("IP Discovery timed out after 5 seconds");
+        }, 5000);
+
         this._status = VoiceUDPSocketStatuses.connecting;
-        this.packet = packet;
-
-        return new Promise((resolve) => {
-            const timeout = setTimeout(() => {
-                // Удаляем слушателя, чтобы не получить отложенный ответ
-                this.socket.removeAllListeners("message");
-                this.socket.removeAllListeners("error");
-
-                this.destroy();
-                resolve(Error("IP Discovery timed out after 5 seconds"));
-            }, 5000); // Таймаут 5 секунд
-
-            // Ждем получения сообщения после отправки код, для подключения UDP
-            this.socket.once("message", (packet) => {
-                clearTimeout(timeout);
-
-                if (packet.readUInt16BE(0) === 2) {
-                    const ip = packet.subarray(8, packet.indexOf(0, 8)).toString("utf8");
-                    const port = packet.readUInt16BE(packet.length - 2);
-
-                    // Если провайдер не предоставляет или нет пути IPV4
-                    if (!isIPv4(ip)) return resolve(Error("Not found IPv4 address"));
-
-                    this._status = VoiceUDPSocketStatuses.connected;
-                    return resolve({ip, port})
-                }
-
-                return resolve(Error("Failed to connect from UDP protocol"));
-            });
-
-            // Если не удалось получить данные для отправки аудио на UDP сервер
-            this.socket.once("error", (err) => {
-                clearTimeout(timeout);
-                this.destroy();
-                resolve(Error(`UDP Error: ${err.message}`));
-            });
-        });
+        return packet;
     };
 
     /**
@@ -136,13 +134,12 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @private
      */
     private reset = () => {
+        if (this.discoveryTimeout) clearTimeout(this.discoveryTimeout);
         if (this.socket) {
             try {
-                this.socket.disconnect?.();
-                this.socket.close?.();
-            } catch (err) {
-                if (err instanceof Error && err.message.includes("Not running")) return;
-            }
+                this.socket.removeAllListeners();
+                this.socket.close();
+            } catch {}
         }
 
         this.socket = null;
@@ -157,8 +154,6 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         if (this._status === "disconnected") return;
         this._status = VoiceUDPSocketStatuses.disconnected;
 
-        this?.removeAllListeners();
-        this.socket?.removeAllListeners();
         super.destroy();
         this.reset();
     };
@@ -177,6 +172,13 @@ export interface UDPSocketEvents {
      * @readonly
      */
     readonly "message": (message: Buffer) => void;
+
+    /**
+     * @description Транспортный пакет, для получения адреса подключения
+     * @param options - Может отдавать как ошибку так и данные
+     * @readonly
+     */
+    readonly "discovery": (options: {ip: string; port: number} | Error) => void;
 
     /**
      * @description Событие при котором сокет получает ошибку

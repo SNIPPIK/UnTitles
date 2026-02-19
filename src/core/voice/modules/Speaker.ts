@@ -1,6 +1,7 @@
 import { HeartbeatManager } from "#core/voice/managers/heartbeat";
 import { VoiceOpcodes } from "discord-api-types/voice";
 import { VoiceConnection } from "#core/voice";
+import {SetArray} from "#structures";
 
 /**
  * @author SNIPPIK
@@ -8,15 +9,7 @@ import { VoiceConnection } from "#core/voice";
  * @const KEEP_SWITCH_SPEAKING
  * @private
  */
-const KEEP_SWITCH_SPEAKING = 10e3;
-
-/**
- * @author SNIPPIK
- * @description Максимальное значение счетчика активности
- * @const MAX_SIZE_VALUE
- * @private
- */
-const MAX_SIZE_VALUE = 2 ** 32 - 1;
+const KEEP_SWITCH_SPEAKING = 5e3;
 
 /**
  * @author SNIPPIK
@@ -29,7 +22,7 @@ export class VoiceSpeakerManager {
      * @description Список пользователей в голосовом канале, для работы E2EE
      * @public
      */
-    public clients = new Set<string>();
+    public clients = new SetArray<string>();
 
     /**
      * @description Текущий тип спикера
@@ -53,13 +46,7 @@ export class VoiceSpeakerManager {
          * @readonly
          * @private
          */
-        buffer: Buffer.alloc(4),
-
-        /**
-         * @description Счетчика активности
-         * @private
-         */
-        counter: 0
+        buffer: Buffer.alloc(8)
     };
 
     /**
@@ -108,7 +95,7 @@ export class VoiceSpeakerManager {
                 delay: 0,
                 ssrc: this.voice._attention.ssrc
             },
-            seq: this.voice.websocket?.sequence || 0
+            seq: this.voice.websocket.sequence
         };
     };
 
@@ -120,9 +107,16 @@ export class VoiceSpeakerManager {
     public constructor(protected voice: VoiceConnection) {
         const heartbeat = this._heartbeat = new HeartbeatManager({
             onTimeout: () => {
-                if (this.keepAlive.counter >= MAX_SIZE_VALUE) this.keepAlive.counter = 0;
-                this.keepAlive.buffer.writeUInt32BE(this.keepAlive.counter++, 0);
-                voice.raw_packet = this.keepAlive.buffer;
+                // Если бот говорит, то не имеет смысла пинговать udp подключение
+                if (this._type !== SpeakerType.disable) return;
+
+                // Discord ожидает пакет, где в начале стоит SSRC (или просто 8 байт данных)
+                // Обычно используется 8-байтовый пакет с текущим временем или SSRC
+                const packet = this.keepAlive.buffer;
+
+                // Можно записать SSRC или просто рандомное число
+                packet.writeUInt32BE(this.voice._attention.ssrc, 0);
+                voice.packet(this.keepAlive.buffer, "raw");
 
                 // Отключаем спикер
                 this.speaking = SpeakerType.disable;

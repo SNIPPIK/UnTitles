@@ -1,14 +1,15 @@
 import type { CycleInteraction, MessageComponent } from "#structures/discord";
-import { Logger, TaskCycle } from "#structures";
 import { OPUS_FRAME_SIZE } from "#core/audio";
 import { AudioPlayer } from "#core/player";
+import { TaskCycle } from "#native/cycle";
+import { Logger } from "#structures";
 import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
  * @description Циклы для работы аудио, лучше не трогать без понимания как все это работает
  * @class ControllerCycles
- * @private
+ * @public
  */
 export class ControllerCycles {
     /**
@@ -30,25 +31,12 @@ export class ControllerCycles {
 
 /**
  * @author SNIPPIK
- * @description Разрешенное кол-во временных интервалов
- * @const PLAYER_AVG_FRAMES
- * @private
- */
-const PLAYER_LATENCY_SIZE = 100;
-const PLAYER_AVG_FRAMES = 10
-
-/**
- * @author SNIPPIK
  * @description Циклическая система плееров, используется для отправки аудио пакетов
  * @class AudioPlayers
  * @extends TaskCycle
  * @private
  */
 class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
-    private _avgFrames = [];
-    private _lastBaseInsert = 0;
-    private _lastAdjust = 0;
-    private _targetDuration = 20;
     /**
      * @description Запускаем циклическую систему плееров, весь логический функционал здесь
      * @constructor
@@ -59,82 +47,22 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             // Время до следующего прогона цикла
             duration: OPUS_FRAME_SIZE,
 
-            // Кастомные функции (если хочется немного изменить логику выполнения)
-            custom: {
-                step: () => {
-                    const now = this.time;
-                    const drift = Math.abs(now - this.insideTime);
-
-                    let frames = OPUS_FRAME_SIZE;
-
-                    // только вверх по 20 ms
-                    if (drift > OPUS_FRAME_SIZE) {
-                        frames = drift + OPUS_FRAME_SIZE;
-                    }
-
-                    // === Контроль записи в массив ===
-                    const canInsertBase = now - this._lastBaseInsert >= 1000; // прошло 1 сек?
-
-                    // разрешено вставлять любое > 20
-                    if (frames > OPUS_FRAME_SIZE) this._avgFrames.push(frames);
-                    else if (frames <= OPUS_FRAME_SIZE && canInsertBase) {
-                        // базовый 20 можно лишь раз в секунду
-                        this._avgFrames.push(OPUS_FRAME_SIZE);
-                        this._lastBaseInsert = now;
-                    }
-
-                    // ограничиваем размер массива
-                    if (this._avgFrames.length > PLAYER_AVG_FRAMES) this._avgFrames.shift();
-
-                    // === Среднее значение Jitter ===
-                    const avg = this._avgFrames.reduce((a, b) => a + b, 0) / this._avgFrames.length;
-
-                    // === Округление по шагу 20ms ===
-                    let quantized = Math.ceil(avg / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE;
-                    if (quantized < OPUS_FRAME_SIZE) quantized = OPUS_FRAME_SIZE;
-                    this._targetDuration = quantized;
-
-                    // === Плавная коррекция duration ===
-                    if (now - this._lastAdjust >= OPUS_FRAME_SIZE) {
-                        if (this.options.duration < this._targetDuration) this.options.duration = Math.min(this.options.duration + OPUS_FRAME_SIZE, this._targetDuration);
-                        else if (this.options.duration > this._targetDuration) this.options.duration = Math.max(this.options.duration - OPUS_FRAME_SIZE, this._targetDuration);
-
-                        this._lastAdjust = now;
-                    }
-                }
-            },
-
             // Функция проверки
             filter: (item) => item.playing,
 
             // Функция отправки аудио фрейма
             execute: (player) => {
-                // latency - задержка соединения
-                const latency = player.voice.connection.latency > PLAYER_LATENCY_SIZE ? Math.ceil(player.voice.connection.latency / PLAYER_LATENCY_SIZE) - 1 : 0;
+                const audio = player.audio.current;
+                const packet = audio.packet;
 
-                // Количество фреймов в текущей итерации
-                let size = this.options.duration / OPUS_FRAME_SIZE;
-
-                // Если есть задержка голосового подключения
-                if (latency > 0 && size <= latency) {
-                    // Инкремент счётчика
-                    player._counter++;
-
-                    // Проверяем достижение порога
-                    if (player._counter < player._stepCounter) return;
-
-                    // Если достигли — выполняем шаг
-                    player._counter = 0; // сбрасываем
-                    size = latency + size;
+                if (packet) player.voice.connection.packet(packet);
+                else {
+                    // Если поток не читается, переходим в состояние ожидания
+                    if (!audio && audio.packets > 0 || !audio.readable) {
+                        player.status = "player/wait";
+                        player.cycle = false;
+                    }
                 }
-
-                // Отправляем пакет/ы в голосовой канал
-                for (let i = 0; i < size; i++) {
-                    player.voice.connection.packet = player.audio.current.packet;
-                }
-
-                // Указываем кол-во аудио пакетов
-                player._stepCounter = size;
             }
         });
     };
@@ -145,8 +73,6 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
      * @public
      */
     public reset = () => {
-        super.reset();
-
         // Запускаем Garbage Collector
         setImmediate(() => {
             if (typeof global.gc === "function") {
@@ -173,7 +99,7 @@ const MESSAGE_RESEND_TIME = 60e3 * 10;
  * @const MESSAGE_UPDATE_TIME
  * @private
  */
-const MESSAGE_UPDATE_TIME = 1e3 * 15;
+const MESSAGE_UPDATE_TIME = 1e3 * 10;
 
 /**
  * @author SNIPPIK
@@ -197,7 +123,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
             custom: {
                 remove: async (item) => {
                     try {
-                        if (item.deletable) await item.delete();
+                        if (!!item.delete) await item.delete();
                     } catch {
                         Logger.log("ERROR", `Failed delete message in cycle!`);
                     }
@@ -209,7 +135,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
             },
 
             // Функция проверки
-            filter: (message) => !!message.edit && message.editable && message.createdTimestamp + 5e3 < Date.now() && message.editedTimestamp + 5e3 < Date.now(),
+            filter: (message) => message.createdTimestamp + 5e3 < Date.now() && message.timestamp + 5e3 < Date.now(),
 
             // Функция обновления сообщения
             execute: (message) => {
@@ -217,7 +143,6 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
 
                 // Если нет очереди
                 if (!queue) this.delete(message);
-
                 const component = queue.components;
 
                 // Если не получен embed
@@ -240,7 +165,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
      */
     public update = (message: T, component: MessageComponent) => {
         try {
-            if (message.editable) message.edit({ components: component }).catch(console.error);
+            if (message.createdTimestamp) message.edit({ components: component }).catch(console.error);
         } catch (error) {
             Logger.log("ERROR", `Failed to edit message in cycle\n${error instanceof Error ? error.stack : error}`);
 
@@ -254,19 +179,31 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
      * @returns Promise<T | null>
      * @public
      */
-    public ensure = (guildId: string, factory: () => Promise<T>): T | null => {
+    public ensure = async (guildId: string, factory: () => Promise<T>): Promise<T | null> => {
         let message = this.find(m => m.guildId === guildId);
 
         // Если нет сообщения в цикле
         if (!message) {
-            factory().then(this.add).catch(console.error);
+            factory()
+                .then((m) => {
+                    m.guildId = guildId;
+                    this.add(m)
+                })
+                .catch(console.error);
+
             return null;
         }
 
         // Если время позволяет пересоздать сообщение о проигрывании
         else if (Date.now() - message.createdTimestamp > MESSAGE_RESEND_TIME) {
             this.delete(message);
-            factory().then(this.add).catch(console.error);
+            factory()
+                .then((m) => {
+                    m.guildId = guildId;
+                    this.add(m)
+                })
+                .catch(console.error);
+
             return null;
         }
 

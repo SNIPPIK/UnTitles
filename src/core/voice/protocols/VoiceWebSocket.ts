@@ -62,10 +62,10 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
     /**
      * @description Последняя зафиксированная задержка в ms
+     * @default 120
      * @public
      */
-    public latency: number = null;
-    private latencyArray: number[] = [];
+    public latency: number = 120;
 
     /**
      * @description Текущий статус клиента
@@ -129,13 +129,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Получен HEARTBEAT_ACK
             onAck: (latency) => {
-                /* Высчитываем задержку подключения */
-                this.latencyArray.push(latency);
-                if (this.latencyArray.length > 10) this.latencyArray.shift();
-
-                let sum = 0;
-                for (const v of this.latencyArray) sum += v;
-                this.latency = parseInt((sum / this.latencyArray.length).toFixed(0));
+                this.latency = latency;
 
                 // Отправляем событие об ответе от websocket
                 this.emit("warn", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
@@ -208,6 +202,12 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Если ws разорвал соединение из-за слишком долгого ответа от рукопожатия
             else if (`${error}`.match(/handshake has timed out/)) {
                 this.destroy();
+                return;
+            }
+
+            // Discord сам разорвал соединение из-за проблем
+            else if (`${error}`.match(/Unexpected server response: 503/)) {
+                this.emit("close", 503, "Unexpected server response: 503");
                 return;
             }
 
@@ -314,7 +314,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 break;
             }
 
-            // Dave
+            // Получение и выполнение любого кода DAVE/E2EE
             case VoiceOpcodes.DaveMlsCommitWelcome:
             case VoiceOpcodes.DaveTransitionReady:
             case VoiceOpcodes.DaveMlsWelcome:
@@ -372,8 +372,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         this.ws = null;
-        this.latencyArray.length = 0;
-        this.latencyArray = [];
 
         // Если есть менеджер жизни ws
         if (this._heartbeat) this._heartbeat.stop();
@@ -390,8 +388,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.sequence = null;
         this._endpoint = null;
         this._status = null;
-
-        this.latencyArray = null;
 
         if (this._heartbeat) {
             this._heartbeat.destroy();

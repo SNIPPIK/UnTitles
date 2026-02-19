@@ -1,133 +1,216 @@
-import { Client, Options, Partials } from "discord.js";
-import { ActivityType } from "discord-api-types/v10";
+import { DiscordGatewayAdapterCreator, VoiceAdapters } from "#core/voice/adapter";
+import { Client, LimitedCollection } from "seyfert";
+import { middlewares } from "#handler/middlewares";
+import { ActivityType } from "seyfert/lib/types";
 import { version } from "package.json";
-import { Logger } from "#structures";
 import { env } from "#app/env";
 import { db } from "#app/db";
+import {Logger} from "#structures";
 
 /**
  * @author SNIPPIK
- * @description Класс клиента
+ * @description Класс адаптера
+ * @class SeyfertVoice
+ * @extends VoiceAdapters
+ */
+export class SeyfertVoice<T extends DiscordClient> extends VoiceAdapters<DiscordClient> {
+    public constructor(client: T) {
+        super(client);
+    };
+
+    /**
+     * @description Указываем как создавать адаптер
+     * @param guild_id - ID сервера для которого надо создать адаптер
+     * @public
+     */
+    public voiceAdapterCreator = (guild_id: string): DiscordGatewayAdapterCreator => {
+        // Если нет ID осколка
+        const id = this.client.gateway.calculateShardId(guild_id);
+
+        return methods => {
+            this.adapters.set(guild_id, methods);
+
+            return {
+                sendPayload: (data) => {
+                    this.client.gateway.send(id, data);
+                    return true;
+                },
+                destroy: () => {
+                    this.adapters.delete(guild_id);
+                }
+            };
+        };
+    };
+
+    /**
+     * @description Реализация смены статуса голосового канала
+     * @param channelId - ID голосового канала
+     * @param status - Название заголовка
+     * @public
+     */
+    public status = (channelId: string, status?: string) => {
+        return this.client.rest.request("PUT", `/channels/${channelId}/voice-status`, {
+            body: {
+                status: status
+            }
+        });
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Реализация клиента discord
  * @class DiscordClient
  * @extends Client
  * @public
  */
 export class DiscordClient extends Client {
     /**
-     * @description Номер осколка
-     * @returns number
+     * @description Коллекция для cooldown
+     * @readonly
      * @public
      */
-    public get shardID(): number {
-        try {
-            return this.shard?.count - 1;
-        } catch {
-            return 0;
-        }
-    };
+    public readonly cooldowns: LimitedCollection<string, number> = new LimitedCollection();
 
     /**
-     * @description Создание стандартного осколка
-     * @constructor
+     * @description Создание класса клиента
      * @public
      */
     public constructor() {
         super({
-            presence: {
-                status: "online",
-                activities: [
-                    {
-                        name: " 💫 Startup...",
-                        type: 4
+
+            /**
+             * @description Хуки для команд
+             */
+            commands: {
+                defaults: {
+                    onMiddlewaresError: (ctx, error) => {
+                        Logger.log(
+                            "ERROR",
+                            `Command | Middleware Error\n` +
+                            `┌ Reason:  ${ctx.fullCommandName}\n` +
+                            `└ Stack:   ${error}`
+                        );
+                    },
+
+                    onRunError: (ctx, error) => {
+                        Logger.log(
+                            "ERROR",
+                            `Command | Run Error\n` +
+                            `┌ Reason:  ${ctx.fullCommandName}\n` +
+                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
+                        );
+                    },
+
+                    onInternalError: (_, ctx, error) => {
+                        Logger.log(
+                            "ERROR",
+                            `Command | Internal Error\n` +
+                            `┌ Reason:  ${ctx.name} - ${ctx.description}\n` +
+                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
+                        );
+                    },
+
+                    onOptionsError: (ctx, error) => {
+                        Logger.log(
+                            "ERROR",
+                            `Command | Options Error\n` +
+                            `┌ Reason:  ${ctx.options}\n` +
+                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
+                        );
                     }
-                ]
+                }
             },
 
-            // Права бота
-            intents: [
-                // Доступ к серверам
-                "Guilds",
+            /**
+             * @description Хуки для компонентов
+             */
+            components: {
+                defaults: {
+                    onMiddlewaresError: (ctx, error) => {
+                        Logger.log(
+                            "ERROR",
+                            `Components | Middleware Error\n` +
+                            `┌ Reason:  ${ctx.customId}\n` +
+                            `└ Stack:   ${error}`
+                        );
+                    },
 
-                // Отправление сообщений
-                "GuildMessages",
+                    onInternalError: (ctx, error) => {
+                        Logger.log(
+                            "ERROR",
+                            `Components | Internal Error\n` +
+                            `┌ Reason:  ${ctx.options}\n` +
+                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
+                        );
+                    },
 
-                // Нужен для голосовой системы
-                "GuildVoiceStates",
-            ],
+                    onRunError: (ctx, error) => {
+                        Logger.log(
+                            "ERROR",
+                            `Components | Run Error\n` +
+                            `┌ Reason:  ${ctx.customId}\n` +
+                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
+                        );
+                    }
+                }
+            },
 
-            // Позволяет обрабатывать частичные данные
-            partials: [
-                Partials.Channel,
-                Partials.GuildMember,
-                Partials.SoundboardSound,
-                Partials.Message,
-                Partials.Reaction,
-                Partials.User,
-                Partials.GuildScheduledEvent,
-                Partials.ThreadMember,
-            ],
 
-            // Задаем параметры кеша
-            makeCache: Options.cacheWithLimits({
-                ...Options.DefaultMakeCacheSettings,
-                ...Options.DefaultSweeperSettings,
-                MessageManager: {
-                    keepOverLimit: (value) => value.createdTimestamp > (Date.now() + 60e3 * 10)
-                },
-                GuildScheduledEventManager: 0,
-                GuildTextThreadManager: 0,
-                BaseGuildEmojiManager: 0,
-                ReactionManager: 0,
-                ReactionUserManager: 0,
-                EntitlementManager: 0,
-                StageInstanceManager: 0,
-                GuildBanManager: 0,
-                GuildForumThreadManager: 0,
-                AutoModerationRuleManager: 0,
-                DMMessageManager: 0,
-                GuildInviteManager: 0,
-                GuildEmojiManager: 0,
-                GuildStickerManager: 0,
-                ThreadManager: 0,
-                ThreadMemberManager: 0,
-            })
+            globalMiddlewares: ["checkCooldown"],
+            allowedMentions: {
+                replied_user: false,
+                parse: ["roles"],
+            }
         });
 
-        // Ограничиваем кол-во событий
-        this.setMaxListeners(10);
-        this.ws.setMaxListeners(10);
+        // Отключаем кеширование данных
+        this.setServices({
+            middlewares: middlewares,
+            langs: {
+                aliases: {
+                    "en-US": ["en-GB"],
+                    "es-419": ["es-ES"],
+                }
+            },
 
-        // Запускаем статусы после инициализации клиента
-        this.once("clientReady", this.initSwapStatus);
+            cache: {
+                disabledCache: {
+                    bans: true,
+                    emojis: true,
+                    stickers: true,
+                    roles: true,
+                    presences: true,
+                    messages: true,
+                    stageInstances: true,
+                    overwrites: true
+                },
+            },
+        });
     };
-
     /**
      * @description Функция создания и управления статусом
-     * @returns void
+     * @readonly
      * @private
      */
-    private initSwapStatus = (): void => {
+    public startIntervalStatuses = () => {
         // Время обновления статуса
         const timeout = parseInt(env.get("client.presence.interval", "120"));
         const arrayUpdate = parseInt(env.get("client.presence.array.update", "3600")) * 1e3;
-        const clientID = this.shardID;
 
-        let array = this.prepareStatuses();
+        let array = this.parseStatuses();
         let size = array.length - 1;
         let i = 0, lastDate = Date.now() + arrayUpdate ;
 
         // Если нет статусов
         if (!array.length) return;
-        else {
-            Logger.log("LOG", `[Core/${clientID}] Success loading custom ${Logger.color(34, `${array.length} statuses`)}`);
-        }
 
         // Интервал для обновления статуса
-        setInterval(() => {
+        setInterval(async () => {
             // Обновляем статусы
             if (lastDate < Date.now()) {
                 // Обновляем статусы
-                array = this.prepareStatuses();
+                array = this.parseStatuses();
 
                 // Обновляем время для следующего обновления
                 lastDate = Date.now() + arrayUpdate;
@@ -138,10 +221,11 @@ export class DiscordClient extends Client {
             const activity = array[i];
 
             // Задаем статус боту
-            this.user.setPresence({
-                status: env.get("client.status", "online"),
-                activities: [activity] as ActivityOptions[],
-                shardId: clientID
+            this.gateway.setPresence({
+                afk: false,
+                since: Date.now(),
+                status: env.get("client.status", "online") as any,
+                activities: [activity] as any[]
             });
 
             i++;
@@ -150,20 +234,19 @@ export class DiscordClient extends Client {
 
     /**
      * @description Функция подготавливающая статусы
-     * @returns ActivityOptions[]
+     * @readonly
      * @private
      */
-    private prepareStatuses = (): ActivityOptions[] => {
+    private parseStatuses = () => {
         const statuses: ActivityOptions[] = [];
-        const guilds = this.guilds.cache.size;
-        const users = this.users.cache.size;
+        const guilds = this.cache.guilds!.count();
+        const users = this.cache.users!.count();
 
         // Получаем пользовательские статусы
         try {
-            const presence = (JSON.parse(`[${env.get("client.presence.array")}]`) as ActivityOptionsRaw[]);
-            const envPresents = presence.map((status) => {
+            const envPresents = (JSON.parse(`[${env.get("client.presence.array")}]`) as ActivityOptions[]).map((status) => {
                 const edited = status.name
-                    .replace(/{shard}/g, `${this.shardID + 1}`)
+                    .replace(/{shard}/g, `${this.gateway.size}`)
                     .replace(/{queues}|{players}/g, `${db.queues.size}`)
                     .replace(/{version}/g, `${version}`)
                     .replace(/{guilds}/g, `${guilds}`)
@@ -171,15 +254,14 @@ export class DiscordClient extends Client {
 
                 return {
                     name: edited,
-                    type: ActivityType[status.type],
-                    shardId: this.shardID
+                    type: ActivityType[status.type] as any
                 }
             });
 
             // Добавляем пользовательские статусы
             statuses.push(...envPresents);
         } catch (e) {
-            Logger.log("ERROR", `[Core/${this.shardID}] Failed to parse env statuses. ${e}`);
+            this.logger.error(`[Client/Status] Failed to parse env statuses. ${e}`);
         }
 
         return statuses;
@@ -190,23 +272,10 @@ export class DiscordClient extends Client {
  * @author SNIPPIK
  * @description Параметры показа статуса
  * @interface ActivityOptions
- * @private
  */
 interface ActivityOptions {
     name: string;
     state?: string;
     url?: string;
     type?: ActivityType;
-    shardId?: number | readonly number[];
-}
-
-/**
- * @author SNIPPIK
- * @description Данные статуса бота из env
- * @interface ActivityOptionsRaw
- * @private
- */
-//@ts-ignore
-interface ActivityOptionsRaw extends ActivityOptions {
-    type?: string;
 }

@@ -24,6 +24,7 @@ import { httpsClient, locale } from "#structures";
     url: "soundcloud.com",
     color: 15105570,
     audio: true,
+    auth: false,
     filter: /^(?:(https?):\/\/)?(?:(?:www|m)\.)?(api\.soundcloud\.com|soundcloud\.com|snd\.sc)\/(.*)$/,
 })
 @OptionsRest({
@@ -167,7 +168,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
      */
     protected API = (url: string): Promise<{api: json, ClientID: string} | Error> => {
         return new Promise(async (resolve) => {
-            const ClientID = await this.getClientID();
+            const ClientID = await this.authorization();
 
             // Если client_id не был получен
             if (ClientID instanceof Error) return resolve(ClientID);
@@ -175,6 +176,8 @@ class RestSoundCloudAPI extends RestServerSide.API {
 
             const result = await new httpsClient({
                 url: `${this.options.api}/${url}&client_id=${ClientID}`,
+                userAgent: true,
+                agent: this.agent
             }).toJson;
 
             // Если возникает ошибка при получении страницы
@@ -191,37 +194,36 @@ class RestSoundCloudAPI extends RestServerSide.API {
      * @description Получаем временный client_id для SoundCloud
      * @protected
      */
-    protected getClientID = async (): Promise<string | Error> => {
+    protected async authorization(): Promise<string | Error> {
         // Если client_id ещё действителен, возвращаем его
         if (this.options.client_id && this.options.time > Date.now()) return this.options.client_id;
 
         try {
             const parsedPage = await new httpsClient({
                 url: `https://${this.url}/`,
-                userAgent: true,
                 headers: {
                     "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
                     "accept-encoding": "gzip, deflate, br"
-                }
+                },
+                agent: this.agent
             }).toString;
 
             if (parsedPage instanceof Error) return parsedPage;
             else if (!parsedPage) return null;
 
-            const split = parsedPage.split("<script crossorigin src=\"");
-            const urls: string[] = [];
+            const soundCLD: any[] = JSON.parse(parsedPage.split(/<script>window.__sc_hydration = /gi)[1].split(";</script>")[0]);
 
-            split.forEach((r) => r.startsWith("https") ? urls.push(r.split("\"")[0]) : null);
+            // Ищем истинный ID
+            const client_id = soundCLD.find((i) => i.hydratable === "apiClient");
 
-            const parsedPage2 = await new httpsClient({url: urls[0]}).toString;
-            if (!parsedPage2 || parsedPage2 instanceof Error) return null;
+            // Если нет ID
+            if (!client_id || !client_id.data || !client_id.data.id) return null;
 
-            const client_id = parsedPage2?.split(",client_id:\"")[1]?.split("\",")[0];
-
-            this.options.client_id = client_id;
+            this.options.client_id = client_id.data.id;
             this.options.time = Date.now() + 60 * 60 * 1e3;
 
-            return client_id;
+            // Выдаем анонимный ID
+            return client_id.data.id;
         } catch (err) {
             console.error("Error fetching client_id:", err);
             return null;
@@ -237,11 +239,15 @@ class RestSoundCloudAPI extends RestServerSide.API {
     protected getFormat = (formats: any[], ClientID: string): Promise<string> => {
         return new Promise<string>(async (resolve) => {
             const FilterFormats = formats.filter((d) => d.format.protocol === "progressive").pop() ?? formats[0];
-            const EndFormat = await new httpsClient({url: `${FilterFormats.url}?client_id=${ClientID}`, userAgent: true}).toJson as json;
+            const EndFormat = await new httpsClient({
+                url: `${FilterFormats.url}?client_id=${ClientID}`,
+                userAgent: true,
+                agent: this.agent
+            }).toJson as json;
 
             return resolve(EndFormat.url);
         });
-    }
+    };
 
     /**
      * @description Подготавливаем трек к отправке
@@ -258,7 +264,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
                 title: track.user.username,
                 image: track.user.avatar_url,
             },
-            image: track.artwork_url,
+            image: track.artwork_url?.replace("large", "t500x500"),
             time: {
                 total: (track.duration / 1e3).toFixed(0)
             },

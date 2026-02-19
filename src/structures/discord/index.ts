@@ -1,44 +1,24 @@
-import type { ChatInputCommandInteraction, AutocompleteInteraction, CacheType, ButtonInteraction, Message, AnySelectMenuInteraction } from "discord.js";
-import type { DiscordClient } from "#structures/discord/index.client";
+import {ParseMiddlewares, CommandContext, WebhookMessage, Message} from "seyfert";
+import { middlewares } from "#handler/middlewares";
+import { AudioPlayerEvents } from "#core/player";
+import { QueueEvents } from "#core/queue";
+import { DiscordClient } from "./index.client";
 
-export * from "./index.manager";
 export * from "./index.client";
-export * from "./index.voice";
 
 /**
- * @description Тип входящих данных для команд
+ * @author SNIPPIK
+ * @description Тип сообщения для команд
  * @type CommandInteraction
- * @public
  */
-export type CommandInteraction = ChatInputCommandInteraction<CacheType>;
+export type CommandInteraction = CommandContext;
 
 /**
- * @description Тип входящих данных для дополнения к команде
- * @type CompeteInteraction
- * @public
+ * @author SNIPPIK
+ * @description Тип сообщения для обновления сообщения
+ * @type CycleInteraction
  */
-export type CompeteInteraction = AutocompleteInteraction<CacheType>;
-
-/**
- * @description Тип входящих данных для кнопок
- * @type buttonInteraction
- * @public
- */
-export type buttonInteraction = ButtonInteraction<CacheType>;
-
-/**
- * @description Тип входящих данных для циклической системы
- * @type buttonInteraction
- * @public
- */
-export type SelectMenuInteract = AnySelectMenuInteraction;
-
-/**
- * @description Тип входящих данных для циклической системы
- * @type buttonInteraction
- * @public
- */
-export type CycleInteraction = Message<boolean>;
+export type CycleInteraction = WebhookMessage | Message;
 
 /**
  * @description Тип входящих данных для циклической системы
@@ -80,22 +60,13 @@ export enum Colors {
 }
 
 /**
- * @description Изменяем параметры discord.js
- * @module discord.js
+ * @author SNIPPIK
+ * @description Редактируем параметры seyfert
  */
-declare module "discord.js" {
-    //@ts-ignore
-    export interface ChatInputCommandInteraction {
-        member: GuildMember;
-    }
+declare module "seyfert" {
+    interface UsingClient extends DiscordClient { }
+    interface CustomEvents extends AudioPlayerEvents, QueueEvents { }
 
-    //@ts-ignore
-    export interface ButtonInteraction {
-        member: GuildMember;
-    }
-
-    //@ts-ignore
-    export interface GuildMemberManager {
-        client: DiscordClient;
-    }
+    // Регистрируем middlewares в системе seyfert
+    interface RegisteredMiddlewares extends ParseMiddlewares<typeof middlewares> {}
 }

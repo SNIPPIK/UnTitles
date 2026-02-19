@@ -1,4 +1,4 @@
-import type { RestAPIS_Names } from "#handler/rest/index.decorator";
+import type { RestAPINames } from "#handler/rest/index.decorator";
 import { env } from "#app/env";
 import { db } from "#app/db";
 
@@ -9,8 +9,8 @@ import { db } from "#app/db";
  * @private
  */
 function initButtons() {
-    buttons = db.api.platforms.array.reduce((acc, api) => {
-        const platform = api.name.toLowerCase();
+    buttons = db.api.platformMap.keys().reduce((acc, api) => {
+        const platform = `${api}`.toLowerCase();
         const inEnv = env.get(`progress.button.${platform}`, null);
 
         if (inEnv) acc[`button_${platform}`] = inEnv;
@@ -90,7 +90,7 @@ export class PlayerProgress {
         if (!buttons) initButtons();
 
         const { current, total } = duration;
-        const button = buttons[`button_${platform.toLowerCase()}`] ?? buttons["button"];
+        const button = buttons[`button_${platform?.toLowerCase()}`] ?? buttons["button"];
 
         // Если live-трек
         if (total === 0) {
@@ -130,7 +130,7 @@ interface PlayerProgressInput {
      * @description Название платформы
      * @public
      */
-    platform: RestAPIS_Names;
+    platform: RestAPINames;
 
     /**
      * @description Данные о времени трека

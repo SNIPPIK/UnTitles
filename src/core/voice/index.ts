@@ -425,6 +425,12 @@ export namespace WebSocketOpcodes {
  */
 export enum GatewayCloseCodes {
     /**
+     * @description Discord сломал сервер голосового соединения
+     * @reconnecting undefined
+     */
+    UNEXPECTED_RESPONSE = 503,
+
+    /**
      * @description Нормальное завершение соединения.
      * @reconnecting true
      */

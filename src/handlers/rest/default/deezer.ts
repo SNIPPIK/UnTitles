@@ -23,6 +23,7 @@ import { httpsClient, locale } from "#structures";
     color: 7419530,
     url: "www.deezer.com",
     audio: false,
+    auth: false,
     filter: /^(https?:\/\/)?(www\.)?(deezer\.com)\/.+$/i,
 })
 @OptionsRest({
@@ -168,6 +169,7 @@ class RestDeezerAPI extends RestServerSide.API {
             new httpsClient({
                 url: `${this.options.api}/${method}`,
                 method: "GET",
+                agent: this.agent
             }).toJson.then((req) => {
                 // Если на этапе получение данных получена одна из ошибок
                 if (!req || req instanceof Error) return resolve(locale.err("api.request.fail"));

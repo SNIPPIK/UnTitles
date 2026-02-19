@@ -21,7 +21,7 @@ export class Environment {
 
             process.loadEnvFile(".env");
         } catch (error) {
-            const path = __dirname.split("/");
+            const path = __dirname.split(/\|\//);
             throw new Error(`[Environment] has not found .env file in directory ${path.splice(path.length, 1).join("/")}`);
         }
     };

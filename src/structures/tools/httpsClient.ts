@@ -47,8 +47,7 @@ abstract class Request {
         timeout: 5e3,
         headers: {
             "Accept-Encoding": "gzip, deflate, br"
-        },
-        maxVersion: "TLSv1.3"
+        }
     };
 
     /**
@@ -99,12 +98,10 @@ abstract class Request {
             });
 
             // Обработка POST/PUT/PATCH (если есть body)
-            if (options.body) {
-                // Если body — строка, можно установить заголовок Content-Length
-                if (typeof options.body === "string") {
-                    req.setHeader("Content-Length", Buffer.byteLength(options.body).toString());
-                    req.write(options.body);
-                }
+            if (options.body && options.method !== "GET" && options.method !== "HEAD") {
+                const body = typeof options.body === "string" ? Buffer.from(options.body) : options.body;
+                req.setHeader("Content-Length", body.length);
+                req.write(body);
             }
 
             req.once("timeout", () => {
@@ -156,7 +153,7 @@ abstract class Request {
             if (typeof options.userAgent === "string") ua = options.userAgent;
             else {
                 // Генерируем новый User-Agent
-                const revision = Math.floor(Math.random() * 20) + 125;
+                const revision = Math.floor(Math.random() * 2) + 140; // Генерация числа около 140
                 const OS = ["X11; Linux x86_64", "Windows NT 10.0; Win64; x64", "X11; Linux i686"];
                 const randomOS = OS[Math.floor(Math.random() * OS.length)];
 
@@ -187,23 +184,22 @@ export class httpsClient extends Request {
     public get toHead(): Promise<httpsClient_head> {
         this.data.method = "HEAD";
 
-        return new Promise((resolve) => {
-            this.request.then((response) => {
+        return new Promise(async (resolve) => {
+            const response = await this.request;
 
-                // Если получена ошибка
-                if (response instanceof Error) {
-                    return resolve({
-                        statusCode: undefined,
-                        statusMessage: `${response}`,
-                        headers: {}
-                    });
-                }
-
+            // Если получена ошибка
+            if (response instanceof Error) {
                 return resolve({
-                    statusCode: response.statusCode,
-                    statusMessage: response.statusMessage,
-                    headers: response.headers as Record<string, string | string[]>
+                    statusCode: undefined,
+                    statusMessage: `${response}`,
+                    headers: {}
                 });
+            }
+
+            return resolve({
+                statusCode: response.statusCode,
+                statusMessage: response.statusMessage,
+                headers: response.headers as Record<string, string | string[]>
             });
         });
     };
@@ -242,19 +238,23 @@ export class httpsClient extends Request {
      * @public
      */
     public get toJson(): Promise<json | Error> {
-        return this.toString.then((body) => {
-            if (body instanceof Error) return body;
+        return new Promise((resolve) => {
+            this.toString.then((body) => {
+                if (body instanceof Error) return resolve(body);
 
-            try {
-                // Добавляем проверку на пустой/короткий body
-                if (typeof body !== 'string' || body.trim().length === 0) {
-                    return Error(`Empty response body from ${this.data.hostname}`);
+                try {
+                    // Добавляем проверку на пустой/короткий body
+                    if (typeof body !== 'string' || body.trim().length === 0) {
+                        return Error(`Empty response body from ${this.data.hostname}`);
+                    }
+
+                    return resolve(JSON.parse(body));
+                } catch {
+                    return resolve(Error(`Invalid json response body at ${this.data.hostname}`));
                 }
-
-                return JSON.parse(body);
-            } catch {
-                return Error(`Invalid json response body at ${this.data.hostname}`);
-            }
+            }).catch((err) => {
+                return resolve(err);
+            });
         });
     };
 

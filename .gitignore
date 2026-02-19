@@ -1,6 +1,7 @@
 .idea
 .dev
 .env
+IRG
 build
 node_modules
 package-lock.json

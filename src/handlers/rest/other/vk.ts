@@ -1,8 +1,6 @@
-import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
+import { APIRequestData, DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
-import type { Track } from "#core/queue";
 import { sdb } from "#worker/db";
-import { env } from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -25,7 +23,7 @@ import { env } from "#app/env";
     color: 30719,
     url: "vk.com",
     audio: true,
-    auth: env.get("token.vk", null),
+    auth: true,
     filter: /^(https?:\/\/)?(vk\.com)\/.+$/i
 })
 @OptionsRest({
@@ -143,7 +141,8 @@ class RestVKAPI extends RestServerSide.API {
             const url = `${this.options.api}/${method}.${type}` + `?access_token=${this.auth}${options}&v=5.95`;
 
             new httpsClient({
-                url
+                url,
+                agent: this.agent
             }).toJson.then((api: any) => {
                 // Если на этапе получение данных получена одна из ошибок
                 if (!api || !api?.response) return resolve(locale.err( "api.request.fail"));
@@ -181,7 +180,7 @@ class RestVKAPI extends RestServerSide.API {
      * @param user {any} Любой автор трека
      * @protected
      */
-    protected author = (user: any): Track.artist => {
+    protected author = (user: any): APIRequestData.Artist => {
         const url = `https://vk.com/audio?performer=1&q=${user.artist.replaceAll(" ", "").toLowerCase()}`;
 
         return { url, title: user.artist };

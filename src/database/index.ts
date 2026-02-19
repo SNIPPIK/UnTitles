@@ -1,14 +1,10 @@
-import { DiscordClient, DJSVoice } from "#structures/discord";
+import { DiscordClient, SeyfertVoice } from "#structures/discord";
 import { ControllerQueues, type Queue } from "#core/queue";
 import { isMainThread } from "node:worker_threads";
 import { env } from "#app/env";
 
 // Database modules
-import { Middlewares } from "#handler/middlewares";
-import { Components } from "#handler/components";
-import { Commands } from "#handler/commands";
 import { RestObject } from "#handler/rest";
-import { Events } from "#handler/events";
 import { Voices } from "#core/voice";
 
 /**
@@ -30,41 +26,7 @@ class Database {
      * @readonly
      * @public
      */
-    public readonly adapter: DJSVoice;
-
-    /**
-     * @author SNIPPIK
-     * @description Загружаем класс для хранения событий
-     * @readonly
-     * @public
-     */
-    public readonly events: Events;
-
-    /**
-     * @author SNIPPIK
-     * @description Загружаем класс для хранения команд
-     * @readonly
-     * @public
-     */
-    public readonly commands: Commands;
-
-    /**
-     * @author SNIPPIK
-     * @description Загружаем класс для хранения кнопок бота
-     * @description Класс хранящий в себе все кнопки для бота
-     * @readonly
-     * @public
-     */
-    public readonly components: Components;
-
-    /**
-     * @author SNIPPIK
-     * @description Загружаем класс для хранения кнопок бота
-     * @description Класс хранящий в себе все кнопки для бота
-     * @readonly
-     * @public
-     */
-    public readonly middlewares: Middlewares;
+    public readonly adapter: SeyfertVoice<DiscordClient>;
 
     /**
      * @description Загружаем класс для хранения очередей, плееров, циклов
@@ -120,14 +82,10 @@ class Database {
         this.api = new RestObject();
         this.queues = new ControllerQueues();
         this.voice = new Voices();
-        this.commands = new Commands();
-        this.components = new Components();
-        this.events = new Events();
-        this.middlewares = new Middlewares();
 
         // Если реально клиент
         if (client instanceof DiscordClient) {
-            this.adapter = new DJSVoice(client);
+            this.adapter = new SeyfertVoice(client);
         }
 
         this.whitelist = {

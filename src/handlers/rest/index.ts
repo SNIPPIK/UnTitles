@@ -1,88 +1,14 @@
-import { Logger, SimpleWorker } from "#structures";
-import type { RestServerSide } from "./index.server";
-import { RestClientSide } from "./index.client";
-import { Worker } from "node:worker_threads";
-import { Track } from "#core/queue";
+import {APIPlatformType, APIRequests, APIRequestsKeys} from "#handler/rest/index.decorator";
+import {Logger, SimpleWorker} from "#structures";
+import type {RestServerSide} from "./index.server";
+import {RestClientSide} from "./index.client";
+import {Worker} from "node:worker_threads";
+import {Track} from "#core/queue";
 
 // Export decorator
 export * from "./index.decorator";
 export * from "./index.client";
 export * from "./index.server";
-
-
-/**
- * @author SNIPPIK
- * @description Типы запросов с лимитом кол-ва треков при запросе
- * @type APIRequestsLimits
- * @public
- */
-export type APIRequestsLimits = "playlist" | "album" | "search" | "artist" | "related";
-
-/**
- * @description Helper: all possible requests across platforms
- * @type APIRequests
- * @helper
- * @public
- */
-export type APIRequests = {
-    track: Track
-    playlist: Track.list
-    album: Track[]
-    artist: Track[]
-    related: Track.list
-    search: Track[]
-}
-
-/**
- * @description Helper: all possible requests across platforms
- * @type APIRequestsRaw
- * @helper
- * @public
- */
-export type APIRequestsRaw = {
-    track: TrackRaw.Data
-    playlist: TrackRaw.List
-    album: TrackRaw.List
-    artist: TrackRaw.Data[]
-    related: TrackRaw.List
-    search: TrackRaw.Data[]
-}
-
-/**
- * @description Сырые типы данных для дальнейшего использования
- * @namespace TrackRaw
- * @helper
- * @private
- */
-namespace TrackRaw {
-    /**
-     * @description Сырые данные объекта трека
-     * @interface Data
-     * @public
-     */
-    export interface Data {
-        readonly id: string;
-        title: string;
-        readonly url: string;
-        artist: { title: string; readonly url: string; image?: string }
-        image: string;
-        time: { total: string; split?: string }
-        audio?: string;
-    }
-
-    /**
-     * @description Сырые данные объекта списка
-     * @interface List
-     * @public
-     */
-    export interface List {
-        readonly url: string;
-        readonly title: string;
-        items: Data[];
-        image: string;
-        artist?: { title: string; readonly url: string; image?: string }
-    }
-}
 
 /**
  * @author SNIPPIK
@@ -91,7 +17,7 @@ namespace TrackRaw {
  * @const normalize
  * @private
  */
-const normalize = (str: string) => str.toLowerCase().replace(/[*:\/;-]/gi, "").replace(/\s+/g, " ").trim().split(" ");
+const normalize = (str: string) => new Set(str.toLowerCase().replace(/[*:/;-]/gi, "").replace(/\s+/g, " ").trim().split(" "));
 
 /**
  * @author SNIPPIK
@@ -119,12 +45,33 @@ export class RestObject {
     public platforms: RestServerSide.Data;
 
     /**
+     * @description База с платформами в Map
+     * @public
+     */
+    public platformMap = new Map<string, RestServerSide.API>();
+
+    /**
+     * @description Map функций для возврата ответа от worker
+     * @private
+     */
+    private pending = new Map<number, {
+        // Функция ответа
+        resolve: (val: RestServerSide.Result<any> & { requestId?: number }) => void,
+
+        // Время ожидания
+        timeout: NodeJS.Timeout
+    }>();
+
+    /**
      * @description Получаем список всех доступных платформ
      * @returns RestServerSide.API[]
      * @public
      */
     public get array(): RestServerSide.API[] {
-        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported).filter(api => api.auth !== null);
+        if (!this.platforms.array) this.platforms.array = this.platforms.authorization.map(name => {
+            const platform = this.platformMap.get(name);
+            return platform.type === APIPlatformType.primary ? platform : null;
+        }).filter(Boolean);
         return this.platforms.array;
     };
 
@@ -147,27 +94,6 @@ export class RestObject {
     };
 
     /**
-     * @description Генерация уникального ID
-     * @param reset - Надо ли делать сброс счетчика
-     * @returns number
-     * @private
-     */
-    private generateUniqueId = (reset = false) => {
-        // Если надо сбросить данные
-        if (reset) {
-            this.lastID = 0;
-            return this.lastID;
-        }
-
-        // Если большое кол-во запросов
-        else if (this.lastID >= 2 ** 16) this.generateUniqueId(true);
-
-        // Добавляем +1 к ID
-        this.lastID += 1;
-        return this.lastID;
-    };
-
-    /**
      * @description Функция для инициализации worker
      * @returns Promise<boolean>
      * @public
@@ -185,9 +111,17 @@ export class RestObject {
                 not_destroyed: true,
                 callback: (data) => {
                     this.platforms = data;
+                    this.platformMap.clear();
+
+                    // Заполняем Map для O(1) доступа
+                    for (const api of Object.values(data.supported)) {
+                        if (api.auth !== null) {
+                            this.platformMap.set(api.name.toUpperCase(), api);
+                        }
+                    }
 
                     // Сбрасываем уникальный id запроса
-                    this.generateUniqueId(true);
+                    this.generateUniqueId();
                     return resolve(true);
                 }
             });
@@ -200,7 +134,33 @@ export class RestObject {
                 this.lastID++;
                 return this.startWorker();
             });
+
+            // Внутри startWorker, после создания this.worker
+            worker.on("message", (message: RestServerSide.Result<any> & { requestId?: number }) => {
+                const { requestId } = message;
+
+                // Ищем, кто ждет этот ID
+                const request = this.pending.get(requestId);
+                if (!request) return; // Если никто не ждет (например, уже был таймаут)
+
+                // Сразу чистим таймер и удаляем из карты
+                clearTimeout(request.timeout);
+                this.pending.delete(requestId);
+
+                // Обработка результата
+                request.resolve(message);
+            });
         });
+    };
+
+    /**
+     * @description Генерация уникального ID
+     * @returns number
+     * @private
+     */
+    private generateUniqueId = () => {
+        this.lastID = (this.lastID + 1) % 65536; // 2^16
+        return this.lastID;
     };
 
     /**
@@ -219,8 +179,95 @@ export class RestObject {
      * @private
      */
     private platform = (name: RestServerSide.API["name"] | string): RestServerSide.API => {
-        return this.array.find((api) => api.name === name || api.filter.test(name) || api.name === "YOUTUBE");
+        if (!name) return this.platformMap.get("YOUTUBE");
+
+        const upperName = name.toUpperCase();
+
+        // Попытка O(1) поиска по точному имени
+        const directMatch = this.platformMap.get(upperName);
+        if (directMatch) return directMatch;
+
+        // Если не нашли, делаем ОДИН проход для проверки RegExp
+        const regexMatch = this.array.find((api) => api.filter.test(name));
+        if (regexMatch) return regexMatch;
+
+        // Fallback к дефолтной платформе
+        return this.platformMap.get("YOUTUBE");
     };
+
+    /**
+     * @description Создание класса для взаимодействия с платформой, рекомендуются добавлять timeout из-вне
+     * @returns Promise<APIRequests[T] | Error>
+     * @protected
+     */
+    public request_worker<T extends APIRequestsKeys>({platform, payload, options, type}: RestClientSide.ClientOptions): Promise<APIRequests<T>| Error> {
+        return new Promise<APIRequests<T> | Error>((resolve) => {
+            const requestId = this.generateUniqueId();
+
+            // Создаем таймаут
+            const timeout = setTimeout(() => {
+                if (this.pending.has(requestId)) {
+                    this.pending.delete(requestId);
+                    resolve(new Error(`Connection to platform ${platform.name} timeout`));
+                }
+            }, 20e3);
+
+            // Регистрируем "ждущего"
+            this.pending.set(requestId, {
+                resolve: (message) => {
+                    const { result, status } = message;
+
+                    /**
+                     * @description Слушаем статус ответа другого потока
+                     * @private
+                     */
+                    switch (status) {
+                        // Если получен успешный ответ
+                        case "success": {
+                            Logger.log("DEBUG", `[Rest/API |${type}| GET - ${platform.name}]: ${payload}`);
+                            const parseTrack = (item) => new Track(item, platform);
+
+                            // Если пришел список треков
+                            if (Array.isArray(result)) {
+                                return resolve(result.map(parseTrack) as APIRequests<T>);
+                            }
+
+                            // Если пришел плейлист
+                            else if (typeof result === "object" && "items" in result) {
+                                return resolve({ ...result, items: result.items.map(parseTrack) } as any);
+                            }
+
+                            // Если просто трек
+                            return resolve(parseTrack(result) as APIRequests<T>);
+                        }
+
+                        // Если была получена ошибка
+                        case "error": {
+                            Logger.log("ERROR", result);
+
+                            // Если платформа не отвечает, то отключаем ее!
+                            if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
+                                this.platforms.block.push(platform.name);
+                            }
+
+                            return resolve(result);
+                        }
+
+                        // Если получен неожиданный ответ
+                        default: {
+                            Logger.log("WARN", `An unknown response was received from another thread!`);
+                            return resolve(new Error(`Unknown response!!!`))
+                        }
+                    }
+                },
+                timeout
+            });
+
+            // Отправляем запрос
+            this.worker.postMessage({ platform: platform.name, payload, options, requestId, type });
+        });
+    };
+
 
     /**
      * @description Ищем похожий трек, но на других платформах
@@ -264,15 +311,31 @@ export class RestObject {
             // Ищем нужный трек
             // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
             const findTrack = search.find((song) => {
-                const candidate = normalize(`${song.artist.title} - ${song.name}`);
-                const matchCount = candidate.filter(word => original.includes(word)).length;
-                const time = Math.abs(track.time.total - song.time.total);
+                const timeDiff = Math.abs(track.time.total - song.time.total);
+                if (timeDiff > 3) return false;
 
-                return (time <= 5 || time === 0) && // по длительности близко
-                    (
-                        matchCount === candidate.length ||               // полное совпадение
-                        matchCount >= Math.floor(candidate.length * 0.6) // ≥60% слов совпало
-                    );
+                // ВАЖНО: Для кандидата нам нужен МАССИВ слов, чтобы matchCount был точным.
+                // Если твой глобальный normalize возвращает Set,
+                // то для кандидата лучше сделать быстрый сплит:
+                const candidateWords = song.artist.title.toLowerCase()
+                    .replace(/[*:/;-]/gi, "")
+                    .split(/\s+/);
+
+                if (candidateWords.length === 0) return false;
+
+                let matchCount = 0;
+                for (const word of candidateWords) {
+                    // Теперь используем .has() у твоего Set
+                    if (original.has(word)) {
+                        matchCount++;
+                    }
+                }
+
+                // Логика порогов
+                const isFullMatch = matchCount === candidateWords.length;
+                const isPartialMatch = matchCount >= Math.floor(candidateWords.length * 0.4);
+
+                return isFullMatch || isPartialMatch;
             });
 
             // Если отфильтровать треки не удалось
@@ -324,7 +387,7 @@ export class RestObject {
      * @returns Promise<string | Error>
      * @public
      */
-    public fetchAudioLink = async (track: Track): Promise<string | Error> => {
+    public fetchAudioLink = async (track: Track): Promise<Track | Error> => {
         const { url, api } = track;
         const { authorization, audio, block } = this.platforms;
 
@@ -335,9 +398,12 @@ export class RestObject {
 
                 // Если удалось получить аудио
                 if (!(song instanceof Error)) {
+                    track["_duration"] = song.time;
                     track.link = song.link;
-                    return song.link;
+                    return song;
                 }
+
+                // Пробуем найти что-то похожее, но на другой платформе
             }
 
             // Ищем похожий трек на другой платформе
@@ -348,7 +414,7 @@ export class RestObject {
 
             track["_duration"] = song.time;
             track.link = song.link;
-            return song.link;
+            return song;
         } catch (err) {
             Logger.log("ERROR", `[APIs/fetch] ${err}`);
             return err instanceof Error ? err : Error(`[APIs/fetch] Unexpected error ${err}`);
@@ -390,7 +456,7 @@ export class RestObject {
                 }
 
                 // Отдаем найденные треки
-                return item.items;
+                return item.items as any;
             }
 
             const song = await this.fetch(track, this.arrayRelated);
@@ -403,76 +469,5 @@ export class RestObject {
             Logger.log("ERROR", `[APIs/fetch] ${err}`);
             return err instanceof Error ? err : Error(`[APIs/fetch] Unexpected error ${err}`);
         }
-    };
-
-    /**
-     * @description Создание класса для взаимодействия с платформой, рекомендуются добавлять timeout из-вне
-     * @returns Promise<APIRequests[T] | Error>
-     * @protected
-     */
-    protected request_worker<T extends keyof APIRequests>({platform, payload, options, type}: RestClientSide.ClientOptions): Promise<APIRequests[T] | Error> {
-        return new Promise<APIRequests[T] | Error>(async (resolve) => {
-            const requestId = this.generateUniqueId(); // Генерируем номер запроса
-
-            // Слушаем сообщение или же ответ
-            const onMessage = async (message: RestServerSide.Result<T> & { requestId?: string }) => {
-                const { result, status } = message;
-
-                // Не наш ответ — игнорируем
-                if (message.requestId !== requestId) return;
-
-                // Отписываемся после получения
-                this.worker.off("message", onMessage);
-
-                /**
-                 * @description Слушаем статус ответа другого потока
-                 * @private
-                 */
-                switch (status) {
-                    // Если получен успешный ответ
-                    case "success": {
-                        Logger.log("DEBUG", `[Rest/API |${type}| GET - ${platform.name}]: ${payload}`);
-                        const parseTrack = (item: TrackRaw.Data) => new Track(item, platform);
-
-                        // Если пришел список треков
-                        if (Array.isArray(result)) {
-                            return resolve(result.map(parseTrack) as APIRequests[T]);
-                        }
-
-                        // Если пришел плейлист
-                        else if (typeof result === "object" && "items" in result) {
-                            return resolve({ ...result, items: result.items.map(parseTrack) } as any);
-                        }
-
-                        // Если просто трек
-                        return resolve(parseTrack(result) as APIRequests[T]);
-                    }
-
-                    // Если была получена ошибка
-                    case "error": {
-                        Logger.log("ERROR", result);
-
-                        // Если платформа не отвечает, то отключаем ее!
-                        if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
-                            this.platforms.block.push(platform.name);
-                        }
-                        return resolve(result);
-                    }
-
-                    // Если получен неожиданный ответ
-                    default: {
-                        Logger.log("WARN", `An unknown response was received from another thread!`);
-                        return resolve(new Error(`Unknown response!!!`))
-                    }
-                }
-            };
-
-            // Слушаем worker
-            this.worker.on("message", onMessage);
-
-            // Отправляем запрос
-            this.worker.postMessage({ platform: platform.name, payload, options, requestId, type });
-            Logger.log("DEBUG", `[Rest/API |${type}| SEND - ${platform.name}]: ${payload}`);
-        });
     };
 }

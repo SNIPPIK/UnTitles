@@ -44,12 +44,16 @@ export class Process {
     public constructor(args: string[], name: string = ffmpeg_path) {
         const index_resource = args.indexOf("-i");
 
-        // Проверяем на наличие ссылки в пути
+        // Твоя логика проверки ссылки
         if (index_resource !== -1) {
             const isLink = args.at(index_resource + 1)?.startsWith("http");
-
-            // Если указана ссылка
-            if (isLink) args.unshift("-reconnect", "1", "-reconnect_delay_max", "5", "-reconnect_on_network_error", "1");
+            if (isLink) args.unshift(
+                "-reconnect", "1",
+                "-reconnect_at_eof", "1",
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "5",
+                "-reconnect_on_network_error", "1"
+            );
         }
 
         // Добавляем аргументы отключения видео и логирования

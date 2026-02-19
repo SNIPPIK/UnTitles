@@ -23,13 +23,6 @@ const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 24;
 
 /**
  * @author SNIPPIK
- * @description Количество пакетов, для которых допускается сбой дешифрования, пока мы не сочтем переход неудачным и не выполним повторную инициализацию.
- * @const DEFAULT_DECRYPTION_FAILURE_TOLERANCE
- */
-//const DEFAULT_DECRYPTION_FAILURE_TOLERANCE = 36;
-
-/**
- * @author SNIPPIK
  * @description Управляет сеансом группы протокола DAVE.
  * @class E2EESession
  * @extends TypedEmitter
@@ -42,9 +35,6 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
     /** Ожидаемый переход */
     private pendingTransitions = new Map<number, number>();
 
-    /** Количество последовательных сбоев, возникших при дешифровании */
-    //private consecutiveFailures = 0;
-
     /** Был ли данный сеанс ранее понижен в рейтинге */
     private downgraded = false;
 
@@ -54,11 +44,22 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
     /** Базовый сеанс DAVE этой оболочки */
     public session: SessionMethods;
 
+    /** Выполняется ли переход кода шифрования */
+    private _isTransitioning = false;
+
+    /**
+     * @description Выполнен ли переход от старого кода к новому
+     * @public
+     */
+    public get isTransitioning(): boolean {
+        return this._isTransitioning;
+    };
+
     /**
      * @description Максимальная доступная версия протокола
      * @returns number
      */
-    public static get version(): number {
+    public static get max_version(): number {
         return MAX_E2EE_PROTOCOL;
     };
 
@@ -166,6 +167,13 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
         this.emit("debug", `Preparing for transition (${data.transition_id}, v${data.protocol_version})`);
         this.pendingTransitions.set(data.transition_id, data.protocol_version);
 
+        // Удаляем старые переходы через 30 секунд, если они не выполнились
+        setTimeout(() => {
+            if (this.pendingTransitions?.has(data.transition_id)) {
+                this.pendingTransitions.delete(data.transition_id);
+            }
+        }, 30000).unref(); // unref() важен, чтобы не держать процесс Node.js
+
         if (data.transition_id === 0) this.executeTransition(data.transition_id);
         else if (data.protocol_version === 0) this.session?.setPassthroughMode(true, TRANSITION_EXPIRY_PENDING_DOWNGRADE);
         return data.transition_id !== 0;
@@ -178,6 +186,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
      * @public
      */
     public executeTransition = (transition_id: number) => {
+        this._isTransitioning = true; // Блокируем отправку
         this.emit("debug", `Executing transition (${transition_id})`);
 
         // Если нет данных для смены версии DAVE
@@ -203,6 +212,12 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
         this.lastTransition_id = transition_id;
         this.emit("debug", `Transition executed (v${oldVersion} -> v${this.version}, id: ${transition_id})`);
         this.pendingTransitions.delete(transition_id);
+
+        // Даем небольшую паузу (один тик), чтобы ключи "улеглись"
+        setImmediate(() => {
+            this._isTransitioning = false;
+        });
+
         return true;
     };
 
@@ -213,13 +228,13 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
      * @returns Buffer
      * @public
      */
-    public processProposals = (payload: Buffer, connectedClients: Set<string>): Buffer | null => {
+    public processProposals = (payload: Buffer, connectedClients: Array<string>): Buffer | null => {
         if (!this.session) throw new Error("No session available");
         this.emit("debug", "MLS proposals processed");
         const { commit, welcome } = this.session.processProposals(
             payload.readUInt8(0) as 0 | 1,
             payload.subarray(1),
-            Array.from(connectedClients),
+            connectedClients
         );
 
         if (!commit) return null;
@@ -263,44 +278,17 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
      * @public
      */
     public encrypt = (packet: Buffer) => {
-        return (this.version === 0 || !this.session?.ready) ? null : this.session.encryptOpus(packet);
-    };
-
-    /**
-     * @description Расшифровать пакет, используя сквозное шифрование.
-     * @param packet - Пакет для расшифровки
-     * @param userId - Идентификатор пользователя, отправившего пакет
-     * @returns Buffer
-     * @public
-     */
-    /*public decrypt = (packet: Buffer, userId: string) => {
-        const canDecrypt = this.session?.ready && (this.version !== 0 || this.session.canPassthrough(userId));
-
-        // Если невозможно расшифровать opus frame
-        if (!canDecrypt || !this.session) return null;
+        if (this.version === 0 || !this.session?.ready || this._isTransitioning) return packet;
 
         try {
-            const buffer = this.session.decrypt(userId, loaded_lib.MediaType.AUDIO, packet);
-            this.consecutiveFailures = 0;
-            return buffer;
-        } catch (error) {
-            if (!this.reinitializing && this.pendingTransitions.size === 0) {
-                this.consecutiveFailures++;
-                this.emit("debug", `Failed to decrypt a packet (${this.consecutiveFailures} consecutive fails)`);
-
-                if (this.consecutiveFailures > DEFAULT_DECRYPTION_FAILURE_TOLERANCE) {
-                    if (this.lastTransition_id) this.recoverFromInvalidTransition = this.lastTransition_id;
-                    else throw error;
-                }
-            } else if (this.reinitializing) {
-                this.emit("debug", 'Failed to decrypt a packet (reinitializing session)');
-            } else if (this.pendingTransitions.size > 0) {
-                this.emit('debug', `Failed to decrypt a packet (${this.pendingTransitions.size} pending transition[s])`);
-            }
+            return this.session.encryptOpus(packet);
+        } catch (err) {
+            this.emit("debug", `Encryption failed: ${err}`);
+            // В случае критической ошибки шифрования лучше отправить тишину или
+            // прозрачный пакет, чтобы не вызвать шум в канале
+            return packet;
         }
-
-        return null;
-    };*/
+    };
 
     /**
      * @description Сбрасывает сеанс и удаляет его
@@ -310,11 +298,14 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
     public destroy = () => {
         super.destroy();
         this.removeAllListeners();
+        this._isTransitioning = true; // Сразу блокируем шифрование
 
-        try {
-            this.session?.reset?.();
-        } catch (error) {
-            Logger.log("ERROR", `Failed to destroy DAVE session: ${error}`);
+        if (this.session) {
+            try {
+                this.session.reset();
+                // Если библиотека поддерживает явное удаление объекта из кучи C++:
+                // (this.session as any).delete?.();
+            } catch (e) {}
         }
 
         this.session = null;
@@ -325,6 +316,8 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
         this.pendingTransitions.clear();
         this.pendingTransitions = null;
         this.downgraded = null;
+
+        this.emit("debug", "E2EE Session destroyed");
     };
 }
 

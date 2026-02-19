@@ -23,6 +23,9 @@
     <a href="LICENSE.md">
       <img src="https://img.shields.io/badge/License-BSD3-green?style=for-the-badge" alt="License" />
     </a>
+    <a href="https://github.com/SNIPPIK/Untitles/releases/latest">
+      <img src="https://img.shields.io/github/v/release/SNIPPIK/Untitles?logo=git&style=for-the-badge&include_prereleases&label=Release" alt="Latest release" />
+    </a>
     <a href="https://github.com/SNIPPIK/Untitles/releases">
       <img src="https://img.shields.io/github/downloads/SNIPPIK/Untitles/total?logo=github&style=for-the-badge&label=Downloads" alt="All downloads" />
     </a>
@@ -37,7 +40,6 @@
 ## 👥 Авторы
 
 - 👤 [`SNIPPIK`](https://github.com/SNIPPIK)
-- 💡 [`GHOST-OF-THE-ABYSS`](https://github.com/GHOST-OF-THE-ABYSS) — идеи и предложения
 
 📢 Об ошибках и недочётах просим сообщать в [`Issues`](https://github.com/SNIPPIK/UnTitles/issues) или [`Discord`](https://discord.gg/qMf2Sv3)  
 🚫 Бот не работает 24/7 — он может быть недоступен!
@@ -54,9 +56,12 @@
 > Полностью устранить `packet lost` не возможно, из-за протокола `UDP` и прочих ограничений `discord`
 
 > [!TIP]
-> Рекомендую включить систему кэширования в `.env`, в таком случае можно включать треки даже при полной блокировке платформы   
+> Рекомендую включить систему кэширования в `.env`, в таком случае можно включать треки даже при полной блокировке платформы  
 > Но голосовой системе просто не дозволено терять аудио пакеты даже при критической нагрузке!
 
+> [!WARNING]
+> Если используется прокси, учитывайте что `FFmpeg` не поддерживает socks. Для таких задач есть [`STH`](https://github.com/SNIPPIK/SHS)  
+> Что-то может не работать, если вы не правильно настроили!!! 
 ---
 
 ### ⚠️ Требования к железу | Данные с Ryzen 7 5700x3D | 1 плеер
@@ -68,20 +73,33 @@
 
 # 🎧 Основные возможности
 #### 🎖️ Особенности
-- Не боится цикла событий, даже в таком случаем звук идет плавно!!!
+- Устойчивость к зацикливанию событий, поэтому даже в этом случае звук воспроизводится плавно!!!
 ```ts
 setInterval(() => {
     const startBlock = performance.now();
     while (performance.now() - startBlock < 100) {}
-}, 200);
+}, 60);
+
+setInterval(() => {
+    const startBlock = performance.now();
+    while (performance.now() - startBlock < 100) {}
+}, 80);
+
+setInterval(() => {
+    const startBlock = performance.now();
+    while (performance.now() - startBlock < 100) {}
+}, 120);
+
+setInterval(() => {
+    const startBlock = performance.now();
+    while (performance.now() - startBlock < 100) {}
+}, 100);
 ```
 #### 🔊 Голосовой движок
 - Реализация [**Voice Gateway Version 8**](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/core/voice) + [**End-to-End Encryption (E2EE 🔐)**](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
 - Полная реализация **SRTP**: `aead_aes256_gcm`, `xchacha20_poly1305` (через библиотеки)
 - Лучший аудио плеер по сравнению с **open source** решениями
 - Не требует никаких opus encoders/decoders, имеет свой opus encoder по методу парсинга!
-- Свой `jitter buffer`, очень схож с WebRTP по логике!
-- Авто калибровка задержки голосового подключения, для компенсации задержек сети
 - Требуется **FFmpeg**, он отвечает за аудио и фильтры!
 - Поддерживаются: Autoplay, Repeat, Shuffle, Replay и другие функции.
 - Работает даже при сильном **event loop lag**!
@@ -94,7 +112,7 @@ setInterval(() => {
 - Присутствует явная синхронизация аудио потока, без аудио фильтров!
 #### 🌐 Платформы
 - Поддерживаются: `YouTube`, `Spotify`, `VK`, `Yandex-Music`, `SoundCloud`, `Deezer`
-- Аудио: `YouTube`, `VK`, `Yandex-Music` **(MP3 + Lossless)**, `SoundCloud`
+- Аудио: `YouTube`, `VK`, `Yandex-Music`, `SoundCloud`
 - Есть поиск аудио на других платформах, даже если платформа не хочет отдавать аудио!
 - Полностью `fallback` система, нет трека на 1 платформе найдется на другой!
 - Есть поддержка `related`(**похожих треков**), включение похожих треков
@@ -107,27 +125,6 @@ setInterval(() => {
 
 ---
 
-# 🔩 Прочий функционал
-#### Своя система [handlers](src/handlers)
-- Универсальный загрузчик: [`commands`](src/handlers/commands), [`events`](src/handlers/events), [`components`](src/handlers/components), [`middlewares`](src/handlers/middlewares), [`rest`](src/handlers/rest)
-- Свой framework для команд, кнопок, селекторов меню, событий
-- Используются декораторы и интерфейсы, включая типизацию
-- Поддержка "горячей" перезагрузки
-
-#### 💡 Адаптивный цикл
-- Не боится **event loop** и **drift**, он просто учитывает их не как проблему, а как параметры!
-- Цикл может срабатывать на опережение от 0 до 2 ms для обработки объектов в цикле!
-- Работает на своих вычислениях, а не на `newTime - oldTime`, вычисления задержки функции, расхождения после выполнения и прочее
-- Точность цикла `±0.05 ms` при `process.hrtime` + `performance.now`
-
-#### ⚙️ Внутренние инструменты
-- [`SetArray`](src/structures/array/index.set.ts) - 2 в одном Array и Set в один класс
-- [`Cycle`](src/structures/tools/Cycle.ts) - Управляет системой обновления сообщений и отправкой аудио пакетов
-- [`TypedEmitter`](src/structures/tools/TypedEmitter.ts) - Пользовательский объект на основе `object`
-- [`SimpleWorker`](src/structures/tools/SimpleWorker.ts) - Класс для работы с потоками
-
----
-
 ## 🎛 Интерфейс
 - Интерактивные кнопки: действия зависят от состояния плеера
 - Поддержка прогресс-бара с тайм-кодами
@@ -136,8 +133,6 @@ setInterval(() => {
 #### 📚 Команды
 |   Команда | Autocomplete | Аргументы                       | Описание                 |
 |----------:|:-------------|:--------------------------------|:-------------------------|
-|    `/api` | ❌            | access:(block, unblock)         | Управление API           |
-|    `/bot` | ❌            | restart:(commands, bot, events) | Перезапуск               |
 | `/filter` | ✅            | (off, push, disable)            | Аудио-фильтры            |
 |   `/play` | ✅            | (query)                         | Проигрывание             |
 | `/player` | ✅            | (api, replay, stop, related)    | Расширенное проигрывание |
@@ -147,14 +142,16 @@ setInterval(() => {
 |   `/skip` | ✅            | (back, to, next)                | Пропуск треков           |
 | `/repeat` | ✅            | type                            | Тип повтора              |
 |  `/queue` | ✅            | {destroy, list}                 | Управление очередью      |
-| `/avatar` | ✅            | {user}                          | Аватар пользователя      |
 |  `/voice` | ✅            | (join, leave, tribune)          | Голосовой канал          |
-| `/report` | ❌            | (none)                          | Связь с разработчиком    |
 
 ---
 ## 🚀 Быстрый старт
 > Необходим Node.js, а также установленный FFmpeg  
 > Все параметры прописаны в `.env`, не забудьте скопировать его в `.build` и настроить его под себя
+
+
+> [!WARNING]
+> Поскольку в проекте используется C++, потребуется компилятор. MSVC для Windows, CLANG для Linux, Mac или что-то другое.
 ```shell
 # Клонируем
 git clone https://github.com/SNIPPIK/UnTitles
@@ -169,9 +166,15 @@ npm run build && npm run start
 ```
 
 ---
+<p>
+    <a href="">
+      <img src=".github/images/image.png" alt="Title" />
+    </a>
+</p>
+
 [![TypeScript](https://img.shields.io/badge/typescript-5.9.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/en)
-[![Discord.js](https://img.shields.io/badge/discord.js-14.24.2-%23CB3837.svg?style=for-the-badge&logo=discord.js&logoColor=white&color=purple)](https://discord.js.org/)
+[![Seyfert](https://img.shields.io/badge/seyfert-4.1.0-%23CB3837.svg?style=for-the-badge&logo=seyfert&logoColor=white&color=purple)](https://www.seyfert.dev)
 [![WS](https://img.shields.io/badge/ws-8.18.3-%23CB3837.svg?style=for-the-badge&logo=socket&logoColor=white)](https://www.npmjs.com/package/ws)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-7.*.*-%23CB3837.svg?style=for-the-badge&logo=ffmpeg&logoColor=white&color)](https://ffmpeg.org/)
 ---

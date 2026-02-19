@@ -23,8 +23,19 @@ export type DefaultListener = (...args: any[]) => void | Promise<void>;
  * @private
  */
 interface EventBucket {
-    listener: DefaultListener;
-    type: "on" | "once"
+    /**
+     * @description Сам слушатель
+     * @readonly
+     * @public
+     */
+    readonly listener: DefaultListener;
+
+    /**
+     * @description Тип функции вызова
+     * @readonly
+     * @public
+     */
+    readonly type: "on" | "once"
 }
 
 /**
@@ -85,25 +96,24 @@ export class TypedEmitter<L extends Record<string, any>> {
         const arr = this._set?.get(event);
         if (!arr?.length) return false;
 
-        for (const run of arr) {
+        // Копируем, чтобы избежать проблем при удалении once-слушателей
+        const executionQueue = [...arr];
+
+        for (const run of executionQueue) {
             const res = run.listener(...args);
 
-            // 🚀 Асинхронный emit
+            if (run.type === "once") {
+                this.off(event, run.listener as any);
+            }
+
             if (res instanceof Promise) {
                 res.catch(err => {
-                    // Чтобы ошибки не "падали" в unhandledRejection
                     setImmediate(() => { throw err; });
-                }).finally(() => {
-                    // Если разовая функция
-                    if (run.type === "once") this.off(event, run.listener as ListenerSignature<L>[string]);
                 });
-            } else {
-                // Если разовая функция
-                if (run.type === "once") this.off(event, run.listener as ListenerSignature<L>[string]);
             }
         }
         return true;
-    };
+    }
 
     /**
      * @description Отписаться от события
@@ -117,7 +127,20 @@ export class TypedEmitter<L extends Record<string, any>> {
     public off(event: string, listener: DefaultListener): this {
         const arr = this._set?.get(event);
         if (!arr) return this;
-        this._set.set(event, arr.filter(x => x.listener !== listener));
+
+        // Ищем индекс элемента
+        const index = arr.findIndex(x => x.listener === listener);
+
+        // Удаляем элемент прямо из существующего массива, если он найден
+        if (index !== -1) {
+            arr.splice(index, 1);
+
+            // Если это был последний слушатель — чистим Map, чтобы не держать пустой массив
+            if (arr.length === 0) {
+                this._set.delete(event);
+            }
+        }
+
         return this;
     };
 
