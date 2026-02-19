@@ -32,7 +32,8 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
+    "configure": "&& node -e \"require('fs').copyFileSync('.env', 'build/.env')\" && node -e \"require('fs').copyFileSync('seyfert.config.mjs', 'build/seyfert.config.mjs')\"",
     "start": "cd build && node -r tsconfig-paths/register src --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache --interval-stack-size",
-    "build": "npx node-gyp configure build && tsc && node -e \"require('fs').copyFileSync('.env', 'build/.env')\" && node -e \"require('fs').copyFileSync('seyfert.config.mjs', 'build/seyfert.config.mjs')\""
+    "build": "npx node-gyp configure build && tsc"
   }
 }

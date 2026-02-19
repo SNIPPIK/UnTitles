@@ -162,7 +162,7 @@ npm install
 
 # Запуск через Node.js
 # настройка переменных окружения в build/.env
-npm run build && npm run start
+npm run build && npm run configure && npm run start
 ```
 
 ---

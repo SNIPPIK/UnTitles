@@ -161,7 +161,7 @@ npm install
 
 # Running via Node.js
 # Setting environment variables in build/.env
-npm run build && npm run start
+npm run build && npm run configure && npm run start
 ```
 
 ---
