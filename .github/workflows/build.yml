@@ -1,4 +1,4 @@
-name: Build Native
+name: Build Rust Modules
 on:
   push:
     branches: [ "main", "beta" ]
@@ -20,10 +20,10 @@ jobs:
             build: npx napi build --release --target x86_64-pc-windows-msvc --cargo-cwd ./src-rs
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: npx napi build --release --target aarch64-unknown-linux-gnu --cargo-cwd ./src-rs
+            build: npx napi build --release --target aarch64-unknown-linux-gnu --use-zig --cargo-cwd ./src-rs
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
-            build: npx napi build --release --target armv7-unknown-linux-gnueabihf --cargo-cwd ./src-rs
+            build: npx napi build --release --target armv7-unknown-linux-gnueabihf --use-zig --cargo-cwd ./src-rs
 
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
@@ -34,7 +34,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install Rust
@@ -56,5 +56,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: src-rs/*.node
+          path: |
+            *.node
+            src-rs/*.node
           if-no-files-found: error
