@@ -20,10 +20,10 @@ jobs:
             build: npx napi build --release --target x86_64-pc-windows-msvc --cargo-cwd ./src-rs
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: npx napi build --release --target aarch64-unknown-linux-gnu --use-zig --cargo-cwd ./src-rs
+            build: npx napi build --release --target aarch64-unknown-linux-gnu --zig --cargo-cwd ./src-rs
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
-            build: npx napi build --release --target armv7-unknown-linux-gnueabihf --use-zig --cargo-cwd ./src-rs
+            build: npx napi build --release --target armv7-unknown-linux-gnueabihf --zig --cargo-cwd ./src-rs
 
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
@@ -43,7 +43,7 @@ jobs:
           targets: ${{ matrix.settings.target }}
 
       - name: Setup zig
-        if: contains(matrix.settings.build, '--use-zig')
+        if: contains(matrix.settings.build, '--zig')
         uses: goto-bus-stop/setup-zig@v2
 
       - name: Install dependencies
