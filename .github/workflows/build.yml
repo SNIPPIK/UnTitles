@@ -53,12 +53,12 @@ jobs:
 
       - name: Build
         run: ${{ matrix.settings.build }}
-        working-directory: ./src-native # Запускаем саму сборку в папке с Rust
+        working-directory: src-native # Запускаем саму сборку в папке с Rust
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
           # Ищем файл в папке, где он скомпилировался
-          path: ./src-native/*.node
+          path: src-native/*.node
           if-no-files-found: error
