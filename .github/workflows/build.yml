@@ -61,4 +61,6 @@ jobs:
           path: |
             *.node
             src-rs/*.node
+            *.js
+            *.ts
           if-no-files-found: error
