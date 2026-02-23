@@ -17,7 +17,7 @@ export * from "./index.server";
  * @const normalize
  * @private
  */
-const normalize = (str: string) => new Set(str.toLowerCase().replace(/[*:/;-]/gi, "").replace(/\s+/g, " ").trim().split(" "));
+const normalize = (str: string) => str.toLowerCase().replace(/[*:\/;-]/gi, "").replace(/\s+/g, " ").trim().split(" ");
 
 /**
  * @author SNIPPIK
@@ -63,16 +63,21 @@ export class RestObject {
     }>();
 
     /**
+     * @description Получение полного списка платформ
+     * @public
+     */
+    public get array_raw() {
+        if (!this.platforms.array) this.platforms.array = Object.values(this.platforms.supported).sort((a, b) => a.name.localeCompare(b.name));
+        return this.platforms.array;
+    };
+
+    /**
      * @description Получаем список всех доступных платформ
      * @returns RestServerSide.API[]
      * @public
      */
     public get array(): RestServerSide.API[] {
-        if (!this.platforms.array) this.platforms.array = this.platforms.authorization.map(name => {
-            const platform = this.platformMap.get(name);
-            return platform.type === APIPlatformType.primary ? platform : null;
-        }).filter(Boolean);
-        return this.platforms.array;
+        return this.array_raw.filter((api) => api.auth !== null && api.type === APIPlatformType.primary);
     };
 
     /**
@@ -114,7 +119,7 @@ export class RestObject {
                     this.platformMap.clear();
 
                     // Заполняем Map для O(1) доступа
-                    for (const api of Object.values(data.supported)) {
+                    for (const api of this.array_raw) {
                         if (api.auth !== null) {
                             this.platformMap.set(api.name.toUpperCase(), api);
                         }
@@ -311,31 +316,15 @@ export class RestObject {
             // Ищем нужный трек
             // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
             const findTrack = search.find((song) => {
-                const timeDiff = Math.abs(track.time.total - song.time.total);
-                if (timeDiff > 3) return false;
+                const candidate = normalize(`${song.artist.title} - ${song.name}`);
+                const matchCount = candidate.filter(word => original.includes(word)).length;
+                const time = Math.abs(track.time.total - song.time.total);
 
-                // ВАЖНО: Для кандидата нам нужен МАССИВ слов, чтобы matchCount был точным.
-                // Если твой глобальный normalize возвращает Set,
-                // то для кандидата лучше сделать быстрый сплит:
-                const candidateWords = song.artist.title.toLowerCase()
-                    .replace(/[*:/;-]/gi, "")
-                    .split(/\s+/);
-
-                if (candidateWords.length === 0) return false;
-
-                let matchCount = 0;
-                for (const word of candidateWords) {
-                    // Теперь используем .has() у твоего Set
-                    if (original.has(word)) {
-                        matchCount++;
-                    }
-                }
-
-                // Логика порогов
-                const isFullMatch = matchCount === candidateWords.length;
-                const isPartialMatch = matchCount >= Math.floor(candidateWords.length * 0.4);
-
-                return isFullMatch || isPartialMatch;
+                return (time <= 5 || time === 0) && // по длительности близко
+                    (
+                        matchCount === candidate.length ||               // полное совпадение
+                        matchCount >= Math.floor(candidate.length * 0.6) // ≥60% слов совпало
+                    );
             });
 
             // Если отфильтровать треки не удалось

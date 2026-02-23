@@ -44,20 +44,6 @@ class Database {
     public readonly voice: Voices;
 
     /**
-     * @description Для управления белым списком пользователей
-     * @readonly
-     * @public
-     */
-    public readonly whitelist: { toggle: boolean; ids: string[] };
-
-    /**
-     * @description Для управления черным списком пользователей
-     * @readonly
-     * @public
-     */
-    public readonly blacklist: { toggle: boolean; ids: string[] };
-
-    /**
      * @description Для работы с командами для разработчика
      * @readonly
      * @public
@@ -87,16 +73,6 @@ class Database {
         if (client instanceof DiscordClient) {
             this.adapter = new SeyfertVoice(client);
         }
-
-        this.whitelist = {
-            toggle: env.get<boolean>("whitelist", false),
-            ids: env.get("whitelist.list", "").split(",")
-        };
-
-        this.blacklist = {
-            toggle: env.get<boolean>("blacklist", false),
-            ids: env.get("blacklist.list", "").split(",")
-        };
 
         this.owner = {
             guildID: env.get("owner.server", ""),

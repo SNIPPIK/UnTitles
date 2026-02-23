@@ -1,8 +1,6 @@
 import * as process from "node:process";
 import { inspect } from "node:util";
 import { env } from "#app/env";
-import path from "node:path";
-import fs from "node:fs";
 
 /**
  * @author SNIPPIK
@@ -65,27 +63,13 @@ export class Logger {
     public static debug = env.get("NODE_ENV") === "development";
 
     /**
-     * @description Путь для сохранения логов
-     * @private
-     * @static
-     */
-    private static _path = path.resolve(env.get("cache.dir"), "logs");
-
-    /**
-     * @description Можно ли создавать файлы логов
-     * @private
-     * @static
-     */
-    private static _createFiles = this.debug ? env.get("cache.file") : null;
-
-    /**
      * @description Отправляем лог в консоль
      * @returns void
      * @public
      * @static
      */
     public static log = (status: keyof typeof db.status, text: string | Error): void => {
-        setImmediate(() => {
+        queueMicrotask(() => {
             const extStatus = db.status[status];
 
             // Получаем память в мегабайтах с двумя знаками после запятой
@@ -95,8 +79,6 @@ export class Logger {
 
             // Если пришел текст
             if (typeof text === "string") {
-                // Сохраняем логи
-                this.saveLog(`[RAM ${memUsedMB} MB] ${time} | ${status} - ${text}`);
                 text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
             }
 
@@ -106,9 +88,6 @@ export class Logger {
                     `┌ Name:    ${text.name}\n` +
                     `├ Message: ${text.message}\n` +
                     `└ Stack:   ${text.stack}`;
-
-                // Сохраняем логи
-                this.saveLog(`[RAM ${memUsedMB} MB] ${time} | ${status} - ${text}`);
             }
 
             // Если объект
@@ -124,26 +103,6 @@ export class Logger {
 
             if (!_timestamp) _timestamp = time;
         });
-    };
-
-    /**
-     * @description Сохранение лога в файл для анализа
-     * @param text
-     * @private
-     * @static
-     */
-    private static saveLog = (text: string) => {
-        try {
-            if (!this._createFiles) return;
-
-            // Если нет пути сохранения
-            else if (this._path && !fs.existsSync(this._path)) fs.mkdirSync(this._path);
-
-            // Сохраняем данные в файл
-            fs.appendFileSync(`${this._path}/${_timestamp}.txt`, text + "\n", "utf8");
-        } catch {
-            return;
-        }
     };
 
     /**

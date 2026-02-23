@@ -129,8 +129,8 @@ export namespace RestServerSide {
          * @param query - Запрос
          * @protected
          */
-        protected getID?(regexp: RegExp, query: string): string {
-            return (regexp).exec(query)[0];
+        protected getID?(regexp: RegExp, query: string) {
+            return (regexp).exec(query);
         };
 
         /**

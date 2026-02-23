@@ -1,3 +1,4 @@
+import { startCycle, stopCycle } from "#native";
 import { SetArray } from "#structures/array";
 
 /**
@@ -47,10 +48,8 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
         // Запускаем цикл сразу после добавления первого элемента
         if (this.size === 1 && !this.startTime) {
-            setImmediate(() => {
-                this.startTime = this.time;
-                this._runTimeout();
-            });
+            this.startTime = this.time;
+            this._runTimeout();
         }
 
         return this;
@@ -71,6 +70,9 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
             super.delete(item);
         }
 
+        // Если нет больше объектов
+        if (this.size === 0) this.reset();
+
         return true;
     };
 
@@ -82,10 +84,10 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     public reset(): void {
         this.clear(); // Удаляем все объекты
 
-        this.startTime = 0;
+        this.startTime = null;
 
         if (this.nativeId !== null) {
-            NativeCycle.stop(this.nativeId);
+            stopCycle(this.nativeId);
             this.nativeId = null;
         }
     };
@@ -98,20 +100,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     protected _runTimeout = (): void => {
         if (this.nativeId) this.reset();
 
-        this.nativeId = NativeCycle.start(this.options.duration, async (shotTimeMs: number) => {
-            await this.step();
-
-            const now = performance.now();
-            // shotTimeMs — это сколько мс прошло ВНУТРИ C++ с момента старта
-            // realElapsed — сколько мс прошло ВНУТРИ JS с момента старта
-            const realElapsed = now - this.startTime;
-
-            // Лаг — это разница между тем, когда C++ выстрелил, и когда JS получил управление
-            const lag = realElapsed - shotTimeMs;
-
-            // Отправляем лаг в микросекундах для C++
-            NativeCycle.lag(this.nativeId, Math.max(this.size, Math.floor(lag * 1024)));
-        });
+        this.nativeId = startCycle(this.options.duration, this.step);
     };
 
     /**
@@ -120,7 +109,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      * @abstract
      */
-    protected abstract step: () => Promise<void>;
+    protected abstract step: () => void;
 
     /**
      * @description Вынесенная логика обработки ошибок для чистоты кода
@@ -153,7 +142,7 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @readonly
      * @private
      */
-    protected step = async () => {
+    protected step = () => {
         const { filter, execute, custom } = this.options;
 
         for (const item of this) {
@@ -182,7 +171,9 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
  * @public
  */
 export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
-    protected get time() { return Date.now(); };
+    protected get time() {
+        return Date.now();
+    };
 
     /**
      * @description Здесь будет выполнен прогон объектов для выполнения execute
@@ -230,13 +221,6 @@ interface BaseCycleConfig<T> {
     duration: number;
 
     /**
-     * @description Как фильтровать объекты, вдруг объект еще не готов
-     * @readonly
-     * @public
-     */
-    readonly filter: (item: T) => boolean;
-
-    /**
      * @description Кастомные функции, необходимы для модификации или правильного удаления
      * @readonly
      * @public
@@ -280,6 +264,13 @@ interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
      * @public
      */
     readonly execute: (item: T) => Promise<void> | void;
+
+    /**
+     * @description Как фильтровать объекты, вдруг объект еще не готов
+     * @readonly
+     * @public
+     */
+    readonly filter: (item: T) => boolean;
 }
 
 /**
@@ -295,36 +286,11 @@ interface AsyncCycleConfig<T> extends BaseCycleConfig<T> {
      * @public
      */
     readonly execute: (item: T) => Promise<boolean>;
-}
-
-
-
-/**
- * @author SNIPPIK
- * @description Интеграция C++ таймера с node.js
- */
-const NativeCycle: NativeCycle = require('../../../Release/cycle_native.node');
-
-/**
- * @author SNIPPIK
- * @description Прямой интерфейс C++ аддона
- */
-interface NativeCycle {
-    /**
-     * @param interval Интервал в мс
-     * @param callback Функция, принимающая время выстрела (timestamp в микросекундах)
-     * @returns ID воркера
-     */
-    start(interval: number, callback: (timestamp: number) => void): number;
 
     /**
-     * @param id ID воркера
+     * @description Как фильтровать объекты, вдруг объект еще не готов
+     * @readonly
+     * @public
      */
-    stop(id: number): void;
-
-    /**
-     * @param id ID воркера
-     * @param lagMicroseconds Задержка в микросекундах для коррекции
-     */
-    lag(id: number, lagMicroseconds: number): void;
+    readonly filter: (item: T) => Promise<boolean>;
 }

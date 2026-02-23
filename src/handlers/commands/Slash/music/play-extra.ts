@@ -1,7 +1,7 @@
 import { Locales, Command, SubCommand, type AutocompleteInteraction, createStringOption, Declare, Options, Middlewares, CommandContext } from "seyfert";
 import { RestClientSide } from "#handler/rest";
-import { locale, Logger } from "#structures";
 import radio from "#core/player/stations.json";
+import { locale } from "#structures";
 import { db } from "#app/db";
 
 /**
@@ -13,12 +13,12 @@ import { db } from "#app/db";
  */
 async function allAutoComplete(message: AutocompleteInteraction, platform: RestClientSide.Request, search: string) {
     // Если платформа заблокирована
-    if (platform.block || !platform.auth) return null;
+    if (platform?.block || !platform?.auth) return;
 
     // Получаем функцию запроса данных с платформы
-    const api = platform.request(search, {audio: false});
+    const api = platform.request(search, { audio: false });
 
-    if (!api.type) return null;
+    if (!api.type) return;
 
     try {
         // Получаем данные в системе rest/API
@@ -26,13 +26,13 @@ async function allAutoComplete(message: AutocompleteInteraction, platform: RestC
         const items: { value: string; name: string }[] = [];
 
         // Если получена ошибка или нет данных
-        if (rest instanceof Error || !rest) return null;
+        if (rest instanceof Error || !rest) return;
 
         // Обработка массива данных
         if (Array.isArray(rest)) {
             items.push(...rest.map((track) => {
                 return {
-                    name: `🎵 (${track.time.split}) | ${track.artist.title.slice(0, 20)} - ${track.name.slice(0, 60)}`,
+                    name: `🎵 (${track.time.split}) | ${track.artist.title?.slice(0, 20)} - ${track.name?.slice(0, 60)}`,
                     value: track.url,
                 }
             }));
@@ -40,23 +40,23 @@ async function allAutoComplete(message: AutocompleteInteraction, platform: RestC
 
         // Показываем плейлист
         else if ("items" in rest) items.push({
-            name: `🎶 [${rest.items.length}] - ${rest.title.slice(0, 70)}`,
-            value: search
+            name: `🎶 [${rest.items.length}] - ${rest.title?.slice(0, 70)}`,
+            value: rest.url
         });
 
         // Показываем трек
         else {
             items.push({
-                name: `🎵 (${rest.time.split}) | ${rest.artist.title.slice(0, 20)} - ${rest.name.slice(0, 60)}`,
-                value: search
+                name: `🎵 (${rest.time.split}) | ${rest.artist.title?.slice(0, 20)} - ${rest.name?.slice(0, 60)}`,
+                value: rest.url
             });
         }
 
         // Отправка ответа
         return message.respond(items);
     } catch (err) {
-        Logger.log("ERROR", err as Error);
-        return null;
+        console.error(err);
+        return;
     }
 }
 

@@ -126,13 +126,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Логика DAVE (MLS): блокируем отправку, если сессия в процессе перехода
         // или еще не инициализировала ключи
-        if (this.e2EE) {
-            const session = this.e2EE.session;
-            if (!session) return false;
-
+        if (this.e2EE?.session) {
             // Если идет переход (transition) или сессия не готова — слать нельзя,
             // иначе Discord отбросит пакеты из-за неверного ключа
-            if (!session.ready || this.e2EE.isTransitioning) {
+            if (!this.e2EE?.session.ready || this.e2EE.isTransitioning) {
                 return false;
             }
         }
@@ -242,28 +239,32 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     public packet = (frame: Buffer, type: "raw" | "rtp" = "rtp") => {
         if (!this.isReadyToSend) return;
 
-        // Если надо отправить не нумерованный поток
-        if (type === "raw") {
-            // Отправляем не тронутый аудио фрейм
-            this.udp.packet(frame);
-            return;
-        }
+        try {
+            let payload: Buffer;
 
-        // Если есть реализация DAVE
-        if (this.e2EE && this.e2EE?.session) {
-            const encrypted = this.e2EE.encrypt(frame);
-            const rtp = this.sRTP.packet(encrypted);
-            this.udp.packet(rtp);
-        }
+            if (type === "raw") {
+                payload = frame;
+            } else {
+                // Логика DAVE (MLS)
+                if (this.e2EE?.session?.ready && !this.e2EE.isTransitioning) {
+                    const encrypted = this.e2EE.encrypt(frame);
+                    payload = this.sRTP!.packet(encrypted);
+                } else {
+                    // Если DAVE еще не готов, но и не обязателен (зависит от настроек сервера)
+                    payload = this.sRTP!.packet(frame);
+                }
+            }
 
-        // Если нет реализации DAVE
-        else {
-            const rtp = this.sRTP.packet(frame);
-            this.udp.packet(rtp);
-        }
+            // Прямая отправка в сокет
+            this.udp!.packet(payload);
 
-        // Меняем состояние спикера (что бы аудио принимал Discord)
-        this.speaker.speaking = this.speaker.default;
+            // Оптимизация Speaking индикатора (только если статус изменился)
+            if (this.speaker.speaking !== this.speaker.default) {
+                this.speaker.speaking = this.speaker.default;
+            }
+        } catch (err) {
+            this.emit("log", `[Voice Packet Error]: ${err}`);
+        }
     };
 
     /**

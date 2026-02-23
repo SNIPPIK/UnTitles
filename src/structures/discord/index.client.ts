@@ -78,7 +78,6 @@ export class DiscordClient extends Client {
      */
     public constructor() {
         super({
-
             /**
              * @description Хуки для команд
              */
@@ -188,49 +187,59 @@ export class DiscordClient extends Client {
             },
         });
     };
+
     /**
-     * @description Функция создания и управления статусом
+     * @description Функция создания и управления статусом через рекурсивный setTimeout
      * @readonly
      * @private
      */
-    public startIntervalStatuses = () => {
-        // Время обновления статуса
-        const timeout = parseInt(env.get("client.presence.interval", "120"));
-        const arrayUpdate = parseInt(env.get("client.presence.array.update", "3600")) * 1e3;
+    public startIntervalStatuses = () => queueMicrotask(() => {
+        // Конфигурация из ENV
+        const timeoutMs = parseInt(env.get("client.presence.interval", "120")) * 1e3;
+        const arrayUpdateMs = parseInt(env.get("client.presence.array.update", "3600")) * 1e3;
+        const botStatus = env.get("client.status", "online") as any;
 
         let array = this.parseStatuses();
-        let size = array.length - 1;
-        let i = 0, lastDate = Date.now() + arrayUpdate ;
+        let i = 0;
+        let lastUpdateDate = Date.now();
 
-        // Если нет статусов
+        // Если статусов нет — выходим
         if (!array.length) return;
 
-        // Интервал для обновления статуса
-        setInterval(async () => {
-            // Обновляем статусы
-            if (lastDate < Date.now()) {
-                // Обновляем статусы
-                array = this.parseStatuses();
+        // Рекурсивная функция обновления
+        const updatePresence = () => {
+            try {
+                // Проверяем, пора ли перепарсить массив статусов
+                if (Date.now() - lastUpdateDate > arrayUpdateMs) {
+                    array = this.parseStatuses();
+                    lastUpdateDate = Date.now();
+                }
 
-                // Обновляем время для следующего обновления
-                lastDate = Date.now() + arrayUpdate;
+                // Сброс индекса, если вышли за пределы массива
+                if (i >= array.length) i = 0;
+
+                const activity = array[i];
+
+                // Установка присутствия в Seyfert
+                this.gateway.setPresence({
+                    afk: false,
+                    since: Date.now(),
+                    status: botStatus,
+                    activities: [activity] as any[]
+                });
+
+                i++;
+            } catch (error) {
+                console.error("[PresenceUpdate]: Failed to set presence:", error);
+            } finally {
+                // Планируем следующий запуск в любом случае
+                setTimeout(updatePresence, timeoutMs);
             }
+        };
 
-            // Запрещаем выходить за диапазон допустимого значения
-            if (i > size) i = 0;
-            const activity = array[i];
-
-            // Задаем статус боту
-            this.gateway.setPresence({
-                afk: false,
-                since: Date.now(),
-                status: env.get("client.status", "online") as any,
-                activities: [activity] as any[]
-            });
-
-            i++;
-        }, timeout * 1e3);
-    };
+        // Запускаем первую итерацию
+        updatePresence();
+    });
 
     /**
      * @description Функция подготавливающая статусы

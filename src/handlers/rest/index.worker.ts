@@ -58,7 +58,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @public
      */
     public get allow() {
-        return this.array.filter(api => api.auth !== null && !this.platforms.block.includes(api.name));
+        return this.array.filter(api => !this.platforms.block.includes(api.name));
     };
 
     /**
@@ -67,7 +67,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @public
      */
     public get allowRelated() {
-        return this.array.filter(api => api.auth !== null && api.requests.some((apis) => apis.name === "related"));
+        return this.array.filter(api => api.requests.some((apis) => apis.name === "related"));
     };
 
     /**

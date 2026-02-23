@@ -53,7 +53,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "related",
             filter: /(track\/[0-9]+)?(list=RD)/,
             execute: async (url) => {
-                const IDs = this.getID(/[0-9]+\/track\/[0-9]+/gi, url).split("/track/");
+                const IDs = this.getID(/[0-9]+\/track\/[0-9]+/gi, url)[0].split("/track/");
 
                 // Если ID трека не удалось извлечь из ссылки
                 if (!IDs) return locale.err( "api.request.id.track");
@@ -82,7 +82,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "track",
             filter: /track\/[0-9]+/i,
             execute: async (url, options) => {
-                const IDs = this.getID(/[0-9]+\/track\/[0-9]+/gi, url).split("/track/");
+                const IDs = this.getID(/[0-9]+\/track\/[0-9]+/gi, url)[0].split("/track/");
 
                 // Если ID трека не удалось извлечь из ссылки
                 if (!IDs) return locale.err( "api.request.id.track");
@@ -141,10 +141,8 @@ class RestYandexAPI extends RestServerSide.API {
                         track["audio"] = link;
                     }
 
-                    setImmediate(() => {
-                        // Сохраняем кеш в системе
-                        if (!cache) sdb.meta_saver.set(track, this.url);
-                    });
+                    // Сохраняем кеш в системе
+                    if (!cache) sdb.meta_saver.set(track, this.url);
 
                     return track;
                 } catch (e) {
@@ -161,7 +159,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "album",
             filter: /(album)\/[0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = this.getID(/[0-9]+/i, url)?.split("album")?.at(0);
+                const ID = this.getID(/[0-9]+/i, url)[0]?.split("album")?.at(0);
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.album");
@@ -193,7 +191,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "playlist",
             filter: /(playlists\/[0-9a-f-]+)/i,
             execute: async (url, {limit}) => {
-                const ID = this.getID(/(playlists\/[0-9a-f-]+)/i, url).split("/")[1];
+                const ID = this.getID(/(playlists\/[0-9a-f-]+)/i, url)[0].split("/")[1];
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err("api.request.id.playlist");

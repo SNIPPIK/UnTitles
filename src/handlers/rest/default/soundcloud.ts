@@ -66,7 +66,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
                     // Если запрос выдал ошибку то
                     if (request instanceof Error) return request;
 
-                    const {api, ClientID} = request;
+                    const { api, ClientID } = request;
 
                     // Если был найден трек
                     if (api.kind === "track") {

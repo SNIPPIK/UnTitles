@@ -102,7 +102,6 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
         if (this.reinitializing) return;
         this.emit("debug", `Invalidating transition ${transitionId}`);
         this.reinitializing = true;
-        //this.consecutiveFailures = 0;
         this.emit("invalidateTransition", transitionId);
         this.reinit();
     };
@@ -237,8 +236,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
             connectedClients
         );
 
-        if (!commit) return null;
-
+        if (!commit) return welcome;
         return Buffer.concat([commit, welcome]);
     };
 
@@ -342,8 +340,36 @@ export interface ClientE2EEEvents {
 
 /**
  * @author SNIPPIK
+ * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
+ * @private
+ */
+let loaded_lib: {
+    DAVESession: new (
+        /**
+         * @description Текущая версия протокола
+         * @readonly
+         */
+    version: number,
+
+        /**
+         * @description ID пользователя
+         * @readonly
+         */
+    user_id: string,
+
+        /**
+         * @description ID голосового канала
+         * @readonly
+         */
+    channel_id: string,
+    ) => SessionMethods
+} = null;
+
+/**
+ * @author SNIPPIK
  * @description Все методы сессии
  * @interface SessionMethods
+ * @private
  */
 interface SessionMethods {
     /**
@@ -445,6 +471,7 @@ interface SessionMethods {
  * @author SNIPPIK
  * @description Результат предложений
  * @interface ProposalsResult
+ * @private
  */
 interface ProposalsResult {
     commit?: Buffer;
@@ -455,18 +482,12 @@ interface ProposalsResult {
  * @author SNIPPIK
  * @description Результат перехода
  * @interface TransitionResult
+ * @private
  */
 interface TransitionResult {
     success: boolean;
     transition_id: number;
 }
-
-/**
- * @author SNIPPIK
- * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
- * @private
- */
-let loaded_lib: any = null;
 
 /**
  * @author SNIPPIK

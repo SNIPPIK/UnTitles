@@ -49,15 +49,21 @@ export class Process {
             const isLink = args.at(index_resource + 1)?.startsWith("http");
             if (isLink) args.unshift(
                 "-reconnect", "1",
-                "-reconnect_at_eof", "1",
+                //"-reconnect_at_eof", "1",
                 "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "5",
+                "-reconnect_delay_max", "50",
                 "-reconnect_on_network_error", "1"
             );
         }
 
         // Добавляем аргументы отключения видео и логирования
-        args.unshift("-vn", "-loglevel", "error", "-hide_banner");
+        args.unshift(
+            "-flags", "low_delay",
+            "-analyzeduration", "0",
+            "-probesize", "128",
+
+            "-vn", "-loglevel", "error"
+        );
         this._process = spawn(name, args, {
             env: { PATH: process.env.PATH },
             stdio: "pipe",

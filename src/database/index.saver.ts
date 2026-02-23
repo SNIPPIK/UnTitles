@@ -1,7 +1,6 @@
 import type { APIRequestData } from "#handler/rest";
 import { Process } from "#core/audio/process";
 import { PromiseCycle } from "#native/cycle";
-import { Logger } from "#structures/logger";
 import { Track } from "#core/queue";
 import afs from "node:fs/promises";
 import { env } from "#app/env";
@@ -42,7 +41,7 @@ export class MetaSaver {
      * @returns Promise<void>
      * @public
      */
-    public set = async (track: APIRequestData.Track, api: string): Promise<void> => {
+    public set = (track: APIRequestData.Track, api: string) => queueMicrotask(async () => {
         // Если нельзя сохранять в файлы
         if (this.inFile) {
             const Path = path.join(this._dirname, "Data", api, `${track.id}.json`);
@@ -74,7 +73,7 @@ export class MetaSaver {
         }
 
         return null;
-    };
+    });
 
     /**
      * @description Выдаем данные из класса
@@ -135,11 +134,11 @@ export class AudioSaver extends PromiseCycle<Track> {
                     });
                 }
             },
-            filter: (item) => {
+            filter: async (item) => {
                 const names = this.status(item);
 
                 // Если такой трек уже есть в системе кеширования
-                if (names.status === "ended" || item.time.total > 500 || item.time.total === 0) {
+                if (names.status === "ended" || item.time.total > 500 || item.time.total === 0 || item.api.type === "primary") {
                     this.delete(item);
                     return false;
                 }
@@ -148,7 +147,7 @@ export class AudioSaver extends PromiseCycle<Track> {
                 else if (!fs.existsSync(names.path)) {
                     let dirs = names.path.split("/");
                     if (!names.path.endsWith("/")) dirs.splice(dirs.length - 1);
-                    fs.mkdirSync(dirs.join("/"), { recursive: true });
+                    await afs.mkdir(dirs.join("/"), { recursive: true });
                 }
 
                 return true;
@@ -191,21 +190,23 @@ export class AudioSaver extends PromiseCycle<Track> {
                 const ffmpeg = new Process(args);
 
                 // Если была получена ошибка
-                ffmpeg.stdout.once("error", () => {
+                ffmpeg.stdout.once("error", async () => {
                     ffmpeg.destroy();
                     this.delete(track);
 
                     // Удаляем файл
-                    fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
+                    if (fs.existsSync(status.path)) await afs.unlink(`${status.path}.opus`);
                     return resolve(false);
                 });
 
                 // Если запись была завершена
-                ffmpeg.stdout.once("end", () => {
-                    fs.stat(`${status.path}.opus`, (err, stats) => {
+                ffmpeg.stdout.once("end", async () => {
+                    if (fs.existsSync(status.path)) {
+                        const data = await afs.stat(`${status.path}.opus`);
+
                         // Если файл не проходит проверку
-                        if (err || stats.size < 10) fs.unlink(`${status.path}.opus`, (err) => Logger.log("ERROR", err));
-                    });
+                        if (data.size < 10) await afs.unlink(`${status.path}.opus`);
+                    }
 
                     ffmpeg.destroy();
                     this.delete(track);
@@ -228,15 +229,13 @@ export class AudioSaver extends PromiseCycle<Track> {
 
             // Если трека нет в очереди, значит он есть
             if (!this.has(track)) {
-                // Если файл все таки есть
+                // Если файл есть
                 if (fs.existsSync(`${file}.opus`)) return {status: "ended", path: `${file}.opus`};
             }
 
             // Выдаем что ничего нет
             return { status: "not-ended", path: file };
         } else {
-            file = `${this._dirname}/Audio/${track}`;
-
             // Если файл все таки есть
             if (fs.existsSync(`${file}.opus`)) return {status: "ended", path: `${file}.opus`};
         }

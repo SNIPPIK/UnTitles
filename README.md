@@ -146,11 +146,11 @@ setInterval(() => {
 ---
 ## 🚀 Quick Start
 > Node.js is required, as well as FFmpeg installed.
-> All parameters are specified in `.env`, don't forget to copy it to `.build` and customize it.
+> All parameters are specified in `.env`
 
 
 > [!WARNING]
-> Since the project uses C++, a compiler will be required. MSVC for windows, CLANG for Linux, Mac or something else 
+> Since the project uses Rust, a compiler will be required 
 ```shell
 # Cloning
 git clone https://github.com/SNIPPIK/UnTitles
@@ -160,7 +160,7 @@ cd UnTitles
 npm install
 
 # Running via Node.js
-# Setting environment variables in build/.env
+# Setting environment variables in .env
 npm run build && npm run configure && npm run start
 ```
 

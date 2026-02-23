@@ -1,0 +1,64 @@
+name: Build Native
+on:
+  push:
+    branches: [ "main", "beta" ]
+    tags-ignore:
+      - '**'
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            build: npx napi build --release --target x86_64-unknown-linux-gnu
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            build: npx napi build --release --target x86_64-pc-windows-msvc
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            build: npx napi build --release --target aarch64-unknown-linux-gnu --use-zig
+          - host: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+            build: npx napi build --release --target armv7-unknown-linux-gnueabihf --use-zig
+
+    name: build-${{ matrix.settings.target }}
+    runs-on: ${{ matrix.settings.host }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24 # 24-я еще может быть нестабильна в раннерах, 20-я — сейф-вариант
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+
+      - name: Setup zig
+        if: contains(matrix.settings.build, '--use-zig')
+        uses: goto-bus-stop/setup-zig@v2
+
+      # Если package.json в корне, оставляем так.
+      # Если он тоже в src-native, добавь working-directory: ./src-native
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: ${{ matrix.settings.build }}
+        working-directory: ./src-native # Запускаем саму сборку в папке с Rust
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          # Ищем файл в папке, где он скомпилировался
+          path: ./src-native/*.node
+          if-no-files-found: error

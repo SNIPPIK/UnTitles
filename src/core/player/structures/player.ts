@@ -1,4 +1,4 @@
-import { BufferedAudioResource, PipeAudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio";
+import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio";
 import { type AudioFilter, type AudioPlayerEvents, ControllerFilters } from "#core/player";
 import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue";
 import { PlayerProgress } from "../modules/progress";
@@ -298,7 +298,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const position = skip?.position ? skip?.position : current;
 
             // Выводим сообщение об ошибке
-            queue.message.client.events.runCustom("message/error", queue, error, position)
+            queue.message.client.events.runCustom("message/error", queue, error, position);
 
             // Если надо пропустить трек
             if (skip) {
@@ -311,7 +311,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                 // Если следующих треков нет
                 else if (player.tracks.size === 0) return queue.cleanup();
-
                 player.tracks.remove(skip.position);
             }
         });
@@ -366,7 +365,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             this.emit("player/log", `[AudioPlayer/${this.id}] has read ${track.isBuffered ? "buffered" : "piped"} stream ${resource}`);
 
             // Выбираем тип аудио
-            const audio = track.isBuffered ? BufferedAudioResource : PipeAudioResource;
+            const audio = track.isBuffered ? AudioResource : AudioResource;
             const stream = this._audio.preload = new audio(
                 {
                     seek,
@@ -378,7 +377,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             );
 
             // Подключаем события для отслеживания работы потока (временные)
-            (stream as BufferedAudioResource)
+            (stream as AudioResource)
                 // Если чтение возможно
                 .once("readable", () => {
                     // Время паузы плеера

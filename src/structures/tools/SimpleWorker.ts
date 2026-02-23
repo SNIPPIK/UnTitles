@@ -15,10 +15,12 @@ export class SimpleWorker {
      * @public
      */
     public static create<T>({options, file, callback, postMessage, not_destroyed}: WorkerInput<T>): Worker {
-        const worker = new Worker(path.resolve(file), options);
+        // Используем абсолютный путь
+        const workerPath = path.isAbsolute(file) ? file : path.resolve(file);
+        const worker = new Worker(workerPath, options);
 
         // Отправляем данные
-        worker.postMessage(postMessage);
+        if (postMessage) worker.postMessage(postMessage);
 
         // События для упрощенного удаления
         worker.once("error", () => this.destroy(worker));
@@ -28,11 +30,8 @@ export class SimpleWorker {
         worker.once("message", (message) => {
             callback(message);
 
-            // Удалям путь файла
-            delete require.cache[require.resolve(file)];
-
             // Если поток должен остаться активным
-            if (!not_destroyed) this.destroy(worker).catch(console.error);
+            if (!not_destroyed) this.destroy(worker);
         });
 
         return worker;
@@ -45,9 +44,11 @@ export class SimpleWorker {
      * @private
      */
     private static destroy = async (worker: Worker) => {
+        // Снимаем все слушатели, чтобы не триггерить повторные вызовы
         worker.removeAllListeners();
 
         try {
+            // terminate() возвращает обещание
             await worker.terminate();
         } catch (err) {
             Logger.log("ERROR", err as Error);

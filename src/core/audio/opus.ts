@@ -30,7 +30,7 @@ export class BufferedEncoder extends Writable {
      * @description Базовый класс декодера
      * @private
      */
-    public parser = new OggOpusParser();
+    public _parser = new OggOpusParser();
 
     /**
      * @description Создаем класс
@@ -40,10 +40,10 @@ export class BufferedEncoder extends Writable {
     public constructor(options: WritableOptions = { autoDestroy: true }) {
         super(options);
         // Твои стандартные бинды
-        this.parser.on("frame", (frame) => this.emit("frame", frame));
-        this.parser.on("head", (frame) => this.emit("head", frame));
-        this.parser.on("tags", (frame) => this.emit("tags", frame));
-        this.parser.on("error", (err) => this.emit("error", err));
+        this._parser.on("frame", (frame) => this.emit("frame", frame));
+        this._parser.on("head", (frame) => this.emit("head", frame));
+        this._parser.on("tags", (frame) => this.emit("tags", frame));
+        this._parser.on("error", (err) => this.emit("error", err));
     };
 
     /**
@@ -51,7 +51,7 @@ export class BufferedEncoder extends Writable {
      * @protected
      */
     public _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void) {
-        this.parser.parseAvailablePages(chunk);
+        this._parser.parseAvailablePages(chunk);
         callback();
     };
 
@@ -62,9 +62,9 @@ export class BufferedEncoder extends Writable {
      * @public
      */
     public _destroy(error: Error | null, callback: (error: Error | null) => void) {
-        if (this.parser) {
-            this.parser.destroy();
-            this.parser = null as any;
+        if (this._parser) {
+            this._parser.destroy();
+            this._parser = null as any;
         }
 
         this.removeAllListeners();
@@ -86,7 +86,7 @@ export class PipeEncoder extends Transform {
      * @description Базовый класс декодера
      * @private
      */
-    private parser = new OggOpusParser();
+    private _parser = new OggOpusParser();
 
     /**
      * @description Создаем класс
@@ -96,15 +96,14 @@ export class PipeEncoder extends Transform {
     public constructor(options: TransformOptions = { autoDestroy: true }) {
         super(Object.assign(options, {
             readableObjectMode: true,
-            writableObjectMode: false, // На вход буферы, на выход объекты (кадры)
             autoDestroy: true
         }));
 
         // Маппим кадры напрямую в поток через push
-        this.parser.on("frame", (frame) => this.push(frame));
-        this.parser.on("head", (frame) => this.emit("head", frame));
-        this.parser.on("tags", (frame) => this.emit("tags", frame));
-        this.parser.on("error", (err) => this.emit("error", err));
+        this._parser.on("frame", (frame) => this.push(frame));
+        this._parser.on("head", (frame) => this.emit("head", frame));
+        this._parser.on("tags", (frame) => this.emit("tags", frame));
+        this._parser.on("error", (err) => this.emit("error", err));
     };
 
     /**
@@ -112,7 +111,7 @@ export class PipeEncoder extends Transform {
      * @public
      */
     public _transform(chunk: Buffer, _: any, done: () => any) {
-        this.parser.parseAvailablePages(chunk);
+        this._parser.parseAvailablePages(chunk);
         done();
     };
 
@@ -123,9 +122,9 @@ export class PipeEncoder extends Transform {
      * @public
      */
     public _destroy(error: Error | null, callback: (error: Error | null) => void) {
-        if (this.parser) {
-            this.parser.destroy();
-            this.parser = null as any;
+        if (this._parser) {
+            this._parser.destroy();
+            this._parser = null as any;
         }
         this.removeAllListeners();
         super.destroy(error || undefined);

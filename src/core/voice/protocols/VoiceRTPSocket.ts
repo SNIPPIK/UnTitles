@@ -38,7 +38,7 @@ export class VoiceRTPSocket {
     private _nonceBuffer: Buffer = Buffer.alloc(12);
 
     /** Порядковый номер пустого буфера */
-    private _nonce : number;
+    public _nonce : number;
 
     /** Последовательность opus фреймов */
     private sequence: number;
@@ -61,10 +61,11 @@ export class VoiceRTPSocket {
      * @public
      */
     public get nonce() {
-        this._nonce++;
-        if (this._nonce > MAX_32BIT - 1) this._nonce = 0;
+        if (this._nonce >= MAX_32BIT) this._nonce = 0;
 
         this._nonceBuffer.writeUInt32BE(this._nonce, 0);
+        this._nonce++;
+
         return this._nonceBuffer;
     };
 

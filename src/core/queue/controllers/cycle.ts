@@ -58,7 +58,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 if (packet) player.voice.connection.packet(packet);
                 else {
                     // Если поток не читается, переходим в состояние ожидания
-                    if (!audio && audio.packets > 0 || !audio.readable) {
+                    if (!audio && audio.packets === 0 || !audio.readable) {
                         player.status = "player/wait";
                         player.cycle = false;
                     }
@@ -165,7 +165,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
      */
     public update = (message: T, component: MessageComponent) => {
         try {
-            if (message.createdTimestamp) message.edit({ components: component }).catch(console.error);
+            if (message.createdTimestamp) message.edit({ components: component, embeds: null }).catch(console.error);
         } catch (error) {
             Logger.log("ERROR", `Failed to edit message in cycle\n${error instanceof Error ? error.stack : error}`);
 

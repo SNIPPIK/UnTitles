@@ -112,7 +112,7 @@ export default class PlayCommand extends Command {
         }
 
         // Если платформа заблокирована
-        if (platform.block) {
+        else if (platform.block) {
             return ctx.client.events.runCustom("rest/error", ctx, locale._(ctx.interaction.locale, "api.platform.block"));
         }
 

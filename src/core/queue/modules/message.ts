@@ -5,8 +5,9 @@ import { MessageFlags } from "seyfert/lib/types";
 import filters from "#core/player/filters.json";
 import type { AudioPlayer } from "#core/player";
 import { RepeatType } from "#core/queue";
+import { locale } from "#structures";
 import { env } from "#app/env";
-import {db} from "#app/db";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -179,6 +180,9 @@ export class QueueButtons {
         loop: this.checkIDComponent("button.loop"),
         loop_one: this.checkIDComponent("button.loop_one"),
         autoplay: this.checkIDComponent("button.autoplay"),
+
+        lyrics: QueueButtons.createButton({env: "lyrics"}),
+        stop: QueueButtons.createButton({env: "stop", style: 4}),
     };
 
     /**
@@ -212,10 +216,10 @@ export class QueueButtons {
                 QueueButtons.createButton({env: "queue", disabled: true}),
 
                 // Кнопка текста песни
-                QueueButtons.createButton({env: "lyrics"}),
+                QueueButtons.button.lyrics,
 
                 // Кнопка стоп
-                QueueButtons.createButton({env: "stop", style: 4}),
+                QueueButtons.button.stop,
 
                 // Кнопка текущих фильтров
                 QueueButtons.createButton({env: "filters", disabled: true}),
@@ -237,7 +241,7 @@ export class QueueButtons {
         // Разово создаем селектор для повторного использования
         this._selector = new ActionRow().addComponents([
             new StringSelectMenu().setCustomId("filter_select")
-                .setPlaceholder("Select audio filter")
+                .setPlaceholder(locale._(ctx.locale, "selector.filters"))
                 .setOptions(filters.filter((filter) => !filter.args).map((filter) => {
                     return new StringSelectOption()
                         .setLabel(filter.name.charAt(0).toUpperCase() + filter.name.slice(1).replace("_", " "))

@@ -12,40 +12,59 @@ import { createEvent } from "seyfert";
  */
 export default createEvent({
     data: { name: 'rest/error' },
-    async run(message, error) {
-        try {
-            const msg = await message.followup({
-                components: [{
-                    "type": 17, // Container
-                    "accent_color": Colors.DarkRed,
-                    components: [
-                        {
-                            "type": 9, // Block
-                            "components": [
-                                {
-                                    "type": 10,
-                                    "content": locale._(message.interaction.locale, "api.error")
-                                },
-                                {
-                                    "type": 10,
-                                    "content": `\`\`\`css\n${error}\n\`\`\``
+    run: (message, error, client) => {
+        queueMicrotask(async () => {
+            try {
+                const options = {
+                    embeds: null,
+                    components: [{
+                        "type": 17, // Container
+                        "accent_color": Colors.DarkRed,
+                        components: [
+                            {
+                                "type": 9, // Block
+                                "components": [
+                                    {
+                                        "type": 10,
+                                        "content": locale._(message.interaction.locale, "api.error")
+                                    },
+                                    {
+                                        "type": 10,
+                                        "content": typeof error === "string" ? error : `\`\`\`css\n${error}\n\`\`\``
+                                    }
+                                ],
+                                "accessory": {
+                                    "type": 11,
+                                    "media": {
+                                        "url": message.client.me.avatarURL()
+                                    }
                                 }
-                            ],
-                            "accessory": {
-                                "type": 11,
-                                "media": {
-                                    "url": message.client.me.avatarURL()
-                                }
-                            }
-                        },
-                    ]
-                }],
-                flags: MessageFlags.Ephemeral
-            });
+                            },
+                        ]
+                    }],
+                    flags: MessageFlags.IsComponentsV2
+                };
+                let msg: any;
 
-            if (msg && !!msg?.delete) setTimeout(() => msg.delete().catch(() => null), 15e3);
-        } catch (error) {
-            Logger.log("ERROR", error as Error);
-        }
+                // Если бот уже ответил на сообщение
+                if (!message.deferred) {
+                    msg = await message.followup(options);
+                }
+
+                // Если можно дать ответ на сообщение
+                else if (message.deferred) {
+                    msg = await message.editOrReply(options);
+                }
+
+                // Отправляем обычное сообщение
+                else msg = await client.messages.write(message.channelId, options);
+
+                if (msg && msg?.delete) setTimeout(() => msg.delete().catch(() => null), 15e3);
+            } catch (error) {
+                Logger.log("ERROR", error as Error);
+            }
+        });
+
+        return null;
     }
 })

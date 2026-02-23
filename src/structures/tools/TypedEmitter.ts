@@ -94,21 +94,31 @@ export class TypedEmitter<L extends Record<string, any>> {
     public emit<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, ...args: L[]): boolean;
     public emit(event: string, ...args: any[]): boolean {
         const arr = this._set?.get(event);
-        if (!arr?.length) return false;
+        if (!arr || arr.length === 0) return false;
 
-        // Копируем, чтобы избежать проблем при удалении once-слушателей
-        const executionQueue = [...arr];
+        /** * Оптимизация: Идем по массиву без создания копии [...arr].
+         * Используем цикл в обратном порядке, чтобы удаление once-слушателей
+         * через splice не ломало индекс текущей итерации.
+         */
+        for (let i = arr.length - 1; i >= 0; i--) {
+            const run = arr[i];
 
-        for (const run of executionQueue) {
-            const res = run.listener(...args);
-
+            // Если это once — удаляем ПЕРЕД вызовом, чтобы избежать рекурсивных петель
             if (run.type === "once") {
-                this.off(event, run.listener as any);
+                arr.splice(i, 1);
+                if (arr.length === 0) this._set.delete(event);
             }
+
+            const res = run.listener(...args);
 
             if (res instanceof Promise) {
                 res.catch(err => {
-                    setImmediate(() => { throw err; });
+                    // Если есть слушатели 'error' — шлем им, иначе кидаем в глобал
+                    if (this._set.has("error")) {
+                        this.emit("error" as any, err);
+                    } else {
+                        process.nextTick(() => { throw err; });
+                    }
                 });
             }
         }
@@ -122,25 +132,26 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @returns this
      * @public
      */
-    public off<E extends keyof ListenerSignature<L>>(event: E, listener: ListenerSignature<L>[E]): this;
-    public off<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener: DefaultListener): this;
-    public off(event: string, listener: DefaultListener): this {
-        const arr = this._set?.get(event);
+    public off<E extends keyof ListenerSignature<L>>(event: E, listener?: ListenerSignature<L>[E]): this;
+    public off<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener?: DefaultListener): this;
+    public off(event: string, listener?: DefaultListener): this {
+        if (!this._set) return this;
+        if (!listener) {
+            this._set.delete(event);
+            return this;
+        }
+
+        const arr = this._set.get(event);
         if (!arr) return this;
 
-        // Ищем индекс элемента
-        const index = arr.findIndex(x => x.listener === listener);
-
-        // Удаляем элемент прямо из существующего массива, если он найден
-        if (index !== -1) {
-            arr.splice(index, 1);
-
-            // Если это был последний слушатель — чистим Map, чтобы не держать пустой массив
-            if (arr.length === 0) {
-                this._set.delete(event);
+        for (let i = 0; i < arr.length; i++) {
+            if (arr[i].listener === listener) {
+                arr.splice(i, 1);
+                break; // Удаляем только одно вхождение (как в vanilla EventEmitter)
             }
         }
 
+        if (arr.length === 0) this._set.delete(event);
         return this;
     };
 
@@ -151,20 +162,7 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @returns this
      * @public
      */
-    public removeListener<E extends keyof ListenerSignature<L>>(event: E, listener?: ListenerSignature<L>[E]): this;
-    public removeListener<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener?: DefaultListener): this;
-    public removeListener(event: string, listener: (...args: any[]) => any): this {
-        if (!listener) {
-            this._set.delete(event);
-            return this;
-        }
-
-        const arr = this._set.get(event);
-        if (!arr) return this;
-
-        this._set.set(event, arr.filter(l => l.listener !== listener));
-        return this;
-    };
+    public removeListener= this.off;
 
     /**
      * @description Все слушатели по названию события

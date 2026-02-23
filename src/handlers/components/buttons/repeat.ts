@@ -1,8 +1,9 @@
 import { ComponentCommand, type ComponentContext } from 'seyfert';
 import { MessageFlags } from 'seyfert/lib/types';
-import {RepeatType} from "#core/queue";
-import {locale} from "#structures";
-import {db} from "#app/db";
+import { Colors } from "#structures/discord";
+import { RepeatType } from "#core/queue";
+import { locale } from "#structures";
+import { db } from "#app/db";
 
 export default class extends ComponentCommand {
     componentType = 'Button' as const;
@@ -21,7 +22,7 @@ export default class extends ComponentCommand {
             return ctx.write({
                 embeds: [{
                     description: locale._(ctx.interaction.locale, "player.button.repeat.songs"),
-                    color: queue.tracks.track.api.color
+                    color: Colors.Green
                 }],
                 flags: MessageFlags.Ephemeral
             });
@@ -33,7 +34,7 @@ export default class extends ComponentCommand {
             return ctx.write({
                 embeds: [{
                     description: locale._(ctx.interaction.locale, "player.button.repeat.song"),
-                    color: queue.tracks.track.api.color
+                    color: Colors.Green
                 }],
                 flags: MessageFlags.Ephemeral
             });
@@ -43,7 +44,7 @@ export default class extends ComponentCommand {
         return ctx.write({
             embeds: [{
                 description: locale._(ctx.interaction.locale, "player.button.repeat.off"),
-                color: queue.tracks.track.api.color
+                color: Colors.Green
             }],
             flags: MessageFlags.Ephemeral
         });

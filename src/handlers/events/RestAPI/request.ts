@@ -12,7 +12,7 @@ import { db } from "#app/db";
  */
 export default createEvent({
     data: { name: 'rest/request' },
-    async run(platform, ctx, url) {
+    run: async (platform, ctx, url) => {
         // Получаем описание запроса от платформы
         const api = platform.request(url);
 
@@ -26,34 +26,33 @@ export default createEvent({
             return null;
         }
 
-        // Отправляем пользователю уведомление о начале запроса
-        try {
-            // Отправляем временное уведомление
-            const message = await ctx.followup({
-                flags: MessageFlags.Ephemeral,
-                embeds: [{
-                    title: `${platform.platform}.${api.type}`,
-                    description: locale._(
-                        ctx.interaction.locale,
-                        platform.audio
-                            ? "api.platform.request"
-                            : "api.platform.request.long",
-                        [db.images.loading, platform.platform]
-                    ),
-                    color: platform.color
-                }]
-            });
-
-            setTimeout(() => message.delete().catch(() => null), 5_000);
-        } catch (err) {
+        /**
+         * @description Отправляем временное уведомление о начале запроса
+         * @protected
+         */
+        ctx.followup({
+            flags: MessageFlags.Ephemeral,
+            embeds: [{
+                title: `${platform.platform}.${api.type}`,
+                description: locale._(
+                    ctx.interaction.locale,
+                    platform.audio
+                        ? "api.platform.request"
+                        : "api.platform.request.long",
+                    [db.images.loading, platform.platform]
+                ),
+                color: platform.color
+            }]
+        }).then((msg) => {
+            setTimeout(() => msg.delete().catch(() => null), 5_000);
+        }).catch((err) => {
             // Ошибка при отправке сообщения о запросе
             Logger.log("ERROR", err as Error);
-        }
+        });
 
         /**
          * @description Выполнение REST-запроса с таймаутом
-         * @param api - Объект запроса платформы
-         * @param ctx - Контекст команды
+         * @protected
          */
         const result = await _withTimeout(
             // Основной запрос к платформе
@@ -66,7 +65,10 @@ export default createEvent({
             new Error(locale._(ctx.interaction.locale, "api.platform.timeout"))
         );
 
-        // Если произошла ошибка — уведомляем пользователя
+        /**
+         * @description Если произошла ошибка, сообщаем о ней
+         * @protected
+         */
         if (result instanceof Error) {
             ctx.client.events.runCustom(
                 "rest/error",
@@ -76,18 +78,23 @@ export default createEvent({
             return null;
         }
 
-        // Получаем очередь пользователя
+        /**
+         * @description Создаем очередь
+         * @protected
+         */
         const queue = db.queues.set(ctx);
+        queue.tracks.push(result, ctx.author); // Добавляем результат (трек / список / плейлист) в очередь
 
-        // Если вернулся одиночный трек — отправляем сообщение о добавлении
-        if (!Array.isArray(result)) {
-            ctx.client.events.runCustom("message/push", queue, ctx.member, result);
-        }
+        /**
+         * @description Отправляем сообщение о добавлении трека
+         * @protected
+         */
+        await ctx.client.events.runCustom("message/push",
+            queue,
+            ctx.member,
+            !Array.isArray(result) ? result : result[0]
+        );
 
-        else ctx.client.events.runCustom("message/push", queue, ctx.member, result[0]);
-
-        // Добавляем результат (трек / список / плейлист) в очередь
-        queue.tracks.push(result, ctx.author);
         return null;
     }
 })

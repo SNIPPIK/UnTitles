@@ -1,32 +1,6 @@
+import { OggOpusParser as OpusParser } from "#native";
 import { TypedEmitter } from "#structures";
-
-/**
- * @author SNIPPIK
- * @description Нативная реализация парсинга на C++
- */
-const NativeOpus: { OggOpusParser: new () => NativeOggOpusParser } = require('../../../Release/opus_native.node');
-
-/**
- * @author SNIPPIK
- * @description Интерфейс нативная реализация парсинга на C++
- * @private
- */
-interface NativeOggOpusParser {
-    /**
-     * @description Метод парсинга страницы
-     * @param chunk    -
-     * @param callback -
-     * @return void
-     * @public
-     */
-    readonly parse: (chunk: Buffer, callback: (type: keyof EncoderEvents, frame: Buffer, meta: {channels: number, sampleRate: number}) => void) => void;
-
-    /**
-     * @description Метод очистки памяти C++ кода
-     * @public
-     */
-    readonly destroy: () => void;
-}
+import { SILENT_FRAME } from "#core/audio";
 
 /**
  * @author SNIPPIK
@@ -37,7 +11,10 @@ interface NativeOggOpusParser {
  */
 export class OggOpusParser extends TypedEmitter<EncoderEvents> {
     /** Запущенный инстанс */
-    private instance: NativeOggOpusParser;
+    private instance: any;
+
+    /** Надо ли отправить 1 калибровочный пустой пакет */
+    private first = true;
 
     /**
      * @description Загружаем данные класса для парсинга аудио
@@ -45,7 +22,7 @@ export class OggOpusParser extends TypedEmitter<EncoderEvents> {
      */
     public constructor() {
         super();
-        this.instance = new NativeOpus.OggOpusParser();
+        this.instance = new OpusParser();
     };
 
     /**
@@ -57,6 +34,11 @@ export class OggOpusParser extends TypedEmitter<EncoderEvents> {
         try {
             // C++ вызывает этот колбэк синхронно для каждого найденного пакета
             this.instance.parse(chunk, (type, frame) => {
+                if (this.first && type === "frame") {
+                    this.first = undefined;
+                    this.emit("frame", SILENT_FRAME);
+                }
+
                 this.emit(type, frame);
             });
         } catch (err) {

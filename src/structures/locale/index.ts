@@ -22,6 +22,9 @@ export type localeString = keyof typeof locales;
  * @public
  */
 export class locale {
+    /** Регулярка для поиска плейсхолдеров. Оптимизирована для глобального поиска */
+    private static readonly ARG_REGEX = /{ARGUMENT}/g;
+
     /**
      * @description Язык по-умолчанию, использовать только тот, где есть перевод на 100%
      * @returns languages
@@ -63,11 +66,10 @@ export class locale {
             translate = locales[locale][this.language];
         }
 
-        // Если есть аргументы
-        if (args && args.length > 0) {
-            for (let i = 0; i < args.length; i++) {
-                translate = translate.replace("{ARGUMENT}", args[i]);
-            }
+        // Если есть аргументы, меняем их через регулярку за один проход (почти)
+        if (args?.length) {
+            let i = 0;
+            translate = translate.replace(this.ARG_REGEX, () => args[i++]?.toString() ?? "{ARGUMENT}");
         }
 
         return translate;

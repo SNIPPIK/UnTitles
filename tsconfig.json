@@ -51,6 +51,7 @@
       "#worker/db": ["./src/database/index.worker"],
 
       // Нативные модули написанные на C++
+      "#native": ["./src/native/index"],
       "#native/*": ["./src/native/*"]
     }
   },

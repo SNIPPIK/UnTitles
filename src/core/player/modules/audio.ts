@@ -1,4 +1,4 @@
-import { BufferedAudioResource, PipeAudioResource } from "#core/audio";
+import { AudioResource } from "#core/audio";
 import { Logger } from "#structures";
 import { db } from "#app/db";
 
@@ -27,7 +27,7 @@ const TIMEOUT_STREAM_BUFFERED = 20e3;
  * # Модуль для плеера
  * - Хранит в себе метаданные об аудио включая аудио
  */
-export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
+export class PlayerAudio<T extends AudioResource> {
     /**
      * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
      * @private
@@ -103,7 +103,7 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
         this._pre_audio = stream;
 
         // Отслеживаем аудио поток на ошибки
-        (stream as BufferedAudioResource).once("error", (error) => {
+        (stream as AudioResource).once("error", (error) => {
             // Удаляем таймер
             clearTimeout(this._timeout);
 
@@ -115,7 +115,7 @@ export class PlayerAudio<T extends BufferedAudioResource | PipeAudioResource> {
         });
 
         // Отслеживаем аудио поток на готовность к чтению
-        (stream as BufferedAudioResource).once("readable", () => {
+        (stream as AudioResource).once("readable", () => {
             // Удаляем таймер
             clearTimeout(this._timeout);
 

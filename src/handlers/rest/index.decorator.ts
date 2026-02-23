@@ -135,7 +135,10 @@ export type APIExecuteParams<T extends APIRequestsKeys> =
  * @type RestAPINames
  * @public
  */
-export type RestAPINames = "RADIO" | "YOUTUBE" | "SPOTIFY" | "VK" | "YANDEX" | "SOUNDCLOUD" | "DEEZER" | "APPLE_MUSIC";
+export type RestAPINames = "RADIO" |
+    "YOUTUBE" | "SPOTIFY" | "SOUNDCLOUD" | "DEEZER" |
+    "VK" | "YANDEX" |
+    "APPLE_MUSIC";
 
 /**
  * @author SNIPPIK

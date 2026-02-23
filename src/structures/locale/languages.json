@@ -28,7 +28,10 @@
 
 
 
-
+  "selector.filters": {
+    "en-US": "Select an audio filter",
+    "ru": "Выберите аудио фильтр"
+  },
 
 
 
@@ -347,33 +350,33 @@
   },
 
   "api.platform.block": {
-    "en-US": "API block: This platform has currently been blocked by the developer",
-    "ru": "Блокировка API: эта платформа в настоящее время заблокирована разработчиком"
+    "en-US": "Error: API Blocked\nThe platform has been blocked for technical reasons, but you'll have to wait for now!",
+    "ru": "Ошибка: Блокировка API\nПлатформа была заблокирована по техническим соображениям, придется пока подождать!"
   },
 
   "api.platform.auth": {
-    "en-US": "API authorization: Problem with authorization data, contact the developer",
-    "ru": "Авторизация API: Проблема с данными авторизации, обратитесь к разработчику"
+    "en-US": "Error: API Authorization\nThis platform is supported, but authorization data is missing!\nData cannot be retrieved!",
+    "ru": "Ошибка: API авторизации\nПоддержка данной платформы присутствует, но данные для авторизации отсутствует!\nДанные получить не получится!"
   },
 
   "api.platform.support": {
-    "en-US": "API error: I don't have support for this type of request",
-    "ru": "Ошибка API: у меня нет поддержки для этого типа запроса"
+    "en-US": "Error: Unknown API\nThis platform is not currently supported!",
+    "ru": "Ошибка: Unknown API\nПока поддержки этой платформы нет!"
   },
 
   "api.platform.request": {
-    "en-US": "{ARGUMENT} Waiting for response from server...",
-    "ru": "{ARGUMENT} Ожидание ответа от сервера..."
+    "en-US": "{ARGUMENT} Waiting for data from internal server...",
+    "ru": "{ARGUMENT} Ожидание данных от внутреннего сервера..."
   },
 
   "api.platform.request.long": {
-    "en-US": "{ARGUMENT} Waiting for response from server...\n\n**{ARGUMENT}** cannot return audio data!!!",
-    "ru": "{ARGUMENT} Ожидание ответа от сервера...\n\n**{ARGUMENT}** не может отдавать аудио данные!!!"
+    "en-US": "{ARGUMENT} Waiting for data from internal server...\n\n**{ARGUMENT}** cannot provide audio data, the search will be performed on other platforms!!!",
+    "ru": "{ARGUMENT} Ожидание данных от внутреннего сервера...\n\n**{ARGUMENT}** не может отдавать аудио данные, поиск будет произведен на других платформах!!!"
   },
 
   "api.platform.timeout": {
-    "en-US": "Timeout server: The server refused to transmit data",
-    "ru": "Истекло время ожидания сервера: сервер отказался передавать данные"
+    "en-US": "Error: Timeout expired\n- The internal server refused to transmit data!",
+    "ru": "Ошибка: Истекло время ожидания\n - Внутренний сервер отказался передавать данные!"
   },
 
   "api.platform.error": {
@@ -428,7 +431,7 @@
   },
 
   "api.request.audio.fail": {
-    "en-US": "[API error]: {ARGUMENT} don't give audio link!",
+    "en-US": "[API error]: {ARGUMENT} doesn't provide an audio link!",
     "ru": "[Ошибка API]: {ARGUMENT} не предоставляет аудио ссылку!"
   },
 

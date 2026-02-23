@@ -41,11 +41,11 @@ class RestVKAPI extends RestServerSide.API {
          */
         {
             name: "track",
-            filter: /(audio)([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i,
+            filter: /(audio)/i,
             execute: async (url, options) => {
-                const ID = this.getID(/([0-9]+_[0-9]+_[a-zA-Z0-9]+|-[0-9]+_[a-zA-Z0-9]+)/i, url);
+                const ID = this.getID(/(|-)[0-9]+_[0-9]+/i, url)?.at(0);
 
-                //Если ID трека не удалось извлечь из ссылки
+                // Если ID трека не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.track");
 
                 // Интеграция с утилитой кеширования
@@ -77,7 +77,7 @@ class RestVKAPI extends RestServerSide.API {
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
 
-                    const track = this.track(api.response.pop(), url);
+                    const track = this.track(api.response.pop());
 
                     // Если указано получение аудио
                     if (options.audio) {
@@ -96,12 +96,56 @@ class RestVKAPI extends RestServerSide.API {
                     // Если нет ссылки на трек
                     if (!track.audio) return locale.err( "api.request.fail");
 
-                    setImmediate(() => {
-                        // Сохраняем кеш в системе
-                        if (!cache) sdb.meta_saver?.set(track, this.url);
-                    });
+                    // Сохраняем кеш в системе
+                    if (!cache) sdb.meta_saver?.set(track, this.url);
 
                     return track;
+                } catch (e) {
+                    return new Error(`[APIs]: ${e}`);
+                }
+            }
+        },
+
+        /**
+         * @description Запрос данных о плейлисте или альбоме
+         * @type "playlist"
+         */
+        {
+            name: "playlist",
+            filter: /(playlist|album)/i,
+            execute: async (url, { limit }) => {
+                const ID = this.getID(/(?:playlist|album)\/(?<owner_id>-?\d+)_(?<playlist_id>\d+)(?:_(?<access_hash>[a-f0-9]+))?/, url)?.groups ?? null;
+
+                // Если ID трека не удалось извлечь из ссылки
+                if (!ID) return locale.err( "api.request.id.playlist");
+
+                try {
+                    // Создаем запрос
+                    const api = await this.API("audio", "getPlaylistById", `&owner_id=${ID.owner_id}&playlist_id=${ID.playlist_id}&access_key=${ID.access_hash}&count=1`);
+
+                    // Получаем список треков в формате ids
+                    const tracks_ids = await this.API("audio", "getIdsBySource", `&entity_id=${ID.owner_id}_${ID.playlist_id}_${ID.access_hash}&source=playlist&ref=`);
+
+                    // Если запрос выдал ошибку то
+                    if (api instanceof Error) return api;
+                    else if (tracks_ids instanceof Error) return tracks_ids;
+
+                    // Получаем треки
+                    const tracks_raw = await this.API("audio", "getById", `&audios=${(tracks_ids.response.audios as any[]).splice(0, limit).map((d) => d.audio_id).join(",")}`);
+
+                    // Если запрос выдал ошибку то
+                    if (tracks_raw instanceof Error) return tracks_raw;
+
+                    const playlist = api.response;
+                    const image = playlist.photo;
+                    const tracks = tracks_raw.response.map(this.track);
+
+                    return {
+                        url: url,
+                        title: playlist.title,
+                        image: image?.["photo_1200"] ?? image?.["photo_600"] ?? image?.["photo_300"] ?? image?.["photo_270"] ?? undefined,
+                        items: tracks
+                    }
                 } catch (e) {
                     return new Error(`[APIs]: ${e}`);
                 }
@@ -136,12 +180,13 @@ class RestVKAPI extends RestServerSide.API {
      * @param options {string} Параметры через &
      * @protected
      */
-    protected API = (method: "audio" | "execute" | "catalog", type: "getById" | "search" | "getPlaylistById", options: string): Promise<json | Error> => {
+    protected API = (method: "audio" | "execute" | "catalog", type: "getById" | "search" | "getPlaylistById" | "getIdsBySource", options: string): Promise<json | Error> => {
         return new Promise((resolve) => {
             const url = `${this.options.api}/${method}.${type}` + `?access_token=${this.auth}${options}&v=5.95`;
 
             new httpsClient({
                 url,
+                userAgent: "VKAndroidApp/8.13-16168 (Android 11; SDK 30; arm64-v8a; samsung SM-G991B; ru; 2400x1080)",
                 agent: this.agent
             }).toJson.then((api: any) => {
                 // Если на этапе получение данных получена одна из ошибок
@@ -158,15 +203,14 @@ class RestVKAPI extends RestServerSide.API {
     /**
      * @description Из полученных данных подготавливаем трек для Audio<Queue>
      * @param track {any} Любой трек из VK
-     * @param url - Ссылка на трек
      * @protected
      */
-    protected track = (track: json, url: string = null) => {
+    protected track = (track: json) => {
         const image = track?.album?.["thumb"];
 
         return {
             id: `${track.owner_id}_${track.id}`,
-            url: url || `https://vk.com/audio${track.owner_id}_${track.id}`,
+            url: `https://vk.com/audio${track.owner_id}_${track.id}`,
             title: track.title,
             artist: this.author(track),
             image: image?.["photo_1200"] ?? image?.["photo_600"] ?? image?.["photo_300"] ?? image?.["photo_270"] ?? undefined,

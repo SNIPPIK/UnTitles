@@ -134,7 +134,7 @@ class RestYouTubeAPI extends RestServerSide.API {
             name: "playlist",
             filter: /playlist\?list=[a-zA-Z0-9-_]+/i,
             execute: async (url, { limit }) => {
-                const ID = this.getID(/playlist\?list=[a-zA-Z0-9-_]+/i, url);
+                const ID = this.getID(/playlist\?list=[a-zA-Z0-9-_]+/i, url)[0];
                 let artist = null;
 
                 try {
@@ -247,7 +247,7 @@ class RestYouTubeAPI extends RestServerSide.API {
             name: "track",
             filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
             execute: async (url, options) => {
-                const ID = this.getID(/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/, url);
+                const ID = this.getID(/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/, url)[0];
 
                 try {
                     // Если ID видео не удалось извлечь из ссылки
@@ -311,10 +311,8 @@ class RestYouTubeAPI extends RestServerSide.API {
                         }
                     }
 
-                    if (!cache && !api?.["videoDetails"]?.["isLive"]) setImmediate(() => {
-                        // Сохраняем кеш в системе
-                        sdb.meta_saver?.set(track, this.url);
-                    });
+                    // Сохраняем кеш в системе
+                    if (!cache && !api?.["videoDetails"]?.["isLive"]) sdb.meta_saver?.set(track, this.url);
 
                     return track;
                 } catch (e) {

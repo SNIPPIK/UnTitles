@@ -64,7 +64,7 @@ class RestSpotifyAPI extends RestServerSide.API {
             name: "track",
             filter: /track\/[a-zA-Z0-9]+/i,
             execute: async (url, options) => {
-                const ID = this.getID(/track\/[a-zA-Z0-9]+/, url)?.split("track\/")?.pop();
+                const ID = this.getID(/track\/[a-zA-Z0-9]+/, url)[0]?.split("track\/")?.pop();
 
                 //Если ID трека не удалось извлечь из ссылки
                 if (!ID) return locale.err("api.request.id.track");
@@ -136,7 +136,7 @@ class RestSpotifyAPI extends RestServerSide.API {
             name: "album",
             filter: /album\/[a-zA-Z0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = this.getID(/album\/[a-zA-Z0-9]+/, url)?.split("album\/")?.pop();
+                const ID = this.getID(/album\/[a-zA-Z0-9]+/, url)[0]?.split("album\/")?.pop();
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.album");
@@ -173,7 +173,7 @@ class RestSpotifyAPI extends RestServerSide.API {
             name: "playlist",
             filter: /playlist\/[a-zA-Z0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = this.getID(/playlist\/[a-zA-Z0-9]+/, url)?.split("playlist\/")?.pop();
+                const ID = this.getID(/playlist\/[a-zA-Z0-9]+/, url)[0]?.split("playlist\/")?.pop();
 
                 // Если ID плейлиста не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.playlist");
@@ -207,7 +207,7 @@ class RestSpotifyAPI extends RestServerSide.API {
             name: "artist",
             filter: /artist\/[a-zA-Z0-9]+/i,
             execute: async (url, {limit}) => {
-                const ID = this.getID(/artist\/[a-zA-Z0-9]+/, url)?.split("artist\/")?.pop();
+                const ID = this.getID(/artist\/[a-zA-Z0-9]+/, url)[0]?.split("artist\/")?.pop();
 
                 // Если ID автора не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.author");
@@ -236,7 +236,7 @@ class RestSpotifyAPI extends RestServerSide.API {
             execute: async (query, {limit}) => {
                 try {
                     // Создаем запрос
-                    const api: Error | any = await this.API(`search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
+                    const api= await this.API(`search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
@@ -255,25 +255,27 @@ class RestSpotifyAPI extends RestServerSide.API {
      * @protected
      */
     protected API = async (method: string): Promise<json | Error> => {
-        // Нужно обновить токен
-        if (!this.options.token || this.options.time <= Date.now()) await this.authorization();
+        return new Promise(async (resolve) => {
+            // Нужно обновить токен
+            if (!this.options.token || this.options.time <= Date.now()) await this.authorization();
 
-        return new httpsClient({
-            url: `${this.options.api}/${method}`,
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Authorization": "Bearer " + this.options.token
-            },
-            agent: this.agent
-        }).toJson.then((api) => {
-            // Если на этапе получение данных получена одна из ошибок
-            if (!api) return locale.err("api.request.fail");
-            else if (api instanceof Error) return api;
-            else if (api.error) return locale.err("api.request.fail.msg", [api.error.message]);
+            new httpsClient({
+                url: `${this.options.api}/${method}`,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": "Bearer " + this.options.token
+                },
+                agent: this.agent
+            }).toJson.then((api) => {
+                // Если на этапе получение данных получена одна из ошибок
+                if (!api) return resolve(locale.err("api.request.fail"));
+                else if (api instanceof Error) return resolve(api);
+                else if (api.error) return resolve(locale.err("api.request.fail.msg", [api.error.message]));
 
-            return api;
-        }).catch((err) => {
-            return Error(`[APIs]: ${err}`);
+                return resolve(api);
+            }).catch((err) => {
+                return resolve(Error(`[APIs]: ${err}`));
+            });
         });
     };
 

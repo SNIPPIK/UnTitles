@@ -1,11 +1,11 @@
-import {ControllerTracks, ControllerVoice, Track} from "#core/queue";
-import {QueueButtons, QueueMessage} from "../modules/message";
-import {CommandInteraction} from "#structures/discord";
-import {VoiceConnection} from "#core/voice";
-import {AudioPlayer} from "#core/player";
-import {Logger} from "#structures";
-import {db} from "#app/db";
-import {SpeakerType} from "#core/voice/modules/Speaker";
+import { ControllerTracks, ControllerVoice, Track } from "#core/queue";
+import { QueueButtons, QueueMessage } from "../modules/message";
+import { SpeakerType } from "#core/voice/modules/Speaker";
+import { CommandInteraction}  from "#structures/discord";
+import { VoiceConnection } from "#core/voice";
+import { AudioPlayer } from "#core/player";
+import { Logger } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -179,9 +179,10 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
         const buttons = this._buttons?.component(player);
 
         try {
-            const {api, artist, name, image, user} = tracks.track;
+            const { api, artist, name, image, user, url } = tracks.track;
             const textTracks = tracks.total > 1 ? `| ${tracks.position + 1}/${tracks.total} | ${tracks.time}` : "";
-            const latency = `${player.latency}/${player.voice.connection.latency} ms`
+            const latency = `${player.latency}/${player.voice.connection.latency} ms`;
+            const vol = player.audio.volume;
 
             return [{
                 "type": 17, // Container
@@ -196,7 +197,7 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
                             },
                             {
                                 "type": 10,
-                                "content": `\`\`\`${name}\`\`\``
+                                "content": `\`\`\`${name}\`\`\`[${("‾").repeat(name.length)}](${url})`
                             }
                         ],
                         "accessory": {
@@ -213,7 +214,7 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
                     },
                     {
                         "type": 10, // Text
-                        "content": `-# ${user.username} ● ${getVolumeIndicator(player.audio.volume)} ${textTracks} | ${latency}` + player.progress
+                        "content": `-# ${user.username} ● ${getVolumeIndicator(vol)} ${textTracks} | ${latency}` + player.progress
                     },
                     ...buttons
                 ]

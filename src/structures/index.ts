@@ -131,7 +131,6 @@ for (const {type, name, value} of prototypes) {
 export * from "./logger";
 export * from "./locale";
 export * from "./tools/TypedEmitter";
-export * from "./tools/Assign";
 export * from "./array";
 export * from "./tools/httpsClient";
 export * from "./tools/SimpleWorker";

@@ -1,6 +1,5 @@
-import { RestAPIAgent, RestServerSide } from "#handler/rest";
+import { APIRequestData, RestAPIAgent, RestServerSide } from "#handler/rest";
 import { httpsClient, httpsStatusCode } from "#structures";
-import { Colors } from "#structures/discord";
 import { sdb } from "#worker/db";
 import { db } from "#app/db";
 
@@ -70,20 +69,14 @@ class ResourceProvider {
 class TrackResolvers {
     protected static providers = {
         /**
-         * @description Lyrics провайдер для получения текста трека
-         * @public
-         */
-        //lyrics: new LyricsProvider(),
-
-        /**
          * @description Провайдеры для поддержания аудио и прочего
          * @public
          */
         audio: new ResourceProvider(async (track) => {
+            const status = sdb.audio_saver?.status(track);
+
             // Проверка кеша (мгновенно)
-            if (sdb.audio_saver?.status(track).status === "ended") {
-                return sdb.audio_saver?.status?.(track)?.path;
-            }
+            if (status.status === "ended") return status.path;
 
             // Если ссылки нет — ищем через API
             if (!track.link) {
@@ -380,18 +373,7 @@ export class Track extends TrackResolvers {
      * @param _api   - Данные о платформе
      * @public
      */
-    //@ts-ignore
-    public constructor(protected _track: Track.data, protected _api: RestServerSide.API = {
-        name: null,
-        color: Colors.Aqua,
-        url: null,
-        audio: true,
-        filter: null,
-        requests: null,
-        proxy: null,
-        options: null,
-        agent: null
-    }) {
+    public constructor(protected _track: APIRequestData.Track, protected _api: RestServerSide.API) {
         super();
         this.time = _track?.time as any;
         this.proxy = _api?.proxy ?? false;

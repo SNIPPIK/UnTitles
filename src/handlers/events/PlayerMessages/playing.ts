@@ -21,7 +21,7 @@ export default createEvent({
         });
 
         // Меняем статус голосового канала
-        await db.adapter.status(queue.message.voice_id, `${db.images.disk_emoji} | ${queue.tracks.track.name}`);
+        db.adapter.status(queue.message.voice_id, `${db.images.disk_emoji} | ${queue.tracks.track.name}`).catch(() => null);
 
         // Если есть сообщение
         if (message) db.queues.cycles.messages.update(message, queue.components);

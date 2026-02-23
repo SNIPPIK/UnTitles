@@ -65,7 +65,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @default 120
      * @public
      */
-    public latency: number = 120;
+    public latency: number = 60;
 
     /**
      * @description Текущий статус клиента
