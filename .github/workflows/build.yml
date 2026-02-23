@@ -56,5 +56,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: build/native/*.node
+          path: src-rs/*.node
           if-no-files-found: error
