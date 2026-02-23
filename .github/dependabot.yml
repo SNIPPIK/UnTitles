@@ -18,7 +18,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 3
-    versioning-strategy: increase
+    versioning-strategy: auto
 
   # Обновления для GitHub Actions
   - package-ecosystem: "github-actions"

@@ -2,15 +2,32 @@ changelog:
   exclude:
     labels:
       - ignore-for-release
+      - duplicate
+      - question
   categories:
-    - title: Breaking Changes 🛠
+    - title: "Breaking Changes 🛠"
       labels:
         - Semver-Major
         - breaking-change
-    - title: Exciting New Features 🎉
+    - title: "Exciting New Features 🎉"
       labels:
         - Semver-Minor
         - enhancement
-    - title: Other Changes
+    - title: "Native & Performance (Rust) 🦀"
+      labels:
+        - rust
+        - performance
+        - native
+    - title: "Bug Fixes 🐛"
+      labels:
+        - Semver-Patch
+        - bug
+        - fix
+    - title: "Maintenance & Tooling ⚙️"
+      labels:
+        - dependencies
+        - github_actions
+        - internal
+    - title: "Other Changes"
       labels:
         - "*"
