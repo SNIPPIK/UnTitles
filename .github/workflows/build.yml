@@ -34,7 +34,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 24 # 24-я еще может быть нестабильна в раннерах, 20-я — сейф-вариант
+          node-version: 24
           cache: 'npm'
 
       - name: Install Rust
@@ -46,19 +46,17 @@ jobs:
         if: contains(matrix.settings.build, '--use-zig')
         uses: goto-bus-stop/setup-zig@v2
 
-      # Если package.json в корне, оставляем так.
-      # Если он тоже в src-native, добавь working-directory: ./src-native
       - name: Install dependencies
         run: npm install
 
       - name: Build
         run: ${{ matrix.settings.build }}
-        working-directory: src-native # Запускаем саму сборку в папке с Rust
+        working-directory: src-rs
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          # Ищем файл в папке, где он скомпилировался
-          path: src-native/*.node
+
+          path: src-rs/*.node
           if-no-files-found: error
