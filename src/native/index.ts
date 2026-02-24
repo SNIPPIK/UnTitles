@@ -1,170 +1,272 @@
 /**
+ * Загружаем нативный модуль один раз
+ */
+const Native = require('../../native/index.js') as any; // или точный путь к .node
+
+/**
+ * @module native-bindings
  * @author SNIPPIK
- * @description Высокопроизводительные нативные привязки Rust для работы с медиа-потоками и сетью.
+ * @description Высокопроизводительные нативные привязки на Rust для работы с медиа-потоками,
+ * сетью, точным таймингом, парсингом OGG/Opus и управлением аудио-очередями.
+ *
+ * Все классы создаются через `new`, большинство методов синхронные.
+ * Асинхронность достигается через колбэки (pipeStdout, startListening, startCycle).
+ * Ошибки выбрасываются как экземпляры Error с полем code и message из нативного слоя.
  */
 
 /**
- * @description Метка времени в микросекундах (1 мс = 1000 мкс).
- * Используется для сверхточной синхронизации аудио-фреймов.
+ * @descriptionТип для представления времени в **микросекундах** (µs).
+ * 1 мс = 1000 µs.
+ * @support Используется для:
+ * - компенсации задержек JS-исполнения
+ * - измерения лага в CycleWorker
+ * - точных RTP-таймстампов
+ * - внутренних расчётов jitter buffer
+ * @type Microseconds
  */
 export type Microseconds = number;
 
 /**
+ * Тип для представления времени в **миллисекундах** с плавающей точкой.
+ * Обычно возвращается:
+ * - из performance.now()
+ * - из колбэка CycleWorker (shotTimeMs)
+ * - из внутренних измерений нативного таймера
+ * @type Milliseconds
+ */
+export type Milliseconds = number;
+
+/**
+ * @support Тип пакета, обнаруженного парсером OGG/Opus.
+ * - head  → OpusHead (основные параметры кодека: каналы, частота дискретизации)
+ * - tags  → OpusTags (метаданные: название, артист, комментарии)
+ * - frame → аудиофрейм Opus (собственно звук)
+ * @type OpusPacketType
+ * @extends OggOpusParser
+ */
+export type OpusPacketType = 'head' | 'tags' | 'frame';
+
+/* ────────────────────────────────────────────────
+   Интерфейсы классов, экспортируемых из нативного модуля
+───────────────────────────────────────────────── */
+
+/**
+ * @description Нативный парсер контейнера OGG с кодеком Opus.
+ * Работает потоково: принимает произвольные куски байтов и выдаёт полные Opus-пакеты.
+ * @support Подходит для:
+ * - потоков из FFmpeg
+ * - RTP-пакетов с OGG-инкапсуляцией
+ * - файлов .ogg
  * @interface OggOpusParser
- * @description Экземпляр нативного парсера OGG/Opus.
  */
 export interface OggOpusParser {
     /**
-     * @description Разбирает входящий поток байт на составляющие Opus-пакеты.
-     * @param chunk {Buffer} - Сырой буфер данных (например, кусок файла или поток из FFmpeg).
-     * @param callback {Function} - Обратный вызов, срабатывающий при обнаружении данных.
-     * @param callback.type {'header' | 'metadata' | 'frame'} - Тип найденного пакета.
-     * @param callback.data {Buffer} - Содержимое пакета.
+     * Основной метод парсинга.
+     * Добавляет новые данные в буфер и пытается извлечь полные страницы и пакеты.
+     * При обнаружении полного Opus-пакета **синхронно** вызывает callback.
+     *
+     * @param chunk - произвольный фрагмент байтов (может быть неполной страницей или несколькими)
+     * @param callback - вызывается сразу при нахождении пакета (не асинхронно!)
+     * @param callback.type - тип пакета
+     * @param callback.data - полные байты пакета (можно сразу передать в opus-decoder)
      */
-    parse(chunk: Buffer, callback: (type: 'header' | 'metadata' | 'frame', data: Buffer) => void): void;
-}
-
-/**
- * @interface FfmpegProcess
- * @description Управляемый процесс FFmpeg, запущенный в нативном слое.
- */
-export interface FfmpegProcess {
-    /**
-     * @description Начинает чтение stdout процесса FFmpeg и передает чанки в JS.
-     * @param callback {Function} - Функция, принимающая Buffer с данными из stdout.
-     * @param callback.chunk {Buffer} - Порция данных от FFmpeg.
-     */
-    pipeStdout(callback: (chunk: Buffer) => void): void;
+    parse(chunk: Buffer, callback: (type: OpusPacketType, data: Buffer) => void): void;
 
     /**
-     * @description Принудительно завершает процесс (SIGKILL) и освобождает ресурсы.
+     * Полностью очищает внутренние буферы (remainder и packet_carry),
+     * сбрасывает состояние (серийный номер потока, флаг ожидания заголовка).
+     * Вызывать обязательно при:
+     * - смене источника потока
+     * - переподключении к голосовому каналу
+     * - завершении сессии
      */
     destroy(): void;
 }
 
 /**
+ * @description Управляемый процесс FFmpeg, запущенный из нативного кода.
+ * Процесс работает в отдельном потоке, не блокирует Event Loop Node.js.
+ * Stdout читается асинхронно и передаётся через колбэк.
+ * @interface FfmpegProcess
+ */
+export interface FfmpegProcess {
+    /**
+     * Запускает чтение stdout и передачу данных в JS.
+     * Вызывается один раз после создания экземпляра.
+     *
+     * @param onData - основной колбэк: вызывается для каждого чанка stdout (обычно OGG/Opus)
+     * @param onError - опционально: ошибки (проблемы с запуском, stderr, краш)
+     * @param onExit - опционально: процесс завершился (код выхода или null при SIGKILL)
+     */
+    pipeStdout(
+        onData: (chunk: Buffer) => void,
+        onError?: (error: Error | string) => void,
+        onExit?: (code: number | null) => void
+    ): void;
+
+    /**
+     * Принудительно завершает процесс FFmpeg (посылает SIGKILL).
+     * Освобождает все ресурсы (память, потоки, дескрипторы).
+     * После вызова объект становится невалидным — повторный вызов pipeStdout приведёт к ошибке.
+     */
+    destroy(): void;
+
+    /** @readonly Процесс запущен и ещё не завершён? */
+    readonly isRunning: boolean;
+
+    /** @readonly PID процесса (если доступен на текущей платформе) */
+    readonly pid?: number;
+}
+
+/**
+ * @description Нативная очередь (Jitter Buffer) для аудио-пакетов.
+ * @support Поддерживает:
+ * - ограничение по времени хранения
+ * - peek (просмотр без удаления)
+ * - позиционирование (можно перематывать)
+ * - безопасную очистку
  * @interface AudioEngine
- * @description Нативный менеджер очереди пакетов (Jitter Buffer / Очередь).
  */
 export interface AudioEngine {
     /**
-     * @description Добавляет готовый пакет Opus в конец внутренней очереди.
-     * @param packet {Buffer} - Фрейм аудио-данных.
+     * Конструктор.
+     * @param maxMinutes - максимальное время хранения пакетов в минутах
+     *   0 = неограниченный режим (только добавление и чтение, без автоматического дропа)
+     *   Пример: 5 минут ≈ 15 000 пакетов при 20 мс фреймах
+     */
+    constructor(maxMinutes: number);
+
+    /**
+     * Добавляет новый аудио-пакет в конец очереди.
+     * Если очередь переполнена (по времени) — старые пакеты автоматически удаляются.
      */
     addPacket(packet: Buffer): void;
 
     /**
-     * @description [Режим Стриминга] Извлекает первый пакет из очереди и удаляет его (FIFO).
-     * @returns {Buffer | null} - Пакет или null, если очередь пуста.
+     * Возвращает следующий пакет и **продвигает** позицию чтения.
+     * @returns следующий пакет или null, если очередь пуста
      */
-    readonly consumePacket: Buffer | null;
+    get packet(): Buffer | null;
 
     /**
-     * @description [Режим Буфера] Возвращает пакет по текущему индексу position без удаления.
-     * @returns {Buffer | null} - Пакет или null.
+     * Возвращает следующие count пакетов **без изменения позиции**.
+     * Полезно для lookahead, FEC, или анализа без потребления.
      */
-    readonly packet: Buffer | null;
+    peekPackets(count: number): Buffer[];
 
-    /**
-     * @description Возвращает общее количество пакетов, хранящихся в памяти.
-     * @returns {number}
-     */
+    /** Текущее количество пакетов в очереди (включая уже прочитанные) */
     readonly size: number;
 
     /**
-     * @description Текущий индекс чтения для режима буферизации (Buffered).
-     * @param value {number} - Новая позиция (индекс пакета).
+     * Текущая позиция чтения (индекс следующего пакета, который вернёт get packet).
+     * Можно менять для перемотки назад/вперёд.
      */
     position: number;
 
     /**
-     * @description Очищает все накопленные пакеты и сбрасывает позицию.
+     * Полностью очищает очередь и сбрасывает позицию в 0.
+     * Не влияет на capacity.
      */
     clear(): void;
+
+    /**
+     * Получить пакет по абсолютному индексу **без сдвига позиции**.
+     * @param index - абсолютный индекс (0 = самый старый пакет)
+     */
+    getPacketAt(index: number): Buffer | null;
+
+    /** Последний добавленный пакет (самый новый) или null */
+    readonly lastPacket: Buffer | null;
+
+    /** Максимальная ёмкость очереди в пакетах (вычисляется из maxMinutes) */
+    readonly capacity: number;
 }
 
 /**
+ * @description Нативный UDP-клиент для отправки и приёма пакетов.
+ * Используется в основном для Discord Voice (RTP + Opus + шифрование).
  * @interface UdpSender
- * @description Нативный UDP-клиент для высокоскоростной отправки данных в Discord.
  */
 export interface UdpSender {
     /**
-     * @description Отправляет UDP-пакет напрямую по адресу назначения.
-     * @param packet {Buffer} - Полностью сформированный пакет (RTP + Encrypted Opus).
+     * Отправляет готовый UDP-пакет по адресу, заданному в конструкторе.
+     * @param packet - полностью сформированный пакет (RTP заголовок + Opus + шифрование)
+     * @throws при ошибке отправки (сокет закрыт, сеть недоступна и т.д.)
      */
     sendPacket(packet: Buffer): void;
 
     /**
-     * @description Запускает фоновый поток прослушивания входящих UDP-пакетов.
-     * @param callback {Function} - Обработка входящих данных (например, IP Discovery).
-     * @param callback.message {Buffer} - Входящий пакет данных.
+     * Запускает фоновый поток прослушивания входящих UDP-пакетов.
+     * @param callback - вызывается асинхронно для каждого полученного пакета
+     * @param callback.message - сырые байты пакета
+     * @param callback.rinfo - информация об отправителе (IP, порт) — опционально
+     * @throws если прослушивание уже запущено
      */
-    startListening(callback: (message: Buffer) => void): void;
+    startListening(
+        callback: (message: Buffer, rinfo?: { address: string; port: number }) => void
+    ): void;
+
+    /**
+     * Останавливает прослушивание и завершает внутренний поток чтения.
+     * После вызова startListening можно вызвать заново.
+     */
+    stopListening(): void;
+
+    /** Прослушивание активно и поток запущен? */
+    readonly isListening: boolean;
 }
 
-/** Загрузка бинарного модуля */
-const NativeRust = require('../../native/index.js');
+/**
+ * @description Высокоточный циклический таймер на основе Rust (steady_clock + компенсация дрифта).
+ * Используется для метронома, аудио-синхронизации, генерации тиков с минимальным джиттером.
+ * @interface CycleWorker
+ */
+export interface CycleWorker {
+    /**
+     * Запускает цикл с заданным интервалом.
+     * Колбэк вызывается примерно каждые interval миллисекунд.
+     *
+     * @param callback - основной колбэк таймера
+     * @param callback.shotTimeMs - миллисекунды от момента вызова start() (с плавающей точкой)
+     */
+    start(callback: (shotTimeMs: Milliseconds) => void): void;
+
+    /**
+     * Останавливает цикл, завершает нативный поток и освобождает ресурсы.
+     * После вызова объект можно переиспользовать (вызвать start снова).
+     */
+    stop(): void;
+
+    /**
+     * Передаёт измеренный лаг выполнения JS-колбека в нативный слой.
+     * Используется для компенсации задержек Event Loop.
+     *
+     * @param lagMicros - разница между планируемым и реальным временем вызова колбека (в µs)
+     *   Положительное значение — JS опаздывает → таймер будет ускоряться
+     *   Отрицательное — опережает → таймер замедлится
+     */
+    setLag(lagMicros: Microseconds): void;
+
+    /** Текущий интервал цикла в микросекундах */
+    readonly intervalMicros: Microseconds;
+
+    /** Цикл запущен и таймер работает? */
+    readonly isRunning: boolean;
+}
+
+/* ────────────────────────────────────────────────
+   Экспорты реальных конструкторов и функций
+───────────────────────────────────────────────── */
 
 /**
- * @description Конструктор парсера OGG/Opus.
- * @example const parser = new OggOpusParser();
+ * Загруженный нативный модуль.
+ * Содержит все конструкторы классов и вспомогательные функции.
  */
-export const OggOpusParser: new () => OggOpusParser = NativeRust.OggOpusParser;
-
-/**
- * @description Конструктор процесса FFmpeg.
- * @param args {string[]} - Аргументы командной строки (например, ["-i", "url", ...]).
- * @param name {string} - Путь к бинарнику или команда 'ffmpeg'.
- */
-export const FfmpegProcess: new (args: string[], name: string) => FfmpegProcess = NativeRust.FfmpegProcess;
-
-/**
- * @description Конструктор движка управления аудио-пакетами.
- * @param maxMinutes {number} - Максимальная длительность буфера в минутах (0 для Pipe/Streaming режима).
- */
-export const AudioEngine: new (maxMinutes: number) => AudioEngine = NativeRust.AudioEngine;
-
-/**
- * @description Конструктор UDP-клиента.
- * @param remoteAddr {string} - Строка адреса в формате "IP:PORT".
- */
-export const UdpSender: new (remoteAddr: string) => UdpSender = NativeRust.UdpSender;
-
-/**
- * @description Пытается найти FFmpeg в системе.
- * @param customPaths {string[]} - Дополнительные пути для поиска.
- * @returns {string | null} - Путь к FFmpeg или null, если не найден.
- */
-export const findFfmpeg: (customPaths: string[]) => string | null = NativeRust.findFfmpeg;
-
-/**
- * @description Запускает нативный высокоточный цикл (воркер).
- * @param interval {number} - Интервал тика в миллисекундах (например, 20).
- * @param callback {Function} - Функция, вызываемая на каждом шаге.
- * @param callback.timestamp {Microseconds} - Точное время выстрела таймера в мкс.
- * @returns {number} - Уникальный ID воркера.
- */
-export const startCycle: (interval: number, callback: (timestamp: Microseconds) => void) => number = NativeRust.startCycle;
-
-/**
- * @description Останавливает работу воркера и удаляет поток.
- * @param id {number} - ID воркера, полученный при старте.
- */
-export const stopCycle: (id: number) => void = NativeRust.stopCycle;
-
-/**
- * @description Устанавливает коррекцию времени для воркера.
- * @param id {number} - ID воркера.
- * @param lagMicroseconds {Microseconds} - Задержка в микросекундах для компенсации.
- */
-export const setLag: (id: number, lagMicroseconds: Microseconds) => void = NativeRust.setLag;
-
-/**
- * @description Меняет множитель интервала шага (скорость цикла).
- * @param id {number} - ID воркера.
- * @param multiplier {number} - Коэффициент скорости (1.0 = норма).
- */
-export const setStepInterval: (id: number, multiplier: number) => void = NativeRust.setStepInterval;
-
-/** Экспорт по умолчанию для доступа через NativeRust */
-export default NativeRust;
+export const {
+    OggOpusParser,
+    FfmpegProcess,
+    AudioEngine,
+    UdpSender,
+    CycleWorker,
+    findFfmpeg,
+} = Native;

@@ -1,27 +1,15 @@
 [package]
 name = "watklok-native"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 # Это критически важно: сообщаем Rust, что собираем динамическую библиотеку C-типа
 crate-type = ["cdylib"]
 
 [dependencies]
-# Основной мост между Node.js и Rust
-# Используем napi4 для поддержки ThreadSafeFunction
-napi = { version = "2.12.2", default-features = false, features = ["napi4", "async", "serde-json"] }
-napi-derive = "2.12.2"
-
-# Глобальный менеджер воркеров (потокобезопасная инициализация)
-once_cell = "1.18.0"
-
-# Для работы с сетью и временем (если решишь добавить UDP прямо в воркер)
-socket2 = { version = "0.5.5", features = ["all"] }
-
-[build-dependencies]
-# Позволяет генерировать .d.ts файлы при сборке
-napi-build = "2.0.1"
+napi = { version = "2.16.17", default-features = false, features = ["napi9", "async", "serde-json"] }
+napi-derive = "2.16.13"
 
 [profile.release]
 # Оптимизации для максимальной точности таймера

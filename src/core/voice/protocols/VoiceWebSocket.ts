@@ -2,8 +2,8 @@ import { type WebSocketOpcodes, GatewayCloseCodes } from "#core/voice";
 import { WebSocket, type MessageEvent, type Data } from "ws";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
 import { HeartbeatManager } from "../managers/heartbeat";
-import { Logger, TypedEmitter } from "#structures";
 import { version, name } from "package.json";
+import { TypedEmitter } from "#structures";
 import os from "node:os";
 
 /**
@@ -153,7 +153,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         // Если ws клиент уже есть
         if (this.ws) {
-            if (code) Logger.log("DEBUG", `[WebSocket/${code}] has reset connection`);
+            if (code) this.emit("warn", `[WebSocket/${code}] has reset connection`);
 
             // Удаляем ws, поскольку он будет создан заново
             this.reset();
@@ -175,7 +175,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this._status = WebSocketStatus.connected;
             this.emit("open");
 
-            Logger.log("DEBUG", `[WebSocket] has open connection`);
+            this.emit("warn", `[WebSocket] has open connection`);
         };
 
         // Закрытие websocket соединения
@@ -184,7 +184,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this._status = WebSocketStatus.closed;
             this.onReceiveClose(ev.code, ev.reason);
 
-            Logger.log("DEBUG", `[WebSocket] has close connection`);
+            this.emit("warn", `[WebSocket] has close connection`);
         };
 
         // Ошибка websocket соединения
@@ -365,7 +365,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this.ws.removeAllListeners();
             this.ws.close();
 
-
             if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
                 this.ws.terminate();
             }
@@ -393,6 +392,8 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this._heartbeat.destroy();
             this._heartbeat = null;
         }
+
+        this.latency = null;
     };
 }
 

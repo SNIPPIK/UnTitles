@@ -1,11 +1,12 @@
-import { ComponentCommand, type ComponentContext } from 'seyfert';
+import { ComponentCommand, type ComponentContext, Middlewares } from 'seyfert';
 import filters from "#core/player/filters.json";
-import {MessageFlags} from "seyfert/lib/types";
-import {AudioFilter} from "#core//player";
-import {Colors} from "#structures/discord";
-import {locale} from "#structures";
-import {db} from "#app/db";
+import { MessageFlags } from "seyfert/lib/types";
+import { AudioFilter } from "#core//player";
+import { Colors } from "#structures/discord";
+import { locale } from "#structures";
+import { db } from "#app/db";
 
+@Middlewares(["checkAnotherVoice", "userVoiceChannel"])
 export default class extends ComponentCommand {
     componentType = 'StringSelect' as const;
 

@@ -1,5 +1,5 @@
-import { startCycle, stopCycle } from "#native";
 import { SetArray } from "#structures/array";
+import { CycleWorker } from "#native";
 
 /**
  * @author SNIPPIK
@@ -10,15 +10,14 @@ import { SetArray } from "#structures/array";
  * @private
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Следующее запланированное время запуска (в ms, с плавающей точкой) */
-    protected startTime: number = 0;
+    /** Время старта (performance.now()) */
+    protected startTime: number | null = null;
 
-    /** Уникальный ID C++ таймера */
-    protected nativeId: number = null;
+    /** Экземпляр нативного воркера */
+    protected worker: CycleWorker = null;
 
     /**
-     * @description Метод получения времени для обновления времени цикла
-     * @default Date.now
+     * @description Метод получения времени
      * @returns number
      * @protected
      */
@@ -34,7 +33,9 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public constructor(public options: SyncCycleConfig<T> | AsyncCycleConfig<T>) {
         super();
-    };
+        // Инициализируем воркер сразу, чтобы он был готов
+        this.worker = new CycleWorker(this.options.duration);
+    }
 
     /**
      * @description Добавляем элемент в очередь
@@ -42,11 +43,11 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @public
      */
     public add(item: T): this {
-        if (this.options.custom?.push) this.options.custom?.push(item);
+        if (this.options.custom?.push) this.options.custom.push(item);
         if (this.has(item)) this.delete(item);
         super.add(item);
 
-        // Запускаем цикл сразу после добавления первого элемента
+        // Если это первый элемент — запускаем нативный поток
         if (this.size === 1 && !this.startTime) {
             this.startTime = this.time;
             this._runTimeout();
@@ -61,11 +62,10 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @returns boolean
      * @public
      */
-    public delete = (item: T) => {
-        const index = this.has(item);
+    public delete = (item: T): boolean => {
+        const hasItem = this.has(item);
 
-        // Если есть объект в базе
-        if (index) {
+        if (hasItem) {
             if (this.options.custom?.remove) this.options.custom.remove(item);
             super.delete(item);
         }
@@ -82,13 +82,11 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @public
      */
     public reset(): void {
-        this.clear(); // Удаляем все объекты
-
+        this.clear();
         this.startTime = null;
 
-        if (this.nativeId !== null) {
-            stopCycle(this.nativeId);
-            this.nativeId = null;
+        if (this.worker) {
+            this.worker.stop();
         }
     };
 
@@ -98,9 +96,10 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected _runTimeout = (): void => {
-        if (this.nativeId) this.reset();
+        if (!this.worker) return;
 
-        this.nativeId = startCycle(this.options.duration, this.step);
+        // Передаем callback напрямую в Rust
+        this.worker.start(this.step);
     };
 
     /**
@@ -119,12 +118,11 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     protected handleStepError(error: unknown, item: T): void {
         this.delete(item);
-
-        console.error(`[StepCycle Error]: Item failed execution. Removed from cycle.`, {
+        console.error(`[StepCycle Error]: Removed from cycle.`, {
             error: error instanceof Error ? error.message : error,
             item
         });
-    };
+    }
 }
 
 
@@ -181,7 +179,7 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @readonly
      * @private
      */
-    protected step = async () => {
+    protected step = () => {
         for (const item of this) {
             if (!this.options.filter(item)) continue;
             this.runItem(item);
@@ -193,7 +191,7 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @param item - объект с обещанием
      * @private
      */
-    private runItem(item: T): void {
+    private runItem = (item: T): void => {
         (this.options.execute(item) as Promise<boolean>)
             .then(ok => {
                 if (!ok) this.delete(item);

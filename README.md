@@ -40,37 +40,37 @@
 
 - 👤 [`SNIPPIK`](https://github.com/SNIPPIK)
 
-📢 Please report any errors or omissions to [`Issues`](https://github.com/SNIPPIK/UnTitles/issues) or [`Discord`](https://discord.gg/qMf2Sv3)
+📢 Please report any errors or omissions to [`Issues`](https://github.com/SNIPPIK/UnTitles/issues) or [`Discord`](https://discord.gg/qMf2Sv3)  
 🚫 The bot doesn't work 24/7 — it may be unavailable!
 
 [![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
 [![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
 
 > [!WARNING]
-> ⚠️ WatKLOK (UnTitles) is a complex technical project that is supported exclusively by 1 author by `SNIPPIK`
+> ⚠️ WatKLOK (UnTitles) is a complex technical project that is supported exclusively by 1 author by `SNIPPIK`  
 > Incorrect use, removal of authorship, or attribution will result in the closure of the public repository.
 >
 > Audio issues
-> If your internet connection is unstable, losses will occur regardless.
+> If your internet connection is unstable, losses will occur regardless.  
 > It is impossible to completely eliminate `packet lost` due to the `UDP` protocol and other `discord` limitations.
 
 > [!TIP]
-> I recommend enabling the caching system in `.env`. This way, you can play tracks even if the platform is completely blocked.
+> I recommend enabling the caching system in `.env`. This way, you can play tracks even if the platform is completely blocked.  
 > However, the voice system is simply not allowed to lose audio packets, even under critical load!
 
 > [!WARNING]
-> If you use a proxy, keep in mind that `FFmpeg` does not support socks. [`STH`](https://github.com/SNIPPIK/SHS) is available for such tasks.
+> If you use a proxy, keep in mind that `FFmpeg` does not support socks. [`STH`](https://github.com/SNIPPIK/SHS) is available for such tasks.  
 > Something may not work if you configured it incorrectly!!!
 ---
 
 ### ⚠️ Hardware Requirements | Data from Ryzen 7 5700x3D | 1 player
-- CPU: 0-0.1%
+- CPU: 0-0.3%
 - RAM: ~80 MB, depends on the number of tracks, platform load, and Discord cache!
 - Disk: ~50 MB, 200 GB is enough for caching (1.5k tracks ~1.2 GB)
 
 ---
 
-# 🎧 Key Features
+### 🚀 Features of the engine (UnTitled)
 #### 🎖️ Features
 - Event loop-resistant, so even in this case, the audio plays smoothly!!!
 ```ts
@@ -94,33 +94,32 @@ setInterval(() => {
   while (performance.now() - startBlock < 100) {}
 }, 100);
 ```
-#### 🔊 Voice Engine
-- Implementation of [**Voice Gateway Version 8**](https://discord.com/developers/docs/topics/voice-connections) [`(WebSocket + UDP + SRTP + Opus + Sodium)`](src/core/voice) + [**End-to-End Encryption (E2EE 🔐)**](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
-- Full **SRTP** implementation: `aead_aes256_gcm`, `xchacha20_poly1305` (via libraries)
-- A better audio player compared to **open source** solutions
-- Does not require any opus encoders/decoders, has its own opus encoder using the parsing method!
-- Requires FFmpeg, which is responsible for audio and filters!
-- Supported: Autoplay, Repeat, Shuffle, Replay, and other functions.
-- Works even with severe event loop lag!
-#### 🎵 Audio
-- Audio can be reused without conversion if it's less than 8 minutes long.
-- Smooth fade-in/fade-out transitions between tracks, even with skip, seek, and other actions.
-- Hot audio swap for smooth transitions from one audio track to another.
-- 16+ filters, you can add your own without digging into the code [**filters**](src/core/player/filters.json)
-- Support for long videos, including Live, is still a bit rough.
-- Explicit audio stream synchronization is present, without audio filters!
-#### 🌐 Platforms
-- Supported: YouTube, Spotify, VK, Yandex Music, SoundCloud, Deezer
-- Audio: YouTube, VK, Yandex Music, SoundCloud
-- Audio search on other platforms is available, even if the platform doesn't want to serve audio!
-- Completely fallback system: no track on one platform will be found on another!
-- Related support (including related tracks) is available.
-- Platforms run in a separate worker (thread) for better performance.
-- Everything is described in detail, with examples and a bunch of interfaces for typing.
-- Easy to extend and adding new platforms via the Dynamic Loader - Handler
-#### 🌍 Localization
-- Available languages: English, Russian ([**language file**](src/structures/locale/languages.json))
-- You can add any language supported by Discord
+#### 🦀 Native Voice Engine (Rust Powered)
+- **High performance**: The main logic of voice processing is transferred to a native module on Rust (src-rs), which guarantees stability even with high event loop lag in Node.js.
+- **Voice engine**: Full implementation of Voice Gateway V8. Stack: WebSocket + UDP + SRTP + Opus.
+- **Security**: Support for End-to-End Encryption (E2EE 🔐) via the Discord DAVE protocol.
+- **Timers**: Cyclic systems using a timer.
+- **Smart streaming**: Does not require external opus encoders for transmission - uses own method of parsing Opus frames.
+- **FFmpeg Integration**: Used for flexible audio decoding and application of complex filters.
+
+#### 🎵 Audio and Player
+- **Hot Audio Swap**: System of instant seamless transition between tracks.
+- **Audio Effects**: Smooth fade-in/fade-out for any actions (skip, seek, pause)
+- **Filters: 16+** built-in **audio filters** with the possibility of easily adding your own via JSON-config [(filters.json)](src/core/player/filters.json)
+- **Optimization**: Ability to reuse audio without re-conversion for tracks up to 8 minutes long
+- **Synchronization**: Direct synchronization of the audio stream without distortion introduced by software filters.
+
+#### 🌐 Platforms and Parsing
+- **Multiplatform**: Support for **YouTube**, **Spotify**, **VK**, **Yandex-Music**, **SoundCloud**, **Deezer**, **Apple (only outline)**.
+- **Smart Fallback**: If a track is not available on one platform, the system will automatically find it on another.
+- **Related Tracks**: Automatic selection and inclusion of similar tracks for endless listening.
+- **Worker Threads**: All heavy search and parsing operations are carried out in separate worker threads so as not to block the main thread of the bot.
+- **Extensibility**: Modular architecture through Dynamic Handler allows you to add a new platform in minutes.
+
+#### 🌍 Localization and Typing
+- **Languages**: Full support for Русский and English ([**file with languages**](src/structures/locale/languages.json)).
+- **DX (Developer Experience)**: The entire project is strictly typed (TypeScript + Rust ABI), comes with a bunch of interfaces and examples.
+- **Scalability**: Easy addition of any languages ​​supported by Discord.
 
 ---
 
@@ -145,12 +144,13 @@ setInterval(() => {
 
 ---
 ## 🚀 Quick Start
-> Node.js is required, as well as FFmpeg installed.
+> Node.js is required, as well as FFmpeg installed.  
 > All parameters are specified in `.env`
 
 
 > [!WARNING]
-> Since the project uses Rust, a compiler will be required 
+> The project uses Rust, if your platform does not have an auto build, you will have to assemble it yourself!  
+> Ready-made builds [here] (https://github.com/SNIPPIK/UnTitles/actions/workflows/build.yml)
 ```shell
 # Cloning
 git clone https://github.com/SNIPPIK/UnTitles
@@ -159,8 +159,10 @@ cd UnTitles
 # Installing dependencies
 npm install
 
-# Running via Node.js
-# Setting environment variables in .env
+# If you need to collect rust components
+npm run build:native
+
+# Build Typescript + settings
 npm run build && npm run configure && npm run start
 ```
 

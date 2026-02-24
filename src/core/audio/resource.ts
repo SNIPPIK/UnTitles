@@ -1,5 +1,5 @@
 import { FfmpegProcess, AudioEngine, OggOpusParser } from "#native";
-import { OPUS_FRAME_SIZE } from "#core/audio/opus";
+import { OPUS_FRAME_SIZE, SILENT_FRAME } from "#core/audio/opus";
 import { TypedEmitter } from "#structures";
 import type { Track } from "#core/queue";
 import { env } from "#app/env";
@@ -271,7 +271,7 @@ export class AudioResource extends BaseAudioResource {
         // Создаем движок в Rust
         // Для буферизированных треков ставим лимит (например, 8-10 минут)
         // Для Pipe лимит 0 (динамическая очередь)
-        this.engine = new AudioEngine(isBuffered ? 10 : 0);
+        this.engine = new AudioEngine(isBuffered ? 10 : 20);
 
         let parser = new OggOpusParser();
         this.process = new FfmpegProcess(this.arguments, "ffmpeg");
@@ -292,6 +292,7 @@ export class AudioResource extends BaseAudioResource {
                             this.engine.addPacket(frame);
 
                             if (!this._readable) {
+                                this.engine.addPacket(SILENT_FRAME);
                                 this._readable = true;
                                 setImmediate(() => this.emit("readable"));
                             }

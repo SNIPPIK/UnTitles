@@ -242,9 +242,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         try {
             let payload: Buffer;
 
-            if (type === "raw") {
-                payload = frame;
-            } else {
+            if (type === "raw") payload = frame;
+            else {
                 // Логика DAVE (MLS)
                 if (this.e2EE?.session?.ready && !this.e2EE.isTransitioning) {
                     const encrypted = this.e2EE.encrypt(frame);
@@ -276,6 +275,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     private createWebSocket = (endpoint: string, code?: GatewayCloseCodes) => {
         this.websocket.connect(endpoint, code); // Подключаемся к endpoint
         this.websocket.removeAllListeners();
+        //this.websocket.on("warn", (d) => this.emit("log", `[voice/${this.configuration.channel_id}] ${d}`));
 
         /**
          * @description Отправляем Identify данные, для регистрации голосового подключения
@@ -389,9 +389,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             this._status = VoiceConnectionStatus.reconnecting;
 
             this._reconnectTimer = setTimeout(() => {
-                this.emit("log", `[${code}/${reason}]: Voice Connection reconstruct ws... 500 ms`);
+                this.emit("log", `[${code}/${reason}]: Voice Connection reconstruct ws... 70 ms`);
                 this.createWebSocket(this.serverState.endpoint, code);
-            }, 500);
+            }, 70);
         });
 
         /**

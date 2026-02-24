@@ -134,23 +134,23 @@ export default class extends ComponentCommand {
             // Собираем кнопки на которые нажал пользователь
             collector.run("menu_back", () => {
                 // Делаем перелистывание на последнею страницу
-                if (page === 0) page = pages - 1;
-                else if (pages === 1) return null;
+                if (pages === 1) return null;
+                else if (page === 0) page = pages - 1;
                 else page--;
 
                 // Редактируем сообщение
-                return ctx.update({components: getContainer(page)});
+                return ctx.editOrReply({components: getContainer(page)});
             });
 
             // Собираем кнопки на которые нажал пользователь
             collector.run("menu_next", () => {
                 // Делаем перелистывание на первую страницу
-                if (page >= pages) page = 0;
-                else if (pages === 1) return null;
+                if (pages === 1) return null;
+                else if (page >= pages) page = 0;
                 else page++;
 
                 // Редактируем сообщение
-                return ctx.update({components: getContainer(page)});
+                return ctx.editOrReply({components: getContainer(page)});
             });
 
 

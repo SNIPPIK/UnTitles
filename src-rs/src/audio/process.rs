@@ -24,7 +24,7 @@ impl FfmpegProcess {
                 args.insert(2, "-reconnect_streamed".to_string());
                 args.insert(3, "1".to_string());
                 args.insert(4, "-reconnect_delay_max".to_string());
-                args.insert(5, "50".to_string());
+                args.insert(5, "1".to_string());
                 args.insert(6, "-reconnect_on_network_error".to_string());
                 args.insert(7, "1".to_string());
             }
@@ -32,9 +32,8 @@ impl FfmpegProcess {
 
         // Базовые аргументы для FFmpeg (low delay, no video)
         let mut final_args = vec![
-            "-flags".to_string(), "low_delay".to_string(),
-            "-analyzeduration".to_string(), "0".to_string(),
-            "-probesize".to_string(), "128".to_string(),
+            "-analyzeduration".to_string(), "200".to_string(),
+            "-probesize".to_string(), "32M".to_string(),
             "-vn".to_string(),
             "-loglevel".to_string(), "error".to_string(),
         ];
@@ -83,13 +82,15 @@ impl FfmpegProcess {
     }
 
     #[napi]
-    pub fn destroy(&self) {
+    pub fn destroy(&self) -> Result<()> {
         let mut child_guard = self.child.lock().unwrap();
         // Если процесс еще существует — убиваем его
         if let Some(mut child) = child_guard.take() {
             let _ = child.kill();
             //println!("FFmpeg process destroyed via Rust");
         }
+
+        Ok(())
     }
 }
 

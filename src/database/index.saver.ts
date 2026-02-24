@@ -153,6 +153,8 @@ export class AudioSaver extends PromiseCycle<Track> {
                 return true;
             },
             execute: (track) => new Promise<boolean>((resolve) => {
+                if (track.api.type === "technical") return resolve(false);
+
                 const status = this.status(track);
                 const args = [
                     "-i", track.link,

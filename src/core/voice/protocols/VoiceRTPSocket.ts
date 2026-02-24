@@ -1,12 +1,13 @@
+import { OPUS_FRAME_SIZE } from "#core/audio";
 import crypto from "node:crypto";
 
 /**
  * @author SNIPPIK
- * @description Время до следующей проверки жизни
+ * @description Время фрейм симпла
  * @const TIMESTAMP_INC
  * @private
  */
-const TIMESTAMP_INC = 960;
+const TIMESTAMP_INC = 48_000 * (OPUS_FRAME_SIZE / 1e3);
 
 /**
  * @author SNIPPIK

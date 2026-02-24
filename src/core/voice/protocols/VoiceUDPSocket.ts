@@ -33,6 +33,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      */
     public packet(packet: Buffer) {
         if (!this.socket) return;
+
         try {
             this.socket.sendPacket(packet);
         } catch (error) {

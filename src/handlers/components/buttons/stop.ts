@@ -1,16 +1,16 @@
-import { ComponentCommand, type ComponentContext } from 'seyfert';
+import { ComponentCommand, type ComponentContext, Middlewares } from 'seyfert';
 import { Colors } from "#structures/discord";
 import { MessageFlags } from 'seyfert/lib/types';
 import { locale } from "#structures";
 import { db } from "#app/db";
 
+@Middlewares(["checkAnotherVoice", "userVoiceChannel"])
 export default class extends ComponentCommand {
     componentType = 'Button' as const;
 
     filter(ctx: ComponentContext<typeof this.componentType>) {
         return ctx.customId === "stop";
     }
-
     async run(ctx: ComponentContext<typeof this.componentType>) {
         const queue = db.queues.get(ctx.guildId);
 

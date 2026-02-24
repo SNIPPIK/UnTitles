@@ -340,7 +340,8 @@ export class Track extends TrackResolvers {
             let api = await Promise.race([await new httpsClient(
                 {
                     url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(this.artist.title)}&track_name=${encodeURIComponent(this.name)}`,
-                    userAgent: "UnTitles 0.5.0, Music bot, github.com/SNIPPIK/UnTitles"
+                    userAgent: "UnTitles 0.5.0, Music bot, github.com/SNIPPIK/UnTitles",
+                    timeout: 20e3
                 }
             ).toJson, timeoutPromise]) as json | Error;
 

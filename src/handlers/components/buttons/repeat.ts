@@ -1,10 +1,11 @@
-import { ComponentCommand, type ComponentContext } from 'seyfert';
+import { ComponentCommand, type ComponentContext, Middlewares } from 'seyfert';
 import { MessageFlags } from 'seyfert/lib/types';
 import { Colors } from "#structures/discord";
 import { RepeatType } from "#core/queue";
 import { locale } from "#structures";
 import { db } from "#app/db";
 
+@Middlewares(["checkAnotherVoice", "userVoiceChannel"])
 export default class extends ComponentCommand {
     componentType = 'Button' as const;
 

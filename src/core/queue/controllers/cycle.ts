@@ -58,7 +58,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 if (packet) player.voice.connection.packet(packet);
                 else {
                     // Если поток не читается, переходим в состояние ожидания
-                    if (!audio && audio.packets === 0 || !audio.readable) {
+                    if (!audio || !audio.readable || audio.packets === 0) {
                         player.status = "player/wait";
                         player.cycle = false;
                     }

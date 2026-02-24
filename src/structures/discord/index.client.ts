@@ -5,7 +5,6 @@ import { ActivityType } from "seyfert/lib/types";
 import { version } from "package.json";
 import { env } from "#app/env";
 import { db } from "#app/db";
-import {Logger} from "#structures";
 
 /**
  * @author SNIPPIK
@@ -81,7 +80,7 @@ export class DiscordClient extends Client {
             /**
              * @description Хуки для команд
              */
-            commands: {
+            /*commands: {
                 defaults: {
                     onMiddlewaresError: (ctx, error) => {
                         Logger.log(
@@ -119,12 +118,12 @@ export class DiscordClient extends Client {
                         );
                     }
                 }
-            },
+            },*/
 
             /**
              * @description Хуки для компонентов
              */
-            components: {
+            /*components: {
                 defaults: {
                     onMiddlewaresError: (ctx, error) => {
                         Logger.log(
@@ -153,7 +152,7 @@ export class DiscordClient extends Client {
                         );
                     }
                 }
-            },
+            },*/
 
 
             globalMiddlewares: ["checkCooldown"],

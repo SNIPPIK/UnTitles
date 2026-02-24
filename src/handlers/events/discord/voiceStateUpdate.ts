@@ -55,72 +55,71 @@ export default createEvent({
                     temple_db.delete(guildId);
                 }
 
-                // Если в базе еще висит очередь — удаляем (бота выгнали)
-                if (db.queues.get(guildId)) {
+                const queue = db.queues.get(guildId);
+                if (queue) {
                     db.queues.remove(guildId);
                     db.voice.remove(guildId);
                 }
                 return;
             }
 
-            // Получаем ВСЕ стейты участников на этом сервере
+            // Получаем ВСЕ стейты участников на сервере
             const guildStates = await client.cache.voiceStates?.values(guildId) ?? [];
 
             // Считаем живых людей в канале с ботом
             let humanCount = 0;
             for (const vs of guildStates) {
-                // Если человек в том же канале, что и бот, и это не сам бот
                 if (vs.channelId === botState.channelId && vs.userId !== client.me.id) {
-                    // Проверяем, не бот ли это (через кэш мемберов)
                     const member = await client.cache.members?.get(vs.userId, guildId);
-                    if (member && !member.user.bot) {
-                        humanCount++;
-                    }
+                    if (member && !member.user.bot) humanCount++;
                 }
             }
 
             const queue = db.queues.get(guildId);
             const temp = temple_db.get(guildId);
 
+            // Если нет очереди, просто выходим
             if (!queue) return;
 
             // ЛОГИКА ПАУЗЫ / ВЫХОДА
             if (humanCount > 0) {
-                // Кто-то есть: отменяем удаление
+                // Есть люди: отменяем таймер удаления
                 if (temp) {
                     clearTimeout(temp);
                     temple_db.delete(guildId);
+
+                    // Возобновляем плеер, если он был на паузе
                     if (queue.player?.status === "player/pause") {
                         queue.player.resume();
                     }
                 }
             } else {
-                // Никого нет: запускаем таймер
-
-                // Пропускаем, если событие вызвано самим ботом (вход в канал)
+                // Пропускаем событие, если это сам бот заходит
                 const isSelfJoin = userId === client.me.id && !!channelId;
                 if (isSelfJoin) return;
 
+                // Если таймера нет — создаём
                 if (!temp) {
-                    // Ставим на паузу сразу
                     if (queue.player?.status === "player/playing") {
                         queue.player.pause();
                     }
 
                     const timer = setTimeout(async () => {
-                        // Финальная проверка перед ливом
+                        // Финальная проверка перед удалением
                         const finalStates = await client.cache.voiceStates?.values(guildId) ?? [];
                         const finalBot = await client.cache.voiceStates?.get(client.me.id, guildId);
 
                         const stillAlone = !finalStates.some(vs =>
                             vs.channelId === finalBot?.channelId &&
-                            vs.userId !== client.me.id
+                            vs.userId !== client.me.id &&
+                            client.cache.members?.get(vs.userId, guildId).bot
                         );
 
                         if (stillAlone) {
                             db.queues.remove(guildId);
                             db.voice.remove(guildId);
-                            // Можно добавить: await client.voice.leave(guildId);
+                            temple_db.delete(guildId);
+                            // Можно: await client.voice.leave(guildId);
                         }
                     }, timeout * 1000);
 
