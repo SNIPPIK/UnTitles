@@ -24,8 +24,8 @@ impl CycleManager {
             sessions: Arc::new(DashMap::new()),
             running: Arc::new(AtomicBool::new(false)),
             interval_ms,
-            max_catchup_ticks: 1,
-            max_acceleration_ms: 2,
+            max_catchup_ticks: 0,
+            max_acceleration_ms: 0,
         }
     }
 
@@ -70,8 +70,8 @@ impl CycleManager {
 
                 // --- Планирование следующего тика с учётом реального времени tick ---
                 let mut next_interval = interval;
-                if last_tick_duration_ms > interval / 4 {
-                    next_interval = interval.saturating_sub(last_tick_duration_ms / 2);
+                if last_tick_duration_ms > interval / 12 {
+                    next_interval = interval.saturating_sub(last_tick_duration_ms);
                     if next_interval < interval.saturating_sub(max_accel) {
                         next_interval = interval.saturating_sub(max_accel);
                     }
