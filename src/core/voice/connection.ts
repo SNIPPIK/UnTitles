@@ -1,4 +1,3 @@
-import type { APIVoiceState, GatewayVoiceServerUpdateDispatchData } from "discord-api-types/v10";
 import { SpeakerType, VoiceSpeakerManager } from "#core/voice/modules/Speaker";
 import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./adapter";
 import { GatewayCloseCodes, type WebSocketOpcodes } from "#core/voice";
@@ -18,10 +17,10 @@ import { TypedEmitter } from "#structures";
  */
 export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     /**
-     * @description Таймер переподключения
+     * @description Текущий статус подключения
      * @private
      */
-    private _reconnectTimer: NodeJS.Timeout | null = null;
+    private _status: ConnectionStatus = ConnectionStatus.connecting;
 
     /**
      * @description Класс слушателя, если надо слушать пользователей
@@ -31,16 +30,16 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     public receiver: VoiceReceiver | null;
 
     /**
-     * @description Функции для общения с websocket клиента
-     * @public
-     */
-    public adapter: VoiceAdapter | null = new VoiceAdapter();
-
-    /**
      * @description Менеджер спикера
      * @private
      */
     private speaker: VoiceSpeakerManager | null = new VoiceSpeakerManager(this);
+
+    /**
+     * @description Функции для общения с websocket клиента
+     * @public
+     */
+    public adapter: VoiceAdapter | null = new VoiceAdapter();
 
     /**
      * @description Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway
@@ -67,19 +66,16 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     public e2EE: E2EESession | null;
 
     /**
-     * @description Дополнительные данные подключения
-     * @private
+     * @description Уникальный помер голосового подключения
+     * @public
      */
-    public _attention = {
-        ssrc: null as number,
-        secret_key: null as number[],
-    };
+    public ssrc: number = null;
 
     /**
-     * @description Текущий статус подключения
-     * @private
+     * @description Ключи шифрования
+     * @public
      */
-    private _status: VoiceConnectionStatus;
+    public secret_key: number[] = null;
 
     /**
      * @description Получаем текущий статус подключения
@@ -95,7 +91,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      */
     public set status(status) {
         if (status !== this._status) {
-            this.emit("log", `[Voice]: swap status ${this._status} - ${status}`);
+            this.emit("log", `[Voice/Status]: ${this._status} --> ${status}`);
 
             this._status = status;
         }
@@ -113,14 +109,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Готовность голосового подключения
      * @public
      */
-    public get isReadyToSend(): boolean {
+    public get ready(): boolean {
         // Базовая проверка статуса и наличия необходимых модулей
-        if (this._status !== VoiceConnectionStatus.ready || !this.udp) {
-            return false;
-        }
-
-        // Проверка состояния WebSocket (должен быть не просто "не null", а именно "connected")
-        else if (this.websocket?.status !== "connected") {
+        if (this._status !== ConnectionStatus.connected || !this.secret_key || !this.ssrc) {
             return false;
         }
 
@@ -134,20 +125,23 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             }
         }
 
-        // Финальная проверка UDP
-        return this.udp.status === "connected";
+        // Финальная проверка UDP, WebSocket
+        return this.websocket.status === "connected" && this.udp.status === "connected";
     };
 
     /**
      * @description Отключаемся от голосового канала
      * @public
      */
-    public get disconnect() {
-        this.status = VoiceConnectionStatus.disconnected;
+    public get disconnect(): boolean {
+        // Если нет адаптера
+        if (!this.adapter) return false;
+
+        this.status = ConnectionStatus.disconnected;
         this.configuration.channel_id = null; // Удаляем id канала
 
         // Отправляем в discord сообщение об отключении бота
-        return this.adapter?.sendPayload(this.configuration);
+        return this.adapter.sendPayload(this.configuration);
     };
 
     /**
@@ -156,6 +150,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public set channel(ID: string) {
+        // Если нет адаптера
+        if (!this.adapter) return;
+
         // Прописываем новый id канала
         this.configuration.channel_id = ID;
         this.adapter?.sendPayload(this.configuration);
@@ -166,7 +163,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @returns APIVoiceState
      * @public
      */
-    public get voiceState(): APIVoiceState {
+    public get stateVoice() {
         return this.adapter.packet.state;
     };
 
@@ -175,7 +172,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @returns GatewayVoiceServerUpdateDispatchData
      * @public
      */
-    public get serverState(): GatewayVoiceServerUpdateDispatchData {
+    public get stateServer() {
         return this.adapter.packet.server;
     };
 
@@ -222,7 +219,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Инициализируем подключение
         if (this.adapter) this.adapter.sendPayload(this.configuration);
-        this._status = VoiceConnectionStatus.connected;
+        this.status = ConnectionStatus.connected;
 
         // Если включен микрофон бота тогда запускаем класс слушатель
         if (!configuration.self_deaf) {
@@ -237,8 +234,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public packet = (frame: Buffer, type: "raw" | "rtp" = "rtp") => {
-        if (!this.isReadyToSend) return;
-
         try {
             let payload: Buffer;
 
@@ -256,11 +251,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
             // Прямая отправка в сокет
             this.udp!.packet(payload);
-
-            // Оптимизация Speaking индикатора (только если статус изменился)
-            if (this.speaker.speaking !== this.speaker.default) {
-                this.speaker.speaking = this.speaker.default;
-            }
+            this.speaker.speaking = this.speaker.default;
         } catch (err) {
             this.emit("log", `[Voice Packet Error]: ${err}`);
         }
@@ -275,7 +266,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     private createWebSocket = (endpoint: string, code?: GatewayCloseCodes) => {
         this.websocket.connect(endpoint, code); // Подключаемся к endpoint
         this.websocket.removeAllListeners();
-        //this.websocket.on("warn", (d) => this.emit("log", `[voice/${this.configuration.channel_id}] ${d}`));
 
         /**
          * @description Отправляем Identify данные, для регистрации голосового подключения
@@ -287,9 +277,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                 op: VoiceOpcodes.Identify,
                 d: {
                     server_id: this.configuration.guild_id,
-                    session_id: this.voiceState.session_id,
-                    user_id: this.voiceState.user_id,
-                    token: this.serverState.token,
+                    session_id: this.stateVoice.session_id,
+                    user_id: this.stateVoice.user_id,
+                    token: this.stateServer.token,
                     max_dave_protocol_version: E2EESession.max_version
                 }
             };
@@ -314,7 +304,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          * @code 4
          */
         this.websocket.on("sessionDescription", ({d}) => {
-            this._status = VoiceConnectionStatus.SessionDescription;
+            // Сохраняем ключ, для повторного использования
+            this.secret_key = d.secret_key;
             this.speaker.speaking = SpeakerType.disable;
 
             // Если уже есть активный RTP
@@ -326,7 +317,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             // Создаем подключение RTP
             this.sRTP = new VoiceRTPSocket({
                 key: new Uint8Array(d.secret_key),
-                ssrc: this._attention.ssrc
+                ssrc: this.ssrc
             });
 
 
@@ -335,12 +326,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                 this.createDaveSession(d.dave_protocol_version);
                 this.emit("createDAVE", `[E2EE]: has created | ${d.dave_protocol_version}`);
             }
-
-            // Сохраняем ключ, для повторного использования
-            this._attention.secret_key = d.secret_key;
-
-            // Смена статуса на готов
-            this._status = VoiceConnectionStatus.ready;
         });
 
         /**
@@ -354,8 +339,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                 op: VoiceOpcodes.Resume,
                 d: {
                     server_id: this.configuration.guild_id,
-                    session_id: this.voiceState.session_id,
-                    token: this.serverState.token,
+                    session_id: this.stateVoice.session_id,
+                    token: this.stateServer.token,
                     seq_ack: this.websocket.sequence
                 }
             };
@@ -367,31 +352,27 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          * @code 1000-4022
          */
         this.websocket.on("close", (code, reason) => {
-            // Очищаем предыдущий таймер если он был
-            if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
-
             const fatalCodes = [4002, 4004, 4011, 4012, 4014, 4016];
             const isFatal = (code >= 1000 && code <= 1002) || fatalCodes.includes(code);
 
-            if (isFatal || this._status === VoiceConnectionStatus.reconnecting) {
-                return this.destroy();
-            }
+            // Если получена критическая ошибка
+            if (isFatal) return this.destroy();
 
             // Подключения больше не существует
             else if (code === 4006 || code === 4003) {
-                this.serverState.endpoint = null;
+                this.stateServer.endpoint = null;
                 //this.voiceState.session_id = null;
                 this.adapter?.sendPayload(this.configuration);
                 return; // Здесь происходит пересоздание ws подключения
             }
 
-            // Меняем статус на переподключение
-            this._status = VoiceConnectionStatus.reconnecting;
+            // Если уже происходит переподключение
+            if (this._status === ConnectionStatus.reconnecting || this._status === ConnectionStatus.disconnected) return;
 
-            this._reconnectTimer = setTimeout(() => {
-                this.emit("log", `[${code}/${reason}]: Voice Connection reconstruct ws... 70 ms`);
-                this.createWebSocket(this.serverState.endpoint, code);
-            }, 70);
+            // Меняем статус на переподключение
+            this.status = ConnectionStatus.reconnecting;
+            this.emit("log", `[${code}/${reason}]: Voice Connection reconstruct ws...`);
+            this.createWebSocket(this.stateServer.endpoint, code);
         });
 
         /**
@@ -401,7 +382,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         this.websocket.on("error", (err) => {
             this.emit("log", err);
 
-            this._status = VoiceConnectionStatus.disconnected;
+            this.status = ConnectionStatus.disconnected;
             this.disconnect;
             this.destroy();
         });
@@ -424,11 +405,12 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @private
      */
     private createUDPSocket = (d: WebSocketOpcodes.ready["d"]) => {
+        this.ssrc = d.ssrc; // Сохраняем SSRC сразу
+
         // Если сокет уже существует, очищаем старые слушатели перед инициализацией
         this.udp?.removeAllListeners();
 
         const udp = this.udp;
-        this._attention.ssrc = d.ssrc; // Сохраняем SSRC сразу
 
         // Подключаемся
         udp.connect(d);
@@ -445,7 +427,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             }
 
             // Проверяем, не успели ли мы отключиться за время discovery
-            if (!this.websocket || this._status === VoiceConnectionStatus.disconnected) return;
+            if (!this.websocket || this._status === ConnectionStatus.disconnected) return;
 
             // Если ответ получен, то удаляем слушателя
             udp.removeListener("discovery");
@@ -464,15 +446,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Обработка закрытия: используем именованную функцию или аккуратный once
         udp.once("close", () => {
-            if (this._status === VoiceConnectionStatus.disconnected || this._status === VoiceConnectionStatus.reconnecting) return;
+            if (this._status === ConnectionStatus.disconnected || this._status === ConnectionStatus.reconnecting) return;
             this.websocket?.emit("warn", "UDP Socket closed unexpectedly. Reconnecting...");
 
             // Небольшая задержка перед пересозданием UDP, чтобы не спамить при падении сети
-            setTimeout(() => {
-                if (this._status !== VoiceConnectionStatus.disconnected) {
-                    this.createUDPSocket(d);
-                }
-            }, 1000);
+            this.createUDPSocket(d);
         });
 
         udp.on("error", (error) => {
@@ -503,11 +481,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         if (this.e2EE) {
             this.e2EE.destroy();
             this.e2EE = null;
-            session = this.e2EE = new E2EESession(version, user_id, channel_id);
         }
 
-        // Если сессии нет
-        else session = this.e2EE = new E2EESession(version, user_id, channel_id);
+        // Создаем сессию
+        session = this.e2EE = new E2EESession(version, user_id, channel_id);
 
         /**
          * @description Получаем коды dave от WebSocket
@@ -610,7 +587,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          */
         session.on("key", (key) => {
             // Если голосовое подключение готово
-            if (this._status === VoiceConnectionStatus.ready || this._status === VoiceConnectionStatus.SessionDescription) {
+            if (this._status === ConnectionStatus.connected && this.secret_key) {
                 this.websocket.packet = Buffer.concat([OPCODE_DAVE_MLS_KEY, key]);
             }
         });
@@ -621,7 +598,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          */
         session.on("invalidateTransition", (transitionId) => {
             // Если голосовое подключение готово
-            if (this._status === VoiceConnectionStatus.ready || this._status === VoiceConnectionStatus.SessionDescription) {
+            if (this._status === ConnectionStatus.connected && this.secret_key) {
                 this.websocket.packet = {
                     op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,
                     d: {
@@ -643,14 +620,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     public destroy = () => {
         this.emit("log", `[Voice/${this.configuration.guild_id}] has destroyed`)
 
-        if (this._status === VoiceConnectionStatus.disconnected) return;
-        this.status = VoiceConnectionStatus.disconnected;
-
-        // Сначала останавливаем таймеры
-        if (this._reconnectTimer) {
-            clearTimeout(this._reconnectTimer);
-            this._reconnectTimer = null;
-        }
+        if (this._status === ConnectionStatus.disconnected) return;
+        this.status = ConnectionStatus.disconnected;
 
         // Закрываем сетевые соединения
         this.websocket?.destroy(); // Мягкое закрытие
@@ -719,27 +690,18 @@ interface VoiceConnectionEvents {
     readonly "createWS": (status: string) => void;
 }
 
+
 /**
  * @author SNIPPIK
  * @description Статусы подключения голосового соединения
- * @enum VoiceConnectionStatus
+ * @enum ConnectionStatus
  * @private
  */
-enum VoiceConnectionStatus {
-    // Полностью готов
-    ready = "ready",
-
-    // Отключен
+enum ConnectionStatus {
     disconnected = "disconnected",
-
-    // Подключен
+    reconnecting = "reconnecting",
+    connecting = "connecting",
     connected = "connected",
-
-    // Получение данных для подключения RTP
-    SessionDescription = "sessionDescription",
-
-    // Если происходит переподключение
-    reconnecting = "reconnecting"
 }
 
 /**

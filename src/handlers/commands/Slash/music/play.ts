@@ -81,12 +81,16 @@ async function allAutoComplete(message: any, platform: RestClientSide.Request, s
             "ru": "Необходимо указать ссылку или название трека!"
         },
         autocomplete: (ctx) => {
-            const search = ctx.getInput();
-            // Не даем делать тупые запросы
-            if (!search || search.length < 1) return null;
+            try {
+                const search = ctx.getInput();
+                // Не даем делать тупые запросы
+                if (!search || search.length < 1) return null;
 
-            const platform = db.api.request(search);
-            return allAutoComplete(ctx, platform, search);
+                const platform = db.api.request(search);
+                return allAutoComplete(ctx, platform, search);
+            } catch (err) {
+                return null;
+            }
         },
     })
 })

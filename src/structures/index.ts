@@ -134,6 +134,7 @@ export * from "./tools/TypedEmitter";
 export * from "./array";
 export * from "./tools/httpsClient";
 export * from "./tools/SimpleWorker";
+export * from "./tools/CycleManager";
 
 /**
  * @author SNIPPIK

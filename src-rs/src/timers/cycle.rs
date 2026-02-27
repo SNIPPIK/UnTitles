@@ -1,114 +1,126 @@
-use napi::bindgen_prelude::*;
-use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
-use napi_derive::napi;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
-use std::sync::{Arc, Mutex};
-use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+    time::{Duration, Instant},
+};
+use dashmap::DashMap;
+use crate::net::udp::UdpBuffered;
 
-#[napi(js_name = "CycleWorker")]
-pub struct CycleWorker {
-    target_interval_micros: Arc<AtomicI64>,
-    current_lag_micros: Arc<AtomicI32>,
-    running: Arc<AtomicBool>,
-    handle: Arc<Mutex<Option<JoinHandle<()>>>>,
+/// Менеджер цикла с учётом реальной задержки UDP send
+pub struct CycleManager {
+    pub sessions: Arc<DashMap<u32, Arc<UdpBuffered>>>,
+    pub running: Arc<AtomicBool>,
+    pub interval_ms: u64,
+    pub max_catchup_ticks: u32,
+    pub max_acceleration_ms: u64,
 }
 
-#[napi]
-impl CycleWorker {
-    #[napi(constructor)]
-    pub fn new(interval_ms: i32) -> Self {
+impl CycleManager {
+    pub fn new(interval_ms: u64) -> Self {
         Self {
-            target_interval_micros: Arc::new(AtomicI64::new((interval_ms * 1000) as i64)),
-            current_lag_micros: Arc::new(AtomicI32::new(0)),
+            sessions: Arc::new(DashMap::new()),
             running: Arc::new(AtomicBool::new(false)),
-            handle: Arc::new(Mutex::new(None)),
+            interval_ms,
+            max_catchup_ticks: 1,
+            max_acceleration_ms: 2,
         }
     }
 
-    #[napi]
-    pub fn start(&self, cb: JsFunction) -> Result<()> {
-        // Если уже запущен — ничего не делаем
-        if self.running.load(Ordering::Acquire) {
-            return Ok(());
+    pub fn add_session(&self, id: u32, session: Arc<UdpBuffered>) {
+        self.sessions.insert(id, session);
+        if !self.running.load(Ordering::SeqCst) {
+            self.start();
+        }
+    }
+
+    pub fn remove_session(&self, id: u32) {
+        self.sessions.remove(&id);
+    }
+
+    pub fn start(&self) {
+        if self.running.swap(true, Ordering::SeqCst) {
+            return;
         }
 
-        let tsfn: ThreadsafeFunction<f64, ErrorStrategy::Fatal> =
-            cb.create_threadsafe_function(0, |ctx| ctx.env.create_double(ctx.value).map(|v| vec![v]))?;
+        let sessions = self.sessions.clone();
+        let running_flag = self.running.clone();
+        let interval = self.interval_ms;
+        let max_catchup_ticks = self.max_catchup_ticks;
+        let max_accel = self.max_acceleration_ms;
 
-        self.running.store(true, Ordering::Release);
-
-        // Клонируем атомики только для этого потока
-        let running = Arc::clone(&self.running);
-        let interval = Arc::clone(&self.target_interval_micros);
-        let lag = Arc::clone(&self.current_lag_micros);
-
-        // Остановим старый поток, если есть
-        if let Ok(mut h) = self.handle.lock() {
-            if let Some(join_handle) = h.take() {
-                running.store(false, Ordering::Release);
-                let _ = join_handle.join();
-            }
-        }
-
-        let handle = thread::spawn(move || {
+        thread::spawn(move || {
             let start_time = Instant::now();
-            let mut tick_counter: u64 = 0;
+            let mut next_tick = start_time;
+            let mut total_elapsed_ms: u128 = 0;
+            let mut last_tick_duration_ms: u64 = 0;
 
-            while running.load(Ordering::Acquire) {
-                tick_counter += 1;
-                let interval_us = interval.load(Ordering::Relaxed) as u64;
-                let ideal_tick = start_time + Duration::from_micros(tick_counter * interval_us);
+            while running_flag.load(Ordering::SeqCst) {
+                if sessions.is_empty() {
+                    running_flag.store(false, Ordering::SeqCst);
+                    break;
+                }
 
-                let lag_us = lag.load(Ordering::Relaxed) as u64;
-                let target = ideal_tick.checked_sub(Duration::from_micros(lag_us)).unwrap_or(ideal_tick);
+                // --- Tick всех сессий и измерение времени ---
+                let tick_start = Instant::now();
+                sessions.iter().for_each(|kv| kv.value().tick());
+                last_tick_duration_ms = tick_start.elapsed().as_millis() as u64;
 
-                loop {
-                    let now = Instant::now();
-                    if now >= target {
-                        break;
-                    }
-                    let diff = target - now;
-                    if diff > Duration::from_micros(200) {
-                        thread::sleep(Duration::from_micros(100));
-                    } else {
-                        std::hint::spin_loop();
-                    }
-                    if !running.load(Ordering::Acquire) {
-                        return;
+                // --- Планирование следующего тика с учётом реального времени tick ---
+                let mut next_interval = interval;
+                if last_tick_duration_ms > interval / 4 {
+                    next_interval = interval.saturating_sub(last_tick_duration_ms / 2);
+                    if next_interval < interval.saturating_sub(max_accel) {
+                        next_interval = interval.saturating_sub(max_accel);
                     }
                 }
 
-                let _ = tsfn.call(
-                    Instant::now().duration_since(start_time).as_secs_f64() * 1000.0,
-                    ThreadsafeFunctionCallMode::NonBlocking,
-                );
-            }
+                total_elapsed_ms += next_interval as u128;
+                next_tick = start_time + Duration::from_millis(total_elapsed_ms as u64);
 
-            let _ = tsfn.abort();
+                // --- Catch-up loop для догонки пропущенных тиков ---
+                let mut catchup_count = 0;
+                while Instant::now() > next_tick && catchup_count < max_catchup_ticks {
+                    sessions.iter().for_each(|kv| kv.value().tick());
+                    total_elapsed_ms += interval as u128;
+                    next_tick = start_time + Duration::from_millis(total_elapsed_ms as u64);
+                    catchup_count += 1;
+                }
+
+                // --- Высокоточный sleep с учётом фактической длительности tick ---
+                let now = Instant::now();
+                if now < next_tick {
+                    let mut sleep_duration = next_tick - now;
+                    if sleep_duration > Duration::from_millis(last_tick_duration_ms) {
+                        sleep_duration -= Duration::from_millis(last_tick_duration_ms);
+                    } else {
+                        sleep_duration = Duration::ZERO;
+                    }
+
+                    if sleep_duration > Duration::from_millis(2) {
+                        thread::sleep(sleep_duration - Duration::from_millis(1));
+                    }
+
+                    while Instant::now() < next_tick {
+                        std::hint::spin_loop();
+                    }
+                } else {
+                    next_tick = Instant::now();
+                }
+            }
         });
-
-        *self.handle.lock().unwrap() = Some(handle);
-
-        Ok(())
     }
 
-    #[napi]
-    pub fn stop(&self) -> Result<()> {
-        self.running.store(false, Ordering::Release);
-
-        if let Ok(mut h) = self.handle.lock() {
-            if let Some(join_handle) = h.take() {
-                let _ = join_handle.join();
-            }
-        }
-
-        Ok(())
-    }
-
-    #[napi]
-    pub fn set_lag(&self, lag_micros: i32) {
-        let target = self.target_interval_micros.load(Ordering::Relaxed) as i32;
-        self.current_lag_micros.store(lag_micros.clamp(0, target), Ordering::Relaxed);
+    pub fn stop(&self) {
+        self.running.store(false, Ordering::SeqCst);
     }
 }
+
+use once_cell::sync::Lazy;
+pub static GLOBAL_MANAGER: Lazy<Arc<CycleManager>> = Lazy::new(|| {
+    let manager = Arc::new(CycleManager::new(20));
+    manager.start();
+    manager
+});

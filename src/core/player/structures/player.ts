@@ -161,9 +161,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Базовые статусы (самая быстрая проверка)
         if (this._status === "player/wait" || this._status === "player/pause") return false;
 
-        // Готовность сокета
-        if (!this._voice.connection?.isReadyToSend) return false;
-
         // Наличие аудио-ресурса (просто проверка ссылки)
         return !!this._audio.current;
     };

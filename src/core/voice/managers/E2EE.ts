@@ -116,10 +116,10 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
         private version: number,
 
         /** Идентификатор пользователя, представленный этим сеансом. */
-        private user_id: string,
+        public user_id: string,
 
         /** Канал в котором будет произведено сквозное шифрование */
-        private channel_id: string
+        public channel_id: string
     ) {
         super();
     };
@@ -295,7 +295,6 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
      */
     public destroy = () => {
         super.destroy();
-        this.removeAllListeners();
         this._isTransitioning = true; // Сразу блокируем шифрование
 
         if (this.session) {

@@ -1,9 +1,8 @@
-import type { CycleInteraction, MessageComponent } from "#structures/discord";
-import { OPUS_FRAME_SIZE } from "#core/audio";
-import { AudioPlayer } from "#core/player";
-import { TaskCycle } from "#native/cycle";
-import { Logger } from "#structures";
-import { db } from "#app/db";
+import type {CycleInteraction, MessageComponent} from "#structures/discord";
+import {Logger, TaskCycle} from "#structures";
+import {OPUS_FRAME_SIZE} from "#core/audio";
+import {AudioPlayer} from "#core/player";
+import {db} from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -45,22 +44,37 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
     public constructor() {
         super({
             // Время до следующего прогона цикла
-            duration: OPUS_FRAME_SIZE,
+            duration: OPUS_FRAME_SIZE * 5,
+
+            // Кастомные функции (если хочется немного изменить логику выполнения)
+            custom: {
+                step: () => {
+                    const now = this.time;
+                    const drift = Math.abs(now - this.insideTime);
+                    this.options.duration = (Math.ceil(drift / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE) + OPUS_FRAME_SIZE;
+                }
+            },
 
             // Функция проверки
-            filter: (item) => item.playing,
+            filter: (item) => item.playing && item.voice?.connection?.ready,
 
             // Функция отправки аудио фрейма
             execute: (player) => {
-                const audio = player.audio.current;
-                const packet = audio.packet;
+                // Количество фреймов в текущей итерации
+                let size = this.options.duration / OPUS_FRAME_SIZE;
 
-                if (packet) player.voice.connection.packet(packet);
-                else {
-                    // Если поток не читается, переходим в состояние ожидания
-                    if (!audio || !audio.readable || audio.packets === 0) {
-                        player.status = "player/wait";
-                        player.cycle = false;
+                // Отправляем пакет/ы в голосовой канал
+                for (let i = 0; i < size; i++) {
+                    const audio = player.audio.current;
+                    const packet = audio.packet;
+
+                    if (packet) player.voice.connection.packet(packet);
+                    else {
+                        // Если поток не читается, переходим в состояние ожидания
+                        if (!audio || !audio.readable || audio.packets === 0) {
+                            player.status = "player/wait";
+                            player.cycle = false;
+                        }
                     }
                 }
             }

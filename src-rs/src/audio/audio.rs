@@ -46,6 +46,23 @@ impl AudioEngine {
         packet.map(Buffer::from)
     }
 
+    /// Получить несколько пакетов подряд и продвинуть позицию
+    #[napi]
+    pub fn get_packets(&mut self, count: u32) -> Vec<Buffer> {
+        let mut result = Vec::with_capacity(count as usize);
+
+        for _ in 0..count {
+            if let Some(packet) = self.buffer.pop_front() {
+                self.position = self.position.saturating_add(1);
+                result.push(Buffer::from(packet));
+            } else {
+                break;
+            }
+        }
+
+        result
+    }
+
     /// Считать несколько пакетов за раз, без удаления
     #[napi]
     pub fn peek_packets(&self, count: u32) -> Vec<Buffer> {

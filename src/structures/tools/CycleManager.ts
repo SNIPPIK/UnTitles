@@ -1,5 +1,4 @@
 import { SetArray } from "#structures/array";
-import { CycleWorker } from "#native";
 
 /**
  * @author SNIPPIK
@@ -10,19 +9,61 @@ import { CycleWorker } from "#native";
  * @private
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Время старта (performance.now()) */
-    protected startTime: number | null = null;
+    /** Последний сохраненный временной интервал */
+    private lastDelay: number = 0;
 
-    /** Экземпляр нативного воркера */
-    protected worker: CycleWorker = null;
+    /** Следующее запланированное время запуска (в ms, с плавающей точкой) */
+    private startTime: number = 0;
+
+    /** Время для высчитывания */
+    private tickTime: number = 0;
+
+    /** Таймер или функция ожидания */
+    private timeout: NodeJS.Timeout | NodeJS.Immediate;
 
     /**
-     * @description Метод получения времени
+     * @description Время циклической системы изнутри
+     * @returns number
+     * @public
+     */
+    public get insideTime(): number {
+        return this.startTime + this.tickTime;
+    };
+
+    /**
+     * @description Метод получения времени для обновления времени цикла
+     * @default Date.now
      * @returns number
      * @protected
      */
     protected get time(): number {
-        return performance.now();
+        return performance.now()
+    };
+
+    /**
+     * @description Последний зафиксированный промежуток выполнения
+     * @returns number
+     * @public
+     */
+    public get delay(): number {
+        return this.lastDelay;
+    };
+
+    /**
+     * @description Высчитываем задержку шага
+     * @param duration - Истинное время шага
+     * @private
+     */
+    private set delay(duration: number) {
+        // Ожидаемое время следующего запуска (без учета _driftStep/lag)
+        const expectedNext = this.startTime + this.tickTime + duration;
+        const now = this.time;
+        const missed = Math.floor((now - expectedNext) / duration);
+        const steps = Math.max(1, missed + 1);
+
+        const correction = Math.floor(steps * duration);
+        this.tickTime += correction;
+        this.lastDelay = correction;
     };
 
     /**
@@ -33,9 +74,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public constructor(public options: SyncCycleConfig<T> | AsyncCycleConfig<T>) {
         super();
-        // Инициализируем воркер сразу, чтобы он был готов
-        this.worker = new CycleWorker(this.options.duration);
-    }
+    };
 
     /**
      * @description Добавляем элемент в очередь
@@ -43,14 +82,13 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @public
      */
     public add(item: T): this {
-        if (this.options.custom?.push) this.options.custom.push(item);
         if (this.has(item)) this.delete(item);
         super.add(item);
 
-        // Если это первый элемент — запускаем нативный поток
+        // Запускаем цикл сразу после добавления первого элемента
         if (this.size === 1 && !this.startTime) {
             this.startTime = this.time;
-            this._runTimeout();
+            setImmediate(this._runTimeout);
         }
 
         return this;
@@ -82,12 +120,21 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @public
      */
     public reset(): void {
-        this.clear();
-        this.startTime = null;
+        this.clear(); // Удаляем все объекты
+        this.reboot();
+    };
 
-        if (this.worker) {
-            this.worker.stop();
-        }
+    /**
+     * @description Подготовка данных цикла для повторного использования
+     * @private
+     */
+    private reboot = () => {
+        this.startTime = 0;
+        this.tickTime = 0;
+        this.lastDelay = 0;
+
+        // Если есть таймер
+        if (this.timeout) this._clearTimeout();
     };
 
     /**
@@ -95,11 +142,23 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @returns void
      * @protected
      */
-    protected _runTimeout = (): void => {
-        if (!this.worker) return;
+    private _runTimeout = (): void => {
+        // === STEP ===
+        this.delay = this.step();
 
-        // Передаем callback напрямую в Rust
-        this.worker.start(this.step);
+        const delay = Math.max(0, this.insideTime - this.time);
+        setTimeout(this._runTimeout, delay);
+    };
+
+    /**
+     * @description Удаляем таймер или Immediate
+     * @protected
+     */
+    protected _clearTimeout = () => {
+        if (!this.timeout) return;
+        if ('hasRef' in this.timeout) clearTimeout(this.timeout as NodeJS.Timeout);
+        else clearImmediate(this.timeout as NodeJS.Immediate);
+        this.timeout = null;
     };
 
     /**
@@ -108,7 +167,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      * @abstract
      */
-    protected abstract step: () => void;
+    protected abstract step: () => number;
 
     /**
      * @description Вынесенная логика обработки ошибок для чистоты кода
@@ -143,19 +202,18 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
     protected step = () => {
         const { filter, execute, custom } = this.options;
 
-        for (const item of this) {
-            // Пропускаем объекты, не прошедшие фильтрацию
-            if (!filter(item)) continue;
+        // Выполнение модифицированного шага
+        custom?.step?.();
 
+        for (const item of this) {
             try {
-                execute(item);
+                if (filter(item)) execute(item);
             } catch (error) {
                 this.handleStepError(error, item);
             }
         }
 
-        // Выполнение модифицированного шага
-        custom?.step?.();
+        return this.options.duration;
     };
 }
 
@@ -184,6 +242,8 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
             if (!this.options.filter(item)) continue;
             this.runItem(item);
         }
+
+        return this.options.duration;
     };
 
     /**

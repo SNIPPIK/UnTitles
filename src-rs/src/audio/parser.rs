@@ -124,7 +124,12 @@ impl OggOpusParser {
 
         let type_str = env.create_string(p_type)?;
         let buffer = env.create_buffer_copy(&self.packet_carry)?;
-        emit.call(None, &[type_str.into_unknown(), buffer.into_unknown()])?;
+        
+        // Если буфер не является пустышкой
+        if !buffer.is_empty() {
+            emit.call(None, &[type_str.into_unknown(), buffer.into_unknown()])?;
+            return Ok(());
+        }
 
         Ok(())
     }

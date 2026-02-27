@@ -1,6 +1,6 @@
 import type { APIRequestData } from "#handler/rest";
 import { Process } from "#core/audio/process";
-import { PromiseCycle } from "#native/cycle";
+import { PromiseCycle } from "#structures";
 import { Track } from "#core/queue";
 import afs from "node:fs/promises";
 import { env } from "#app/env";

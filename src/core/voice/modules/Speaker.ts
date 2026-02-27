@@ -93,7 +93,7 @@ export class VoiceSpeakerManager {
             d: {
                 speaking: speaking,
                 delay: 0,
-                ssrc: this.voice._attention.ssrc
+                ssrc: this.voice.ssrc
             },
             seq: this.voice.websocket.sequence
         };
@@ -115,7 +115,7 @@ export class VoiceSpeakerManager {
                 const packet = this.keepAlive.buffer;
 
                 // Можно записать SSRC или просто рандомное число
-                packet.writeUInt32BE(this.voice._attention.ssrc, 0);
+                packet.writeUInt32BE(this.voice.ssrc, 0);
                 voice.packet(this.keepAlive.buffer, "raw");
 
                 // Отключаем спикер

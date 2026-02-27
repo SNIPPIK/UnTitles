@@ -186,12 +186,12 @@ class RestVKAPI extends RestServerSide.API {
 
             new httpsClient({
                 url,
-                userAgent: "VKAndroidApp/8.13-16168 (Android 11; SDK 30; arm64-v8a; samsung SM-G991B; ru; 2400x1080)",
                 agent: this.agent
             }).toJson.then((api: any) => {
+                if (api?.["error_code"] || api?.error) return resolve(locale.err( "api.request.fail.msg", [api?.["error_msg"]]));
+
                 // Если на этапе получение данных получена одна из ошибок
-                if (!api || !api?.response) return resolve(locale.err( "api.request.fail"));
-                else if (api?.["error_code"] || api?.error) return resolve(locale.err( "api.request.fail.msg", [api?.["error_msg"]]));
+                else if (!api || !api?.response) return resolve(locale.err( "api.request.fail"));
 
                 return resolve(api);
             }).catch((err) => {

@@ -1,7 +1,7 @@
 import { type WebSocketOpcodes } from "#core/voice";
 import { TypedEmitter } from "#structures";
+import { UDPSocket } from "#native";
 import { isIPv4 } from "node:net";
-import { UdpSender } from "#native";
 
 /**
  * @author SNIPPIK
@@ -14,7 +14,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     private _status: VoiceUDPSocketStatuses;
 
     /** Socket UDP подключения */
-    private socket: UdpSender;
+    private socket: UDPSocket;
 
     /** Данные подключения, полные данные пакета ready.d */
     public options: WebSocketOpcodes.ready["d"];
@@ -35,7 +35,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         if (!this.socket) return;
 
         try {
-            this.socket.sendPacket(packet);
+            this.socket.pushPacket(packet);
         } catch (error) {
             this.emit("error", error as Error);
         }
@@ -51,7 +51,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         this.options = options;
         if (this.socket) this.reset();
 
-        this.socket = new UdpSender(`${options.ip}:${options.port}`);
+        this.socket = new UDPSocket(`${options.ip}:${options.port}`);
         this._status = VoiceUDPSocketStatuses.connecting;
 
         // Rust сам создаст поток и будет вызывать этот колбэк
@@ -116,6 +116,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      */
     private reset = () => {
         if (this.discoveryTimeout) clearTimeout(this.discoveryTimeout);
+        this.socket.destroy();
         this.socket = null;
     };
 

@@ -22,22 +22,25 @@ export default createEvent({
 
         const { guildId, userId, channelId } = payload;
 
-        // Обновляем адаптер базы данных (необходимо для работы голосового движка)
-        db.adapter.onVoiceStateUpdate({
-            session_id: payload.sessionId,
-            channel_id: payload.channelId,
-            guild_id: guildId,
-            user_id: userId,
-            self_stream: payload.selfStream,
-            self_video: payload.selfVideo,
-            self_mute: payload.selfMute,
-            self_deaf: payload.selfDeaf,
-            request_to_speak_timestamp: payload.requestToSpeakTimestamp,
-            deaf: payload.deaf,
-            mute: payload.mute,
-            suppress: payload.suppress,
-            member: null
-        });
+        // Если это был бот
+        if (payload.userId === client.botId) {
+            // Обновляем адаптер базы данных (необходимо для работы голосового движка)
+            db.adapter.onVoiceStateUpdate({
+                session_id: payload.sessionId,
+                channel_id: payload.channelId,
+                guild_id: guildId,
+                user_id: userId,
+                self_stream: payload.selfStream,
+                self_video: payload.selfVideo,
+                self_mute: payload.selfMute,
+                self_deaf: payload.selfDeaf,
+                request_to_speak_timestamp: payload.requestToSpeakTimestamp,
+                deaf: payload.deaf,
+                mute: payload.mute,
+                suppress: payload.suppress,
+                member: null
+            });
+        }
 
         /**
          * Используем queueMicrotask, чтобы логика проверки не блокировала
@@ -71,7 +74,7 @@ export default createEvent({
             for (const vs of guildStates) {
                 if (vs.channelId === botState.channelId && vs.userId !== client.me.id) {
                     const member = await client.cache.members?.get(vs.userId, guildId);
-                    if (member && !member.user.bot) humanCount++;
+                    if (member && !member.user?.bot) humanCount++;
                 }
             }
 

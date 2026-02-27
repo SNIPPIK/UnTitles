@@ -2,6 +2,7 @@ import { type WebSocketOpcodes, GatewayCloseCodes } from "#core/voice";
 import { WebSocket, type MessageEvent, type Data } from "ws";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
 import { HeartbeatManager } from "../managers/heartbeat";
+import { OPUS_FRAME_SIZE } from "#core/audio";
 import { version, name } from "package.json";
 import { TypedEmitter } from "#structures";
 import os from "node:os";
@@ -65,7 +66,16 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @default 120
      * @public
      */
-    public latency: number = 60;
+    private _latency: number = 60;
+
+    /**
+     * @description Задержка WS ответа между UDP пакетами
+     * @public
+     */
+    public get latency() {
+        if (!this._latency) return 0;
+        return this._latency - OPUS_FRAME_SIZE;
+    };
 
     /**
      * @description Текущий статус клиента
@@ -129,7 +139,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Получен HEARTBEAT_ACK
             onAck: (latency) => {
-                this.latency = latency;
+                this._latency = latency;
 
                 // Отправляем событие об ответе от websocket
                 this.emit("warn", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
@@ -393,7 +403,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this._heartbeat = null;
         }
 
-        this.latency = null;
+        this._latency = null;
     };
 }
 

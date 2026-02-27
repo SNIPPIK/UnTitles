@@ -289,13 +289,13 @@ export class AudioResource extends BaseAudioResource {
                 p.pipeStdout((chunk: Buffer) => {
                     parser.parse(chunk, (type, frame) => {
                         if (type === 'frame') {
-                            this.engine.addPacket(frame);
-
                             if (!this._readable) {
                                 this.engine.addPacket(SILENT_FRAME);
                                 this._readable = true;
                                 setImmediate(() => this.emit("readable"));
                             }
+
+                            this.engine.addPacket(frame);
                         }
                     });
                 });

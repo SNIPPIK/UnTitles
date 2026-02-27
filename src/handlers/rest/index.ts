@@ -103,7 +103,7 @@ export class RestObject {
      * @returns Promise<boolean>
      * @public
      */
-    public startWorker = async (): Promise<boolean> => {
+    public startWorker = (): Promise<boolean> => {
         return new Promise(resolve => {
             // Создаем поток через менеджер потоков
             const worker = this.worker = SimpleWorker.create<RestServerSide.Data>({
@@ -270,6 +270,7 @@ export class RestObject {
 
             // Отправляем запрос
             this.worker.postMessage({ platform: platform.name, payload, options, requestId, type });
+            Logger.log("DEBUG", `[Rest/API |${type}| SEND - ${platform.name}]: ${payload}`);
         });
     };
 
@@ -285,7 +286,8 @@ export class RestObject {
         const { name, artist, api } = track;
 
         // Оригинальный трек по словам
-        const original = normalize(`${artist.title} ${name}`);
+        const original_name = `${artist.title} ${name}`;
+        const original = normalize(original_name);
         let link: Track = null, lastError: Error;
 
         // Ищем нужную платформу
@@ -297,7 +299,7 @@ export class RestObject {
             const platformAPI = this.request(platform.name);
 
             // Поиск трека
-            const search = await platformAPI.request<"search">(`${artist.title} ${name}`).request();
+            const search = await platformAPI.request<"search">(original_name).request();
 
             // Если при получении треков произошла ошибка
             if (search instanceof Error) {
@@ -316,14 +318,14 @@ export class RestObject {
             // Ищем нужный трек
             // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
             const findTrack = search.find((song) => {
-                const candidate = normalize(`${song.artist.title} - ${song.name}`);
+                const candidate = normalize(`${song.artist.title} ${song.name}`);
                 const matchCount = candidate.filter(word => original.includes(word)).length;
                 const time = Math.abs(track.time.total - song.time.total);
 
-                return (time <= 5 || time === 0) && // по длительности близко
+                return (time <= 7) && // по длительности близко
                     (
                         matchCount === candidate.length ||               // полное совпадение
-                        matchCount >= Math.floor(candidate.length * 0.6) // ≥60% слов совпало
+                        matchCount >= Math.floor(candidate.length * 0.4) // ≥40% слов совпало
                     );
             });
 
