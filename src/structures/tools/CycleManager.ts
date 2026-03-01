@@ -129,9 +129,12 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
         // Если delay слишком мал
         if (delay <= 0) {
-            process.nextTick(this.step);
-            // Переходим к следующему шагу в следующем тике
-            setTimeout(this._runTimeout, duration);
+            process.nextTick(() => {
+                this.step();
+
+                // Переходим к следующему шагу в следующем тике
+                setTimeout(this._runTimeout, duration);
+            });
             return;
         }
 

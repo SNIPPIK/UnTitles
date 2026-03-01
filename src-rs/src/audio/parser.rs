@@ -127,7 +127,6 @@ impl OggOpusParser {
         }
         *bitstream_serial = serial;
 
-        let continued = (header_type & 0x01) != 0;
         let bos = (header_type & 0x02) != 0;
 
         if bos {

@@ -1,6 +1,6 @@
 import { type WebSocketOpcodes } from "#core/voice";
+import { type iType, UDPSocket } from "#native";
 import { TypedEmitter } from "#structures";
-import { UDPSocket } from "#native";
 import { isIPv4 } from "node:net";
 
 /**
@@ -14,7 +14,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     private _status: VoiceUDPSocketStatuses;
 
     /** Socket UDP подключения */
-    private socket: UDPSocket;
+    private socket: iType<typeof UDPSocket>;
 
     /** Данные подключения, полные данные пакета ready.d */
     public options: WebSocketOpcodes.ready["d"];

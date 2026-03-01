@@ -41,7 +41,7 @@ export class Process {
      * @constructor
      * @public
      */
-    public constructor(args: string[], name: string = ffmpeg_path) {
+    public constructor(args: string[], name: string = FFMPEG_PATH) {
         const index_resource = args.indexOf("-i");
 
         // Твоя логика проверки ссылки
@@ -105,7 +105,7 @@ export class Process {
  * @description Путь до исполняемого файла ffmpeg
  * @private
  */
-let ffmpeg_path = null;
+export let FFMPEG_PATH = null;
 
 /**
  * @author SNIPPIK
@@ -120,7 +120,7 @@ let ffmpeg_path = null;
         try {
             const result = spawnSync(name, ['-h'], { windowsHide: true });
             if (result.error) continue;
-            ffmpeg_path = name;
+            FFMPEG_PATH = name;
             return;
         } catch {}
     }

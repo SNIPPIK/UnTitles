@@ -29,7 +29,7 @@ const PLAYER_PAUSE_OFFSET = 3000;
  * @const PLAYER_TIMEOUT_OFFSET
  * @private
  */
-const PLAYER_TIMEOUT_OFFSET = 2000;
+const PLAYER_TIMEOUT_OFFSET = 3000;
 
 /**
  * @author SNIPPIK

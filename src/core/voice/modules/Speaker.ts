@@ -13,6 +13,14 @@ const KEEP_SWITCH_SPEAKING = 10e3;
 
 /**
  * @author SNIPPIK
+ * @description Максимальное значение счетчика активности
+ * @const MAX_SIZE_VALUE
+ * @private
+ */
+const MAX_SIZE_VALUE = 2 ** 32 - 1;
+
+/**
+ * @author SNIPPIK
  * @description Класс управляющий голосовым состоянием спикера
  * @class VoiceSpeakerManager
  * @public
@@ -46,7 +54,13 @@ export class VoiceSpeakerManager {
          * @readonly
          * @private
          */
-        buffer: Buffer.alloc(8)
+        buffer: Buffer.alloc(8),
+
+        /**
+         * @description Счетчика активности
+         * @private
+         */
+        counter: 0
     };
 
     /**
@@ -107,16 +121,15 @@ export class VoiceSpeakerManager {
     public constructor(protected voice: VoiceConnection) {
         const heartbeat = this._heartbeat = new HeartbeatManager({
             onTimeout: () => {
-                // Если бот говорит, то не имеет смысла пинговать udp подключение
-                if (this._type !== SpeakerType.disable) return;
+                if (this.keepAlive.counter >= MAX_SIZE_VALUE) this.keepAlive.counter = 0;
 
                 // Discord ожидает пакет, где в начале стоит SSRC (или просто 8 байт данных)
                 // Обычно используется 8-байтовый пакет с текущим временем или SSRC
                 const packet = this.keepAlive.buffer;
 
                 // Можно записать SSRC или просто рандомное число
-                packet.writeUInt32BE(this.voice.ssrc, 0);
-                voice.packet(this.keepAlive.buffer, "raw");
+                packet.writeUInt32BE(this.keepAlive.counter++, 0);
+                voice.packet(packet, "raw");
 
                 // Отключаем спикер
                 this.speaking = SpeakerType.disable;

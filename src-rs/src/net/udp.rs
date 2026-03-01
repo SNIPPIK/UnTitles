@@ -28,12 +28,7 @@ impl UdpBufferedInner {
     pub fn push(&self, data: Vec<u8>) {
         let mut buf = self.buffer.lock().unwrap();
 
-        // Если audio frame пуст
-        if buf.is_empty() || buf.len() < 10 {
-            return;
-        }
-
-        else if buf.len() >= MAX_BUFFER_ITEMS {
+        if buf.len() >= MAX_BUFFER_ITEMS {
             buf.pop_front(); // теряем старый пакет
             self.send_drops.fetch_add(1, Ordering::Relaxed);
         }
@@ -44,15 +39,35 @@ impl UdpBufferedInner {
     /// Попытка отправки одного пакета; при WouldBlock возвращает пакет в начало
     pub fn tick(&self) {
         if let Ok(mut buf) = self.buffer.try_lock() {
-            if let Some(data) = buf.pop_front() {
+            // максимум 2 попытки за тик
+            for attempt in 0..2 {
+                let data = match buf.pop_front() {
+                    Some(d) => d,
+                    None => break,
+                };
+
+                let is_small = data.len() < 5;
+
                 match self.socket.send(&data) {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        // если это вторая попытка — выходим
+                        if attempt == 1 {
+                            break;
+                        }
+
+                        // если пакет не маленький — не делаем вторую отправку
+                        if !is_small {
+                            break;
+                        }
+                    }
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        buf.push_front(data); // повторная попытка
+                        buf.push_front(data);
                         self.send_drops.fetch_add(1, Ordering::Relaxed);
+                        break; // сокет забит — дальше смысла нет
                     }
                     Err(_) => {
                         self.send_drops.fetch_add(1, Ordering::Relaxed);
+                        break;
                     }
                 }
             }
@@ -104,7 +119,7 @@ impl UdpBuffered {
 
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        if !packet.is_empty() {
+        if !packet.is_empty() && packet.len() > 2 {
             self.inner.push(packet.as_ref().to_vec());
         }
     }

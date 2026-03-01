@@ -1,5 +1,6 @@
-import { FfmpegProcess, AudioEngine, OggOpusParser } from "#native";
+import { FfmpegProcess, AudioEngine, OggOpusParser, type iType } from "#native";
 import { OPUS_FRAME_SIZE, SILENT_FRAME } from "#core/audio/opus";
+import { FFMPEG_PATH } from "#core/audio/process";
 import { TypedEmitter } from "#structures";
 import type { Track } from "#core/queue";
 import { env } from "#app/env";
@@ -220,8 +221,8 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
  * @public
  */
 export class AudioResource extends BaseAudioResource {
-    private engine: AudioEngine;
-    private process: FfmpegProcess;
+    private engine: iType<typeof AudioEngine>;
+    private process: iType<typeof FfmpegProcess>;
     private _played_frames = 0;
 
     /**
@@ -274,7 +275,7 @@ export class AudioResource extends BaseAudioResource {
         this.engine = new AudioEngine(isBuffered ? 10 : 20);
 
         let parser = new OggOpusParser();
-        this.process = new FfmpegProcess(this.arguments, "ffmpeg");
+        this.process = new FfmpegProcess(this.arguments, FFMPEG_PATH);
 
         // Привязываем события через внутренний метод input (как в твоем Base)
         this.input({
@@ -321,7 +322,6 @@ export class AudioResource extends BaseAudioResource {
         super.destroy();
     };
 }
-
 
 /**
  * @author SNIPPIK
@@ -397,7 +397,6 @@ function getSpeedMultiplier(filtersString: string): number {
     // Проверка на NaN и возврат результата.
     return isNaN(totalMultiplier) ? 1.0 : totalMultiplier;
 }
-
 
 /**
  * @author SNIPPIK

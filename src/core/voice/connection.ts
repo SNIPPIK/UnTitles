@@ -140,10 +140,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Логика DAVE (MLS): блокируем отправку, если сессия в процессе перехода
         // или еще не инициализировала ключи
-        if (this.e2EE?.session) {
+        if (this.e2EE && this.e2EE?.session) {
             // Если идет переход (transition) или сессия не готова — слать нельзя,
             // иначе Discord отбросит пакеты из-за неверного ключа
-            if (!this.e2EE?.session.ready || this.e2EE.isTransitioning) {
+            if (!this.e2EE?.session.ready || this.e2EE.isTransitioning || !this.e2EE.encrypt) {
                 return false;
             }
         }
@@ -262,7 +262,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             if (type === "raw") payload = frame;
             else {
                 // Логика DAVE (MLS)
-                const encrypted = this.e2EE.encrypt(frame);
+                const encrypted = this.e2EE?.encrypt(frame);
                 payload = this.sRTP!.packet(encrypted);
             }
 
@@ -423,6 +423,12 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         const udp = this.udp;
 
+        // Создаем таймер ожидания discovery пакета
+        const timeout = setTimeout(() => {
+            this.destroy();
+            throw Error("Failed send discovery packet!");
+        }, 7e3)
+
         // Подключаемся
         udp.connect(d);
 
@@ -432,6 +438,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Используем once для разовых событий, но с обработкой ошибок
         udp.on("discovery", (data) => {
+            clearTimeout(timeout);
+
             if (data instanceof Error) {
                 this.emit("log", `[Voice] Discovery failed: ${data.message}`);
                 return this.destroy();
@@ -457,6 +465,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Обработка закрытия: используем именованную функцию или аккуратный once
         udp.once("close", () => {
+            clearTimeout(timeout);
+
             if (this._status === ConnectionStatus.disconnected || this._status === ConnectionStatus.reconnecting) return;
             this.websocket?.emit("warn", "UDP Socket closed unexpectedly. Reconnecting...");
 
@@ -465,6 +475,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         });
 
         udp.on("error", (error) => {
+            clearTimeout(timeout);
+
             // Логируем, но не всегда уничтожаем.
             // Если это системная ошибка сокета, "close" сработает следом.
             this.emit("log", `[Voice UDP] ${error.message}`);
