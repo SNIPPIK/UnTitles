@@ -65,7 +65,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      */
     private handleMessage(msg: Buffer) {
         // Логика Discovery
-        if (msg.length === 74 && msg.readUInt16BE(0) === 2) {
+        if (msg && msg.length === 74 && msg.readUInt16BE(0) === 2) {
             const ip = msg.subarray(8, msg.indexOf(0, 8)).toString("utf8");
             const port = msg.readUInt16BE(msg.length - 2);
 

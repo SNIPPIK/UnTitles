@@ -16,9 +16,10 @@
   },
   "dependencies": {
     "discord-api-types": "^0.38.39",
-    "http-proxy-agent": "^7.0.2",
-    "seyfert": "^4.2.2",
     "socks-proxy-agent": "^8.0.5",
+    "http-proxy-agent": "^7.0.2",
+    "@snazzah/davey": "^0.1.9",
+    "seyfert": "^4.2.2",
     "ws": "^8.19.0"
   },
   "optionalDependencies": {

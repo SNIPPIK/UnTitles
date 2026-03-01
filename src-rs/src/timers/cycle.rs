@@ -1,7 +1,7 @@
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     thread,
     time::{Duration, Instant},
@@ -9,118 +9,134 @@ use std::{
 use dashmap::DashMap;
 use crate::net::udp::UdpBuffered;
 
-/// Менеджер цикла с учётом реальной задержки UDP send
+/// Менеджер цикла с точным планированием на f64
 pub struct CycleManager {
-    pub sessions: Arc<DashMap<u32, Arc<UdpBuffered>>>,
-    pub running: Arc<AtomicBool>,
-    pub interval_ms: u64,
-    pub max_catchup_ticks: u32,
-    pub max_acceleration_ms: u64,
+    sessions: Arc<DashMap<u32, Arc<UdpBuffered>>>,
+    running: Arc<AtomicBool>,
+    handle: Mutex<Option<thread::JoinHandle<()>>>,
+    interval: Duration, // храним как Duration для точности
 }
 
 impl CycleManager {
-    pub fn new(interval_ms: u64) -> Self {
+    pub fn new(interval_ms: f64) -> Self {
+        let interval = Duration::from_secs_f64(interval_ms / 1000.0);
         Self {
             sessions: Arc::new(DashMap::new()),
             running: Arc::new(AtomicBool::new(false)),
-            interval_ms,
-            max_catchup_ticks: 0,
-            max_acceleration_ms: 0,
+            handle: Mutex::new(None),
+            interval,
         }
     }
 
     pub fn add_session(&self, id: u32, session: Arc<UdpBuffered>) {
         self.sessions.insert(id, session);
-        if !self.running.load(Ordering::SeqCst) {
-            self.start();
-        }
+        self.start_if_needed();
     }
 
     pub fn remove_session(&self, id: u32) {
         self.sessions.remove(&id);
     }
 
-    pub fn start(&self) {
-        if self.running.swap(true, Ordering::SeqCst) {
+    fn start_if_needed(&self) {
+        if self.running.load(Ordering::Acquire) {
             return;
+        }
+        // Пытаемся переключить флаг с false на true
+        if self.running.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
+            return; // уже кто-то запустил
         }
 
         let sessions = self.sessions.clone();
         let running_flag = self.running.clone();
-        let interval = self.interval_ms;
-        let max_catchup_ticks = self.max_catchup_ticks;
-        let max_accel = self.max_acceleration_ms;
+        let interval = self.interval;
 
-        thread::spawn(move || {
+        let handle = thread::spawn(move || {
             let start_time = Instant::now();
-            let mut next_tick = start_time;
-            let mut total_elapsed_ms: u128 = 0;
-            let mut last_tick_duration_ms: u64 = 0;
+            let mut next_tick = start_time + interval;
 
-            while running_flag.load(Ordering::SeqCst) {
-                if sessions.is_empty() {
-                    running_flag.store(false, Ordering::SeqCst);
+            loop {
+                if !running_flag.load(Ordering::Acquire) {
                     break;
                 }
 
-                // --- Tick всех сессий и измерение времени ---
-                let tick_start = Instant::now();
-                sessions.iter().for_each(|kv| kv.value().tick());
-                last_tick_duration_ms = tick_start.elapsed().as_millis() as u64;
-
-                // --- Планирование следующего тика с учётом реального времени tick ---
-                let mut next_interval = interval;
-                if last_tick_duration_ms > interval / 12 {
-                    next_interval = interval.saturating_sub(last_tick_duration_ms);
-                    if next_interval < interval.saturating_sub(max_accel) {
-                        next_interval = interval.saturating_sub(max_accel);
-                    }
+                // Если нет активных сессий – спим с проверкой, не тратим ресурсы
+                if sessions.is_empty() {
+                    thread::sleep(Duration::from_millis(100));
+                    // переустанавливаем start_time и next_tick при появлении данных?
+                    // Лучше просто перейти к началу цикла, флаг проверится
+                    continue;
                 }
 
-                total_elapsed_ms += next_interval as u128;
-                next_tick = start_time + Duration::from_millis(total_elapsed_ms as u64);
-
-                // --- Catch-up loop для догонки пропущенных тиков ---
-                let mut catchup_count = 0;
-                while Instant::now() > next_tick && catchup_count < max_catchup_ticks {
-                    sessions.iter().for_each(|kv| kv.value().tick());
-                    total_elapsed_ms += interval as u128;
-                    next_tick = start_time + Duration::from_millis(total_elapsed_ms as u64);
-                    catchup_count += 1;
-                }
-
-                // --- Высокоточный sleep с учётом фактической длительности tick ---
+                // Ожидание до следующего тика с учётом возможного опоздания
                 let now = Instant::now();
                 if now < next_tick {
-                    let mut sleep_duration = next_tick - now;
-                    if sleep_duration > Duration::from_millis(last_tick_duration_ms) {
-                        sleep_duration -= Duration::from_millis(last_tick_duration_ms);
-                    } else {
-                        sleep_duration = Duration::ZERO;
+                    let sleep_dur = next_tick - now;
+                    if sleep_dur > Duration::from_millis(2) {
+                        // Спим почти всё время, оставляя 1 мс на точность
+                        thread::sleep(sleep_dur - Duration::from_millis(1));
                     }
-
-                    if sleep_duration > Duration::from_millis(2) {
-                        thread::sleep(sleep_duration - Duration::from_millis(1));
-                    }
-
-                    while Instant::now() < next_tick {
+                    // Активное ожидание остатка
+                    while Instant::now() < next_tick && running_flag.load(Ordering::Acquire) {
                         std::hint::spin_loop();
                     }
-                } else {
-                    next_tick = Instant::now();
                 }
+
+                // Проверка флага после ожидания
+                if !running_flag.load(Ordering::Acquire) {
+                    break;
+                }
+
+                // Выполняем тик всех сессий
+                sessions.iter().for_each(|kv| kv.value().tick());
+
+                // Планируем следующий тик
+                let now = Instant::now();
+                let mut target = next_tick + interval;
+
+                // Если мы отстали (например, тик занял много времени), догоняем
+                while now > target && running_flag.load(Ordering::Acquire) {
+                    // Пропущенный тик – выполняем ещё один немедленно
+                    sessions.iter().for_each(|kv| kv.value().tick());
+                    target = target + interval;
+                }
+
+                // Устанавливаем следующее целевое время
+                next_tick = target;
             }
         });
+
+        *self.handle.lock().unwrap() = Some(handle);
     }
 
     pub fn stop(&self) {
-        self.running.store(false, Ordering::SeqCst);
+        self.running.store(false, Ordering::Release);
+        if let Some(handle) = self.handle.lock().unwrap().take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl Drop for CycleManager {
+    fn drop(&mut self) {
+        self.stop();
     }
 }
 
 use once_cell::sync::Lazy;
-pub static GLOBAL_MANAGER: Lazy<Arc<CycleManager>> = Lazy::new(|| {
-    let manager = Arc::new(CycleManager::new(20));
-    manager.start();
-    manager
+use std::sync::Mutex as StdMutex;
+
+// Глобальный менеджер, обёрнутый в Mutex для безопасного доступа из нескольких потоков
+pub static GLOBAL_MANAGER: Lazy<Arc<StdMutex<CycleManager>>> = Lazy::new(|| {
+    Arc::new(StdMutex::new(CycleManager::new(20.0)))
 });
+
+// Вспомогательные функции для работы с глобальным менеджером
+pub fn add_global_session(id: u32, session: Arc<UdpBuffered>) {
+    let guard = GLOBAL_MANAGER.lock().unwrap();
+    guard.add_session(id, session);
+}
+
+pub fn remove_global_session(id: u32) {
+    let guard = GLOBAL_MANAGER.lock().unwrap();
+    guard.remove_session(id);
+}

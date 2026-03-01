@@ -200,20 +200,12 @@ export interface UDPSocket {
      */
     stopListening(): void;
 
+    get drops(): number;
+
     /**
      * Отключение UDP от цикла Rust и удаление данных из памяти
      */
-    destroy(): void
-}
-
-export interface FfmpegOggParser {
-    constructor(args: Array<string>, ffmpegBin: string)
-    /** Старт чтения stdout FFmpeg и запись в буфер */
-    pipeStdout(callback: (...args: any[]) => any): void
-    /** Парсинг Ogg/Opus пакетов прямо из stdout буфера */
-    parseOgg(emit: (...args: any[]) => any): void
-    destroy(): void
-    get lossCount(): number
+    destroy(): void;
 }
 
 /* ────────────────────────────────────────────────
@@ -225,7 +217,6 @@ export interface FfmpegOggParser {
  * Содержит все конструкторы классов и вспомогательные функции.
  */
 export const {
-    FfmpegOggParser,
     OggOpusParser,
     FfmpegProcess,
     AudioEngine,

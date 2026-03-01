@@ -9,7 +9,7 @@ import {SetArray} from "#structures";
  * @const KEEP_SWITCH_SPEAKING
  * @private
  */
-const KEEP_SWITCH_SPEAKING = 5e3;
+const KEEP_SWITCH_SPEAKING = 10e3;
 
 /**
  * @author SNIPPIK

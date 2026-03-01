@@ -6,48 +6,67 @@ use std::{
     collections::VecDeque,
     net::UdpSocket,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
     },
     thread,
     time::Duration,
 };
 
-use crate::timers::cycle::GLOBAL_MANAGER;
+use crate::timers::cycle::{add_global_session, remove_global_session};
 
-const MAX_BUFFER: usize = 1024 * 32;
+const MAX_BUFFER_ITEMS: usize = 1024 * 32;
 
+/// Внутренние данные UDP с буфером и статистикой
 pub struct UdpBufferedInner {
     pub socket: Arc<UdpSocket>,
     pub buffer: Mutex<VecDeque<Vec<u8>>>,
+    pub send_drops: AtomicUsize,
 }
 
 impl UdpBufferedInner {
-    /// Добавление аудио пакета в буфер
     pub fn push(&self, data: Vec<u8>) {
         let mut buf = self.buffer.lock().unwrap();
-        buf.push_back(data);
 
-        // Если буфер достиг лимита
-        if buf.len() > MAX_BUFFER {
-            buf.pop_front();
+        // Если audio frame пуст
+        if buf.is_empty() || buf.len() < 10 {
+            return;
         }
+
+        else if buf.len() >= MAX_BUFFER_ITEMS {
+            buf.pop_front(); // теряем старый пакет
+            self.send_drops.fetch_add(1, Ordering::Relaxed);
+        }
+
+        buf.push_back(data);
     }
 
-    /// Отправка аудио в endpoint по UDP
+    /// Попытка отправки одного пакета; при WouldBlock возвращает пакет в начало
     pub fn tick(&self) {
-        if let Some(data) = self.buffer.lock().unwrap().pop_front() {
-            let _ = self.socket.send(&data);
+        if let Ok(mut buf) = self.buffer.try_lock() {
+            if let Some(data) = buf.pop_front() {
+                match self.socket.send(&data) {
+                    Ok(_) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        buf.push_front(data); // повторная попытка
+                        self.send_drops.fetch_add(1, Ordering::Relaxed);
+                    }
+                    Err(_) => {
+                        self.send_drops.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+            }
         }
     }
 }
-
 
 #[napi(js_name = "UDPSocket")]
 #[derive(Clone)]
 pub struct UdpBuffered {
     inner: Arc<UdpBufferedInner>,
     listener_active: Arc<AtomicBool>,
+    listener_handle: Arc<Mutex<Option<thread::JoinHandle<()>>>>,
+    destroyed: Arc<AtomicBool>,
     id: u32,
 }
 
@@ -55,37 +74,39 @@ pub struct UdpBuffered {
 impl UdpBuffered {
     #[napi(constructor)]
     pub fn new(remote_addr: String) -> Result<Self> {
-        let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-        socket.connect(&remote_addr).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+        let socket = UdpSocket::bind("0.0.0.0:0")
+            .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+        socket
+            .connect(&remote_addr)
+            .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
         socket.set_nonblocking(true).ok();
 
         let inner = Arc::new(UdpBufferedInner {
             socket: Arc::new(socket),
             buffer: Mutex::new(VecDeque::with_capacity(128)),
+            send_drops: AtomicUsize::new(0),
         });
 
         let id = rand::random::<u32>();
 
         let udp = Self {
-            inner: inner.clone(),
+            inner,
             listener_active: Arc::new(AtomicBool::new(false)),
+            listener_handle: Arc::new(Mutex::new(None)),
+            destroyed: Arc::new(AtomicBool::new(false)),
             id,
         };
 
-        // Добавляем UDP сессию в Cycle
-        GLOBAL_MANAGER.add_session(id, Arc::new(udp.clone_for_manager()));
+        add_global_session(id, Arc::new(udp.clone_for_manager()));
 
         Ok(udp)
     }
 
-    /// Добавляем аудио пакет для последующей отправки
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        if packet.is_empty() {
-            return;
+        if !packet.is_empty() {
+            self.inner.push(packet.as_ref().to_vec());
         }
-
-        self.inner.push(packet.to_vec());
     }
 
     /// Начинаем слушать входящий поток
@@ -130,34 +151,49 @@ impl UdpBuffered {
         Ok(())
     }
 
-    /// Останавливаем слушателя входящего потока
     #[napi]
     pub fn stop_listening(&self) {
-        self.listener_active.store(false, Ordering::SeqCst);
+        self.listener_active.store(false, Ordering::Release);
+
+        if let Some(handle) = self.listener_handle.lock().unwrap().take() {
+            let _ = handle.join(); // дожидаемся завершения потока
+        }
     }
 
-    /// Удаляем все зависимости
     #[napi]
     pub fn destroy(&self) {
-        // останавливаем listener
+        if self.destroyed.swap(true, Ordering::AcqRel) {
+            return;
+        }
+
         self.stop_listening();
-
-        // очищаем буфер
         self.inner.buffer.lock().unwrap().clear();
-
-        // удаляем из глобального менеджера
-        GLOBAL_MANAGER.remove_session(self.id);
+        remove_global_session(self.id);
     }
 
     fn clone_for_manager(&self) -> Self {
         Self {
             inner: self.inner.clone(),
             listener_active: self.listener_active.clone(),
+            listener_handle: Arc::new(Mutex::new(None)),
+            destroyed: self.destroyed.clone(),
             id: self.id,
         }
     }
 
+    #[napi]
     pub fn tick(&self) {
         self.inner.tick();
+    }
+
+    #[napi(getter)]
+    pub fn drops(&self) -> u32 {
+        self.inner.send_drops.load(Ordering::Relaxed) as u32
+    }
+}
+
+impl Drop for UdpBuffered {
+    fn drop(&mut self) {
+        self.destroy();
     }
 }

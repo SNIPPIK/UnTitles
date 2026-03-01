@@ -160,8 +160,10 @@ export class ControllerTracks<T extends Track> {
                     : (track.items as T[]);
 
         // Проставляем пользователя
-        for (const tr of tracks) {
-            tr.user = user;
+        if (user) {
+            for (const tr of tracks) {
+                tr.user = user;
+            }
         }
 
         // Если включена перетасовка — сохраняем оригинальный порядок

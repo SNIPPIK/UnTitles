@@ -179,9 +179,11 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
         const buttons = this._buttons?.component(player);
 
         try {
+            const e2eeStatus = player.voice.connection?.e2EE?.lastTransition_id > 0 ? "🔓" : "🔐";
+
             const { api, artist, name, image, user, url } = tracks.track;
             const textTracks = tracks.total > 1 ? `| ${tracks.position + 1}/${tracks.total} | ${tracks.time}` : "";
-            const latency = `${player.latency}/${player.voice.connection.latency} ms`;
+            const latency = `${e2eeStatus} ${player.latency}/${player.voice.connection.latency} ms`;
             const vol = player.audio.volume;
 
             return [{

@@ -1,6 +1,6 @@
 import { SpeakerType, VoiceSpeakerManager } from "#core/voice/modules/Speaker";
 import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./adapter";
-import { GatewayCloseCodes, type WebSocketOpcodes } from "#core/voice";
+import { GatewayCloseCodes, WebSocketOpcodes } from "#core/voice";
 import { VoiceReceiver } from "#core/voice/structures/receiver";
 import { VoiceRTPSocket } from "./protocols/VoiceRTPSocket";
 import { VoiceWebSocket } from "./protocols/VoiceWebSocket";
@@ -20,7 +20,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Текущий статус подключения
      * @private
      */
-    private _status: ConnectionStatus = ConnectionStatus.connecting;
+    private _status: ConnectionStatus = ConnectionStatus.disconnected;
 
     /**
      * @description Класс слушателя, если надо слушать пользователей
@@ -92,8 +92,31 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     public set status(status) {
         if (status !== this._status) {
             this.emit("log", `[Voice/Status]: ${this._status} --> ${status}`);
-
             this._status = status;
+
+            // Подключаемся к голосовому каналу
+            if (status === ConnectionStatus.connecting) {
+                // Инициализируем подключение
+                if (this.adapter) {
+                    // Подключаемся
+                    this.adapter.sendPayload(this.configuration);
+
+                    // Если удалось подключится
+                    this.status = ConnectionStatus.connected;
+                    return;
+                }
+
+                // Если не удалось найти адаптер
+                throw Error("Adapter has not found");
+            }
+
+            // Если производится попытка переподключения
+            if (status === ConnectionStatus.reconnecting) {
+                setTimeout(() => {
+                    this.websocket?.emit("debug", `[WS]`, `Voice Connection reconstruct ws... 100 ms`);
+                    this.createWebSocket(this.stateServer.endpoint);
+                }, 100);
+            }
         }
     };
 
@@ -126,7 +149,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         }
 
         // Финальная проверка UDP, WebSocket
-        return this.websocket.status === "connected" && this.udp.status === "connected";
+        return this.websocket.status === "connected" && this.udp.status === "connected" && !!this.sRTP;
     };
 
     /**
@@ -217,9 +240,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             destroy: this.destroy
         });
 
-        // Инициализируем подключение
-        if (this.adapter) this.adapter.sendPayload(this.configuration);
-        this.status = ConnectionStatus.connected;
+        // Задаем статус подключения
+        this.status = ConnectionStatus.connecting;
 
         // Если включен микрофон бота тогда запускаем класс слушатель
         if (!configuration.self_deaf) {
@@ -240,13 +262,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             if (type === "raw") payload = frame;
             else {
                 // Логика DAVE (MLS)
-                if (this.e2EE?.session?.ready && !this.e2EE.isTransitioning) {
-                    const encrypted = this.e2EE.encrypt(frame);
-                    payload = this.sRTP!.packet(encrypted);
-                } else {
-                    // Если DAVE еще не готов, но и не обязателен (зависит от настроек сервера)
-                    payload = this.sRTP!.packet(frame);
-                }
+                const encrypted = this.e2EE.encrypt(frame);
+                payload = this.sRTP!.packet(encrypted);
             }
 
             // Прямая отправка в сокет
@@ -284,7 +301,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                 }
             };
 
-            this.emit("createWS", `[WS]: Send identify data`);
+            this.emit("log", `[WS]: Send identify data`);
         });
 
         /**
@@ -294,8 +311,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          */
         this.websocket.on("ready", ({d}) => {
             this.createUDPSocket(d);
-
-            this.emit("createUDP", `[UDP]: has created`);
+            this.emit("log", `[UDP]: has created`);
         });
 
         /**
@@ -320,11 +336,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                 ssrc: this.ssrc
             });
 
-
             // Если есть поддержка DAVE
             if (E2EESession.max_version > 0) {
                 this.createDaveSession(d.dave_protocol_version);
-                this.emit("createDAVE", `[E2EE]: has created | ${d.dave_protocol_version}`);
+                this.emit("log", `[E2EE]: has created | ${d.dave_protocol_version}`);
             }
         });
 
@@ -351,12 +366,13 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          * @status WS Close
          * @code 1000-4022
          */
-        this.websocket.on("close", (code, reason) => {
+        this.websocket.on("close", (code) => {
             const fatalCodes = [4002, 4004, 4011, 4012, 4014, 4016];
             const isFatal = (code >= 1000 && code <= 1002) || fatalCodes.includes(code);
 
-            // Если получена критическая ошибка
-            if (isFatal) return this.destroy();
+            if (isFatal || this.status === ConnectionStatus.reconnecting) {
+                return this.destroy();
+            }
 
             // Подключения больше не существует
             else if (code === 4006 || code === 4003) {
@@ -366,13 +382,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                 return; // Здесь происходит пересоздание ws подключения
             }
 
-            // Если уже происходит переподключение
-            if (this._status === ConnectionStatus.reconnecting || this._status === ConnectionStatus.disconnected) return;
-
             // Меняем статус на переподключение
             this.status = ConnectionStatus.reconnecting;
-            this.emit("log", `[${code}/${reason}]: Voice Connection reconstruct ws...`);
-            this.createWebSocket(this.stateServer.endpoint, code);
         });
 
         /**

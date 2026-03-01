@@ -1,11 +1,12 @@
 import type { VoiceDavePrepareEpochData, VoiceDavePrepareTransitionData } from "discord-api-types/voice/v8";
-import { Logger, TypedEmitter } from "#structures";
+import { DAVESession, DAVE_PROTOCOL_VERSION,  } from "@snazzah/davey";
+import { TypedEmitter } from "#structures";
 
 /**
  * @author SNIPPIK
  * @description Текущая версия протокола dave
  */
-let MAX_E2EE_PROTOCOL: number = 0;
+let MAX_E2EE_PROTOCOL: number = DAVE_PROTOCOL_VERSION;
 
 /**
  * @author SNIPPIK
@@ -42,7 +43,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
     public reinitializing = false;
 
     /** Базовый сеанс DAVE этой оболочки */
-    public session: SessionMethods;
+    public session: DAVESession;
 
     /** Выполняется ли переход кода шифрования */
     private _isTransitioning = false;
@@ -140,7 +141,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
 
             // Если сессии еще нет
             else {
-                this.session = new loaded_lib.DAVESession(this.version, this.user_id, this.channel_id);
+                this.session = new DAVESession(this.version, this.user_id, this.channel_id);
                 this.emit("debug", `Session initialized for protocol version ${this.version}`);
             }
 
@@ -339,146 +340,6 @@ export interface ClientE2EEEvents {
 
 /**
  * @author SNIPPIK
- * @description Здесь будет находиться найденная библиотека, если она конечно будет найдена
- * @private
- */
-let loaded_lib: {
-    DAVESession: new (
-        /**
-         * @description Текущая версия протокола
-         * @readonly
-         */
-    version: number,
-
-        /**
-         * @description ID пользователя
-         * @readonly
-         */
-    user_id: string,
-
-        /**
-         * @description ID голосового канала
-         * @readonly
-         */
-    channel_id: string,
-    ) => SessionMethods
-} = null;
-
-/**
- * @author SNIPPIK
- * @description Все методы сессии
- * @interface SessionMethods
- * @private
- */
-interface SessionMethods {
-    /**
-     * @description Проверяет, может ли пользователь с указанным userId пропускать данные без дополнительного шифрования.
-     * @param user_id - Идентификатор пользователя Discord.
-     * @returns `true`, если пропуск разрешён, иначе `false`.
-     */
-    canPassthrough(user_id: string): boolean;
-
-    /**
-     * @description Расшифровывает входящий пакет голосовых данных для указанного пользователя и типа медиа.
-     * @param user_id - Идентификатор пользователя Discord.
-     * @param mediaType - Тип медиа: 0 для аудио, 1 для видео.
-     * @param frame - Буфер с зашифрованными данными.
-     * @returns Расшифрованный буфер данных.
-     */
-    decrypt(user_id: string, mediaType: 0 | 1, frame: Buffer): Buffer;
-
-    /**
-     * @description Шифрует пакет Opus аудио для отправки.
-     * @param frame - Буфер с аудио данными Opus.
-     * @returns Шифрованный буфер.
-     */
-    encryptOpus(frame: Buffer): Buffer;
-
-    /**
-     * @description Получает сериализованный ключевой пакет для обмена ключами.
-     * @returns Буфер с сериализованным ключевым пакетом.
-     */
-    getSerializedKeyPackage(): Buffer;
-
-    /**
-     * @description Получает код верификации для указанного пользователя.
-     * Используется для подтверждения подлинности ключей.
-     * @param user_id - Идентификатор пользователя Discord.
-     * @returns Промис, который разрешается строкой с кодом верификации.
-     */
-    getVerificationCode(user_id: string): Promise<string>;
-
-    /**
-     * @description Обрабатывает commit пакет, содержащий подтверждение ключей.
-     * @param commit - Буфер с данными commit.
-     */
-    processCommit(commit: Buffer): void;
-
-    /**
-     * Обрабатывает предложения (proposals) по ключам.
-     * @param type - Тип медиа: 0 для аудио, 1 для видео.
-     * @param proposals - Буфер с предложениями.
-     * @param recognizedUserIds - Опциональный список userId, которые распознаны.
-     * @returns Результат обработки предложений.
-     */
-    processProposals(type: 0 | 1, proposals: Buffer, recognizedUserIds?: string[]): ProposalsResult;
-
-    /**
-     * @description Обрабатывает пакет welcome — инициализирующее сообщение сессии.
-     * @param welcome - Буфер с данными welcome.
-     */
-    processWelcome(welcome: Buffer): void;
-
-    /**
-     * @description Статус готовности сессии к работе.
-     */
-    ready: boolean;
-
-    /**
-     * @description Переинициализирует сессию с новым протоколом, пользователем и каналом.
-     * @param protocolVersion - Версия протокола.
-     * @param user_id - Идентификатор пользователя Discord.
-     * @param channel_id - Идентификатор голосового канала Discord.
-     */
-    reinit(protocolVersion: number, user_id: string, channel_id: string): void;
-
-    /**
-     * @description Сбрасывает текущее состояние сессии и очищает данные.
-     */
-    reset(): void;
-
-    /**
-     * @description Устанавливает внешний отправитель данных (например, для мультикаста).
-     * @param externalSender - Буфер с идентификатором внешнего отправителя.
-     */
-    setExternalSender(externalSender: Buffer): void;
-
-    /**
-     * @description Включает или выключает режим пропуска (passthrough) для передачи данных напрямую.
-     * @param passthrough - Флаг включения режима пропуска.
-     * @param expiry - Время истечения действия режима в миллисекундах.
-     */
-    setPassthroughMode(passthrough: boolean, expiry: number): void;
-
-    /**
-     * @description Код голосовой приватности, используемый для шифрования.
-     */
-    voicePrivacyCode: string;
-}
-
-/**
- * @author SNIPPIK
- * @description Результат предложений
- * @interface ProposalsResult
- * @private
- */
-interface ProposalsResult {
-    commit?: Buffer;
-    welcome?: Buffer;
-}
-
-/**
- * @author SNIPPIK
  * @description Результат перехода
  * @interface TransitionResult
  * @private
@@ -487,26 +348,3 @@ interface TransitionResult {
     success: boolean;
     transition_id: number;
 }
-
-/**
- * @author SNIPPIK
- * @description Делаем проверку на наличие FFmpeg
- */
-(async () => {
-    const names = ["@snazzah/davey"];
-
-    // Делаем проверку всех доступных библиотек
-    for (const name of names) {
-        try {
-            const library = await import(name);
-            delete require.cache[require.resolve(name)];
-
-            MAX_E2EE_PROTOCOL = library?.DAVE_PROTOCOL_VERSION as number;
-            loaded_lib = library;
-            return;
-        } catch {}
-    }
-
-    // Выдаем предупреждение если нет библиотеки dave
-    Logger.log("WARN", `[DAVE]: has not found library: @snazzah/davey`);
-})();

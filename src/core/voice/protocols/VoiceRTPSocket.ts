@@ -7,7 +7,7 @@ import crypto from "node:crypto";
  * @const TIMESTAMP_INC
  * @private
  */
-const TIMESTAMP_INC = 48_000 * (OPUS_FRAME_SIZE / 1e3);
+const TIMESTAMP_INC = Math.round(48000 * (OPUS_FRAME_SIZE / 1000));
 
 /**
  * @author SNIPPIK
@@ -15,15 +15,7 @@ const TIMESTAMP_INC = 48_000 * (OPUS_FRAME_SIZE / 1e3);
  * @const MAX_16BIT
  * @private
  */
-const MAX_16BIT = 2 ** 16;
-
-/**
- * @author SNIPPIK
- * @description Максимальное значение int 32
- * @const MAX_32BIT
- * @private
- */
-const MAX_32BIT = 2 ** 32;
+const MAX_16BIT = 0xFFFF;
 
 /**
  * @author SNIPPIK
@@ -32,14 +24,8 @@ const MAX_32BIT = 2 ** 32;
  * @public
  */
 export class VoiceRTPSocket {
-    /** Пустой заголовок RTP, для использования внутри класса */
-    private head = Buffer.allocUnsafe(12);
-
-    /** Пустой буфер */
-    private _nonceBuffer: Buffer = Buffer.alloc(12);
-
     /** Порядковый номер пустого буфера */
-    public _nonce : number;
+    public counter : number;
 
     /** Последовательность opus фреймов */
     private sequence: number;
@@ -62,12 +48,15 @@ export class VoiceRTPSocket {
      * @public
      */
     public get nonce() {
-        if (this._nonce >= MAX_32BIT) this._nonce = 0;
+        const nonce = Buffer.allocUnsafe(12);
 
-        this._nonceBuffer.writeUInt32BE(this._nonce, 0);
-        this._nonce++;
+        nonce.writeUInt32BE(this.counter >>> 0, 0);
+        nonce.fill(0, 4);
 
-        return this._nonceBuffer;
+        const tail = nonce.subarray(0, 4);
+        this.counter = (this.counter + 1) >>> 0;
+
+        return { nonce, tail };
     };
 
     /**
@@ -76,24 +65,28 @@ export class VoiceRTPSocket {
      * @private
      */
     private get header() {
-        if (this.sequence >= MAX_16BIT) this.sequence = 0;   // Проверяем что-бы не было превышения int 16
-        if (this.timestamp >= MAX_32BIT) this.timestamp = 0; // Проверяем что-бы не было превышения int 32
+        const header = Buffer.allocUnsafe(12);
 
-        // Получаем текущий заголовок
-        const RTPHead = this.head;
+        // Version(2) + Padding(0) + Extension(0) + CC(0)
+        header[0] = 0x80;
+
+        // Marker(0) + Payload type (120 = Opus)
+        header[1] = 0x78;
 
         // Записываем новую последовательность
-        RTPHead.writeUInt16BE(this.sequence, 2);
-        this.sequence++;
+        header.writeUInt16BE(this.sequence, 2);
 
         // Временная метка
-        RTPHead.writeUInt32BE(this.timestamp, 4);
-        this.timestamp += TIMESTAMP_INC;
+        header.writeUInt32BE(this.timestamp, 4);
 
         // SSRC
-        RTPHead.writeUInt32BE(this.options.ssrc, 8);
+        header.writeUInt32BE(this.options.ssrc, 8);
 
-        return RTPHead;
+        // Increment counters (with wrap)
+        this.sequence = (this.sequence + 1) & MAX_16BIT;
+        this.timestamp = (this.timestamp + TIMESTAMP_INC) >>> 0;
+
+        return header;
     };
 
     /**
@@ -104,10 +97,7 @@ export class VoiceRTPSocket {
     public constructor(private options: EncryptorOptions) {
         this.sequence = randomNBit(16);
         this.timestamp = randomNBit(32);
-        this._nonce = randomNBit(32);
-
-        // Version + Flags, Payload Type 120 (Opus)
-        [this.head[0], this.head[1]] = [0x80, 0x78];
+        this.counter = randomNBit(32);
     };
 
     /**
@@ -117,19 +107,33 @@ export class VoiceRTPSocket {
      * @public
      */
     public packet = (frame: Buffer) => {
-        const head = this.header;
-        const nonce = this.nonce;
-        const key = this.options.key;
+        const header = this.header;
+        const { nonce, tail } = this.nonce;
 
-        // Получаем первые 4 байта из буфера
-        const nonceBuffer = nonce.subarray(0, 4);
-        const cipher = crypto.createCipheriv("aes-256-gcm", key, nonce);
+        const cipher = crypto.createCipheriv(
+            "aes-256-gcm",
+            this.options.key,
+            nonce
+        );
 
-        // !! ВАЖНО !!: Устанавливаем заголовок RTP (head) как AAD (Associated Data).
-        // Это гарантирует, что RTP-заголовок будет аутентифицирован (защищен от подделки),
-        // но не зашифрован, что соответствует SRTP.
-        cipher.setAAD(head);
-        return Buffer.concat([head, cipher.update(frame), cipher.final(), cipher.getAuthTag(), nonceBuffer]);
+        // Устанавливаем заголовок RTP (head) как AAD (Associated Data).
+        cipher.setAAD(header);
+
+        const encrypted = Buffer.concat([
+            cipher.update(frame),
+            cipher.final()
+        ]);
+
+        const tag = cipher.getAuthTag();
+
+        // Layout:
+        // [RTP header][ciphertext][auth tag][nonce(4 bytes)]
+        return Buffer.concat([
+            header,
+            encrypted,
+            tag,
+            tail
+        ]);
     };
 
     /**
@@ -138,12 +142,10 @@ export class VoiceRTPSocket {
      * @public
      */
     public destroy = () => {
-        this._nonce = null;
         this.timestamp = null;
         this.sequence = null;
         this.options = null;
-        this._nonceBuffer = null;
-        this.head = null;
+        this.counter = null;
     };
 }
 
@@ -155,7 +157,9 @@ export class VoiceRTPSocket {
  * @private
  */
 function randomNBit(bits: number){
-    return crypto.randomInt(0, 1 << bits);
+    const bytes = Math.ceil(bits / 8);
+    const buf = crypto.randomBytes(bytes);
+    return buf.readUIntBE(0, bytes);
 }
 
 /**

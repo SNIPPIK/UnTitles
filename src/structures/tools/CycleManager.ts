@@ -9,17 +9,11 @@ import { SetArray } from "#structures/array";
  * @private
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Последний сохраненный временной интервал */
-    private lastDelay: number = 0;
-
     /** Следующее запланированное время запуска (в ms, с плавающей точкой) */
     private startTime: number = 0;
 
     /** Время для высчитывания */
     private tickTime: number = 0;
-
-    /** Таймер или функция ожидания */
-    private timeout: NodeJS.Timeout | NodeJS.Immediate;
 
     /**
      * @description Время циклической системы изнутри
@@ -41,29 +35,19 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     };
 
     /**
-     * @description Последний зафиксированный промежуток выполнения
-     * @returns number
-     * @public
-     */
-    public get delay(): number {
-        return this.lastDelay;
-    };
-
-    /**
      * @description Высчитываем задержку шага
      * @param duration - Истинное время шага
      * @private
      */
     private set delay(duration: number) {
-        // Ожидаемое время следующего запуска (без учета _driftStep/lag)
+        /*// Ожидаемое время следующего запуска (без учета _driftStep/lag)
         const expectedNext = this.startTime + this.tickTime + duration;
         const now = this.time;
         const missed = Math.floor((now - expectedNext) / duration);
         const steps = Math.max(1, missed + 1);
 
-        const correction = Math.floor(steps * duration);
-        this.tickTime += correction;
-        this.lastDelay = correction;
+        const correction = Math.floor(steps * duration);*/
+        this.tickTime += duration;
     };
 
     /**
@@ -108,9 +92,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
             super.delete(item);
         }
 
-        // Если нет больше объектов
-        if (this.size === 0) this.reset();
-
         return true;
     };
 
@@ -131,10 +112,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     private reboot = () => {
         this.startTime = 0;
         this.tickTime = 0;
-        this.lastDelay = 0;
-
-        // Если есть таймер
-        if (this.timeout) this._clearTimeout();
     };
 
     /**
@@ -143,22 +120,22 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     private _runTimeout = (): void => {
+        // Если нет больше объектов
+        if (this.size === 0) this.reset();
+
         // === STEP ===
-        this.delay = this.step();
-
+        const duration = this.delay = this.step();
         const delay = Math.max(0, this.insideTime - this.time);
-        setTimeout(this._runTimeout, delay);
-    };
 
-    /**
-     * @description Удаляем таймер или Immediate
-     * @protected
-     */
-    protected _clearTimeout = () => {
-        if (!this.timeout) return;
-        if ('hasRef' in this.timeout) clearTimeout(this.timeout as NodeJS.Timeout);
-        else clearImmediate(this.timeout as NodeJS.Immediate);
-        this.timeout = null;
+        // Если delay слишком мал
+        if (delay <= 0) {
+            process.nextTick(this.step);
+            // Переходим к следующему шагу в следующем тике
+            setTimeout(this._runTimeout, duration);
+            return;
+        }
+
+        setTimeout(this._runTimeout, delay);
     };
 
     /**

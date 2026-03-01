@@ -1,8 +1,8 @@
-import type {CycleInteraction, MessageComponent} from "#structures/discord";
-import {Logger, TaskCycle} from "#structures";
-import {OPUS_FRAME_SIZE} from "#core/audio";
-import {AudioPlayer} from "#core/player";
-import {db} from "#app/db";
+import type { CycleInteraction, MessageComponent } from "#structures/discord";
+import { Logger, TaskCycle } from "#structures";
+import { OPUS_FRAME_SIZE } from "#core/audio";
+import { AudioPlayer } from "#core/player";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -30,12 +30,23 @@ export class ControllerCycles {
 
 /**
  * @author SNIPPIK
+ * @description Время шага и время аудио пакетов для отправки в низкоуровневую систему
+ * @const PLAYER_SEND_NATIVE
+ * @private
+ */
+const PLAYER_SEND_NATIVE = OPUS_FRAME_SIZE * 30;
+
+/**
+ * @author SNIPPIK
  * @description Циклическая система плееров, используется для отправки аудио пакетов
  * @class AudioPlayers
  * @extends TaskCycle
  * @private
  */
 class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
+    private _lastAdjust = 0;
+    private _targetDuration = PLAYER_SEND_NATIVE;
+
     /**
      * @description Запускаем циклическую систему плееров, весь логический функционал здесь
      * @constructor
@@ -44,14 +55,33 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
     public constructor() {
         super({
             // Время до следующего прогона цикла
-            duration: OPUS_FRAME_SIZE * 5,
+            duration: PLAYER_SEND_NATIVE,
 
             // Кастомные функции (если хочется немного изменить логику выполнения)
             custom: {
                 step: () => {
                     const now = this.time;
                     const drift = Math.abs(now - this.insideTime);
-                    this.options.duration = (Math.ceil(drift / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE) + OPUS_FRAME_SIZE;
+
+                    let frames = PLAYER_SEND_NATIVE;
+
+                    // только вверх по 20 ms
+                    if (drift > PLAYER_SEND_NATIVE) {
+                        frames = drift + PLAYER_SEND_NATIVE;
+                    }
+
+                    // === Округление по шагу 20ms ===
+                    let quantized = Math.ceil(frames / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE;
+                    if (quantized < PLAYER_SEND_NATIVE) quantized = PLAYER_SEND_NATIVE;
+                    this._targetDuration = quantized;
+
+                    // === Плавная коррекция duration ===
+                    if (now - this._lastAdjust >= OPUS_FRAME_SIZE) {
+                        if (this.options.duration < this._targetDuration) this.options.duration = Math.min(this.options.duration + OPUS_FRAME_SIZE, this._targetDuration);
+                        else if (this.options.duration > this._targetDuration) this.options.duration = Math.max(this.options.duration - OPUS_FRAME_SIZE, this._targetDuration);
+
+                        this._lastAdjust = now;
+                    }
                 }
             },
 
@@ -66,14 +96,17 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 // Отправляем пакет/ы в голосовой канал
                 for (let i = 0; i < size; i++) {
                     const audio = player.audio.current;
-                    const packet = audio.packet;
 
-                    if (packet) player.voice.connection.packet(packet);
-                    else {
-                        // Если поток не читается, переходим в состояние ожидания
-                        if (!audio || !audio.readable || audio.packets === 0) {
-                            player.status = "player/wait";
-                            player.cycle = false;
+                    if (audio) {
+                        const packet = audio.packet;
+
+                        if (packet) player.voice.connection.packet(packet);
+                        else {
+                            // Если поток не читается, переходим в состояние ожидания
+                            if (!audio || !audio.readable || audio.packets === 0) {
+                                player.status = "player/wait";
+                                player.cycle = false;
+                            }
                         }
                     }
                 }
@@ -105,7 +138,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
  * @const MESSAGE_RESEND_TIME
  * @private
  */
-const MESSAGE_RESEND_TIME = 60e3 * 10;
+const MESSAGE_RESEND_TIME = 60e3 * 5;
 
 /**
  * @author SNIPPIK
@@ -149,7 +182,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
             },
 
             // Функция проверки
-            filter: (message) => message.createdTimestamp + 5e3 < Date.now() && message.timestamp + 5e3 < Date.now(),
+            filter: (message) => !!message.edit,
 
             // Функция обновления сообщения
             execute: (message) => {
@@ -180,6 +213,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
     public update = (message: T, component: MessageComponent) => {
         try {
             if (message.createdTimestamp) message.edit({ components: component, embeds: null }).catch(console.error);
+            else message.write({ components: component, embeds: null }).catch(console.error);
         } catch (error) {
             Logger.log("ERROR", `Failed to edit message in cycle\n${error instanceof Error ? error.stack : error}`);
 
