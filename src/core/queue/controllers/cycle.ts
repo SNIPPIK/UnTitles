@@ -1,7 +1,7 @@
 import type { CycleInteraction, MessageComponent } from "#structures/discord";
+import { AudioPlayer, AudioPlayerState } from "#core/player";
 import { Logger, TaskCycle } from "#structures";
 import { OPUS_FRAME_SIZE } from "#core/audio";
-import { AudioPlayer } from "#core/player";
 import { db } from "#app/db";
 
 /**
@@ -76,7 +76,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                     this._targetDuration = quantized;
 
                     // === Плавная коррекция duration ===
-                    if (now - this._lastAdjust >= OPUS_FRAME_SIZE) {
+                    if (now - this._lastAdjust >= PLAYER_SEND_NATIVE) {
                         if (this.options.duration < this._targetDuration) this.options.duration = Math.min(this.options.duration + OPUS_FRAME_SIZE, this._targetDuration);
                         else if (this.options.duration > this._targetDuration) this.options.duration = Math.max(this.options.duration - OPUS_FRAME_SIZE, this._targetDuration);
 
@@ -104,7 +104,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                         else {
                             // Если поток не читается, переходим в состояние ожидания
                             if (!audio || !audio.readable || audio.packets === 0) {
-                                player.status = "player/wait";
+                                player.status = AudioPlayerState.idle;
                                 player.cycle = false;
                             }
                         }
@@ -212,8 +212,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
      */
     public update = (message: T, component: MessageComponent) => {
         try {
-            if (message.createdTimestamp) message.edit({ components: component, embeds: null }).catch(console.error);
-            else message.write({ components: component, embeds: null }).catch(console.error);
+            message.edit({ components: component, embeds: null }).catch(console.error);
         } catch (error) {
             Logger.log("ERROR", `Failed to edit message in cycle\n${error instanceof Error ? error.stack : error}`);
 

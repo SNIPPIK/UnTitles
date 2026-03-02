@@ -92,7 +92,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     public set status(status) {
         if (status !== this._status) {
             this.emit("log", `[Voice/Status]: ${this._status} --> ${status}`);
-            this._status = status;
 
             // Подключаемся к голосовому каналу
             if (status === ConnectionStatus.connecting) {
@@ -111,12 +110,14 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             }
 
             // Если производится попытка переподключения
-            if (status === ConnectionStatus.reconnecting) {
+            if (this._status === ConnectionStatus.disconnected && status === ConnectionStatus.reconnecting) {
                 setTimeout(() => {
                     this.websocket?.emit("debug", `[WS]`, `Voice Connection reconstruct ws... 100 ms`);
                     this.createWebSocket(this.stateServer.endpoint);
                 }, 100);
             }
+
+            this._status = status;
         }
     };
 
@@ -150,6 +151,14 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Финальная проверка UDP, WebSocket
         return this.websocket.status === "connected" && this.udp.status === "connected" && !!this.sRTP;
+    };
+
+    /**
+     * @description Защищено ли голосовое подключение dave протоколом
+     * @public
+     */
+    public get secure(): boolean {
+        return this.e2EE?.lastTransition_id > 0;
     };
 
     /**
@@ -263,11 +272,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             else {
                 // Логика DAVE (MLS)
                 const encrypted = this.e2EE?.encrypt(frame);
-                payload = this.sRTP!.packet(encrypted);
+                payload = this.sRTP?.packet(encrypted);
             }
 
             // Прямая отправка в сокет
-            this.udp!.packet(payload);
+            this.udp?.packet(payload);
             this.speaker.speaking = this.speaker.default;
         } catch (err) {
             this.emit("log", `[Voice Packet Error]: ${err}`);
@@ -645,6 +654,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         if (this._status === ConnectionStatus.disconnected) return;
         this.status = ConnectionStatus.disconnected;
+
+        this.speaker.destroy();
 
         // Закрываем сетевые соединения
         this.websocket?.destroy(); // Мягкое закрытие

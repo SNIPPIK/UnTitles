@@ -126,17 +126,14 @@ export class RestObject {
                     }
 
                     // Сбрасываем уникальный id запроса
-                    this.generateUniqueId();
+                    this.lastID = 0;
                     return resolve(true);
                 }
             });
 
             // Если возникнет ошибка, пересоздадим worker
             worker.once("error", (error) => {
-                if (this.lastID >= 5) throw error;
-                else console.log(error);
-
-                this.lastID++;
+                console.log(error);
                 return this.startWorker();
             });
 
@@ -150,10 +147,10 @@ export class RestObject {
 
                 // Сразу чистим таймер и удаляем из карты
                 clearTimeout(request.timeout);
-                this.pending.delete(requestId);
 
                 // Обработка результата
                 request.resolve(message);
+                this.pending.delete(requestId);
             });
         });
     };

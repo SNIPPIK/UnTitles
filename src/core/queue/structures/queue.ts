@@ -9,16 +9,24 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
- * @description Класс для управления и хранения плеера
- * @class ControllerPlayer
- * @private
+ * @description Класс очереди для управления всей системой, бесконтрольное использование ведет к поломке всего процесса!!!
+ * @class Queue
+ * @public
  */
-class ControllerPlayer<T extends AudioPlayer> {
+export class Queue {
+    /**
+     * @description Время создания очереди
+     * @public
+     */
+    public timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
+
+
     /**
      * @description Текущий экземпляр плеера
      * @protected
      */
-    protected _player: T;
+    protected _player: AudioPlayer;
+
 
     /**
      * @description Хранилище треков, с умной системой управления
@@ -26,76 +34,13 @@ class ControllerPlayer<T extends AudioPlayer> {
      */
     public tracks = new ControllerTracks<Track>();
 
+
     /**
      * @description Голосовое подключение
      * @public
      */
     public voice = new ControllerVoice<VoiceConnection>();
 
-    /**
-     * @description Выдаем плеер привязанный к очереди
-     * @return AudioPlayer
-     * @public
-     */
-    public get player() {
-        // Если плеер уже не доступен
-        if (!this._player) return null;
-        return this._player;
-    };
-
-    /**
-     * @description Создаем класс для управления плеером и составными для проигрывания
-     * @constructor
-     * @public
-     */
-    public constructor({guild_id, channel_id}: initPlayerOptions) {
-        const oldPlayer = this._player;
-
-        // Если есть старый плеер
-        if (oldPlayer) oldPlayer.destroy();
-
-        // Задаем новый плеер
-        this._player = new AudioPlayer(this.tracks, this.voice, guild_id) as T;
-
-        // Подключаемся к голосовому каналу
-        const voice = db.voice.join({
-            guild_id, channel_id,
-            self_deaf: true,
-            self_mute: false,
-            self_speaker: SpeakerType.priority
-        }, db.adapter.voiceAdapterCreator(guild_id));
-
-        this.voice.connection = voice;
-        voice.on("log", status => Logger.log("LOG", status));
-    };
-
-    /**
-     * @description Удаляем данные плеера и подмодулей
-     * @public
-     */
-    public destroy() {
-        // Удаляем плеер
-        this._player.destroy();
-        this.tracks.clear();
-
-        this.tracks = null;
-        this.voice = null;
-        this._player = null;
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Класс очереди для управления всей системой, бесконтрольное использование ведет к поломке всего процесса!!!
- * @class Queue
- * @public
- */
-export class Queue extends ControllerPlayer<AudioPlayer> {
-    /**
-     * @description Время создания очереди
-     * @public
-     */
-    public timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
 
     /**
      * @description Сообщение пользователя
@@ -103,11 +48,13 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
      */
     protected _message: QueueMessage<CommandInteraction>;
 
+
     /**
      * @description Создаем класс для отображения фильтров
      * @protected
      */
     protected _buttons: QueueButtons;
+
 
     /**
      * @description Записываем сообщение в базу для дальнейшего использования
@@ -142,6 +89,40 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
     };
 
     /**
+     * @description Задаем плеер
+     * @param player - плеер
+     * @public
+     */
+    public set player(player) {
+        const oldPlayer = this._player;
+
+        // Если есть старый плеер
+        if (oldPlayer) oldPlayer.destroy();
+
+        // Задаем новый плеер
+        this._player = player;
+    };
+
+    /**
+     * @description Подключаемся к голосовому каналу и задаем подключение
+     * @param msg - Сообщение от пользователя
+     * @private
+     */
+    public set joinVoice(msg: QueueMessage<CommandInteraction>) {
+        const {guild_id, channel_id} = msg;
+
+        // Подключаемся к голосовому каналу
+        const voice = this.voice.connection = db.voice.join({
+            guild_id, channel_id,
+            self_deaf: true,
+            self_mute: false,
+            self_speaker: SpeakerType.priority
+        }, db.adapter.voiceAdapterCreator(guild_id));
+
+        voice.on("log", (det) => Logger.log("DEBUG", det));
+    };
+
+    /**
      * @description Создаем очередь для дальнейшей работы, все подключение находятся здесь
      * @param message - Опции для создания очереди
      * @constructor
@@ -149,13 +130,13 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
      */
     public constructor(message: CommandInteraction) {
         const queue_message = new QueueMessage(message);
-        const ID = queue_message.guild_id;
+        const {guild_id} = queue_message;
+
+        // Подключаемся к гс
+        this.joinVoice = queue_message;
 
         // Задаем плеер
-        super({
-            guild_id: ID,
-            channel_id: queue_message.voice_id
-        });
+        this.player = new AudioPlayer(this.tracks, this.voice, guild_id);
 
         // Добавляем данные в класс
         this.message = queue_message;
@@ -163,7 +144,7 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
         // Создаем класс для отображения кнопок
         this._buttons = new QueueButtons(queue_message);
 
-        Logger.log("LOG", `[Queue/${ID}] has create`);
+        Logger.log("LOG", `[Queue/${guild_id}] has create`);
     };
 
     /**
@@ -179,7 +160,7 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
         const buttons = this._buttons?.component(player);
 
         try {
-            const e2eeStatus = player.voice.connection?.e2EE?.lastTransition_id > 0 ? "🔓" : "🔐";
+            const e2eeStatus = player.voice.connection.secure ? "🔓" : "🔐";
 
             const { api, artist, name, image, user, url } = tracks.track;
             const textTracks = tracks.total > 1 ? `| ${tracks.position + 1}/${tracks.total} | ${tracks.time}` : "";
@@ -258,7 +239,8 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
         this._buttons.destroy();
         this._buttons = null;
 
-        super.destroy();
+        // Удаляем плеер
+        this._player.destroy();
     };
 }
 
@@ -271,15 +253,4 @@ export class Queue extends ControllerPlayer<AudioPlayer> {
 function getVolumeIndicator(volume: number): string {
     const clamped = Math.max(0, Math.min(volume, 200));
     return `${clamped}%`.padStart(4, " ");
-}
-
-/**
- * @author SNIPPIK
- * @description Данные для запуска плеера
- * @interface initPlayerOptions
- * @private
- */
-interface initPlayerOptions {
-    guild_id: string;
-    channel_id: string;
 }

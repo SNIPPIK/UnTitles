@@ -17,7 +17,7 @@ export default class extends ComponentCommand {
         const position = queue.tracks.position + 1;
 
         // Если позиция больше чем есть треков
-        if (position > queue.tracks.total) {
+        if (position >= queue.tracks.total) {
             // Переключаем на 0 позицию
             queue.tracks.position = 0;
 

@@ -40,14 +40,13 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @private
      */
     private set delay(duration: number) {
-        /*// Ожидаемое время следующего запуска (без учета _driftStep/lag)
+        // Ожидаемое время следующего запуска (без учета _driftStep/lag)
         const expectedNext = this.startTime + this.tickTime + duration;
         const now = this.time;
-        const missed = Math.floor((now - expectedNext) / duration);
-        const steps = Math.max(1, missed + 1);
-
-        const correction = Math.floor(steps * duration);*/
-        this.tickTime += duration;
+        const missed = (now - expectedNext) / duration;
+        const steps = Math.max(1, missed);
+        const correction = Math.max(steps * duration, duration);
+        this.tickTime += correction;
     };
 
     /**
@@ -129,12 +128,10 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
         // Если delay слишком мал
         if (delay <= 0) {
-            process.nextTick(() => {
-                this.step();
+            process.nextTick(this.step);
 
-                // Переходим к следующему шагу в следующем тике
-                setTimeout(this._runTimeout, duration);
-            });
+            // Переходим к следующему шагу в следующем тике
+            setTimeout(this._runTimeout, duration);
             return;
         }
 

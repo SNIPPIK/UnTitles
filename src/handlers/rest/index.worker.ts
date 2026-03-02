@@ -125,14 +125,18 @@ if (parentPort && workerData.rest) {
 
         parentPort.postMessage({
             status: "error",
-            requestId: undefined,
+            requestId: message.requestId,
             result: Error("Dont support this request")
         });
     });
 
     // Если возникнет непредвиденная ошибка
     process.on("unhandledRejection", (err) => {
-        parentPort?.postMessage({ status: "error", result: err });
+        parentPort?.postMessage({
+            requestId: undefined,
+            status: "error",
+            result: err
+        });
     });
 }
 
@@ -171,14 +175,16 @@ async function fetchFromPlatform(api: RestServerSide.ServerOptions) {
 
         // Если была получена ошибка
         if (result instanceof Error) {
-            return parentPort.postMessage({ requestId,
+            return parentPort.postMessage({
+                requestId,
                 status: "error",
                 result
             });
         }
 
         // Если запрос успешен
-        return parentPort.postMessage({ requestId,
+        return parentPort.postMessage({
+            requestId,
             type: callback.name,
             status: "success",
             result

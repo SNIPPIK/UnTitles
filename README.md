@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🌟 Discord Music Bot</h1>
+  <h1>🌟 Discord Music Bot 💫</h1>
 
 <h4>Incredible bot with its own voice/audio engine, scalable architecture, multiple filters and support for 6 music platforms.</h4>
 <h4>Audio quality surpasses lavalink, don't believe me? Listen for yourself!</h4>
@@ -66,8 +66,9 @@
 ### ⚠️ Hardware Requirements | Data from Ryzen 7 5700x3D | 1 player
 - CPU: 0-0.3%
 - RAM: ~80 MB, depends on the number of tracks, platform load, and Discord cache!
-- Disk: ~50 MB, 200 GB is enough for caching (1.5k tracks ~1.2 GB)
-
+- 
+#### Round-robin system
+- Binding strictly to one shard to reduce CPU load; one shard can handle up to 1,000 servers
 ---
 
 ### 🚀 Features of the engine (UnTitled)
@@ -143,26 +144,22 @@ setInterval(() => {
 |  `/voice` | ✅            | (join, leave, tribune)       | Voice channel     |
 
 ---
-## 🚀 Quick Start
-> Node.js is required, as well as FFmpeg installed.  
-> All parameters are specified in `.env`
-
-
-> [!WARNING]
-> The project uses Rust, if your platform does not have an auto build, you will have to assemble it yourself!  
-> Ready-made builds [here] (https://github.com/SNIPPIK/UnTitles/actions/workflows/build.yml)
+## 🚀 Launch
+- Node.js, FFmpeg, and Rust required
+- No need to build Rust components! Ready-to-use builds [here](https://github.com/SNIPPIK/UnTitles/actions/workflows/build.yml)
+> All parameters should already be in `.env.custom`, so take it and rename it to .env
 ```shell
-# Cloning
+# Clone
 git clone https://github.com/SNIPPIK/UnTitles
 cd UnTitles
 
-# Installing dependencies
-npm install
+# Install dependencies
+npm i
 
-# If you need to collect rust components
+# If you need to build Rust components
 npm run build:native
 
-# Build Typescript + settings
+# Build Typescript + settings + start
 npm run build && npm run configure && npm run start
 ```
 

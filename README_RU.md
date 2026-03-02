@@ -67,8 +67,9 @@
 ### ⚠️ Требования к железу | Данные с Ryzen 7 5700x3D | 1 плеер
 - CPU: 0-0.3%
 - RAM: `~80 MB`, все зависит от кол-ва треков, нагрузки на платформы, кеша discord!
-- Disk: `~50 MB`, для кеширования хватает `200 GB` (1.5к треков ~1.2 GB)
 
+#### Циклическая система
+- Привязка строго к 1 шарду, для уменьшения нагрузки на CPU, 1 шард может тянуть за собой до 1к серверов
 ---
 
 ### 🚀 Особенности движка (UnTitles)
@@ -144,26 +145,22 @@ setInterval(() => {
 |  `/voice` | ✅            | (join, leave, tribune)          | Голосовой канал          |
 
 ---
-## 🚀 Быстрый старт
-> Необходим Node.js, а также установленный FFmpeg  
-> Все параметры прописаны в `.env`
-
-
-> [!WARNING]
-> В проекте используется Rust, если на вашу платформу нет авто сборки придется самостоятельно собрать!   
-> Готовые сборки [тут](https://github.com/SNIPPIK/UnTitles/actions/workflows/build.yml)
+## 🚀 Запуск
+- Необходим Node.js, FFmpeg, Rust
+- Можно не собирать rust компоненты! Готовые сборки [тут](https://github.com/SNIPPIK/UnTitles/actions/workflows/build.yml)
+> Все параметры уже должны быть прописаны в `.env.custom`, берем и переименовываем в .env
 ```shell
 # Клонируем
 git clone https://github.com/SNIPPIK/UnTitles
 cd UnTitles
 
 # Установка зависимостей
-npm install
+npm i
 
 # Если надо собрать rust компоненты
 npm run build:native
 
-# Сборка Typescript + настройки
+# Сборка Typescript + настройки + запуск
 npm run build && npm run configure && npm run start
 ```
 

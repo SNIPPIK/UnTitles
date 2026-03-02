@@ -39,35 +39,15 @@ impl UdpBufferedInner {
     /// Попытка отправки одного пакета; при WouldBlock возвращает пакет в начало
     pub fn tick(&self) {
         if let Ok(mut buf) = self.buffer.try_lock() {
-            // максимум 2 попытки за тик
-            for attempt in 0..2 {
-                let data = match buf.pop_front() {
-                    Some(d) => d,
-                    None => break,
-                };
-
-                let is_small = data.len() < 5;
-
+            if let Some(data) = buf.pop_front() {
                 match self.socket.send(&data) {
-                    Ok(_) => {
-                        // если это вторая попытка — выходим
-                        if attempt == 1 {
-                            break;
-                        }
-
-                        // если пакет не маленький — не делаем вторую отправку
-                        if !is_small {
-                            break;
-                        }
-                    }
+                    Ok(_) => {}
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        buf.push_front(data);
+                        buf.push_front(data); // повторная попытка
                         self.send_drops.fetch_add(1, Ordering::Relaxed);
-                        break; // сокет забит — дальше смысла нет
                     }
                     Err(_) => {
                         self.send_drops.fetch_add(1, Ordering::Relaxed);
-                        break;
                     }
                 }
             }
