@@ -14,16 +14,16 @@ jobs:
         settings:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            build: napi build --release --platform --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
           - host: windows-latest
             target: x86_64-pc-windows-msvc
-            build: napi build --release --platform --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: napi build --release --platform --zig --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
-            build: napi build --release --platform --zig --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
 
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
