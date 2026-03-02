@@ -59,8 +59,7 @@ jobs:
         with:
           name: bindings-${{ matrix.settings.target }}
           path: |
-            *.node
-            src-rs/*.node
-            index.js
-            *.ts
+            **/*.js
+            **/*.ts
+            **/*.node
           if-no-files-found: error
