@@ -90,25 +90,26 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
 
             // Функция отправки аудио фрейма
             execute: (player) => {
-                // Количество фреймов в текущей итерации
-                let size = this.options.duration / OPUS_FRAME_SIZE;
+                const audio = player.audio.current;
+                if (!audio) return;
 
-                // Отправляем пакет/ы в голосовой канал
-                for (let i = 0; i < size; i++) {
-                    const audio = player.audio.current;
+                const frames = this.options.duration / OPUS_FRAME_SIZE;
+                const udpPackets = player.voice.connection?.udp?.packets ?? 0;
+                const deficit = Math.max(frames - udpPackets, 0);
+                const total = frames + deficit;
 
-                    if (audio) {
-                        const packet = audio.packet;
+                for (let i = 0; i < total; i++) {
+                    const packet = audio.packet;
 
-                        if (packet) player.voice.connection.packet(packet);
-                        else {
-                            // Если поток не читается, переходим в состояние ожидания
-                            if (!audio || !audio.readable || audio.packets === 0) {
-                                player.status = AudioPlayerState.idle;
-                                player.cycle = false;
-                            }
+                    if (!packet) {
+                        if (!audio.readable || audio.packets === 0) {
+                            player.status = AudioPlayerState.idle;
+                            player.cycle = false;
                         }
+                        return;
                     }
+
+                    player.voice.connection.packet(packet);
                 }
             }
         });
@@ -150,6 +151,14 @@ const MESSAGE_UPDATE_TIME = 1e3 * 10;
 
 /**
  * @author SNIPPIK
+ * @description Время через которое можно обновлять сообщение
+ * @const MESSAGE_COOLDOWN_TIME
+ * @private
+ */
+const MESSAGE_COOLDOWN_TIME = 5e3;
+
+/**
+ * @author SNIPPIK
  * @description Циклическая система сообщений, используется для сообщения о текущем треке
  * @class Messages
  * @extends TaskCycle
@@ -182,7 +191,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
             },
 
             // Функция проверки
-            filter: (message) => !!message.edit,
+            filter: (message) => !!message.edit && message.createdTimestamp + MESSAGE_COOLDOWN_TIME < Date.now() || message.timestamp + MESSAGE_COOLDOWN_TIME < Date.now(),
 
             // Функция обновления сообщения
             execute: (message) => {
@@ -212,7 +221,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
      */
     public update = (message: T, component: MessageComponent) => {
         try {
-            message.edit({ components: component, embeds: null }).catch(console.error);
+            if (message.createdTimestamp) message.edit({ components: component, embeds: null }).catch(console.error);
         } catch (error) {
             Logger.log("ERROR", `Failed to edit message in cycle\n${error instanceof Error ? error.stack : error}`);
 
@@ -231,12 +240,13 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
 
         // Если нет сообщения в цикле
         if (!message) {
-            factory()
-                .then((m) => {
-                    m.guildId = guildId;
-                    this.add(m)
-                })
-                .catch(console.error);
+            try {
+                const msg = await factory();
+                msg.guildId = guildId;
+                this.add(msg);
+            } catch (err) {
+                console.error(`TIMEOUT1: ${err}`)
+            }
 
             return null;
         }
@@ -244,12 +254,13 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
         // Если время позволяет пересоздать сообщение о проигрывании
         else if (Date.now() - message.createdTimestamp > MESSAGE_RESEND_TIME) {
             this.delete(message);
-            factory()
-                .then((m) => {
-                    m.guildId = guildId;
-                    this.add(m)
-                })
-                .catch(console.error);
+            try {
+                const msg = await factory();
+                msg.guildId = guildId;
+                this.add(msg);
+            } catch (err) {
+                console.error(`TIMEOUT2: ${err}`)
+            }
 
             return null;
         }

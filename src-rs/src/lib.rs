@@ -1,3 +1,3 @@
 mod audio;
 mod timers;
-mod net;
+mod network;

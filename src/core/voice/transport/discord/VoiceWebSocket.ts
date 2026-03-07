@@ -1,27 +1,9 @@
-import { type WebSocketOpcodes, GatewayCloseCodes } from "#core/voice";
-import { WebSocket, type MessageEvent, type Data } from "ws";
-import { VoiceOpcodes } from "discord-api-types/voice/v8";
-import { HeartbeatManager } from "../managers/heartbeat";
-import { OPUS_FRAME_SIZE } from "#core/audio";
-import { version, name } from "package.json";
-import { TypedEmitter } from "#structures";
-import os from "node:os";
-
-/**
- * @author SNIPPIK
- * @description Версия user agent для WebSocket
- * @const user_agent
- * @private
- */
-const user_agent = `Node.js (${os.arch()}; ${os.version()}) ${version}/${name}`;
-
-/**
- * @author SNIPPIK
- * @description Игнорируемые коды закрытия от discord
- * @const GatewayCloseCodesIgnore
- * @private
- */
-const GatewayCloseCodesIgnore: GatewayCloseCodes[] = [4014, 4022];
+import {VoiceCloseCodes, VoiceOpcodes} from "discord-api-types/voice/v8";
+import {type Data, type MessageEvent, WebSocket} from "ws";
+import {HeartbeatManager} from "../../managers/heartbeat";
+import {type WebSocketOpcodes} from "#core/voice";
+import {OPUS_FRAME_SIZE} from "#core/audio";
+import {TypedEmitter} from "#structures";
 
 /**
  * @author SNIPPIK
@@ -31,12 +13,6 @@ const GatewayCloseCodesIgnore: GatewayCloseCodes[] = [4014, 4022];
  * @public
  */
 export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
-    /**
-     * @description Текущий статус подключения клиента
-     * @private
-     */
-    private _status: WebSocketStatus = WebSocketStatus.idle;
-
     /**
      * @description Адрес для подключения по websocket
      * @private
@@ -78,14 +54,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     };
 
     /**
-     * @description Текущий статус клиента
-     * @public
-     */
-    public get status() {
-        return this._status;
-    };
-
-    /**
      * @description Отправляем пакет для работы discord
      * @param payload - Данные Discord Voice Opcodes
      * @public
@@ -94,21 +62,18 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         // Для отладки
         this.emit("debug", `[WebSocket/send]:`, payload);
 
-        // Если ws клиент подключен
-        if (this._status === "connected") {
-            try {
-                if (payload instanceof Buffer) this.ws.send(payload);
-                else this.ws.send(JSON.stringify(payload));
-            } catch (err) {
-                // Если ws упал
-                if (`${err}`.match(/Cannot read properties of null/)) {
-                    // Пробуем подключится заново
-                    this.connect(this._endpoint, 4000);
-                    return;
-                }
-
-                this.emit("error", err instanceof Error ? err : new Error(String(err)));
+        try {
+            if (payload instanceof Buffer) this.ws.send(payload);
+            else this.ws.send(JSON.stringify(payload));
+        } catch (err) {
+            // Если ws упал
+            if (`${err}`.match(/Cannot read properties of null/)) {
+                // Пробуем подключится заново
+                this.connect(this._endpoint, VoiceCloseCodes.UnknownOpcode);
+                return;
             }
+
+            this.emit("error", err instanceof Error ? err : new Error(String(err)));
         }
     };
 
@@ -133,8 +98,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Если не получен HEARTBEAT_ACK вовремя
             onTimeout: () => {
-                this.emit("close", 4000, "HEARTBEAT_ACK timeout");
-                this.emit("warn", "HEARTBEAT_ACK timeout, reconnecting...");
+                this.emit("close", VoiceCloseCodes.SessionTimeout, "HEARTBEAT_ACK timeout");
             },
 
             // Получен HEARTBEAT_ACK
@@ -154,13 +118,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @returns void
      * @public
      */
-    public connect = (endpoint: string, code?: GatewayCloseCodes): void => {
-        // Если ws уже подключается заново
-        if (this._status === WebSocketStatus.connecting) return;
-
-        // Меняем статус на подключение
-        this._status = WebSocketStatus.connecting;
-
+    public connect = (endpoint: string, code?: VoiceCloseCodes): void => {
         // Если ws клиент уже есть
         if (this.ws) {
             if (code) this.emit("warn", `[WebSocket/${code}] has reset connection`);
@@ -170,37 +128,27 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         this._endpoint = endpoint;
-        this.ws = new WebSocket(`wss://${endpoint}?v=8`, {
-            headers: {
-                "user-agent": user_agent
-            }
-        });
+        this.ws = new WebSocket(`wss://${endpoint}?v=8`);
 
         // Сообщение от websocket соединения
         this.ws.onmessage = this.onReceiveMessage;
 
         // Запуск websocket соединения
         this.ws.onopen = () => {
-            // Меняем статус на подключен
-            this._status = WebSocketStatus.connected;
             this.emit("open");
-
             this.emit("warn", `[WebSocket] has open connection`);
         };
 
         // Закрытие websocket соединения
-        this.ws.onclose = (ev) => {
-            // Меняем статус на отключен
-            this._status = WebSocketStatus.closed;
-            this.onReceiveClose(ev.code, ev.reason);
+        this.ws.onclose = (reason) => {
+            this.emit("warn", `[WebSocket/close]: ${code} - ${reason}`);
 
-            this.emit("warn", `[WebSocket] has close connection`);
+            // Отправляем данные в TypedEmitter
+            this.emit("close", code, reason.reason);
         };
 
         // Ошибка websocket соединения
         this.ws.onerror = ({error}) => {
-            // Меняем статус на переподключение
-            this._status = WebSocketStatus.reconnecting;
             this.emit("warn", error);
 
             // Если ws уже разорвал соединение
@@ -217,7 +165,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Discord сам разорвал соединение из-за проблем
             else if (`${error}`.match(/Unexpected server response: 503/)) {
-                this.emit("close", 503, "Unexpected server response: 503");
+                this.emit("close", VoiceCloseCodes.ServerNotFound, "Unexpected server response: 503");
                 return;
             }
 
@@ -346,23 +294,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     };
 
     /**
-     * @description Принимаем сообщение со стороны websocket
-     * @param code - Код закрытия
-     * @param reason - Причина закрытия
-     * @returns void
-     * @private
-     */
-    private onReceiveClose = (code: GatewayCloseCodes, reason: string) => {
-        this.emit("warn", `[WebSocket/close]: ${code} - ${reason}`);
-
-        // Если получен игнорируемый код
-        if (GatewayCloseCodesIgnore.includes(code)) return;
-
-        // Отправляем данные в TypedEmitter
-        this.emit("close", code, reason);
-    };
-
-    /**
      * @description Отключение текущего websocket подключения
      * @returns void
      * @public
@@ -396,7 +327,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         super.destroy();
         this.sequence = null;
         this._endpoint = null;
-        this._status = null;
 
         if (this._heartbeat) {
             this._heartbeat.destroy();
@@ -405,28 +335,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         this._latency = null;
     };
-}
-
-/**
- * @author SNIPPIK
- * @description Статусы для работы класса ClientWebSocket
- * @enum WebSocketStatus
- */
-enum WebSocketStatus {
-    /** Если клиент подключается заново  */
-    reconnecting = "reconnecting",
-
-    /** Если клиент подключается */
-    connecting = "connecting",
-
-    /** Если клиент подключен к серверу */
-    connected = "connected",
-
-    /** Если клиент закрыл соединение */
-    closed = "closed",
-
-    /** Если клиент просто ожидает дальнейших действий */
-    idle = "idle"
 }
 
 /**
@@ -441,7 +349,7 @@ interface ClientWebSocketEvents {
      */
     "error": (err: Error) => void;
 
-    "warn": (text: string) => void;
+    "info": (text: string) => void;
     "debug": (state: string, text: any) => void;
 
     /**
@@ -449,7 +357,7 @@ interface ClientWebSocketEvents {
      * @param code - Код отключения
      * @param reason - Причина отключения
      */
-    "close": (code: GatewayCloseCodes, reason: string) => void;
+    "close": (code: VoiceCloseCodes, reason: string) => void;
 
     /**
      * @description Если получен код голоса от discord, нужен для receiver
@@ -480,7 +388,7 @@ interface ClientWebSocketEvents {
      * @param opcodes - Не полный список получаемых opcodes
      */
     "sessionDescription": (opcodes: WebSocketOpcodes.session) => void;
-
+warn
     /**
      * @description Все события для работы с dave сессией
      * @param opcodes - Полный список всех протоколов Dave

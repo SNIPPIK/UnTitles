@@ -193,7 +193,7 @@ export interface iUDPSocket {
      * @throws если прослушивание уже запущено
      */
     startListening(
-        callback: (message: Buffer, rinfo?: { address: string; port: number }) => void
+        callback: (message: Buffer, info?: { address: string; port: number }) => void
     ): void;
 
     /**
@@ -202,9 +202,17 @@ export interface iUDPSocket {
      */
     stopListening(): void;
 
-    get drops(): number;
+    /**
+     * @description Кол-во аудио пакетов в очереди
+     * @public
+     */
+    get packets(): number
 
-    tick(): void
+    /**
+     * @description Кол-во потерянных аудио пакетов
+     * @public
+     */
+    get drops(): number;
 
     /**
      * Отключение UDP от цикла Rust и удаление данных из памяти

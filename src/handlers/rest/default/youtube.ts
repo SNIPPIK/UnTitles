@@ -40,11 +40,11 @@ const Clients = {
             context: {
                 client: {
                     clientName: "ANDROID",
-                    clientVersion: "19.35.36",
+                    clientVersion: "21.03.36",
                     platform: "MOBILE",
                     osName: "Android",
-                    osVersion: "13",
-                    androidSdkVersion: "33",
+                    osVersion: "16",
+                    androidSdkVersion: "36",
                     hl: "en",
                     gl: "US",
                     utcOffsetMinutes: -240,
@@ -65,7 +65,7 @@ const Clients = {
         },
         headers: {
             "Content-Type": "application/json",
-            "User-Agent": `com.google.android.youtube/19.35.36(Linux; U; Android 13; en_US; SM-S908E Build/TP1A.220624.014) gzip`,
+            "User-Agent": `com.google.android.youtube/21.03.36(Linux; U; Android 16; en_US; SM-S908E Build/TP1A.220624.014) gzip`,
             "X-Goog-Api-Format-Version": "2"
         }
     },

@@ -1,4 +1,4 @@
-import { DiscordGatewayAdapterCreator, VoiceAdapters } from "#core/voice/adapter";
+import { DiscordGatewayAdapterCreator, VoiceAdapters } from "#core/voice/transport/adapter";
 import { Client, LimitedCollection } from "seyfert";
 import { middlewares } from "#handler/middlewares";
 import { ActivityType } from "seyfert/lib/types";

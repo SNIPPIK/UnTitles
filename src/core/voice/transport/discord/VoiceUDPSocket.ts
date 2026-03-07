@@ -18,7 +18,6 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
     /** Данные подключения, полные данные пакета ready.d */
     public options: WebSocketOpcodes.ready["d"];
-    private discoveryTimeout?: NodeJS.Timeout;
 
     /**
      * @description Получаем текущий статус подключения
@@ -29,11 +28,18 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     };
 
     /**
+     * @description Кол-во пакетов в системе rust
+     * @public
+     */
+    public get packets() {
+        return this.socket.packets;
+    };
+
+    /**
      * @description Отправка данных на сервер через Rust
+     * @public
      */
     public packet(packet: Buffer) {
-        if (!this.socket) return;
-
         try {
             this.socket.pushPacket(packet);
         } catch (error) {
@@ -43,10 +49,9 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
     /**
      * @description Подключаемся и запускаем цикл прослушивания
+     * @public
      */
     public connect = (options: WebSocketOpcodes.ready["d"]) => {
-        if (this.options && options.ip === this.options.ip && options.port === this.options.port) return;
-
         // Меняем данные
         this.options = options;
         if (this.socket) this.reset();
@@ -62,14 +67,13 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 
     /**
      * @description Цикл опроса нативного сокета
+     * @private
      */
     private handleMessage(msg: Buffer) {
         // Логика Discovery
         if (msg && msg.length === 74 && msg.readUInt16BE(0) === 2) {
             const ip = msg.subarray(8, msg.indexOf(0, 8)).toString("utf8");
             const port = msg.readUInt16BE(msg.length - 2);
-
-            if (this.discoveryTimeout) clearTimeout(this.discoveryTimeout);
 
             if (!isIPv4(ip)) {
                 this.emit("discovery", new Error("Not found IPv4 address"));
@@ -94,18 +98,6 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         packet.writeUInt16BE(1, 0);
         packet.writeUInt16BE(70, 2);
         packet.writeUInt32BE(ssrc, 4);
-
-        // Запускаем таймер ожидания
-        if (this.discoveryTimeout) clearTimeout(this.discoveryTimeout);
-
-        this.discoveryTimeout = setTimeout(() => {
-            // Значит подключение удалось!
-            if (this._status === VoiceUDPSocketStatuses.connected) return;
-            this.destroy();
-            this.emit("error", new Error("IP Discovery timed out after 5 seconds"));
-        }, 5000);
-
-        this._status = VoiceUDPSocketStatuses.connecting;
         return packet;
     };
 
@@ -115,7 +107,6 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @private
      */
     private reset = () => {
-        if (this.discoveryTimeout) clearTimeout(this.discoveryTimeout);
         this.socket.destroy();
         this.socket = null;
     };

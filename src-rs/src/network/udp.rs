@@ -104,6 +104,12 @@ impl UdpBuffered {
         }
     }
 
+    /// Кол-во аудио пакетов в очереди
+    #[napi(getter)]
+    pub fn packets(&self) -> u32 {
+        self.inner.buffer.lock().unwrap().len() as u32
+    }
+
     /// Начинаем слушать входящий поток
     #[napi]
     pub fn start_listening(&self, callback: JsFunction) -> Result<()> {
@@ -175,8 +181,7 @@ impl UdpBuffered {
             id: self.id,
         }
     }
-
-    #[napi]
+    
     pub fn tick(&self) {
         self.inner.tick();
     }

@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 use dashmap::DashMap;
-use crate::net::udp::UdpBuffered;
+use crate::network::udp::UdpBuffered;
 
 /// Менеджер цикла с точным планированием на f64
 pub struct CycleManager {

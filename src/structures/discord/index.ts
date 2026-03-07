@@ -18,7 +18,7 @@ export type CommandInteraction = CommandContext;
  * @description Тип сообщения для обновления сообщения
  * @type CycleInteraction
  */
-export type CycleInteraction = WebhookMessage | Message;
+export type CycleInteraction = (WebhookMessage | Message) & { editedTimestamp: number };
 
 /**
  * @description Тип входящих данных для циклической системы

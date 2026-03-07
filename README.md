@@ -157,6 +157,7 @@ cd UnTitles
 npm i
 
 # If you need to build Rust components
+# If you don't want to compile, download the ready-made build and upload everything to the build/native path
 npm run build:native
 
 # Build Typescript + settings + start

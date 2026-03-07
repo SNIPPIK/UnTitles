@@ -1,6 +1,7 @@
 import type { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData } from "discord-api-types/v10";
 import type { VoiceConnectionConfiguration } from "#core/voice";
 import { GatewayOpcodes } from "discord-api-types/v10";
+import {SetArray} from "#structures";
 
 /**
  * @author SNIPPIK
@@ -101,6 +102,12 @@ export class VoiceAdapter {
      * @public
      */
     public adapter: DiscordGatewayAdapterImplementerMethods;
+
+    /**
+     * @description Список пользователей в голосовом канале, для работы E2EE
+     * @public
+     */
+    public clients = new SetArray<string>();
 
     /**
      * @description Пакеты для работы с голосовым подключением

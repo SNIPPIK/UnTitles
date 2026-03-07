@@ -77,7 +77,7 @@ impl FfmpegProcess {
             .and_then(|c| c.stdout.take())
             .ok_or_else(|| Error::new(Status::GenericFailure, "Stdout already taken or process dead".to_string()))?;
 
-        // Создаём потокобезопасную функцию
+        // Создаём безопасную функцию
         let tsfn: ThreadsafeFunction<Vec<u8>, ErrorStrategy::Fatal> = callback
             .create_threadsafe_function(0, |ctx: ThreadSafeCallContext<Vec<u8>>| {
                 // Создаём Buffer из данных (копирование надёжнее)

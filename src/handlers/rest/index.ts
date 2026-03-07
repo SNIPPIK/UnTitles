@@ -63,6 +63,23 @@ export class RestObject {
     }>();
 
     /**
+     * @description Получение случайной платформы
+     * @private
+     */
+    private get random () {
+        const map = this.array_raw;
+        const index = Math.floor(Math.random() * map.length);
+        let i = 0;
+
+        for (const value of map.values()) {
+            if (i === index) return value;
+            i++;
+        }
+
+        return null;
+    };
+
+    /**
      * @description Получение полного списка платформ
      * @public
      */
@@ -181,7 +198,7 @@ export class RestObject {
      * @private
      */
     private platform = (name: RestServerSide.API["name"] | string): RestServerSide.API => {
-        if (!name) return this.platformMap.get("YOUTUBE");
+        if (!name) return this.random;
 
         const upperName = name.toUpperCase();
 

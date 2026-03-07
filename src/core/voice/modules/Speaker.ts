@@ -1,7 +1,6 @@
 import { HeartbeatManager } from "#core/voice/managers/heartbeat";
 import { VoiceOpcodes } from "discord-api-types/voice";
 import { VoiceConnection } from "#core/voice";
-import {SetArray} from "#structures";
 
 /**
  * @author SNIPPIK
@@ -26,12 +25,6 @@ const MAX_SIZE_VALUE = 2 ** 32 - 1;
  * @public
  */
 export class VoiceSpeakerManager {
-    /**
-     * @description Список пользователей в голосовом канале, для работы E2EE
-     * @public
-     */
-    public clients = new SetArray<string>();
-
     /**
      * @description Текущий тип спикера
      * @private
@@ -96,20 +89,20 @@ export class VoiceSpeakerManager {
         this._heartbeat.ack();
 
         // Если нельзя по состоянию или уже бот говорит
-        if (this._type === speaking || !this.voice.websocket) return;
+        if (this._type === speaking || !this.voice.ws) return;
 
         // Меняем состояние спикера
         this._type = speaking;
 
         // Обновляем статус голоса
-        this.voice.websocket.packet = {
+        this.voice.ws.packet = {
             op: VoiceOpcodes.Speaking,
             d: {
                 speaking: speaking,
                 delay: 0,
-                ssrc: this.voice.ssrc
+                ssrc: this.voice.transport.ssrc
             },
-            seq: this.voice.websocket.sequence
+            seq: this.voice.ws.sequence
         };
     };
 
@@ -146,10 +139,6 @@ export class VoiceSpeakerManager {
     public destroy = () => {
         this._heartbeat.destroy();
         this._heartbeat = null;
-
-        // Чистим список клиентов
-        this.clients.clear();
-        this.clients = null;
     };
 }
 

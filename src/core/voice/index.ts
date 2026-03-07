@@ -1,12 +1,12 @@
-import type { DiscordGatewayAdapterCreator } from "#core/voice/adapter";
+import type { DiscordGatewayAdapterCreator } from "#core/voice/transport/adapter";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
 import { VoiceConnection } from "#core/voice/connection";
 import { Collection } from "#structures";
 
 // Voice Sockets
-export * from "./protocols/VoiceWebSocket";
-export * from "./protocols/VoiceUDPSocket";
-export * from "./protocols/VoiceRTPSocket";
+export * from "./transport/discord/VoiceWebSocket";
+export * from "./transport/discord/VoiceUDPSocket";
+export * from "./transport/discord/VoiceRTPSocket";
 export * from "./connection";
 
 
@@ -415,156 +415,4 @@ export namespace WebSocketOpcodes {
             transition_id: number
         };
     }
-}
-
-/**
- * @author SNIPPIK
- * @description Gateway Close Event Codes, для глубокой типизации и для правильного взаимодействия с WebSocket подключением
- * @enum GatewayCloseCodes
- * @public
- */
-export enum GatewayCloseCodes {
-    /**
-     * @description Discord сломал сервер голосового соединения
-     * @reconnecting undefined
-     */
-    UNEXPECTED_RESPONSE = 503,
-
-    /**
-     * @description Нормальное завершение соединения.
-     * @reconnecting true
-     */
-    NORMAL_CLOSURE = 1000,
-
-    /**
-     * @description Соединение закрыто, т.к, сервер или клиент отключается.
-     * @reconnecting true
-     */
-    GOING_AWAY = 1001,
-
-    /**
-     * @description Код экстренного выхода
-     * @reconnecting true
-     */
-    EXIT_RESULT = 1002,
-
-    /**
-     * @description Аномальное закрытие, соединение было закрыто без фрейма закрытия
-     * @reconnecting true
-     */
-    ABNORMAL_CLOSURE = 1006,
-
-    /**
-     * @description Мы не уверены, что пошло не так. Попробуйте переподключиться?
-     * @reconnecting true
-     */
-    UNKNOWN_ERROR = 4000,
-
-    /**
-     * @description Вы отправили недействительный код операции Gateway или недействительную полезную нагрузку для кода операции. Не делайте этого!
-     * @reconnecting true
-     */
-    UNKNOWN_OPCODE = 4001,
-
-    /**
-     * @description Вы отправили недействительную полезную нагрузку в Discord. Не делайте этого!
-     * @reconnecting true
-     */
-    DECODE_ERROR = 4002,
-
-    /**
-     * @description Вы отправили нам полезную нагрузку до идентификации, или этот сеанс был признан недействительным.
-     * @reconnecting true
-     */
-    NOT_AUTHENTICATED = 4003,
-
-    /**
-     * @description Токен учетной записи, отправленный с вашей идентификационной информацией, неверен.
-     * @reconnecting false
-     */
-    AUTHENTICATION_FAILED = 4004,
-
-    /**
-     * @description Вы отправили более одного идентификационного груза. Не делайте этого!
-     * @reconnecting true
-     */
-    ALREADY_AUTHENTICATED = 4005,
-
-    /**
-     * @description Сессия больше не действительна
-     * @reconnecting false
-     */
-    INVALID_SESSION = 4006,
-
-    /**
-     * @description Последовательность, отправленная при возобновлении сеанса, была недействительной. Подключитесь заново и начните новый сеанс.
-     * @reconnecting true
-     */
-    INVALID_SEQ = 4007,
-
-    /**
-     * @description Ух ты, Нелли! Ты слишком быстро отправляешь нам данные. Сбавь скорость! При получении этого сообщения ты будешь отключен.
-     * @reconnecting true
-     */
-    RATE_LIMITED = 4008,
-
-    /**
-     * @description Ваш сеанс истек. Подключитесь снова и начните новый.
-     * @reconnecting true
-     */
-    SESSION_TIMEOUT = 4009,
-
-    /**
-     * @description При идентификации вы отправили нам недействительный осколок.
-     * @reconnecting false
-     */
-    INVALID_SHARD = 4010,
-
-    /**
-     * @description В сеансе участвовало бы слишком много гильдий — для подключения вам потребуется разделить свое соединение.
-     * @reconnecting false
-     */
-    SHARDING_REQUIRED = 4011,
-
-    /**
-     * @description Вы отправили недействительную версию для шлюза.
-     * @reconnecting false
-     */
-    INVALID_API_VERSION = 4012,
-
-    /**
-     * @description Вы отправили недопустимое намерение для Gateway Intent
-     * @reconnecting false
-     */
-    INVALID_INTENTS = 4013,
-
-    /**
-     * @description Вы отправили неразрешенное намерение для Gateway Intent
-     * @reconnecting false
-     */
-    DISALLOWED_INTENTS = 4014,
-
-    /**
-     * @description Голосовой сервер вышел из строя
-     * @reconnecting true
-     */
-    INSUFFICIENT_RESOURCES = 4015,
-
-    /**
-     * @description Неизвестный режим шифрования
-     * @reconnecting true
-     */
-    OVERLOADED = 4016,
-
-    /**
-     * @description Плохой запрос
-     * @reconnecting true
-     */
-    BAD_REQUEST = 4020,
-
-    /**
-     * @description Сессия устарела
-     * @reconnecting false
-     */
-    SESSION_EXPIRED = 4022
 }
