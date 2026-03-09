@@ -39,7 +39,7 @@ export default createEvent({
                         accessory: { type: 11, media: image }
                     },
                     { type: 14, spacing: 2, divider: true },
-                    { type: 10, content: `-# ${user.username} | ${totalTime.duration(false)} | ${queue.tracks.size}` },
+                    { type: 10, content: `-# ${user.username} | ${totalTime.duration(false)} | ${queue.tracks.size}/${queue.tracks.total}` },
                     // Кнопки
                     {
                         type: 1,

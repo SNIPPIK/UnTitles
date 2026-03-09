@@ -86,8 +86,31 @@ impl CycleManager {
                     break;
                 }
 
-                // Выполняем тик всех сессий
-                sessions.iter().for_each(|kv| kv.value().tick());
+                // --- распределяем отправку внутри тика ---
+                let count = sessions.len().max(1);
+                let step = interval / count as u32;
+
+                let mut next = Instant::now();
+
+                // Прогоняем все сессии в очереди
+                for session in sessions.iter() {
+                    session.value().tick();
+                    next += step;
+                    let now = Instant::now();
+
+                    if now < next {
+                        // Даем время поспать потоку
+                        let sleep = next - now;
+                        if sleep > Duration::from_millis(1) {
+                            thread::sleep(sleep - Duration::from_millis(1));
+                        }
+
+                        // Крутим loop
+                        while Instant::now() < next {
+                            std::hint::spin_loop();
+                        }
+                    }
+                }
 
                 // Планируем следующий тик
                 let now = Instant::now();

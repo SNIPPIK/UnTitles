@@ -28,7 +28,10 @@ const OPCODE_DAVE_MLS_KEY = new Uint8Array([VoiceOpcodes.DaveMlsKeyPackage]);
  * @public
  */
 export class Transport extends TypedEmitter<TransportEvents> {
-    private _state: TransportState;
+    private _state: TransportState = {
+        code: 0,
+        payload: null
+    };
 
     /**
      * @description Клиент UDP соединения, ключевой класс для отправки пакетов
@@ -109,15 +112,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
         switch (state.code) {
             // Поднимаем WS
             case TransportStateCode.OpeningWs: {
-                const last_seq = this._ws?.sequence;
-                this._ws = new VoiceWebSocket();
-
-                // Если происходит возобновление сессии
-                if (state.payload) {
-                    this._ws.sequence = last_seq;
-                    this._ws.emit("resumed");
-                }
-
+                this.connect(this.adapter.packet.server.endpoint);
                 return;
             }
 
@@ -274,10 +269,6 @@ export class Transport extends TypedEmitter<TransportEvents> {
      */
     public constructor(private adapter: VoiceAdapter) {
         super();
-        this.state = {
-            code: TransportStateCode.OpeningWs,
-            payload: null
-        };
     };
 
     /**
@@ -308,6 +299,20 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @private
      */
     public connect = (endpoint: string) => {
+        const last_seq = this._ws?.sequence;
+
+        if (this._ws) {
+            this._ws.removeAllListeners();
+            this._ws.destroy();
+            this._ws = null;
+        }
+
+        this._ws = new VoiceWebSocket();
+        if (last_seq) {
+            this._ws.sequence = last_seq;
+            this._ws.emit("resumed");
+        }
+
         this._ws.connect(endpoint); // Подключаемся к endpoint
 
         /**
@@ -391,17 +396,14 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 return;
             }
 
-            // Если есть шансы на восстановление сессии
-            else if (code !== 4009) {
-                // Если соединение не было закрыто собственноручно
-                if (this.state.code !== TransportStateCode.Closed) {
-                    // Пробуем поднять соединение заново
-                    this.state = {
-                        code: TransportStateCode.OpeningWs,
-                        payload: null
-                    };
-                    return;
-                }
+            // Если соединение не было закрыто собственноручно
+            if (this.state.code !== TransportStateCode.Closed) {
+                // Пробуем поднять соединение заново
+                this.state = {
+                    code: TransportStateCode.OpeningWs,
+                    payload: code
+                };
+                return;
             }
 
             // Если нет больше методов подъема соединения, то уничтожаем окончательно
@@ -591,31 +593,78 @@ export class Transport extends TypedEmitter<TransportEvents> {
     };
 }
 
+/**
+ * @author SNIPPIK
+ * @description
+ * @interface
+ * @private
+ */
+interface TransportState_Idle {
+    code: 0;
+    payload: null;
+}
+
+/**
+ * @author SNIPPIK
+ * @description
+ * @interface
+ * @private
+ */
 interface TransportState_Ready {
     code: TransportStateCode.Ready;
     payload: WebSocketOpcodes.ready["d"];
 }
 
+/**
+ * @author SNIPPIK
+ * @description
+ * @interface
+ * @private
+ */
 interface TransportState_Identifying {
     code: TransportStateCode.Identifying;
     payload: WebSocketOpcodes.identify["d"];
 }
 
+/**
+ * @author SNIPPIK
+ * @description
+ * @interface
+ * @private
+ */
 interface TransportState_Resuming {
     code: TransportStateCode.Resuming;
     payload: WebSocketOpcodes.resume["d"];
 }
 
+/**
+ * @author SNIPPIK
+ * @description
+ * @interface
+ * @private
+ */
 interface TransportState_Session {
     code: TransportStateCode.Session;
     payload: WebSocketOpcodes.session["d"];
 }
 
+/**
+ * @author SNIPPIK
+ * @description
+ * @interface
+ * @private
+ */
 interface TransportState_OpeningWs {
     code: TransportStateCode.OpeningWs;
     payload: number;
 }
 
+/**
+ * @author SNIPPIK
+ * @description
+ * @interface
+ * @private
+ */
 interface TransportState_Closed {
     code: TransportStateCode.Closed;
     payload: null;
@@ -629,8 +678,14 @@ type TransportState =
     | TransportState_Session
     | TransportState_OpeningWs
     | TransportState_Closed
+    | TransportState_Idle
 
 
+/**
+ * @author SNIPPIK
+ * @description Все статусы подключения транспорта
+ * @enum TransportStateCode
+ */
 enum TransportStateCode {
     OpeningWs,
     Identifying,
