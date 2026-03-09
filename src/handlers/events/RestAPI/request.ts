@@ -1,5 +1,4 @@
-import { MessageFlags } from "seyfert/lib/types";
-import { locale, Logger } from "#structures";
+import { locale } from "#structures";
 import { createEvent } from "seyfert";
 import { db } from "#app/db";
 
@@ -27,53 +26,31 @@ export default createEvent({
         }
 
         /**
-         * @description Отправляем временное уведомление о начале запроса
-         * @protected
-         */
-        ctx.followup({
-            flags: MessageFlags.Ephemeral,
-            embeds: [{
-                title: `${platform.platform}.${api.type}`,
-                description: locale._(
-                    ctx.interaction.locale,
-                    platform.audio
-                        ? "api.platform.request"
-                        : "api.platform.request.long",
-                    [db.images.loading, platform.platform]
-                ),
-                color: platform.color
-            }]
-        }).then((msg) => {
-            setTimeout(() => msg.delete().catch(() => null), 5_000);
-        }).catch((err) => {
-            // Ошибка при отправке сообщения о запросе
-            Logger.log("ERROR", err as Error);
-        });
-
-        /**
-         * @description Выполнение REST-запроса с таймаутом
+         * @description Выполнение REST-запроса с тайм-аутом
          * @protected
          */
         const result = await _withTimeout(
             // Основной запрос к платформе
             api.request(),
 
-            // Таймаут выполнения запроса (15 секунд)
+            // Тайм-аут выполнения запроса (15 секунд)
             15_000,
 
             // Ошибка по таймауту
             new Error(locale._(ctx.interaction.locale, "api.platform.timeout"))
-        );
+        ).catch(() => {
+            return new Error("Request error");
+        });
 
         /**
          * @description Если произошла ошибка, сообщаем о ней
          * @protected
          */
-        if (result instanceof Error) {
-            ctx.client.events.runCustom(
+        if (result instanceof Error || result["message"]) {
+            await ctx.client.events.runCustom(
                 "rest/error",
                 ctx,
-                `**${platform.platform}.${api.type}**\n**❯** **${result.message}**`
+                `**${platform.platform}.${api.type}**\n**❯** **${result["message"] ?? result}**`
             );
             return null;
         }
@@ -103,7 +80,7 @@ export default createEvent({
  * @description Обёртка для выполнения Promise с таймаутом
  * @param promise - Основной Promise
  * @param ms - Время ожидания в миллисекундах
- * @param error - Ошибка, возвращаемая по таймауту
+ * @param error - Ошибка, возвращаемая по тайм-ауту
  */
 function _withTimeout<T>(promise: Promise<T>, ms: number, error: Error): Promise<T | Error> {
     return Promise.race([

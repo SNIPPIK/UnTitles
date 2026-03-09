@@ -1,3 +1,4 @@
+import { MessageFlags } from "seyfert/lib/types";
 import { Colors } from "#structures/discord";
 import { createEvent } from "seyfert";
 import { locale } from "#structures";
@@ -14,40 +15,61 @@ import { db } from "#app/db";
 export default createEvent({
     data: { name: "message/push" },
     async run(queue, user, obj) {
-        const {artist, image} = obj;
+        const buildComponents = () => {
+            const isTrack = obj instanceof Track;
+            const artist = obj["artist"];
+            const image = obj["image"] ?? { url: db.images.no_image };
+            const url = obj["url"];
+            const title = isTrack ? obj["name"] : obj["title"];
+            const tracks = isTrack ? [obj] : obj.items.slice(0, 5);
+            const totalTime = isTrack ? obj.time.total : obj.items.reduce((sum, t) => sum + (t?.time?.total ?? 0), 0);
 
-        // Отправляем сообщение, о том что было добавлено в очередь
-        const msg = await queue.message.send({
-            embeds: [{
-                color: obj["api"] ? obj["api"]["color"] : Colors.Blue,
-                thumbnail: typeof image === "string" ? {url: image} : image ?? {url: db.images.no_image},
-                footer: {
-                    iconURL: user.avatarURL(),
-                    text: `${user.displayName}`
-                },
-                author: {
-                    name: artist?.title,
-                    url: artist?.url,
-                    iconURL: db.images.disk
-                },
-                fields: [
+            const component = {
+                type: 17,
+                accent_color: isTrack ? obj.api?.color ?? Colors.Blue : Colors.White,
+                components: [
+                    // Основной блок
                     {
-                        name: locale._(queue.message.locale, "player.queue.push"),
-                        value: obj instanceof Track ?
-                            // Если один трек в списке
-                            `\`\`\`[${obj.time.split}] - ${obj.name}\`\`\`` :
-
-                            // Если добавляется список треков (альбом или плейлист)
-                            `${obj.items.slice(0, 5).map((track, index) => {
-                                return `\`${index + 1}\` ${track.name_replace}`;
-                            }).join("\n")}${obj.items.length > 5 ? locale._(queue.message.locale, "player.queue.push.more", [obj.items.length - 5]) : ""}
-                                    `
+                        type: 9,
+                        components: [
+                            { type: 10, content: `## [${artist.title}](${artist.url})` },
+                            { type: 10, content: `${isTrack ? "" : `\`${title}\``}\n\`${locale._(queue.message.locale, "player.queue.push")}\`` },
+                            ...tracks.map((t, idx) => ({ type: 10, content: `\`${idx + 1}\` | ${t.name_replace}` }))
+                        ],
+                        accessory: { type: 11, media: image }
+                    },
+                    { type: 14, spacing: 2, divider: true },
+                    { type: 10, content: `-# ${user.username} | ${totalTime.duration(false)} | ${queue.tracks.size}` },
+                    // Кнопки
+                    {
+                        type: 1,
+                        components: [
+                            { type: 2, label: "Link", style: 5, url }
+                        ]
                     }
                 ]
-            } as any]
+            };
+
+            if (tracks.length > 5) {
+                component.components[0].components.push(
+                    //@ts-ignore
+                    {
+                        type: 10,
+                        content: locale._(queue.message.locale, "player.queue.push.more", [tracks.length - 5])
+                    }
+                )
+            }
+
+            return component;
+        };
+
+        //@ts-ignore
+        const msg = await queue.message.send({
+            flags: MessageFlags.IsComponentsV2,
+            components: [buildComponents() as any],
+            embeds: null
         }, true);
 
-        // Если есть ответ от отправленного сообщения
-        if (msg) setTimeout(() => !!msg.delete ? msg.delete().catch(() => null) : null, 12e3);
+        if (msg) setTimeout(() => msg.delete?.().catch(() => null), 20e3);
     }
 })

@@ -16,6 +16,7 @@ export class ControllerVoice<T extends VoiceConnection> {
     /**
      * @description Производим подключение к голосовому каналу
      * @param connection - Голосовой канал
+     * @setter
      * @public
      */
     public set connection(connection: T) {
@@ -32,6 +33,7 @@ export class ControllerVoice<T extends VoiceConnection> {
     /**
      * @description Получение голосового подключения
      * @return VoiceConnection
+     * @getter
      * @public
      */
     public get connection() {

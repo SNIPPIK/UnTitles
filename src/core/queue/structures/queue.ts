@@ -20,13 +20,11 @@ export class Queue {
      */
     public timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
 
-
     /**
      * @description Текущий экземпляр плеера
      * @protected
      */
     protected _player: AudioPlayer;
-
 
     /**
      * @description Хранилище треков, с умной системой управления
@@ -34,13 +32,11 @@ export class Queue {
      */
     public tracks = new ControllerTracks<Track>();
 
-
     /**
      * @description Голосовое подключение
      * @public
      */
     public voice = new ControllerVoice<VoiceConnection>();
-
 
     /**
      * @description Сообщение пользователя
@@ -48,13 +44,11 @@ export class Queue {
      */
     protected _message: QueueMessage<CommandInteraction>;
 
-
     /**
      * @description Создаем класс для отображения фильтров
      * @protected
      */
     protected _buttons: QueueButtons;
-
 
     /**
      * @description Записываем сообщение в базу для дальнейшего использования
@@ -109,11 +103,12 @@ export class Queue {
      * @private
      */
     public set joinVoice(msg: QueueMessage<CommandInteraction>) {
-        const {guild_id, channel_id} = msg;
+        const { guild_id, voice_id } = msg;
 
         // Подключаемся к голосовому каналу
         this.voice.connection = db.voice.join({
-            guild_id, channel_id,
+            guild_id,
+            channel_id: voice_id,
             self_deaf: true,
             self_mute: false,
             self_speaker: SpeakerType.priority
@@ -128,7 +123,7 @@ export class Queue {
      */
     public constructor(message: CommandInteraction) {
         const queue_message = new QueueMessage(message);
-        const {guild_id} = queue_message;
+        const { guild_id } = queue_message;
 
         // Подключаемся к гс
         this.joinVoice = queue_message;
@@ -152,7 +147,10 @@ export class Queue {
      */
     public get components() {
         // Если класс кнопок (компонентов был уничтожен)
-        if (!this._buttons) return null;
+        if (!this._buttons) {
+            Logger.log("ERROR", "[Queue/MessageV2]: Fail init buttons class");
+            return null;
+        }
 
         const player = this._player, tracks = this.tracks;
         const buttons = this._buttons?.component(player);
@@ -208,6 +206,7 @@ export class Queue {
     /**
      * @description Эта функция частично удаляет очередь
      * @warn Автоматически выполняется при удалении через db
+     * @returns void
      * @public
      */
     public cleanup = () => {
@@ -224,7 +223,7 @@ export class Queue {
      * @description Эта функция полностью удаляет очередь и все сопутствующие данные, используется в другом классе
      * @warn Автоматически удаляется через событие VoiceStateUpdate
      * @returns void
-     * @protected
+     * @public
      */
     public destroy = () => {
         Logger.log("LOG", `[Queue/${this.message.guild_id}] has destroyed`);
@@ -248,5 +247,5 @@ export class Queue {
  */
 function getVolumeIndicator(volume: number): string {
     const clamped = Math.max(0, Math.min(volume, 200));
-    return `${clamped}%`.padStart(4, " ");
+    return `${clamped}%`;
 }

@@ -82,7 +82,7 @@ class RestYandexAPI extends RestServerSide.API {
             name: "track",
             filter: /track\/[0-9]+/i,
             execute: async (url, options) => {
-                const IDs = this.getID(/[0-9]+\/track\/[0-9]+/gi, url)[0].split("/track/");
+                const IDs = this.getID(/[0-9]+\/track\/[0-9]+/gi, url)?.[0]?.split("/track/");
 
                 // Если ID трека не удалось извлечь из ссылки
                 if (!IDs) return locale.err( "api.request.id.track");
