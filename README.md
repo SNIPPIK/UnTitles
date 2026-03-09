@@ -3,6 +3,7 @@
 
 <h4>Incredible bot with its own voice/audio engine, scalable architecture, multiple filters and support for 6 music platforms.</h4>
 <h4>Audio quality surpasses lavalink, don't believe me? Listen for yourself!</h4>
+<h4>The project is aimed at quality, not speed!!!</h4>
 
   <p>
     English

@@ -31,7 +31,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected get time(): number {
-        return performance.now()
+        return performance.now();
     };
 
     /**
@@ -124,7 +124,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
         // === STEP ===
         const duration = this.delay = this.step();
-        const delay = Math.max(0, this.insideTime - this.time);
+        const delay = Math.min(Math.max(0, this.insideTime - this.time), duration);
 
         // Если delay слишком мал
         if (delay <= 0) {

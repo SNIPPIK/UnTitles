@@ -184,8 +184,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             Logger.log("DEBUG",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
         });
 
-        this.transport.on("close", (e1, e2) => {
-            Logger.log("DEBUG",`[Voice Layer/${this.configuration.guild_id}]: ${e1} -> ${e2}`);
+        this.transport.on("close", (code, reason) => {
+            Logger.log("DEBUG",`[Voice Layer/${this.configuration.guild_id}]: ${code} -> ${reason}`);
         });
     };
 
@@ -209,7 +209,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         if (this._status === ConnectionStatus.disconnected) return;
         this.status = ConnectionStatus.disconnected;
-
+        //this.disconnect();
         this.speaker.destroy();
 
         // Очищаем адаптер последним

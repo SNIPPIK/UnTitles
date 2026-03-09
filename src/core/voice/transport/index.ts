@@ -86,8 +86,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
             }
         }
 
-        // Финальная проверка UDP, WebSocket
-        return this._ws && this._udp.status === "connected" && !!this._rtp;
+        return (this._ws && this._udp.status === "connected" && !!this._rtp) && this.state.code === TransportStateCode.Session;
     };
 
     /**
@@ -96,7 +95,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      */
     public get state() {
         return this._state;
-    }
+    };
 
     /**
      * @description Сеттер управляющий состоянием подключений
@@ -110,17 +109,13 @@ export class Transport extends TypedEmitter<TransportEvents> {
         switch (state.code) {
             // Поднимаем WS
             case TransportStateCode.OpeningWs: {
-                if (this._ws) {
-                    this._ws.destroy();
-                    this._ws = null;
-                }
-
+                const last_seq = this._ws?.sequence;
                 this._ws = new VoiceWebSocket();
 
                 // Если происходит возобновление сессии
                 if (state.payload) {
-                    this._ws.sequence = state.payload;
-                    //this._ws.emit("resumed");
+                    this._ws.sequence = last_seq;
+                    this._ws.emit("resumed");
                 }
 
                 return;
@@ -384,19 +379,33 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @code 1000-4022
          */
         this._ws.on("close", (code, reason) => {
-            // Если можно возобновить подключение
-            if (code === 4_015 || code === 4009 || code < 4_000 && this.ready) {
-                const lastSequence = this._ws.sequence;
+            // Сообщаем что хотим переподключится
+            this.emit("close", code, `[Transport/WS]: ${reason}`);
 
+            // Если можно возобновить подключение
+            if ((code === 4_015 || code < 4_000) && this.ready) {
                 this.state = {
                     code: TransportStateCode.OpeningWs,
-                    payload: lastSequence
+                    payload: code
                 };
                 return;
             }
 
-            // Сообщаем что хотим переподключится
-            this.emit("close", code, `[Transport/WS]: ${reason}`);
+            // Если есть шансы на восстановление сессии
+            else if (code !== 4009) {
+                // Если соединение не было закрыто собственноручно
+                if (this.state.code !== TransportStateCode.Closed) {
+                    // Пробуем поднять соединение заново
+                    this.state = {
+                        code: TransportStateCode.OpeningWs,
+                        payload: null
+                    };
+                    return;
+                }
+            }
+
+            // Если нет больше методов подъема соединения, то уничтожаем окончательно
+            this.destroy();
         });
 
         /**
@@ -464,47 +473,36 @@ export class Transport extends TypedEmitter<TransportEvents> {
             };
         });
 
-        session.on("debug", (msg) => this.emit("info", `[Transport/Dave]: ${msg}`));
-
         /**
          * @description Получаем коды dave от WebSocket
          * @code 21-31
          */
         this._ws.on("daveSession", ({op, d}) => {
-            try {
+            this.emit("info", `[DAVE/WS]: ${op} -> Opcode: ${d}`);
+
+            switch (op) {
                 // Предстоит понижение версии протокола DAVE
-                if (op === VoiceOpcodes.DavePrepareTransition) {
+                case VoiceOpcodes.DavePrepareTransition: {
                     const sendReady = session.prepareTransition(d);
 
-                    if (sendReady)
-                        this._ws.packet = {
-                            op: VoiceOpcodes.DaveTransitionReady,
-                            d: {
-                                transition_id: d.transition_id
-                            }
-                        };
+                    if (sendReady) this._ws.packet = {
+                        op: VoiceOpcodes.DaveTransitionReady,
+                        d: {
+                            transition_id: d.transition_id
+                        }
+                    };
+                    return;
                 }
 
                 // Выполнить ранее объявленный переход протокола
-                else if (op === VoiceOpcodes.DaveExecuteTransition) session.executeTransition(d.transition_id);
+                case VoiceOpcodes.DaveExecuteTransition: {
+                    session.executeTransition(d.transition_id);
+                    return;
+                }
 
-                // Скоро выйдет версия протокола DAVE или изменится группа
-                else if (op === VoiceOpcodes.DavePrepareEpoch) session.prepareEpoch = d;
-            } catch (err) {
-                this.emit("close", 4017, `[Transport/Dave] Critical error: ${err}`);
-                const transitionId = typeof d === "object" && d ? d["transition_id"] ?? 0 : 0;
-
-                // Optional: попробовать сбросить сессию или пересоздать DAVE
-                try {
-                    session.reinit();
-                    this._ws.packet = {
-                        op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,
-                        d: {
-                            transition_id: transitionId
-                        }
-                    };
-                } catch (fallbackErr) {
-                    this.emit("close", 4017, `[Transport/Dave] DAVE fallback failed: ${fallbackErr}`);
+                case VoiceOpcodes.DavePrepareEpoch: {
+                    session.prepareEpoch = d;
+                    return;
                 }
             }
         });
@@ -514,6 +512,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @code 21-31
          */
         this._ws.on("binary", ({op, payload}) => {
+            this.emit("info", `[DAVE/WS]: ${op} -> Buffer Size: ${payload.length}`);
+
             switch (op) {
                 // Учетные данные и открытый ключ для внешнего отправителя MLS
                 case VoiceOpcodes.DaveMlsExternalSender: {
@@ -556,13 +556,15 @@ export class Transport extends TypedEmitter<TransportEvents> {
                         if (transition_id !== 0) {
                             this._ws.packet = {
                                 op: VoiceOpcodes.DaveTransitionReady,
-                                d: {transition_id},
+                                d: { transition_id },
                             };
                         }
                     }
                 }
             }
         });
+
+        session.on("debug", (msg) => this.emit("info", `[Transport/Dave]: ${msg}`));
 
         // Запускаем заново или впервые
         session.reinit();
@@ -580,14 +582,12 @@ export class Transport extends TypedEmitter<TransportEvents> {
         this._udp?.destroy?.();
         this._rtp?.destroy?.();
         this._dave?.destroy?.();
-        this.adapter?.adapter?.destroy();
 
         // Nullify
         this._rtp = null;
         this._ws = null;
         this._udp = null;
         this._dave = null;
-        this.adapter = null;
     };
 }
 

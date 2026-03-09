@@ -34,7 +34,15 @@ export class ControllerCycles {
  * @const PLAYER_SEND_NATIVE
  * @private
  */
-const PLAYER_SEND_NATIVE = OPUS_FRAME_SIZE * 30;
+const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 30);
+
+/**
+ * @author SNIPPIK
+ * @description Кол-во пакетов которые будет всегда в udp подключении в качестве буфера для гашения Event loop
+ * @const PLAYER_SEND_POOL
+ * @private
+ */
+const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 1.2);
 
 /**
  * @author SNIPPIK
@@ -93,16 +101,17 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 const audio = player.audio.current;
                 if (!audio) return;
 
-                const frames = this.options.duration / OPUS_FRAME_SIZE;
+                const framesThisStep = this.options.duration / OPUS_FRAME_SIZE; // сколько пакетов «должно» пройти за этот цикл
                 const udpPackets = player.voice.connection?.udp?.packets ?? 0;
-                const deficit = Math.max(frames - udpPackets, 0);
-                const total = frames + deficit;
 
-                for (let i = 0; i < total; i++) {
+                // Считаем, сколько пакетов реально нужно отправить
+                const desiredPackets = framesThisStep + PLAYER_SEND_POOL;
+                const sendCount = Math.max(desiredPackets - udpPackets, 0);
+
+                for (let i = 0; i < sendCount; i++) {
                     const packet = audio.packet;
-
                     if (!packet) {
-                        if (!audio.readable || audio.packets === 0) {
+                        if ((!audio.readable || audio.packets === 0) && !udpPackets) {
                             player.status = AudioPlayerState.idle;
                             player.cycle = false;
                         }

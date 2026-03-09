@@ -1,9 +1,9 @@
-import {VoiceCloseCodes, VoiceOpcodes} from "discord-api-types/voice/v8";
-import {type Data, type MessageEvent, WebSocket} from "ws";
-import {HeartbeatManager} from "../../managers/heartbeat";
-import {type WebSocketOpcodes} from "#core/voice";
-import {OPUS_FRAME_SIZE} from "#core/audio";
-import {TypedEmitter} from "#structures";
+import { VoiceCloseCodes, VoiceOpcodes } from "discord-api-types/voice/v8";
+import { type Data, type MessageEvent, WebSocket } from "ws";
+import { HeartbeatManager } from "../../managers/heartbeat";
+import { type WebSocketOpcodes } from "#core/voice";
+import { OPUS_FRAME_SIZE } from "#core/audio";
+import { TypedEmitter } from "#structures";
 
 /**
  * @author SNIPPIK
@@ -50,6 +50,8 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public get latency() {
         if (!this._latency) return 0;
+
+        // Не забываем что аудио длится 20 ms, сразу гасим ping задержки пакета
         return this._latency - OPUS_FRAME_SIZE;
     };
 
@@ -106,7 +108,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 this._latency = latency;
 
                 // Отправляем событие об ответе от websocket
-                this.emit("warn", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
+                this.emit("info", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
             }
         });
     };
@@ -121,7 +123,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public connect = (endpoint: string, code?: VoiceCloseCodes): void => {
         // Если ws клиент уже есть
         if (this.ws) {
-            if (code) this.emit("warn", `[WebSocket/${code}] has reset connection`);
+            if (code) this.emit("info", `[WebSocket/${code}] has reset connection`);
 
             // Удаляем ws, поскольку он будет создан заново
             this.reset();
@@ -136,15 +138,15 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         // Запуск websocket соединения
         this.ws.onopen = () => {
             this.emit("open");
-            this.emit("warn", `[WebSocket] has open connection`);
+            this.emit("info", `[WebSocket] has open connection`);
         };
 
         // Закрытие websocket соединения
         this.ws.onclose = (reason) => {
-            this.emit("warn", `[WebSocket/close]: ${code} - ${reason}`);
+            this.emit("info", `[WebSocket/close]: ${code} - ${reason}`);
 
             // Отправляем данные в TypedEmitter
-            this.emit("close", code, reason.reason);
+            this.emit("close", reason.code, reason.reason);
         };
 
         // Ошибка websocket соединения
@@ -388,7 +390,7 @@ interface ClientWebSocketEvents {
      * @param opcodes - Не полный список получаемых opcodes
      */
     "sessionDescription": (opcodes: WebSocketOpcodes.session) => void;
-warn
+
     /**
      * @description Все события для работы с dave сессией
      * @param opcodes - Полный список всех протоколов Dave
