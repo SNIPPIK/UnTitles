@@ -1,9 +1,9 @@
-import {APIPlatformType, APIRequests, APIRequestsKeys} from "#handler/rest/index.decorator";
-import {Logger, SimpleWorker} from "#structures";
-import type {RestServerSide} from "./index.server";
-import {RestClientSide} from "./index.client";
-import {Worker} from "node:worker_threads";
-import {Track} from "#core/queue";
+import { APIPlatformType, APIRequestData, APIRequests, APIRequestsKeys } from "#handler/rest/index.decorator";
+import { Logger, SimpleWorker } from "#structures";
+import type { RestServerSide } from "./index.server";
+import { RestClientSide } from "./index.client";
+import { Worker } from "node:worker_threads";
+import { Track } from "#core/queue";
 
 // Export decorator
 export * from "./index.decorator";
@@ -243,8 +243,8 @@ export class RestObject {
                     switch (status) {
                         // Если получен успешный ответ
                         case "success": {
-                            Logger.log("DEBUG", `[Rest/API |${type}| GET - ${platform.name}]: ${payload}`);
-                            const parseTrack = (item) => new Track(item, platform);
+                            Logger.log("DEBUG", `[Rest/API |${type}| GET  - ${platform.name}]: ${payload}`);
+                            const parseTrack = (item: APIRequestData.Track) => new Track(item, platform);
 
                             // Если пришел список треков
                             if (Array.isArray(result)) {

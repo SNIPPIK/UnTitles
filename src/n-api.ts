@@ -93,15 +93,9 @@ export interface iFfmpegProcess {
      * Запускает чтение stdout и передачу данных в JS.
      * Вызывается один раз после создания экземпляра.
      *
-     * @param onData - основной колбэк: вызывается для каждого чанка stdout (обычно OGG/Opus)
-     * @param onError - опционально: ошибки (проблемы с запуском, stderr, краш)
-     * @param onExit - опционально: процесс завершился (код выхода или null при SIGKILL)
+     * @param callback - основной колбэк: вызывается для каждого чанка stdout (обычно OGG/Opus)
      */
-    pipeStdout(
-        onData: (chunk: Buffer) => void,
-        onError?: (error: Error | string) => void,
-        onExit?: (code: number | null) => void
-    ): void;
+    pipeStdout(callback: (...args: any[]) => any): void
 
     /**
      * Принудительно завершает процесс FFmpeg (посылает SIGKILL).
@@ -220,6 +214,18 @@ export interface iUDPSocket {
     destroy(): void;
 }
 
+export interface VoiceRTPSocket {
+    constructor(ssrc: number, key: Uint8Array<ArrayBuffer>): void;
+    /** Режим шифрования (как в оригинале) */
+    get mode(): string
+    /** Возвращает nonce (12 байт) и tail (первые 4 байта) */
+    getNonce(): Array<Buffer>
+    /** Создаёт зашифрованный RTP-пакет из Opus-фрейма */
+    packet(frame: Buffer): Buffer
+    /** Метод destroy (для совместимости с JS-версией) */
+    destroy(): void
+}
+
 /* ────────────────────────────────────────────────
    Экспорты реальных конструкторов и функций
 ───────────────────────────────────────────────── */
@@ -229,13 +235,15 @@ export interface iUDPSocket {
  * Содержит все конструкторы классов и вспомогательные функции.
  */
 export const {
+    VoiceRTPSocket,
     OggOpusParser,
     FfmpegProcess,
     AudioEngine,
     UDPSocket
 } = Native as {
-    OggOpusParser: NativeClass<iOggOpusParser>,
-    FfmpegProcess: NativeClass<iFfmpegProcess>,
-    AudioEngine:   NativeClass<iAudioEngine>,
-    UDPSocket:     NativeClass<iUDPSocket>,
+    VoiceRTPSocket: NativeClass<VoiceRTPSocket>
+    OggOpusParser:  NativeClass<iOggOpusParser>,
+    FfmpegProcess:  NativeClass<iFfmpegProcess>,
+    AudioEngine:    NativeClass<iAudioEngine>,
+    UDPSocket:      NativeClass<iUDPSocket>,
 };

@@ -1,5 +1,6 @@
+import { createEvent, WebhookMessage } from "seyfert";
+import { MessageFlags } from "seyfert/lib/types";
 import { locale } from "#structures";
-import { createEvent } from "seyfert";
 import { db } from "#app/db";
 
 /**
@@ -25,11 +26,52 @@ export default createEvent({
             return null;
         }
 
+        let msg: WebhookMessage = null, result: any = null;
+        try {
+            /**
+             * @description Отправляем временное уведомление о начале запроса
+             * @protected
+             */
+            msg = await ctx.followup({
+                flags: MessageFlags.IsComponentsV2,
+                components: [
+                    {
+                        type: 17,
+                        accent_color: platform.color,
+                        components: [
+                            {
+                                type: 9,
+                                components: [
+                                    {type: 10, content: `### ${platform.platform}.${api.type}`},
+                                    {
+                                        type: 10,
+                                        content: `${locale._(ctx.interaction.locale, platform.audio ? "api.platform.request" : "api.platform.request.long", [db.images.loading, platform.platform])}`
+                                    },
+                                    {type: 10, content: `-# ${ctx.author.username}`},
+                                ],
+                                accessory: {
+                                    type: 11,
+                                    media: {
+                                        url: ctx.author.avatarURL()
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ],
+            });
+
+            // Вставляем оригинального автора
+            msg.author = ctx.author;
+        } catch (err) {
+            console.log(err)
+        }
+
         /**
          * @description Выполнение REST-запроса с тайм-аутом
          * @protected
          */
-        const result = await _withTimeout(
+        result = await _withTimeout(
             // Основной запрос к платформе
             api.request(),
 
@@ -40,6 +82,22 @@ export default createEvent({
             new Error(locale._(ctx.interaction.locale, "api.platform.timeout"))
         ).catch(() => {
             return new Error("Request error");
+        });
+
+        // Выполняем в конце
+        setImmediate(async () => {
+            // Если очередь была создана
+            const queue = db.queues.get(ctx.guildId);
+
+            /**
+             * @description Отправляем сообщение о добавлении трека
+             * @protected
+             */
+            await ctx.client.events.runCustom("message/push",
+                msg,
+                queue,
+                !Array.isArray(result) ? result : result[0],
+            );
         });
 
         /**
@@ -61,17 +119,6 @@ export default createEvent({
          */
         const queue = db.queues.set(ctx);
         queue.tracks.push(result, ctx.author); // Добавляем результат (трек / список / плейлист) в очередь
-
-        /**
-         * @description Отправляем сообщение о добавлении трека
-         * @protected
-         */
-        await ctx.client.events.runCustom("message/push",
-            queue,
-            ctx.member,
-            !Array.isArray(result) ? result : result[0]
-        );
-
         return null;
     }
 })

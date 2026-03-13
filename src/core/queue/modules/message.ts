@@ -136,7 +136,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @returns Promise<CycleInteraction>
      * @public
      */
-    public send = (options: {embeds: Embed[], components?: ActionRow<Button>[], flags?: MessageFlags}, response: boolean = false) => {
+    public send = (options: {embeds: Embed[], components?: ActionRow<Button>[], flags?: MessageFlags}) => {
         try {
             // Если бот уже ответил на сообщение
             if (this.replied && !this.deferred) {
@@ -147,7 +147,7 @@ export class QueueMessage<T extends CommandInteraction> {
             // Если можно дать ответ на сообщение
             else if (!this.deferred && !this.replied) {
                 this._deferred = true;
-                return this._original.editOrReply(options, response);
+                return this._original.editOrReply(options, true);
             }
 
             // Отправляем обычное сообщение

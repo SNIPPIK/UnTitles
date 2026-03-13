@@ -17,7 +17,7 @@ export default createEvent({
                 embeds: [],
                 components: queue.components,
                 flags: MessageFlags.IsComponentsV2
-            } as any, true) as any;
+            } as any) as any;
         });
 
         // Меняем статус голосового канала

@@ -6,7 +6,6 @@ import { Collection } from "#structures";
 // Voice Sockets
 export * from "./transport/discord/VoiceWebSocket";
 export * from "./transport/discord/VoiceUDPSocket";
-export * from "./transport/discord/VoiceRTPSocket";
 export * from "./connection";
 
 

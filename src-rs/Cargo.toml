@@ -13,6 +13,8 @@ napi-derive = "2.16.13"
 once_cell = "1.21.3"
 rand = "0.10.0"
 dashmap = "7.0.0-rc2"
+aes-gcm = "0.11.0-rc.3"
+memchr = "2.8.0"
 
 [profile.release]
 # Оптимизации для максимальной точности таймера

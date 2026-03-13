@@ -294,7 +294,6 @@ class RestSpotifyAPI extends RestServerSide.API {
             method: "POST",
             agent: this.agent
         }).toJson;
-
         // Если при получении токена была получена ошибка
         if (token instanceof Error) {
             return new Error(`[APIs]: ${token}`);

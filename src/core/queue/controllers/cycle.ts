@@ -34,7 +34,7 @@ export class ControllerCycles {
  * @const PLAYER_SEND_NATIVE
  * @private
  */
-const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 30);
+const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 20);
 
 /**
  * @author SNIPPIK
@@ -42,7 +42,7 @@ const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 30);
  * @const PLAYER_SEND_POOL
  * @private
  */
-const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 1.2);
+const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 2);
 
 /**
  * @author SNIPPIK

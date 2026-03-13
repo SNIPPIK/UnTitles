@@ -1,4 +1,4 @@
-import { FfmpegProcess, AudioEngine, OggOpusParser, type iType } from "#native";
+import { FfmpegProcess, AudioEngine, type iType } from "#native";
 import { OPUS_FRAME_SIZE, SILENT_FRAME } from "#core/audio/opus";
 import { FFMPEG_PATH } from "#core/audio/process";
 import { TypedEmitter } from "#structures";
@@ -273,32 +273,27 @@ export class AudioResource extends BaseAudioResource {
         // Для буферизированных треков ставим лимит (например, 8-10 минут)
         // Для Pipe лимит 0 (динамическая очередь)
         this.engine = new AudioEngine(isBuffered ? 10 : 20);
-
-        let parser = new OggOpusParser();
         this.process = new FfmpegProcess(this.arguments, FFMPEG_PATH);
 
         // Привязываем события через внутренний метод input (как в твоем Base)
         this.input({
             events: {
                 destroy_callback: (p) => {
-                    parser = null;
                     p.destroy()
                 }
             },
             input: this.process,
             decode: (p) => {
-                p.pipeStdout((chunk: Buffer) => {
-                    parser.parse(chunk, (type, frame) => {
-                        if (type === 'frame') {
-                            if (!this._readable) {
-                                this.engine.addPacket(SILENT_FRAME);
-                                this._readable = true;
-                                setImmediate(() => this.emit("readable"));
-                            }
-
-                            this.engine.addPacket(frame);
+                p.pipeStdout((type, frame: Buffer) => {
+                    if (type === 'frame') {
+                        if (!this._readable) {
+                            this.engine.addPacket(SILENT_FRAME);
+                            this._readable = true;
+                            setImmediate(() => this.emit("readable"));
                         }
-                    });
+
+                        this.engine.addPacket(frame);
+                    }
                 });
             }
         });

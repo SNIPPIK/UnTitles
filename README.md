@@ -98,9 +98,9 @@ setInterval(() => {
 ```
 #### 🦀 Native Voice Engine (Rust Powered)
 - **High performance**: The main logic of voice processing is transferred to a native module on Rust (src-rs), which guarantees stability even with high event loop lag in Node.js.
-- **Voice engine**: Full implementation of Voice Gateway V8. Stack: WebSocket + UDP + SRTP + Opus.
+- **Voice engine**: Full implementation of Voice Gateway V8. Stack: UDP + SRTP + Opus.
 - **Security**: Support for End-to-End Encryption (E2EE 🔐) via the Discord DAVE protocol.
-- **Timers**: Cyclic systems using a timer.
+- **Timers**: Cyclic systems using a timer + auto balancer.
 - **Smart streaming**: Does not require external opus encoders for transmission - uses own method of parsing Opus frames.
 - **FFmpeg Integration**: Used for flexible audio decoding and application of complex filters.
 

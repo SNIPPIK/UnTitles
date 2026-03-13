@@ -1,6 +1,7 @@
-import { VoiceRTPSocket, VoiceUDPSocket, VoiceWebSocket, WebSocketOpcodes } from "#core/voice";
+import { VoiceUDPSocket, VoiceWebSocket, WebSocketOpcodes } from "#core/voice";
 import { VoiceOpcodes, VoiceCloseCodes } from "discord-api-types/voice/v8";
 import { E2EESession } from "#core/voice/managers/E2EE";
+import { VoiceRTPSocket, iType} from "#native";
 import { TypedEmitter } from "#structures";
 import { VoiceAdapter } from "./adapter";
 
@@ -19,6 +20,17 @@ const OPCODE_DAVE_MLS_WELCOME = new Uint8Array([VoiceOpcodes.DaveMlsCommitWelcom
  * @private
  */
 const OPCODE_DAVE_MLS_KEY = new Uint8Array([VoiceOpcodes.DaveMlsKeyPackage]);
+
+
+/**
+ * @author SNIPPIK
+ * @description Коды игнорирования
+ * @const IGNORED_OPCODES
+ * @private
+ */
+const IGNORED_OPCODES: VoiceCloseCodes[] = [
+    VoiceCloseCodes.CallTerminated
+];
 
 /**
  * @author SNIPPIK
@@ -43,7 +55,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @description Клиент RTP, ключевой класс для шифрования пакетов для отправки через UDP
      * @public
      */
-    public _rtp: VoiceRTPSocket;
+    public _rtp: iType<typeof VoiceRTPSocket>;
 
     /**
      * @description Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway
@@ -181,7 +193,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                             data: {
                                 address: data.ip,
                                 port: data.port,
-                                mode: VoiceRTPSocket.mode
+                                mode: "aead_aes256_gcm_rtpsize"
                             }
                         }
                     };
@@ -228,10 +240,10 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 }
 
                 // Создаем подключение RTP
-                this._rtp = new VoiceRTPSocket({
-                    key: new Uint8Array(d.secret_key),
-                    ssrc: this.ssrc
-                });
+                this._rtp = new VoiceRTPSocket(
+                    this.ssrc,
+                    new Uint8Array(d.secret_key)
+                );
 
                 // Если есть поддержка DAVE
                 if (E2EESession.max_version > 0) {
@@ -387,8 +399,11 @@ export class Transport extends TypedEmitter<TransportEvents> {
             // Сообщаем что хотим переподключится
             this.emit("close", code, `[Transport/WS]: ${reason}`);
 
+            // Коды которые просто игнорируются
+            if (IGNORED_OPCODES.includes(code)) return;
+
             // Если можно возобновить подключение
-            if ((code === 4_015 || code < 4_000) && this.ready) {
+            else if ((code === 4_015 || code < 4_000) && this.ready) {
                 this.state = {
                     code: TransportStateCode.OpeningWs,
                     payload: code
@@ -396,14 +411,16 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 return;
             }
 
-            // Если соединение не было закрыто собственноручно
-            if (this.state.code !== TransportStateCode.Closed) {
-                // Пробуем поднять соединение заново
-                this.state = {
-                    code: TransportStateCode.OpeningWs,
-                    payload: code
-                };
-                return;
+            else if (code !== 4006) {
+                // Если соединение не было закрыто собственноручно
+                if (this.state.code !== TransportStateCode.Closed) {
+                    // Пробуем поднять соединение заново
+                    this.state = {
+                        code: TransportStateCode.OpeningWs,
+                        payload: code
+                    };
+                    return;
+                }
             }
 
             // Если нет больше методов подъема соединения, то уничтожаем окончательно
@@ -457,6 +474,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @event
          */
         session.on("key", (key) => {
+            if (!this.secret_key && !this.ssrc) return;
+
             // Если голосовое подключение готово
             this._ws.packet = Buffer.concat([OPCODE_DAVE_MLS_KEY, key]);
         });
@@ -466,6 +485,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @event
          */
         session.on("invalidateTransition", (transitionId) => {
+            if (!this.secret_key && !this.ssrc) return;
+
             // Если голосовое подключение готово
             this._ws.packet = {
                 op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,

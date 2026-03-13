@@ -39,7 +39,7 @@ export default createEvent({
                     iconURL: user?.avatar
                 }
             } as any]
-        }, true);
+        });
 
         // Если есть ответ от отправленного сообщения
         if (message) setTimeout(() => !!message.delete ? message.delete().catch(() => null) : null, 20e3);

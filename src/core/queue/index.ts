@@ -1,11 +1,12 @@
-import {APIRequestData, RestClientSide} from "#handler/rest";
+import { APIRequestData, RestClientSide } from "#handler/rest";
 import { Colors, CommandInteraction } from "#structures/discord";
 import { ControllerCycles } from "./controllers/cycle";
 import { Queue } from "#core/queue/structures/queue";
+import { Track } from "#core/queue/structures/track";
 import { QueueMessage } from "./modules/message";
 import { Collection, locale } from "#structures";
+import { WebhookMessage } from "seyfert";
 import { env } from "#app/env";
-import {Track} from "#core/queue/structures/track";
 
 export * from "./controllers/tracks";
 export * from "./controllers/voice";
@@ -139,7 +140,7 @@ class BaseQueueController<T extends Queue> {
                 ]
             } as any).then((msg) => {
                 setTimeout(() => {
-                    if (msg.deletable) msg.delete().catch(() => null);
+                    if (!!msg.delete) msg.delete().catch(() => null);
                 }, timeout ?? 1e3);
             });
 
@@ -191,7 +192,7 @@ export interface QueueEvents {
      * @returns void
      * @readonly
      */
-    readonly "message/push": (queue: Queue, user: CommandInteraction["member"], items: Track | APIRequestData.List<Track>) => void;
+    readonly "message/push": (msg: WebhookMessage, queue: Queue, items: Track | APIRequestData.List<Track>) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять сообщение о текущем треке

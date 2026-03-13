@@ -217,6 +217,9 @@ export class Queue {
 
         // Для удаления динамического сообщения
         this._message.delete();
+
+        // Удаляем статус гс канала
+        db.adapter.status(this.message.voice_id, null);
     };
 
     /**
