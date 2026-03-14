@@ -1,4 +1,4 @@
-name: Build Rust modules + Typescript
+name: Build Rust modules
 on:
   push:
     branches: [ "main", "beta" ]
@@ -11,6 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        node-version: [ 25.x ]
         settings:
           # Linux
           - host: ubuntu-latest
@@ -48,6 +49,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # Node Setup
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - run: npm i
+      - run: npm run build --if-present
 
       # Rust Setup
       - name: Install Rust
