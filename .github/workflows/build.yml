@@ -33,16 +33,16 @@ jobs:
 
           - host: windows-latest
             target: aarch64-pc-windows-msvc
-            build: npx napi build --release --platform --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
 
           # macOS
           - host: macos-latest
             target: x86_64-apple-darwin
-            build: npx napi build --release --platform --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
 
           - host: macos-latest
             target: aarch64-apple-darwin
-            build: npx napi build --release --platform --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
 
           # Android
           - host: ubuntu-latest
@@ -86,31 +86,24 @@ jobs:
       # Prepare builds
       - name: Prepare full build folder
         run: |
-          # --- Создаём папки ---
+          # --- Создаём нужные папки ---
           mkdir -p build/native
-          mkdir -p build/src
 
-          # --- Копируем все файлы Rust сборки (.node) в native ---
-          find src-rs -name "*.node" -exec cp {} build/native/ \;
-
-          # --- Копируем Node.js entrypoint ---
+          # --- Копируем Rust сборки в build/native ---
+          cp *.node build/native/ || true
           cp index.js build/native/ || true
           cp index.ts build/native/ || true
 
-          # --- Копируем весь src в build/src (рекурсивно) ---
-          # cp -r src/* build/src/
+          # --- Копируем Node entrypoint и конфиги в корень build ---
+          cp README.md build/
 
-          # --- Копируем все другие файлы проекта, которые нужны для работы ---
-          # cp package.json build/native/ || true
-          # cp package-lock.json build/native/ || true
-          # cp README.md build/native/ || true
-          # cp -r lib build/native/ || true  # если есть вспомогательные скрипты
-
-          # --- Проверка ---
+          # --- Проверка структуры ---
           echo "--- build/native ---"
           ls -R build/native
-          echo "--- build/src ---"
-          ls -R build/src
+          echo "--- build/ ---"
+          ls -R build
+          echo "--- src/ ---"
+          ls -R src
 
       # Create builds
       - name: Upload artifact
