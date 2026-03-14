@@ -84,32 +84,33 @@ jobs:
         run: ${{ matrix.settings.build }}
 
       # Prepare builds
-      - name: Prepare native build folder
+      - name: Prepare full build folder
         run: |
-          # --- Создаём нужные папки ---
+          # --- Создаём папки ---
           mkdir -p build/native
           mkdir -p build/src
 
+          # --- Копируем все файлы Rust сборки (.node) в native ---
+          find src-rs -name "*.node" -exec cp {} build/native/ \;
+
           # --- Копируем Node.js entrypoint ---
           cp index.js build/native/ || true
-          cp index.ts build/native/ || true  # если нужен ts-node
+          cp index.ts build/native/ || true
 
-          # --- Копируем Rust бинарники ---
-          cp *.node build/native/ || true
-          cp src-rs/*.node build/native/ || true
+          # --- Копируем весь src в build/src (рекурсивно) ---
+          # cp -r src/* build/src/
 
-          # --- Копируем весь src в build/src ---
-          cp -r src/* build/src/ || true
-
-          # --- Опционально: package.json и другие конфиги ---
-          cp package.json build/native/ || true
-          cp package-lock.json build/native/ || true
+          # --- Копируем все другие файлы проекта, которые нужны для работы ---
+          # cp package.json build/native/ || true
+          # cp package-lock.json build/native/ || true
+          # cp README.md build/native/ || true
+          # cp -r lib build/native/ || true  # если есть вспомогательные скрипты
 
           # --- Проверка ---
-          echo "Contents of build/native:"
-          ls -la build/native
-          echo "Contents of build/src:"
-          ls -la build/src
+          echo "--- build/native ---"
+          ls -R build/native
+          echo "--- build/src ---"
+          ls -R build/src
 
       # Create builds
       - name: Upload artifact
