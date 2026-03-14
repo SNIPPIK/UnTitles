@@ -84,39 +84,23 @@ jobs:
         run: ${{ matrix.settings.build }}
 
       # Prepare builds
-      - name: Prepare final build
+      - name: Build final artifact
         run: |
-          # --- Создаём необходимые папки ---
+          # --- Создаём папку для нативных сборок ---
           mkdir -p build/native
-          mkdir -p src
 
-          # --- Копируем Rust сборки в build/native ---
-          cp *.node build/native/ || true
-          cp src-rs/*.node build/native/ || true
+          # --- Копируем все .node файлы в build/native ---
+          find . -name "*.node" -exec cp {} build/native/ \;
 
           # --- Копируем index.js и index.d.ts для нативного модуля ---
           cp index.js build/native/ || true
           cp index.d.ts build/native/ || true
 
-          # --- Копируем всю исходную папку TS в src/ ---
-          cp -r src/* src/
-
-          # --- Копируем все прочие файлы проекта в корень build ---
-          cp LICENSE.md build/
-          cp README.md build/
-          cp README_RU.md build/
-          cp package.json build/
-          cp package-lock.json build/
-          cp seyfert.config.mjs build/
-          cp tsconfig.json build/
-
-          # --- Проверка ---
+          # --- JS файлы после TSC уже лежат в build, src остаётся на месте ---
           echo "--- build/native ---"
           ls -R build/native
           echo "--- build root ---"
           ls -la build
-          echo "--- src ---"
-          ls -R src
 
       # Create builds
       - name: Upload artifact
