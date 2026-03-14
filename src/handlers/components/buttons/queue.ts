@@ -14,8 +14,8 @@ export default class extends ComponentCommand {
     async run(ctx: ComponentContext<typeof this.componentType>) {
         const lang = ctx.interaction.locale;
         const queue = db.queues.get(ctx.guildId);
-        let page = parseInt((queue.tracks.position / 5).toFixed(0));
-        const pages = parseInt((queue.tracks.total / 5).toFixed(0));
+        let page = Math.max(Math.ceil(queue.tracks.position / 5), 1);
+        const pages = Math.ceil(queue.tracks.total / 5);
 
         // Получаем контейнер на 2 версии компонентов
         const getContainer = (position: number) => {
@@ -29,11 +29,11 @@ export default class extends ComponentCommand {
                         "components": [
                             {
                                 "type": 10,
-                                "content": `### ${db.images.disk_emoji} **[${track.artist.title}](${track.artist.url})**`
+                                "content": `## ${db.images.disk_emoji} **[${track.artist.title}](${track.artist.url})**`
                             },
                             {
                                 "type": 10,
-                                "content": `### **[${track.name}](${track.url})**\n-# ${track.time.split} - ${track.api.name.toLowerCase()}`
+                                "content": `### **[${track.name}](${track.url})**\n> ${track.time.split}\n-# ${track.user.username} ● ${track.time.split} | ${track.api.name.toLowerCase()}`
                             }
                         ],
                         "accessory": {
@@ -78,7 +78,7 @@ export default class extends ComponentCommand {
                         },
                         {
                             "type": 10, // Text
-                            "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages, queue.tracks.total, queue.tracks.time])
+                            "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page, pages, queue.tracks.total, queue.tracks.time])
                         },
 
                         // Кнопки

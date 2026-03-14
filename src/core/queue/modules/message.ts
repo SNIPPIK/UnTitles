@@ -151,12 +151,38 @@ export class QueueMessage<T extends CommandInteraction> {
             }
 
             // Отправляем обычное сообщение
+            return this.send_single(options);
+        } catch {
+            this._deferred = false;
+
+            try {
+                // Отправляем обычное сообщение
+                return this.send_single(options);
+            } catch {
+                return null;
+            }
+        }
+    };
+
+    /**
+     * @description Авто отправка сообщения
+     * @param options - Параметры сообщения
+     * @returns Promise<CycleInteraction>
+     * @public
+     */
+    public send_single = (options: {embeds: Embed[], components?: ActionRow<Button>[], flags?: MessageFlags}) => {
+        try {
+            // Отправляем обычное сообщение
             return this._original.client.messages.write(this.channel_id, options);
         } catch {
             this._deferred = false;
 
-            // Отправляем обычное сообщение
-            return this._original.client.messages.write(this.channel_id, options);
+            try {
+                // Отправляем обычное сообщение
+                return this._original.client.messages.write(this.channel_id, options);
+            } catch {
+                return null;
+            }
         }
     };
 }

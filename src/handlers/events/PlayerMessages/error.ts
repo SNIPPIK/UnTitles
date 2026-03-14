@@ -20,7 +20,7 @@ export default createEvent({
         const {api, artist, image, user, name} = position ? queue.tracks.get(position) : queue.tracks.track;
 
         // Создаем сообщение
-        const message = await queue.message.send({
+        const message = await queue.message.send_single({
             embeds: [{
                 color: api.color, thumbnail: image, timestamp: new Date(),
                 fields: [

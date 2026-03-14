@@ -70,9 +70,13 @@ impl CycleManager {
         if self.running.load(Ordering::Acquire) {
             return;
         }
+
         // Пытаемся переключить флаг с false на true. Если не удалось — значит,
         // другой поток уже запустил процесс, выходим.
-        if self.running.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        if self.running
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
             return;
         }
 
@@ -82,74 +86,55 @@ impl CycleManager {
         let interval = self.interval;
 
         let handle = thread::spawn(move || {
-            // Время следующего тика (момент, когда нужно начать новый цикл обработки).
-            let start_time = Instant::now();
-            let next_tick = start_time + interval;
+            // Начало первого интервала
+            let mut interval_start = Instant::now();
 
             loop {
-                // Проверяем флаг остановки.
+                // Проверка флага остановки
                 if !running_flag.load(Ordering::Acquire) {
                     break;
                 }
 
-                // Если нет активных сессий – не тратим ресурсы на точное ожидание,
-                // просто спим с короткой паузой и проверяем флаг.
-                if sessions.is_empty() {
-                    thread::sleep(Duration::from_millis(10));
-                    continue;
-                }
+                let session_count = sessions.len().max(1) as u32;
+                let step = interval / session_count;
 
-                // Ожидание до наступления следующего тика.
-                let now = Instant::now();
-                if now >= next_tick {
-                    let sleep = next_tick - now;
-                    // Если спать нужно больше 2 мс, используем thread::sleep,
-                    // оставляя 1 мс на активное ожидание для точности.
-                    if sleep >= Duration::from_millis(2) {
-                        thread::sleep(sleep - Duration::from_millis(1));
-                    }
-
-                    // Активное ожидание (spin-loop) для оставшегося времени.
-                    // Закомментировано, но может быть включено для ultra-low latency.
-                    while Instant::now() <= next_tick && running_flag.load(Ordering::Acquire) {
-                        std::hint::spin_loop();
-                    }
-                }
-
-                // --- Распределение вызовов tick() внутри одного интервала ---
-                let count = sessions.len().max(1); // избегаем деления на ноль
-                let step = interval / count as u32; // шаг времени между tick() разных сессий
-
-                let mut next = Instant::now(); // момент вызова следующей сессии (относительный)
-
-                // Проходим по всем сессиям (итератор DashMap даёт доступ к каждой записи).
-                for session in sessions.iter() {
-                    // Вызываем tick() для текущей сессии.
-                    session.value().tick();
-
-                    // Вычисляем время, когда должна быть вызвана следующая сессия.
-                    next += step;
+                // Проходим по всем сессиям
+                for (i, session) in sessions.iter().enumerate() {
+                    // Рассчитываем целевое время tick для этой сессии
+                    let target_time = interval_start + step * (i as u32);
                     let now = Instant::now();
 
-                    // Если до следующего вызова ещё есть время, немного спим,
-                    // чтобы снизить нагрузку на CPU.
-                    if now <= next {
-                        let sleep = next - now;
+                    if target_time > now {
+                        let remaining = target_time - now;
 
-                        if sleep >= Duration::from_micros(500) {
-                            thread::sleep(sleep - Duration::from_micros(100));
+                        // Основная пауза — thread::sleep почти весь интервал
+                        // Без spin-loop — минимальная нагрузка CPU
+                        if remaining > Duration::from_micros(200) {
+                            thread::sleep(remaining);
                         }
 
-                        // Активное ожидание остатка (опционально)
-                        while Instant::now() < next {
+                        // Минимальный spin-loop для остатка времени (1–2 мс)
+                        while Instant::now() < target_time && running_flag.load(Ordering::Acquire) {
                             std::hint::spin_loop();
                         }
                     }
+
+                    // Вызов tick() для сессии
+                    session.value().tick();
+                }
+
+                // Обновляем начало следующего интервала
+                interval_start += interval;
+
+                // Если цикл сильно отстал, синхронизируемся с реальным временем
+                let now = Instant::now();
+                if interval_start < now {
+                    interval_start = now - step;
                 }
             }
         });
 
-        // Сохраняем дескриптор потока, чтобы потом дождаться его завершения.
+        // Сохраняем handle
         *self.handle.lock().unwrap() = Some(handle);
     }
 

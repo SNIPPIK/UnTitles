@@ -88,7 +88,7 @@ class RestYandexAPI extends RestServerSide.API {
                 if (!IDs) return locale.err( "api.request.id.track");
 
                 // Интеграция с утилитой кеширования
-                const cache = sdb.meta_saver?.get(`${this.url}/${IDs[0]}_${IDs[1]}`);
+                const cache = sdb.meta_saver?.get(`${this.url}/track/${IDs[0]}_${IDs[1]}`);
 
                 // Если трек есть в кеше
                 if (cache) {
@@ -142,7 +142,7 @@ class RestYandexAPI extends RestServerSide.API {
                     }
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(track, this.url);
+                    if (!cache) sdb.meta_saver.set(track, `${this.url}/track`);
 
                     return track;
                 } catch (e) {
@@ -164,6 +164,15 @@ class RestYandexAPI extends RestServerSide.API {
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.album");
 
+                // Интеграция с утилитой кеширования
+                const cache = sdb.meta_saver?.get(`${this.url}/album/${ID}`);
+
+                // Если трек есть в кеше
+                if (cache) {
+                    // Если нет возможности получить аудио
+                    if (!this.audio) return cache;
+                }
+
                 try {
                     // Создаем запрос
                     const api = await this.API(`albums/${ID}/with-tracks`);
@@ -176,7 +185,19 @@ class RestYandexAPI extends RestServerSide.API {
                     const tracks = api["volumes"]?.pop().splice(0, limit);
                     const songs = tracks.map(this.track);
 
-                    return {id: ID, url, title: api.title, image: AlbumImage, items: songs};
+                    const album = {
+                        id: ID,
+                        url,
+                        title:
+                        api.title,
+                        image: AlbumImage,
+                        items: songs
+                    };
+
+                    // Сохраняем кеш в системе
+                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
+
+                    return album;
                 } catch (e) {
                     return Error(`[APIs]: ${e}`);
                 }

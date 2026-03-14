@@ -13,7 +13,7 @@ export default createEvent({
     data: { name: "message/playing" },
     async run(queue) {
         const message = await db.queues.cycles.messages.ensure(queue.message.guild_id, () => {
-            return queue.message.send({
+            return queue.message.send_single({
                 embeds: [],
                 components: queue.components,
                 flags: MessageFlags.IsComponentsV2

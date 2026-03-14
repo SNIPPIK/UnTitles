@@ -22,7 +22,7 @@ class Database {
     public readonly api: RestObject;
 
     /**
-     * @description Адаптер для общения с websocket'ом клиента
+     * @description Адаптер для общения с websocket клиента/бота
      * @readonly
      * @public
      */

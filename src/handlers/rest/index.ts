@@ -13,11 +13,17 @@ export * from "./index.server";
 /**
  * @author SNIPPIK
  * @description Разделение слов в названии трека
- * @param str - Название
+ * @param text - Название
  * @const normalize
  * @private
  */
-const normalize = (str: string) => str.toLowerCase().replace(/[*:\/;-]/gi, "").replace(/\s+/g, " ").trim().split(" ");
+const normalize = (text: string) => text
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
 
 /**
  * @author SNIPPIK
@@ -336,10 +342,11 @@ export class RestObject {
                 const matchCount = candidate.filter(word => original.includes(word)).length;
                 const time = Math.abs(track.time.total - song.time.total);
 
-                return (time <= 7) && // по длительности близко
+                return (time <= 10) && // по длительности близко
                     (
                         matchCount === candidate.length ||               // полное совпадение
-                        matchCount >= Math.floor(candidate.length * 0.4) // ≥40% слов совпало
+                        matchCount === original.length ||                // Если есть полное совпадение по оригиналу
+                        matchCount >= Math.floor(candidate.length * 0.5) // ≥50% слов совпало
                     );
             });
 

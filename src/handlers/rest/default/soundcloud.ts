@@ -16,7 +16,7 @@ import { httpsClient, locale } from "#structures";
  * @author SNIPPIK
  * @description Динамически загружаемый класс
  * @class RestSoundCloudAPI
- * @extends Assign
+ * @extends RestServerSide
  * @public
  */
 @DeclareRest({
@@ -56,7 +56,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
         {
             name: "track",
             filter: /^https?:\/\/soundcloud\.com\/([\w-]+)\/?([\w-]+)(?:\?.*)?$/i,
-            execute: async (url, options) => {
+            execute: async (url, { audio }) => {
                 const fixed = url.split("?")[0];
 
                 try {
@@ -73,7 +73,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
                         const track = this.track(api);
 
                         // Если указано получение аудио
-                        if (options.audio) {
+                        if (audio) {
                             if (api.media.transcodings) {
                                 // Расшифровываем аудио формат
                                 track.audio = await this.getFormat(api.media.transcodings, ClientID);
@@ -98,7 +98,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
         {
             name: "playlist",
             filter: /sets\/[a-zA-Z0-9]+/i,
-            execute: async (url, {limit}) => {
+            execute: async (url, { limit }) => {
                 const fixed = url.split("?")[0];
 
                 try {
@@ -194,7 +194,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
      * @description Получаем временный client_id для SoundCloud
      * @protected
      */
-    protected async authorization(): Promise<string | Error> {
+    protected authorization = async (): Promise<string | Error> => {
         // Если client_id ещё действителен, возвращаем его
         if (this.options.client_id && this.options.time > Date.now()) return this.options.client_id;
 
@@ -220,7 +220,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
             if (!client_id || !client_id.data || !client_id.data.id) return null;
 
             this.options.client_id = client_id.data.id;
-            this.options.time = Date.now() + 60 * 60 * 1e3;
+            this.options.time = Date.now() + 60 * 30 * 1e3;
 
             // Выдаем анонимный ID
             return client_id.data.id;

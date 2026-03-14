@@ -1,5 +1,6 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
+import {sdb} from "#worker/db";
 
 /**
  * @author SNIPPIK
@@ -24,7 +25,7 @@ import { httpsClient, locale } from "#structures";
     url: "www.deezer.com",
     audio: false,
     auth: false,
-    filter: /^(https?:\/\/)?(www\.)?(deezer\.com)\/.+$/i,
+    filter: /^(https?:\/\/)?(www\.)|(link\.)?(deezer\.com)\/.+$/i, //|(link\.) - Short URL
 })
 @OptionsRest({
     /**
@@ -42,11 +43,20 @@ class RestDeezerAPI extends RestServerSide.API {
         {
             name: "album",
             filter: /(album)\/[0-9]+/i,
-            execute: async (url, {limit}) => {
+            execute: async (url, { limit }) => {
                 const ID = this.getID(/[0-9]+/i, url)[0]?.split("album")?.at(0);
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.album");
+
+                // Интеграция с утилитой кеширования
+                const cache = sdb.meta_saver?.get(`${this.url}/album/${ID}`);
+
+                // Если трек есть в кеше
+                if (cache) {
+                    // Если нет возможности получить аудио
+                    if (!this.audio) return cache;
+                }
 
                 try {
                     // Создаем запрос
@@ -58,13 +68,18 @@ class RestDeezerAPI extends RestServerSide.API {
                     const tracks = api.tracks.data.splice(0, limit);
                     const songs = tracks.map(this.track);
 
-                    return {
+                    const album = {
                         id: ID,
                         url,
                         title: api.title,
                         items: songs,
                         image: api.cover_xl
                     };
+
+                    // Сохраняем кеш в системе
+                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
+
+                    return album;
                 } catch (e) {
                     return Error(`[APIs]: ${e}`);
                 }

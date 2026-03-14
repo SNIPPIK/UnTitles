@@ -14,7 +14,7 @@ class SharedDatabase {
      * @readonly
      * @public
      */
-    public readonly meta_saver: MetaSaver;
+    public readonly meta_saver: MetaSaver<any>;
 
     /**
      * @description Класс для кеширования аудио

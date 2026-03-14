@@ -141,6 +141,15 @@ class RestSpotifyAPI extends RestServerSide.API {
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err( "api.request.id.album");
 
+                // Интеграция с утилитой кеширования
+                const cache = sdb.meta_saver?.get(`${this.url}/album/${ID}`);
+
+                // Если трек есть в кеше
+                if (cache) {
+                    // Если нет возможности получить аудио
+                    if (!this.audio) return cache;
+                }
+
                 try {
                     // Создаем запрос
                     const api: Error | any = await this.API(`albums/${ID}?offset=0&limit=${Math.min(limit, 100)}`);
@@ -150,7 +159,8 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                     // Подготавливаем все треки
                     const tracks = api.tracks.items.map((track: any) => this.track(track, api.images));
-                    return {
+
+                    const album = {
                         id: ID,
                         url: `https://open.spotify/album/${ID}`,
                         title: api.name,
@@ -158,6 +168,10 @@ class RestSpotifyAPI extends RestServerSide.API {
                         items: tracks,
                         artist: api?.["artists"][0]
                     };
+
+                    // Сохраняем кеш в системе
+                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
+                    return album;
                 } catch (e) {
                     return new Error(`[APIs]: ${e}`);
                 }

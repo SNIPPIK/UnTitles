@@ -13,7 +13,7 @@ import fs from "node:fs";
  * @class MetaSaver
  * @public
  */
-export class MetaSaver {
+export class MetaSaver<T extends APIRequestData.Track | APIRequestData.List> {
     /**
      * @description Можно ли сохранять файлы
      * @returns boolean
@@ -29,20 +29,14 @@ export class MetaSaver {
     public _dirname = path.resolve(env.get("cache.dir"));
 
     /**
-     * @description Бд треков, для повторного использования
-     * @private
-     */
-    private tracks: Map<string, APIRequestData.Track> = !this.inFile ? new Map<string, APIRequestData.Track>() : null;
-
-    /**
      * @description Сохраняем трек в локальную базу данных
      * @param track - Кешируемый трек
      * @param api - Ссылка на платформу
-     * @returns Promise<void>
+     * @returns void
      * @public
      */
-    public set = (track: APIRequestData.Track, api: string) => queueMicrotask(async () => {
-        // Если нельзя сохранять в файлы
+    public set = (track: T, api: string) => queueMicrotask(async () => {
+        // Если можно сохранять в файлы
         if (this.inFile) {
             const Path = path.join(this._dirname, "Data", api, `${track.id}.json`);
 
@@ -52,24 +46,11 @@ export class MetaSaver {
                     await afs.mkdir(dirPath, { recursive: true });
 
                     // Записываем данные в файл
-                    await afs.writeFile(Path, JSON.stringify(
-                        {
-                            track: {
-                                ...track,
-                                audio: null
-                            }
-                        }, null, 2), "utf-8");
+                    await afs.writeFile(Path, JSON.stringify(track, null, 2), "utf-8");
                 } catch (error) {
                     console.error("Failed to write track cache:", error);
                 }
             }
-        } else {
-            const song = this.tracks?.get?.(track.id);
-
-            // Если уже сохранен трек
-            if (song) return null;
-
-            this.tracks.set(track.id, track);
         }
 
         return null;
@@ -78,29 +59,24 @@ export class MetaSaver {
     /**
      * @description Выдаем данные из класса
      * @param ID - Идентификатор трека
-     * @returns APIRequestData.Track
+     * @returns T
      * @public
      */
-    public get = (ID: string): APIRequestData.Track => {
-        // Если есть трек в кеше
-        if (fs.existsSync(`${this._dirname}/Data/${ID}.json`)) {
-            try {
-                // Если трек кеширован в файл
-                const json = JSON.parse(fs.readFileSync(`${this._dirname}/Data/${ID}.json`, "utf8"));
+    public get = (ID: string): T => {
+        // Если можно сохранять в файлы
+        if (this.inFile) {
+            // Если есть трек в кеше
+            if (fs.existsSync(`${this._dirname}/Data/${ID}.json`)) {
+                try {
+                    // Если трек кеширован в файл
+                    const json = JSON.parse(fs.readFileSync(`${this._dirname}/Data/${ID}.json`, "utf8"));
 
-                // Если трек был найден среди файлов
-                if (json) return json.track;
-            } catch {
-                return null;
+                    // Если трек был найден среди файлов
+                    if (json) return json?.track ?? json;
+                } catch {
+                    return null;
+                }
             }
-        }
-
-        // Если включен режим без кеширования в файл
-        else {
-            const track = this.tracks?.get?.(ID.split("/").at(-1));
-
-            // Если трек кеширован в память, то выдаем данные
-            if (track) return track;
         }
 
         return null;
