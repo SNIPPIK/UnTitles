@@ -86,17 +86,21 @@ jobs:
       # Prepare builds
       - name: Build final artifact
         run: |
-          mkdir -p build/native
-          cp index.js build/native/ || true
-          cp *.ts build/native/ || true
-          cp *.node build/native/ || true
-          rm -rd node_modules
+          mkdir -p out/build/native
+          cp src out/ || true
+          cp *.json out/ || true
+          cp *.mjs out/ || true
+          cp *.example out/ || true
+          
+          cp index.js out/build/native/ || true
+          cp *.ts out/build/native/ || true
+          cp *.node out/build/native/ || true
+          
 
       # Create builds
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: |
-            **/*
+          path: out
           if-no-files-found: error
