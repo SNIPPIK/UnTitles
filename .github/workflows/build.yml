@@ -33,16 +33,16 @@ jobs:
 
           - host: windows-latest
             target: aarch64-pc-windows-msvc
-            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
 
           # macOS
           - host: macos-latest
             target: x86_64-apple-darwin
-            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
 
           - host: macos-latest
             target: aarch64-apple-darwin
-            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
 
           # Android
           - host: ubuntu-latest
@@ -106,6 +106,9 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bindings-${{ matrix.settings.target }}
-          path: /
-          if-no-files-found: error
+           name: bindings-${{ matrix.settings.target }}
+           path: |
+              **/*.js
+              **/*.ts
+              **/*.node
+            if-no-files-found: error
