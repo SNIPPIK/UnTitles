@@ -1,4 +1,4 @@
-name: Build Rust modules
+name: Build Rust Modules
 on:
   push:
     branches: [ "main", "beta" ]
@@ -11,7 +11,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [ 25.x ]
         settings:
           # Linux
           - host: ubuntu-latest
@@ -29,37 +28,33 @@ jobs:
           # Windows
           - host: windows-latest
             target: x86_64-pc-windows-msvc
-            build: npx napi build --release --platform --cargo-cwd ./src-rs
+            build: npx napi build --release --target x86_64-pc-windows-msvc --cargo-cwd ./src-rs
 
           - host: windows-latest
             target: aarch64-pc-windows-msvc
-            build: npx napi build --release --platform --cargo-cwd ./src-rs
+            build: npx napi build --release --target aarch64-pc-windows-msvc --cargo-cwd ./src-rs
 
           # Android
           - host: ubuntu-latest
             target: aarch64-linux-android
-            build: npx napi build --release --target aarch64-linux-android --zig --cargo-cwd ./src-rs
+            build: npx napi build --release --target aarch64-linux-android --cargo-cwd ./src-rs
 
           - host: ubuntu-latest
             target: armv7-linux-androideabi
-            build: npx napi build --release --target armv7-linux-androideabi --zig --cargo-cwd ./src-rs
+            build: npx napi build --release --target armv7-linux-androideabi --cargo-cwd ./src-rs
 
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      # Node Setup
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+      - name: Setup node
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24
           cache: 'npm'
-      - run: npm i
-      - run: npm run build --if-present
 
-      # Rust Setup
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -71,22 +66,23 @@ jobs:
         with:
           version: 0.13.0
 
+      - name: Install dependencies
+        run: npm install
+
       - name: Build
         run: ${{ matrix.settings.build }}
 
-      # Prepare builds
-      - name: Build final artifact
+      - name: Prepare native build folder
         run: |
-          mkdir -p out/native/
-          cp index.js out/native/ || true
-          cp *.ts out/native/ || true
-          cp *.node out/native/ || true
-          
+          mkdir -p build/native
+          cp index.js build/native/ || true
+          cp *.ts build/native/ || true
+          cp *.node build/native/ || true
+          cp src-rs/*.node build/native/ || true
 
-      # Create builds
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: out
+          path: build/native
           if-no-files-found: error
