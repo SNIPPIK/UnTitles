@@ -1,4 +1,4 @@
-name: Build Rust Modules
+name: Build Rust modules + Typescript
 on:
   push:
     branches: [ "main", "beta" ]
@@ -11,20 +11,40 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        node-version: [ 24.x, 25.x ]
         settings:
+          # Linux
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             build: npx napi build --release --platform --cargo-cwd ./src-rs
-          - host: windows-latest
-            target: x86_64-pc-windows-msvc
-            build: npx napi build --release --platform --cargo-cwd ./src-rs
+
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
+
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
             build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
 
+          # Windows
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
+
+          - host: windows-latest
+            target: aarch64-pc-windows-msvc
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
+
+          # macOS
+          - host: macos-latest
+            target: x86_64-apple-darwin
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
+
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
+
+          # Android
           - host: ubuntu-latest
             target: aarch64-linux-android
             build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
@@ -39,12 +59,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup node
+      # Node Setup
+      - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
+      - run: npm i
+      - run: npm run build --if-present
 
+      # Rust Setup
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -56,20 +80,38 @@ jobs:
         with:
           version: 0.13.0
 
-      - name: Install dependencies
-        run: npm install
-
       - name: Build
         run: ${{ matrix.settings.build }}
 
+      # Prepare builds
       - name: Prepare native build folder
         run: |
+          # --- Создаём нужные папки ---
           mkdir -p build/native
+          mkdir -p build/src
+
+          # --- Копируем Node.js entrypoint ---
           cp index.js build/native/ || true
-          cp *.ts build/native/ || true
+          cp index.ts build/native/ || true  # если нужен ts-node
+
+          # --- Копируем Rust бинарники ---
           cp *.node build/native/ || true
           cp src-rs/*.node build/native/ || true
 
+          # --- Копируем весь src в build/src ---
+          cp -r src/* build/src/ || true
+
+          # --- Опционально: package.json и другие конфиги ---
+          cp package.json build/native/ || true
+          cp package-lock.json build/native/ || true
+
+          # --- Проверка ---
+          echo "Contents of build/native:"
+          ls -la build/native
+          echo "Contents of build/src:"
+          ls -la build/src
+
+      # Create builds
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
