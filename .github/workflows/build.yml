@@ -38,21 +38,21 @@ jobs:
           # Android
           - host: ubuntu-latest
             target: aarch64-linux-android
-            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
+            build: npx napi build --release --target aarch64-linux-android --zig --cargo-cwd ./src-rs
 
           - host: ubuntu-latest
             target: armv7-linux-androideabi
-            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
+            build: npx napi build --release --target armv7-linux-androideabi --zig --cargo-cwd ./src-rs
 
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       # Node Setup
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
