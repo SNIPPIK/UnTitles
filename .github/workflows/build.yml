@@ -106,9 +106,9 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-           name: bindings-${{ matrix.settings.target }}
-           path: |
-              **/*.js
-              **/*.ts
-              **/*.node
-            if-no-files-found: error
+          name: bindings-${{ matrix.settings.target }}
+          path: |
+            **/*.js
+            **/*.ts
+            **/*.node
+          if-no-files-found: error
