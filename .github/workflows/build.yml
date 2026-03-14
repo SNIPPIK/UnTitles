@@ -87,12 +87,12 @@ jobs:
       - name: Build final artifact
         run: |
           mkdir -p out/build/native
-          cp src/** out/ || true
+          cp src/**/* out/ || true
           cp *.json out/ || true
           cp *.mjs out/ || true
           cp *.example out/ || true
           
-          cp build/** out/build || true
+          cp build/**/* out/build || true
           cp index.js out/build/native/ || true
           cp *.ts out/build/native/ || true
           cp *.node out/build/native/ || true
