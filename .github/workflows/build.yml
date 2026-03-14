@@ -84,25 +84,38 @@ jobs:
         run: ${{ matrix.settings.build }}
 
       # Prepare builds
-      - name: Prepare full build folder
+      - name: Prepare final build
         run: |
-          # --- Создаём нужные папки ---
+          # --- Создаём необходимые папки ---
           mkdir -p build/native
+          mkdir -p src
 
           # --- Копируем Rust сборки в build/native ---
           cp *.node build/native/ || true
+          cp src-rs/*.node build/native/ || true
+
+          # --- Копируем index.js и index.d.ts для нативного модуля ---
           cp index.js build/native/ || true
-          cp index.ts build/native/ || true
+          cp index.d.ts build/native/ || true
 
-          # --- Копируем Node entrypoint и конфиги в корень build ---
+          # --- Копируем всю исходную папку TS в src/ ---
+          cp -r src/* src/
+
+          # --- Копируем все прочие файлы проекта в корень build ---
+          cp LICENSE.md build/
           cp README.md build/
+          cp README_RU.md build/
+          cp package.json build/
+          cp package-lock.json build/
+          cp seyfert.config.mjs build/
+          cp tsconfig.json build/
 
-          # --- Проверка структуры ---
+          # --- Проверка ---
           echo "--- build/native ---"
           ls -R build/native
-          echo "--- build/ ---"
-          ls -R build
-          echo "--- src/ ---"
+          echo "--- build root ---"
+          ls -la build
+          echo "--- src ---"
           ls -R src
 
       # Create builds
