@@ -25,6 +25,14 @@ jobs:
             target: armv7-unknown-linux-gnueabihf
             build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
 
+          - host: ubuntu-latest
+            target: aarch64-linux-android
+            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
+
+          - host: ubuntu-latest
+            target: armv7-linux-androideabi
+            build: npx napi build --release --platform --zig --cargo-cwd ./src-rs
+
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
 
