@@ -61,7 +61,7 @@ impl OggOpusParser {
     #[napi(constructor)]
     pub fn new() -> Self {
         Self {
-            remainder: Vec::with_capacity(32000),
+            remainder: Vec::with_capacity(8192),
             packet_carry: Vec::with_capacity(8192),
             bitstream_serial: -1,
             waiting_for_head: true,

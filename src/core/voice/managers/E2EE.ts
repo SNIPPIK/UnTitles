@@ -167,12 +167,12 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
         this.emit("debug", `Preparing for transition (${data.transition_id}, v${data.protocol_version})`);
         this.pendingTransitions.set(data.transition_id, data.protocol_version);
 
-        // Удаляем старые переходы через 30 секунд, если они не выполнились
+        // Удаляем старые переходы через 5 секунд, если они не выполнились
         setTimeout(() => {
             if (this.pendingTransitions?.has(data.transition_id)) {
                 this.pendingTransitions.delete(data.transition_id);
             }
-        }, 30000).unref(); // unref() важен, чтобы не держать процесс Node.js
+        }, 5e3);
 
         if (data.transition_id === 0) this.executeTransition(data.transition_id);
         else if (data.protocol_version === 0) this.session?.setPassthroughMode(true, TRANSITION_EXPIRY_PENDING_DOWNGRADE);
@@ -212,12 +212,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
         this.lastTransition_id = transition_id;
         this.emit("debug", `Transition executed (v${oldVersion} -> v${this.version}, id: ${transition_id})`);
         this.pendingTransitions.delete(transition_id);
-
-        // Даем небольшую паузу (один тик), чтобы ключи "улеглись"
-        setImmediate(() => {
-            this._isTransitioning = false;
-        });
-
+        this._isTransitioning = false;
         return true;
     };
 

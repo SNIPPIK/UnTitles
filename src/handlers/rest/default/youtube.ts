@@ -253,7 +253,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     // Если ID видео не удалось извлечь из ссылки
                     if (!ID) return locale.err("api.request.id.track");
 
-                    const cache = sdb.meta_saver.get(`${this.url}/${ID}`);
+                    const cache = sdb.meta_saver.get(`${this.url}/track/${ID}`);
 
                     // Если трек есть в кеше
                     if (cache) {
@@ -312,7 +312,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     }
 
                     // Сохраняем кеш в системе
-                    if (!cache && !api?.["videoDetails"]?.["isLive"]) sdb.meta_saver?.set(track, this.url);
+                    if (!cache && !api?.["videoDetails"]?.["isLive"]) sdb.meta_saver?.set(track, `${this.url}/track`);
 
                     return track;
                 } catch (e) {

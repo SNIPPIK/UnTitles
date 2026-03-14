@@ -47,13 +47,8 @@ export default createEvent({
                 let msg: any;
 
                 // Если бот уже ответил на сообщение
-                if (!message.deferred) {
+                if (message.deferred) {
                     msg = await message.followup(options);
-                }
-
-                // Если можно дать ответ на сообщение
-                else if (message.deferred) {
-                    msg = await message.editOrReply(options);
                 }
 
                 // Отправляем обычное сообщение

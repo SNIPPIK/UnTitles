@@ -65,7 +65,7 @@
 ---
 
 ### ⚠️ Hardware Requirements | Data from Ryzen 7 5700x3D | 1 player
-- CPU: 0-0.3%
+- CPU: 0-0.1%
 - RAM: ~80 MB, depends on the number of tracks, platform load, and Discord cache!
 - 
 #### Round-robin system
@@ -174,9 +174,9 @@ npm run build && npm run configure && npm run start
 
 [![TypeScript](https://img.shields.io/badge/typescript-5.9.3-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![NodeJS](https://img.shields.io/badge/node.js-23.0.0-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/en)
-[![Seyfert](https://img.shields.io/badge/seyfert-4.1.0-%23CB3837.svg?style=for-the-badge&logo=seyfert&logoColor=white&color=purple)](https://www.seyfert.dev)
-[![WS](https://img.shields.io/badge/ws-8.18.3-%23CB3837.svg?style=for-the-badge&logo=socket&logoColor=white)](https://www.npmjs.com/package/ws)
-[![FFmpeg](https://img.shields.io/badge/FFmpeg-7.*.*-%23CB3837.svg?style=for-the-badge&logo=ffmpeg&logoColor=white&color)](https://ffmpeg.org/)
+[![Seyfert](https://img.shields.io/badge/seyfert-4.2.2-%23CB3837.svg?style=for-the-badge&logo=seyfert&logoColor=white&color=purple)](https://www.seyfert.dev)
+[![WS](https://img.shields.io/badge/ws-8.19.0-%23CB3837.svg?style=for-the-badge&logo=socket&logoColor=white)](https://www.npmjs.com/package/ws)
+[![FFmpeg](https://img.shields.io/badge/FFmpeg-8.*.*-%23CB3837.svg?style=for-the-badge&logo=ffmpeg&logoColor=white&color)](https://ffmpeg.org/)
 ---
 
 # 📊 Project Diagram

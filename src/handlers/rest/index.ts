@@ -72,8 +72,8 @@ export class RestObject {
      * @description Получение случайной платформы
      * @private
      */
-    private get random () {
-        const map = this.array_raw;
+    private get random() {
+        const map = this.arrayAuth;
         const index = Math.floor(Math.random() * map.length);
         let i = 0;
 
@@ -86,12 +86,13 @@ export class RestObject {
     };
 
     /**
-     * @description Получение полного списка платформ
+     * @description Получаем список всех платформ
+     * @returns RestServerSide.API[]
      * @public
      */
-    public get array_raw() {
+    public get array(): RestServerSide.API[] {
         if (!this.platforms.array) this.platforms.array = Object.values(this.platforms.supported).sort((a, b) => a.name.localeCompare(b.name));
-        return this.platforms.array;
+        return this.platforms.array.filter((api) => api.type === APIPlatformType.primary);
     };
 
     /**
@@ -99,8 +100,8 @@ export class RestObject {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get array(): RestServerSide.API[] {
-        return this.array_raw.filter((api) => api.auth !== null && api.type === APIPlatformType.primary);
+    public get arrayAuth(): RestServerSide.API[] {
+        return this.array.filter((api) => api.auth !== null);
     };
 
     /**
@@ -119,73 +120,6 @@ export class RestObject {
      */
     public get arrayRelated(): RestServerSide.API[] {
         return this.array.filter(api => api.requests.some((apis) => apis.name === "related"));
-    };
-
-    /**
-     * @description Функция для инициализации worker
-     * @returns Promise<boolean>
-     * @public
-     */
-    public startWorker = (): Promise<boolean> => {
-        return new Promise(resolve => {
-            // Создаем поток через менеджер потоков
-            const worker = this.worker = SimpleWorker.create<RestServerSide.Data>({
-                file: __dirname + "/index.worker",
-                options: {
-                    execArgv: ["-r", "tsconfig-paths/register"],
-                    workerData: { rest: true },
-                },
-                postMessage: { data: true },
-                not_destroyed: true,
-                callback: (data) => {
-                    this.platforms = data;
-                    this.platformMap.clear();
-
-                    // Заполняем Map для O(1) доступа
-                    for (const api of this.array_raw) {
-                        if (api.auth !== null) {
-                            this.platformMap.set(api.name.toUpperCase(), api);
-                        }
-                    }
-
-                    // Сбрасываем уникальный id запроса
-                    this.lastID = 0;
-                    return resolve(true);
-                }
-            });
-
-            // Если возникнет ошибка, пересоздадим worker
-            worker.once("error", (error) => {
-                console.log(error);
-                return this.startWorker();
-            });
-
-            // Внутри startWorker, после создания this.worker
-            worker.on("message", (message: RestServerSide.Result<any> & { requestId?: number }) => {
-                const { requestId } = message;
-
-                // Ищем, кто ждет этот ID
-                const request = this.pending.get(requestId);
-                if (!request) return; // Если никто не ждет (например, уже был таймаут)
-
-                // Сразу чистим таймер и удаляем из карты
-                clearTimeout(request.timeout);
-
-                // Обработка результата
-                request.resolve(message);
-                this.pending.delete(requestId);
-            });
-        });
-    };
-
-    /**
-     * @description Генерация уникального ID
-     * @returns number
-     * @private
-     */
-    private generateUniqueId = () => {
-        this.lastID = (this.lastID + 1) % 65536; // 2^16
-        return this.lastID;
     };
 
     /**
@@ -294,6 +228,72 @@ export class RestObject {
         });
     };
 
+    /**
+     * @description Функция для инициализации worker
+     * @returns Promise<boolean>
+     * @public
+     */
+    public startWorker = (): Promise<boolean> => {
+        return new Promise(resolve => {
+            // Создаем поток через менеджер потоков
+            const worker = this.worker = SimpleWorker.create<RestServerSide.Data>({
+                file: __dirname + "/index.worker",
+                options: {
+                    execArgv: ["-r", "tsconfig-paths/register"],
+                    workerData: { rest: true },
+                },
+                postMessage: { data: true },
+                not_destroyed: true,
+                callback: (data) => {
+                    this.platforms = data;
+                    this.platformMap.clear();
+
+                    // Заполняем Map для O(1) доступа
+                    for (const api of this.array) {
+                        if (api.auth !== null) {
+                            this.platformMap.set(api.name.toUpperCase(), api);
+                        }
+                    }
+
+                    // Сбрасываем уникальный id запроса
+                    this.lastID = 0;
+                    return resolve(true);
+                }
+            });
+
+            // Если возникнет ошибка, пересоздадим worker
+            worker.once("error", (error) => {
+                console.log(error);
+                return this.startWorker();
+            });
+
+            // Внутри startWorker, после создания this.worker
+            worker.on("message", (message: RestServerSide.Result<any> & { requestId?: number }) => {
+                const { requestId } = message;
+
+                // Ищем, кто ждет этот ID
+                const request = this.pending.get(requestId);
+                if (!request) return; // Если никто не ждет (например, уже был таймаут)
+
+                // Сразу чистим таймер и удаляем из карты
+                clearTimeout(request.timeout);
+
+                // Обработка результата
+                request.resolve(message);
+                this.pending.delete(requestId);
+            });
+        });
+    };
+
+    /**
+     * @description Генерация уникального ID
+     * @returns number
+     * @private
+     */
+    private generateUniqueId = () => {
+        this.lastID = (this.lastID + 1) % 65536; // 2^16
+        return this.lastID;
+    };
 
     /**
      * @description Ищем похожий трек, но на других платформах

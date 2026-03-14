@@ -244,6 +244,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     this.ssrc,
                     new Uint8Array(d.secret_key)
                 );
+                this.emit("info", `[Transport/RTP]: has created | ${this._rtp.mode}`);
 
                 // Если есть поддержка DAVE
                 if (E2EESession.max_version > 0) {

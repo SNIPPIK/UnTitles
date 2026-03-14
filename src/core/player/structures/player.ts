@@ -574,14 +574,6 @@ class AudioPlayerTimeout {
     private _resumeTimer: NodeJS.Timeout | null = null;
 
     /**
-     * @description Возвращает, можно ли возобновить плеер
-     * @public
-     */
-    public get canResume(): boolean {
-        return this._resumeAllowedAt !== null && Date.now() >= this._resumeAllowedAt;
-    };
-
-    /**
      * @description Последнее заданное время
      * @returns number
      * @public

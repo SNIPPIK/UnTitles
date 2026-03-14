@@ -57,7 +57,7 @@ export default createEvent({
                             {type: 14, spacing: 2, divider: true},
                             {
                                 type: 10,
-                                content: `-# ${user.username} | ${totalTime.duration(false)} | ${queue.tracks.total}`
+                                content: `-# ${user.username} | ${totalTime.duration(false)} | \`🎶 ${queue.tracks.total}\``
                             },
                             // Кнопки
                             {

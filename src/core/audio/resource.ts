@@ -269,13 +269,11 @@ export class AudioResource extends BaseAudioResource {
 
         const { isBuffered } = this.options.track;
 
-        // Создаем движок в Rust
-        // Для буферизированных треков ставим лимит (например, 8-10 минут)
-        // Для Pipe лимит 0 (динамическая очередь)
+        // Создаем аудио движок в Rust
         this.engine = new AudioEngine(isBuffered ? 10 : 20);
         this.process = new FfmpegProcess(this.arguments, FFMPEG_PATH);
 
-        // Привязываем события через внутренний метод input (как в твоем Base)
+        // Привязываем события через внутренний метод input
         this.input({
             events: {
                 destroy_callback: (p) => {

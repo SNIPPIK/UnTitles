@@ -95,41 +95,37 @@ impl CycleManager {
                     break;
                 }
 
-                let session_count = sessions.len().max(1) as u32;
-                let step = interval / session_count;
+                // Обновляем начало следующего интервала
+                interval_start += interval;
 
                 // Проходим по всем сессиям
-                for (i, session) in sessions.iter().enumerate() {
-                    // Рассчитываем целевое время tick для этой сессии
-                    let target_time = interval_start + step * (i as u32);
-                    let now = Instant::now();
-
-                    if target_time > now {
-                        let remaining = target_time - now;
-
-                        // Основная пауза — thread::sleep почти весь интервал
-                        // Без spin-loop — минимальная нагрузка CPU
-                        if remaining > Duration::from_micros(200) {
-                            thread::sleep(remaining);
-                        }
-
-                        // Минимальный spin-loop для остатка времени (1–2 мс)
-                        while Instant::now() < target_time && running_flag.load(Ordering::Acquire) {
-                            std::hint::spin_loop();
-                        }
-                    }
-
+                for (_i, session) in sessions.iter().enumerate() {
                     // Вызов tick() для сессии
                     session.value().tick();
                 }
 
-                // Обновляем начало следующего интервала
-                interval_start += interval;
-
-                // Если цикл сильно отстал, синхронизируемся с реальным временем
+                // Рассчитываем целевое время tick для этой сессии
+                let target_time = interval_start;
                 let now = Instant::now();
-                if interval_start < now {
-                    interval_start = now - step;
+
+                // Если время отправлять данные
+                if target_time == now {
+                    continue;
+                }
+                    // Иначе
+                else {
+                    let remaining = target_time - now;
+
+                    // Основная пауза — thread::sleep почти весь интервал
+                    // Без spin-loop — минимальная нагрузка CPU
+                    if remaining > Duration::from_micros(300) {
+                        thread::sleep(remaining);
+                    }
+
+                    // Минимальный spin-loop для остатка времени (1–2 мс)
+                    while Instant::now() < target_time && running_flag.load(Ordering::Acquire) {
+                        std::hint::spin_loop();
+                    }
                 }
             }
         });

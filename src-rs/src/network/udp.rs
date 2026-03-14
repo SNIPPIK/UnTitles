@@ -66,6 +66,11 @@ impl UdpBufferedInner {
     pub fn tick(&self) {
         if let Ok(mut buf) = self.buffer.try_lock() {
             if let Some(data) = buf.pop_front() {
+                // Если нет данных
+                if data.is_empty() {
+                    return;
+                }
+
                 match self.socket.send(&data) {
                     Ok(_) => {}
 

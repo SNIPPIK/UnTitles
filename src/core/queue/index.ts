@@ -55,6 +55,9 @@ class BaseQueueController<T extends Queue> {
                 setImmediate(async () => {
                     const player = queue.player;
 
+                    // Ставим на последнюю позицию
+                    if (queue.tracks.total > 0) queue.tracks.position = queue.tracks.total - 1;
+
                     // Если у плеера стоит пауза
                     if (player.status === "player/pause") player.resume();
 
