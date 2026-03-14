@@ -90,8 +90,7 @@ jobs:
           cp index.js build/native/ || true
           cp *.ts build/native/ || true
           cp *.node build/native/ || true
-          cp src-rs/*.node build/native/ || true
-          rm node_modules
+          rm -rd node_modules
 
       # Create builds
       - name: Upload artifact
