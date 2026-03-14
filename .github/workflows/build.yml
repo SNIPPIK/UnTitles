@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [ 24.x, 25.x ]
+        node-version: [ 25.x ]
         settings:
           # Linux
           - host: ubuntu-latest
