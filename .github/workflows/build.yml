@@ -28,20 +28,20 @@ jobs:
           # Windows
           - host: windows-latest
             target: x86_64-pc-windows-msvc
-            build: npx napi build --release --target x86_64-pc-windows-msvc --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
 
           - host: windows-latest
             target: aarch64-pc-windows-msvc
-            build: npx napi build --release --target aarch64-pc-windows-msvc --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
 
           # Android
           - host: ubuntu-latest
             target: aarch64-linux-android
-            build: npx napi build --release --target aarch64-linux-android --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
 
           - host: ubuntu-latest
             target: armv7-linux-androideabi
-            build: npx napi build --release --target armv7-linux-androideabi --cargo-cwd ./src-rs
+            build: npx napi build --release --platform --cargo-cwd ./src-rs
 
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
@@ -52,7 +52,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 25
           cache: 'npm'
 
       - name: Install Rust
