@@ -1,6 +1,7 @@
-use dashmap::DashMap;
-use once_cell::sync::Lazy;
 use std::{
+    collections::{
+        HashMap
+    },
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -8,11 +9,14 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+use dashmap::DashMap;
+use arc_swap::ArcSwap;
+use once_cell::sync::Lazy;
 use crate::network::udp::UdpBuffered;
 
 /// Максимальное количество UDP-сессий, обслуживаемых одним рабочим потоком (worker).
 /// При превышении этого лимита создаётся новый worker.
-const MAX_PER_WORKER: usize = 100;
+const MAX_PER_WORKER: usize = 50;
 
 /// Минимальное количество рабочих потоков, которое всегда должно существовать,
 /// даже если они пусты (чтобы избежать лишних созданий/удалений).
@@ -26,7 +30,7 @@ const MIN_WORKERS: usize = 1;
 pub struct CycleManager {
     /// Хранилище активных сессий, привязанных к этому менеджеру.
     /// Ключ — идентификатор сессии, значение — Arc<UdpBuffered>.
-    sessions: Arc<DashMap<u32, Arc<UdpBuffered>>>,
+    sessions: Arc<ArcSwap<HashMap<u32, Arc<UdpBuffered>>>>,
 
     /// Флаг, сигнализирующий фоновому потоку о необходимости остановиться.
     running: Arc<AtomicBool>,
@@ -44,7 +48,7 @@ impl CycleManager {
     pub fn new(interval_ms: f64) -> Self {
         let interval = Duration::from_secs_f64(interval_ms / 1000.0);
         Self {
-            sessions: Arc::new(DashMap::new()),
+            sessions: Arc::new(ArcSwap::from_pointee(HashMap::new())),
             running: Arc::new(AtomicBool::new(false)),
             handle: Mutex::new(None),
             interval,
@@ -54,84 +58,118 @@ impl CycleManager {
     /// Добавляет сессию в менеджере. Если фоновый поток ещё не запущен,
     /// запускает его (через `start_if_needed`).
     pub fn add_session(&self, id: u32, session: Arc<UdpBuffered>) {
-        self.sessions.insert(id, session);
+        let mut map = self.sessions.load_full();
+        Arc::make_mut(&mut map).insert(id, session);
+        self.sessions.store(map);
+
         self.start_if_needed();
     }
 
     /// Удаляет сессию из менеджера.
     pub fn remove_session(&self, id: u32) {
-        self.sessions.remove(&id);
+        let mut map = self.sessions.load_full();
+        Arc::make_mut(&mut map).remove(&id);
+        self.sessions.store(map);
     }
 
     /// Запускает фоновый поток, если он ещё не запущен и есть необходимость.
     /// Использует атомарный compare_exchange для безопасного запуска из нескольких потоков.
     fn start_if_needed(&self) {
-        // Быстрая проверка без блокировки: если уже работает, выходим.
+        // Быстрая проверка: если уже запущен (флаг running установлен), выходим.
+        // Ordering::Acquire гарантирует, что мы увидим все записи, сделанные до установки флага в другом потоке.
         if self.running.load(Ordering::Acquire) {
             return;
         }
 
-        // Пытаемся переключить флаг с false на true. Если не удалось — значит,
-        // другой поток уже запустил процесс, выходим.
+        // Захватываем мьютекс на handle, чтобы безопасно заменить его новым потоком.
+        let mut handle_guard = self.handle.lock().unwrap();
+
+        // Повторная проверка под мьютексом: возможно, другой поток уже запустил поток
+        // и изменил running между первой проверкой и захватом мьютекса.
+        // Используем compare_exchange для атомарной установки running в true, только если она была false.
+        // Ordering::AcqRel означает: успех — AcqRel (загружаем с Acquire, сохраняем с Release),
+        // неудача — Acquire (просто загружаем).
         if self.running
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
         {
+            // Если обмен не удался (running уже true), значит поток уже запущен — выходим.
             return;
         }
 
-        // Клонируем Arc для передачи в поток.
-        let sessions = self.sessions.clone();
+        // Клонируем Arc для передачи в новый поток.
+        let sessions_ptr = self.sessions.clone();
         let running_flag = self.running.clone();
         let interval = self.interval;
 
+        // Запускаем фоновый поток.
         let handle = thread::spawn(move || {
-            // Начало первого интервала
-            let mut interval_start = Instant::now();
+            // Момент, когда должен быть выполнен следующий тик.
+            // Изначально устанавливаем в текущее время + интервал.
+            let mut next_tick = Instant::now() + interval;
+
+            // Порог, выше которого используем сон, ниже — активное ожидание.
+            // 250 мкс — достаточно для точности, но экономит CPU при больших задержках.
+            let spin_limit = Duration::from_micros(250);
 
             loop {
-                // Проверка флага остановки
+                // Проверяем флаг остановки. Если running сброшен (например, при вызове stop()), выходим из цикла.
                 if !running_flag.load(Ordering::Acquire) {
                     break;
                 }
 
-                // Обновляем начало следующего интервала
-                interval_start += interval;
+                // Вычисляем время следующего тика (базовое планирование).
+                next_tick += interval;
 
-                // Проходим по всем сессиям
-                for (_i, session) in sessions.iter().enumerate() {
-                    // Вызов tick() для сессии
-                    session.value().tick();
-                }
+                // Получаем "снимок" всех активных сессий.
+                // Предполагается, что sessions.load() возвращает lock-free коллекцию,
+                // которую можно безопасно читать без блокировок, даже если другие потоки её модифицируют.
+                let snapshot = sessions_ptr.load();
 
-                // Рассчитываем целевое время tick для этой сессии
-                let target_time = interval_start;
-                let now = Instant::now();
+                // Параллельно вызываем tick() для каждой сессии, используя Rayon.
+                // Par_bridge позволяет превратить обычный итератор по значениям снимка в параллельный.
+                // Это ускоряет обработку, если сессий много и tick() не слишком лёгкий.
+                snapshot.values().for_each(|session| {
+                    session.tick();
+                });
 
-                // Если время отправлять данные
-                if target_time == now {
+                let mut now = Instant::now();
+
+                // Контроль дрифта (накопления ошибки времени) и ситуации "пулемётной очереди".
+                // Если текущее время уже позже запланированного next_tick, значит мы не успеваем.
+                if now > next_tick {
+                    // Если опоздание больше, чем один интервал, вероятно, была большая пауза (например, система уснула).
+                    // В таком случае сбрасываем базу: следующий тик планируем от текущего момента.
+                    if now > next_tick + interval {
+                        next_tick = now + interval;
+                    }
+                    // Если опоздание меньше интервала, просто пропускаем ожидание и переходим к следующей итерации.
+                    // Это позволяет наверстать упущенное, но не создаёт лишней нагрузки.
                     continue;
                 }
-                    // Иначе
-                else {
-                    let remaining = target_time - now;
 
-                    // Основная пауза — thread::sleep почти весь интервал
-                    // Без spin-loop — минимальная нагрузка CPU
-                    if remaining > Duration::from_micros(300) {
-                        thread::sleep(remaining);
-                    }
+                // Вычисляем оставшееся время до следующего тика.
+                let remaining = next_tick - now;
 
-                    // Минимальный spin-loop для остатка времени (1–2 мс)
-                    while Instant::now() < target_time && running_flag.load(Ordering::Acquire) {
-                        std::hint::spin_loop();
-                    }
+                // Гибридное ожидание:
+                if remaining > spin_limit {
+                    // Если осталось больше spin_limit, засыпаем на основную часть времени.
+                    // Сон экономит CPU, но может быть неточным из-за планировщика ОС.
+                    thread::sleep(remaining - spin_limit);
+                    now = Instant::now(); // обновляем время после сна
+                }
+
+                // Короткий активный спин-луп для точной "дотяжки" до нужного момента.
+                // Используем Relaxed порядок для флага, так как нам не нужна синхронизация здесь,
+                // и мы часто читаем атомарно (это достаточно дёшево).
+                while now < next_tick && running_flag.load(Ordering::Relaxed) {
+                    std::hint::spin_loop(); // подсказка процессору, что мы в спин-лупе
+                    now = Instant::now();
                 }
             }
         });
 
-        // Сохраняем handle
-        *self.handle.lock().unwrap() = Some(handle);
+        *handle_guard = Some(handle);
     }
 
     /// Останавливает фоновый поток и дожидается его завершения.

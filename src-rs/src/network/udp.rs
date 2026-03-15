@@ -66,11 +66,6 @@ impl UdpBufferedInner {
     pub fn tick(&self) {
         if let Ok(mut buf) = self.buffer.try_lock() {
             if let Some(data) = buf.pop_front() {
-                // Если нет данных
-                if data.is_empty() {
-                    return;
-                }
-
                 match self.socket.send(&data) {
                     Ok(_) => {}
 
@@ -175,7 +170,7 @@ impl UdpBuffered {
     /// пустых или служебных пакетов). В реальном приложении это может быть настроено.
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        if packet.len() > 2 {
+        if !packet.is_empty() {
             self.inner.push(packet.as_ref().to_vec());
         }
     }

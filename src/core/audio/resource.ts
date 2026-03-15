@@ -277,7 +277,7 @@ export class AudioResource extends BaseAudioResource {
         this.input({
             events: {
                 destroy_callback: (p) => {
-                    p.destroy()
+                    p.destroy();
                 }
             },
             input: this.process,
@@ -302,6 +302,8 @@ export class AudioResource extends BaseAudioResource {
      * @public
      */
     public destroy() {
+        this.engine.addPacket(SILENT_FRAME);
+
         if (this.process) {
             this.process.destroy();
             this.process = null;

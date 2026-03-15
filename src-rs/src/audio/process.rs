@@ -117,8 +117,8 @@ impl FfmpegProcess {
 
                 // Преобразуем Rust-строку в JS-строку
                 let type_str = ctx.env.create_string(&kind)?;
-                // Копируем данные в JS-буфер (эффективнее было бы использовать zero-copy, но здесь просто)
-                let buffer = ctx.env.create_buffer_copy(&data)?;
+                // Копируем данные в JS-буфер
+                let buffer = ctx.env.create_buffer_with_data(data)?;
 
                 Ok(vec![
                     type_str.into_unknown(),
@@ -126,7 +126,7 @@ impl FfmpegProcess {
                 ])
             })?;
 
-        // Устанавливаем флаг активности до запуска потока (Release гарантирует видимость в потоке)
+        // Устанавливаем флаг активности до запуска потока
         self.reading_active.store(true, Ordering::Release);
         let active = Arc::clone(&self.reading_active);
 
@@ -188,13 +188,12 @@ impl FfmpegProcess {
         // Сначала убиваем процесс ffmpeg, чтобы разблокировать вызов read() в потоке
         let mut child_guard = self.child.lock().unwrap();
         if let Some(mut child) = child_guard.take() {
-            let _ = child.kill();    // Отправляем SIGKILL (на самом деле Terminate)
+            let _ = child.kill();    // Отправляем SIGKILL
             let _ = child.wait();    // Дожидаемся завершения, чтобы избежать зомби-процессов
         }
         drop(child_guard); // Освобождаем блокировку, чтобы поток мог завершиться
 
         // Теперь дожидаемся завершения фонового потока чтения
-        // (он должен выйти из read() из-за закрытого stdout и флага активности)
         if let Some(handle) = self.reader_handle.lock().unwrap().take() {
             let _ = handle.join();
         }

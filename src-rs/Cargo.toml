@@ -15,6 +15,7 @@ rand = "0.10.0"
 dashmap = "7.0.0-rc2"
 aes-gcm = "0.11.0-rc.3"
 memchr = "2.8.0"
+arc-swap = "1.8.2"
 
 [profile.release]
 # Оптимизации для максимальной точности таймера
