@@ -130,10 +130,12 @@ impl UdpBuffered {
         // Привязываемся к любому свободному порту на всех интерфейсах.
         let socket = UdpSocket::bind("0.0.0.0:0")
             .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+
         // Устанавливаем соединение (фильтрует входящие пакеты только от этого адреса).
         socket
             .connect(&remote_addr)
             .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+
         // Переводим в неблокирующий режим.
         socket.set_nonblocking(true).ok();
 

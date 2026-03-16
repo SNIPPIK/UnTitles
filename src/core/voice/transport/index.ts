@@ -61,7 +61,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @description Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway
      * @public
      */
-    public _ws:  VoiceWebSocket;
+    public _ws: VoiceWebSocket;
 
     /**
      * @description Клиент Dave, для работы сквозного шифрования
@@ -86,22 +86,29 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @public
      */
     public get ready(): boolean {
-        // Базовая проверка статуса и наличия необходимых модулей
         if (!this.secret_key || !this.ssrc) {
             return false;
         }
 
         // Логика DAVE (MLS): блокируем отправку, если сессия в процессе перехода
         // или еще не инициализировала ключи
-        if (this._dave && this._dave?.session) {
-            // Если идет переход (transition) или сессия не готова — слать нельзя,
-            // иначе Discord отбросит пакеты из-за неверного ключа
-            if (!this._dave?.session.ready || this._dave.isTransitioning || !this._dave.encrypt) {
+        if (this._dave?.session) {
+            if (!this._dave.session.ready || this._dave.isTransitioning || !this._dave.encrypt) {
                 return false;
             }
         }
 
-        return (this._ws && this._udp.status === "connected" && !!this._rtp) && this.state.code === TransportStateCode.Session;
+        // Проверяем есть ли ключевые элементы для отправки пакетов
+        if (!this._ws || !this._udp || !this._rtp) {
+            return false;
+        }
+
+        // Если нет подключения к udp
+        if (this._udp.status !== "connected") {
+            return false;
+        }
+
+        return this.state.code === TransportStateCode.Session;
     };
 
     /**
@@ -151,7 +158,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 // задержка как у настоящего клиента
                 const delay = 60 + Math.floor(Math.random() * 80);
 
-                // Запуска5ем таймер отправки Discovery
+                // Запускаем таймер отправки Discovery
                 setTimeout(() => {
                     const discoveryPacket = udp.discovery(d.ssrc);
 
@@ -290,17 +297,19 @@ export class Transport extends TypedEmitter<TransportEvents> {
      */
     public packet = (frame: Buffer, type: "raw" | "rtp" = "rtp") => {
         try {
-            let payload: Buffer;
-
-            if (type === "raw") payload = frame;
-            else {
+            if (type !== "raw") {
                 // Логика DAVE (MLS)
-                const encrypted = this._dave?.encrypt(frame);
-                payload = this._rtp?.packet(encrypted);
+                if (this._dave?.session?.ready && !this._dave.isTransitioning && this._dave.encrypt) {
+                    const encrypted = this._dave.encrypt(frame);
+                    if (encrypted) frame = encrypted;
+                }
+
+                frame = this._rtp.packet(frame);
             }
 
             // Прямая отправка в сокет
-            this._udp?.packet(payload);
+            this._udp?.packet(frame);
+
         } catch (err) {
             this.emit("info", `[Transport/Packet]: ${err}`);
         }

@@ -33,7 +33,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @readonly
      * @public
      */
-    public readonly limits = (() => {
+    public readonly limits: Record<APIRequestsLimits, number> = (() => {
         const keys: APIRequestsLimits[] = ["playlist", "album", "search", "artist", "related"];
         const obj = {} as Record<APIRequestsLimits, number>;
         for (const key of keys) {
@@ -47,8 +47,11 @@ class RestServer extends handler<RestServerSide.API> {
      * @returns RestServerSide.API[]
      * @private
      */
-    private get array() {
-        if (!this.platforms?.array) this.platforms.array = Object.values(this.platforms.supported).sort((a, b) => a.name.localeCompare(b.name));
+    private get array(): RestServerSide.API[] {
+        if (!this.platforms?.array) {
+            this.platforms.array = Object.values(this.platforms.supported)
+                .sort((a, b) => a.name.localeCompare(b.name));
+        }
         return this.platforms.array;
     };
 
@@ -57,7 +60,7 @@ class RestServer extends handler<RestServerSide.API> {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get allow() {
+    public get allow(): RestServerSide.API[] {
         return this.array.filter(api => !this.platforms.block.includes(api.name));
     };
 
@@ -66,8 +69,10 @@ class RestServer extends handler<RestServerSide.API> {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get allowRelated() {
-        return this.array.filter(api => api.requests.some((apis) => apis.name === "related"));
+    public get allowRelated(): RestServerSide.API[] {
+        return this.array.filter(api =>
+            api.requests?.some((req) => req.name === "related")
+        );
     };
 
     /**
@@ -85,14 +90,16 @@ class RestServer extends handler<RestServerSide.API> {
      * @returns void
      * @public
      */
-    public register = () => {
+    public register(): void {
         this.load();
 
         // Загружаем команды в текущий класс
-        for (let file of this.files) {
+        for (const file of this.files) {
             if (file.auth !== null) this.platforms.authorization.push(file.name);
             if (file.audio) this.platforms.audio.push(file.name);
-            if (file.requests.find((req) => req.name === "related")) this.platforms.related.push(file.name);
+            if (file.requests?.find((req) => req.name === "related")) {
+                this.platforms.related.push(file.name);
+            }
 
             this.platforms.supported[file.name] = file;
         }
@@ -117,17 +124,25 @@ if (parentPort && workerData.rest) {
 
     // Получаем ответ от основного потока
     parentPort.on("message", async (message: RestServerSide.ServerOptions) => {
-        // Если запрос к платформе
-        if (message.platform) return fetchFromPlatform(message);
+        try {
+            // Если запрос к платформе
+            if (message.platform) return await fetchFromPlatform(message);
 
-        // Если надо выдать данные о загруженных платформах
-        else if (message.data) return fetchPlatforms();
+            // Если надо выдать данные о загруженных платформах
+            else if (message.data) return fetchPlatforms();
 
-        parentPort.postMessage({
-            status: "error",
-            requestId: message.requestId,
-            result: Error("Dont support this request")
-        });
+            parentPort.postMessage({
+                status: "error",
+                requestId: message.requestId,
+                result: new Error("Dont support this request")
+            });
+        } catch (error) {
+            parentPort?.postMessage({
+                requestId: message.requestId,
+                status: "error",
+                result: error
+            });
+        }
     });
 
     // Если возникнет непредвиденная ошибка
@@ -146,8 +161,10 @@ if (parentPort && workerData.rest) {
  * @param obj - Данные запроса из Rest API
  * @private
  */
-function stripFunctions<T extends object>(obj: T) {
-    return Object.fromEntries(Object.entries(obj).filter(([_, v]) => typeof v !== "function")) as RestServerSide.Serializable<T>;
+function stripFunctions<T extends object>(obj: T): RestServerSide.Serializable<T> {
+    return Object.fromEntries(
+        Object.entries(obj).filter(([_, v]) => typeof v !== "function")
+    ) as RestServerSide.Serializable<T>;
 }
 
 /**
@@ -158,15 +175,31 @@ function stripFunctions<T extends object>(obj: T) {
  * @function fetchFromPlatform
  * @async
  */
-async function fetchFromPlatform(api: RestServerSide.ServerOptions) {
+async function fetchFromPlatform(api: RestServerSide.ServerOptions): Promise<void> {
     const { platform, payload, options, requestId, type } = api;
 
     try {
         const restPlatform = rest.platforms.supported[platform] as RestServerSide.API;
-        const callback = restPlatform.requests.find((request) => request.name === "all" || request.name === type);
+        if (!restPlatform) {
+            return parentPort.postMessage({
+                requestId,
+                status: "error",
+                result: new Error(`Platform not found: ${platform}`)
+            });
+        }
+
+        const callback = restPlatform.requests?.find((request) =>
+            request.name === "all" || request.name === type
+        );
 
         // Если не найдена функция вызова
-        if (!callback) return parentPort.postMessage({requestId, status: "error", result: Error(`Callback not found for platform: ${platform}`)});
+        if (!callback) {
+            return parentPort.postMessage({
+                requestId,
+                status: "error",
+                result: new Error(`Callback not found for platform: ${platform}`)
+            });
+        }
 
         const result = await callback.execute(payload, {
             audio: options?.audio !== undefined ? options.audio : true,
@@ -193,7 +226,11 @@ async function fetchFromPlatform(api: RestServerSide.ServerOptions) {
         parentPort.postMessage({
             status: "error",
             requestId,
-            result: { name: err.name, message: err.message, stack: err.stack }
+            result: {
+                name: err.name,
+                message: err.message,
+                stack: err.stack
+            }
         });
     }
 }
@@ -205,7 +242,7 @@ async function fetchFromPlatform(api: RestServerSide.ServerOptions) {
  * @function fetchPlatforms
  * @async
  */
-async function fetchPlatforms() {
+async function fetchPlatforms(): Promise<void> {
     const fakeReq = rest.allow.map(api => ({
         ...stripFunctions(api),
         requests: (api.requests ?? []).map(stripFunctions)

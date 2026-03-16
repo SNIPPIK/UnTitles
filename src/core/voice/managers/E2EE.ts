@@ -232,8 +232,8 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
             connectedClients
         );
 
-        if (!commit) return welcome;
-        return Buffer.concat([commit, welcome]);
+        if (!commit) return null;
+        return welcome ? Buffer.concat([commit, welcome]) : commit;
     };
 
     /**
@@ -272,7 +272,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
      * @public
      */
     public encrypt = (packet: Buffer) => {
-        if (this.version === 0 || !this.session?.ready || this._isTransitioning) return packet;
+        if (this.version === 0 || !this.session?.ready || this._isTransitioning) return null;
 
         try {
             return this.session.encryptOpus(packet);
@@ -280,7 +280,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
             this.emit("debug", `Encryption failed: ${err}`);
             // В случае критической ошибки шифрования лучше отправить тишину или
             // прозрачный пакет, чтобы не вызвать шум в канале
-            return packet;
+            return null;
         }
     };
 

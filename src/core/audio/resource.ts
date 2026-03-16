@@ -115,9 +115,12 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
             "-af", this.filters,
 
             // Указываем формат аудио (ogg/opus)
-            "-acodec", "libopus",
+            "-c:a", "libopus",
             "-frame_duration", "20",
-            "-f", "opus",
+            "-vbr", "on",
+            "-compression_level", "10",
+            "-application", "audio",
+            "-f", "ogg",
             "pipe:1"
         ];
     };

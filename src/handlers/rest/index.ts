@@ -72,18 +72,13 @@ export class RestObject {
      * @description Получение случайной платформы
      * @private
      */
-    private get random() {
+    private get random(): RestServerSide.API | null {
         const map = this.arrayAuth;
+        if (map.length === 0) return null;
+
         const index = Math.floor(Math.random() * map.length);
-        let i = 0;
-
-        for (const value of map.values()) {
-            if (i === index) return value;
-            i++;
-        }
-
-        return null;
-    };
+        return map[index];
+    }
 
     /**
      * @description Получаем список всех платформ
@@ -91,9 +86,13 @@ export class RestObject {
      * @public
      */
     public get array(): RestServerSide.API[] {
-        if (!this.platforms.array) this.platforms.array = Object.values(this.platforms.supported).sort((a, b) => a.name.localeCompare(b.name));
-        return this.platforms.array.filter((api) => api.type === APIPlatformType.primary);
-    };
+        if (!this.platforms.array) {
+            this.platforms.array = Object.values(this.platforms.supported)
+                .filter(api => api.type === APIPlatformType.primary)
+                .sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return this.platforms.array;
+    }
 
     /**
      * @description Получаем список всех доступных платформ
@@ -101,8 +100,8 @@ export class RestObject {
      * @public
      */
     public get arrayAuth(): RestServerSide.API[] {
-        return this.array.filter((api) => api.auth !== null);
-    };
+        return this.array.filter(api => api.auth !== null);
+    }
 
     /**
      * @description Платформы с доступом к аудио
@@ -110,8 +109,9 @@ export class RestObject {
      * @public
      */
     public get arrayAudio(): RestServerSide.API[] {
-        return this.array.filter(api => api.audio !== false && !this.platforms.block.includes(api.name));
-    };
+        return this.array
+            .filter(api => api.audio !== false && !this.platforms.block.includes(api.name));
+    }
 
     /**
      * @description Платформы с доступом к похожим трекам
@@ -119,8 +119,9 @@ export class RestObject {
      * @public
      */
     public get arrayRelated(): RestServerSide.API[] {
-        return this.array.filter(api => api.requests.some((apis) => apis.name === "related"));
-    };
+        return this.array
+            .filter(api => api.requests?.some(req => req.name === "related"));
+    }
 
     /**
      * @description Создание класса для взаимодействия с платформой
@@ -151,7 +152,7 @@ export class RestObject {
         if (regexMatch) return regexMatch;
 
         // Fallback к дефолтной платформе
-        return this.platformMap.get("YOUTUBE");
+        return this.platformMap.get("YOUTUBE") || this.random || null;
     };
 
     /**
