@@ -44,7 +44,7 @@ abstract class Request {
         // Пользовательский User-Agent
         userAgent?: string | boolean;
     } & RequestOptions = {
-        timeout: 5e3,
+        timeout: 10e3,
         headers: {
             "Accept-Encoding": "gzip, deflate, br"
         }

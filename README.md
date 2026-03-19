@@ -47,9 +47,19 @@
 [![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
 [![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
 
+## 🎧 What is WatKLOK (UnTitles)?
+
+A high-performance Discord music bot with:
+- Instant playback (no delays)
+- Smart track matching across platforms
+- Seamless transitions (no gaps)
+- Stable voice engine even under heavy load
+
+---
+
 > [!WARNING]
 > ⚠️ WatKLOK (UnTitles) is a complex technical project that is supported exclusively by 1 author by `SNIPPIK`  
-> Incorrect use, removal of authorship, or attribution will result in the closure of the public repository.
+> Please respect the original authorship and license of the project. 
 >
 > Audio issues
 > If your internet connection is unstable, losses will occur regardless.  
@@ -76,26 +86,19 @@
 #### 🎖️ Features
 - Event loop-resistant, so even in this case, the audio plays smoothly!!!
 ```ts
-setInterval(() => {
-  const startBlock = performance.now();
-  while (performance.now() - startBlock < 100) {}
-}, 60);
-
-setInterval(() => {
-  const startBlock = performance.now();
-  while (performance.now() - startBlock < 100) {}
-}, 80);
-
-setInterval(() => {
-  const startBlock = performance.now();
-  while (performance.now() - startBlock < 100) {}
-}, 120);
-
-setInterval(() => {
+setInterval(() => { //Possible x4
   const startBlock = performance.now();
   while (performance.now() - startBlock < 100) {}
 }, 100);
 ```
+#### 🎵 Audio Quality
+- No quality loss beyond Discord’s own encoding limits
+- **Hot Audio Swap**: System of instant seamless transition between tracks.
+- **Audio Effects**: Smooth fade-in/fade-out for any actions (skip, seek, pause)
+- **Filters: 16+** built-in **audio filters** with the possibility of easily adding your own via JSON-config [(filters.json)](src/core/player/filters.json)
+- **Optimization**: Ability to reuse audio without re-conversion for tracks up to 8 minutes long
+- **Synchronization**: Direct synchronization of the audio stream without distortion introduced by software filters.
+
 #### 🦀 Native Voice Engine (Rust Powered)
 - **High performance**: The main logic of voice processing is transferred to a native module on Rust (src-rs), which guarantees stability even with high event loop lag in Node.js.
 - **Voice engine**: Full implementation of Voice Gateway V8. Stack: UDP + SRTP + Opus.
@@ -103,13 +106,6 @@ setInterval(() => {
 - **Timers**: Cyclic systems using a timer + auto balancer.
 - **Smart streaming**: Does not require external opus encoders for transmission - uses own method of parsing Opus frames.
 - **FFmpeg Integration**: Used for flexible audio decoding and application of complex filters.
-
-#### 🎵 Audio and Player
-- **Hot Audio Swap**: System of instant seamless transition between tracks.
-- **Audio Effects**: Smooth fade-in/fade-out for any actions (skip, seek, pause)
-- **Filters: 16+** built-in **audio filters** with the possibility of easily adding your own via JSON-config [(filters.json)](src/core/player/filters.json)
-- **Optimization**: Ability to reuse audio without re-conversion for tracks up to 8 minutes long
-- **Synchronization**: Direct synchronization of the audio stream without distortion introduced by software filters.
 
 #### 🌐 Platforms and Parsing
 - **Multiplatform**: Support for **YouTube**, **Spotify**, **VK**, **Yandex-Music**, **SoundCloud**, **Deezer**, **Apple (only outline)**.
@@ -122,6 +118,10 @@ setInterval(() => {
 - **Languages**: Full support for Русский and English ([**file with languages**](src/structures/locale/languages.json)).
 - **DX (Developer Experience)**: The entire project is strictly typed (TypeScript + Rust ABI), comes with a bunch of interfaces and examples.
 - **Scalability**: Easy addition of any languages ​​supported by Discord.
+
+#### Cache utility
+- **Support**: `Tracks`, `Albums`, `Audios`
+- Save in files, later it will be possible to save via FTP, Redis
 
 ---
 

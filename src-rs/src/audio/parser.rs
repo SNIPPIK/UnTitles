@@ -161,10 +161,10 @@ impl OggOpusParser {
             let segment_table = &page[27..header_size];
 
             // Вычисляем общий размер полезной нагрузки (сумма всех размеров сегментов).
-            let mut payload_size = 0;
-            for &s in segment_table {
-                payload_size += s as usize;
-            }
+            let payload_size: usize = segment_table
+                .iter()
+                .try_fold(0usize, |acc, &s| acc.checked_add(s as usize))
+                .ok_or_else(|| Error::from_reason("Payload size overflow"))?;
 
             // Защита от слишком больших страниц (DoS).
             if payload_size > MAX_PAGE_SIZE {
@@ -226,6 +226,18 @@ impl OggOpusParser {
     where
         F: FnMut(PacketType, Vec<u8>) -> Result<()>,
     {
+        let continued = header_type & 0x01 != 0;
+
+        // Если страница продолжает пакет, но у нас нет данных — поток битый
+        if continued && packet_carry.is_empty() {
+            return Err(Error::from_reason("Invalid continuation: no previous packet"));
+        }
+
+        // Если НЕ continuation, но packet_carry не пуст — сбрасываем (рассинхрон)
+        if !continued && !packet_carry.is_empty() {
+            packet_carry.clear();
+        }
+
         // Извлекаем серийный номер потока (little-endian, байты 14-17).
         let serial = i32::from_le_bytes(
             page[14..18]

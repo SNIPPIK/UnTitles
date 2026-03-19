@@ -1,11 +1,11 @@
 import type { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData } from "discord-api-types/v10";
 import type { VoiceConnectionConfiguration } from "#core/voice";
 import { GatewayOpcodes } from "discord-api-types/v10";
-import {SetArray} from "#structures";
+import { SetArray } from "#structures";
 
 /**
  * @author SNIPPIK
- * @description Класс для взаимодействия с клиентским websocket'ом
+ * @description Класс для взаимодействия с клиентским websocket
  * @supported `@discordjs/voice`, `other`
  * @class VoiceAdapters
  * @abstract
@@ -140,6 +140,15 @@ export class VoiceAdapter {
             console.error("hook error in adapter", e);
             return false;
         }
+    };
+
+    /**
+     * @description Удаление адаптера, с очисткой
+     * @public
+     */
+    public destroy = () => {
+        this.adapter?.destroy();
+        this.adapter = null;
     };
 }
 

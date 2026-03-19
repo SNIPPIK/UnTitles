@@ -280,7 +280,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
             this.emit("debug", `Encryption failed: ${err}`);
             // В случае критической ошибки шифрования лучше отправить тишину или
             // прозрачный пакет, чтобы не вызвать шум в канале
-            return null;
+            return packet;
         }
     };
 

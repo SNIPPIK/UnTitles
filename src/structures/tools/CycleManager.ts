@@ -127,14 +127,13 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         const delay = Math.min(Math.max(0, this.insideTime - this.time), duration);
 
         // Если delay слишком мал
-        if (delay <= 0) {
+        if (delay === 0) {
             process.nextTick(this.step);
 
             // Переходим к следующему шагу в следующем тике
             setTimeout(this._runTimeout, duration);
             return;
         }
-
         setTimeout(this._runTimeout, delay);
     };
 

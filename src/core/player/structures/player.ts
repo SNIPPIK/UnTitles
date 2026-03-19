@@ -45,7 +45,11 @@ const PLAYER_TIMEOUT_OFFSET = 3000;
  * - Высокая надежность, практически невозможно сломать
  */
 export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
-    public _stepCounter: number | null = 1; // Требуется для подстройки под голосовое соединение
+    /**
+     * @description Кол-во аудио пакетов в буфере в UDP подключении
+     * @public
+     */
+    public _buffered: number | null = 1;
 
     /**
      * @description Текущий статус плеера, при создании он должен быть в ожидании
@@ -148,11 +152,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
-     * @description Задержка плеера между отправкой аудио пакетов
+     * @description Буфер плеера, кол-во времени пакетов в буфере udp подключения
      * @public
      */
     public get latency() {
-        return this._stepCounter * OPUS_FRAME_SIZE;
+        return this._buffered * OPUS_FRAME_SIZE;
     };
 
     /**

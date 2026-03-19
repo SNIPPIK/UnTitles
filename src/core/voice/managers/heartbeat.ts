@@ -4,7 +4,7 @@
  * @const timeout
  * @private
  */
-const timeout = 5e3;
+const HEART_TIMEOUT_ASK = 7e3;
 
 /**
  * @author SNIPPIK
@@ -84,7 +84,7 @@ export class HeartbeatManager {
         this.timeout = setTimeout(() => {
             this.misses++;
             this.hooks.onTimeout(); // вызываем внешний обработчик
-        }, timeout); // небольшой запас, чтобы не ложно сработать
+        }, HEART_TIMEOUT_ASK); // небольшой запас, чтобы не ложно сработать
     };
 
     /**

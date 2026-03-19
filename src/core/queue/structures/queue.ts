@@ -157,8 +157,6 @@ export class Queue {
 
         try {
             const { api, artist, name, image, user, url } = tracks.track;
-            const textTracks = tracks.total > 1 ? `| ${tracks.position + 1}/${tracks.total} | ${tracks.time}` : "";
-            const latency = `${player.latency}/${player.voice.connection.latency} ms`;
             const vol = player.audio.volume;
 
             return [{
@@ -191,7 +189,7 @@ export class Queue {
                     },
                     {
                         "type": 10, // Text
-                        "content": `-# ${user.username} ● ${getVolumeIndicator(vol)} ${textTracks} | ${latency}` + player.progress
+                        "content": `> -# \`👤 ${user.username}\`  |  \`${getVolumeIndicator(vol)}\` ${tracks.footer} |  \`🌐 ${player.voice.connection.latency}ms\`` + player.progress
                     },
                     ...buttons
                 ]
@@ -250,5 +248,12 @@ export class Queue {
  */
 function getVolumeIndicator(volume: number): string {
     const clamped = Math.max(0, Math.min(volume, 200));
-    return `${clamped}%`;
+    let text = "";
+
+    if (clamped < 30) text+= "🔈";
+    else if (clamped >= 30 && clamped < 70) text+= "🔉";
+    else if (clamped >= 70 && clamped < 150) text+= "🔊";
+    else if (clamped >= 150) text+= "📢";
+
+    return text + ` ${clamped}%`;
 }

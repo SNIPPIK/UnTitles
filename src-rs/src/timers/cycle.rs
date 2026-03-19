@@ -1,4 +1,7 @@
 use std::{
+    hint::{
+        spin_loop
+    },
     collections::{
         HashMap
     },
@@ -75,84 +78,90 @@ impl CycleManager {
     /// Запускает фоновый поток, если он ещё не запущен и есть необходимость.
     /// Использует атомарный compare_exchange для безопасного запуска из нескольких потоков.
     fn start_if_needed(&self) {
-        // Быстрая проверка: если уже запущен (флаг running установлен), выходим.
-        // Ordering::Acquire гарантирует, что мы увидим все записи, сделанные до установки флага в другом потоке.
         if self.running.load(Ordering::Acquire) {
             return;
         }
 
-        // Захватываем мьютекс на handle, чтобы безопасно заменить его новым потоком.
         let mut handle_guard = self.handle.lock().unwrap();
 
-        // Повторная проверка под мьютексом: возможно, другой поток уже запустил поток
-        // и изменил running между первой проверкой и захватом мьютекса.
-        // Используем compare_exchange для атомарной установки running в true, только если она была false.
-        // Ordering::AcqRel означает: успех — AcqRel (загружаем с Acquire, сохраняем с Release),
-        // неудача — Acquire (просто загружаем).
         if self.running
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
         {
-            // Если обмен не удался (running уже true), значит поток уже запущен — выходим.
             return;
         }
 
-        // Клонируем Arc для передачи в новый поток.
         let sessions_ptr = self.sessions.clone();
         let running_flag = self.running.clone();
         let interval = self.interval;
+        let spin_limit = Duration::from_micros(500);
+        let early_limit = Duration::from_micros(500);
 
-        // Запускаем фоновый поток.
         let handle = thread::spawn(move || {
-            // Порог, выше которого используем сон, ниже — активное ожидание.
-            // 250 мкс — достаточно для точности, но экономит CPU при больших задержках.
-            let spin_limit = Duration::from_micros(200);
-
-            // Момент, когда должен быть выполнен следующий тик.
-            // Изначально устанавливаем в текущее время + интервал.
             let mut next_tick = Instant::now() + interval;
 
             loop {
-                // Проверяем флаг остановки. Если running сброшен (например, при вызове stop()), выходим из цикла.
                 if !running_flag.load(Ordering::Acquire) {
                     break;
                 }
 
-                let now = Instant::now();
+                // ===== WAIT =====
+                loop {
+                    let now = Instant::now();
 
-                // Контроль дрифта (накопления ошибки времени) и ситуации "пулемётной очереди".
-                // Если текущее время уже позже запланированного next_tick, значит мы не успеваем.
-                if now < next_tick {
+                    if now >= next_tick {
+                        break;
+                    }
+
                     let remaining = next_tick - now;
 
                     if remaining > spin_limit {
-                        thread::sleep(remaining - spin_limit);
-                    }
+                        // 🔥 ранний wake-up (анти oversleep)
+                        let sleep_time = remaining
+                            .saturating_sub(spin_limit)
+                            .saturating_sub(Duration::from_micros(100));
 
-                    // Короткий активный спин-луп для точной "дотяжки" до нужного момента.
-                    // Используем Relaxed порядок для флага, так как нам не нужна синхронизация здесь,
-                    while Instant::now() < next_tick && running_flag.load(Ordering::Relaxed) {
-                        std::hint::spin_loop();
+                        if sleep_time > Duration::ZERO {
+                            thread::sleep(sleep_time);
+                        }
+                    } else {
+                        spin_loop();
+                    }
+                }
+
+                let now = Instant::now();
+
+                // ===== EARLY CLAMP (чтобы не стрелять слишком рано) =====
+                if next_tick > now {
+                    let early = next_tick - now;
+
+                    if early > early_limit {
+                        while Instant::now() < next_tick {
+                            spin_loop();
+                        }
                     }
                 }
 
                 // ===== EXECUTION =====
                 let snapshot = sessions_ptr.load();
 
-                // Параллельно вызываем tick() для каждой сессии
-                // Это ускоряет обработку, если сессий много и tick() не слишком лёгкий.
                 snapshot.values().for_each(|session| {
                     session.tick();
                 });
 
-                // Вычисляем время следующего тика (базовое планирование).
+                // ===== NEXT TICK =====
                 next_tick += interval;
 
-                // защита от огромного дрифта
+                // ===== SOFT DRIFT CONTROL =====
                 let now = Instant::now();
 
-                if now > next_tick + interval {
-                    next_tick = now + interval;
+                if now > next_tick {
+                    let drift = now - next_tick;
+
+                    // ⚠️ только если реально отстали (не микро-дрифт)
+                    if drift > interval {
+                        next_tick = now + interval;
+                    }
                 }
             }
         });

@@ -144,6 +144,15 @@ export class ControllerTracks<T extends Track> {
     };
 
     /**
+     * @description текстовое значение о тек треках
+     * @public
+     */
+    public get footer() {
+        const total = this._current.length;
+        return total > 1 ? `• \`${this._position + 1}/${total}\` • \`🕐 ${this.time}\`` : "";
+    };
+
+    /**
      * @description Добавляем трек в очередь
      * @param track - Сам трек
      * @param user - Пользователь добавивший трек

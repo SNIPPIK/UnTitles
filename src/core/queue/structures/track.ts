@@ -369,6 +369,14 @@ export class Track extends TrackResolvers {
     };
 
     /**
+     * @description Данные о тек треке в урезанном формате
+     * @public
+     */
+    public get footer() {
+        return `-# \`👤 ${this.user.username}\` • \`🕐 ${this.time.split}\` • \`${this.api.name.toLowerCase()}\``
+    };
+
+    /**
      * @description Создаем трек
      * @param _track - Данные трека с учетом <Song.track>
      * @param _api   - Данные о платформе

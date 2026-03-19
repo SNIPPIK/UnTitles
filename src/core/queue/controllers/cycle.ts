@@ -42,7 +42,7 @@ const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 20);
  * @const PLAYER_SEND_POOL
  * @private
  */
-const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 2);
+const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 1.7);
 
 /**
  * @author SNIPPIK
@@ -120,6 +120,9 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
 
                     player.voice.connection.packet(packet);
                 }
+
+                // Передаем кол-во пакетов в буфере
+                player._buffered = sendCount;
             }
         });
     };

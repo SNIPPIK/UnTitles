@@ -209,11 +209,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         if (this._status === ConnectionStatus.disconnected) return;
         this.status = ConnectionStatus.disconnected;
-        //this.disconnect();
         this.speaker.destroy();
 
         // Очищаем адаптер последним
-        this.adapter?.adapter?.destroy();
+        this.adapter.destroy();
 
         // Nullify
         this.adapter = null;

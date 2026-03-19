@@ -33,7 +33,7 @@ export default class extends ComponentCommand {
                             },
                             {
                                 "type": 10,
-                                "content": `### **[${track.name}](${track.url})**\n> ${track.time.split}\n-# ${track.user.username} ● ${track.time.split} | ${track.api.name.toLowerCase()}`
+                                "content": `### **[${track.name}](${track.url})**\n> ${track.footer}`
                             }
                         ],
                         "accessory": {

@@ -12,12 +12,17 @@ use std::{
     thread,
     time::Duration,
 };
+use std::sync::atomic::AtomicU64;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::timers::cycle::{add_global_session, remove_global_session};
 
 /// Максимальное количество пакетов, которое может храниться в очереди на отправку.
 /// При превышении лимита самый старый пакет отбрасывается.
-const MAX_BUFFER_ITEMS: usize = 1024 ;
+const MAX_BUFFER_ITEMS: usize = 1024;
+
+/// Время до отправки keepalive пакета, для работы через nat системы
+const KEEP_ALIVE_TIMEOUT: u64 = 10000;
 
 /// Внутренние данные UDP-сокета с буфером исходящих пакетов и статистикой.
 ///
@@ -38,6 +43,8 @@ pub struct UdpBufferedInner {
     /// или временной недоступности сокета (WouldBlock). Атомарный для потокобезопасности
     /// без блокировок.
     pub send_drops: AtomicUsize,
+
+    pub last_send_ms: AtomicU64,
 }
 
 impl UdpBufferedInner {
@@ -64,10 +71,20 @@ impl UdpBufferedInner {
     /// пакет возвращается в начало очереди (push_front) для повторной попытки позже,
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self) {
+        let now = now_ms();
+        let mut sent_anything = false;
+
+        // Пытаемся достать реальные данные
         if let Ok(mut buf) = self.buffer.try_lock() {
             if let Some(data) = buf.pop_front() {
+                if data.is_empty() {return;}
+
                 match self.socket.send(&data) {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        sent_anything = true;
+                        // Обновляем таймер после успешной отправки
+                        self.last_send_ms.store(now, Ordering::Relaxed);
+                    }
 
                     // Если очередь отправки сокета переполнена, возвращаем пакет обратно
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -81,6 +98,21 @@ impl UdpBufferedInner {
                         buf.push_front(data);
                         self.send_drops.fetch_add(1, Ordering::Relaxed);
                     }
+                }
+            }
+        }
+
+        // Логика Keep-alive (если буфер был пуст)
+        if !sent_anything {
+            let last_ts = self.last_send_ms.load(Ordering::Relaxed);
+
+            if now >= last_ts + KEEP_ALIVE_TIMEOUT {
+                // Формируем минимальный keepalive пакет (например, 4 байта нулей или спец. заголовок)
+                let keepalive_packet = [0u8; 8];
+
+                if self.socket.send(&keepalive_packet).is_ok() {
+                    // Обновляем таймер, чтобы следующий keepalive ушел через 2 сек
+                    self.last_send_ms.store(now, Ordering::Relaxed);
                 }
             }
         }
@@ -143,6 +175,7 @@ impl UdpBuffered {
             socket: Arc::new(socket),
             buffer: Mutex::new(VecDeque::with_capacity(256)),
             send_drops: AtomicUsize::new(0),
+            last_send_ms: AtomicU64::new(now_ms()),
         });
 
         // Генерируем случайный идентификатор для этой сессии.
@@ -298,4 +331,13 @@ impl Drop for UdpBuffered {
     fn drop(&mut self) {
         self.destroy();
     }
+}
+
+
+/// Вспомогательная функция для получения текущего времени в мс
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
 }

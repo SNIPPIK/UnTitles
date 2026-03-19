@@ -40,7 +40,7 @@ export default createEvent({
                                     { type: 10, content: `## ${header}` },
                                     {
                                         type: 10,
-                                        content: `\n\`${locale._(queue.message.locale, "player.queue.push")}\``
+                                        content: `\n__${locale._(queue.message.locale, "player.queue.push")}__`
                                     },
                                     {
                                         type: 10,
@@ -54,10 +54,10 @@ export default createEvent({
                                     }
                                 }
                             },
-                            {type: 14, spacing: 2, divider: true},
+                            { type: 14, spacing: 2, divider: true },
                             {
                                 type: 10,
-                                content: `-# ${user.username} | ${totalTime.duration(false)} | \`🎶 ${queue.tracks.total}\``
+                                content: `> -# \`👤 ${user.username}\` | \`🕐 ${totalTime.duration(false)}\` • \`🎶 ${queue.tracks.total}\``
                             },
                             // Кнопки
                             {
