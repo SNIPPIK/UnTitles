@@ -101,7 +101,7 @@ export class RestObject {
      */
     public get arrayAuth(): RestServerSide.API[] {
         return this.array.filter(api => api.auth !== null);
-    }
+    };
 
     /**
      * @description Платформы с доступом к аудио
@@ -111,7 +111,7 @@ export class RestObject {
     public get arrayAudio(): RestServerSide.API[] {
         return this.array
             .filter(api => api.audio !== false && !this.platforms.block.includes(api.name));
-    }
+    };
 
     /**
      * @description Платформы с доступом к похожим трекам
@@ -121,7 +121,7 @@ export class RestObject {
     public get arrayRelated(): RestServerSide.API[] {
         return this.array
             .filter(api => api.requests?.some(req => req.name === "related"));
-    }
+    };
 
     /**
      * @description Создание класса для взаимодействия с платформой
@@ -207,6 +207,7 @@ export class RestObject {
 
                             // Если платформа не отвечает, то отключаем ее!
                             if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
+                                // Блочим платформу
                                 this.platforms.block.push(platform.name);
                             }
 
@@ -265,7 +266,11 @@ export class RestObject {
             // Если возникнет ошибка, пересоздадим worker
             worker.once("error", (error) => {
                 console.log(error);
-                return this.startWorker();
+
+                // Делам небольшую задержку для запуска
+                setTimeout(() => {
+                    return this.startWorker();
+                }, 2e3);
             });
 
             // Внутри startWorker, после создания this.worker

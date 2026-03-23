@@ -1,6 +1,6 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
-import {sdb} from "#worker/db";
+import { sdb } from "#worker/db";
 
 /**
  * @author SNIPPIK
@@ -77,7 +77,7 @@ class RestDeezerAPI extends RestServerSide.API {
                     };
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
+                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album/${ID}`);
 
                     return album;
                 } catch (e) {

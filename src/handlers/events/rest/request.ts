@@ -13,6 +13,17 @@ import { db } from "#app/db";
 export default createEvent({
     data: { name: 'rest/request' },
     run: async (platform, ctx, url) => {
+        // Если было получено ничего!
+        if (url === undefined) {
+            await ctx.client.events.runCustom(
+                "rest/error",
+                ctx,
+                locale._(ctx.interaction.locale, "api.request.fail")
+            );
+            return null;
+        }
+
+
         // Получаем описание запроса от платформы
         const api = platform.request(url);
 

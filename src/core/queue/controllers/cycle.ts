@@ -34,7 +34,7 @@ export class ControllerCycles {
  * @const PLAYER_SEND_NATIVE
  * @private
  */
-const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 20);
+const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 10);
 
 /**
  * @author SNIPPIK
@@ -42,7 +42,7 @@ const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 20);
  * @const PLAYER_SEND_POOL
  * @private
  */
-const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 1.7);
+const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 4);
 
 /**
  * @author SNIPPIK
@@ -99,30 +99,36 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             // Функция отправки аудио фрейма
             execute: (player) => {
                 const audio = player.audio.current;
-                if (!audio) return;
+                const connection = player.voice.connection;
+                const udpPackets = connection.udp.packets ?? 0;
 
-                const framesThisStep = this.options.duration / OPUS_FRAME_SIZE; // сколько пакетов «должно» пройти за этот цикл
-                const udpPackets = player.voice.connection?.udp?.packets ?? 0;
+                // Сколько пакетов должно быть в буфере после этого шага
+                const framesThisStep = this.options.duration / OPUS_FRAME_SIZE;
+                const targetPackets = framesThisStep + PLAYER_SEND_POOL;
 
-                // Считаем, сколько пакетов реально нужно отправить
-                const desiredPackets = framesThisStep + PLAYER_SEND_POOL;
-                const sendCount = Math.max(desiredPackets - udpPackets, 0);
+                // Сколько нужно отправить
+                let sendCount = Math.max(targetPackets - udpPackets, 0);
 
-                for (let i = 0; i < sendCount; i++) {
+                let actuallySent = 0;
+
+                while (sendCount > 0) {
                     const packet = audio.packet;
                     if (!packet) {
-                        if ((!audio.readable || audio.packets === 0) && !udpPackets) {
+                        // Аудио закончилось или буфер пуст
+                        if ((!audio.readable || audio.packets === 0) && udpPackets === 0) {
                             player.status = AudioPlayerState.idle;
                             player.cycle = false;
                         }
-                        return;
+                        break;
                     }
 
-                    player.voice.connection.packet(packet);
+                    connection.packet(packet);
+                    actuallySent++;
+                    sendCount--;
                 }
 
-                // Передаем кол-во пакетов в буфере
-                player._buffered = sendCount;
+                // Фиксируем реальное количество в буфере
+                player._buffered = actuallySent;
             }
         });
     };

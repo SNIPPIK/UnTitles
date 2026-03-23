@@ -40,7 +40,7 @@ export default createEvent({
                                     { type: 10, content: `## ${header}` },
                                     {
                                         type: 10,
-                                        content: `\n__${locale._(queue.message.locale, "player.queue.push")}__`
+                                        content: `\n**${locale._(queue.message.locale, "player.queue.push")}**`
                                     },
                                     {
                                         type: 10,

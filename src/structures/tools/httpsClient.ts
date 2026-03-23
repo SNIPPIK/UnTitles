@@ -245,7 +245,7 @@ export class httpsClient extends Request {
                 try {
                     // Добавляем проверку на пустой/короткий body
                     if (typeof body !== 'string' || body.trim().length === 0) {
-                        return Error(`Empty response body from ${this.data.hostname}`);
+                        return resolve(Error(`Empty response body from ${this.data.hostname}`));
                     }
 
                     return resolve(JSON.parse(body));

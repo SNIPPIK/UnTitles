@@ -70,14 +70,12 @@ class RestSpotifyAPI extends RestServerSide.API {
                 if (!ID) return locale.err("api.request.id.track");
 
                 // Интеграция с утилитой кеширования
-                const cache = sdb.meta_saver?.get(`${this.url}/${ID}`);
+                const cache = sdb.meta_saver?.get(`${this.url}/track/${ID}`);
 
                 // Если трек есть в кеше
                 if (cache) {
-                    if (!options.audio) return cache;
-
                     // Если включена утилита кеширования аудио
-                    else if (sdb.audio_saver) {
+                    if (sdb.audio_saver) {
                         const check = sdb.audio_saver.status(`${this.url}/${ID}`);
 
                         // Если есть кеш аудио
@@ -117,7 +115,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                     setImmediate(() => {
                         // Сохраняем кеш в системе
-                        if (!cache) sdb.meta_saver.set(track, this.url);
+                        if (!cache) sdb.meta_saver.set(track, `${this.url}/track/${ID}`);
                     });
 
                     return track;
@@ -170,7 +168,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                     };
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
+                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album/${ID}`);
                     return album;
                 } catch (e) {
                     return new Error(`[APIs]: ${e}`);
@@ -298,24 +296,26 @@ class RestSpotifyAPI extends RestServerSide.API {
      * @protected
      */
     protected async authorization(): Promise<Error | string> {
-        const token = await new httpsClient({
-            url: `${this.options.account}/token`,
-            headers: {
-                "Authorization": `Basic ${Buffer.from(`${this.auth}`).toString("base64")}`,
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: "grant_type=client_credentials",
-            method: "POST",
-            agent: this.agent
-        }).toJson;
-        // Если при получении токена была получена ошибка
-        if (token instanceof Error) {
-            return new Error(`[APIs]: ${token}`);
-        }
+        try {
+            const token = await new httpsClient({
+                url: `${this.options.account}/token`,
+                headers: {
+                    "Authorization": `Basic ${Buffer.from(`${this.auth}`).toString("base64")}`,
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: "grant_type=client_credentials",
+                method: "POST",
+                agent: this.agent
+            }).toJson;
+            // Если при получении токена была получена ошибка
+            if (token instanceof Error) {
+                return new Error(`[APIs]: ${token}`);
+            }
 
-        // Вносим данные авторизации
-        this.options.time = Date.now() + token["expires_in"];
-        this.options.token = token["access_token"];
+            // Вносим данные авторизации
+            this.options.time = Date.now() + token["expires_in"];
+            this.options.token = token["access_token"];
+        } catch {}
 
         return super.authorization();
     };

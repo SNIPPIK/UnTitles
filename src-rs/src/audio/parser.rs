@@ -198,7 +198,7 @@ impl OggOpusParser {
 
         // Удаляем обработанные данные из буфера remainder.
         if processed > 0 {
-            self.remainder = self.remainder.split_off(processed);
+            self.remainder.drain(..processed);
         }
 
         Ok(())

@@ -115,21 +115,130 @@ let rest: RestServer;
 
 /**
  * @author SNIPPIK
+ * @description Класс для управления запросами в другом потоке
+ * @class RestWorker
+ * @private
+ */
+class RestWorker {
+    /**
+     * @author SNIPPIK
+     * @description Выдача найденных платформ без функций запроса
+     * @public
+     */
+    public get platforms() {
+        const fakeReq = rest.allow.map(api => ({
+            ...stripFunctions(api),
+            requests: (api.requests ?? []).map(stripFunctions)
+        }));
+
+        const data = {
+            supported: fakeReq,
+            authorization: fakeReq.filter(api => api.auth !== null).map(api => api.name),
+            audio: fakeReq.filter(api => api.audio).map(api => api.name),
+            related: rest.allowRelated.map(api => api.name),
+            block: []
+        };
+
+        return data;
+    };
+
+    /**
+     * @description Получения json данных из платформ
+     * @param api - Данные для успешного запроса
+     * @returns Promise<void>
+     * @public
+     */
+    public request = async (api: RestServerSide.ServerOptions) => {
+        const { platform, payload, options, requestId, type } = api;
+
+        try {
+            const restPlatform = rest.platforms.supported[platform] as RestServerSide.API;
+            if (!restPlatform) {
+                return parentPort.postMessage({
+                    requestId,
+                    status: "error",
+                    result: new Error(`Platform not found: ${platform}`)
+                });
+            }
+
+            const callback = restPlatform.requests?.find((request) =>
+                request.name === "all" || request.name === type
+            );
+
+            // Если не найдена функция вызова
+            if (!callback) {
+                return parentPort.postMessage({
+                    requestId,
+                    status: "error",
+                    result: new Error(`Callback not found for platform: ${platform}`)
+                });
+            }
+
+            const result = await callback.execute(payload, {
+                audio: options?.audio !== undefined ? options.audio : true,
+                limit: rest.limits[callback.name]
+            });
+
+            // Если была получена ошибка
+            if (result instanceof Error) {
+                return parentPort.postMessage({
+                    requestId,
+                    status: "error",
+                    result
+                });
+            }
+
+            // Если запрос успешен
+            return parentPort.postMessage({
+                requestId,
+                type: callback.name,
+                status: "success",
+                result
+            });
+        } catch (err: any) {
+            parentPort.postMessage({
+                status: "error",
+                requestId,
+                result: {
+                    name: err.name,
+                    message: err.message,
+                    stack: err.stack
+                }
+            });
+        }
+    };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Класс для управления запросами в другом потоке
+ * @private
+ */
+let worker: RestWorker;
+
+/**
+ * @author SNIPPIK
  * @description Не даем запустить без необходимости
  * @private
  */
 if (parentPort && workerData.rest) {
     initSharedDatabase();
+    worker = new RestWorker();
     rest = new RestServer();
 
     // Получаем ответ от основного потока
     parentPort.on("message", async (message: RestServerSide.ServerOptions) => {
         try {
             // Если запрос к платформе
-            if (message.platform) return await fetchFromPlatform(message);
+            if (message.platform) return await worker.request(message);
 
             // Если надо выдать данные о загруженных платформах
-            else if (message.data) return fetchPlatforms();
+            else if (message.data) {
+                const platforms = worker.platforms;
+
+                // Отдаем данные в другой поток
+                return parentPort?.postMessage(platforms);
+            }
 
             parentPort.postMessage({
                 status: "error",
@@ -165,97 +274,4 @@ function stripFunctions<T extends object>(obj: T): RestServerSide.Serializable<T
     return Object.fromEntries(
         Object.entries(obj).filter(([_, v]) => typeof v !== "function")
     ) as RestServerSide.Serializable<T>;
-}
-
-/**
- * @author SNIPPIK
- * @description Получения json данных из платформ
- * @param api - Данные для успешного запроса
- * @returns Promise<void>
- * @function fetchFromPlatform
- * @async
- */
-async function fetchFromPlatform(api: RestServerSide.ServerOptions): Promise<void> {
-    const { platform, payload, options, requestId, type } = api;
-
-    try {
-        const restPlatform = rest.platforms.supported[platform] as RestServerSide.API;
-        if (!restPlatform) {
-            return parentPort.postMessage({
-                requestId,
-                status: "error",
-                result: new Error(`Platform not found: ${platform}`)
-            });
-        }
-
-        const callback = restPlatform.requests?.find((request) =>
-            request.name === "all" || request.name === type
-        );
-
-        // Если не найдена функция вызова
-        if (!callback) {
-            return parentPort.postMessage({
-                requestId,
-                status: "error",
-                result: new Error(`Callback not found for platform: ${platform}`)
-            });
-        }
-
-        const result = await callback.execute(payload, {
-            audio: options?.audio !== undefined ? options.audio : true,
-            limit: rest.limits[callback.name]
-        });
-
-        // Если была получена ошибка
-        if (result instanceof Error) {
-            return parentPort.postMessage({
-                requestId,
-                status: "error",
-                result
-            });
-        }
-
-        // Если запрос успешен
-        return parentPort.postMessage({
-            requestId,
-            type: callback.name,
-            status: "success",
-            result
-        });
-    } catch (err: any) {
-        parentPort.postMessage({
-            status: "error",
-            requestId,
-            result: {
-                name: err.name,
-                message: err.message,
-                stack: err.stack
-            }
-        });
-    }
-}
-
-/**
- * @author SNIPPIK
- * @description Выдача найденных платформ без функций запроса
- * @returns Promise<void>
- * @function fetchPlatforms
- * @async
- */
-async function fetchPlatforms(): Promise<void> {
-    const fakeReq = rest.allow.map(api => ({
-        ...stripFunctions(api),
-        requests: (api.requests ?? []).map(stripFunctions)
-    }));
-
-    const response = {
-        supported: fakeReq,
-        authorization: fakeReq.filter(api => api.auth !== null).map(api => api.name),
-        audio: fakeReq.filter(api => api.audio).map(api => api.name),
-        related: rest.allowRelated.map(api => api.name),
-        block: []
-    };
-
-    // Отдаем данные в другой поток
-    parentPort?.postMessage(response);
 }

@@ -11,17 +11,23 @@ import { db } from "#app/db";
  * @param search - Текст или ссылка пользователя
  */
 async function allAutoComplete(message: any, platform: RestClientSide.Request, search: string) {
-    // Если платформа заблокирована
-    if (platform?.block || !platform?.auth) return;
-
     // Получаем функцию запроса данных с платформы
     const api = platform.request(search, { audio: false });
-
-    if (!api.type) return;
 
     try {
         // Получаем данные в системе rest/API
         const rest = await api.request();
+
+        // Если была получена ошибка
+        if (rest instanceof Error) {
+            return message.respond([
+                {
+                    name: `[REST/API] -> ${rest}`.slice(0, 120),
+                    value: search,
+                }
+            ]);
+        }
+
         const items: { value: string; name: string }[] = [];
 
         // Если получена ошибка или нет данных

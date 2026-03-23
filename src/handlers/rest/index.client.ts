@@ -51,7 +51,7 @@ export namespace RestClientSide {
         };
 
         /**
-         * @description Выдаем bool, Недоступна ли платформа
+         * @description Проверяем доступ к платформе
          * @return boolean
          * @public
          */
@@ -60,7 +60,7 @@ export namespace RestClientSide {
         };
 
         /**
-         * @description Выдаем bool, есть ли доступ к платформе
+         * @description Проверяем авторизацию к платформе
          * @return boolean
          * @public
          */

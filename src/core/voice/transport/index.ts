@@ -297,11 +297,17 @@ export class Transport extends TypedEmitter<TransportEvents> {
      */
     public packet = (frame: Buffer, type: "raw" | "rtp" = "rtp") => {
         try {
-            if (type !== "raw") {
+            if (type === "rtp") {
                 // Логика DAVE (MLS)
-                if (this._dave?.session?.ready && !this._dave.isTransitioning && this._dave.encrypt) {
+                if (this._dave?.session?.ready) {
                     const encrypted = this._dave.encrypt(frame);
                     if (encrypted) frame = encrypted;
+
+                    // Если DAVE не смог зашифровать, то просто не отдает пакет
+                    else {
+                        this.packet(frame, type);
+                        return;
+                    }
                 }
 
                 frame = this._rtp.packet(frame);

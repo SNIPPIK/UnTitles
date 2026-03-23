@@ -1,7 +1,4 @@
 use std::{
-    hint::{
-        spin_loop
-    },
     collections::{
         HashMap
     },
@@ -9,7 +6,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
-    thread,
     time::{Duration, Instant},
 };
 use dashmap::DashMap;
@@ -39,7 +35,7 @@ pub struct CycleManager {
     running: Arc<AtomicBool>,
 
     /// Дескриптор фонового потока, в котором выполняется цикл тиков.
-    handle: Mutex<Option<thread::JoinHandle<()>>>,
+    handle: Mutex<Option<tokio::task::JoinHandle<()>>>,
 
     /// Интервал между полными циклами обработки всех сессий (в миллисекундах,
     /// преобразуется в Duration).
@@ -83,7 +79,6 @@ impl CycleManager {
         }
 
         let mut handle_guard = self.handle.lock().unwrap();
-
         if self.running
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
@@ -94,10 +89,10 @@ impl CycleManager {
         let sessions_ptr = self.sessions.clone();
         let running_flag = self.running.clone();
         let interval = self.interval;
-        let spin_limit = Duration::from_micros(500);
-        let early_limit = Duration::from_micros(500);
 
-        let handle = thread::spawn(move || {
+        let handle = tokio::spawn(async move {
+            const SPIN_LIMIT: Duration = Duration::from_micros(1000); // ← для максимальной точности
+
             let mut next_tick = Instant::now() + interval;
 
             loop {
@@ -105,63 +100,39 @@ impl CycleManager {
                     break;
                 }
 
-                // ===== WAIT =====
-                loop {
-                    let now = Instant::now();
-
-                    if now >= next_tick {
-                        break;
-                    }
-
-                    let remaining = next_tick - now;
-
-                    if remaining > spin_limit {
-                        // 🔥 ранний wake-up (анти oversleep)
-                        let sleep_time = remaining
-                            .saturating_sub(spin_limit)
-                            .saturating_sub(Duration::from_micros(100));
-
-                        if sleep_time > Duration::ZERO {
-                            thread::sleep(sleep_time);
-                        }
-                    } else {
-                        spin_loop();
-                    }
-                }
-
+                // ===== WAIT: гарантированно просыпаемся РАНЬШЕ или точно вовремя =====
                 let now = Instant::now();
+                if now < next_tick {
+                    let remaining = next_tick.duration_since(now);
 
-                // ===== EARLY CLAMP (чтобы не стрелять слишком рано) =====
-                if next_tick > now {
-                    let early = next_tick - now;
+                    if remaining > SPIN_LIMIT {
+                        tokio::time::sleep(remaining - SPIN_LIMIT).await;
+                    }
 
-                    if early > early_limit {
-                        while Instant::now() < next_tick {
-                            spin_loop();
-                        }
+                    // финальная дотяжка — выходим строго до next_tick (никогда не опаздываем)
+                    while Instant::now() < next_tick {
+                        tokio::task::yield_now().await;
                     }
                 }
 
                 // ===== EXECUTION =====
                 let snapshot = sessions_ptr.load();
+                let sessions: Vec<_> = snapshot.values().collect();
 
-                snapshot.values().for_each(|session| {
-                    session.tick();
-                });
+                for chunk in sessions.chunks(8) {
+                    for session in chunk {
+                        session.tick();
+                    }
+                    tokio::task::yield_now().await;
+                }
 
                 // ===== NEXT TICK =====
                 next_tick += interval;
 
-                // ===== SOFT DRIFT CONTROL =====
+                // ===== DRIFT CONTROL: ускоряем при отставании (catch-up) =====
                 let now = Instant::now();
-
-                if now > next_tick {
-                    let drift = now - next_tick;
-
-                    // ⚠️ только если реально отстали (не микро-дрифт)
-                    if drift > interval {
-                        next_tick = now + interval;
-                    }
+                if next_tick < now {
+                    next_tick = now + SPIN_LIMIT; // сразу догоняем, следующие тики идут раньше
                 }
             }
         });
@@ -171,17 +142,18 @@ impl CycleManager {
 
     /// Останавливает фоновый поток и дожидается его завершения.
     /// Может быть вызван явно или автоматически в Drop.
-    pub fn stop(&self) {
+    pub async fn stop(&self) {
         self.running.store(false, Ordering::Release);
+
         if let Some(handle) = self.handle.lock().unwrap().take() {
-            let _ = handle.join();
+            let _ = handle.await;
         }
     }
 }
 
 impl Drop for CycleManager {
     fn drop(&mut self) {
-        self.stop();
+        let _ = self.stop();
     }
 }
 

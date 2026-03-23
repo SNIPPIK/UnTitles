@@ -72,48 +72,52 @@ impl UdpBufferedInner {
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self) {
         let now = now_ms();
-        let mut sent_anything = false;
 
         // Пытаемся достать реальные данные
-        if let Ok(mut buf) = self.buffer.try_lock() {
-            if let Some(data) = buf.pop_front() {
-                if data.is_empty() {return;}
+        let buf = if let Ok(mut buf) = self.buffer.try_lock() {
+            buf.pop_front()
+        } else {
+            None
+        };
 
-                match self.socket.send(&data) {
-                    Ok(_) => {
-                        sent_anything = true;
-                        // Обновляем таймер после успешной отправки
-                        self.last_send_ms.store(now, Ordering::Relaxed);
-                    }
+        // Пытаемся достать реальные данные
+        if let Some(data) = buf {
+            match self.socket.send(&data) {
+                Ok(_) => {
+                    // Обновляем таймер после успешной отправки
+                    self.last_send_ms.store(now, Ordering::Relaxed);
+                }
 
-                    // Если очередь отправки сокета переполнена, возвращаем пакет обратно
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        buf.push_front(data); // повторная попытка в следующем тике
-                        self.send_drops.fetch_add(1, Ordering::Relaxed);
-                    }
+                // Если очередь отправки сокета переполнена, возвращаем пакет обратно
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    // повторная попытка, возможны старые ключи
+                    self.buffer.try_lock().unwrap().push_front(data);
+                    self.send_drops.fetch_add(1, Ordering::Relaxed);
+                }
 
-                    // Любая другая ошибка (например, закрытый сокет) – тоже возвращаем пакет,
-                    // хотя в дальнейшем он может быть отправлен, если ошибка временная.
-                    Err(_) => {
-                        buf.push_front(data);
-                        self.send_drops.fetch_add(1, Ordering::Relaxed);
-                    }
+                // Любая другая ошибка (например, закрытый сокет) – тоже возвращаем пакет,
+                // хотя в дальнейшем он может быть отправлен, если ошибка временная.
+                Err(_) => {
+                    // повторная попытка, возможны старые ключи
+                    //self.buffer.try_lock().unwrap().push_front(data);
+                    self.send_drops.fetch_add(1, Ordering::Relaxed);
                 }
             }
+
+            // Если есть аудио данные
+            return;
         }
 
         // Логика Keep-alive (если буфер был пуст)
-        if !sent_anything {
-            let last_ts = self.last_send_ms.load(Ordering::Relaxed);
+        let last_ts = self.last_send_ms.load(Ordering::Relaxed);
 
-            if now >= last_ts + KEEP_ALIVE_TIMEOUT {
-                // Формируем минимальный keepalive пакет (например, 4 байта нулей или спец. заголовок)
-                let keepalive_packet = [0u8; 8];
+        if now >= last_ts + KEEP_ALIVE_TIMEOUT {
+            // Формируем минимальный keepalive пакет (например, 4 байта нулей или спец. заголовок)
+            let keepalive_packet = [0u8; 8];
 
-                if self.socket.send(&keepalive_packet).is_ok() {
-                    // Обновляем таймер, чтобы следующий keepalive ушел через 2 сек
-                    self.last_send_ms.store(now, Ordering::Relaxed);
-                }
+            if self.socket.send(&keepalive_packet).is_ok() {
+                // Обновляем таймер, чтобы следующий keepalive ушел через 2 сек
+                self.last_send_ms.store(now, Ordering::Relaxed);
             }
         }
     }
@@ -173,7 +177,7 @@ impl UdpBuffered {
 
         let inner = Arc::new(UdpBufferedInner {
             socket: Arc::new(socket),
-            buffer: Mutex::new(VecDeque::with_capacity(256)),
+            buffer: Mutex::new(VecDeque::with_capacity(128)),
             send_drops: AtomicUsize::new(0),
             last_send_ms: AtomicU64::new(now_ms()),
         });
@@ -196,16 +200,27 @@ impl UdpBuffered {
         Ok(udp)
     }
 
-    /// Добавляет пакет в очередь на отправку.
+    /// Добавляет пакет в очередь на отправку. С проверкой мусора
     ///
     /// # Аргументы
     /// * `packet` - Buffer с данными для отправки.
     ///
-    /// Если длина пакета меньше или равна 2, пакет игнорируется (эвристика для отсеивания
-    /// пустых или служебных пакетов). В реальном приложении это может быть настроено.
+    /// Если длина пакета будет равна 3, он будет проверен, допустим ли он!
+    /// Если размер пакета более 3, то позволяем ему отправится в циклической системе
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        if !packet.is_empty() {
+        // Если найден примерный SILENT FRAME
+        if packet.len() == 3 {
+            // Допускаем Silent Frames
+            if packet.starts_with(&[0xF8, 0xFF, 0xFE]) {
+                self.inner.push(packet.as_ref().to_vec());
+            }
+            return;
+        }
+
+        // Если реально есть что-то
+        else if packet.len() > 3 {
+            // Добавляем вектор
             self.inner.push(packet.as_ref().to_vec());
         }
     }
@@ -255,7 +270,7 @@ impl UdpBuffered {
                     Ok(size) if size > 0 => {
                         let data = buf[..size].to_vec();
                         // Вызываем вызов
-                        let _ = tsfn.call(data, ThreadsafeFunctionCallMode::NonBlocking);
+                        tsfn.call(data, ThreadsafeFunctionCallMode::NonBlocking);
                     }
                     // Если сокет временно недоступен (нет данных), немного спим.
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
