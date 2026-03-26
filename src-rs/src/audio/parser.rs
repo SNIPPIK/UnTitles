@@ -4,7 +4,7 @@ use memchr::memmem;
 
 /// Максимально допустимый размер страницы Ogg в байтах.
 /// Используется для защиты от некорректных или злонамеренных входных данных.
-const MAX_PAGE_SIZE: usize = 1024 * 1024;
+const MAX_PAGE_SIZE: usize = 1024 * 1024 * 5;
 
 /// Тип пакета Opus, извлечённого из потока Ogg.
 /// Соответствует трём возможным типам пакетов в спецификации Opus over Ogg.
@@ -61,8 +61,8 @@ impl OggOpusParser {
     #[napi(constructor)]
     pub fn new() -> Self {
         Self {
-            remainder: Vec::with_capacity(8192),
-            packet_carry: Vec::with_capacity(8192),
+            remainder: Vec::with_capacity(1024 * 5),
+            packet_carry: Vec::with_capacity(1024 * 5),
             bitstream_serial: -1,
             waiting_for_head: true,
         }

@@ -91,7 +91,7 @@ impl CycleManager {
         let interval = self.interval;
 
         let handle = tokio::spawn(async move {
-            const SPIN_LIMIT: Duration = Duration::from_micros(1000); // ← для максимальной точности
+            const SPIN_THRESHOLD: Duration = Duration::from_micros(50); // финальная дотяжка для точности
 
             let mut next_tick = Instant::now() + interval;
 
@@ -100,19 +100,20 @@ impl CycleManager {
                     break;
                 }
 
-                // ===== WAIT: гарантированно просыпаемся РАНЬШЕ или точно вовремя =====
                 let now = Instant::now();
-                if now < next_tick {
-                    let remaining = next_tick.duration_since(now);
 
-                    if remaining > SPIN_LIMIT {
-                        tokio::time::sleep(remaining - SPIN_LIMIT).await;
+                // ===== SLEEP PHASE =====
+                if next_tick > now {
+                    let mut remaining = next_tick - now;
+                    while remaining > SPIN_THRESHOLD {
+                        tokio::time::sleep(remaining - SPIN_THRESHOLD).await;
+                        remaining = next_tick - Instant::now();
                     }
+                }
 
-                    // финальная дотяжка — выходим строго до next_tick (никогда не опаздываем)
-                    while Instant::now() < next_tick {
-                        tokio::task::yield_now().await;
-                    }
+                // ===== SPIN PHASE =====
+                while Instant::now() < next_tick {
+                    std::hint::spin_loop(); // короткий busy-wait
                 }
 
                 // ===== EXECUTION =====
@@ -123,16 +124,19 @@ impl CycleManager {
                     for session in chunk {
                         session.tick();
                     }
+                    // небольшая пауза между чанками, чтобы не блокировать другие async-таски
                     tokio::task::yield_now().await;
                 }
 
                 // ===== NEXT TICK =====
                 next_tick += interval;
 
-                // ===== DRIFT CONTROL: ускоряем при отставании (catch-up) =====
+                // ===== DRIFT COMPENSATION =====
                 let now = Instant::now();
-                if next_tick < now {
-                    next_tick = now + SPIN_LIMIT; // сразу догоняем, следующие тики идут раньше
+                if now > next_tick {
+                    let drift = now.duration_since(next_tick);
+                    let missed_ticks = (drift.as_nanos() / interval.as_nanos()) as u32 + 1;
+                    next_tick += interval * missed_ticks;
                 }
             }
         });

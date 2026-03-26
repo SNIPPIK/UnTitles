@@ -16,22 +16,22 @@
   },
   "dependencies": {
     "@snazzah/davey": "^0.1.10",
-    "discord-api-types": "^0.38.41",
+    "discord-api-types": "^0.38.42",
     "http-proxy-agent": "^7.0.2",
     "seyfert": "^4.2.2",
     "socks-proxy-agent": "^8.0.5",
-    "ws": "^8.19.0"
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^2.18.4",
-    "@types/node": "^25.3.5",
+    "@types/node": "^25.5.0",
     "@types/ws": "^8.18.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
   },
   "scripts": {
     "configure": "node -e \"require('fs').copyFileSync('.env', 'build/.env')\" && node -e \"require('fs').copyFileSync('seyfert.config.mjs', 'build/seyfert.config.mjs')\"",
-    "start": "cd build && node -r tsconfig-paths/register src --use-strict --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache --interval-stack-size",
+    "start": "cd build && node -r tsconfig-paths/register src --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache --interval-stack-size",
     "build": "tsc",
     "build:native": "napi build --platform --release --cargo-cwd ./src-rs && node -e \"const fs = require('fs'); const p = 'build/native'; if (!fs.existsSync(p)) fs.mkdirSync(p, {recursive:true}); const f = fs.readdirSync('.').find(x => x.endsWith('.node')); if (f) { fs.renameSync(f, p + '/' + f); ['index.d.ts', 'index.js'].forEach(x => { if(fs.existsSync(x)) fs.renameSync(x, p + '/' + x) }); console.log('Moved ' + f + ' to ' + p); } else { console.log('Current dir: ' + process.cwd()); console.error('No .node file found here'); process.exit(1); }\""
   }

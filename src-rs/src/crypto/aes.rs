@@ -1,6 +1,6 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
 use std::fmt;
 use rand::{rng, RngExt};
 use aes_gcm::{
@@ -8,20 +8,10 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 
-/// Приращение временной метки (timestamp) для каждого отправленного пакета.
-/// Рассчитано для 20 мс фреймов при частоте дискретизации 48 кГц:
-/// 48000 samples/sec * 0.02 sec = 960 samples.
-pub const TIMESTAMP_INC: u32 = 960;
-
-/// Максимальное 16-битное значение, используется для обнуления счётчика
-/// последовательности (sequence number) при переполнении.
-const MAX_16BIT: u32 = 0xFFFF;
-
-/// Тип полезной нагрузки RTP для Opus (стандартное значение для Discord).
-const PAYLOAD_TYPE: u8 = 120;
-
-/// Максимальный размер фрейма (MTU - накладные расходы), чтобы избежать фрагментации.
-const MAX_FRAME_SIZE: usize = 1200;
+/// Время OPUS пакета
+/// 48kHz * 20ms / 1000
+const TIMESTAMP_INC: u32 = 960;
+const MAX_FRAME_SIZE: usize = 4096; // Максимальный размер Opus фрейма
 
 /// Кастомная ошибка для криптографических операций.
 #[derive(Debug)]
@@ -76,7 +66,7 @@ pub struct VoiceRTPSocket {
     options: EncryptorOptions,
 
     /// Счётчик последовательности RTP (16 бит). Автоматически увеличивается для каждого пакета.
-    sequence: AtomicU32,
+    sequence: AtomicU16,
 
     /// Временная метка RTP (32 бита). Увеличивается на TIMESTAMP_INC для каждого пакета.
     timestamp: AtomicU32,
@@ -110,7 +100,7 @@ impl VoiceRTPSocket {
 
         Ok(Self {
             options: EncryptorOptions { ssrc, key: key_array },
-            sequence: AtomicU32::new(rng.random_range(0..=MAX_16BIT)),
+            sequence: AtomicU16::new(rng.random_range(0..=u16::MAX)),
             timestamp: AtomicU32::new(rng.random()),
             counter: AtomicU32::new(rng.random()),
         })
@@ -120,24 +110,6 @@ impl VoiceRTPSocket {
     #[napi(getter)]
     pub fn mode(&self) -> String {
         "aead_aes256_gcm_rtpsize".to_string()
-    }
-
-    /// Устанавливает счётчик последовательности вручную (для восстановления после реконнекта).
-    #[napi]
-    pub fn set_sequence(&self, seq: u32) {
-        self.sequence.store(seq & MAX_16BIT, Ordering::Release);
-    }
-
-    /// Устанавливает временную метку вручную.
-    #[napi]
-    pub fn set_timestamp(&self, ts: u32) {
-        self.timestamp.store(ts, Ordering::Release);
-    }
-
-    /// Устанавливает счётчик nonce вручную.
-    #[napi]
-    pub fn set_counter(&self, cnt: u32) {
-        self.counter.store(cnt, Ordering::Release);
     }
 
     /// Возвращает текущий nonce (12 байт) и его первые 4 байта (tail).
@@ -161,6 +133,12 @@ impl VoiceRTPSocket {
     }
 
     /// Создаёт зашифрованный RTP-пакет из переданного Opus-фрейма.
+    ///
+    /// Структура пакета (RFC 3550 + Discord AEAD AES256-GCM RTP Size):
+    /// - RTP Header (12 байт): V=2, P=0, X=0, CC=0, M=0, PT=120, SEQ, TS, SSRC
+    /// - Encrypted Payload (N байт)
+    /// - Authentication Tag (16 байт)
+    /// - Nonce Tail (4 байта): первые 4 байта nonce в конце пакета
     #[napi]
     pub fn packet(&self, frame: Buffer) -> Result<Buffer> {
         // Проверяем размер фрейма, чтобы избежать фрагментации.
@@ -171,14 +149,17 @@ impl VoiceRTPSocket {
         let header = self.build_header();
         let counter = self.counter.fetch_add(1, Ordering::AcqRel);
 
+        // Формируем nonce: 32-bit счётчик + 8 нулевых байт (всего 12 байт)
         let mut nonce_bytes = [0u8; 12];
         nonce_bytes[0..4].copy_from_slice(&counter.to_be_bytes());
+        // остальные 8 байт уже нули
+
         let nonce = Nonce::from(nonce_bytes);
-        let tail = nonce_bytes[0..4].to_vec();
 
         let cipher = Aes256Gcm::new_from_slice(&self.options.key)
             .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?;
 
+        // Payload = Opus фрейм, AAD = RTP header (для аутентификации)
         let payload = Payload {
             msg: frame.as_ref(),
             aad: &header,
@@ -188,32 +169,49 @@ impl VoiceRTPSocket {
             .encrypt(&nonce, payload)
             .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
+        // GCM тег — последние 16 байт (полный размер)
         let tag_start = ciphertext_with_tag.len() - 16;
         let encrypted = &ciphertext_with_tag[..tag_start];
         let tag = &ciphertext_with_tag[tag_start..];
 
-        let mut packet = Vec::with_capacity(header.len() + encrypted.len() + tag.len() + tail.len());
+        // Финальный пакет: Header + Encrypted + Tag + 4-byte nonce tail
+        let mut packet = Vec::with_capacity(
+            header.len() + encrypted.len() + tag.len() + 4
+        );
         packet.extend_from_slice(&header);
         packet.extend_from_slice(encrypted);
         packet.extend_from_slice(tag);
-        packet.extend_from_slice(&tail);
+        packet.extend_from_slice(&counter.to_be_bytes()); // Nonce tail (первые 4 байта nonce)
 
         Ok(Buffer::from(packet))
     }
 
-    /// Внутренний метод формирования RTP-заголовка.
+    /// Формирует RTP-заголовок согласно RFC 3550.
+    ///
+    /// Структура (12 байт):
+    /// - Байт 0: V(2)=2, P(1)=0, X(1)=0, CC(4)=0 → 0x80
+    /// - Байт 1: M(1)=0, PT(7)=120 (Opus) → 0x78
+    /// - Байты 2-3: Sequence number (16-bit, увеличивается на 1)
+    /// - Байты 4-7: Timestamp (32-bit, увеличивается на 960 для 48kHz/20ms)
+    /// - Байты 8-11: SSRC (32-bit, уникальный идентификатор)
     fn build_header(&self) -> Vec<u8> {
         let mut header = vec![0u8; 12];
 
-        header[0] = 0x80; // Version 2, no extensions
-        header[1] = PAYLOAD_TYPE; // Marker 0, Payload Type
+        // Байт 0: Version + Flags
+        header[0] = 0x80;
 
-        let seq = self.sequence.fetch_add(1, Ordering::Relaxed) & MAX_16BIT;
-        header[2..4].copy_from_slice(&(seq as u16).to_be_bytes());
+        // Байт 1: Payload Type
+        header[1] = 0x78;
 
+        // Байты 2-3: Sequence number (увеличивается на 1 с каждым пакетом)
+        let seq = self.sequence.fetch_add(1, Ordering::Relaxed);
+        header[2..4].copy_from_slice(&seq.to_be_bytes());
+
+        // Байты 4-7: Timestamp (увеличивается на 960 для Opus 48kHz/20ms)
         let ts = self.timestamp.fetch_add(TIMESTAMP_INC, Ordering::Relaxed);
         header[4..8].copy_from_slice(&ts.to_be_bytes());
 
+        // Байты 8-11: SSRC
         header[8..12].copy_from_slice(&self.options.ssrc.to_be_bytes());
 
         header

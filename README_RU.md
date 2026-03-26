@@ -1,6 +1,6 @@
 
 <div align="center">
-  <h1>🌟 Discord Music Bot 💫</h1>
+  <h1>🌟 WatKLOK — High-Performance Voice Engine for Discord</h1>
 
 <h4>Невероятный бот с собственным голосовым/аудио движком, масштабируемой архитектурой, множеством фильтров и поддержкой 6 музыкальных платформ.</h4>
 <h4>Качество аудио превосходит lavalink и использует E2EE 🔐, не верите? Послушайте сами! Работает без просадок даже на ARM!</h4>
@@ -42,8 +42,7 @@
 
 - 👤 [`SNIPPIK`](https://github.com/SNIPPIK)
 
-📢 Об ошибках и недочётах просим сообщать в [`Issues`](https://github.com/SNIPPIK/UnTitles/issues) или [`Discord`](https://discord.gg/qMf2Sv3)  
-🚫 Бот не работает 24/7 — он может быть недоступен!
+📢 Об ошибках и недочётах, сообщать в [`Issues`](https://github.com/SNIPPIK/UnTitles/issues) или [`Discord`](https://discord.gg/qMf2Sv3)
 
 [![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
 [![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
@@ -72,26 +71,42 @@
 
 > [!WARNING]
 > Если используется прокси, учитывайте что `FFmpeg` не поддерживает socks. Для таких задач есть [`STH`](https://github.com/SNIPPIK/SHS)  
-> Что-то может не работать, если вы не правильно настроили!!! 
+> ⚠️ Некоторые функции требуют корректной настройки окружения (FFmpeg, proxy, native modules)
 ---
 
 ### ⚠️ Требования к железу | Данные с Ryzen 7 5700x3D | 1 плеер
-- CPU: 0-0.1%
+- CPU: 0-0.1% (`1 цикл` = `50 voice` подключений)
 - RAM: `~80 MB`, все зависит от кол-ва треков, нагрузки на платформы, кеша discord!
-
-#### Циклическая система
-- Привязка строго к 1 шарду, для уменьшения нагрузки на CPU, 1 шард может тянуть за собой до 1к серверов
+  - 1 ShardManager `20 MB`
+  - 1 Shard `30-40 MB`
+  - 1 Worker `20-30 MB`
 ---
 
-### 🚀 Особенности движка (UnTitles)
-#### 🎖️ Особенности
-- Устойчивость к зацикливанию событий, поэтому даже в этом случае звук воспроизводится плавно!!!
+### 🚀 Особенности движка (WatKLOK)
+
+#### 🎖️ Устойчивость к блокировке Event Loop
+Даже при жёстком блокировании основного потока Node.js звук продолжает воспроизводиться **без лагов и искажений**.
 ```ts
-setInterval(() => { // Possible x4
-    const startBlock = performance.now();
-    while (performance.now() - startBlock < 100) {}
+// 💣 Event Loop Blocking Test (x4)
+setInterval(() => {
+    const start = performance.now();
+    while (performance.now() - start < 100) {}
 }, 100);
 ```
+
+#### 💀 Что происходит обычно
+* аудио начинает хрипеть
+* появляются задержки
+* ломается тайминг
+* возможен полный stop playback
+
+#### ⚡ В WatKLOK
+* стабильный поток аудио
+* корректный тайминг
+* отсутствие искажений
+* воспроизведение не зависит от JS event loop
+> 📌 Движок использует изолированные потоки и нативную обработку аудио, поэтому блокировка JS не влияет на playback
+
 #### 🎵 Качество звука
 - Качество не ухудшается, за исключением ограничений кодирования, установленных `Discord`
 - **Hot Audio Swap**: Система мгновенного бесшовного перехода между треками.

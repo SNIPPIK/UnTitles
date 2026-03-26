@@ -300,7 +300,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             // Если другой аудио поток загружается, то запрещаем включение
             if (this._audio.preloaded) return null;
 
-            this.emit("player/log", `[AudioPlayer/${this.id}] has read ${track.isBuffered ? "buffered" : "piped"} stream ${resource}`);
+            this.emit("player/log", `[AudioPlayer/${this.id}|${this._filters?.size}] has read ${track.isBuffered ? "buffered" : "piped"} stream ${resource}`);
 
             // Выбираем тип аудио
             const audio = track.isBuffered ? AudioResource : AudioResource;

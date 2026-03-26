@@ -295,27 +295,13 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @description Отправление аудио пакета в систему rust cycle
      * @public
      */
-    public packet = (frame: Buffer, type: "raw" | "rtp" = "rtp") => {
+    public packet = (frame: Buffer) => {
         try {
-            if (type === "rtp") {
-                // Логика DAVE (MLS)
-                if (this._dave?.session?.ready) {
-                    const encrypted = this._dave.encrypt(frame);
-                    if (encrypted) frame = encrypted;
-
-                    // Если DAVE не смог зашифровать, то просто не отдает пакет
-                    else {
-                        this.packet(frame, type);
-                        return;
-                    }
-                }
-
-                frame = this._rtp.packet(frame);
-            }
+            const encrypted = this._dave.encrypt(frame);
+            const rtp = this._rtp.packet(encrypted);
 
             // Прямая отправка в сокет
-            this._udp?.packet(frame);
-
+            this._udp.packet(rtp);
         } catch (err) {
             this.emit("info", `[Transport/Packet]: ${err}`);
         }

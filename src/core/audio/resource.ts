@@ -284,19 +284,17 @@ export class AudioResource extends BaseAudioResource {
                 }
             },
             input: this.process,
-            decode: (p) => {
-                p.pipeStdout((type, frame: Buffer) => {
-                    if (type === 'frame') {
-                        if (!this._readable) {
-                            this.engine.addPacket(SILENT_FRAME);
-                            this._readable = true;
-                            setImmediate(() => this.emit("readable"));
-                        }
-
-                        this.engine.addPacket(frame);
+            decode: (p) => p.pipeStdout(async (type, frame: Buffer) => {
+                if (type === 'frame') {
+                    if (!this._readable) {
+                        this.engine.addPacket(SILENT_FRAME);
+                        this._readable = true;
+                        setImmediate(() => this.emit("readable"));
                     }
-                });
-            }
+
+                    this.engine.addPacket(frame);
+                }
+            })
         });
     };
 
@@ -305,7 +303,7 @@ export class AudioResource extends BaseAudioResource {
      * @public
      */
     public destroy() {
-        this.engine.addPacket(SILENT_FRAME);
+        //this.engine.addPacket(SILENT_FRAME);
 
         if (this.process) {
             this.process.destroy();

@@ -192,11 +192,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     /**
      * @description Подготавливает аудио пакет и немедленно отправляет его.
      * @param frame - Аудио пакет OPUS
-     * @param type - Тип шифрования данных
      * @public
      */
-    public packet = (frame: Buffer, type: "raw" | "rtp" = "rtp") => {
-        this.transport.packet(frame, type);
+    public packet = (frame: Buffer) => {
+        this.transport.packet(frame);
         this.speaker.speaking = this.speaker.default;
     };
 

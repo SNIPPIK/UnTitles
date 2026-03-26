@@ -42,7 +42,7 @@ const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 10);
  * @const PLAYER_SEND_POOL
  * @private
  */
-const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 4);
+const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 3);
 
 /**
  * @author SNIPPIK
@@ -53,7 +53,6 @@ const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 4);
  */
 class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
     private _lastAdjust = 0;
-    private _targetDuration = PLAYER_SEND_NATIVE;
 
     /**
      * @description Запускаем циклическую систему плееров, весь логический функционал здесь
@@ -70,24 +69,13 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 step: () => {
                     const now = this.time;
                     const drift = Math.abs(now - this.insideTime);
+                    const frames = drift > PLAYER_SEND_NATIVE ? drift + PLAYER_SEND_NATIVE : PLAYER_SEND_NATIVE;
+                    const quantized = Math.max(PLAYER_SEND_NATIVE, Math.ceil(frames / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE);
 
-                    let frames = PLAYER_SEND_NATIVE;
-
-                    // только вверх по 20 ms
-                    if (drift > PLAYER_SEND_NATIVE) {
-                        frames = drift + PLAYER_SEND_NATIVE;
-                    }
-
-                    // === Округление по шагу 20ms ===
-                    let quantized = Math.ceil(frames / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE;
-                    if (quantized < PLAYER_SEND_NATIVE) quantized = PLAYER_SEND_NATIVE;
-                    this._targetDuration = quantized;
-
-                    // === Плавная коррекция duration ===
-                    if (now - this._lastAdjust >= PLAYER_SEND_NATIVE) {
-                        if (this.options.duration < this._targetDuration) this.options.duration = Math.min(this.options.duration + OPUS_FRAME_SIZE, this._targetDuration);
-                        else if (this.options.duration > this._targetDuration) this.options.duration = Math.max(this.options.duration - OPUS_FRAME_SIZE, this._targetDuration);
-
+                    // Коррекция только если нужно и время пришло
+                    if ((now - this._lastAdjust >= PLAYER_SEND_NATIVE) && (this.options.duration !== quantized)) {
+                        const step = this.options.duration > quantized ? -OPUS_FRAME_SIZE : OPUS_FRAME_SIZE;
+                        this.options.duration = Math.max(PLAYER_SEND_NATIVE, Math.min(this.options.duration + step, quantized));
                         this._lastAdjust = now;
                     }
                 }
@@ -100,34 +88,29 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             execute: (player) => {
                 const audio = player.audio.current;
                 const connection = player.voice.connection;
-                const udpPackets = connection.udp.packets ?? 0;
-
-                // Сколько пакетов должно быть в буфере после этого шага
-                const framesThisStep = this.options.duration / OPUS_FRAME_SIZE;
-                const targetPackets = framesThisStep + PLAYER_SEND_POOL;
-
-                // Сколько нужно отправить
-                let sendCount = Math.max(targetPackets - udpPackets, 0);
+                const sendCount = Math.max(
+                    ((this.options.duration / OPUS_FRAME_SIZE) + PLAYER_SEND_POOL) - (connection.udp.packets ?? 0),
+                    0
+                );
 
                 let actuallySent = 0;
+                let packet: Buffer;
 
-                while (sendCount > 0) {
-                    const packet = audio.packet;
-                    if (!packet) {
-                        // Аудио закончилось или буфер пуст
-                        if ((!audio.readable || audio.packets === 0) && udpPackets === 0) {
-                            player.status = AudioPlayerState.idle;
-                            player.cycle = false;
-                        }
-                        break;
+                // Если есть пакеты к отправлению
+                if (sendCount) {
+                    // Развёрнутый цикл для микро-оптимизации (если очень много пакетов)
+                    while (actuallySent < sendCount) {
+                        if (!(packet = audio.packet)) break;
+                        connection.packet(packet);
+                        actuallySent++;
                     }
-
-                    connection.packet(packet);
-                    actuallySent++;
-                    sendCount--;
                 }
 
-                // Фиксируем реальное количество в буфере
+                if (!packet && audio.packets === 0 && !connection.udp.packets) {
+                    player.status = AudioPlayerState.idle;
+                    player.cycle = false;
+                }
+
                 player._buffered = actuallySent;
             }
         });

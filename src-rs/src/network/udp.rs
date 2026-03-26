@@ -14,12 +14,7 @@ use std::{
 };
 use std::sync::atomic::AtomicU64;
 use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::timers::cycle::{add_global_session, remove_global_session};
-
-/// Максимальное количество пакетов, которое может храниться в очереди на отправку.
-/// При превышении лимита самый старый пакет отбрасывается.
-const MAX_BUFFER_ITEMS: usize = 1024;
 
 /// Время до отправки keepalive пакета, для работы через nat системы
 const KEEP_ALIVE_TIMEOUT: u64 = 10000;
@@ -44,7 +39,7 @@ pub struct UdpBufferedInner {
     /// без блокировок.
     pub send_drops: AtomicUsize,
 
-    pub last_send_ms: AtomicU64,
+    pub last_send_ms: AtomicU64
 }
 
 impl UdpBufferedInner {
@@ -54,12 +49,6 @@ impl UdpBufferedInner {
     /// (pop_front) и увеличивает счётчик сброшенных пакетов.
     pub fn push(&self, data: Vec<u8>) {
         let mut buf = self.buffer.lock().unwrap();
-
-        if buf.len() >= MAX_BUFFER_ITEMS {
-            buf.pop_front(); // теряем самый старый пакет
-            self.send_drops.fetch_add(1, Ordering::Relaxed);
-        }
-
         buf.push_back(data);
     }
 
@@ -73,51 +62,35 @@ impl UdpBufferedInner {
     pub fn tick(&self) {
         let now = now_ms();
 
-        // Пытаемся достать реальные данные
-        let buf = if let Ok(mut buf) = self.buffer.try_lock() {
-            buf.pop_front()
-        } else {
-            None
-        };
+        // ===== Попытка достать пакет =====
+        let packet_opt = self.buffer.try_lock().ok().and_then(|mut buf| buf.pop_front());
 
-        // Пытаемся достать реальные данные
-        if let Some(data) = buf {
-            match self.socket.send(&data) {
-                Ok(_) => {
-                    // Обновляем таймер после успешной отправки
-                    self.last_send_ms.store(now, Ordering::Relaxed);
-                }
-
-                // Если очередь отправки сокета переполнена, возвращаем пакет обратно
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    // повторная попытка, возможны старые ключи
-                    self.buffer.try_lock().unwrap().push_front(data);
-                    self.send_drops.fetch_add(1, Ordering::Relaxed);
-                }
-
-                // Любая другая ошибка (например, закрытый сокет) – тоже возвращаем пакет,
-                // хотя в дальнейшем он может быть отправлен, если ошибка временная.
-                Err(_) => {
-                    // повторная попытка, возможны старые ключи
-                    //self.buffer.try_lock().unwrap().push_front(data);
-                    self.send_drops.fetch_add(1, Ordering::Relaxed);
+        match packet_opt {
+            Some(packet) => {
+                // ===== Отправка реального пакета =====
+                match self.socket.send(&packet) {
+                    Ok(_) => self.last_send_ms.store(now, Ordering::Relaxed),
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        // Возвращаем пакет обратно
+                        self.buffer.try_lock().unwrap().push_front(packet);
+                        self.send_drops.fetch_add(1, Ordering::Relaxed);
+                    }
+                    Err(_) => {
+                        // Любая другая ошибка — тоже возвращаем
+                        self.buffer.try_lock().unwrap().push_front(packet);
+                        self.send_drops.fetch_add(1, Ordering::Relaxed);
+                    }
                 }
             }
-
-            // Если есть аудио данные
-            return;
-        }
-
-        // Логика Keep-alive (если буфер был пуст)
-        let last_ts = self.last_send_ms.load(Ordering::Relaxed);
-
-        if now >= last_ts + KEEP_ALIVE_TIMEOUT {
-            // Формируем минимальный keepalive пакет (например, 4 байта нулей или спец. заголовок)
-            let keepalive_packet = [0u8; 8];
-
-            if self.socket.send(&keepalive_packet).is_ok() {
-                // Обновляем таймер, чтобы следующий keepalive ушел через 2 сек
-                self.last_send_ms.store(now, Ordering::Relaxed);
+            None => {
+                // ===== Keep-alive =====
+                let last_ts = self.last_send_ms.load(Ordering::Relaxed);
+                if now >= last_ts + KEEP_ALIVE_TIMEOUT {
+                    // Используем статический SILENT_FRAME, без нового Vec
+                    if self.socket.send(&[0u8; 8]).is_ok() {
+                        self.last_send_ms.store(now, Ordering::Relaxed);
+                    }
+                }
             }
         }
     }
@@ -177,7 +150,7 @@ impl UdpBuffered {
 
         let inner = Arc::new(UdpBufferedInner {
             socket: Arc::new(socket),
-            buffer: Mutex::new(VecDeque::with_capacity(128)),
+            buffer: Mutex::new(VecDeque::with_capacity(1024 * 2)),
             send_drops: AtomicUsize::new(0),
             last_send_ms: AtomicU64::new(now_ms()),
         });
