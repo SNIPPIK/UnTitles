@@ -61,8 +61,8 @@ impl OggOpusParser {
     #[napi(constructor)]
     pub fn new() -> Self {
         Self {
-            remainder: Vec::with_capacity(1024 * 5),
-            packet_carry: Vec::with_capacity(1024 * 5),
+            remainder: Vec::with_capacity(0),
+            packet_carry: Vec::with_capacity(0),
             bitstream_serial: -1,
             waiting_for_head: true,
         }
@@ -133,7 +133,12 @@ impl OggOpusParser {
             let window = &self.remainder[processed..];
             let pos = match memmem::find(window, b"OggS") {
                 Some(p) => p,
-                None => break,           // маркер не найден — ждём ещё данных
+                None => { // маркер не найден — ждём ещё данных
+                    // оставляем только хвост для возможного "OggS" на границе чанков
+                    let keep = 3.min(total_len);
+                    self.remainder.drain(..total_len - keep);
+                    return Ok(());
+                },
             };
 
             // Сдвигаем processed до начала предполагаемой страницы.
@@ -230,7 +235,8 @@ impl OggOpusParser {
 
         // Если страница продолжает пакет, но у нас нет данных — поток битый
         if continued && packet_carry.is_empty() {
-            return Err(Error::from_reason("Invalid continuation: no previous packet"));
+            // Просто пропускаем данные этой страницы до первого завершённого пакета
+            // Ничего не делаем — packet_carry останется пустым
         }
 
         // Если НЕ continuation, но packet_carry не пуст — сбрасываем (рассинхрон)

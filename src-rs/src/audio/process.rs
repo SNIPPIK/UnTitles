@@ -73,7 +73,7 @@ impl FfmpegProcess {
         let child = Command::new(name)
             .args(final_args)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::null())
             .spawn()
             .map_err(|e| Error::new(Status::GenericFailure, format!("Failed to spawn ffmpeg: {}", e)))?;
 
@@ -95,7 +95,8 @@ impl FfmpegProcess {
     /// в отдельные фреймы Opus с помощью `OggOpusParser`.
     #[napi]
     pub fn pipe_stdout(&self, callback: JsFunction) -> Result<()> {
-        // Проверяем, не запущен ли уже поток чтения
+        // Проверяем, не запущен ли уже поток чтения.
+        // Acquire гарантирует, что мы увидим запись флага из другого потока.
         if self.reading_active.load(Ordering::Acquire) {
             return Err(Error::new(
                 Status::GenericFailure,
@@ -103,59 +104,89 @@ impl FfmpegProcess {
             ));
         }
 
-        // Забираем stdout у дочернего процесса (Option::take, чтобы оставить только один владелец)
+        // Забираем stdout у дочернего процесса.
+        // Захватываем мьютекс, чтобы получить эксклюзивный доступ к child.
+        // `take()` забирает stdout из Option, оставляя там None – это гарантирует,
+        // что только один поток (этот) будет владеть дескриптором.
         let mut child_guard = self.child.lock().unwrap();
         let stdout = child_guard
             .as_mut()
             .and_then(|c| c.stdout.take())
             .ok_or_else(|| Error::new(Status::GenericFailure, "Stdout already taken".to_string()))?;
 
-        // Создаём потоко-безопасную обёртку над JS-вызовом, которая будет вызываться из фонового потока
-        let tsfn: ThreadsafeFunction<(&str, Vec<u8>), ErrorStrategy::Fatal> = callback
-            .create_threadsafe_function(0, |ctx: ThreadSafeCallContext<(&str, Vec<u8>)>| {
-                let (kind, data) = ctx.value;
+        // Создаём потокобезопасную функцию для вызова JS-колбэка.
+        // Тип данных, передаваемых в JS: массив объектов { type: string, data: Buffer }.
+        // Второй аргумент `1024` – это размер очереди для отложенных вызовов,
+        // если они будут производиться из фонового потока быстрее, чем JS успевает обрабатывать.
+        let tsfn: ThreadsafeFunction<Vec<(PacketType, Vec<u8>)>, ErrorStrategy::Fatal> = callback
+            .create_threadsafe_function(1024, |ctx: ThreadSafeCallContext<Vec<(PacketType, Vec<u8>)>>| {
+                let env = ctx.env;
 
-                // Преобразуем Rust-строку в JS-строку
-                let type_str = ctx.env.create_string(&kind)?;
-                // Копируем данные в JS-буфер
-                let buffer = ctx.env.create_buffer_with_data(data)?;
+                // Создаём JS-массив, куда сложим все полученные пакеты.
+                let mut js_array = env.create_array_with_length(ctx.value.len())?;
 
-                Ok(vec![
-                    type_str.into_unknown(),
-                    buffer.into_unknown(),
-                ])
+                for (i, (kind, data)) in ctx.value.into_iter().enumerate() {
+                    let mut obj = env.create_object()?;
+
+                    let kind_str = env.create_string(kind.as_str())?;
+                    // `create_buffer_with_data` копирует данные в память, управляемую V8.
+                    let buffer = env.create_buffer_with_data(data)?.into_unknown();
+
+                    obj.set_named_property("type", kind_str)?;
+                    obj.set_named_property("data", buffer)?;
+
+                    js_array.set_element(i as u32, obj)?;
+                }
+
+                // Возвращаем массив как единственный аргумент колбэка.
+                Ok(vec![js_array.into_unknown()])
             })?;
 
-        // Устанавливаем флаг активности до запуска потока
+        // Устанавливаем флаг активности до запуска потока.
+        // Release гарантирует, что все предыдущие записи (например, изменение child_guard)
+        // будут видны в потоке чтения после загрузки флага с Acquire.
         self.reading_active.store(true, Ordering::Release);
         let active = Arc::clone(&self.reading_active);
 
-        // Запускаем фоновый поток чтения
+        // Запускаем фоновый поток чтения.
         let handle = thread::spawn(move || {
+            // Используем буферизированный reader для эффективного чтения.
             let mut reader = BufReader::new(stdout);
-            let mut buffer = [0u8; 16384];  // 16 КБ буфер для чтения из stdout
+            let mut buffer = [0u8; 16384]; // 16 КБ – компромисс между частотой вызовов и задержкой.
 
             let mut parser = OggOpusParser::new();
 
-            // Читаем, пока флаг активности установлен
+            // Батчинг: накапливаем до 64 пакетов, чтобы уменьшить количество вызовов в JS.
+            // Это снижает накладные расходы на переключение контекста и ускоряет обработку.
+            let mut batch: Vec<(PacketType, Vec<u8>)> = Vec::with_capacity(64);
+
             while active.load(Ordering::Acquire) {
                 match reader.read(&mut buffer) {
-                    Ok(0) => break,  // Конец потока (stdout закрыт)
+                    Ok(0) => break, // EOF – процесс завершился или закрыл stdout.
                     Ok(n) => {
                         let chunk = &buffer[..n];
 
                         let mut frames: Vec<(PacketType, Vec<u8>)> = Vec::new();
-
-                        // Парсим входные данные в отдельные фреймы Opus
                         if let Err(e) = parser.parse_internal(chunk, &mut frames) {
                             eprintln!("Parser error: {}", e);
                             break;
                         }
 
-                        // Отправляем каждый фрейм в JS через threadsafe-функцию
-                        for (kind, frame) in frames {
-                            if tsfn.call((kind.as_str(), frame), ThreadsafeFunctionCallMode::Blocking) != Status::Ok {
-                                break; // JS-окружение закрыто или ошибка — прекращаем
+                        for frame in frames {
+                            batch.push(frame);
+
+                            // Когда накопилось достаточно пакетов, отправляем батч.
+                            if batch.len() >= 64 {
+                                // `std::mem::take` заменяет batch на пустой вектор,
+                                // передавая содержимое во владение tsfn без копирования.
+                                let send = std::mem::take(&mut batch);
+
+                                // NonBlocking: если очередь вызовов переполнена, вызов не блокируется,
+                                // а пакет отбрасывается (ErrorStrategy::Fatal не позволяет игнорировать ошибку,
+                                // но в этом месте мы игнорируем результат `call`, что может привести к потере).
+                                // Это компромисс: мы предпочитаем потерять несколько пакетов,
+                                // чем блокировать поток чтения и создавать задержки.
+                                let _ = tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking);
                             }
                         }
                     }
@@ -166,12 +197,17 @@ impl FfmpegProcess {
                 }
             }
 
-            // Сообщаем JS-стороне, что больше данных не будет
+            // После выхода из цикла отправляем оставшиеся пакеты (если есть).
+            if !batch.is_empty() {
+                let _ = tsfn.call(batch, ThreadsafeFunctionCallMode::NonBlocking);
+            }
+
+            // Уведомляем JS, что источник данных исчерпан.
             let _ = tsfn.abort();
             active.store(false, Ordering::Release);
         });
 
-        // Сохраняем handle потока, чтобы потом дождаться его завершения
+        // Сохраняем handle потока, чтобы потом дождаться его завершения.
         *self.reader_handle.lock().unwrap() = Some(handle);
 
         Ok(())

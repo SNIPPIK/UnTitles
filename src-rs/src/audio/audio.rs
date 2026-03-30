@@ -31,7 +31,7 @@ impl AudioEngine {
         // 50 пакетов в секунду * 60 секунд * минуты
         let capacity = (50 * 60 * max_minutes) as usize;
         Self {
-            buffer: VecDeque::with_capacity(capacity.max(1000)),
+            buffer: VecDeque::with_capacity(0),
             max_capacity: capacity,
             position: 0,
         }
