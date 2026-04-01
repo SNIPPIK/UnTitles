@@ -129,6 +129,8 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 global.gc();
             }
         });
+
+        super.reset();
     };
 }
 

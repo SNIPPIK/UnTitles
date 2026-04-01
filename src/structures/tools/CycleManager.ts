@@ -119,8 +119,8 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     private _runTimeout = (): void => {
-        // Если нет больше объектов
-        if (this.size === 0) this.reset();
+        // Проверяем цикл на наличие объектов
+        if (this.size === 0) return this.reset();
 
         // === STEP ===
         const duration = this.delay = this.step();
