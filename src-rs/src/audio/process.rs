@@ -162,7 +162,16 @@ impl FfmpegProcess {
 
             while active.load(Ordering::Acquire) {
                 match reader.read(&mut buffer) {
-                    Ok(0) => break, // EOF – процесс завершился или закрыл stdout.
+                    // Отправляем остаток
+                    Ok(0) => {
+                        if batch.len() > 0 {
+                            // `std::mem::take` заменяет batch на пустой вектор,
+                            // передавая содержимое во владение tsfn без копирования.
+                            let send = std::mem::take(&mut batch);
+                            let _ = tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking);
+                            break;
+                        }
+                    },
                     Ok(n) => {
                         let chunk = &buffer[..n];
 
