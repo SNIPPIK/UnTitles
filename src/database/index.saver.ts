@@ -110,7 +110,7 @@ export class AudioSaver extends PromiseCycle<Track> {
                     });
                 }
             },
-            filter: async (item) => {
+            filter: (item) => {
                 const names = this.status(item);
 
                 // Если такой трек уже есть в системе кеширования
@@ -123,7 +123,7 @@ export class AudioSaver extends PromiseCycle<Track> {
                 else if (!fs.existsSync(names.path)) {
                     let dirs = names.path.split("/");
                     if (!names.path.endsWith("/")) dirs.splice(dirs.length - 1);
-                    await afs.mkdir(dirs.join("/"), { recursive: true });
+                    afs.mkdir(dirs.join("/"), { recursive: true });
                 }
 
                 return true;
@@ -214,7 +214,7 @@ export class AudioSaver extends PromiseCycle<Track> {
             // Выдаем что ничего нет
             return { status: "not-ended", path: file };
         } else {
-            // Если файл все таки есть
+            // Если файл все-таки есть
             if (fs.existsSync(`${file}.opus`)) return {status: "ended", path: `${file}.opus`};
         }
 
