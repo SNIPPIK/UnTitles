@@ -79,6 +79,19 @@ impl OggOpusParser {
     ///   - `data` (Buffer) – бинарные данные пакета
     #[napi]
     pub fn parse(&mut self, env: Env, chunk: Buffer, emit: JsFunction) -> Result<()> {
+        let data = chunk.as_ref();
+        if data.is_empty() {
+            // Пустой буфер — сигнал конца потока, сбрасываем остатки
+            let mut remaining = Vec::new();
+            self.flush(&mut remaining)?;
+            for (packet_type, data) in remaining {
+                let kind = env.create_string(packet_type.as_str())?;
+                let buffer = env.create_buffer_with_data(data)?;
+                emit.call(None, &[kind.into_unknown(), buffer.into_unknown()])?;
+            }
+            return Ok(());
+        }
+
         // Вызываем общий внутренний парсер, передавая замыкание,
         // которое для каждого пакета конвертирует данные в JS-значения и вызывает вызов.
         self.parse_core(chunk.as_ref(), |packet_type, data| {
@@ -100,10 +113,57 @@ impl OggOpusParser {
         chunk: &[u8],
         output: &mut Vec<(PacketType, Vec<u8>)>,
     ) -> Result<()> {
+        if chunk.is_empty() { return self.flush(output); }
+
         self.parse_core(chunk, |packet_type, data| {
             output.push((packet_type, data));
             Ok(())
         })
+    }
+
+    /// Принудительно извлекает все оставшиеся данные из парсера и завершает обработку потока.
+    ///
+    /// Этот метод должен вызываться после того, как все входные данные были переданы в парсер
+    /// (например, при закрытии потока или достижении EOF). Он обрабатывает ситуацию, когда
+    /// в буферах парсера остались неполные данные, которые не могут быть завершены обычным
+    /// способом из-за отсутствия последующих страниц Ogg.
+    ///
+    /// # Алгоритм
+    /// 1. Проверяет наличие необработанных данных в `remainder` (неполные страницы).
+    /// 2. Если в `packet_carry` есть накопленный пакет, который не был завершён из-за
+    ///    отсутствия последнего сегмента (<255), он обрабатывается как завершённый пакет.
+    /// 3. Все пакеты добавляются в `output` для отправки в JS.
+    ///
+    /// # Примечания по безопасности
+    /// - Неполные страницы в `remainder` (без маркера "OggS") отбрасываются, так как по
+    ///   спецификации Ogg пакет может быть завершён только внутри полной страницы.
+    /// - Если `packet_carry` содержит данные, они считаются последним пакетом потока.
+    /// - Флаг `waiting_for_head` игнорируется, так как при завершении потока мы всё равно
+    ///   отдаём всё, что накопили, даже если заголовок не был получен (это позволит избежать
+    ///   потери данных в случае обрыва соединения).
+    ///
+    /// # Возвращаемое значение
+    /// - `Ok(())` — успешно обработаны остатки.
+    /// - `Err` — ошибка при обработке пакета (например, недопустимый тип).
+    pub fn flush(&mut self, output: &mut Vec<(PacketType, Vec<u8>)>) -> Result<()> {
+        // Если есть необработанный остаток (неполные страницы), которые не содержат маркер "OggS",
+        // они считаются повреждёнными или незавершёнными. В корректном Ogg-потоке после закрытия
+        // все данные должны быть разобраны на страницы, поэтому этот остаток игнорируем.
+        if !self.remainder.is_empty() {
+            // Однако если в `packet_carry` накопились данные, это может быть последний пакет,
+            // который не был завершён сегментом <255 (например, последний сегмент страницы был 255,
+            // и конец пакета совпал с концом потока). В этом случае обрабатываем его.
+            if !self.packet_carry.is_empty() {
+                // Обрабатываем накопленный пакет через стандартную логику `process_packet_core`,
+                // которая определяет тип пакета и, при необходимости, добавляет его в выходной вектор.
+                Self::process_packet_core(&mut self.packet_carry, &mut self.waiting_for_head, &mut |packet_type, data| {
+                    output.push((packet_type, data));
+                    Ok(())
+                })?;
+                self.packet_carry.clear();
+            }
+        }
+        Ok(())
     }
 
     /// Основная логика парсинга, общая для обоих API.
@@ -117,10 +177,7 @@ impl OggOpusParser {
     /// 5. Если все данные страницы присутствуют, передаёт её в `handle_page_core`.
     /// 6. Повторяет до тех пор, пока не закончатся полные страницы.
     /// 7. Оставляет неполные данные в `remainder` для следующего вызова.
-    fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()>
-    where
-        F: FnMut(PacketType, Vec<u8>) -> Result<()>,
-    {
+    fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
         // Добавляем новый фрагмент к остатку предыдущих вызовов.
         self.remainder.extend_from_slice(chunk);
 
@@ -227,10 +284,7 @@ impl OggOpusParser {
         bitstream_serial: &mut i32,
         waiting_for_head: &mut bool,
         on_packet: &mut F,
-    ) -> Result<()>
-    where
-        F: FnMut(PacketType, Vec<u8>) -> Result<()>,
-    {
+    ) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
         let continued = header_type & 0x01 != 0;
 
         // Если страница продолжает пакет, но у нас нет данных — поток битый
@@ -316,10 +370,7 @@ impl OggOpusParser {
         packet: &mut Vec<u8>,
         waiting_for_head: &mut bool,
         on_packet: &mut F,
-    ) -> Result<()>
-    where
-        F: FnMut(PacketType, Vec<u8>) -> Result<()>,
-    {
+    ) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
         // Пустой пакет игнорируем (не должен возникать, но на всякий случай).
         if packet.is_empty() {
             return Ok(());

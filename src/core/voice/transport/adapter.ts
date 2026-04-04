@@ -86,6 +86,8 @@ export abstract class VoiceAdapters<T extends any> {
      * @public
      */
     public onVoiceStateUpdate = (payload: GatewayVoiceStateUpdateDispatchData & { guild_id: string }) => {
+        const id = this.client?.["botId"] ?? this.client?.["id"];
+        if (id !== payload.user_id) return;
         this.adapters.get(payload.guild_id)?.onVoiceStateUpdate(payload);
     };
 }

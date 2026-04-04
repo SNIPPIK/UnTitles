@@ -248,7 +248,7 @@ export class AudioResource extends BaseAudioResource {
      * @public
      */
     public get packets(): number {
-        return this.engine.size;
+        return this.engine?.size ?? 0;
     };
 
     /**
@@ -279,26 +279,46 @@ export class AudioResource extends BaseAudioResource {
         // Привязываем события через внутренний метод input
         this.input({
             events: {
-                destroy_callback: (p) => {
-                    p.destroy();
-                }
+                destroy_callback: (p) => p.destroy
             },
             input: this.process,
             decode: (p) => p.pipeStdout((frames) => {
-                // Загружаем фрагменты полученные в процессе парсинга
-                for (let {type, data} of frames) {
-                    if (type === "frame") {
-                        if (!this._readable) {
-                            this.engine.addPacket(SILENT_FRAME);
-                            this._readable = true;
-                            setImmediate(() => this.emit("readable"));
-                        }
+                const batch: Buffer[] = [];
+                let becameReadable = false;
 
-                        this.engine.addPacket(data);
+                for (const { type, data } of frames) {
+                    if (type !== "frame") continue;
+
+                    if (!this._readable) {
+                        batch.push(SILENT_FRAME);
+                        this._readable = true;
+                        becameReadable = true;
                     }
+
+                    batch.push(data);
+                }
+
+                // Отправляем одним батчем
+                if (batch.length > 0) {
+                    this.engine.addPackets(batch);
+                }
+
+                if (becameReadable) {
+                    setImmediate(() => this.emit("readable"));
                 }
             })
         });
+    };
+
+    /**
+     * @description Получаем пакеты
+     * @param size - Кол-во пакетов
+     * @public
+     */
+    public packetAt = (size: number) => {
+        const frames = this.engine.getPackets(size);
+        if (frames) this._played_frames += frames.length;
+        return frames;
     };
 
     /**

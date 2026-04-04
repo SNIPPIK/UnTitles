@@ -9,11 +9,17 @@ import { SetArray } from "#structures/array";
  * @private
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
+    /** Последний сохраненный временной интервал */
+    private lastDelay: number = 0;
+
     /** Следующее запланированное время запуска (в ms, с плавающей точкой) */
     private startTime: number = 0;
 
     /** Время для высчитывания */
     private tickTime: number = 0;
+
+    /** Таймер или функция ожидания */
+    private timeout: NodeJS.Timeout | NodeJS.Immediate;
 
     /**
      * @description Время циклической системы изнутри
@@ -35,6 +41,15 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     };
 
     /**
+     * @description Последний зафиксированный промежуток выполнения
+     * @returns number
+     * @public
+     */
+    public get delay(): number {
+        return this.lastDelay;
+    };
+
+    /**
      * @description Высчитываем задержку шага
      * @param duration - Истинное время шага
      * @private
@@ -43,10 +58,12 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         // Ожидаемое время следующего запуска (без учета _driftStep/lag)
         const expectedNext = this.startTime + this.tickTime + duration;
         const now = this.time;
-        const missed = (now - expectedNext) / duration;
-        const steps = Math.max(1, missed);
-        const correction = Math.max(steps * duration, duration);
+        const missed = Math.floor((now - expectedNext) / duration);
+        const steps = Math.max(1, missed + 1);
+
+        const correction = Math.floor(steps * duration);
         this.tickTime += correction;
+        this.lastDelay = correction;
     };
 
     /**
@@ -65,13 +82,15 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @public
      */
     public add(item: T): this {
+        if (this.options.custom?.push) this.options.custom?.push(item);
+
         if (this.has(item)) this.delete(item);
         super.add(item);
 
         // Запускаем цикл сразу после добавления первого элемента
         if (this.size === 1 && !this.startTime) {
             this.startTime = this.time;
-            setImmediate(this._runTimeout);
+            setImmediate(this.step);
         }
 
         return this;
@@ -83,10 +102,11 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @returns boolean
      * @public
      */
-    public delete = (item: T): boolean => {
-        const hasItem = this.has(item);
+    public delete = (item: T) => {
+        const index = this.has(item);
 
-        if (hasItem) {
+        // Если есть объект в базе
+        if (index) {
             if (this.options.custom?.remove) this.options.custom.remove(item);
             super.delete(item);
         }
@@ -111,6 +131,10 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     private reboot = () => {
         this.startTime = 0;
         this.tickTime = 0;
+        this.lastDelay = 0;
+
+        // Если есть таймер
+        if (this.timeout) this._clearTimeout();
     };
 
     /**
@@ -118,23 +142,26 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @returns void
      * @protected
      */
-    private _runTimeout = (): void => {
+    private step = (): void => {
         // Проверяем цикл на наличие объектов
         if (this.size === 0) return this.reset();
 
         // === STEP ===
-        const duration = this.delay = this.step();
-        const delay = Math.min(Math.max(0, this.insideTime - this.time), duration);
+        this.delay = this._stepCycle();
 
-        // Если delay слишком мал
-        if (delay === 0) {
-            process.nextTick(this.step);
+        const delay = Math.max(0, this.insideTime - this.time);
+        setTimeout(this.step, delay);
+    };
 
-            // Переходим к следующему шагу в следующем тике
-            setTimeout(this._runTimeout, duration);
-            return;
-        }
-        setTimeout(this._runTimeout, delay);
+    /**
+     * @description Удаляем таймер или Immediate
+     * @protected
+     */
+    protected _clearTimeout = () => {
+        if (!this.timeout) return;
+        if ('hasRef' in this.timeout) clearTimeout(this.timeout as NodeJS.Timeout);
+        else clearImmediate(this.timeout as NodeJS.Immediate);
+        this.timeout = null;
     };
 
     /**
@@ -143,23 +170,8 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      * @abstract
      */
-    protected abstract step: () => number;
-
-    /**
-     * @description Вынесенная логика обработки ошибок для чистоты кода
-     * @param error - Ошибка
-     * @param item - Объект с ошибкой
-     * @protected
-     */
-    protected handleStepError(error: unknown, item: T): void {
-        this.delete(item);
-        console.error(`[StepCycle Error]: Removed from cycle.`, {
-            error: error instanceof Error ? error.message : error,
-            item
-        });
-    }
+    protected abstract _stepCycle: () => number;
 }
-
 
 /**
  * @author SNIPPIK
@@ -175,25 +187,24 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @readonly
      * @private
      */
-    protected step = () => {
-        const { filter, execute, custom } = this.options;
-
-        // Выполнение модифицированного шага
-        custom?.step?.();
-
+    protected _stepCycle = () => {
+        // Запускаем цикл
         for (const item of this) {
+            // Если объект не готов
+            if (!this.options.filter(item)) continue;
+
             try {
-                if (filter(item)) execute(item);
+                this.options.execute(item);
             } catch (error) {
-                this.handleStepError(error, item);
+                this.delete(item);
+                console.log(error);
             }
         }
 
+        this.options?.custom?.step?.();
         return this.options.duration;
     };
 }
-
-
 
 /**
  * @author SNIPPIK
@@ -203,9 +214,7 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
  * @public
  */
 export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
-    protected get time() {
-        return Date.now();
-    };
+    protected get time() { return Date.now(); };
 
     /**
      * @description Здесь будет выполнен прогон объектов для выполнения execute
@@ -213,13 +222,14 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @readonly
      * @private
      */
-    protected step = () => {
+    protected _stepCycle = () => {
         for (const item of this) {
             if (!this.options.filter(item)) continue;
             this.runItem(item);
         }
 
-        return this.options.duration;
+        this.options?.custom?.step?.();
+        return 30_000;
     };
 
     /**
@@ -227,18 +237,17 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @param item - объект с обещанием
      * @private
      */
-    private runItem = (item: T): void => {
+    private runItem(item: T): void {
         (this.options.execute(item) as Promise<boolean>)
             .then(ok => {
                 if (!ok) this.delete(item);
             })
             .catch(err => {
-                this.handleStepError(err, item);
+                this.delete(item);
+                console.error(err);
             });
     };
 }
-
-
 
 /**
  * @author SNIPPIK
@@ -253,6 +262,13 @@ interface BaseCycleConfig<T> {
      * @public
      */
     duration: number;
+
+    /**
+     * @description Как фильтровать объекты, вдруг объект еще не готов
+     * @readonly
+     * @public
+     */
+    readonly filter: (item: T) => boolean;
 
     /**
      * @description Кастомные функции, необходимы для модификации или правильного удаления
@@ -300,11 +316,11 @@ interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
     readonly execute: (item: T) => Promise<void> | void;
 
     /**
-     * @description Как фильтровать объекты, вдруг объект еще не готов
+     * @description Время прогона цикла, через n времени будет запущен цикл по новой
      * @readonly
      * @public
      */
-    readonly filter: (item: T) => boolean;
+    duration: number;
 }
 
 /**
@@ -320,11 +336,4 @@ interface AsyncCycleConfig<T> extends BaseCycleConfig<T> {
      * @public
      */
     readonly execute: (item: T) => Promise<boolean>;
-
-    /**
-     * @description Как фильтровать объекты, вдруг объект еще не готов
-     * @readonly
-     * @public
-     */
-    readonly filter: (item: T) => Promise<boolean>;
 }

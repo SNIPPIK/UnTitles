@@ -25,7 +25,7 @@ import { sdb } from "#worker/db";
     url: "www.deezer.com",
     audio: false,
     auth: false,
-    filter: /^(https?:\/\/)?(www\.)|(link\.)?(deezer\.com)\/.+$/i, //|(link\.) - Short URL
+    filter: /^https?:\/\/(www\.|link\.)?deezer\.com\/.+$/i,
 })
 @OptionsRest({
     /**

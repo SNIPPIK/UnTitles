@@ -102,6 +102,12 @@ export class PlayerAudio<T extends AudioResource> {
         // Записываем аудио в пред-загруженные
         this._pre_audio = stream;
 
+        // Установка таймера ожидания
+        const waitTime = stream.options.track.isBuffered ? TIMEOUT_STREAM_BUFFERED : TIMEOUT_STREAM_PIPE;
+        this._timeout = setTimeout(() => {
+            stream.emit("error", Error("Timeout: the stream has been exceeded!"));
+        }, waitTime);
+
         // Отслеживаем аудио поток на ошибки
         (stream as AudioResource).once("error", (error) => {
             // Удаляем таймер
@@ -128,12 +134,6 @@ export class PlayerAudio<T extends AudioResource> {
             this._audio = stream;
             this._pre_audio = null;
         });
-
-        // Установка таймера ожидания
-        const waitTime = stream.options.track.isBuffered ? TIMEOUT_STREAM_BUFFERED : TIMEOUT_STREAM_PIPE;
-        this._timeout = setTimeout(() => {
-            stream.emit("error", Error("Timeout: the stream has been exceeded!"));
-        }, waitTime);
     };
 
     /**

@@ -84,34 +84,52 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             // Функция проверки
             filter: (item) => item.playing && item.voice?.connection?.ready,
 
-            // Функция отправки аудио фрейма
+            /**
+             * @author SNIPPIK
+             * @description Выполняет отправку аудиопакетов из буфера в UDP-соединение.
+             *              Пакеты извлекаются из очереди аудиоданных и передаются в сокет.
+             *              Если пакетов нет и очереди пусты, плеер переводится в состояние idle.
+             *
+             * @param player - Экземпляр аудиоплеера, содержащий буфер аудиоданных и UDP-соединение.
+             *
+             * @remarks
+             * - Количество пакетов для отправки рассчитывается как `длительность фрейма / размер фрейма` + запас.
+             * - Запас (PLAYER_SEND_POOL) позволяет поддерживать буфер в соединении заполненным,
+             *   предотвращая микро-заикания.
+             * - Если пакетов в очереди аудиоданных нет и буфер соединения пуст, плеер переходит в idle.
+             *
+             * @public
+             */
             execute: (player) => {
                 const audio = player.audio.current;
                 const connection = player.voice.connection;
-                const sendCount = Math.max(
-                    ((this.options.duration / OPUS_FRAME_SIZE) + PLAYER_SEND_POOL) - (connection.udp.packets ?? 0),
-                    0
-                );
 
-                let actuallySent = 0;
-                let packet: Buffer;
+                // Текущая задержка шага
+                let toSend = Math.floor(this.options.duration / OPUS_FRAME_SIZE);
 
-                // Если есть пакеты к отправлению
-                if (sendCount) {
-                    // Развёрнутый цикл для микро-оптимизации (если очень много пакетов)
-                    while (actuallySent < sendCount) {
-                        if (!(packet = audio.packet)) break;
-                        connection.packet(packet);
-                        actuallySent++;
-                    }
+                // Добавляем буфер
+                if (connection.udp.packets <= PLAYER_SEND_POOL) {
+                    toSend += PLAYER_SEND_POOL;
                 }
 
-                if (!packet && audio.packets === 0 && !connection.udp.packets) {
+                // Если есть что отправлять
+                if (toSend <= 0) {
+                    if (audio.packets === 0 && (connection.udp.packets ?? 0) === 0) {
+                        player.status = AudioPlayerState.idle;
+                        player.cycle = false;
+                    }
+                    return;
+                }
+
+                const batch = audio.packetAt(toSend);
+
+                if (batch.length > 0) connection.packet(batch);
+                player._buffered = batch.length;
+
+                if (audio.packets === 0 && connection.udp.packets === 0) {
                     player.status = AudioPlayerState.idle;
                     player.cycle = false;
                 }
-
-                player._buffered = actuallySent;
             }
         });
     };
@@ -162,24 +180,51 @@ const MESSAGE_COOLDOWN_TIME = 5e3;
 
 /**
  * @author SNIPPIK
- * @description Циклическая система сообщений, используется для сообщения о текущем треке
- * @class Messages
- * @extends TaskCycle
- * @private
+ * @description Менеджер циклического обновления сообщений в голосовых каналах.
+ *              Отвечает за автоматическое обновление now-playing embed'ов и компонентов,
+ *              удаление устаревших сообщений, пересоздание при необходимости.
+ *
+ * @template T - Тип сообщения, должен расширять `CycleInteraction` (иметь `guildId`, `edit`, `delete`).
+ *
+ * @remarks
+ * - Использует родительский класс `TaskCycle<T>`, который обеспечивает циклический вызов `execute`.
+ * - В конструкторе настраиваются параметры цикла: интервал обновления, кастомные обработчики,
+ *   фильтр и основная логика обновления.
+ * - Каждый гильдии соответствует только одно активное сообщение (проверка по `guildId`).
+ * - Сообщения автоматически удаляются, если очередь музыки исчезла или компоненты отсутствуют.
+ *
+ * @example
+ * ```typescript
+ * const messages = new Messages();
+ * const msg = await messages.ensure(guildId, () => channel.send({ embeds: [embed] }));
+ * if (msg) messages.update(msg, newComponents);
+ * ```
  */
 class Messages<T extends CycleInteraction> extends TaskCycle<T> {
     /**
-     * @description Запускаем циклическую систему сообщений
-     * @constructor
+     * @description Создаёт экземпляр менеджера сообщений и настраивает цикл обновления.
+     *
+     * @remarks
+     * Параметры цикла:
+     * - `duration` – интервал между вызовами `execute` (миллисекунды).
+     * - `custom.remove` – обработчик удаления сообщения: вызывает `delete()`, если метод существует.
+     * - `custom.push` – при добавлении нового сообщения удаляет старое для той же гильдии (гарантирует уникальность).
+     * - `filter` – проверяет, можно ли обновлять сообщение (наличие метода `edit` и не истёк ли `cooldown`).
+     * - `execute` – основная логика: получает очередь из БД, извлекает компоненты, вызывает `update`.
+     *
      * @public
      */
     public constructor() {
         super({
-            // Время до следующего прогона цикла
+            // Интервал обновления сообщений (миллисекунды)
             duration: MESSAGE_UPDATE_TIME,
 
-            // Кастомные функции (если хочется немного изменить логику выполнения)
+            // Кастомные обработчики жизненного цикла
             custom: {
+                /**
+                 * Удаляет сообщение, если у него есть метод `delete`.
+                 * Вызывается при выходе сообщения из цикла.
+                 */
                 remove: async (item) => {
                     try {
                         if (!!item.delete) await item.delete();
@@ -187,24 +232,43 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
                         Logger.log("ERROR", `Failed delete message in cycle!`);
                     }
                 },
+                /**
+                 * При добавлении нового сообщения удаляет старое для той же гильдии,
+                 * чтобы в системе всегда было только одно активное сообщение на гильдию.
+                 */
                 push: (item) => {
                     const old = this.find(msg => msg.guildId === item.guildId);
                     if (old) this.delete(old);
                 }
             },
 
-            // Функция проверки
-            filter: (message) => !!message.edit && message.createdTimestamp + MESSAGE_COOLDOWN_TIME < Date.now() || message.timestamp + MESSAGE_COOLDOWN_TIME < Date.now(),
+            /**
+             * Фильтр, определяющий, нужно ли обновлять сообщение.
+             * Условия:
+             * 1. У сообщения есть метод `edit` (возможность редактирования).
+             * 2. Сообщение существует дольше, чем `MESSAGE_COOLDOWN_TIME`,
+             *    либо прошло достаточно времени с момента создания.
+             */
+            filter: (message) => !!message.edit && message.createdTimestamp + MESSAGE_COOLDOWN_TIME < Date.now() || message.createdTimestamp + MESSAGE_COOLDOWN_TIME < Date.now(),
 
-            // Функция обновления сообщения
+            /**
+             * Основная функция обновления, вызываемая циклически.
+             * - Получает очередь музыки по `guildId`.
+             * - Если очереди нет – удаляет сообщение.
+             * - Если есть компоненты (кнопки, селекты) – вызывает `update`.
+             * - Если компонентов нет – удаляет сообщение.
+             */
             execute: (message) => {
                 const queue = db.queues.get(message.guildId);
 
-                // Если нет очереди
-                if (!queue) this.delete(message);
+                // Нет очереди – сообщение больше не нужно
+                if (!queue) {
+                    this.delete(message);
+                    return;
+                }
                 const component = queue.components;
 
-                // Если не получен embed
+                // Нет компонентов для обновления – сообщение бесполезно
                 if (!component) {
                     this.delete(message);
                     return;
@@ -216,10 +280,17 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
     };
 
     /**
-     * @description Обновление сообщения принудительно
-     * @param message - Сообщение
-     * @param component - Данные для обновления
-     * @returns Promise<void>
+     * @description Принудительно обновляет сообщение, используя переданные компоненты.
+     *              В случае ошибки (например, сообщение удалено) удаляет сообщение из цикла.
+     *
+     * @param message - Объект сообщения, которое нужно обновить.
+     * @param component - Новые компоненты (кнопки, селекты) для встраивания.
+     *
+     * @remarks
+     * - Редактирование происходит только если у сообщения есть поле `createdTimestamp`
+     *   (т.е. оно действительно существует и было создано).
+     * - Ошибки перехватываются и логируются, после чего сообщение удаляется из цикла.
+     *
      * @public
      */
     public update = (message: T, component: MessageComponent) => {
@@ -228,20 +299,33 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
         } catch (error) {
             Logger.log("ERROR", `Failed to edit message in cycle\n${error instanceof Error ? error.stack : error}`);
 
-            // Если при обновлении произошла ошибка
+            // Если при обновлении произошла ошибка, удаляем сообщение из цикла
             this.delete(message);
         }
     };
 
     /**
-     * @description Гарантирует, что сообщение существует и не устарело
-     * @returns Promise<T | null>
+     * @description Гарантирует существование актуального сообщения для гильдии.
+     *              Если сообщения нет или оно устарело (старше `MESSAGE_RESEND_TIME`),
+     *              создаётся новое с помощью фабричной функции.
+     *
+     * @param guildId - ID гильдии, для которой нужно сообщение.
+     * @param factory - Функция, создающая новое сообщение (обычно отправляет embed).
+     *
+     * @returns Актуальное сообщение (если оно уже есть и не устарело), иначе `null`.
+     *          После создания нового сообщения возвращается `null`, так как оно ещё не попало в цикл.
+     *
+     * @remarks
+     * - Используется при старте воспроизведения или при необходимости пересоздать embed.
+     * - Если сообщение существует, но старше `MESSAGE_RESEND_TIME`, оно удаляется и создаётся новое.
+     * - В случае ошибки создания (например, канал удалён) ошибка логируется, возвращается `null`.
+     *
      * @public
      */
     public ensure = async (guildId: string, factory: () => Promise<T>): Promise<T | null> => {
         let message = this.find(m => m.guildId === guildId);
 
-        // Если нет сообщения в цикле
+        // Случай 1: сообщения в цикле нет – создаём новое
         if (!message) {
             try {
                 const msg = await factory();

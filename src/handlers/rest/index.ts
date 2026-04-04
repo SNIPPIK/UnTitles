@@ -152,7 +152,7 @@ export class RestObject {
         if (regexMatch) return regexMatch;
 
         // Fallback к дефолтной платформе
-        return this.platformMap.get("YOUTUBE") || this.random || null;
+        return this.platformMap.get("YOUTUBE") ?? this.random;
     };
 
     /**
@@ -164,7 +164,7 @@ export class RestObject {
         return new Promise<APIRequests<T> | Error>((resolve) => {
             const requestId = this.generateUniqueId();
 
-            // Создаем таймаут
+            // Создаем тайм-аут
             const timeout = setTimeout(() => {
                 if (this.pending.has(requestId)) {
                     this.pending.delete(requestId);

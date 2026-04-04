@@ -74,7 +74,7 @@ export class Logger {
 
             // Получаем память в мегабайтах с двумя знаками после запятой
             const mem = process.memoryUsage();
-            const memUsedMB = ((mem.heapUsed + mem.external + mem.arrayBuffers) / 1024 / 1024).toFixed(2);
+            const memUsedMB = ((mem.heapUsed + mem.external + mem.arrayBuffers + mem.heapTotal) / 1024 / 1024).toFixed(2);
             const time = createDate();
 
             // Если пришел текст

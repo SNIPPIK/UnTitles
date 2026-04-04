@@ -3,7 +3,6 @@ use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode, 
 use napi_derive::napi;
 
 use std::{
-    collections::VecDeque,
     net::UdpSocket,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -14,6 +13,7 @@ use std::{
 };
 use std::sync::atomic::AtomicU64;
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::audio::ring_buffer::RingBuffer;
 use crate::timers::cycle::{add_global_session, remove_global_session};
 
 /// Время до отправки keepalive пакета, для работы через nat системы
@@ -32,7 +32,7 @@ pub struct UdpBufferedInner {
     /// Очередь исходящих пакетов. Защищена мьютексом, так как используется из нескольких
     /// потоков: основной поток добавляет пакеты через push, а цикл тиков (в CycleManager)
     /// вызывает tick для отправки.
-    pub buffer: Mutex<VecDeque<Vec<u8>>>,
+    pub buffer: RingBuffer,
 
     /// Счётчик количества пакетов, которые не были отправлены из-за переполнения буфера
     /// или временной недоступности сокета (WouldBlock). Атомарный для потокобезопасности
@@ -48,8 +48,9 @@ impl UdpBufferedInner {
     /// Если очередь переполнена (достигнут MAX_BUFFER_ITEMS), удаляет самый старый пакет
     /// (pop_front) и увеличивает счётчик сброшенных пакетов.
     pub fn push(&self, data: Vec<u8>) {
-        let mut buf = self.buffer.lock().unwrap();
-        buf.push_back(data);
+        if self.buffer.push(data).is_err() {
+            self.send_drops.fetch_add(1, Ordering::Relaxed);
+        }
     }
 
     /// Попытка отправить один пакет из очереди.
@@ -63,25 +64,26 @@ impl UdpBufferedInner {
         let now = now_ms();
 
         // ===== Попытка достать пакет =====
-        let packet_opt = self.buffer.try_lock().ok().and_then(|mut buf| buf.pop_front());
+        let packet = self.buffer.pop();
 
-        match packet_opt {
+        match packet {
             Some(packet) => {
                 // ===== Отправка реального пакета =====
                 match self.socket.send(&packet) {
                     Ok(_) => self.last_send_ms.store(now, Ordering::Relaxed),
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                         // Возвращаем пакет обратно
-                        self.buffer.try_lock().unwrap().push_front(packet);
+                        self.buffer.push(packet).expect("TODO: WouldBlock Error");
                         self.send_drops.fetch_add(1, Ordering::Relaxed);
                     }
                     Err(_) => {
                         // Любая другая ошибка — тоже возвращаем
-                        self.buffer.try_lock().unwrap().push_front(packet);
+                        self.buffer.push(packet).expect("Error: Unknown Error");
                         self.send_drops.fetch_add(1, Ordering::Relaxed);
                     }
                 }
             }
+
             None => {
                 // ===== Keep-alive =====
                 let last_ts = self.last_send_ms.load(Ordering::Relaxed);
@@ -150,7 +152,7 @@ impl UdpBuffered {
 
         let inner = Arc::new(UdpBufferedInner {
             socket: Arc::new(socket),
-            buffer: Mutex::new(VecDeque::with_capacity(1024 * 2)),
+            buffer: RingBuffer::new(1024 * 5),
             send_drops: AtomicUsize::new(0),
             last_send_ms: AtomicU64::new(now_ms()),
         });
@@ -182,26 +184,24 @@ impl UdpBuffered {
     /// Если размер пакета более 3, то позволяем ему отправится в циклической системе
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        // Если найден примерный SILENT FRAME
-        if packet.len() == 3 {
-            // Допускаем Silent Frames
-            if packet.starts_with(&[0xF8, 0xFF, 0xFE]) {
-                self.inner.push(packet.as_ref().to_vec());
-            }
-            return;
-        }
+        self.try_push(packet.as_ref());
+    }
 
-        // Если реально есть что-то
-        else if packet.len() > 3 {
-            // Добавляем вектор
-            self.inner.push(packet.as_ref().to_vec());
+    /// Добавляет несколько пакетов в очередь с проверкой мусора.
+    ///
+    /// # Аргументы
+    /// * `packets` - массив Buffer с данными для отправки.
+    #[napi]
+    pub fn push_packets(&self, packets: Vec<Buffer>) {
+        for packet in packets {
+            self.try_push(packet.as_ref());
         }
     }
 
     /// Текущее количество пакетов в очереди на отправку.
     #[napi(getter)]
-    pub fn packets(&self) -> u32 {
-        self.inner.buffer.lock().unwrap().len() as u32
+    pub fn packets(&self) -> usize {
+        self.inner.buffer.len()
     }
 
     /// Начинает прослушивание входящих пакетов в отдельном потоке.
@@ -284,8 +284,36 @@ impl UdpBuffered {
         }
 
         self.stop_listening();
-        self.inner.buffer.lock().unwrap().clear();
+        self.inner.buffer.clear();
         remove_global_session(self.id);
+    }
+
+    /// Пытается добавить байты во внутренний буфер для последующей отправки.
+    ///
+    /// Метод выполняет фильтрацию входящих данных:
+    /// - Пакеты длиной 3 байта, начинающиеся с последовательности `[0xF8, 0xFF, 0xFE]`,
+    ///   считаются специальными и также помещаются в буфер. Эта магическая последовательность
+    ///   часто используется в аудиокодеках (например, Opus) для обозначения пустых фреймов
+    ///   или маркеров тишины, которые не должны отбрасываться.
+    /// - Любые другие пакеты длиной более 3 байт добавляются без изменений.
+    /// - Пакеты длиной 3 байта, не соответствующие магической последовательности, игнорируются.
+    /// - Пакеты короче 3 байт отбрасываются (предположительно, это невалидные данные).
+    #[inline]
+    fn try_push(&self, bytes: &[u8]) {
+        // Если пакет состоит ровно из 3 байт и это специальная сигнатура тишины,
+        // то он нужен для сохранения таймингов и не должен отбрасываться.
+        if bytes.len() == 3 {
+            if bytes.starts_with(&[0xF8, 0xFF, 0xFE]) {
+                self.inner.push(bytes.to_vec());
+            }
+            return;
+        }
+
+        // Все остальные пакеты, которые длиннее 3 байт, считаются полноценными
+        // фреймами и отправляются в буфер.
+        if bytes.len() > 3 {
+            self.inner.push(bytes.to_vec());
+        }
     }
 
     /// Создаёт клон UdpBuffered, предназначенный для использования в менеджере (CycleManager).
@@ -309,9 +337,7 @@ impl UdpBuffered {
 
     /// Количество пакетов, сброшенных из-за переполнения очереди или временных ошибок.
     #[napi(getter)]
-    pub fn drops(&self) -> u32 {
-        self.inner.send_drops.load(Ordering::Relaxed) as u32
-    }
+    pub fn drops(&self) -> usize { self.inner.send_drops.load(Ordering::Relaxed) }
 }
 
 /// При падении объекта автоматически вызывается destroy.

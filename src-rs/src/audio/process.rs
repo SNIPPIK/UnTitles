@@ -162,53 +162,55 @@ impl FfmpegProcess {
 
             while active.load(Ordering::Acquire) {
                 match reader.read(&mut buffer) {
-                    // Отправляем остаток
+                    // Конец потока (EOF) — больше данных нет
                     Ok(0) => {
-                        if batch.len() > 0 {
-                            // `std::mem::take` заменяет batch на пустой вектор,
-                            // передавая содержимое во владение tsfn без копирования.
+                        // Отправляем последний батч, если есть
+                        if !batch.is_empty() {
                             let send = std::mem::take(&mut batch);
                             let _ = tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking);
-                            break;
                         }
-                    },
+                        break;
+                    }
                     Ok(n) => {
                         let chunk = &buffer[..n];
+                        let mut frames = Vec::with_capacity(16); // небольшая начальная ёмкость
 
-                        let mut frames: Vec<(PacketType, Vec<u8>)> = Vec::new();
                         if let Err(e) = parser.parse_internal(chunk, &mut frames) {
                             eprintln!("Parser error: {}", e);
+                            // При ошибке парсинга всё равно отправляем то, что накопили, чтобы не терять
+                            if !batch.is_empty() {
+                                let send = std::mem::take(&mut batch);
+                                let _ = tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking);
+                            }
                             break;
                         }
 
                         for frame in frames {
                             batch.push(frame);
 
-                            // Когда накопилось достаточно пакетов, отправляем батч.
                             if batch.len() >= 64 {
-                                // `std::mem::take` заменяет batch на пустой вектор,
-                                // передавая содержимое во владение tsfn без копирования.
                                 let send = std::mem::take(&mut batch);
-
-                                // NonBlocking: если очередь вызовов переполнена, вызов не блокируется,
-                                // а пакет отбрасывается (ErrorStrategy::Fatal не позволяет игнорировать ошибку,
-                                // но в этом месте мы игнорируем результат `call`, что может привести к потере).
-                                // Это компромисс: мы предпочитаем потерять несколько пакетов,
-                                // чем блокировать поток чтения и создавать задержки.
-                                let _ = tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking);
+                                // NonBlocking — не блокируем поток, если очередь JS переполнена, пакет будет отброшен.
+                                // В случае ошибки (например, JS-объект уничтожен) тоже не блокируемся.
+                                if tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking) != Status::Ok {
+                                    eprintln!("Failed to send batch to JS");
+                                    // Если вызов не удался, вероятно, JS-сторона уже не принимает данные,
+                                    // поэтому прерываем цикл
+                                    break;
+                                }
                             }
                         }
                     }
                     Err(e) => {
                         eprintln!("FFmpeg read error: {}", e);
+                        // При ошибке чтения отправляем накопленное
+                        if !batch.is_empty() {
+                            let send = std::mem::take(&mut batch);
+                            let _ = tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking);
+                        }
                         break;
                     }
                 }
-            }
-
-            // После выхода из цикла отправляем оставшиеся пакеты (если есть).
-            if !batch.is_empty() {
-                let _ = tsfn.call(batch, ThreadsafeFunctionCallMode::NonBlocking);
             }
 
             // Уведомляем JS, что источник данных исчерпан.

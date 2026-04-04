@@ -3,22 +3,61 @@ import * as path from "node:path";
 import fs from "node:fs";
 
 /**
- * @author SNIPPIK
- * @description Класс для загрузки директорий и их перезагрузки
- * @class handler
- * @abstract
+ * Абстрактный базовый класс для загрузки и управления модулями из директории.
+ * Предназначен для динамической загрузки файлов (команд, плагинов, слушателей и т.п.)
+ * с поддержкой «горячей» перезагрузки (удаление из кэша require).
+ *
+ * @typeParam T - Тип загружаемых объектов (по умолчанию unknown).
+ *
+ * @remarks
+ * - Загрузка происходит синхронно через `fs.readdirSync` и `require`.
+ * - После загрузки файла его кэш удаляется через `setImmediate`,
+ *   что позволяет повторно загружать изменённые файлы при следующем вызове `load()`.
+ * - Поддерживаются как одиночные экспорты, так и массивы экспортов.
+ * - Если экспорт является классом (имеет `prototype`), создаётся экземпляр.
+ * - Файлы с именами, начинающимися с `index` (например, `index.ts`), игнорируются.
+ *
+ * @example
+ * ```ts
+ * class CommandHandler extends handler<Command> {
+ *   constructor() {
+ *     super(path.join(__dirname, 'commands'));
+ *   }
+ *
+ *   public reload() {
+ *     this.load();
+ *     console.log(`Loaded ${this.size} commands`);
+ *   }
+ * }
+ * ```
+ *
  * @public
+ * @abstract
  */
 export abstract class handler<T = unknown> {
     /**
-     * @description Загруженные файлы, именно файлы не пути к файлам
-     * @readonly
+     * Внутреннее хранилище загруженных объектов.
+     * Используется `SetArray` для эффективного хранения уникальных элементов
+     * с возможностью быстрой итерации.
+     *
      * @private
+     * @readonly
      */
     private readonly _files = new SetArray<T>();
 
     /**
-     * @description Выдаем все загруженные файлы
+     * Внутреннее хранилище загруженных объектов.
+     * Используется `Map` для эффективного хранения уникальных элементов
+     * с возможностью быстрой итерации.
+     *
+     * @public
+     * @readonly
+     */
+    public readonly map = new Map<string, T>();
+
+    /**
+     * Возвращает коллекцию всех загруженных объектов (только для чтения).
+     *
      * @protected
      */
     protected get files() {
@@ -26,7 +65,8 @@ export abstract class handler<T = unknown> {
     };
 
     /**
-     * @description Кол-во загруженных элементов
+     * Количество загруженных объектов.
+     *
      * @public
      */
     public get size() {
@@ -34,52 +74,80 @@ export abstract class handler<T = unknown> {
     };
 
     /**
-     * @description Даем классу необходимые данные
-     * @param directory - Имя директории
+     * Создаёт экземпляр загрузчика.
+     *
+     * @param directory - Путь к директории, из которой будут загружаться файлы.
+     *                    Может быть относительным или абсолютным; будет нормализован через `path.resolve`.
      * @protected
      */
-    protected constructor(private readonly directory: string) {};
+    protected constructor(private readonly directory: string) {
+    };
 
     /**
-     * @description Загружаем директории полностью, за исключением index файлов
+     * Загружает все допустимые файлы из указанной директории (рекурсивно).
+     * При повторном вызове очищает предыдущие загруженные объекты.
+     *
+     * @throws {Error} Если директория не существует.
+     *
+     * @remarks
+     * Процесс загрузки:
+     * 1. Очистка существующих объектов.
+     * 2. Проверка существования директории.
+     * 3. Рекурсивный обход файлов.
+     * 4. Для каждого файла:
+     *    - Проверка расширения (.ts или .js).
+     *    - Игнорирование файлов с именем, начинающимся на `index`.
+     *    - Вызов `_push` для загрузки модуля.
+     *
      * @protected
      */
     protected load = () => {
-        // Если есть загруженные файлы
+        // Очистка предыдущей загрузки
         if (this.size > 0) {
-            // Удаляем все загруженные файлы
             this.files.clear();
+            this.map.clear();
         }
 
         const selfDir = path.resolve(this.directory);
 
-        // Если нет такой директории
-        if (!fs.existsSync(selfDir)) throw new Error(`Directory not found: ${selfDir}`);
+        // Проверка существования директории
+        if (!fs.existsSync(selfDir)) {
+            throw new Error(`Directory not found: ${selfDir}`);
+        }
 
-        // Загружаем директорию
+        // Запуск рекурсивного обхода
         this._loadRecursive(selfDir);
     };
 
     /**
-     * @description Поиск файлов загрузки
-     * @param dirPath - Путь до директории
+     * Рекурсивно обходит директорию и добавляет все подходящие файлы.
+     *
+     * @param dirPath - Абсолютный путь к директории для обхода.
+     *
+     * @private
      */
     private _loadRecursive = (dirPath: string) => {
-        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        const entries = fs.readdirSync(dirPath, {withFileTypes: true});
 
         for (const entry of entries) {
             const fullPath = path.resolve(dirPath, entry.name);
 
-            // Если это еще одна директория
-            if (entry.isDirectory()) this._loadRecursive(fullPath);
+            if (entry.isDirectory()) {
+                // Рекурсивный обход поддиректорий
+                this._loadRecursive(fullPath);
+                continue;
+            }
 
-            // Если это файл
-            else if (entry.isFile()) {
-                // Если это не файл ts или js
-                if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) continue;
+            if (entry.isFile()) {
+                // Фильтрация по расширению
+                if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) {
+                    continue;
+                }
 
-                // Не загружаем index файлы (они являются загрузочными)
-                if (entry.name.startsWith("index")) continue;
+                // Игнорирование индексных файлов (предполагается, что они являются точками входа)
+                if (entry.name.startsWith("index")) {
+                    continue;
+                }
 
                 this._push(fullPath);
             }
@@ -87,36 +155,78 @@ export abstract class handler<T = unknown> {
     };
 
     /**
-     * @description Добавляем загруженный файл в коллекцию файлов
-     * @param path - Путь до файла
+     * Загружает конкретный файл через `require`, извлекает экспорт по умолчанию
+     * и добавляет его в коллекцию.
+     *
+     * @param filePath - Абсолютный путь к файлу.
+     *
+     * @throws {Error} Если файл не содержит `export default`.
+     *
+     * @remarks
+     * - Сразу после загрузки файла его кэш помечается на удаление через `setImmediate`,
+     *   что позволяет при следующей загрузке получить актуальную версию.
+     * - Если экспорт по умолчанию является массивом, каждый элемент обрабатывается индивидуально.
+     * - Если экспорт является классом (определён `prototype`), создаётся экземпляр.
+     * - В остальных случаях объект добавляется как есть.
+     *
+     * @private
      */
-    private _push = (path: string) => {
-        const imported = require(path);
+    private _push = (filePath: string) => {
+        // Загружаем модуль
+        const imported = require(filePath);
 
-        // Удаляем кеш загружаемого файла
-        delete require.cache[require.resolve(path)];
+        // Удаляем кэш после того, как текущий стек вызовов завершится.
+        // Это позволяет перезагружать файлы при повторном вызове `load()`.
+        setImmediate(() => {
+            delete require.cache[require.resolve(filePath)];
+        });
 
-        // Если нет импортируемых объектов
-        if (!imported?.default) throw new Error(`Missing default export in ${path}`);
-
-        const default_export = imported.default;
-
-        // Если полученные данные являются списком
-        if (default_export instanceof Array) {
-            for (const obj of default_export) {
-                if (obj.prototype) this._files.add(new obj(null));
-                else this._files.add(obj);
-            }
-            return;
+        // Проверяем наличие default экспорта
+        if (!imported?.default) {
+            throw new Error(`Missing default export in ${filePath}`);
         }
 
-        // Если загружаемый объект является классом
-        else if (default_export.prototype) {
-            this._files.add(new default_export(null));
-            return;
-        }
+        const defaultExport = imported.default;
 
-        // Добавляем файл в базу для дальнейшего экспорта
-        this._files.add(default_export);
+        if (defaultExport instanceof Array) {
+            // Массив экспортов: инициализируем каждый элемент
+            for (const item of defaultExport) this._init(item);
+        } else {
+            // Одиночный экспорт
+            this._init(defaultExport);
+        }
+    };
+
+    /**
+     * @author SNIPPIK
+     * @description Инициализирует отдельный экспорт, определяя, является ли он классом или обычным объектом.
+     *              Добавляет экземпляр/объект в коллекцию `_files` и, при наличии поля `name`, в карту `map`.
+     * @param exported - Экспортируемая сущность (класс, объект, функция).
+     * @remarks
+     * - Классом считается функция-конструктор, имеющая `prototype` и не являющаяся `Function.prototype`.
+     * - Если передан класс, создаётся его экземпляр через `new exported()`.
+     * - Если передан обычный объект (в т.ч. функция не-конструктор), он добавляется как есть.
+     * - При наличии у экземпляра/объекта строкового поля `name`, он также сохраняется в `this.map` для быстрого доступа по имени.
+     * @private
+     */
+    private _init = (exported: any) => {
+        // Проверка, является ли экспорт классом (конструктором):
+        // - тип 'function'
+        // - наличие свойства prototype (у классов и функций-конструкторов оно есть)
+        // - не является встроенным Function.prototype (чтобы не путать с обычной функцией)
+        const isClass = typeof exported === 'function' && exported.prototype && exported !== Function.prototype;
+
+        if (isClass) {
+            // Создаём экземпляр класса
+            const instance = new exported();
+            this._files.add(instance);
+            // Сохраняем по имени, если оно определено (например, Command.name)
+            if (instance.name) this.map.set(instance.name, instance);
+        } else {
+            // Обычный объект или функция – добавляем напрямую
+            this._files.add(exported);
+            // Если объект имеет строковое свойство "name", тоже сохраняем в карту
+            if (exported?.["name"]) this.map.set(exported["name"], exported);
+        }
     };
 }

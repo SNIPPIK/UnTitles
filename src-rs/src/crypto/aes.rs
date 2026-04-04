@@ -49,30 +49,32 @@ impl From<CryptoError> for Error {
 /// Содержит SSRC (идентификатор источника синхронизации) и ключ AES-256.
 #[derive(Clone)]
 struct EncryptorOptions {
-    ssrc: u32,
-    key: [u8; 32],
+    ssrc: u32
 }
 
 /// Буферизованный RTP-сокет для голоса с шифрованием AES-256-GCM.
 ///
 /// Генерирует RTP-пакеты с правильными заголовками (sequence, timestamp, SSRC),
 /// шифрует полезную нагрузку (Opus-фрейм) с использованием режима AEAD_AES_256_GCM_RTPSIZE,
-/// который требует включения заголовка RTP в дополнительные аутентифицированные данные (AAD).
+/// который требует включения заголовка RTP в дополнительные аутентифицированные данные (AAD)
 ///
-/// Счётчики sequence, timestamp и nonce counter управляются атомарно и потокобезопасны.
+/// Счётчики sequence, timestamp и nonce counter управляются атомарно и потокобезопасны
 #[napi(js_name = "VoiceRTPSocket")]
 pub struct VoiceRTPSocket {
-    /// Параметры шифрования (SSRC и ключ).
+    /// Параметры шифрования (SSRC и ключ)
     options: EncryptorOptions,
 
-    /// Счётчик последовательности RTP (16 бит). Автоматически увеличивается для каждого пакета.
+    /// Счётчик последовательности RTP (16 бит). Автоматически увеличивается для каждого пакета
     sequence: AtomicU16,
 
-    /// Временная метка RTP (32 бита). Увеличивается на TIMESTAMP_INC для каждого пакета.
+    /// Временная метка RTP (32 бита). Увеличивается на TIMESTAMP_INC для каждого пакета
     timestamp: AtomicU32,
 
-    /// Счётчик для формирования nonce (первые 4 байта nonce). Используется как счётчик пакетов.
+    /// Счётчик для формирования nonce (первые 4 байта nonce). Используется как счётчик пакетов
     counter: AtomicU32,
+
+    /// AES-GCM с 256-битным ключом и 96-битным одноразовым значением
+    cipher: Aes256Gcm
 }
 
 #[napi]
@@ -99,7 +101,10 @@ impl VoiceRTPSocket {
         let mut rng = rng();
 
         Ok(Self {
-            options: EncryptorOptions { ssrc, key: key_array },
+            cipher: Aes256Gcm::new_from_slice(&key)
+                .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?,
+
+            options: EncryptorOptions { ssrc },
             sequence: AtomicU16::new(rng.random_range(0..=u16::MAX)),
             timestamp: AtomicU32::new(rng.random()),
             counter: AtomicU32::new(rng.random()),
@@ -117,8 +122,8 @@ impl VoiceRTPSocket {
     /// Nonce формируется как:
     /// - первые 4 байта: значение счётчика `counter` (увеличивается при каждом вызове)
     /// - остальные 8 байт: нули (согласно спецификации Discord/RTP)
-    #[napi]
-    pub fn get_nonce(&self) -> Result<Vec<Buffer>> {
+    #[napi(getter)]
+    pub fn nonce(&self) -> Result<Vec<Buffer>> {
         let counter = self.counter.fetch_add(1, Ordering::AcqRel);
 
         let mut nonce = [0u8; 12];
@@ -147,7 +152,7 @@ impl VoiceRTPSocket {
         }
 
         let header = self.build_header();
-        let counter = self.counter.fetch_add(1, Ordering::AcqRel);
+        let counter = self.counter.fetch_add(1, Ordering::Relaxed);
 
         // Формируем nonce: 32-bit счётчик + 8 нулевых байт (всего 12 байт)
         let mut nonce_bytes = [0u8; 12];
@@ -156,16 +161,13 @@ impl VoiceRTPSocket {
 
         let nonce = Nonce::from(nonce_bytes);
 
-        let cipher = Aes256Gcm::new_from_slice(&self.options.key)
-            .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?;
-
         // Payload = Opus фрейм, AAD = RTP header (для аутентификации)
         let payload = Payload {
             msg: frame.as_ref(),
             aad: &header,
         };
 
-        let ciphertext_with_tag = cipher
+        let ciphertext_with_tag = self.cipher
             .encrypt(&nonce, payload)
             .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 

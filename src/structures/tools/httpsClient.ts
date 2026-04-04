@@ -105,7 +105,7 @@ abstract class Request {
             }
 
             req.once("timeout", () => {
-                req.destroy(); // Уничтожаем запрос при таймауте
+                req.destroy(); // Уничтожаем запрос при тайм-ауте
                 return resolve(Error(`[httpsClient]: Connection Timeout Exceeded ${options.hostname}:${options.port || 443}`));
             });
 

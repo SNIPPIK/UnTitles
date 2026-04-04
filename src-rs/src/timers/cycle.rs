@@ -1,12 +1,10 @@
 use std::{
-    collections::{
-        HashMap
-    },
+    collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
-    time::{Duration, Instant},
+    time::Duration,
 };
 use dashmap::DashMap;
 use arc_swap::ArcSwap;
@@ -15,35 +13,42 @@ use crate::network::udp::UdpBuffered;
 
 /// Максимальное количество UDP-сессий, обслуживаемых одним рабочим потоком (worker).
 /// При превышении этого лимита создаётся новый worker.
+/// Выбрано 50, потому что:
+/// - Каждая сессия требует вызова `tick()` ~раз в 20 мс (50 Гц). 50 сессий дают 2500 вызовов/сек — комфортная нагрузка.
+/// - При большем количестве возрастает задержка обработки (jitter) из-за последовательного обхода.
 const MAX_PER_WORKER: usize = 50;
 
 /// Минимальное количество рабочих потоков, которое всегда должно существовать,
 /// даже если они пусты (чтобы избежать лишних созданий/удалений).
+/// При активной работе частое создание/удаление потоков вызывает накладные расходы.
 const MIN_WORKERS: usize = 1;
 
-/// -------------------------------------
-/// CycleManager — управляет периодическим вызовом tick() для группы UDP-сессий.
-/// Каждый worker владеет одним CycleManager, который в фоновом потоке
-/// равномерно распределяет вызовы tick() между своими сессиями в течение заданного интервала.
-/// -------------------------------------
+/// Менеджер циклического вызова `tick()` для группы UDP-сессий.
+/// Использует `ArcSwap<HashMap<...>>` для потокобезопасного хранения сессий.
+/// Почему не `DashMap`? Потому что нам нужно атомарно заменять всю таблицу при добавлении/удалении,
+/// чтобы итерация в фоновом потоке была по консистентному снимку (snapshot) без блокировок на время обхода.
+/// `ArcSwap` даёт атомарную замену указателя, а фоновый поток работает со старым снимком, пока не возьмёт новый.
 pub struct CycleManager {
-    /// Хранилище активных сессий, привязанных к этому менеджеру.
-    /// Ключ — идентификатор сессии, значение — Arc<UdpBuffered>.
+    /// Атомарно заменяемый указатель на текущую карту сессий.
+    /// Ключ — ID сессии, значение — `Arc<UdpBuffered>`.
+    /// Плюсы: итерация по снимку не блокирует добавление/удаление.
+    /// Минусы: при каждом изменении копируется вся `HashMap` (что приемлемо при <=50 сессий на воркер).
     sessions: Arc<ArcSwap<HashMap<u32, Arc<UdpBuffered>>>>,
 
-    /// Флаг, сигнализирующий фоновому потоку о необходимости остановиться.
+    /// Флаг остановки фонового потока.
     running: Arc<AtomicBool>,
 
-    /// Дескриптор фонового потока, в котором выполняется цикл тиков.
+    /// Дескриптор асинхронной задачи Tokio.
+    /// Используется `tokio::task::JoinHandle`, потому что цикл должен работать в асинхронной среде.
+    /// Если бы мы использовали `std::thread`, то спам потоками при большом количестве воркеров был бы проблемой.
     handle: Mutex<Option<tokio::task::JoinHandle<()>>>,
 
-    /// Интервал между полными циклами обработки всех сессий (в миллисекундах,
-    /// преобразуется в Duration).
+    /// Интервал между вызовами `tick()` для всей группы сессий.
     interval: Duration,
 }
 
 impl CycleManager {
-    /// Создаёт новый CycleManager с заданным интервалом в миллисекундах.
+    /// Создаёт новый менеджер с интервалом в миллисекундах.
     pub fn new(interval_ms: f64) -> Self {
         let interval = Duration::from_secs_f64(interval_ms / 1000.0);
         Self {
@@ -54,101 +59,81 @@ impl CycleManager {
         }
     }
 
-    /// Добавляет сессию в менеджере. Если фоновый поток ещё не запущен,
-    /// запускает его (через `start_if_needed`).
+    /// Добавляет сессию. При первом добавлении автоматически запускает фоновый цикл.
+    /// **Важно:** копирует всю `HashMap` при каждом добавлении. При большом количестве сессий (>1000) это может быть дорого.
+    /// В нашем случае на один воркер приходится не более `MAX_PER_WORKER` сессий, так что OK.
     pub fn add_session(&self, id: u32, session: Arc<UdpBuffered>) {
+        // Загружаем текущую карту и делаем её мутабельной (через `Arc::make_mut`).
+        // Это создаст новый `Arc`, если текущий разделяемый, или модифицирует существующий, если владение единственное.
         let mut map = self.sessions.load_full();
         Arc::make_mut(&mut map).insert(id, session);
+        // Атомарно заменяем указатель. Старая карта останется у тех, кто её держит (например, у фонового потока, если он сейчас итерируется).
         self.sessions.store(map);
 
         self.start_if_needed();
     }
 
-    /// Удаляет сессию из менеджера.
+    /// Удаляет сессию аналогично добавлению.
     pub fn remove_session(&self, id: u32) {
         let mut map = self.sessions.load_full();
         Arc::make_mut(&mut map).remove(&id);
         self.sessions.store(map);
     }
 
-    /// Запускает фоновый поток, если он ещё не запущен и есть необходимость.
-    /// Использует атомарный compare_exchange для безопасного запуска из нескольких потоков.
+    /// Запускает фоновую задачу, если она ещё не запущена.
+    /// Использует `compare_exchange`, чтобы избежать гонки при одновременном вызове из нескольких потоков.
     fn start_if_needed(&self) {
-        if self.running.load(Ordering::Acquire) {
+        // Пытаемся переключить флаг с false на true. Если не удалось — значит, уже запущено.
+        if self.running.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
             return;
         }
 
         let mut handle_guard = self.handle.lock().unwrap();
-        if self.running
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_err()
-        {
+
+        // Двойная проверка: возможно, пока мы ждали мьютекс, задача уже была создана другим потоком.
+        if handle_guard.is_some() {
             return;
         }
 
         let sessions_ptr = self.sessions.clone();
         let running_flag = self.running.clone();
-        let interval = self.interval;
+        let interval_duration = self.interval;
 
         let handle = tokio::spawn(async move {
-            const SPIN_THRESHOLD: Duration = Duration::from_micros(50); // финальная дотяжка для точности
-
-            let mut next_tick = Instant::now() + interval;
+            // `interval` с поведением `Skip` означает: если тик отстал (например, из-за долгой обработки),
+            // не пытаться догнать, а сразу перейти к следующему по расписанию.
+            // Это предотвращает «лавинное» выполнение многих тиков подряд, которое могло бы перегрузить систему.
+            let mut interval = tokio::time::interval(interval_duration);
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
             loop {
                 if !running_flag.load(Ordering::Acquire) {
                     break;
                 }
 
-                let now = Instant::now();
-
-                // ===== SLEEP PHASE =====
-                if next_tick > now {
-                    let mut remaining = next_tick - now;
-                    while remaining > SPIN_THRESHOLD {
-                        tokio::time::sleep(remaining - SPIN_THRESHOLD).await;
-                        remaining = next_tick - Instant::now();
-                    }
-                }
-
-                // ===== SPIN PHASE =====
-                while Instant::now() < next_tick {
-                    std::hint::spin_loop(); // короткий busy-wait
-                }
-
-                // ===== EXECUTION =====
+                // Загружаем текущий снимок сессий. Если в этот момент кто-то добавил/удалил сессию,
+                // мы продолжим работать со старым снимком, что безопасно.
                 let snapshot = sessions_ptr.load();
-                let sessions: Vec<_> = snapshot.values().collect();
 
-                for chunk in sessions.chunks(8) {
-                    for session in chunk {
-                        session.tick();
-                    }
-                    // небольшая пауза между чанками, чтобы не блокировать другие async-таски
-                    tokio::task::yield_now().await;
+                // Вызываем `tick()` у каждой сессии. Порядок не важен, т.к. они независимы.
+                for session in snapshot.values() {
+                    session.tick();
                 }
 
-                // ===== NEXT TICK =====
-                next_tick += interval;
-
-                // ===== DRIFT COMPENSATION =====
-                let now = Instant::now();
-                if now > next_tick {
-                    let drift = now.duration_since(next_tick);
-                    let missed_ticks = (drift.as_nanos() / interval.as_nanos()) as u32 + 1;
-                    next_tick += interval * missed_ticks;
-                }
+                // Ждём следующий тик. Tokio сам корректирует дрейф времени.
+                interval.tick().await;
             }
         });
 
         *handle_guard = Some(handle);
     }
 
-    /// Останавливает фоновый поток и дожидается его завершения.
-    /// Может быть вызван явно или автоматически в Drop.
+    /// Останавливает фоновую задачу и дожидается её завершения.
+    /// Вызывается при `Drop` или вручную.
     pub async fn stop(&self) {
         self.running.store(false, Ordering::Release);
 
+        // Забираем handle из мьютекса и ожидаем его.
         if let Some(handle) = self.handle.lock().unwrap().take() {
             let _ = handle.await;
         }
@@ -157,44 +142,38 @@ impl CycleManager {
 
 impl Drop for CycleManager {
     fn drop(&mut self) {
+        // В `drop` нельзя использовать асинхронность, поэтому запускаем синхронную блокировку.
+        // Это может быть неидеально, но для управляемого выключения (например, при завершении программы) подходит.
         let _ = self.stop();
     }
 }
 
-/// -------------------------------------
-/// Worker — объединяет CycleManager и множество сессий, закреплённых за ним.
-/// Используется внутри AutoBalancer для группировки сессий по worker.
-/// -------------------------------------
+/// Рабочий процесс (worker), содержащий свой `CycleManager` и карту сессий.
+/// Использует `DashMap` для быстрого доступа при добавлении/удалении на стороне балансировщика.
+/// В отличие от `CycleManager`, здесь нам не нужен snapshot для итерации, так как `CycleManager` сам управляет циклом.
 struct Worker {
-    /// Менеджер, который управляет циклом вызовов tick() для сессий этого workers.
     manager: Arc<CycleManager>,
-
-    /// Сессии, принадлежащие данному worker's.
     sessions: DashMap<u32, Arc<UdpBuffered>>,
 }
 
-/// AutoBalancer — балансировщик нагрузки, распределяющий UDP-сессии по рабочим потокам (worker).
-/// Каждый worker имеет свой CycleManager и лимит на количество сессий.
-/// При достижении лимита создаётся новый worker. Пустые workers удаляются,
-/// но не меньше MIN_WORKERS.
+/// Балансировщик нагрузки, распределяющий сессии между несколькими `Worker`.
+/// Каждый worker имеет свой независимый цикл `tick()`.
+/// Балансировщик старается равномерно заполнять воркеры, но не перераспределяет сессии после добавления.
+/// При добавлении сессии ищется первый воркер, у которого число сессий меньше `MAX_PER_WORKER`.
+/// При удалении сессии воркер может стать пустым, и тогда он будет удалён (кроме `MIN_WORKERS`).
 pub struct AutoBalancer {
-    /// Вектор всех существующих worker. Каждый worker обёрнут в Arc<Mutex>,
-    /// чтобы можно было безопасно изменять его содержимое из разных потоков
-    /// (хотя в текущей реализации все операции с балансировщиком предполагают
-    /// внешнюю синхронизацию через Mutex на уровне глобального балансировщика).
     workers: Vec<Arc<Mutex<Worker>>>,
 }
 
 impl AutoBalancer {
-    /// Создаёт новый балансировщик с одним worker.
     pub fn new() -> Self {
         let mut balancer = Self { workers: Vec::new() };
         balancer.create_worker();
         balancer
     }
 
-    /// Создаёт нового worker's с собственным CycleManager (интервал 20 мс)
-    /// и добавляет его в список workers. Возвращает Arc<Mutex<Worker>>.
+    /// Создаёт нового воркера с собственным `CycleManager` (интервал 20 мс = 50 тиков/сек).
+    /// Возвращает `Arc<Mutex<Worker>>` для безопасного доступа из нескольких потоков балансировщика.
     fn create_worker(&mut self) -> Arc<Mutex<Worker>> {
         let manager = Arc::new(CycleManager::new(20.0));
         let worker = Arc::new(Mutex::new(Worker {
@@ -205,22 +184,24 @@ impl AutoBalancer {
         worker
     }
 
-    /// Удаляет пустые worker's из списка, оставляя как минимум MIN_WORKERS.
+    /// Удаляет пустые воркеры, оставляя минимум `MIN_WORKERS`.
+    /// **Важно:** вызывается после каждого добавления/удаления. Если бы воркеров было много (тысячи),
+    /// эта операция могла бы стать затратной, но при `MAX_PER_WORKER = 50` общее число воркеров обычно невелико.
     fn cleanup_empty_workers(&mut self) {
         let len = self.workers.len();
         self.workers.retain(|w| {
             let w_lock = w.lock().unwrap();
-            // Оставляем worker, если в нём есть сессии, или если общее количество
-            // после удаления станет меньше MIN_WORKERS.
+            // Оставляем воркер, если он не пуст, либо если общее количество воркеров после удаления упадёт ниже MIN_WORKERS.
+            // Это гарантирует, что у нас всегда будет хотя бы один воркер, даже если все сессии удалены.
             !w_lock.sessions.is_empty() || len <= MIN_WORKERS
         });
     }
 
-    /// Добавляет сессию в балансировщике. Выбирает worker с наименьшей загрузкой
-    /// (первый, у которого меньше MAX_PER_WORKER сессий), либо создаёт нового,
-    /// если все заняты. После добавления удаляет пустые workers.
+    /// Добавляет сессию в балансировщике.
+    /// Ищет первый воркер с числом сессий < MAX_PER_WORKER. Если такого нет, создаёт новый воркер.
+    /// Затем вставляет сессию в выбранный воркер и добавляет её в `CycleManager` этого воркера.
+    /// В конце удаляет пустые воркеры.
     pub fn add_session(&mut self, id: u32, session: Arc<UdpBuffered>) {
-        // Ищем worker, у которого ещё есть свободные места.
         let mut target = None;
         for w in &self.workers {
             let w_lock = w.lock().unwrap();
@@ -230,7 +211,6 @@ impl AutoBalancer {
             }
         }
 
-        // Если не нашли, создаём нового worker
         if target.is_none() {
             target = Some(self.create_worker());
         }
@@ -242,12 +222,12 @@ impl AutoBalancer {
             w_lock.manager.add_session(id, session);
         }
 
-        // Удаляем пустые workers (кроме минимального количества).
         self.cleanup_empty_workers();
     }
 
-    /// Удаляет сессию из балансировщика. Ищет worker, содержащий данную сессию,
-    /// и удаляет её оттуда. После удаления также запускает очистку пустых worker.
+    /// Удаляет сессию из балансировщика.
+    /// Ищет воркер, содержащий данную сессию, удаляет её оттуда и из `CycleManager` этого воркера.
+    /// После удаления запускает очистку пустых воркеров.
     pub fn remove_session(&mut self, id: u32) {
         for w in &self.workers {
             let w_lock = w.lock().unwrap();
@@ -256,27 +236,25 @@ impl AutoBalancer {
                 break;
             }
         }
-
         self.cleanup_empty_workers();
     }
 }
 
-/// -------------------------------------
-/// Глобальный экземпляр AutoBalancer (синглтон), доступный из любого места программы.
-/// Используется для добавления и удаления сессий без необходимости явно создавать
-/// и хранить балансировщик.
-/// -------------------------------------
+/// Глобальный синглтон балансировщика, защищённый мьютексом.
+/// Все операции добавления/удаления сессий проходят через него.
 pub static GLOBAL_BALANCER: Lazy<Mutex<AutoBalancer>> = Lazy::new(|| {
     Mutex::new(AutoBalancer::new())
 });
 
-/// Добавляет сессию в глобальном балансировщике
+/// Добавляет сессию в глобальный балансировщик.
+/// Обычно вызывается из конструктора `UdpBuffered`.
 pub fn add_global_session(id: u32, session: Arc<UdpBuffered>) {
     let mut bal = GLOBAL_BALANCER.lock().unwrap();
     bal.add_session(id, session);
 }
 
 /// Удаляет сессию из глобального балансировщика.
+/// Обычно вызывается из метода `destroy` у `UdpBuffered`.
 pub fn remove_global_session(id: u32) {
     let mut bal = GLOBAL_BALANCER.lock().unwrap();
     bal.remove_session(id);

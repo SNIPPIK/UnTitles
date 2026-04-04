@@ -54,6 +54,19 @@ impl AudioEngine {
         Ok(())
     }
 
+    /// Добавляет несколько пакетов в очередь.
+    ///
+    /// # Аргументы
+    /// * `packets` – массив бинарных буферов (из Node.js)
+    #[napi]
+    pub fn add_packets(&mut self, packets: Vec<Buffer>) -> Result<()> {
+        for packet in packets {
+            let _ = self.add_packet(packet);
+        }
+
+        Ok(())
+    }
+
     /// Получает следующий пакет из очереди (удаляя его) и увеличивает позицию чтения.
     /// Возвращает `Option<Buffer>`, который можно передать обратно в JavaScript.
     #[napi(getter)]

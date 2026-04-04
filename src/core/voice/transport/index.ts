@@ -295,17 +295,26 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @description Отправление аудио пакета в систему rust cycle
      * @public
      */
-    public packet = (frame: Buffer) => {
-        try {
-            const encrypted = this._dave.encrypt(frame);
-            const rtp = this._rtp.packet(encrypted);
+    public packet = (frames: Buffer[] | Buffer) => {
+        const list = Array.isArray(frames) ? frames : [frames];
+        const batch: Buffer[] = [];
 
-            // Прямая отправка в сокет
-            this._udp.packet(rtp);
-        } catch (err) {
-            this.emit("info", `[Transport/Packet]: ${err}`);
+        // Готовим аудио пакеты
+        for (const frame of list) {
+            try {
+                const encrypted = this._dave.encrypt(frame);
+                const rtp = this._rtp.packet(encrypted);
+
+                batch.push(rtp);
+            } catch (err) {
+                this.emit("info", `[Transport/Packet]: ${err}`);
+            }
         }
+
+        // Отправляем все готовые пакеты разом
+        if (batch.length > 0) this._udp.packet(batch);
     };
+
 
     /**
      * @description Подключаемся к серверам discord

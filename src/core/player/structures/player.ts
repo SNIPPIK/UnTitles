@@ -9,70 +9,86 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
- * @description Создаем класс для вычисления progress bar
- * @class PlayerProgress
+ * @description Глобальный экземпляр для вычисления прогресс-бара.
+ * @remarks
+ * Вынесен для переиспользования, чтобы не создавать объект при каждом запросе.
  * @private
  */
 const Progress = new PlayerProgress();
 
 /**
  * @author SNIPPIK
- * @description Безопасное время между отправкой аудио пакетов
- * @const PLAYER_PAUSE_OFFSET
+ * @description Безопасное время (мс) между отправкой аудио пакетов при возобновлении после паузы.
+ * @remarks
+ * Используется для защиты от переполнения jitter-буфера. При паузе плеер продолжает отправлять
+ * SILENT_FRAME, но фактическое воспроизведение останавливается. Возобновление происходит только
+ * после истечения этого интервала, чтобы избежать резкого наплыва пакетов.
+ * @const
  * @private
  */
 const PLAYER_PAUSE_OFFSET = 3000;
 
 /**
  * @author SNIPPIK
- * @description Безопасное время между аудио потоками
- * @const PLAYER_TIMEOUT_OFFSET
+ * @description Безопасное время (мс) между завершением одного трека и началом следующего.
+ * @remarks
+ * Необходимо для корректного закрытия текущего аудиопотока и освобождения ресурсов перед
+ * запуском следующего. Без этого VoiceSocket может получить переполнение буфера (пинг >1000).
+ * @const
  * @private
  */
 const PLAYER_TIMEOUT_OFFSET = 3000;
 
 /**
  * @author SNIPPIK
- * @description Плеер для проигрывания аудио
- * @class AudioPlayer
- * @extends TypedEmitter
+ * @description Основной класс аудио плеера, управляющий воспроизведением очереди треков.
+ * @extends TypedEmitter<AudioPlayerEvents>
  * @public
  *
  * # Особенности
- * - Плеер не даст загрузить новый трек если прошлый не загружен! Через 10 сек можно будет загрузить новый!
- * - Поддерживает hot swap, не ломает jitter buffer (AudioPlayerTimeout)
- * - Умеет накладывать аудио на аудио, через ffmpeg
- * - Высокая надежность, практически невозможно сломать
+ * - Предотвращает загрузку нового трека, пока предыдущий не завершён (через 10 сек можно загрузить новый).
+ * - Поддерживает «горячую» замену треков (hot swap) без сбоев jitter buffer (использует AudioPlayerTimeout).
+ * - Умеет накладывать аудио фильтры через FFmpeg (громкость, эквалайзер и т.д.).
+ * - Высокая надёжность, практически невозможно сломать благодаря встроенным тайм-аутам и защитным механизмам.
+ *
+ * @example
+ * ```ts
+ * const player = new AudioPlayer(tracks, voice, guildId);
+ * player.on('player/playing', () => console.log('Now playing'));
+ * player.play();
+ * ```
  */
 export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     /**
-     * @description Кол-во аудио пакетов в буфере в UDP подключении
+     * @description Количество пакетов, ожидающих отправки в UDP-буфере (для мониторинга загрузки).
+     * @remarks
+     * Используется для расчёта задержки (latency) и принятия решения о буферизации.
      * @public
      */
     public _buffered: number | null = 1;
 
     /**
-     * @description Текущий статус плеера, при создании он должен быть в ожидании
+     * @description Текущее состояние плеера.
+     * @remarks
+     * При создании устанавливается в `idle`. Изменение статуса генерирует соответствующее событие.
      * @private
      */
     protected _status: AudioPlayerState | null = AudioPlayerState.idle;
 
     /**
-     * @description Класс для управления временем плеера
+     * @description Менеджер тайм-аутов для безопасной паузы/возобновления.
      * @protected
      */
     protected _timer: AudioPlayerTimeout | null = new AudioPlayerTimeout();
 
     /**
-     * @description Хранилище аудио фильтров
-     * @readonly
+     * @description Хранилище активных аудио фильтров (громкость, эквалайзер и т.п.).
      * @private
      */
     protected _filters: ControllerFilters<AudioFilter> | null = new ControllerFilters<AudioFilter>();
 
     /**
-     * @description Управление потоковым вещанием
-     * @readonly
+     * @description Управление текущим аудиопотоком (чтение, буферизация, пред загрузка).
      * @private
      */
     protected _audio: PlayerAudio<AudioResource> | null = new PlayerAudio();
@@ -143,10 +159,17 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public get progress() {
         const { api, time } = this._tracks.track;
-        const current = this._audio.current?.duration ?? 0;
+        const current = (this._audio.current?.duration || 0);
 
         // Создаем прогресс бар
-        const bar =  Progress.bar({ platform: api.name, duration: { current, total: time.total } });
+        const bar =  Progress.bar({
+                platform: api.name,
+                duration: {
+                    current: current,
+                    total: time.total
+                }
+            }
+        );
 
         return `\n\`\`${current.duration()}\`\` ${bar} \`\`${time.split}\`\``;
     };
@@ -547,74 +570,77 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
 /**
  * @author SNIPPIK
- * @description Статусы состояние я плеера
+ * @description Возможные состояния плеера.
  * @public
  */
 export enum AudioPlayerState {
-    idle = "player/wait",
-    playing = "player/playing",
-    ended = "player/ended",
-    pause = "player/pause",
-    error = "player/error"
+    idle = "player/wait",      // Ожидание, нет активного трека
+    playing = "player/playing", // Воспроизведение
+    ended = "player/ended",     // Трек завершён (используется для автоматического переключения)
+    pause = "player/pause",     // Пауза
+    error = "player/error",     // Ошибка
 }
 
 /**
  * @author SNIPPIK
- * @description Управление безопасными паузами и таймингом плеера
- * @class AudioPlayerTimeout
+ * @description Управление безопасными паузами и таймингом плеера.
+ * @remarks
+ * Гарантирует, что после паузы или ошибки будет выдержана необходимая задержка перед возобновлением,
+ * чтобы не нарушить работу jitter buffer и VoiceSocket.
  * @private
  */
 class AudioPlayerTimeout {
     /**
-     * @description Время когда плеер поставили на паузу
+     * @description Время (мс), после которого разрешено возобновление (включает PLAYER_PAUSE_OFFSET).
      * @protected
      */
     protected _resumeAllowedAt: number = null;
 
     /**
-     * @description Последний сохраненный таймер
-     * @protected
+     * @description Ссылка на активный таймер (для отмены).
+     * @private
      */
     private _resumeTimer: NodeJS.Timeout | null = null;
 
     /**
-     * @description Последнее заданное время
-     * @returns number
+     * @description Возвращает время, когда будет разрешено возобновление, или null.
      * @public
      */
     public get timeout(): number | null {
         return this._resumeAllowedAt;
-    };
+    }
 
     /**
-     * @description Последнее заданное время
+     * @description Устанавливает время разрешения возобновления с учётом PLAYER_PAUSE_OFFSET.
+     * @param time - Базовое время (обычно момент паузы), если null – сброс.
      * @public
      */
     public set timeout(time: number | null) {
         this._resumeAllowedAt = time !== null ? time + PLAYER_PAUSE_OFFSET : null;
-    };
+    }
 
     /**
-     * @description Устанавливаем таймер повтора
-     * @param timer - Таймер, не обязательный!
+     * @description Устанавливает или заменяет таймер возобновления.
+     * @param timer - Таймер, может быть null (сбрасывает).
      * @public
      */
     public set timer(timer: NodeJS.Timeout | null) {
         if (this._resumeTimer) clearTimeout(this._resumeTimer);
         this._resumeTimer = timer;
-    };
+    }
 
     /**
-     * @description Проверяем, можно ли возобновить, и если нет — возвращаем оставшееся время
+     * @description Возвращает оставшееся время до разрешения возобновления (в мс).
+     * @returns 0, если возобновление разрешено сейчас.
+     * @public
      */
     public getRemaining(): number {
         if (!this._resumeAllowedAt) return 0;
         return Math.max(this._resumeAllowedAt - Date.now(), 0);
-    };
+    }
 
     /**
-     * @description Удаляем не нужные данные
-     * @returns void
+     * @description Очищает таймер и сбрасывает состояние.
      * @public
      */
     public destroy() {
@@ -623,5 +649,5 @@ class AudioPlayerTimeout {
             this._resumeTimer = null;
         }
         this._resumeAllowedAt = null;
-    };
+    }
 }
