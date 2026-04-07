@@ -115,7 +115,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                     setImmediate(() => {
                         // Сохраняем кеш в системе
-                        if (!cache) sdb.meta_saver.set(track, `${this.url}/track/${ID}`);
+                        if (!cache) sdb.meta_saver.set(track, `${this.url}/track`);
                     });
 
                     return track;
@@ -168,7 +168,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                     };
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album/${ID}`);
+                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
                     return album;
                 } catch (e) {
                     return new Error(`[APIs]: ${e}`);

@@ -142,7 +142,7 @@ class RestYandexAPI extends RestServerSide.API {
                     }
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(track, `${this.url}/track/${IDs[0]}_${IDs[1]}`);
+                    if (!cache) sdb.meta_saver.set(track, `${this.url}/track`);
 
                     return track;
                 } catch (e) {
@@ -195,7 +195,7 @@ class RestYandexAPI extends RestServerSide.API {
                     };
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album/${ID}`);
+                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
 
                     return album;
                 } catch (e) {

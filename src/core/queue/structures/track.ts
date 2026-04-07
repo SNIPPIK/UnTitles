@@ -76,7 +76,7 @@ class TrackResolvers {
             const status = sdb.audio_saver?.status(track);
 
             // Проверка кеша (мгновенно)
-            if (status.status === "ended") return status.path;
+            if (status?.status === "ended") return status.path;
 
             // Если ссылки нет — ищем через API
             if (!track.link) {
@@ -304,7 +304,7 @@ export class Track extends TrackResolvers {
                 return;
             }
 
-            const total = parseInt(time.total);
+            const total = parseInt(time?.total);
 
             // Время трека
             if (isNaN(total) || !total) this._duration = { split: "Live", total: 0 };

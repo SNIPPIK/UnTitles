@@ -26,7 +26,9 @@ export class SeyfertVoice<T extends DiscordClient> extends VoiceAdapters<Discord
 
             return {
                 sendPayload: (data) => {
-                    this.client.gateway.send(id, data);
+                    try {
+                        this.client.gateway.send(id, data);
+                    } catch { return false; }
                     return true;
                 },
                 destroy: () => {
@@ -47,6 +49,6 @@ export class SeyfertVoice<T extends DiscordClient> extends VoiceAdapters<Discord
             body: {
                 status: status
             }
-        });
+        }).catch(() => {});
     };
 }

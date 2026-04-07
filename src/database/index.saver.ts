@@ -1,6 +1,6 @@
 import type { APIRequestData } from "#handler/rest";
+import { Logger, PromiseCycle } from "#structures";
 import { Process } from "#core/audio/process";
-import { PromiseCycle } from "#structures";
 import { Track } from "#core/queue";
 import afs from "node:fs/promises";
 import { env } from "#app/env";
@@ -116,7 +116,7 @@ export class AudioSaver extends PromiseCycle<Track> {
                 const names = this.status(item);
 
                 // Если такой трек уже есть в системе кеширования
-                if (names.status === "ended" || item.time.total > 500 || item.time.total === 0 || item.api.type === "primary") {
+                if (names.status === "ended" || item.time.total > 500 || item.time.total === 0 || item.api.type === "technical") {
                     this.delete(item);
                     return false;
                 }
@@ -139,6 +139,8 @@ export class AudioSaver extends PromiseCycle<Track> {
                     "-f", `opus`,
                     `${status.path}.opus`
                 ];
+
+                Logger.log("DEBUG", `[AudioCache/Start]: Save ${status.path}`);
 
                 // Если платформа не может играть нативно из сети
                 if (track.proxy && track.link.startsWith("http")) {
@@ -187,6 +189,8 @@ export class AudioSaver extends PromiseCycle<Track> {
                         // Если файл не проходит проверку
                         if (data.size < 10) await afs.unlink(`${status.path}.opus`);
                     }
+
+                    Logger.log("DEBUG", `[AudioCache/End]: Saved ${track.ID}`);
 
                     ffmpeg.destroy();
                     this.delete(track);

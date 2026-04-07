@@ -97,7 +97,7 @@ class RestVKAPI extends RestServerSide.API {
                     if (!track.audio) return locale.err( "api.request.fail");
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver?.set(track, `${this.url}/track/${ID}`);
+                    if (!cache) sdb.meta_saver?.set(track, `${this.url}/track`);
 
                     return track;
                 } catch (e) {

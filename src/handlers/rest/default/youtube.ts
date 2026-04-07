@@ -312,7 +312,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     }
 
                     // Сохраняем кеш в системе
-                    if (!cache && !api?.["videoDetails"]?.["isLive"]) sdb.meta_saver?.set(track, `${this.url}/track/${ID}`);
+                    if (!cache && !api?.["videoDetails"]?.["isLive"]) sdb.meta_saver?.set(track, `${this.url}/track`);
 
                     return track;
                 } catch (e) {
