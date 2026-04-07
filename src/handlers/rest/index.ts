@@ -54,7 +54,7 @@ export class RestObject {
      * @description База с платформами в Map
      * @public
      */
-    public platformMap = new Map<string, RestServerSide.API>();
+    public map = new Map<string, RestServerSide.API>();
 
     /**
      * @description Map функций для возврата ответа от worker
@@ -62,10 +62,7 @@ export class RestObject {
      */
     private pending = new Map<number, {
         // Функция ответа
-        resolve: (val: RestServerSide.Result<any> & { requestId?: number }) => void,
-
-        // Время ожидания
-        timeout: NodeJS.Timeout
+        resolve: (val: RestServerSide.Result<any> & { requestId?: number }) => void
     }>();
 
     /**
@@ -78,7 +75,7 @@ export class RestObject {
 
         const index = Math.floor(Math.random() * map.length);
         return map[index];
-    }
+    };
 
     /**
      * @description Получаем список всех платформ
@@ -92,7 +89,7 @@ export class RestObject {
                 .sort((a, b) => a.name.localeCompare(b.name));
         }
         return this.platforms.array;
-    }
+    };
 
     /**
      * @description Получаем список всех доступных платформ
@@ -144,7 +141,7 @@ export class RestObject {
         const upperName = name.toUpperCase();
 
         // Попытка O(1) поиска по точному имени
-        const directMatch = this.platformMap.get(upperName);
+        const directMatch = this.map.get(upperName);
         if (directMatch) return directMatch;
 
         // Если не нашли, делаем ОДИН проход для проверки RegExp
@@ -152,7 +149,7 @@ export class RestObject {
         if (regexMatch) return regexMatch;
 
         // Fallback к дефолтной платформе
-        return this.platformMap.get("YOUTUBE") ?? this.random;
+        return this.map.get("YOUTUBE") ?? this.random;
     };
 
     /**
@@ -163,14 +160,6 @@ export class RestObject {
     public request_worker<T extends APIRequestsKeys>({platform, payload, options, type}: RestClientSide.ClientOptions): Promise<APIRequests<T>| Error> {
         return new Promise<APIRequests<T> | Error>((resolve) => {
             const requestId = this.generateUniqueId();
-
-            // Создаем тайм-аут
-            const timeout = setTimeout(() => {
-                if (this.pending.has(requestId)) {
-                    this.pending.delete(requestId);
-                    resolve(new Error(`Connection to platform ${platform.name} timeout`));
-                }
-            }, 20e3);
 
             // Регистрируем "ждущего"
             this.pending.set(requestId, {
@@ -220,8 +209,7 @@ export class RestObject {
                             return resolve(new Error(`Unknown response!!!`))
                         }
                     }
-                },
-                timeout
+                }
             });
 
             // Отправляем запрос
@@ -248,12 +236,12 @@ export class RestObject {
                 not_destroyed: true,
                 callback: (data) => {
                     this.platforms = data;
-                    this.platformMap.clear();
+                    this.map.clear();
 
                     // Заполняем Map для O(1) доступа
                     for (const api of this.array) {
                         if (api.auth !== null) {
-                            this.platformMap.set(api.name.toUpperCase(), api);
+                            this.map.set(api.name.toUpperCase(), api);
                         }
                     }
 
@@ -280,9 +268,6 @@ export class RestObject {
                 // Ищем, кто ждет этот ID
                 const request = this.pending.get(requestId);
                 if (!request) return; // Если никто не ждет (например, уже был таймаут)
-
-                // Сразу чистим таймер и удаляем из карты
-                clearTimeout(request.timeout);
 
                 // Обработка результата
                 request.resolve(message);

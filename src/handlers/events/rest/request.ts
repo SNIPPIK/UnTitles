@@ -82,18 +82,7 @@ export default createEvent({
          * @description Выполнение REST-запроса с тайм-аутом
          * @protected
          */
-        result = await _withTimeout(
-            // Основной запрос к платформе
-            api.request(),
-
-            // Тайм-аут выполнения запроса (15 секунд)
-            15_000,
-
-            // Ошибка по таймауту
-            new Error(locale._(ctx.interaction.locale, "api.platform.timeout"))
-        ).catch(() => {
-            return new Error("Request error");
-        });
+        result = await api.request();
 
         // Выполняем в конце
         setImmediate(async () => {
@@ -133,16 +122,3 @@ export default createEvent({
         return null;
     }
 })
-
-/**
- * @description Обёртка для выполнения Promise с таймаутом
- * @param promise - Основной Promise
- * @param ms - Время ожидания в миллисекундах
- * @param error - Ошибка, возвращаемая по тайм-ауту
- */
-function _withTimeout<T>(promise: Promise<T>, ms: number, error: Error): Promise<T | Error> {
-    return Promise.race([
-        promise,
-        new Promise<Error>(resolve => setTimeout(() => resolve(error), ms))
-    ]);
-}

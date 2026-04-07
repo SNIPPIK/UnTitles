@@ -9,7 +9,7 @@ import { db } from "#app/db";
  * @private
  */
 function initButtons() {
-    buttons = db.api.platformMap.keys().reduce((acc, api) => {
+    buttons = db.api.map.keys().reduce((acc, api) => {
         const platform = `${api}`.toLowerCase();
         const inEnv = env.get(`progress.button.${platform}`, null);
 

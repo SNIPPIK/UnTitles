@@ -32,12 +32,12 @@ async function runShard(): Promise<void> {
 
     try {
         // Инициализация баз данных
-        await initDatabase(client);
-        await initSharedDatabase();
+        initDatabase(client);
+        initSharedDatabase();
 
         // Загрузка API-модулей
         await db.api.startWorker();
-        client.logger.info(`Loaded ${Logger.color(34, `${db.api.platformMap.size} APIs`)}`);
+        client.logger.info(`Loaded ${Logger.color(34, `${db.api.map.size} APIs`)}`);
 
         // Запуск Discord клиента с последующей пост-инициализацией
         await client.start();
