@@ -3,53 +3,61 @@ import { initSharedDatabase } from "#worker/db";
 import { db, initDatabase } from "#app/db";
 import { Logger } from "#structures";
 
-// Точка входа
-void main();
+// Точка входа с обработкой ошибок
+main().catch((error) => {
+    Logger.log("ERROR", `Failed to start application: ${error.stack || error}`);
+    process.exit(1);
+});
 
 /**
  * @author SNIPPIK
  * @description Запуск всего проекта в async режиме
- * @function main
- * @returns void or Promise<void>
+ * @returns {Promise<void>}
+ * @async
  */
-function main() {
-    // Запускаем осколок
-    return runShard();
+async function main(): Promise<void> {
+    await runShard();
 }
 
 /**
  * @author SNIPPIK
- * @description Если требуется запустить осколок
- * @function runShard
- * @returns Promise<void>
+ * @description Запуск основного шарда (экземпляра бота)
+ * @returns {Promise<void>}
  * @async
  */
-async function runShard() {
-    Logger.log("WARN", `[Core] has running ${Logger.color(36, `shard`)}`);
+async function runShard(): Promise<void> {
+    Logger.log("WARN", `[Core] has running ${Logger.color(36, "shard")}`);
 
     const client = new DiscordClient();
 
-    // Инициализируем базу данных
-    initDatabase(client);
-    initSharedDatabase();
+    try {
+        // Инициализация баз данных
+        await initDatabase(client);
+        await initSharedDatabase();
 
-    // Загружаем API
-    await db.api.startWorker();
-    client.logger.info(`Loaded ${Logger.color(34, `${db.api.array.length} APIs`)}`);
+        // Загрузка API-модулей
+        await db.api.startWorker();
+        client.logger.info(`Loaded ${Logger.color(34, `${db.api.platformMap.size} APIs`)}`);
 
-    // Запускаем бота
-    client.start()
-        // Что делаем после подключения к discord api
-        .finally(async () => {
-            await client.uploadCommands({ cachePath: "./commands.json" });
+        // Запуск Discord клиента с последующей пост-инициализацией
+        await client.start();
 
-            // Запускаем Garbage Collector
-            setImmediate(() => {
-                if (typeof global.gc === "function") global.gc();
-            });
+        // Загрузка команд после успешного подключения
+        await client.uploadCommands({ cachePath: "./commands.json" }).catch((err) => {
+            client.logger.error(`Failed to upload commands: ${err.message}`);
         });
 
-    // Запускаем отслеживание событий процесса
+        // Опциональный вызов GC (только при явном флаге или в dev-режиме)
+        if (process.env.FORCE_GC === "true" && typeof global.gc === "function") {
+            setImmediate(() => global.gc());
+            client.logger.debug("Garbage collector triggered");
+        }
+    } catch (error) {
+        Logger.log("ERROR", `Failed to initialize shard: ${error["stack"] || error}`);
+        throw error; // Пробрасываем для обработки в main
+    }
+
+    // Отслеживание событий процесса (сигналы, ошибки)
     initProcessEvents();
 
     // Тест постоянной нагрузки на event loop
@@ -86,16 +94,17 @@ async function runShard() {
 }
 
 /**
- * @author SNIPPIK
- * @description Инициализирует события процесса (ошибки, сигналы)
+ * @description Инициализация глобальных обработчиков процесса
  * @function initProcessEvents
- * @returns void
  */
-function initProcessEvents() {
-    // Необработанная ошибка (внутри синхронного кода)
+function initProcessEvents(): void {
+    // Необработанное синхронное исключение
     process.on("uncaughtException", (err, origin) => {
-        // Скорее всего дело в Discord.js
-        if (err.stack.match(/ws\/lib\/websocket/gi)) return;
+        // Игнорируем известные проблемы WebSocket (Discord.js)
+        if (isWebSocketError(err)) {
+            Logger.log("DEBUG", `Ignored WebSocket error: ${err.message}`);
+            return;
+        }
 
         Logger.log(
             "ERROR",
@@ -103,51 +112,67 @@ function initProcessEvents() {
             `┌ Name:    ${err.name}\n` +
             `├ Message: ${err.message}\n` +
             `├ Origin:  ${origin}\n` +
-            `└ Stack:   ${err.stack}`
+            `└ Stack:   ${err.stack || "N/A"}`
         );
     });
 
-    // Необработанный обещание
-    process.on("unhandledRejection", (reason) => {
+    // Необработанное отклонение промиса
+    process.on("unhandledRejection", (reason, promise) => {
+        const error = reason instanceof Error ? reason : new Error(String(reason));
         Logger.log(
             "ERROR",
             `Unhandled Rejection\n` +
-            `┌ Reason:  ${reason instanceof Error ? reason.message : String(reason)}\n` +
-            `└ Stack:   ${reason instanceof Error ? reason.stack : "N/A"}`
+            `┌ Reason:  ${error.message}\n` +
+            `├ Promise: ${promise}\n` +
+            `└ Stack:   ${error.stack || "N/A"}`
         );
     });
 
-    // Возможность завершить процесс корректно
-    for (const event of ["SIGINT", "SIGTERM"]) {
-        process.on(event, () => {
-            if (ProcessQueues()) return;
-
-            Logger.log("WARN", `Received ${event}. Shutting down...`);
-            process.exit(0);
+    // Корректное завершение по сигналам
+    const shutdownSignals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+    for (const signal of shutdownSignals) {
+        process.on(signal, () => {
+            Logger.log("WARN", `Received ${signal}. Initiating graceful shutdown...`);
+            return gracefulShutdown();
         });
     }
 }
 
 /**
- * @author SNIPPIK
- * @description Функция проверяющая состояние очередей, для безопасного выключения
- * @function ProcessQueues
- * @returns void
+ * @description Проверяет, является ли ошибка внутренней проблемой WebSocket Discord.js
+ * @param err - Ошибка
+ * @returns true если это известная ошибка WebSocket
  */
-function ProcessQueues(): boolean {
-    if (db.queues.size > 0) {
-        // Время самого долгого трека из всех очередей
-        const timeout = db.queues.shutdown();
+function isWebSocketError(err: Error): boolean {
+    // Проверка по имени или сообщению, а не по хрупкому регулярному выражению
+    return err.name === "WebSocketError" ||
+        err.message?.includes("WebSocket") ||
+        err.stack?.includes("ws/lib/websocket") === true;
+}
 
-        // Если плееры играют и есть остаток от аудио
-        if (timeout > 0) {
-            // Ожидаем выключения музыки на других серверах
-            setTimeout(() => { process.exit(0); }, timeout + 1e3);
-
-            Logger.log("WARN", `[Queues/${db.queues.size}] Wait other queues. Timeout to restart ${(timeout / 1e3).duration()}`);
-            return true;
+/**
+ * @description Graceful shutdown: ожидание завершения активных очередей и выход
+ * @async
+ */
+async function gracefulShutdown(): Promise<void> {
+    // Проверяем наличие активных музыкальных очередей
+    const hasQueues = db.queues && db.queues.size > 0;
+    if (hasQueues) {
+        const maxTimeout = db.queues.shutdown(); // время до конца самого длинного трека
+        if (maxTimeout > 0) {
+            Logger.log(
+                "WARN",
+                `[Queues/${db.queues.size}] Waiting for queues to finish. ` +
+                `Max delay: ${(maxTimeout / 1000).toFixed(1)}s`
+            );
+            await new Promise((resolve) => setTimeout(resolve, maxTimeout + 1000));
         }
     }
 
-    return false;
+    // Закрытие соединений с базами данных (если есть метод close)
+    //if (db.close) await db.close().catch((e) => Logger.error("DB close error", e));
+    //if (db.api?.close) await db.api.close().catch((e) => Logger.error("API close error", e));
+
+    Logger.log("WARN", "Shutdown complete. Exiting.");
+    process.exit(0);
 }

@@ -105,16 +105,16 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 const connection = player.voice.connection;
 
                 // Текущая задержка шага
-                let toSend = Math.floor(this.options.duration / OPUS_FRAME_SIZE);
+                let toSend = Math.ceil(this.options.duration / OPUS_FRAME_SIZE);
 
                 // Добавляем буфер
-                if (connection.udp.packets <= PLAYER_SEND_POOL) {
+                if (audio.packets > 0 && connection.udp.packets <= PLAYER_SEND_POOL) {
                     toSend += PLAYER_SEND_POOL;
                 }
 
                 // Если есть что отправлять
                 if (toSend <= 0) {
-                    if (audio.packets === 0 && (connection.udp.packets ?? 0) === 0) {
+                    if (audio.packets === 0 && connection.udp.packets === 0) {
                         player.status = AudioPlayerState.idle;
                         player.cycle = false;
                     }

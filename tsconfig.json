@@ -6,7 +6,7 @@
     "moduleResolution": "NodeNext",    /* Современный алгоритм разрешения модулей Node.js */
     "lib": ["ESNext"],                 /* Включаем новейшие фичи языка */
 
-    "baseUrl": "./",
+    "rootDir": "./",
     "outDir": "./build",
 
     "sourceMap": false,

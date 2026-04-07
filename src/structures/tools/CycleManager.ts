@@ -2,338 +2,307 @@ import { SetArray } from "#structures/array";
 
 /**
  * @author SNIPPIK
- * @description Базовый класс цикла
+ * @description Базовый класс цикла с точным управлением временем
  * @class DefaultCycleSystem
  * @extends SetArray
  * @abstract
- * @private
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Последний сохраненный временной интервал */
-    private lastDelay: number = 0;
+    /** Последняя зафиксированная длительность цикла (целевая) */
+    private lastDuration: number = 0;
 
-    /** Следующее запланированное время запуска (в ms, с плавающей точкой) */
-    private startTime: number = 0;
+    /** Абсолютное время следующего запланированного выполнения (ms) */
+    private nextExecutionTime: number = 0;
 
-    /** Время для высчитывания */
-    private tickTime: number = 0;
-
-    /** Таймер или функция ожидания */
-    private timeout: NodeJS.Timeout | NodeJS.Immediate;
+    /** Идентификатор активного таймера */
+    private timer: NodeJS.Timeout | NodeJS.Immediate | null = null;
 
     /**
-     * @description Время циклической системы изнутри
-     * @returns number
-     * @public
-     */
-    public get insideTime(): number {
-        return this.startTime + this.tickTime;
-    };
-
-    /**
-     * @description Метод получения времени для обновления времени цикла
-     * @default Date.now
-     * @returns number
+     * @description Текущее время в миллисекундах (высокая точность)
      * @protected
      */
     protected get time(): number {
-        return performance.now();
+        return Date.now();
     };
 
     /**
-     * @description Последний зафиксированный промежуток выполнения
+     * @description Ожидаемое время следующего шага цикла
+     * @returns number (0 если цикл не активен)
+     * @public
+     */
+    public get insideTime(): number {
+        return this.nextExecutionTime;
+    };
+
+    /**
+     * @description Последний целевой интервал цикла
      * @returns number
      * @public
      */
     public get delay(): number {
-        return this.lastDelay;
+        return this.lastDuration;
     };
 
     /**
-     * @description Высчитываем задержку шага
-     * @param duration - Истинное время шага
-     * @private
-     */
-    private set delay(duration: number) {
-        // Ожидаемое время следующего запуска (без учета _driftStep/lag)
-        const expectedNext = this.startTime + this.tickTime + duration;
-        const now = this.time;
-        const missed = Math.floor((now - expectedNext) / duration);
-        const steps = Math.max(1, missed + 1);
-
-        const correction = Math.floor(steps * duration);
-        this.tickTime += correction;
-        this.lastDelay = correction;
-    };
-
-    /**
-     * @description Создаем класс и добавляем параметры
-     * @param options - Параметры для работы класса
-     * @constructor
-     * @public
+     * @description Конструктор
+     * @param options - конфигурация цикла
+     * @throws {Error} если duration <= 0
      */
     public constructor(public options: SyncCycleConfig<T> | AsyncCycleConfig<T>) {
         super();
+        if (options.duration <= 0) {
+            throw new Error("Duration must be a positive number");
+        }
+        this.lastDuration = options.duration;
     };
 
     /**
-     * @description Добавляем элемент в очередь
-     * @param item - Объект T
-     * @public
+     * @description Добавляет элемент в очередь и запускает цикл при необходимости
+     * @param item - элемент для добавления
+     * @returns this
      */
     public add(item: T): this {
-        if (this.options.custom?.push) this.options.custom?.push(item);
+        // Вызов кастомного обработчика добавления
+        if (this.options.custom?.push) {
+            this.options.custom.push(item);
+        }
 
+        // Удаляем дубликат, если уже существует
         if (this.has(item)) this.delete(item);
         super.add(item);
 
-        // Запускаем цикл сразу после добавления первого элемента
-        if (this.size === 1 && !this.startTime) {
-            this.startTime = this.time;
-            setImmediate(this.step);
+        // Запуск цикла при первом добавленном элементе
+        if (this.size === 1 && !this.nextExecutionTime) {
+            const now = this.time;
+            this.nextExecutionTime = now + this.options.duration;
+            // Используем setImmediate для немедленного, но асинхронного старта
+            this.timer = setImmediate(this.step);
         }
 
         return this;
     };
 
     /**
-     * @description Удаляем элемент из очереди
-     * @param item - Объект T
-     * @returns boolean
-     * @public
+     * @description Удаляет элемент из очереди
+     * @param item - элемент для удаления
+     * @returns true если элемент был удалён, иначе false
      */
-    public delete = (item: T) => {
-        const index = this.has(item);
+    public delete(item: T): boolean {
+        const existed = this.has(item);
+        if (!existed) return false;
 
-        // Если есть объект в базе
-        if (index) {
-            if (this.options.custom?.remove) this.options.custom.remove(item);
-            super.delete(item);
+        if (this.options.custom?.remove) {
+            this.options.custom.remove(item);
         }
 
+        super.delete(item);
         return true;
     };
 
     /**
-     * @description Чистка цикла от всего
-     * @returns void
-     * @public
+     * @description Полная очистка очереди и остановка цикла
      */
     public reset(): void {
-        this.clear(); // Удаляем все объекты
-        this.reboot();
+        this.clearTimer();
+        this.clear();          // очистка SetArray
+        this.nextExecutionTime = 0;
+        this.lastDuration = 0;
     };
 
     /**
-     * @description Подготовка данных цикла для повторного использования
+     * @description Очищает активный таймер, если он существует
+     * @protected
+     */
+    protected clearTimer(): void {
+        if (!this.timer) return;
+
+        if ("hasRef" in this.timer) {
+            clearTimeout(this.timer as NodeJS.Timeout);
+        } else {
+            clearImmediate(this.timer as NodeJS.Immediate);
+        }
+        this.timer = null;
+    };
+
+    /**
+     * @description Планирует следующий шаг цикла с учётом времени выполнения
+     * @protected
+     */
+    protected scheduleStep(): void {
+        const now = this.time;
+        let delay = this.nextExecutionTime - now;
+
+        // Если отстаём больше чем на интервал – запускаем немедленно
+        if (delay < 0) delay = 0;
+
+        this.clearTimer();
+        this.timer = setTimeout(() => this.step(), delay);
+    };
+
+    /**
+     * @description Основной шаг цикла
      * @private
      */
-    private reboot = () => {
-        this.startTime = 0;
-        this.tickTime = 0;
-        this.lastDelay = 0;
-
-        // Если есть таймер
-        if (this.timeout) this._clearTimeout();
-    };
-
-    /**
-     * @description Проверяем время для запуска цикла повторно с учетом дрифта цикла
-     * @returns void
-     * @protected
-     */
     private step = (): void => {
-        // Проверяем цикл на наличие объектов
+        // Если очередь пуста – останавливаем цикл
         if (this.size === 0) return this.reset();
 
-        // === STEP ===
-        this.delay = this._stepCycle();
+        try {
+            // Выполнение полезной нагрузки (переопределяется в наследниках)
+            this._stepCycle();
+        } catch (error) {
+            // Логируем критические ошибки, но не даём циклу упасть
+            console.error("[CycleSystem] Unhandled error in _stepCycle:", error);
+        }
 
-        const delay = Math.max(0, this.insideTime - this.time);
-        setTimeout(this.step, delay);
+        // Обновляем время следующего выполнения (устойчиво к дрейфу)
+        const now = this.time;
+        this.nextExecutionTime += this.options.duration;
+
+        // Если мы сильно отстали (например, из-за долгой обработки),
+        // сбрасываем nextExecutionTime, чтобы избежать каскадного отставания
+        if (this.nextExecutionTime < now) {
+            this.nextExecutionTime = now + this.options.duration;
+        }
+
+        this.lastDuration = this.options.duration;
+
+        // Планируем следующий шаг
+        this.scheduleStep();
     };
 
     /**
-     * @description Удаляем таймер или Immediate
-     * @protected
-     */
-    protected _clearTimeout = () => {
-        if (!this.timeout) return;
-        if ('hasRef' in this.timeout) clearTimeout(this.timeout as NodeJS.Timeout);
-        else clearImmediate(this.timeout as NodeJS.Immediate);
-        this.timeout = null;
-    };
-
-    /**
-     * @description Выполняет шаг цикла с учётом точного времени следующего запуска | Полный запрет на promise
-     * @returns number
+     * @description Абстрактный метод, выполняющий полезную работу на каждом шаге
      * @protected
      * @abstract
      */
-    protected abstract _stepCycle: () => number;
+    protected abstract _stepCycle(): void;
 }
 
 /**
  * @author SNIPPIK
- * @description Класс для удобного управления циклами
+ * @description Синхронный/асинхронный цикл с обработкой элементов
  * @class TaskCycle
- * @abstract
- * @public
+ * @extends DefaultCycleSystem
  */
 export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
     /**
-     * @description Здесь будет выполнен прогон объектов для выполнения execute
-     * @returns Promise<void>
-     * @readonly
-     * @private
+     * @description Выполняет все подходящие элементы цикла
+     * @protected
      */
-    protected _stepCycle = () => {
-        // Запускаем цикл
+    protected _stepCycle(): void {
         for (const item of this) {
-            // Если объект не готов
+            // Пропускаем элементы, не прошедшие фильтр
             if (!this.options.filter(item)) continue;
 
             try {
-                this.options.execute(item);
+                const result = this.options.execute(item);
+                // Если результат – Promise, обрабатываем возможные ошибки асинхронно
+                if (result instanceof Promise) {
+                    result.catch((err) => {
+                        console.error("[TaskCycle] Async execution error:", err);
+                        this.delete(item);
+                    });
+                }
             } catch (error) {
+                // Синхронная ошибка – удаляем элемент и логируем
+                console.error("[TaskCycle] Sync execution error:", error);
                 this.delete(item);
-                console.log(error);
             }
         }
 
-        this.options?.custom?.step?.();
-        return this.options.duration;
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Класс для удобного управления promise циклами
- * @class PromiseCycle
- * @abstract
- * @public
- */
-export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
-    protected get time() { return Date.now(); };
-
-    /**
-     * @description Здесь будет выполнен прогон объектов для выполнения execute
-     * @returns Promise<void>
-     * @readonly
-     * @private
-     */
-    protected _stepCycle = () => {
-        for (const item of this) {
-            if (!this.options.filter(item)) continue;
-            this.runItem(item);
+        // Вызов пользовательского хука после шага
+        if (this.options.custom?.step) {
+            this.options.custom.step();
         }
-
-        this.options?.custom?.step?.();
-        return 30_000;
-    };
-
-    /**
-     * @description Обработка обещаний
-     * @param item - объект с обещанием
-     * @private
-     */
-    private runItem(item: T): void {
-        (this.options.execute(item) as Promise<boolean>)
-            .then(ok => {
-                if (!ok) this.delete(item);
-            })
-            .catch(err => {
-                this.delete(item);
-                console.error(err);
-            });
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Интерфейс для опций DefaultCycleSystem
- * @interface BaseCycleConfig
- * @private
- */
-interface BaseCycleConfig<T> {
-    /**
-     * @description Время прогона цикла, через n времени будет запущен цикл по новой
-     * @readonly
-     * @public
-     */
-    duration: number;
-
-    /**
-     * @description Как фильтровать объекты, вдруг объект еще не готов
-     * @readonly
-     * @public
-     */
-    readonly filter: (item: T) => boolean;
-
-    /**
-     * @description Кастомные функции, необходимы для модификации или правильного удаления
-     * @readonly
-     * @public
-     */
-    readonly custom?: {
-        /**
-         * @description Данная функция расширяет функционал добавления, выполняется перед добавлением
-         * @param item - объект
-         * @readonly
-         * @public
-         */
-        readonly push?: (item: T) => void;
-
-        /**
-         * @description Данная функция расширяет функционал удаления, выполняется перед удалением
-         * @param item - объект
-         * @readonly
-         * @public
-         */
-        readonly remove?: (item: T) => void;
-
-        /**
-         * @description Данная функция расширяет функционал шага, выполняется перед шагом
-         * @readonly
-         * @public
-         */
-        readonly step?: () => void;
     }
 }
 
 /**
  * @author SNIPPIK
- * @description Интерфейс для опций TaskCycle
- * @interface SyncCycleConfig
- * @private
+ * @description Цикл для работы с Promise-ориентированными задачами
+ * @class PromiseCycle
+ * @extends DefaultCycleSystem
  */
-interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
+export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
     /**
-     * @description Функция для выполнения
-     * @readonly
-     * @public
+     * @description Используем Date.now() для совместимости с оригиналом
+     * @protected
      */
-    readonly execute: (item: T) => Promise<void> | void;
+    protected get time(): number {
+        return Date.now();
+    }
 
     /**
-     * @description Время прогона цикла, через n времени будет запущен цикл по новой
-     * @readonly
-     * @public
+     * @description Выполняет все подходящие элементы, не дожидаясь Promise
+     * @protected
      */
-    duration: number;
+    protected _stepCycle(): void {
+        for (const item of this) {
+            if (!this.options.filter(item)) continue;
+            this.runItem(item);
+        }
+
+        if (this.options.custom?.step) {
+            this.options.custom.step();
+        }
+    }
+
+    /**
+     * @description Запускает асинхронную обработку элемента с автоматическим удалением при ошибке или возврате false
+     * @param item - элемент для обработки
+     * @private
+     */
+    private runItem(item: T): void {
+        Promise.resolve(this.options.execute(item))
+            .then((keep) => {
+                if (keep === false) {
+                    this.delete(item);
+                }
+            })
+            .catch((err) => {
+                console.error("[PromiseCycle] Promise execution error:", err);
+                this.delete(item);
+            });
+    }
 }
 
 /**
- * @author SNIPPIK
- * @description Интерфейс для опций PromiseCycle
+ * @description Базовая конфигурация для всех циклов
+ * @interface BaseCycleConfig
+ */
+interface BaseCycleConfig<T> {
+    /** Интервал между шагами (мс) */
+    duration: number;
+
+    /** Фильтр для пропуска элементов, не готовых к обработке */
+    readonly filter: (item: T) => boolean;
+
+    /** Дополнительные кастомные хуки */
+    readonly custom?: {
+        /** Вызывается перед добавлением элемента */
+        readonly push?: (item: T) => void;
+        /** Вызывается перед удалением элемента */
+        readonly remove?: (item: T) => void;
+        /** Вызывается после завершения шага цикла */
+        readonly step?: () => void;
+    };
+}
+
+/**
+ * @description Конфигурация для TaskCycle (синхронные/асинхронные execute)
+ * @interface SyncCycleConfig
+ */
+interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
+    /** Функция обработки элемента (может быть синхронной или возвращать Promise) */
+    readonly execute: (item: T) => Promise<void> | void;
+}
+
+/**
+ * @description Конфигурация для PromiseCycle (execute всегда возвращает Promise<boolean>)
  * @interface AsyncCycleConfig
- * @private
  */
 interface AsyncCycleConfig<T> extends BaseCycleConfig<T> {
-    /**
-     * @description Функция для выполнения
-     * @readonly
-     * @public
-     */
+    /** Функция обработки элемента, должна вернуть Promise<boolean> – true чтобы оставить элемент, false – удалить */
     readonly execute: (item: T) => Promise<boolean>;
 }

@@ -103,11 +103,13 @@ export class AudioSaver extends PromiseCycle<Track> {
             duration: 30e3,
             custom: {
                 push: (track) => {
-                    // Защита от повторного добавления
+                    // Удаляем дубликаты по URL (асинхронно, чтобы избежать мутации во время итерации)
                     setImmediate(() => {
-                        const find = this.filter((item) => track.url === item.url);
-                        if (find.length > 1) this.delete(find[0]);
-                    });
+                        const duplicates = Array.from(this).filter(t => t.url === track.url);
+                        for (let i = 1; i < duplicates.length; i++) {
+                            this.delete(duplicates[i]);
+                        }
+                    })
                 }
             },
             filter: (item) => {

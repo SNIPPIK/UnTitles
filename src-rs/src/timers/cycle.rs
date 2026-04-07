@@ -104,7 +104,6 @@ impl CycleManager {
             // не пытаться догнать, а сразу перейти к следующему по расписанию.
             // Это предотвращает «лавинное» выполнение многих тиков подряд, которое могло бы перегрузить систему.
             let mut interval = tokio::time::interval(interval_duration);
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
             loop {
                 if !running_flag.load(Ordering::Acquire) {

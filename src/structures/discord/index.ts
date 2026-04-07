@@ -5,6 +5,7 @@ import { QueueEvents } from "#core/queue";
 import { DiscordClient } from "./index.client";
 
 export * from "./index.client";
+export * from "./index.voice";
 
 /**
  * @author SNIPPIK

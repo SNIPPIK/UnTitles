@@ -1,60 +1,9 @@
-import { DiscordGatewayAdapterCreator, VoiceAdapters } from "#core/voice/transport/adapter";
 import { Client, LimitedCollection } from "seyfert";
 import { middlewares } from "#handler/middlewares";
 import { ActivityType } from "seyfert/lib/types";
-import { version } from "package.json";
+import { Logger } from "#structures";
 import { env } from "#app/env";
 import { db } from "#app/db";
-
-/**
- * @author SNIPPIK
- * @description Класс адаптера
- * @class SeyfertVoice
- * @extends VoiceAdapters
- */
-export class SeyfertVoice<T extends DiscordClient> extends VoiceAdapters<DiscordClient> {
-    public constructor(client: T) {
-        super(client);
-    };
-
-    /**
-     * @description Указываем как создавать адаптер
-     * @param guild_id - ID сервера для которого надо создать адаптер
-     * @public
-     */
-    public voiceAdapterCreator = (guild_id: string): DiscordGatewayAdapterCreator => {
-        // Если нет ID осколка
-        const id = this.client.gateway.calculateShardId(guild_id);
-
-        return methods => {
-            this.adapters.set(guild_id, methods);
-
-            return {
-                sendPayload: (data) => {
-                    this.client.gateway.send(id, data);
-                    return true;
-                },
-                destroy: () => {
-                    this.adapters.delete(guild_id);
-                }
-            };
-        };
-    };
-
-    /**
-     * @description Реализация смены статуса голосового канала
-     * @param channelId - ID голосового канала
-     * @param status - Название заголовка
-     * @public
-     */
-    public status = (channelId: string, status?: string) => {
-        return this.client.rest.request("PUT", `/channels/${channelId}/voice-status`, {
-            body: {
-                status: status
-            }
-        });
-    };
-}
 
 /**
  * @author SNIPPIK
@@ -80,8 +29,14 @@ export class DiscordClient extends Client {
             /**
              * @description Хуки для команд
              */
-            /*commands: {
+            commands: {
                 defaults: {
+                    onBeforeOptions: (ctx) => {
+                        Logger.log("DEBUG", `[${ctx.author.name}] run autocomplete ${ctx.fullCommandName}`);
+                    },
+                    onAfterRun: (ctx) => {
+                        Logger.log("DEBUG", `[${ctx.author.name}] run command ${ctx.fullCommandName}`);
+                    },
                     onMiddlewaresError: (ctx, error) => {
                         Logger.log(
                             "ERROR",
@@ -118,13 +73,17 @@ export class DiscordClient extends Client {
                         );
                     }
                 }
-            },*/
+            },
 
             /**
              * @description Хуки для компонентов
              */
-            /*components: {
+            components: {
                 defaults: {
+                    onAfterRun: (ctx) => {
+                      Logger.log("DEBUG", `[${ctx.author.name}] run component ${ctx.customId}`);
+                    },
+
                     onMiddlewaresError: (ctx, error) => {
                         Logger.log(
                             "ERROR",
@@ -152,8 +111,7 @@ export class DiscordClient extends Client {
                         );
                     }
                 }
-            },*/
-
+            },
 
             globalMiddlewares: ["checkCooldown"],
             allowedMentions: {
@@ -256,7 +214,7 @@ export class DiscordClient extends Client {
                 const edited = status.name
                     .replace(/{shard}/g, `${this.gateway.size}`)
                     .replace(/{queues}|{players}/g, `${db.queues.size}`)
-                    .replace(/{version}/g, `${version}`)
+                    .replace(/{version}/g, `0.5.0 Seyfert`)
                     .replace(/{guilds}/g, `${guilds}`)
                     .replace(/{users}/g, `${users}`)
 

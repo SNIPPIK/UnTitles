@@ -322,7 +322,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @private
      */
     public connect = (endpoint: string) => {
-        const last_seq = this._ws?.sequence;
+        //const last_seq = this._ws?.sequence;
 
         if (this._ws) {
             this._ws.removeAllListeners();
@@ -331,10 +331,10 @@ export class Transport extends TypedEmitter<TransportEvents> {
         }
 
         this._ws = new VoiceWebSocket();
-        if (last_seq) {
+        /*if (last_seq) {
             this._ws.sequence = last_seq;
             this._ws.emit("resumed");
-        }
+        }*/
 
         this._ws.connect(endpoint); // Подключаемся к endpoint
 

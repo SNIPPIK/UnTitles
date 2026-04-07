@@ -188,7 +188,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public get playing() {
-        // Наличие аудио-ресурса (просто проверка ссылки)
+        // Наличие аудио-ресурса и статуса
         return this._status === "player/playing" && !!this._audio.current;
     };
 
