@@ -323,7 +323,7 @@ export class QueueButtons {
             style: currentRepeatType === RepeatType.None ? 2 : 3,
         });
 
-        // ⏸ / ▶ Pause / Resume
+        // ⏸ / ▶ - Pause / Resume
         setButton(firstRow[2], {
             emoji: isPaused ? QueueButtons.button.resume : QueueButtons.button.pause,
             style: isPaused ? 3 : 1,
@@ -340,9 +340,10 @@ export class QueueButtons {
 
     /**
      * @description Удаляем компоненты когда они уже не нужны
+     * @returns void
      * @public
      */
-    public destroy() {
+    public destroy = () => {
         this._buttons = null;
         this._selector = null;
     };
@@ -351,6 +352,7 @@ export class QueueButtons {
      * @author SNIPPIK
      * @description Делаем проверку id
      * @param name - Название параметра в env
+     * @returns object
      * @private
      */
     private static checkIDComponent(name: string) {
@@ -365,6 +367,7 @@ export class QueueButtons {
      * @author SNIPPIK
      * @description Создание одной кнопки в одной функции
      * @param options - Параметры для создания кнопки
+     * @returns object
      * @private
      */
     private static createButton(options: any) {

@@ -140,7 +140,7 @@ export class AudioSaver extends PromiseCycle<Track> {
                     `${status.path}.opus`
                 ];
 
-                Logger.log("DEBUG", `[AudioCache/Start]: Save ${status.path}`);
+                Logger.log("DEBUG", `[AudioCache/Start]: Save ${status.path}.opus`);
 
                 // Если платформа не может играть нативно из сети
                 if (track.proxy && track.link.startsWith("http")) {
@@ -190,7 +190,7 @@ export class AudioSaver extends PromiseCycle<Track> {
                         if (data.size < 10) await afs.unlink(`${status.path}.opus`);
                     }
 
-                    Logger.log("DEBUG", `[AudioCache/End]: Saved ${track.ID}`);
+                    Logger.log("DEBUG", `[AudioCache/End]: Saved ${status.path}.opus`);
 
                     ffmpeg.destroy();
                     this.delete(track);

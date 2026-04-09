@@ -1,6 +1,6 @@
 import { ControllerTracks, ControllerVoice, Track } from "#core/queue";
 import { QueueButtons, QueueMessage } from "../modules/message";
-import { SpeakerType } from "#core/voice/modules/Speaker";
+import { SpeakerType } from "#core/voice/structures/Speaker";
 import { CommandInteraction}  from "#structures/discord";
 import { VoiceConnection } from "#core/voice";
 import { AudioPlayer } from "#core/player";
@@ -217,7 +217,9 @@ export class Queue {
         this._message.delete();
 
         // Удаляем статус гс канала
-        db.adapter.status(this.message.voice_id, null);
+        db.adapter.status(this.message.voice_id, null).catch(() => {
+            return null;
+        });
     };
 
     /**

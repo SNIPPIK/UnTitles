@@ -14,7 +14,7 @@ use std::{
 use std::sync::atomic::AtomicU64;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::audio::ring_buffer::RingBuffer;
-use crate::timers::cycle::{add_global_session, remove_global_session};
+use crate::timers::scheduler::balancer::{add_global_session, remove_global_session};
 
 /// Время до отправки keepalive пакета, для работы через nat системы
 const KEEP_ALIVE_TIMEOUT: u64 = 10000;
@@ -63,36 +63,36 @@ impl UdpBufferedInner {
     pub fn tick(&self) {
         let now = now_ms();
 
-        // ===== Попытка достать пакет =====
-        let packet = self.buffer.pop();
+        if let Some(packet) = self.buffer.pop() {
+            match self.socket.send(&packet) {
+                Ok(_) => {
+                    self.last_send_ms.store(now, Ordering::Relaxed);
+                }
 
-        match packet {
-            Some(packet) => {
-                // ===== Отправка реального пакета =====
-                match self.socket.send(&packet) {
-                    Ok(_) => self.last_send_ms.store(now, Ordering::Relaxed),
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        // Возвращаем пакет обратно
-                        self.buffer.push(packet).expect("TODO: WouldBlock Error");
-                        self.send_drops.fetch_add(1, Ordering::Relaxed);
-                    }
-                    Err(_) => {
-                        // Любая другая ошибка — тоже возвращаем
-                        self.buffer.push(packet).expect("Error: Unknown Error");
-                        self.send_drops.fetch_add(1, Ordering::Relaxed);
-                    }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    // Возвращаем пакет обратно без panic
+                    let _ = self.buffer.push(packet);
+                    self.send_drops.fetch_add(1, Ordering::Relaxed);
+                }
+
+                Err(_) => {
+                    let _ = self.buffer.push(packet);
+                    self.send_drops.fetch_add(1, Ordering::Relaxed);
                 }
             }
 
-            None => {
-                // ===== Keep-alive =====
-                let last_ts = self.last_send_ms.load(Ordering::Relaxed);
-                if now >= last_ts + KEEP_ALIVE_TIMEOUT {
-                    // Используем статический SILENT_FRAME, без нового Vec
-                    if self.socket.send(&[0u8; 8]).is_ok() {
-                        self.last_send_ms.store(now, Ordering::Relaxed);
-                    }
-                }
+            return;
+        }
+
+        // ===== Keep-alive =====
+        let last_ts = self.last_send_ms.load(Ordering::Relaxed);
+
+        if now >= last_ts + KEEP_ALIVE_TIMEOUT {
+            // статический silent frame (без аллокаций)
+            static SILENT_FRAME: [u8; 8] = [0u8; 8];
+
+            if self.socket.send(&SILENT_FRAME).is_ok() {
+                self.last_send_ms.store(now, Ordering::Relaxed);
             }
         }
     }
@@ -152,7 +152,7 @@ impl UdpBuffered {
 
         let inner = Arc::new(UdpBufferedInner {
             socket: Arc::new(socket),
-            buffer: RingBuffer::new(1024 * 5),
+            buffer: RingBuffer::new(512),
             send_drops: AtomicUsize::new(0),
             last_send_ms: AtomicU64::new(now_ms()),
         });

@@ -1,7 +1,7 @@
 import { AudioPlayer } from "#core/player";
 
 export * from "./structures/player";
-export * from "./controllers/filters";
+export * from "./structures/filters";
 
 /**
  * @author SNIPPIK

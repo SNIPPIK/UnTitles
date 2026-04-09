@@ -33,6 +33,21 @@
     "ru": "Выберите аудио фильтр"
   },
 
+  "autocomplete.null": {
+    "en-US": "A title or URL is required",
+    "ru": "Необходимо указать название или ссылку"
+  },
+
+  "autocomplete.number.null": {
+    "en-US": "A title or URL is required",
+    "ru": "Необходимо указать число!"
+  },
+
+  "autocomplete.fallback": {
+    "en-US": "[WARNING]: Your request was rejected because the arguments did not match",
+    "ru": "[ПРЕДУПРЕЖДЕНИЕ]: Ваш запрос был отклонен, поскольку аргументы не совпали"
+  },
+
 
 
 

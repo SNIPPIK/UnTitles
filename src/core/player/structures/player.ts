@@ -1,10 +1,10 @@
-import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio";
 import { type AudioFilter, type AudioPlayerEvents, ControllerFilters } from "#core/player";
 import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue";
-import { PlayerProgress } from "../modules/progress";
+import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio";
+import { PlayerProgress } from "../controllers/progress";
 import { Logger, TypedEmitter } from "#structures";
 import type { VoiceConnection } from "#core/voice";
-import { PlayerAudio } from "../modules/audio";
+import { PlayerAudio } from "../structures/audio";
 import { db } from "#app/db";
 
 /**
@@ -201,11 +201,12 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (isActive) {
             // Если нет плеера в цикле
             if (!db.queues.cycles.players.has(this)) {
-                // Отправляем пустышку
-                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
 
                 // Добавляем плеер в цикл
                 db.queues.cycles.players.add(this);
+
+                // Отправляем пустышку
+                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
                 this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`)
             }
         }
@@ -608,7 +609,7 @@ class AudioPlayerTimeout {
      */
     public get timeout(): number | null {
         return this._resumeAllowedAt;
-    }
+    };
 
     /**
      * @description Устанавливает время разрешения возобновления с учётом PLAYER_PAUSE_OFFSET.
@@ -617,7 +618,7 @@ class AudioPlayerTimeout {
      */
     public set timeout(time: number | null) {
         this._resumeAllowedAt = time !== null ? time + PLAYER_PAUSE_OFFSET : null;
-    }
+    };
 
     /**
      * @description Устанавливает или заменяет таймер возобновления.
@@ -627,7 +628,7 @@ class AudioPlayerTimeout {
     public set timer(timer: NodeJS.Timeout | null) {
         if (this._resumeTimer) clearTimeout(this._resumeTimer);
         this._resumeTimer = timer;
-    }
+    };
 
     /**
      * @description Возвращает оставшееся время до разрешения возобновления (в мс).
@@ -637,7 +638,7 @@ class AudioPlayerTimeout {
     public getRemaining(): number {
         if (!this._resumeAllowedAt) return 0;
         return Math.max(this._resumeAllowedAt - Date.now(), 0);
-    }
+    };
 
     /**
      * @description Очищает таймер и сбрасывает состояние.
@@ -649,5 +650,5 @@ class AudioPlayerTimeout {
             this._resumeTimer = null;
         }
         this._resumeAllowedAt = null;
-    }
+    };
 }

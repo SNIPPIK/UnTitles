@@ -1,22 +1,7 @@
+import { TRACK_CHECK_WAIT } from "#core/queue/controllers/provider";
 import { AudioResource } from "#core/audio";
 import { Logger } from "#structures";
 import { db } from "#app/db";
-
-/**
- * @author SNIPPIK
- * @description Время ожидания потока live трека
- * @const TIMEOUT_STREAM_PIPE
- * @private
- */
-const TIMEOUT_STREAM_PIPE = 40e3;
-
-/**
- * @author SNIPPIK
- * @description Время ожидания потока трека
- * @const TIMEOUT_STREAM_BUFFERED
- * @private
- */
-const TIMEOUT_STREAM_BUFFERED = 20e3;
 
 /**
  * @author SNIPPIK
@@ -103,10 +88,9 @@ export class PlayerAudio<T extends AudioResource> {
         this._pre_audio = stream;
 
         // Установка таймера ожидания
-        const waitTime = stream.options.track.isBuffered ? TIMEOUT_STREAM_BUFFERED : TIMEOUT_STREAM_PIPE;
         this._timeout = setTimeout(() => {
             stream.emit("error", Error("Timeout: the stream has been exceeded!"));
-        }, waitTime);
+        }, TRACK_CHECK_WAIT);
 
         // Отслеживаем аудио поток на ошибки
         (stream as AudioResource).once("error", (error) => {

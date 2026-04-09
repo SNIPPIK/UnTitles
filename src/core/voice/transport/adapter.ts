@@ -69,7 +69,7 @@ export abstract class VoiceAdapters<T extends any> {
      *
      * ```
      */
-    public abstract status(channelId: string, status?: string): void;
+    public abstract status(channelId: string, status?: string): void | Promise<any>;
 
     /**
      * @description Поиск адаптера голосового соединения из данных и передаче данных VOICE_SERVER_UPDATE

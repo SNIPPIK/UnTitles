@@ -1,12 +1,12 @@
 import type { VoiceDavePrepareEpochData, VoiceDavePrepareTransitionData } from "discord-api-types/voice/v8";
-import { DAVESession, DAVE_PROTOCOL_VERSION,  } from "@snazzah/davey";
+import { DAVESession, iType } from "#native";
 import { TypedEmitter } from "#structures";
 
 /**
  * @author SNIPPIK
  * @description Текущая версия протокола dave
  */
-let MAX_E2EE_PROTOCOL: number = DAVE_PROTOCOL_VERSION;
+let MAX_DAVE_PROTOCOL: number = 1;
 
 /**
  * @author SNIPPIK
@@ -25,11 +25,11 @@ const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 24;
 /**
  * @author SNIPPIK
  * @description Управляет сеансом группы протокола DAVE.
- * @class E2EESession
+ * @class MLSSession
  * @extends TypedEmitter
  * @public
  */
-export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
+export class MLSSession extends TypedEmitter<ClientMLSEvents> {
     /** Последний выполненный идентификатор перехода */
     public lastTransition_id?: number;
 
@@ -43,7 +43,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
     public reinitializing = false;
 
     /** Базовый сеанс DAVE этой оболочки */
-    public session: DAVESession;
+    public session: iType<typeof DAVESession>;
 
     /** Выполняется ли переход кода шифрования */
     private _isTransitioning = false;
@@ -61,7 +61,7 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
      * @returns number
      */
     public static get max_version(): number {
-        return MAX_E2EE_PROTOCOL;
+        return MAX_DAVE_PROTOCOL;
     };
 
     /**
@@ -267,21 +267,13 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
 
     /**
      * @description Зашифруйте пакет, используя сквозное шифрование.
-     * @param packet - Пакет для шифрования
-     * @returns Buffer
+     * @param packets - Пакет для шифрования
+     * @returns Buffer[]
      * @public
      */
-    public encrypt = (packet: Buffer) => {
+    public encrypt = (packets: Buffer[]) => {
         if (this.version === 0 || !this.session?.ready || this._isTransitioning) return null;
-
-        try {
-            return this.session.encryptOpus(packet);
-        } catch (err) {
-            this.emit("debug", `Encryption failed: ${err}`);
-            // В случае критической ошибки шифрования лучше отправить тишину или
-            // прозрачный пакет, чтобы не вызвать шум в канале
-            return packet;
-        }
+        return this.session.encryptOpusBatch(packets);
     };
 
     /**
@@ -310,16 +302,16 @@ export class E2EESession extends TypedEmitter<ClientE2EEEvents> {
         this.pendingTransitions = null;
         this.downgraded = null;
 
-        this.emit("debug", "E2EE Session destroyed");
+        this.emit("debug", "MLS Session destroyed");
     };
 }
 
 /**
  * @author SNIPPIK
  * @description События класса DAVESession
- * @interface E2EESession
+ * @interface MLSSession
  */
-export interface ClientE2EEEvents {
+export interface ClientMLSEvents {
     // Ошибка?! Какая ошибка
     "error": (error: Error) => void;
 

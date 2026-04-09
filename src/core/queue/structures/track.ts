@@ -1,107 +1,7 @@
-import { APIRequestData, RestAPIAgent, RestServerSide } from "#handler/rest";
-import { httpsClient, httpsStatusCode } from "#structures";
-import { sdb } from "#worker/db";
+import { TrackResolvers, TRACK_BUFFERED_TIME, TRACK_CHECK_WAIT } from "#core/queue/controllers/provider";
+import { APIRequestData, RestServerSide } from "#handler/rest";
+import { httpsClient } from "#structures";
 import { db } from "#app/db";
-
-/**
- * @author SNIPPIK
- * @description Безопасное время для буферизации трека
- * @const TRACK_BUFFERED_TIME
- * @public
- */
-const TRACK_BUFFERED_TIME = 500;
-
-/**
- * @author SNIPPIK
- * @description Резолвер ресурсов с поддержкой экспоненциальной паузы и защитой от утечек
- * @class ResourceResolver
- * @private
- */
-class ResourceProvider {
-    constructor(
-        private readonly prepare: (track: Track) => Promise<string | Error>,
-        private readonly options = { retries: 3, initialDelay: 70 }
-    ) {}
-
-    /**
-     * @description Пытается разрешить путь к ресурсу, плавно увеличивая паузы при ошибках
-     * @public
-     */
-    public async resolve(track: Track): Promise<string | Error> {
-        let lastError: Error | string = "Unknown error";
-
-        for (let attempt = 0; attempt < this.options.retries; attempt++) {
-            // Пытаемся подготовить ресурс
-            const result = await this.prepare(track);
-
-            // Если успех — сразу отдаем результат
-            if (typeof result === "string") {
-                track.link = result;
-                return result;
-            }
-
-            // Если ошибка — логируем и готовимся к следующей попытке
-            lastError = result;
-            track.link = null; // Сбрасываем битую ссылку, чтобы prepare искал заново
-
-            // Если это не последняя попытка — ждем (Exponential Backoff)
-            if (attempt < this.options.retries - 1) {
-                const delay = this.options.initialDelay * Math.pow(2, attempt);
-                await this.sleep(delay);
-            }
-        }
-
-        return lastError instanceof Error
-            ? lastError
-            : new Error(`[ResourceResolver]: Max retries reached. Last error: ${lastError}`);
-    }
-
-    private sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-}
-
-
-/**
- * @author SNIPPIK
- * @description
- * @class TrackResolvers
- * @private
- */
-class TrackResolvers {
-    protected static providers = {
-        /**
-         * @description Провайдеры для поддержания аудио и прочего
-         * @public
-         */
-        audio: new ResourceProvider(async (track) => {
-            const status = sdb.audio_saver?.status(track);
-
-            // Проверка кеша (мгновенно)
-            if (status?.status === "ended") return status.path;
-
-            // Если ссылки нет — ищем через API
-            if (!track.link) {
-                const song = await db.api.fetchAudioLink(track);
-                if (song instanceof Error) return song;
-                else if (!song) return Error("No link found")
-
-                track.link = song.link;
-                track.proxy = song.api.proxy;
-            }
-
-            // Проверяем HTTP HEAD (если это ссылка)
-            if (track.link.startsWith("http")) {
-                const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null });
-                const status = await client.toHead;
-                const error = httpsStatusCode.parse(status);
-
-                if (error) return error; // Резолвер поймает это, обнулит ссылку и вызовет prepare снова
-                if (sdb.audio_saver) sdb.audio_saver.add(track);
-            }
-
-            return track.link;
-        })
-    };
-}
 
 /**
  * @author SNIPPIK
@@ -188,9 +88,10 @@ export class Track extends TrackResolvers {
     public get name_replace() {
         // Удаляем лишнее скобки
         const title = `[${this._track.title.substring(0, 45)}](${this.url})`;
+        const artist = `[${this.artist.title.substring(0, 45)}](${this.artist.url})`;
 
         if (this._api?.name === "YOUTUBE") return `\`\`${this._duration.split}\`\` ${title}`;
-        return `\`\`${this._duration.split}\`\` [${this.artist.title}](${this.artist.url}) - ${title}`;
+        return `\`\`${this._duration.split}\`\` ${artist} - ${title}`;
     };
 
     /**
@@ -337,13 +238,14 @@ export class Track extends TrackResolvers {
                 setTimeout(() => reject(new Error("Timeout server request")), 10e3)
             );
 
-            let api = await Promise.race([await new httpsClient(
-                {
+            const api = await Promise.race([
+                new httpsClient({
                     url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(this.artist.title)}&track_name=${encodeURIComponent(this.name)}`,
                     userAgent: "UnTitles 0.5.0, Music bot, github.com/SNIPPIK/UnTitles",
-                    timeout: 20e3
-                }
-            ).toJson, timeoutPromise]) as json | Error;
+                    timeout: TRACK_CHECK_WAIT
+                }).toJson,
+                timeoutPromise
+            ]) as json | Error;
 
             // Если получаем вместо данных ошибку
             if (api instanceof Error) return resolve(api);

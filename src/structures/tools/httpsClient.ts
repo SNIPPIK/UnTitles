@@ -1,6 +1,6 @@
 import { BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip } from "node:zlib";
-import { request as httpsRequest, RequestOptions } from "node:https";
-import { IncomingMessage, request as httpRequest } from "node:http";
+import { request as httpsRequest, RequestOptions, Agent as httpsAgent } from "node:https";
+import { IncomingMessage, request as httpRequest, Agent as httpAgent } from "node:http";
 
 /**
  * @author SNIPPIK
@@ -26,6 +26,8 @@ export interface httpsClient_head {
  * @abstract
  */
 abstract class Request {
+    protected _redirect_url = null;
+
     /**
      * @description Данные для создания запроса
      * @protected
@@ -56,66 +58,137 @@ abstract class Request {
      * @private
      */
     private get protocol() {
-        const protocol = this.data.protocol?.split(":")[0];
-        return protocol === "https" ? httpsRequest : httpRequest;
+        const protocol = this.data.protocol;
+        return protocol === "https:" ? httpsRequest : httpRequest;
     };
 
     /**
-     * @description Создаем запрос по ссылке, модифицируем по необходимости
-     * @return Promise<IncomingMessage | Error>
-     * @public
+     * @description Какой Agent надо будет использовать для Keep-Alive
+     * @private
+     */
+    private get agent() {
+        const protocol = this.data.protocol;
+        return protocol === "https:" ? httpsAgent : httpAgent;
+    };
+
+    /**
+     * Выполняет HTTP/HTTPS-запрос с поддержкой автоматического следования редиректам (до 5).
+     * Возвращает Promise с объектом `IncomingMessage` (ответ сервера).
+     *
+     * @remarks
+     * - Метод учитывает настройки из `this.data` (метод, заголовки, тело, тайм-аут и т.д.).
+     * - При получении статуса 3xx (редирект) из заголовка `Location` формируется новый запрос.
+     * - Тело запроса отправляется только для методов, отличных от GET и HEAD.
+     * - Устанавливается заголовок `Content-Length` автоматически.
+     * - Тайм-аут соединения отслеживается через событие `timeout`.
+     * - При любой ошибке или превышении лимита редиректов Promise отклоняется.
+     *
+     * @returns Promise, который разрешается объектом ответа или отклоняется с ошибкой.
+     *
+     * @throws {Error} При слишком большом количестве редиректов (>5).
+     * @throws {Error} При некорректном URL редиректа.
+     * @throws {Error} При превышении времени ожидания соединения.
+     * @throws {Error} При ошибке соединения (сеть, DNS, SSL).
+     *
+     * @example
+     * ```ts
+     * const client = new HttpsClient({ hostname: 'api.example.com', path: '/data' });
+     * const response = await client.request;
+     * console.log(response.statusCode);
+     * ```
      */
     public get request(): Promise<IncomingMessage | Error> {
         return new Promise((resolve) => {
-            // Клонируем данные, чтобы избежать изменения опций при параллельных запросах
             const options = { ...this.data };
 
-            const req = this.protocol(options, (res) => {
-
-                // Более строгая проверка редиректа.
-                // Возврат resolve(this.request) запускает новый запрос, что правильно для автоматического редиректа.
-                if (res.headers.location && (res.statusCode >= 300 && res.statusCode < 400)) {
-                    // Создаем новый объект данных на основе старого + новый путь
-                    const newUrl = res.headers.location;
-
-                    // Повторный парсинг URL для корректного обновления всех полей (hostname, protocol, path, port)
-                    try {
-                        const parsedUrl = new URL(newUrl);
-                        this.data.hostname = parsedUrl.hostname;
-                        this.data.protocol = parsedUrl.protocol;
-                        this.data.path = parsedUrl.pathname + parsedUrl.search;
-                        this.data.port = parsedUrl.port;
-                    } catch (e) {
-                        // Если редирект на некорректный URL, возвращаем ошибку
-                        return resolve(Error(`[httpsClient]: Invalid redirect URL: ${newUrl}`));
-                    }
-
-                    // Возвращаем промис нового запроса, чтобы продолжить цепочку
-                    return this.request.then(resolve).catch(resolve);
+            /**
+             * Рекурсивная функция для выполнения запроса с обработкой редиректов.
+             * @param opts - Опции запроса (hostname, path, method, headers и т.д.)
+             * @param redirectCount - Текущее количество выполненных редиректов
+             */
+            const makeRequest = (opts: typeof options, redirectCount = 0) => {
+                // Защита от бесконечных циклов редиректов (RFC позволяет не более 5)
+                if (redirectCount > 5) {
+                    return resolve(new Error(`[httpsClient]: Too many redirects`));
                 }
 
-                return resolve(res);
-            });
+                // Создаём запрос с использованием протокола (http/https)
+                const req = this.protocol(opts, (res) => {
+                    // Проверяем, является ли ответ редиректом и есть ли заголовок Location
+                    if (res.headers.location) {
+                        const newUrl = res.headers.location;
 
-            // Обработка POST/PUT/PATCH (если есть body)
-            if (options.body && options.method !== "GET" && options.method !== "HEAD") {
-                const body = typeof options.body === "string" ? Buffer.from(options.body) : options.body;
-                req.setHeader("Content-Length", body.length);
-                req.write(body);
-            }
+                        let newOptions = { ...opts };
 
-            req.once("timeout", () => {
-                req.destroy(); // Уничтожаем запрос при тайм-ауте
-                return resolve(Error(`[httpsClient]: Connection Timeout Exceeded ${options.hostname}:${options.port || 443}`));
-            });
+                        // Парсим новый URL, чтобы извлечь hostname, protocol, path, port
+                        try {
+                            const parsedUrl = new URL(newUrl);
 
-            req.once("error", (err) => {
-                req.destroy(); // Уничтожаем запрос при ошибке
-                return resolve(Error(`[httpsClient]: Connection Error: ${err.message}`));
-            });
+                            newOptions.hostname = parsedUrl.hostname;
+                            newOptions.protocol = parsedUrl.protocol;
+                            newOptions.path = parsedUrl.pathname + parsedUrl.search;
+                            newOptions.port = parsedUrl.port;
 
-            req.end();
+                            this._redirect_url = `${parsedUrl.href}`;
+                        } catch (e) {
+                            return resolve(new Error(`[httpsClient]: Invalid redirect URL: ${newUrl}`));
+                        }
+
+                        // Повторяем запрос с новыми опциями, увеличивая счётчик редиректов
+                        return makeRequest(newOptions, redirectCount++);
+                    }
+
+                    // Не редирект – возвращаем ответ
+                    resolve(res);
+                });
+
+                // Если в опциях есть тело и метод не GET/HEAD, отправляем тело
+                if (opts.body && opts.method !== "GET" && opts.method !== "HEAD") {
+                    const body =
+                        typeof opts.body === "string"
+                            ? Buffer.from(opts.body)
+                            : opts.body;
+
+                    // Устанавливаем заголовок Content-Length (обязателен для некоторых серверов)
+                    req.setHeader("Content-Length", body.length);
+                    req.write(body);
+                }
+
+                // Обработка тайм-аута соединения (например, если сервер не отвечает)
+                req.once("timeout", () => {
+                    req.destroy();
+                    resolve(
+                        new Error(
+                            `[httpsClient]: Connection Timeout Exceeded ${opts.hostname}:${opts.port || 443}`
+                        )
+                    );
+                });
+
+                // Обработка ошибок сокета (ECONNRESET, ENOTFOUND и т.п.)
+                req.once("error", (err) => {
+                    req.destroy();
+                    resolve(
+                        new Error(
+                            `[httpsClient]: Connection Error: ${err.message}`
+                        )
+                    );
+                });
+
+                // Завершаем запрос (отправляем заголовки и тело, если не отправлено ранее)
+                req.end();
+            };
+
+            // Начинаем запрос
+            makeRequest(options);
         });
+    };
+
+    /**
+     * @description Последняя ссылка перенаправления
+     * @public
+     */
+    public get redirect() {
+        return this._redirect_url;
     };
 
     /**
@@ -144,6 +217,11 @@ abstract class Request {
                 path: parsedUrl.pathname + parsedUrl.search,
                 port: parsedUrl.port || (parsedUrl.protocol === "https:" ? 443 : 80),
             };
+        }
+
+        // Если нет Agent (Keep-Alive)
+        if (!options.agent) {
+            options.agent = new this.agent();
         }
 
         // Устанавливаем User-Agent

@@ -61,8 +61,8 @@ impl OggOpusParser {
     #[napi(constructor)]
     pub fn new() -> Self {
         Self {
-            remainder: Vec::with_capacity(0),
-            packet_carry: Vec::with_capacity(0),
+            remainder: Vec::with_capacity(1024 * 2),
+            packet_carry: Vec::with_capacity(1024),
             bitstream_serial: -1,
             waiting_for_head: true,
         }
@@ -108,11 +108,7 @@ impl OggOpusParser {
     /// # Аргументы
     /// * `chunk` - новые входные данные
     /// * `output` - вектор, в который будут добавлены кортежи (тип пакета, данные)
-    pub fn parse_internal(
-        &mut self,
-        chunk: &[u8],
-        output: &mut Vec<(PacketType, Vec<u8>)>,
-    ) -> Result<()> {
+    pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<(PacketType, Vec<u8>)>) -> Result<()> {
         if chunk.is_empty() { return self.flush(output); }
 
         self.parse_core(chunk, |packet_type, data| {
@@ -276,15 +272,7 @@ impl OggOpusParser {
     /// * `bitstream_serial` - серийный номер потока (проверяется на смену)
     /// * `waiting_for_head` - флаг ожидания заголовочного пакета
     /// * `on_packet` - замыкание, вызываемое для каждого завершённого пакета
-    fn handle_page_core<F>(
-        page: &[u8],
-        header_type: u8,
-        segments: usize,
-        packet_carry: &mut Vec<u8>,
-        bitstream_serial: &mut i32,
-        waiting_for_head: &mut bool,
-        on_packet: &mut F,
-    ) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
+    fn handle_page_core<F>(page: &[u8], header_type: u8, segments: usize, packet_carry: &mut Vec<u8>, bitstream_serial: &mut i32, waiting_for_head: &mut bool, on_packet: &mut F) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
         let continued = header_type & 0x01 != 0;
 
         // Если страница продолжает пакет, но у нас нет данных — поток битый
@@ -340,7 +328,6 @@ impl OggOpusParser {
 
             // Добавляем данные сегмента в текущий собираемый пакет.
             packet_carry.extend_from_slice(&page[offset..end]);
-
             offset = end;
 
             // Если сегмент имеет размер меньше 255, это означает конец пакета (в Ogg пакет может
@@ -366,11 +353,7 @@ impl OggOpusParser {
     /// - Если ожидается заголовок (`waiting_for_head == true`) и пакет является фреймом,
     ///   он отбрасывается (поток ещё не синхронизирован).
     /// - Если пакет является Head, флаг `waiting_for_head` сбрасывается.
-    fn process_packet_core<F>(
-        packet: &mut Vec<u8>,
-        waiting_for_head: &mut bool,
-        on_packet: &mut F,
-    ) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
+    fn process_packet_core<F>(packet: &mut Vec<u8>, waiting_for_head: &mut bool, on_packet: &mut F) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
         // Пустой пакет игнорируем (не должен возникать, но на всякий случай).
         if packet.is_empty() {
             return Ok(());
@@ -382,11 +365,6 @@ impl OggOpusParser {
         // Если это заголовочный пакет (OpusHead), снимаем флаг ожидания.
         if packet_type == PacketType::Head {
             *waiting_for_head = false;
-        }
-
-        // Если мы всё ещё ждём заголовок, а пакет — фрейм, пропускаем его.
-        if *waiting_for_head && packet_type == PacketType::Frame {
-            return Ok(());
         }
 
         // Забираем данные из packet (std::mem::take очищает вектор, оставляя его пустым).

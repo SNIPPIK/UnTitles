@@ -5,7 +5,6 @@ use std::io::{BufReader, Read};
 use std::process::{Command, Child, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread::{self, JoinHandle};
 use crate::audio::parser::{OggOpusParser, PacketType};
 
 /// Представляет запущенный процесс FFmpeg с возможностью читать его stdout
@@ -26,7 +25,7 @@ pub struct FfmpegProcess {
 
     /// Handle фонового потока, который читает stdout FFmpeg и вызывает JS-вызов.
     /// Нужен для того, чтобы дождаться завершения потока при уничтожении.
-    reader_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
+    reader_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 #[napi]
@@ -149,7 +148,7 @@ impl FfmpegProcess {
         let active = Arc::clone(&self.reading_active);
 
         // Запускаем фоновый поток чтения.
-        let handle = thread::spawn(move || {
+        let handle = tokio::spawn(async move {
             // Используем буферизированный reader для эффективного чтения.
             let mut reader = BufReader::new(stdout);
             let mut buffer = [0u8; 16384]; // 16 КБ – компромисс между частотой вызовов и задержкой.
@@ -164,6 +163,15 @@ impl FfmpegProcess {
                 match reader.read(&mut buffer) {
                     // Конец потока (EOF) — больше данных нет
                     Ok(0) => {
+                        // Финализируем парсер – извлекаем все оставшиеся фреймы
+                        let mut final_frames = Vec::new();
+                        if let Err(e) = parser.parse_internal(&[], &mut final_frames) {
+                            eprintln!("Final flush error: {}", e);
+                        }
+                        // Добавляем оставшиеся фреймы в батч
+                        for frame in final_frames {
+                            batch.push(frame);
+                        }
                         // Отправляем последний батч, если есть
                         if !batch.is_empty() {
                             let send = std::mem::take(&mut batch);
@@ -180,7 +188,7 @@ impl FfmpegProcess {
                             // При ошибке парсинга всё равно отправляем то, что накопили, чтобы не терять
                             if !batch.is_empty() {
                                 let send = std::mem::take(&mut batch);
-                                let _ = tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking);
+                                let _ = tsfn.call(send, ThreadsafeFunctionCallMode::Blocking);
                             }
                             break;
                         }
@@ -192,7 +200,7 @@ impl FfmpegProcess {
                                 let send = std::mem::take(&mut batch);
                                 // NonBlocking — не блокируем поток, если очередь JS переполнена, пакет будет отброшен.
                                 // В случае ошибки (например, JS-объект уничтожен) тоже не блокируемся.
-                                if tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking) != Status::Ok {
+                                if tsfn.call(send, ThreadsafeFunctionCallMode::Blocking) != Status::Ok {
                                     eprintln!("Failed to send batch to JS");
                                     // Если вызов не удался, вероятно, JS-сторона уже не принимает данные,
                                     // поэтому прерываем цикл
@@ -206,7 +214,7 @@ impl FfmpegProcess {
                         // При ошибке чтения отправляем накопленное
                         if !batch.is_empty() {
                             let send = std::mem::take(&mut batch);
-                            let _ = tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking);
+                            let _ = tsfn.call(send, ThreadsafeFunctionCallMode::Blocking);
                         }
                         break;
                     }
@@ -228,21 +236,29 @@ impl FfmpegProcess {
     /// Этот метод вызывается автоматически при уничтожении объекта (Drop).
     /// Может быть вызван и в ручную из JS для явного освобождения ресурсов.
     #[napi]
-    pub fn destroy(&self) -> Result<()> {
-        // Сигнализируем фоновому потоку чтения остановиться
+    pub async fn destroy(&self) -> Result<()> {
         self.reading_active.store(false, Ordering::Release);
 
-        // Сначала убиваем процесс ffmpeg, чтобы разблокировать вызов read() в потоке
-        let mut child_guard = self.child.lock().unwrap();
-        if let Some(mut child) = child_guard.take() {
-            let _ = child.kill();    // Отправляем SIGKILL
-            let _ = child.wait();    // Дожидаемся завершения, чтобы избежать зомби-процессов
-        }
-        drop(child_guard); // Освобождаем блокировку, чтобы поток мог завершиться
+        // Сначала достаём handle из mutex и отпускаем lock
+        let handle = {
+            let mut guard = self.reader_handle.lock().unwrap();
+            guard.take()
+        };
 
-        // Теперь дожидаемся завершения фонового потока чтения
-        if let Some(handle) = self.reader_handle.lock().unwrap().take() {
-            let _ = handle.join();
+        // Теперь await — БЕЗ lock
+        if let Some(handle) = handle {
+            let _ = handle.await;
+        }
+
+        // Теперь ffmpeg
+        let child = {
+            let mut guard = self.child.lock().unwrap();
+            guard.take()
+        };
+
+        if let Some(mut child) = child {
+            let _ = child.kill();
+            let _ = child.wait();
         }
 
         Ok(())

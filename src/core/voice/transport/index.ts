@@ -1,6 +1,6 @@
 import { VoiceUDPSocket, VoiceWebSocket, WebSocketOpcodes } from "#core/voice";
 import { VoiceOpcodes, VoiceCloseCodes } from "discord-api-types/voice/v8";
-import { E2EESession } from "#core/voice/managers/E2EE";
+import { MLSSession } from "#core/voice/structures/MLSSession";
 import { VoiceRTPSocket, iType} from "#native";
 import { TypedEmitter } from "#structures";
 import { VoiceAdapter } from "./adapter";
@@ -41,7 +41,7 @@ const IGNORED_OPCODES: VoiceCloseCodes[] = [
  */
 export class Transport extends TypedEmitter<TransportEvents> {
     private _state: TransportState = {
-        code: 0,
+        code: TransportStateCode.Closed,
         payload: null
     };
 
@@ -79,7 +79,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @description Клиент Dave, для работы сквозного шифрования
      * @public
      */
-    public _dave: E2EESession | null;
+    public _dave: MLSSession | null;
 
     /**
      * @description Готовность транспорта к передаче данных
@@ -254,9 +254,9 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 this.emit("info", `[Transport/RTP]: has created | ${this._rtp.mode}`);
 
                 // Если есть поддержка DAVE
-                if (E2EESession.max_version > 0) {
+                if (MLSSession.max_version > 0) {
                     this.createDaveSession(d.dave_protocol_version);
-                    this.emit("info", `[Transport/E2EE]: has created | ${d.dave_protocol_version} | Max --> ${E2EESession.max_version}`);
+                    this.emit("info", `[Transport/E2EE]: has created | ${d.dave_protocol_version} | Max --> ${MLSSession.max_version}`);
                 }
 
                 return;
@@ -297,22 +297,11 @@ export class Transport extends TypedEmitter<TransportEvents> {
      */
     public packet = (frames: Buffer[] | Buffer) => {
         const list = Array.isArray(frames) ? frames : [frames];
-        const batch: Buffer[] = [];
-
-        // Готовим аудио пакеты
-        for (const frame of list) {
-            try {
-                const encrypted = this._dave.encrypt(frame);
-                const rtp = this._rtp.packet(encrypted);
-
-                batch.push(rtp);
-            } catch (err) {
-                this.emit("info", `[Transport/Packet]: ${err}`);
-            }
-        }
+        const encrypted = this._dave.encrypt(list);
+        const rtp = this._rtp.packets(encrypted);
 
         // Отправляем все готовые пакеты разом
-        if (batch.length > 0) this._udp.packet(batch);
+        this._udp.packet(rtp);
     };
 
 
@@ -352,7 +341,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     session_id: state.session_id,
                     user_id: state.user_id,
                     token: server.token,
-                    max_dave_protocol_version: E2EESession.max_version
+                    max_dave_protocol_version: MLSSession.max_version
                 }
             };
         });
@@ -406,7 +395,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @status WS Close
          * @code 1000-4022
          */
-        this._ws.on("close", (code, reason) => {
+        this._ws.on("close", (code, reason = "Unknown") => {
             // Сообщаем что хотим переподключится
             this.emit("close", code, `[Transport/WS]: ${reason}`);
 
@@ -432,6 +421,18 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     };
                     return;
                 }
+            }
+
+            // Если сессия больше не валидна
+            else if (code === 4006) {
+                this.adapter.packet.state.session_id = null;
+
+                // Пробуем поднять соединение заново
+                this.state = {
+                    code: TransportStateCode.OpeningWs,
+                    payload: code
+                };
+                return;
             }
 
             // Если нет больше методов подъема соединения, то уничтожаем окончательно
@@ -465,7 +466,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      */
     private createDaveSession = (version: number) => {
         const { user_id, channel_id } = this.adapter.packet.state;
-        let session: E2EESession;
+        let session: MLSSession;
 
         // Отключаем все события от ws
         this._ws.removeListener("daveSession");
@@ -478,7 +479,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
         }
 
         // Создаем сессию
-        session = this._dave = new E2EESession(version, user_id, channel_id);
+        session = this._dave = new MLSSession(version, user_id, channel_id);
 
         /**
          * @description Создаем слушателя события для получения ключа
@@ -512,7 +513,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @code 21-31
          */
         this._ws.on("daveSession", ({op, d}) => {
-            this.emit("info", `[DAVE/WS]: ${op} -> Opcode: ${d}`);
+            this.emit("info", `[MLS/WS]: ${op} -> Opcode: ${d}`);
 
             switch (op) {
                 // Предстоит понижение версии протокола DAVE
@@ -546,7 +547,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @code 21-31
          */
         this._ws.on("binary", ({op, payload}) => {
-            this.emit("info", `[DAVE/WS]: ${op} -> Buffer Size: ${payload.length}`);
+            this.emit("info", `[MLS/WS]: ${op} -> Get Buffer Size: ${payload.length}`);
 
             switch (op) {
                 // Учетные данные и открытый ключ для внешнего отправителя MLS
@@ -598,7 +599,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
             }
         });
 
-        session.on("debug", (msg) => this.emit("info", `[Transport/Dave]: ${msg}`));
+        session.on("debug", (msg) => this.emit("info", `[Transport/MLS]: ${msg}`));
 
         // Запускаем заново или впервые
         session.reinit();
@@ -719,12 +720,12 @@ type TransportState =
  * @enum TransportStateCode
  */
 enum TransportStateCode {
-    OpeningWs,
-    Identifying,
-    Session,
-    Ready,
-    Resuming,
-    Closed,
+    OpeningWs = "open_ws_connection",
+    Identifying = "identifying",
+    Session = "session_description",
+    Ready = "ready",
+    Resuming = "resume",
+    Closed = "closed",
 }
 
 /**

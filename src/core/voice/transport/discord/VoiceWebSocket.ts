@@ -1,6 +1,6 @@
 import { VoiceCloseCodes, VoiceOpcodes } from "discord-api-types/voice/v8";
 import { type Data, type MessageEvent, WebSocket } from "ws";
-import { HeartbeatManager } from "../../managers/heartbeat";
+import { HeartbeatManager } from "../../structures/heartbeat";
 import { type WebSocketOpcodes } from "#core/voice";
 import { OPUS_FRAME_SIZE } from "#core/audio";
 import { TypedEmitter } from "#structures";

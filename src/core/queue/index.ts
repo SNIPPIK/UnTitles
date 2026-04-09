@@ -1,15 +1,14 @@
+import { Colors, CommandInteraction, CycleInteraction } from "#structures/discord";
 import { APIRequestData, RestClientSide } from "#handler/rest";
-import { Colors, CommandInteraction } from "#structures/discord";
 import { ControllerCycles } from "./controllers/cycle";
 import { Queue } from "#core/queue/structures/queue";
 import { Track } from "#core/queue/structures/track";
 import { QueueMessage } from "./modules/message";
 import { Collection, locale } from "#structures";
-import { WebhookMessage } from "seyfert";
 import { env } from "#app/env";
 
-export * from "./controllers/tracks";
-export * from "./controllers/voice";
+export * from "./structures/tracks";
+export * from "./structures/voice";
 export * from "./structures/track";
 export * from "./structures/queue";
 
@@ -101,15 +100,6 @@ class BaseQueueController<T extends Queue> {
     };
 
     /**
-     * @description Перезапуск очереди включая плеер
-     * @param ID - Уник. номер очереди
-     * @public
-     */
-    public restart = (ID: string) => {
-        this.queue.get(ID).cleanup();
-    };
-
-    /**
      * @description Выключение системы очереди, можно отложить выключение музыки на время максимального трека
      * @public
      */
@@ -192,7 +182,7 @@ export interface QueueEvents {
      * @returns void
      * @readonly
      */
-    readonly "message/push": (msg: WebhookMessage, queue: Queue, items: Track | APIRequestData.List<Track>) => void;
+    readonly "message/push": (msg: CycleInteraction, queue: Queue, items: Track | APIRequestData.List<Track>) => void;
 
     /**
      * @description Событие при котором коллекция будет отправлять сообщение о текущем треке

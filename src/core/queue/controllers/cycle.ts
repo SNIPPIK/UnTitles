@@ -34,7 +34,7 @@ export class ControllerCycles {
  * @const PLAYER_SEND_NATIVE
  * @private
  */
-const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 10);
+const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 5);
 
 /**
  * @author SNIPPIK
@@ -42,7 +42,7 @@ const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 10);
  * @const PLAYER_SEND_POOL
  * @private
  */
-const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 3);
+const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 2);
 
 /**
  * @author SNIPPIK
@@ -122,8 +122,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 }
 
                 const batch = audio.packetAt(toSend);
-
-                if (batch.length > 0) connection.packet(batch);
+                connection.packet(batch);
                 player._buffered = batch.length;
 
                 if (audio.packets === 0 && connection.udp.packets === 0) {

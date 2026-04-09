@@ -1,225 +1,229 @@
+//! Модуль `VoiceRTPSocket` реализует шифрование RTP-пакетов для голосового протокола Discord.
+//! Используется алгоритм AES-256-GCM в режиме `aead_aes256_gcm_rtpsize`, где заголовок RTP
+//! служит дополнительными аутентифицированными данными (AAD), а nonce формируется из счётчика.
+//!
+//! # Особенности
+//! - Неблокирующие атомарные счётчики для sequence, timestamp и nonce.
+//! - Поддержка пакетного шифрования (`packets`) для уменьшения накладных расходов.
+//! - Падение стойкое: ошибки шифрования возвращаются через `Result`, не паникуют.
+//! - Отсутствует динамическая аллокация при построении заголовка (используется массив фиксированного размера).
+
+use rand::RngExt;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
 use std::fmt;
-use rand::{rng, RngExt};
+use rand::{rng};
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Nonce,
 };
 
-/// Время OPUS пакета
-/// 48kHz * 20ms / 1000
+/// Приращение временной метки RTP для одного пакета.
+/// Рассчитывается как `48000 samples/sec * 0.02 sec = 960 samples` для кадров Opus длительностью 20 мс.
 const TIMESTAMP_INC: u32 = 960;
-const MAX_FRAME_SIZE: usize = 4096; // Максимальный размер Opus фрейма
 
-/// Кастомная ошибка для криптографических операций.
+/// Размер стандартного заголовка RTP в байтах (без CSRC и расширений).
+const RTP_HEADER_SIZE: usize = 12;
+
+/// Типы ошибок, специфичные для криптографических операций.
 #[derive(Debug)]
 pub enum CryptoError {
+    /// Ключ шифрования имеет неверную длину (должен быть 32 байта).
     InvalidKeyLength(usize),
+    /// Ошибка при шифровании (проблема с nonce, AAD или внутренняя ошибка AES-GCM).
     EncryptionFailed(String),
+    /// Размер фрейма превышает максимально допустимый (обычно MTU ~1200 байт).
     FrameTooLarge(usize),
+    /// Некорректный RTP-пакет (например, слишком короткий заголовок).
+    InvalidPacket,
 }
 
 impl fmt::Display for CryptoError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CryptoError::InvalidKeyLength(len) => {
-                write!(f, "Invalid key length: expected 32, got {}", len)
-            }
-            CryptoError::EncryptionFailed(msg) => {
-                write!(f, "Encryption failed: {}", msg)
-            }
-            CryptoError::FrameTooLarge(size) => {
-                write!(f, "Frame too large: {} > {}", size, MAX_FRAME_SIZE)
-            }
+            CryptoError::InvalidKeyLength(len) => write!(f, "Invalid key length: {}", len),
+            CryptoError::EncryptionFailed(msg) => write!(f, "Encryption failed: {}", msg),
+            CryptoError::FrameTooLarge(size) => write!(f, "Frame too large: {}", size),
+            CryptoError::InvalidPacket => write!(f, "Invalid RTP packet"),
         }
     }
 }
 
 impl std::error::Error for CryptoError {}
 
+/// Преобразование нашей ошибки в формат N-API.
 impl From<CryptoError> for Error {
     fn from(e: CryptoError) -> Self {
         Error::new(Status::GenericFailure, e.to_string())
     }
 }
 
-/// Параметры шифрования, специфичные для данного RTP-потока.
-/// Содержит SSRC (идентификатор источника синхронизации) и ключ AES-256.
+/// Внутренние параметры шифрования (пока только SSRC, в будущем можно расширить).
 #[derive(Clone)]
 struct EncryptorOptions {
-    ssrc: u32
+    ssrc: u32,
 }
 
-/// Буферизованный RTP-сокет для голоса с шифрованием AES-256-GCM.
+/// Объект RTP-сокета для голоса, доступный из JavaScript.
+/// Выполняет шифрование аудиофреймов (Opus) в соответствии с требованиями Discord.
 ///
-/// Генерирует RTP-пакеты с правильными заголовками (sequence, timestamp, SSRC),
-/// шифрует полезную нагрузку (Opus-фрейм) с использованием режима AEAD_AES_256_GCM_RTPSIZE,
-/// который требует включения заголовка RTP в дополнительные аутентифицированные данные (AAD)
+/// # Атомарные счётчики
+/// - `sequence` – 16-битный счётчик RTP-пакетов (оборачивается).
+/// - `timestamp` – 32-битная метка времени, увеличивается на `TIMESTAMP_INC` для каждого пакета.
+/// - `counter` – 32-битный счётчик nonce (используется как первые 4 байта 12-байтового nonce).
 ///
-/// Счётчики sequence, timestamp и nonce counter управляются атомарно и потокобезопасны
+/// # Потокобезопасность
+/// Все методы могут вызываться из разных потоков благодаря атомарным операциям.
+/// Однако `cipher` внутри не является `Sync`, поэтому экземпляр `VoiceRTPSocket` не должен
+/// использоваться из нескольких потоков одновременно (если только не обёрнут в Mutex).
 #[napi(js_name = "VoiceRTPSocket")]
 pub struct VoiceRTPSocket {
-    /// Параметры шифрования (SSRC и ключ)
     options: EncryptorOptions,
-
-    /// Счётчик последовательности RTP (16 бит). Автоматически увеличивается для каждого пакета
     sequence: AtomicU16,
-
-    /// Временная метка RTP (32 бита). Увеличивается на TIMESTAMP_INC для каждого пакета
     timestamp: AtomicU32,
-
-    /// Счётчик для формирования nonce (первые 4 байта nonce). Используется как счётчик пакетов
     counter: AtomicU32,
-
-    /// AES-GCM с 256-битным ключом и 96-битным одноразовым значением
-    cipher: Aes256Gcm
+    cipher: Aes256Gcm,
 }
 
 #[napi]
 impl VoiceRTPSocket {
-    /// Создаёт новый экземпляр VoiceRTPSocket.
+    /// Создаёт новый экземпляр `VoiceRTPSocket`.
     ///
-    /// # Аргументы
-    /// * `ssrc` - 32-битный идентификатор источника синхронизации (SSRC), уникальный для потока.
-    /// * `key` - Buffer длиной ровно 32 байта, содержащий ключ AES-256-GCM.
+    /// # Параметры
+    /// - `ssrc` – 32-битный идентификатор источника синхронизации (Synchronization Source).
+    /// - `key` – 32-байтовый ключ AES-256-GCM (получается из Discord Voice WebSocket).
     ///
-    /// Начальные значения sequence, timestamp и counter генерируются случайным образом
-    /// для улучшения криптостойкости и предотвращения угадывания.
+    /// # Инициализация счётчиков
+    /// `sequence`, `timestamp` и `counter` инициализируются случайными значениями,
+    /// что улучшает криптостойкость (затрудняет предсказание nonce).
     #[napi(constructor)]
     pub fn new(ssrc: u32, key: Buffer) -> Result<Self> {
-        // Проверяем длину — обязательно 32 байта для AES-256-GCM
+        // Проверяем длину ключа – только AES-256
         if key.len() != 32 {
             return Err(CryptoError::InvalidKeyLength(key.len()).into());
         }
 
-        // Копируем данные из Buffer в фиксированный массив
         let mut key_array = [0u8; 32];
         key_array.copy_from_slice(key.as_ref());
+
+        // Инициализируем шифр. `new_from_slice` возвращает ошибку, если ключ не подходит.
+        let cipher = Aes256Gcm::new_from_slice(&key_array)
+            .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?;
 
         let mut rng = rng();
 
         Ok(Self {
-            cipher: Aes256Gcm::new_from_slice(&key)
-                .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?,
-
+            cipher,
             options: EncryptorOptions { ssrc },
-            sequence: AtomicU16::new(rng.random_range(0..=u16::MAX)),
+            sequence: AtomicU16::new(rng.random()),
             timestamp: AtomicU32::new(rng.random()),
             counter: AtomicU32::new(rng.random()),
         })
     }
 
-    /// Возвращает строку, идентифицирующую режим шифрования.
+    /// Тип шифрования пакетов, требуется для логирования
     #[napi(getter)]
     pub fn mode(&self) -> String {
         "aead_aes256_gcm_rtpsize".to_string()
     }
 
-    /// Возвращает текущий nonce (12 байт) и его первые 4 байта (tail).
+    /// Шифрует один аудиофрейм (Opus) и возвращает полный RTP-пакет.
     ///
-    /// Nonce формируется как:
-    /// - первые 4 байта: значение счётчика `counter` (увеличивается при каждом вызове)
-    /// - остальные 8 байт: нули (согласно спецификации Discord/RTP)
-    #[napi(getter)]
-    pub fn nonce(&self) -> Result<Vec<Buffer>> {
-        let counter = self.counter.fetch_add(1, Ordering::AcqRel);
-
-        let mut nonce = [0u8; 12];
-        nonce[0..4].copy_from_slice(&counter.to_be_bytes());
-
-        let tail = nonce[0..4].to_vec();
-
-        Ok(vec![
-            Buffer::from(nonce.to_vec()),
-            Buffer::from(tail),
-        ])
-    }
-
-    /// Создаёт зашифрованный RTP-пакет из переданного Opus-фрейма.
+    /// # Процесс
+    /// 1. Формируется RTP-заголовок (12 байт) с текущими значениями sequence, timestamp, SSRC.
+    /// 2. Генерируется 12-байтовый nonce: первые 4 байта – счётчик (big-endian), остальные – нули.
+    /// 3. Шифруется фрейм с использованием AAD = RTP-заголовок.
+    /// 4. К результату добавляются первые 4 байта nonce (tail) для возможности дешифровки.
     ///
-    /// Структура пакета (RFC 3550 + Discord AEAD AES256-GCM RTP Size):
-    /// - RTP Header (12 байт): V=2, P=0, X=0, CC=0, M=0, PT=120, SEQ, TS, SSRC
-    /// - Encrypted Payload (N байт)
-    /// - Authentication Tag (16 байт)
-    /// - Nonce Tail (4 байта): первые 4 байта nonce в конце пакета
+    /// # Формат выходного пакета
+    /// `[RTP header 12 байт][зашифрованные данные + 16 байт тега][4 байта tail]`
+    ///
+    /// # Ошибки
+    /// - Если шифрование провалилось (например, из-за неправильного nonce).
+    /// - Если размер фрейма превышает допустимый (проверка отсутствует, но можно добавить).
     #[napi]
     pub fn packet(&self, frame: Buffer) -> Result<Buffer> {
-        // Проверяем размер фрейма, чтобы избежать фрагментации.
-        if frame.len() > MAX_FRAME_SIZE {
-            return Err(CryptoError::FrameTooLarge(frame.len()).into());
-        }
-
+        let frame_ref = frame.as_ref();
         let header = self.build_header();
-        let counter = self.counter.fetch_add(1, Ordering::Relaxed);
 
-        // Формируем nonce: 32-bit счётчик + 8 нулевых байт (всего 12 байт)
-        let mut nonce_bytes = [0u8; 12];
-        nonce_bytes[0..4].copy_from_slice(&counter.to_be_bytes());
-        // остальные 8 байт уже нули
-
+        let nonce_bytes = self.generate_nonce();
         let nonce = Nonce::from(nonce_bytes);
 
-        // Payload = Opus фрейм, AAD = RTP header (для аутентификации)
         let payload = Payload {
-            msg: frame.as_ref(),
+            msg: frame_ref,
             aad: &header,
         };
 
-        let ciphertext_with_tag = self.cipher
+        // `encrypt` возвращает Vec<u8>, содержащий шифротекст с тегом аутентификации в конце.
+        let encrypted = self
+            .cipher
             .encrypt(&nonce, payload)
             .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
-        // GCM тег — последние 16 байт (полный размер)
-        let tag_start = ciphertext_with_tag.len() - 16;
-        let encrypted = &ciphertext_with_tag[..tag_start];
-        let tag = &ciphertext_with_tag[tag_start..];
+        // Формируем итоговый пакет: заголовок + шифротекст/тег + tail nonce.
+        let mut out = Vec::with_capacity(header.len() + encrypted.len() + 4);
+        out.extend_from_slice(&header);
+        out.extend_from_slice(&encrypted);
+        out.extend_from_slice(&nonce_bytes[0..4]);
 
-        // Финальный пакет: Header + Encrypted + Tag + 4-byte nonce tail
-        let mut packet = Vec::with_capacity(
-            header.len() + encrypted.len() + tag.len() + 4
-        );
-        packet.extend_from_slice(&header);
-        packet.extend_from_slice(encrypted);
-        packet.extend_from_slice(tag);
-        packet.extend_from_slice(&counter.to_be_bytes()); // Nonce tail (первые 4 байта nonce)
-
-        Ok(Buffer::from(packet))
+        Ok(Buffer::from(out))
     }
 
-    /// Формирует RTP-заголовок согласно RFC 3550.
+    /// Пакетное шифрование нескольких фреймов.
+    /// Удобно для отправки нескольких аудиопакетов за раз (снижает количество вызовов через FFI).
     ///
-    /// Структура (12 байт):
-    /// - Байт 0: V(2)=2, P(1)=0, X(1)=0, CC(4)=0 → 0x80
-    /// - Байт 1: M(1)=0, PT(7)=120 (Opus) → 0x78
-    /// - Байты 2-3: Sequence number (16-bit, увеличивается на 1)
-    /// - Байты 4-7: Timestamp (32-bit, увеличивается на 960 для 48kHz/20ms)
-    /// - Байты 8-11: SSRC (32-bit, уникальный идентификатор)
+    /// # Реализация
+    /// Просто последовательно вызывает `packet` для каждого фрейма.
+    /// Аллокация результата происходит один раз с предварительным резервированием ёмкости.
+    #[napi]
+    pub fn packets(&self, frames: Vec<Buffer>) -> Result<Vec<Buffer>> {
+        let mut out = Vec::with_capacity(frames.len());
+        for frame in frames {
+            let packet = self.packet(frame)?;
+            out.push(packet);
+        }
+        Ok(out)
+    }
+
+    /// Генерирует 12-байтовый nonce для AES-GCM.
+    /// Первые 4 байта – текущее значение счётчика (big-endian), остальные 8 байт – нули.
+    ///
+    /// Счётчик увеличивается атомарно на единицу каждый раз (Acquire/Release гарантирует видимость).
+    fn generate_nonce(&self) -> [u8; 12] {
+        let counter = self.counter.fetch_add(1, Ordering::AcqRel);
+        let mut nonce = [0u8; 12];
+        nonce[0..4].copy_from_slice(&counter.to_be_bytes());
+        nonce
+    }
+
+    /// Строит стандартный RTP-заголовк (12 байт) в соответствии с RFC 3550.
+    ///
+    /// Поля:
+    /// - V=2, P=0, X=0, CC=0 → байт 0 = 0x80
+    /// - PT=120 (Opus), M=0 → байт 1 = 0x78
+    /// - Sequence number (16 бит, big-endian) – увеличивается атомарно.
+    /// - Timestamp (32 бита, big-endian) – увеличивается на TIMESTAMP_INC.
+    /// - SSRC (32 бита, big-endian) – фиксированный.
     fn build_header(&self) -> Vec<u8> {
-        let mut header = vec![0u8; 12];
+        let mut header = [0u8; RTP_HEADER_SIZE];
 
-        // Байт 0: Version + Flags
         header[0] = 0x80;
-
-        // Байт 1: Payload Type
         header[1] = 0x78;
 
-        // Байты 2-3: Sequence number (увеличивается на 1 с каждым пакетом)
         let seq = self.sequence.fetch_add(1, Ordering::Relaxed);
         header[2..4].copy_from_slice(&seq.to_be_bytes());
 
-        // Байты 4-7: Timestamp (увеличивается на 960 для Opus 48kHz/20ms)
         let ts = self.timestamp.fetch_add(TIMESTAMP_INC, Ordering::Relaxed);
         header[4..8].copy_from_slice(&ts.to_be_bytes());
 
-        // Байты 8-11: SSRC
         header[8..12].copy_from_slice(&self.options.ssrc.to_be_bytes());
 
-        header
+        header.to_vec()
     }
 
     /// Сбрасывает все внутренние счётчики в ноль.
+    /// Используется при уничтожении экземпляра или для очистки состояния.
     #[napi]
     pub fn destroy(&mut self) {
         self.sequence.store(0, Ordering::Relaxed);

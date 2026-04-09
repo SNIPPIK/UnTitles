@@ -1,4 +1,4 @@
-import { HeartbeatManager } from "#core/voice/managers/heartbeat";
+import { HeartbeatManager } from "#core/voice/structures/heartbeat";
 import { VoiceOpcodes } from "discord-api-types/voice";
 import { VoiceConnection } from "#core/voice";
 

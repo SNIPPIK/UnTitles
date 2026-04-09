@@ -1,5 +1,5 @@
 import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./transport/adapter";
-import { SpeakerType, VoiceSpeakerManager } from "#core/voice/modules/Speaker";
+import { SpeakerType, VoiceSpeakerManager } from "#core/voice/structures/Speaker";
 import { TypedEmitter, Logger } from "#structures";
 import { Transport } from "#core/voice/transport";
 
