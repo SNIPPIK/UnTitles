@@ -15,17 +15,15 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@snazzah/davey": "^0.1.11",
     "discord-api-types": "^0.38.44",
     "http-proxy-agent": "^7.0.2",
-    "seyfert": "^4.2.2",
+    "seyfert": "^4.3.0",
     "socks-proxy-agent": "^8.0.5",
     "ws": "^8.20.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^2.18.4",
     "@types/node": "^25.5.2",
-    "@types/ws": "^8.18.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
   },

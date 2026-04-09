@@ -15,11 +15,32 @@ export * from "./index.voice";
 export type CommandInteraction = CommandContext;
 
 /**
- * @author SNIPPIK
- * @description Тип сообщения для обновления сообщения
- * @type CycleInteraction
+ * @description Тип входящих данных для дополнения к команде
+ * @type CompeteInteraction
+ * @public
  */
-export type CycleInteraction = (WebhookMessage | Message) & { editedTimestamp: number };
+export type CompeteInteraction = CommandContext;
+
+/**
+ * @description Тип входящих данных для кнопок
+ * @type buttonInteraction
+ * @public
+ */
+export type buttonInteraction = CommandContext;
+
+/**
+ * @description Тип входящих данных для циклической системы
+ * @type buttonInteraction
+ * @public
+ */
+export type SelectMenuInteract = CommandContext;
+
+/**
+ * @description Тип входящих данных для циклической системы
+ * @type buttonInteraction
+ * @public
+ */
+export type CycleInteraction = (WebhookMessage | Message) & { editedTimestamp?: string };
 
 /**
  * @description Тип входящих данных для циклической системы
