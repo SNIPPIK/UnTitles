@@ -1,4 +1,4 @@
-import { type DiscordGatewayAdapterCreator, VoiceAdapters } from "#core/voice/transport/adapter";
+import { VoiceAdapters, DiscordGatewayAdapterLibraryMethods } from "#core/voice/transport/adapter";
 import type { DiscordClient } from "#structures/discord/index.client";
 
 /**
