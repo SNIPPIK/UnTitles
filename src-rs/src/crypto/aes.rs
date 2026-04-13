@@ -83,7 +83,7 @@ pub struct VoiceRTPSocket {
     sequence: AtomicU16,
     timestamp: AtomicU32,
     counter: AtomicU32,
-    cipher: Aes256Gcm,
+    cipher: Aes256Gcm
 }
 
 #[napi]

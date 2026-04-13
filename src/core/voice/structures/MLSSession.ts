@@ -49,6 +49,14 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
     private _isTransitioning = false;
 
     /**
+     * @description Максимальная доступная версия протокола
+     * @returns number
+     */
+    public static get max_version(): number {
+        return MAX_DAVE_PROTOCOL;
+    };
+
+    /**
      * @description Выполнен ли переход от старого кода к новому
      * @public
      */
@@ -57,11 +65,11 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
     };
 
     /**
-     * @description Максимальная доступная версия протокола
-     * @returns number
+     * @description Статус текущего dave шифрования
+     * @public
      */
-    public static get max_version(): number {
-        return MAX_DAVE_PROTOCOL;
+    public get status() {
+        return this?.session?.status;
     };
 
     /**
@@ -84,7 +92,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
     public set prepareEpoch(data: VoiceDavePrepareEpochData) {
         if (this.reinitializing) return;
 
-        this.emit("debug", `Preparing for epoch (${data.epoch})`);
+        //this.emit("debug", `Preparing for epoch (${data.epoch})`);
 
         // Если есть идентификатор
         if (data.epoch === 1) {
@@ -101,7 +109,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      */
     public set recoverFromInvalidTransition(transitionId: number) {
         if (this.reinitializing) return;
-        this.emit("debug", `Invalidating transition ${transitionId}`);
+        //this.emit("debug", `Invalidating transition ${transitionId}`);
         this.reinitializing = true;
         this.emit("invalidateTransition", transitionId);
         this.reinit();
@@ -136,13 +144,13 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
             // Если сессия уже есть
             if (this.session) {
                 this.session.reinit(this.version, this.user_id, this.channel_id);
-                this.emit("debug", `Session reinitialized for protocol version ${this.version}`);
+                //this.emit("debug", `Session reinitialized for protocol version ${this.version}`);
             }
 
             // Если сессии еще нет
             else {
                 this.session = new DAVESession(this.version, this.user_id, this.channel_id);
-                this.emit("debug", `Session initialized for protocol version ${this.version}`);
+                //this.emit("debug", `Session initialized for protocol version ${this.version}`);
             }
 
             // Отправляем ключ
@@ -153,7 +161,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
         else if (this.session) {
             this.session.reset();
             this.session.setPassthroughMode(true, TRANSITION_EXPIRY);
-            this.emit("debug", "Session reset");
+            //this.emit("debug", "Session reset");
         }
     };
 
@@ -164,7 +172,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      * @public
      */
     public prepareTransition = (data: VoiceDavePrepareTransitionData) => {
-        this.emit("debug", `Preparing for transition (${data.transition_id}, v${data.protocol_version})`);
+        //this.emit("debug", `Preparing for transition (${data.transition_id}, v${data.protocol_version})`);
         this.pendingTransitions.set(data.transition_id, data.protocol_version);
 
         // Удаляем старые переходы через 5 секунд, если они не выполнились
@@ -187,11 +195,11 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      */
     public executeTransition = (transition_id: number) => {
         this._isTransitioning = true; // Блокируем отправку
-        this.emit("debug", `Executing transition (${transition_id})`);
+        //this.emit("debug", `Executing transition (${transition_id})`);
 
         // Если нет данных для смены версии DAVE
         if (!this.pendingTransitions.has(transition_id)) {
-            this.emit("debug", `Received execute transition, but we don't have a pending transition for ${transition_id}`);
+            //this.emit("debug", `Received execute transition, but we don't have a pending transition for ${transition_id}`);
             return false;
         }
 
@@ -201,16 +209,16 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
         // Управление обновлениями и понижение версии
         if (oldVersion !== this.version && this.version === 0) {
             this.downgraded = true;
-            this.emit("debug", "Session downgraded");
+            //this.emit("debug", "Session downgraded");
         } else if (transition_id > 0 && this.downgraded) {
             this.downgraded = false;
             this.session?.setPassthroughMode(true, TRANSITION_EXPIRY);
-            this.emit("debug", "Session upgraded");
+            //this.emit("debug", "Session upgraded");
         }
 
         // В будущем можно будет подать сигнал DAVESession о переходе, но на данный момент поддерживается только версия v1.
         this.lastTransition_id = transition_id;
-        this.emit("debug", `Transition executed (v${oldVersion} -> v${this.version}, id: ${transition_id})`);
+        //this.emit("debug", `Transition executed (v${oldVersion} -> v${this.version}, id: ${transition_id})`);
         this.pendingTransitions.delete(transition_id);
         this._isTransitioning = false;
         return true;
@@ -225,7 +233,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      */
     public processProposals = (payload: Buffer, connectedClients: Array<string>): Buffer | null => {
         if (!this.session) throw new Error("No session available");
-        this.emit("debug", "MLS proposals processed");
+        //this.emit("debug", "MLS proposals processed");
         const { commit, welcome } = this.session.processProposals(
             payload.readUInt8(0) as 0 | 1,
             payload.subarray(1),
@@ -256,10 +264,10 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
                 this.lastTransition_id = transition_id;
             } else this.pendingTransitions.set(transition_id, this.version);
 
-            this.emit("debug", `MLS ${type} processed (transition id: ${transition_id})`);
+            //this.emit("debug", `MLS ${type} processed (transition id: ${transition_id})`);
             return { transition_id, success: true };
         } catch (error) {
-            this.emit("debug", `MLS ${type} errored from transition ${transition_id}: ${error}`);
+            //this.emit("debug", `MLS ${type} errored from transition ${transition_id}: ${error}`);
             this.recoverFromInvalidTransition = transition_id;
             return { transition_id, success: false };
         }
@@ -302,7 +310,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
         this.pendingTransitions = null;
         this.downgraded = null;
 
-        this.emit("debug", "MLS Session destroyed");
+        //this.emit("debug", "MLS Session destroyed");
     };
 }
 

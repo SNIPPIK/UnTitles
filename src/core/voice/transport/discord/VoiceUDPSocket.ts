@@ -19,7 +19,7 @@ import { isIPv4 } from "node:net";
  * цикл событий Node.js. JavaScript-слой только передаёт данные и реагирует на события.
  *
  * @example
- * ```typescript
+ * ```ts
  * const udp = new VoiceUDPSocket();
  * udp.on('discovery', (info) => console.log('IP:', info.ip, 'Port:', info.port));
  * udp.on('message', (buffer) => console.log('Received:', buffer));
@@ -29,7 +29,8 @@ import { isIPv4 } from "node:net";
  * @public
  */
 export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
-    private _status: VoiceUDPSocketStatuses;
+    /** Текущий статус UDP подключения **/
+    private _status: VoiceUDPSocketStatuses = VoiceUDPSocketStatuses.disconnected;
 
     /** Rust-сокет, обеспечивающий низкоуровневую отправку/приём UDP-пакетов */
     private socket: iType<typeof UDPSocket> | null;
@@ -50,12 +51,21 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /**
      * Количество пакетов, ожидающих отправки в Rust-очереди.
      * Полезно для мониторинга нагрузки и отладки.
-     *
+     * @return number
      * @readonly
      */
     public get packets() {
         // Обработка случая, когда сокет уничтожен (null)
         return Number(this.socket?.packets ?? 0);
+    };
+
+    /**
+     * Кол-во утерянный пакетов со стороны клиента
+     * @return number
+     * @public
+     */
+    public get drops() {
+        return this.socket.drops;
     };
 
     /**
@@ -80,7 +90,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * // Отправить несколько пакетов за раз
      * socket.packet([frame1, frame2, frame3]);
      */
-    public packet(packet: Buffer[] | Buffer) {
+    public packet = (packet: Buffer[] | Buffer): void => {
         try {
             const list = Array.isArray(packet) ? packet : [packet];
             if (list.length > 0 && this.socket) {
@@ -89,6 +99,21 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         } catch (error) {
             this.emit("error", error as Error);
         }
+    };
+
+    /**
+     * Формирует discovery-пакет для запроса внешнего IP и порта.
+     *
+     * @param ssrc - SSRC идентификатор (из WebSocket-сессии), необходимый для идентификации потока.
+     * @returns Буфер, готовый к отправке через UDP-сокет.
+     * @public
+     */
+    public discovery = (ssrc: number): Buffer => {
+        const packet = Buffer.alloc(74, 0);
+        packet.writeUInt16BE(1, 0);   // тип 1 (discovery)
+        packet.writeUInt16BE(70, 2);  // длина 70 байт (всего 74)
+        packet.writeUInt32BE(ssrc, 4);
+        return packet;
     };
 
     /**
@@ -104,7 +129,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      *
      * @public
      */
-    public connect = (options: WebSocketOpcodes.ready["d"]) => {
+    public connect = (options: WebSocketOpcodes.ready["d"]): void => {
         this.options = options;
         if (this.socket) this.reset();
 
@@ -128,7 +153,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @param msg - полученный буфер данных.
      * @private
      */
-    private handleMessage(msg: Buffer) {
+    private handleMessage = (msg: Buffer): void => {
         // Проверка discovery-пакета (RFC для Discord Voice)
         if (msg && msg.length === 74 && msg.readUInt16BE(0) === 2) {
             const ip = msg.subarray(8, msg.indexOf(0, 8)).toString("utf8");
@@ -146,21 +171,6 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         // Любое другое сообщение передаём наружу
         this.emit("message", msg);
     }
-
-    /**
-     * Формирует discovery-пакет для запроса внешнего IP и порта.
-     *
-     * @param ssrc - SSRC идентификатор (из WebSocket-сессии), необходимый для идентификации потока.
-     * @returns Буфер, готовый к отправке через UDP-сокет.
-     * @public
-     */
-    public discovery = (ssrc: number): Buffer => {
-        const packet = Buffer.alloc(74, 0);
-        packet.writeUInt16BE(1, 0);   // тип 1 (discovery)
-        packet.writeUInt16BE(70, 2);  // длина 70 байт (всего 74)
-        packet.writeUInt32BE(ssrc, 4);
-        return packet;
-    };
 
     /**
      * Принудительно уничтожает текущий Rust-сокет и освобождает его ресурсы.

@@ -25,7 +25,7 @@ export class SeyfertVoice<T extends DiscordClient> extends VoiceAdapters<Discord
             this.adapters.set(guild_id, methods);
 
             return {
-                sendPayload: (data) => {
+                send: (data) => {
                     try {
                         this.client.gateway.send(id, data);
                     } catch { return false; }

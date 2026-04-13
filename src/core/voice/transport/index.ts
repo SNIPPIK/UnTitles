@@ -1,26 +1,13 @@
-import { VoiceUDPSocket, VoiceWebSocket, WebSocketOpcodes } from "#core/voice";
 import { VoiceOpcodes, VoiceCloseCodes } from "discord-api-types/voice/v8";
+import { VoiceWebSocket, WebSocketOpcodes } from "#core/voice";
 import { MLSSession } from "#core/voice/structures/MLSSession";
-import { VoiceRTPSocket, iType} from "#native";
 import { TypedEmitter } from "#structures";
 import { VoiceAdapter } from "./adapter";
 
-/**
- * @author SNIPPIK
- * @description Opcode dave mls приветствия
- * @const OPCODE_DAVE_MLS_WELCOME
- * @private
- */
-const OPCODE_DAVE_MLS_WELCOME = new Uint8Array([VoiceOpcodes.DaveMlsCommitWelcome]);
-
-/**
- * @author SNIPPIK
- * @description Opcode dave mls ключа пакета
- * @const OPCODE_DAVE_MLS_KEY
- * @private
- */
-const OPCODE_DAVE_MLS_KEY = new Uint8Array([VoiceOpcodes.DaveMlsKeyPackage]);
-
+// Layers
+import { UDPLayer } from "#core/voice/transport/layers/UDPLayer";
+import { RTPLayer } from "#core/voice/transport/layers/RTPLayer";
+import { DAVELayer } from "#core/voice/transport/layers/DAVELayer";
 
 /**
  * @author SNIPPIK
@@ -28,9 +15,9 @@ const OPCODE_DAVE_MLS_KEY = new Uint8Array([VoiceOpcodes.DaveMlsKeyPackage]);
  * @const IGNORED_OPCODES
  * @private
  */
-const IGNORED_OPCODES: VoiceCloseCodes[] = [
+/*const IGNORED_OPCODES: VoiceCloseCodes[] = [
     VoiceCloseCodes.CallTerminated
-];
+];*/
 
 /**
  * @author SNIPPIK
@@ -49,13 +36,19 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @description Клиент UDP соединения, ключевой класс для отправки пакетов
      * @public
      */
-    public _udp: VoiceUDPSocket;
+    public _udp = new UDPLayer();
 
     /**
      * @description Клиент RTP, ключевой класс для шифрования пакетов для отправки через UDP
      * @public
      */
-    public _rtp: iType<typeof VoiceRTPSocket>;
+    public _rtp = new RTPLayer();
+
+    /**
+     * @description Клиент Dave, для работы сквозного шифрования
+     * @public
+     */
+    public _dave: DAVELayer;
 
     /**
      * @description Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway
@@ -76,39 +69,11 @@ export class Transport extends TypedEmitter<TransportEvents> {
     public secret_key: number[];
 
     /**
-     * @description Клиент Dave, для работы сквозного шифрования
-     * @public
-     */
-    public _dave: MLSSession | null;
-
-    /**
      * @description Готовность транспорта к передаче данных
      * @public
      */
     public get ready(): boolean {
-        if (!this.secret_key || !this.ssrc) {
-            return false;
-        }
-
-        // Логика DAVE (MLS): блокируем отправку, если сессия в процессе перехода
-        // или еще не инициализировала ключи
-        if (this._dave?.session) {
-            if (!this._dave.session.ready || this._dave.isTransitioning || !this._dave.encrypt) {
-                return false;
-            }
-        }
-
-        // Проверяем есть ли ключевые элементы для отправки пакетов
-        if (!this._ws || !this._udp || !this._rtp) {
-            return false;
-        }
-
-        // Если нет подключения к udp
-        if (this._udp.status !== "connected") {
-            return false;
-        }
-
-        return this.state.code === TransportStateCode.Session;
+        return this.secret_key && this.ssrc && this._dave.ready && this._rtp.ready && this._udp.ready && this.state.code === TransportStateCode.Session;
     };
 
     /**
@@ -140,96 +105,29 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 const d = state.payload;
                 this.ssrc = d.ssrc;
 
-                // Если UDP был поднят ранее
-                if (this._udp) {
-                    this._udp.destroy();
-                    this._udp = null;
-                }
+                this._udp.create(d).then((ws) => {
+                    this.emit("info", "[Transport/UDP]: Getting out");
 
-                const udp = this._udp = new VoiceUDPSocket();
+                    if (ws instanceof Error) {
+                        this.emit("info", "[Transport/UDP]: Bad Discovery handshake");
 
-                // Таймер отключения, если не удасться отправить discovery frame
-                const timeout = setTimeout(() => {
-                    this.emit("close", VoiceCloseCodes.UnknownEncryptionMode,"[Transport/UDP]: Timeout to send Discovery handshake");
-                }, 10000);
-
-                udp.connect(d);
-
-                // задержка как у настоящего клиента
-                const delay = 60 + Math.floor(Math.random() * 80);
-
-                // Запускаем таймер отправки Discovery
-                setTimeout(() => {
-                    const discoveryPacket = udp.discovery(d.ssrc);
-
-                    // первый пакет
-                    udp.packet(discoveryPacket);
-
-                    // retry через ~100ms
-                    setTimeout(() => {
-                        if (this._udp && this._state.code === TransportStateCode.Ready) {
-                            udp.packet(discoveryPacket);
-                        }
-                    }, 100);
-
-                }, delay);
-
-                /**
-                 * @description Ожидаем ответ с данными для прямого подключения через NAT
-                 * @event discovery
-                 * @private
-                 */
-                udp.on("discovery", (data) => {
-                    clearTimeout(timeout);
-
-                    if (data instanceof Error) {
-                        this.emit(
-                            "close",
-                            VoiceCloseCodes.UnknownEncryptionMode,
-                            `[Transport] Discovery failed: ${data.message}`
-                        );
-                        return this.destroy();
+                        this.destroy();
+                        return;
                     }
 
-                    udp.removeListener("discovery");
-
+                    this.emit("info", "[Transport/UDP]: Good Discovery handshake");
                     this._ws.packet = {
                         op: VoiceOpcodes.SelectProtocol,
                         d: {
                             protocol: "udp",
                             data: {
-                                address: data.ip,
-                                port: data.port,
+                                address: ws.ip,
+                                port: ws.port,
                                 mode: "aead_aes256_gcm_rtpsize"
                             }
                         }
                     };
                 });
-
-                /**
-                 * @description Если соединение UDP было разорвано
-                 * @event close
-                 * @private
-                 */
-                udp.once("close", () => {
-                    clearTimeout(timeout);
-                    this.state = null;
-                });
-
-                /**
-                 * @description Если UDP подключение было разорвано по какой-либо ошибке
-                 * @event error
-                 * @private
-                 */
-                udp.on("error", (error) => {
-                    clearTimeout(timeout);
-                    this.emit(
-                        "close",
-                        VoiceCloseCodes.UnknownProtocol,
-                        `[Transport/UDP] ${error.message}`
-                    );
-                });
-
                 return;
             }
 
@@ -240,22 +138,12 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 // Сохраняем ключ, для повторного использования
                 this.secret_key = d.secret_key;
 
-                // Если уже есть активный RTP
-                if (this._rtp) {
-                    this._rtp.destroy();
-                    this._rtp = null;
-                }
-
-                // Создаем подключение RTP
-                this._rtp = new VoiceRTPSocket(
-                    this.ssrc,
-                    new Uint8Array(d.secret_key)
-                );
-                this.emit("info", `[Transport/RTP]: has created | ${this._rtp.mode}`);
+                this._rtp.create(this.ssrc, d.secret_key);
+                this.emit("info", `[Transport/RTP]: has created`);
 
                 // Если есть поддержка DAVE
                 if (MLSSession.max_version > 0) {
-                    this.createDaveSession(d.dave_protocol_version);
+                    this._dave.create(d.dave_protocol_version);
                     this.emit("info", `[Transport/E2EE]: has created | ${d.dave_protocol_version} | Max --> ${MLSSession.max_version}`);
                 }
 
@@ -297,13 +185,12 @@ export class Transport extends TypedEmitter<TransportEvents> {
      */
     public packet = (frames: Buffer[] | Buffer) => {
         const list = Array.isArray(frames) ? frames : [frames];
-        const encrypted = this._dave.encrypt(list);
-        const rtp = this._rtp.packets(encrypted);
+        const encrypted = this._dave.packet(list);
+        const rtp = this._rtp.packet(encrypted);
 
         // Отправляем все готовые пакеты разом
         this._udp.packet(rtp);
     };
-
 
     /**
      * @description Подключаемся к серверам discord
@@ -311,7 +198,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @private
      */
     public connect = (endpoint: string) => {
-        //const last_seq = this._ws?.sequence;
+        const last_seq = this._ws?.sequence;
 
         if (this._ws) {
             this._ws.removeAllListeners();
@@ -320,10 +207,11 @@ export class Transport extends TypedEmitter<TransportEvents> {
         }
 
         this._ws = new VoiceWebSocket();
-        /*if (last_seq) {
+        this._dave = new DAVELayer(this.adapter, this._ws);
+        if (last_seq) {
             this._ws.sequence = last_seq;
             this._ws.emit("resumed");
-        }*/
+        }
 
         this._ws.connect(endpoint); // Подключаемся к endpoint
 
@@ -400,10 +288,10 @@ export class Transport extends TypedEmitter<TransportEvents> {
             this.emit("close", code, `[Transport/WS]: ${reason}`);
 
             // Коды которые просто игнорируются
-            if (IGNORED_OPCODES.includes(code)) return;
+            //if (IGNORED_OPCODES.includes(code)) return;
 
             // Если можно возобновить подключение
-            else if ((code === 4_015 || code < 4_000) && this.ready) {
+            if ((code === 4_015 || code < 4_000) && this.ready) {
                 this.state = {
                     code: TransportStateCode.OpeningWs,
                     payload: code
@@ -421,18 +309,6 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     };
                     return;
                 }
-            }
-
-            // Если сессия больше не валидна
-            else if (code === 4006) {
-                this.adapter.packet.state.session_id = null;
-
-                // Пробуем поднять соединение заново
-                this.state = {
-                    code: TransportStateCode.OpeningWs,
-                    payload: code
-                };
-                return;
             }
 
             // Если нет больше методов подъема соединения, то уничтожаем окончательно
@@ -460,156 +336,11 @@ export class Transport extends TypedEmitter<TransportEvents> {
     };
 
     /**
-     * @description Создание Dave
-     * @param version - Версия dave которую использует discord
-     * @private
-     */
-    private createDaveSession = (version: number) => {
-        const { user_id, channel_id } = this.adapter.packet.state;
-        let session: MLSSession;
-
-        // Отключаем все события от ws
-        this._ws.removeListener("daveSession");
-        this._ws.removeListener("binary");
-
-        // Если уже есть активная сессия
-        if (this._dave) {
-            this._dave.destroy();
-            this._dave = null;
-        }
-
-        // Создаем сессию
-        session = this._dave = new MLSSession(version, user_id, channel_id);
-
-        /**
-         * @description Создаем слушателя события для получения ключа
-         * @event
-         */
-        session.on("key", (key) => {
-            if (!this.secret_key && !this.ssrc) return;
-
-            // Если голосовое подключение готово
-            this._ws.packet = Buffer.concat([OPCODE_DAVE_MLS_KEY, key]);
-        });
-
-        /**
-         * @description Сообщаем что мы тоже хотим использовать DAVE
-         * @event
-         */
-        session.on("invalidateTransition", (transitionId) => {
-            if (!this.secret_key && !this.ssrc) return;
-
-            // Если голосовое подключение готово
-            this._ws.packet = {
-                op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,
-                d: {
-                    transition_id: transitionId
-                }
-            };
-        });
-
-        /**
-         * @description Получаем коды dave от WebSocket
-         * @code 21-31
-         */
-        this._ws.on("daveSession", ({op, d}) => {
-            this.emit("info", `[MLS/WS]: ${op} -> Opcode: ${d}`);
-
-            switch (op) {
-                // Предстоит понижение версии протокола DAVE
-                case VoiceOpcodes.DavePrepareTransition: {
-                    const sendReady = session.prepareTransition(d);
-
-                    if (sendReady) this._ws.packet = {
-                        op: VoiceOpcodes.DaveTransitionReady,
-                        d: {
-                            transition_id: d.transition_id
-                        }
-                    };
-                    return;
-                }
-
-                // Выполнить ранее объявленный переход протокола
-                case VoiceOpcodes.DaveExecuteTransition: {
-                    session.executeTransition(d.transition_id);
-                    return;
-                }
-
-                case VoiceOpcodes.DavePrepareEpoch: {
-                    session.prepareEpoch = d;
-                    return;
-                }
-            }
-        });
-
-        /**
-         * @description Получаем буфер от webSocket
-         * @code 21-31
-         */
-        this._ws.on("binary", ({op, payload}) => {
-            this.emit("info", `[MLS/WS]: ${op} -> Get Buffer Size: ${payload.length}`);
-
-            switch (op) {
-                // Учетные данные и открытый ключ для внешнего отправителя MLS
-                case VoiceOpcodes.DaveMlsExternalSender: {
-                    this._dave.externalSender = payload;
-                    return;
-                }
-
-                // Предложения MLS, которые будут добавлены или отозваны
-                case VoiceOpcodes.DaveMlsProposals: {
-                    const proposal = this._dave.processProposals(payload, this.adapter.clients.array);
-
-                    // Меняем протокол DAVE
-                    if (proposal) this._ws.packet = Buffer.concat([OPCODE_DAVE_MLS_WELCOME, proposal]);
-                    return;
-                }
-
-                // MLS Commit будет обработан для предстоящего перехода
-                case VoiceOpcodes.DaveMlsAnnounceCommitTransition: {
-                    const { transition_id, success } = this._dave.processMLSTransit("commit", payload);
-
-                    // Если успешно
-                    if (success) {
-                        if (transition_id !== 0) {
-                            this._ws.packet = {
-                                op: VoiceOpcodes.DaveTransitionReady,
-                                d: { transition_id },
-                            };
-                        }
-                    }
-
-                    return;
-                }
-
-                // MLS Добро пожаловать в группу для предстоящего перехода
-                case VoiceOpcodes.DaveMlsWelcome: {
-                    const { transition_id, success } = this._dave.processMLSTransit("welcome", payload);
-
-                    // Если успешно
-                    if (success) {
-                        if (transition_id !== 0) {
-                            this._ws.packet = {
-                                op: VoiceOpcodes.DaveTransitionReady,
-                                d: { transition_id },
-                            };
-                        }
-                    }
-                }
-            }
-        });
-
-        session.on("debug", (msg) => this.emit("info", `[Transport/MLS]: ${msg}`));
-
-        // Запускаем заново или впервые
-        session.reinit();
-    };
-
-    /**
      * @description Уничтожаем голосовой транспорт
      * @public
      */
     public destroy = () => {
+        this._state.code = TransportStateCode.Closed;
         super.destroy();
 
         // Использование Optional Chaining для безопасного вызова

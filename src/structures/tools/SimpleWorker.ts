@@ -31,7 +31,9 @@ export class SimpleWorker {
             callback(message);
 
             // Если поток должен остаться активным
-            if (!not_destroyed) this.destroy(worker);
+            if (!not_destroyed) this.destroy(worker).catch((err) => {
+                throw err;
+            });
         });
 
         return worker;

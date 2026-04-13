@@ -49,7 +49,7 @@ impl FfmpegProcess {
                     "-reconnect_streamed".to_string(),
                     "1".to_string(),
                     "-reconnect_delay_max".to_string(),
-                    "5".to_string(),
+                    "10".to_string(),
                     "-reconnect_on_network_error".to_string(),
                     "1".to_string(),
                 ];
@@ -59,13 +59,11 @@ impl FfmpegProcess {
 
         // Базовые аргументы FFmpeg для низкой задержки и подавления видео
         let mut final_args = vec![
-            "-analyzeduration".to_string(),
-            "200".to_string(),
-            "-probesize".to_string(),
-            "32M".to_string(),
             "-vn".to_string(),
             "-loglevel".to_string(),
             "error".to_string(),
+            "-nostdin".to_string(),      // не ждать ввода с stdin
+            "-hide_banner".to_string()   // скрыть баннер
         ];
         final_args.extend(args);
 
@@ -94,8 +92,6 @@ impl FfmpegProcess {
     /// в отдельные фреймы Opus с помощью `OggOpusParser`.
     #[napi]
     pub fn pipe_stdout(&self, callback: JsFunction) -> Result<()> {
-        // Проверяем, не запущен ли уже поток чтения.
-        // Acquire гарантирует, что мы увидим запись флага из другого потока.
         if self.reading_active.load(Ordering::Acquire) {
             return Err(Error::new(
                 Status::GenericFailure,
@@ -103,107 +99,72 @@ impl FfmpegProcess {
             ));
         }
 
-        // Забираем stdout у дочернего процесса.
-        // Захватываем мьютекс, чтобы получить эксклюзивный доступ к child.
-        // `take()` забирает stdout из Option, оставляя там None – это гарантирует,
-        // что только один поток (этот) будет владеть дескриптором.
         let mut child_guard = self.child.lock().unwrap();
         let stdout = child_guard
             .as_mut()
             .and_then(|c| c.stdout.take())
             .ok_or_else(|| Error::new(Status::GenericFailure, "Stdout already taken".to_string()))?;
 
-        // Создаём потокобезопасную функцию для вызова JS-колбэка.
-        // Тип данных, передаваемых в JS: массив объектов { type: string, data: Buffer }.
-        // Второй аргумент `1024` – это размер очереди для отложенных вызовов,
-        // если они будут производиться из фонового потока быстрее, чем JS успевает обрабатывать.
         let tsfn: ThreadsafeFunction<Vec<(PacketType, Vec<u8>)>, ErrorStrategy::Fatal> = callback
             .create_threadsafe_function(1024, |ctx: ThreadSafeCallContext<Vec<(PacketType, Vec<u8>)>>| {
                 let env = ctx.env;
-
-                // Создаём JS-массив, куда сложим все полученные пакеты.
                 let mut js_array = env.create_array_with_length(ctx.value.len())?;
-
                 for (i, (kind, data)) in ctx.value.into_iter().enumerate() {
                     let mut obj = env.create_object()?;
-
-                    let kind_str = env.create_string(kind.as_str())?;
-                    // `create_buffer_with_data` копирует данные в память, управляемую V8.
-                    let buffer = env.create_buffer_with_data(data)?.into_unknown();
-
-                    obj.set_named_property("type", kind_str)?;
-                    obj.set_named_property("data", buffer)?;
-
+                    obj.set_named_property("type", env.create_string(kind.as_str())?)?;
+                    obj.set_named_property("data", env.create_buffer_with_data(data)?.into_unknown())?;
                     js_array.set_element(i as u32, obj)?;
                 }
-
-                // Возвращаем массив как единственный аргумент колбэка.
                 Ok(vec![js_array.into_unknown()])
             })?;
 
-        // Устанавливаем флаг активности до запуска потока.
-        // Release гарантирует, что все предыдущие записи (например, изменение child_guard)
-        // будут видны в потоке чтения после загрузки флага с Acquire.
         self.reading_active.store(true, Ordering::Release);
         let active = Arc::clone(&self.reading_active);
 
-        // Запускаем фоновый поток чтения.
         let handle = tokio::spawn(async move {
-            // Используем буферизированный reader для эффективного чтения.
             let mut reader = BufReader::new(stdout);
-            let mut buffer = [0u8; 16384]; // 16 КБ – компромисс между частотой вызовов и задержкой.
-
+            let mut buffer = [0u8; 16384];
             let mut parser = OggOpusParser::new();
-
-            // Батчинг: накапливаем до 64 пакетов, чтобы уменьшить количество вызовов в JS.
-            // Это снижает накладные расходы на переключение контекста и ускоряет обработку.
             let mut batch: Vec<(PacketType, Vec<u8>)> = Vec::with_capacity(64);
 
+            // Вспомогательная функция для отправки батча с логированием ошибок
+            fn send_batch(
+                tsfn: &ThreadsafeFunction<Vec<(PacketType, Vec<u8>)>, ErrorStrategy::Fatal>,
+                batch: &mut Vec<(PacketType, Vec<u8>)>,
+            ) -> bool {
+                if batch.is_empty() {
+                    return true;
+                }
+                let payload = std::mem::take(batch);
+                match tsfn.call(payload, ThreadsafeFunctionCallMode::Blocking) {
+                    Status::Ok => true,
+                    err => {
+                        eprintln!("Failed to send batch to JS: {:?}", err);
+                        false
+                    }
+                }
+            }
+
+            // Основной цикл чтения с активным флагом
             while active.load(Ordering::Acquire) {
                 match reader.read(&mut buffer) {
-                    // Конец потока (EOF) — больше данных нет
                     Ok(0) => {
-                        // Финализируем парсер – извлекаем все оставшиеся фреймы
-                        let mut final_frames = Vec::new();
-                        if let Err(e) = parser.parse_internal(&[], &mut final_frames) {
-                            eprintln!("Final flush error: {}", e);
-                        }
-                        // Добавляем оставшиеся фреймы в батч
-                        for frame in final_frames {
-                            batch.push(frame);
-                        }
-                        // Отправляем последний батч, если есть
-                        if !batch.is_empty() {
-                            let send = std::mem::take(&mut batch);
-                            let _ = tsfn.call(send, ThreadsafeFunctionCallMode::NonBlocking);
-                        }
+                        // EOF: выходим из цикла, чтобы выполнить финальный flush
                         break;
                     }
                     Ok(n) => {
                         let chunk = &buffer[..n];
-                        let mut frames = Vec::with_capacity(16); // небольшая начальная ёмкость
-
+                        let mut frames = Vec::with_capacity(16);
                         if let Err(e) = parser.parse_internal(chunk, &mut frames) {
                             eprintln!("Parser error: {}", e);
-                            // При ошибке парсинга всё равно отправляем то, что накопили, чтобы не терять
-                            if !batch.is_empty() {
-                                let send = std::mem::take(&mut batch);
-                                let _ = tsfn.call(send, ThreadsafeFunctionCallMode::Blocking);
-                            }
+                            // Отправляем что накопили и выходим
+                            send_batch(&tsfn, &mut batch);
                             break;
                         }
-
                         for frame in frames {
                             batch.push(frame);
-
                             if batch.len() >= 64 {
-                                let send = std::mem::take(&mut batch);
-                                // NonBlocking — не блокируем поток, если очередь JS переполнена, пакет будет отброшен.
-                                // В случае ошибки (например, JS-объект уничтожен) тоже не блокируемся.
-                                if tsfn.call(send, ThreadsafeFunctionCallMode::Blocking) != Status::Ok {
-                                    eprintln!("Failed to send batch to JS");
-                                    // Если вызов не удался, вероятно, JS-сторона уже не принимает данные,
-                                    // поэтому прерываем цикл
+                                if !send_batch(&tsfn, &mut batch) {
                                     break;
                                 }
                             }
@@ -211,24 +172,39 @@ impl FfmpegProcess {
                     }
                     Err(e) => {
                         eprintln!("FFmpeg read error: {}", e);
-                        // При ошибке чтения отправляем накопленное
-                        if !batch.is_empty() {
-                            let send = std::mem::take(&mut batch);
-                            let _ = tsfn.call(send, ThreadsafeFunctionCallMode::Blocking);
-                        }
+                        send_batch(&tsfn, &mut batch);
                         break;
                     }
                 }
             }
 
-            // Уведомляем JS, что источник данных исчерпан.
-            let _ = tsfn.abort();
+            // === ГАРАНТИРОВАННЫЙ FLUSH ВСЕХ УРОВНЕЙ ===
+            // Убираем read_to_end! Если мы вышли по Ok(0), читать больше нечего.
+            // Если вышли по active=false, читать дальше НЕЛЬЗЯ, иначе заблокируемся.
+
+            // 1. Финализируем парсер: передаём пустой слайс
+            let mut final_frames = Vec::new();
+            if let Err(e) = parser.parse_internal(&[], &mut final_frames) {
+                eprintln!("Final flush error: {}", e);
+            }
+
+            for frame in final_frames {
+                batch.push(frame);
+                if batch.len() >= 64 {
+                    send_batch(&tsfn, &mut batch);
+                }
+            }
+
+            // 2. Отправляем самый последний батч
+            send_batch(&tsfn, &mut batch);
+
+            // 3. ВАЖНО: Мы НЕ вызываем tsfn.abort()!
+            // Когда переменная `tsfn` выйдет из области видимости (Drop), она корректно
+            // завершит работу (napi_tsfn_release), сохранив очередь и отдав все пакеты в JS.
             active.store(false, Ordering::Release);
         });
 
-        // Сохраняем handle потока, чтобы потом дождаться его завершения.
         *self.reader_handle.lock().unwrap() = Some(handle);
-
         Ok(())
     }
 
@@ -238,19 +214,8 @@ impl FfmpegProcess {
     #[napi]
     pub async fn destroy(&self) -> Result<()> {
         self.reading_active.store(false, Ordering::Release);
-
-        // Сначала достаём handle из mutex и отпускаем lock
-        let handle = {
-            let mut guard = self.reader_handle.lock().unwrap();
-            guard.take()
-        };
-
-        // Теперь await — БЕЗ lock
-        if let Some(handle) = handle {
-            let _ = handle.await;
-        }
-
-        // Теперь ffmpeg
+        
+        // Закрываем stdout, и reader.read() в потоке мгновенно вернёт Ok(0).
         let child = {
             let mut guard = self.child.lock().unwrap();
             guard.take()
@@ -259,6 +224,16 @@ impl FfmpegProcess {
         if let Some(mut child) = child {
             let _ = child.kill();
             let _ = child.wait();
+        }
+
+        // Безопасно ждём завершения фонового потока.
+        let handle = {
+            let mut guard = self.reader_handle.lock().unwrap();
+            guard.take()
+        };
+
+        if let Some(handle) = handle {
+            let _ = handle.await;
         }
 
         Ok(())

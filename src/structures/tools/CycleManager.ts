@@ -22,7 +22,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected get time(): number {
-        return Date.now();
+        return performance.now();
     };
 
     /**
@@ -116,11 +116,8 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     protected clearTimer(): void {
         if (!this.timer) return;
 
-        if ("hasRef" in this.timer) {
-            clearTimeout(this.timer as NodeJS.Timeout);
-        } else {
-            clearImmediate(this.timer as NodeJS.Immediate);
-        }
+        if ("hasRef" in this.timer) clearTimeout(this.timer as NodeJS.Timeout);
+        else clearImmediate(this.timer as NodeJS.Immediate);
         this.timer = null;
     };
 
@@ -129,14 +126,14 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected scheduleStep(): void {
-        const now = this.time;
-        let delay = this.nextExecutionTime - now;
-
-        // Если отстаём больше чем на интервал – запускаем немедленно
-        if (delay < 0) delay = 0;
-
+        const delay = Math.max(0, this.nextExecutionTime - this.time);
         this.clearTimer();
-        this.timer = setTimeout(() => this.step(), delay);
+
+        if (delay > 0) this.timer = setTimeout(() => this.step(), delay);
+        else process.nextTick(() => {
+            this._stepCycle();
+            this.timer = setTimeout(() => this.step(), this.options.duration * 0.8);
+        });
     };
 
     /**
@@ -144,6 +141,28 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @private
      */
     private step = (): void => {
+        if (this.size === 0) return this.reset();
+
+        const start = this.time;
+        try {
+            this._stepCycle();
+        } catch (error) {
+            console.error("[CycleSystem] Unhandled error in _stepCycle:", error);
+        }
+        const elapsed = this.time - start; // реальное время выполнения шага
+
+        // Вычисляем задержку до следующего старта
+        let delay = this.options.duration - elapsed;
+        if (delay < 0) delay = 0; // не может быть отрицательной
+
+        // Следующее время выполнения = сейчас + скорректированная задержка
+        this.nextExecutionTime = this.time + delay;
+        this.lastDuration = this.options.duration;
+
+        this.scheduleStep(); // scheduleStep использует nextExecutionTime для setTimeout
+    };
+
+    /*private step = (): void => {
         // Если очередь пуста – останавливаем цикл
         if (this.size === 0) return this.reset();
 
@@ -169,7 +188,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
         // Планируем следующий шаг
         this.scheduleStep();
-    };
+    };*/
 
     /**
      * @description Абстрактный метод, выполняющий полезную работу на каждом шаге

@@ -1,5 +1,5 @@
 import { FfmpegProcess, AudioEngine, type iType } from "#native";
-import { OPUS_FRAME_SIZE, SILENT_FRAME } from "#core/audio/opus";
+import { OPUS_FRAME_SIZE } from "#core/audio/opus";
 import { FFMPEG_PATH } from "#core/audio/process";
 import { TypedEmitter } from "#structures";
 import type { Track } from "#core/queue";
@@ -270,10 +270,8 @@ export class AudioResource extends BaseAudioResource {
     public constructor(config: AudioResourceOptions) {
         super(config);
 
-        const { isBuffered } = this.options.track;
-
         // Создаем аудио движок в Rust
-        this.engine = new AudioEngine(isBuffered ? 10 : 20);
+        this.engine = new AudioEngine(20);
         this.process = new FfmpegProcess(this.arguments, FFMPEG_PATH);
 
         // Привязываем события через внутренний метод input
@@ -284,28 +282,21 @@ export class AudioResource extends BaseAudioResource {
             input: this.process,
             decode: (p) => p.pipeStdout((frames) => {
                 const batch: Buffer[] = [];
-                let becameReadable = false;
 
                 for (const { type, data } of frames) {
                     if (type !== "frame") continue;
 
                     if (!this._readable) {
-                        batch.push(SILENT_FRAME);
+                        //batch.push(SILENT_FRAME);
                         this._readable = true;
-                        becameReadable = true;
+                        setImmediate(() => this.emit("readable"));
                     }
 
                     batch.push(data);
                 }
 
-                // Отправляем одним батчем
-                if (batch.length > 0) {
-                    this.engine.addPackets(batch);
-                }
-
-                if (becameReadable) {
-                    setImmediate(() => this.emit("readable"));
-                }
+                // Отправляем одним array
+                if (batch.length > 0) this.engine.addPackets(batch);
             })
         });
     };
@@ -326,7 +317,7 @@ export class AudioResource extends BaseAudioResource {
      * @public
      */
     public destroy() {
-        this.engine.addPacket(SILENT_FRAME);
+        //this.engine.addPacket(SILENT_FRAME);
 
         if (this.process) {
             this.process.destroy();
@@ -349,7 +340,7 @@ export class AudioResource extends BaseAudioResource {
  * @const ASSETRATE_MULTIPLIER_PATTERN
  * @private
  */
-const ASSETRATE_MULTIPLIER_PATTERN = /(?:^|,)asetrate=48000\*([\d\.]+)/;
+const ASSETRATE_MULTIPLIER_PATTERN = /(?:^|,)asetrate=48000\*([\d.]+)/;
 
 /**
  * @author SNIPPIK
@@ -358,7 +349,7 @@ const ASSETRATE_MULTIPLIER_PATTERN = /(?:^|,)asetrate=48000\*([\d\.]+)/;
  * @const ATEMPO_MULTIPLIER_PATTERN
  * @private
  */
-const ATEMPO_MULTIPLIER_PATTERN = /(?:^|,)atempo=([\d\.]+)/;
+const ATEMPO_MULTIPLIER_PATTERN = /(?:^|,)atempo=([\d.]+)/;
 
 /**
  * @author SNIPPIK

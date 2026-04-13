@@ -177,8 +177,9 @@ export class Queue {
                         ],
                         "accessory": {
                             "type": 11,
+                            //"description": name, // Подсказка
                             "media": {
-                                "url": image.url
+                                "url": image.url,
                             }
                         }
                     },
@@ -189,7 +190,7 @@ export class Queue {
                     },
                     {
                         "type": 10, // Text
-                        "content": `> -# \`👤 ${user.username}\`  |  \`${getVolumeIndicator(vol)}\` ${tracks.footer} |  \`🌐 ${player.voice.connection.latency}ms\`` + player.progress
+                        "content": `> -# \`👤 ${user.username}\`  |  \`${getVolumeIndicator(vol)}\` ${tracks.footer} |  \`🌐 ${player.voice.connection.latency}ms | 📥 ${player.voice.connection.udp.lost}\`` + player.progress
                     },
                     ...buttons
                 ]

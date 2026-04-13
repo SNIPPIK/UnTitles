@@ -1,109 +1,58 @@
+//! Кольцевой буфер (ring buffer) для передачи `Vec<u8>` между потоками.
+//! Предназначен для сценария **один производитель — один потребитель** (SPSC),
+//! но с поддержкой операции `push_front` от потребителя (например, для возврата пакета при ошибке).
+//! Использует атомарные индексы и CAS для безопасного резервирования места при `push_front`.
+
 use std::mem::MaybeUninit;
+use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-/// Кольцевой буфер (ring buffer) для передачи `Vec<u8>` между потоками.
-/// Предназначен для сценария **один производитель — один потребитель** (SPSC).
-/// Без блокировок, использует атомарные индексы `head` и `tail`.
-///
-/// # Безопасность
-/// - `buffer` хранит `MaybeUninit<Vec<u8>>`, чтобы не требовать инициализации при создании.
-/// - `push` и `pop` используют правильные барьеры памяти для видимости изменений.
-/// - `Drop` корректно извлекает оставшиеся элементы, предотвращая утечки.
+/// Ограничение по байтам MTU
+const MAX_PACKET_SIZE: usize = 1500;
+
+/// Кольцевой буфер для `Vec<u8>`.
+/// Безопасен для использования в сценариях, где `push`, `push_front` и `pop` могут вызываться конкурентно,
+/// при условии, что `push` и `push_front` вызываются только из одного потока (производитель и потребитель соответственно),
+/// а `pop` — тоже из одного потока (потребитель). При этом `push_front` и `pop` могут конкурировать за `tail`.
 pub struct RingBuffer {
-    /// Предварительно выделенная память под `capacity` элементов.
-    /// Элементы могут быть неинициализированы.
-    buffer: Vec<MaybeUninit<Vec<u8>>>,
-    /// Ёмкость буфера (фиксирована).
+    /// Выделенная память для элементов. Ёмкость = реальная ёмкость (capacity + 1).
+    /// Используется `Box<[MaybeUninit<Vec<u8>>]>` для фиксированного размера на куче.
+    buffer: Box<[MaybeUninit<Vec<u8>>]>,
+    /// Реальная ёмкость буфера (переданная capacity + 1). Нужна для различения пустого и полного состояний.
     capacity: usize,
-    /// Индекс, по которому будет записан следующий элемент.
-    /// Изменяется только производителем.
+    /// Индекс, куда будет записан следующий элемент. Изменяется только производителем (`push`).
     head: AtomicUsize,
-    /// Индекс, из которого будет прочитан следующий элемент.
-    /// Изменяется только потребителем.
+    /// Индекс, откуда будет прочитан следующий элемент. Изменяется потребителем (`pop` и `push_front`).
     tail: AtomicUsize,
 }
 
 impl RingBuffer {
-    /// Создаёт новый кольцевой буфер с заданной ёмкостью.
-    /// Паникует, если `capacity == 0`.
+    /// Создаёт новый кольцевой буфер с указанной ёмкостью (количество элементов, которые можно сохранить).
+    /// Реально выделяется `capacity + 1` слотов, чтобы отличать пустоту от заполненности.
     pub fn new(capacity: usize) -> Self {
         assert!(capacity > 0, "Capacity must be greater than 0");
 
-        // Создаём вектор нужного размера, заполненный неинициализированными элементами.
-        let mut buffer = Vec::with_capacity(capacity);
+        // Для кольцевого буфера нужно на 1 слот больше, чтобы отличать состояние "пуст" от "полон".
+        let real_capacity = capacity + 1;
+        let mut buffer = Vec::with_capacity(real_capacity);
         unsafe {
-            // Устанавливаем длину вектора, не инициализируя память.
-            // Это безопасно, потому что мы будем использовать слоты только после записи.
-            buffer.set_len(capacity);
+            buffer.set_len(real_capacity); // заполняем неинициализированными элементами
         }
 
         Self {
-            buffer,
-            capacity,
+            buffer: buffer.into_boxed_slice(),
+            capacity: real_capacity,
             head: AtomicUsize::new(0),
             tail: AtomicUsize::new(0),
         }
     }
 
-    /// Пытается добавить данные в буфер.
-    /// Возвращает `Err(data)`, если буфер полон.
-    ///
-    /// # Ordering
-    /// - `head` загружается с `Relaxed` — изменения `head` производит только этот поток.
-    /// - `tail` загружается с `Acquire` — нужно увидеть все предыдущие изменения потребителя (pop).
-    /// - `head` сохраняется с `Release` — гарантирует, что запись данных будет видна потребителю.
-    pub fn push(&self, data: Vec<u8>) -> Result<(), Vec<u8>> {
-        let head = self.head.load(Ordering::Relaxed);
-        let next_head = (head + 1) % self.capacity;
-
-        // Если следующий head равен текущему tail — буфер переполнен.
-        // Acquire: видим все изменения tail, сделанные потребителем.
-        if next_head == self.tail.load(Ordering::Acquire) {
-            return Err(data);
-        }
-
-        // Запись данных в слот.
-        unsafe {
-            // Получаем указатель на слот head. Используем арифметику указателей для избежания проверок.
-            let slot = self.buffer.as_ptr().add(head) as *mut MaybeUninit<Vec<u8>>;
-            // Записываем `MaybeUninit::new(data)` — помещаем данные в неинициализированный слот.
-            slot.write(MaybeUninit::new(data));
-        }
-
-        // Обновляем head с Release, чтобы потребитель гарантированно увидел запись.
-        self.head.store(next_head, Ordering::Release);
-        Ok(())
-    }
-
-    /// Извлекает данные из буфера, если они есть.
-    /// Возвращает `None`, если буфер пуст.
-    ///
-    /// # Ordering
-    /// - `tail` загружается с `Relaxed` — изменения производит только этот поток.
-    /// - `head` загружается с `Acquire` — нужно увидеть все записи производителя.
-    /// - `tail` сохраняется с `Release` — чтобы производитель видел освободившееся место.
-    pub fn pop(&self) -> Option<Vec<u8>> {
-        let tail = self.tail.load(Ordering::Relaxed);
-
-        // Если tail совпадает с head — буфер пуст.
-        // Acquire: видим все записи производителя.
-        if tail == self.head.load(Ordering::Acquire) {
-            return None;
-        }
-
-        // Читаем данные из слота.
-        unsafe {
-            // `get_unchecked` безопасен, так как tail всегда в пределах [0, capacity).
-            // `assume_init_read` перемещает `Vec<u8>` из слота, оставляя его неинициализированным.
-            let data = self.buffer.get_unchecked(tail).assume_init_read();
-            let next_tail = (tail + 1) % self.capacity;
-            self.tail.store(next_tail, Ordering::Release);
-            Some(data)
-        }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Возвращает текущее количество элементов в буфере.
-    /// Результат приближённый, так как между загрузками head и tail может произойти изменение.
+    /// Приблизительное значение, так как между загрузками `head` и `tail` может произойти изменение.
     pub fn len(&self) -> usize {
         let head = self.head.load(Ordering::Acquire);
         let tail = self.tail.load(Ordering::Acquire);
@@ -115,21 +64,160 @@ impl RingBuffer {
         }
     }
 
-    /// Очищает буфер, извлекая все элементы.
-    /// Предполагается, что другие потоки не обращаются к буферу одновременно.
-    /// Обычно вызывается перед уничтожением.
-    pub fn clear(&self) {
-        while self.pop().is_some() {}
+    /// Добавляет элемент в конец очереди (со стороны производителя).
+    /// Если буфер полон, возвращает `Err(data)`.
+    ///
+    /// # Порядок доступа
+    /// - `head` загружается с `Relaxed` (изменяется только этим потоком).
+    /// - `tail` загружается с `Acquire`, чтобы увидеть изменения потребителя.
+    /// - `head` сохраняется с `Release`, чтобы запись данных стала видна потребителю.
+    pub fn push(&self, data: Vec<u8>) -> Result<(), Vec<u8>> {
+        // Простая валидация: не пустой пакет и не слишком большой.
+        if data.is_empty() {
+            println!("push: dropped empty packet");
+            return Err(data);
+        }
+        if data.len() > MAX_PACKET_SIZE {
+            println!("push: dropped oversize packet ({} bytes)", data.len());
+            return Err(data);
+        }
+
+        let head = self.head.load(Ordering::Relaxed);
+        let next_head = (head + 1) % self.capacity;
+
+        // Если следующий head упёрся в tail — буфер полон.
+        if next_head == self.tail.load(Ordering::Acquire) {
+            println!("push: buffer full, dropping packet");
+            return Err(data);
+        }
+
+        // Запись данных в слот.
+        unsafe {
+            // Получаем указатель на слот head. Используем арифметику указателей для избежания проверок.
+            let slot = self.buffer.as_ptr().add(head) as *mut MaybeUninit<Vec<u8>>;
+            // запись без паники; если Vec::new() или клонирование может паниковать —
+            // это уже ответственность вызывающего.
+            slot.write(MaybeUninit::new(data));
+        }
+
+        // Публикуем новый head так, чтобы потребитель увидел запись.
+        self.head.store(next_head, Ordering::Release);
+        Ok(())
+    }
+
+    /// Добавляет элемент в начало очереди (со стороны потребителя, например, при повторной попытке отправки).
+    /// Использует CAS (compare-and-swap) для безопасного резервирования слота,
+    /// чтобы не конфликтовать с `pop()`, который также изменяет `tail`.
+    ///
+    /// # Алгоритм
+    /// 1. Загружаем текущий `tail`.
+    /// 2. Вычисляем новый `next_tail` (предыдущий индекс в кольце).
+    /// 3. Если новый tail упёрся в `head` — буфер полон.
+    /// 4. Пытаемся атомарно заменить `tail` на `next_tail` с помощью `compare_exchange_weak`.
+    /// 5. Если успешно — записываем данные в зарезервированный слот.
+    /// 6. Если CAS не удался (другой поток изменил `tail`), повторяем с новым значением.
+    pub fn push_front(&self, data: Vec<u8>) -> Result<(), Vec<u8>> {
+        // Валидация как в push.
+        if data.is_empty() {
+            println!("push_front: dropped empty packet");
+            return Err(data);
+        }
+        if data.len() > MAX_PACKET_SIZE {
+            println!("push_front: dropped oversize packet ({} bytes)", data.len());
+            return Err(data);
+        }
+
+        let mut tail = self.tail.load(Ordering::Acquire);
+
+        loop {
+            // Вычисляем предыдущий индекс (двигаем tail назад).
+            let next_tail = if tail == 0 { self.capacity - 1 } else { tail - 1 };
+
+            // Если новый tail упёрся в head — места нет.
+            if next_tail == self.head.load(Ordering::Acquire) {
+                println!("push_front: buffer full, dropping packet");
+                return Err(data);
+            }
+
+            // Резервируем слот, движением tail назад.
+            match self.tail.compare_exchange_weak(
+                tail,
+                next_tail,
+                Ordering::AcqRel, // успех: видим запись ранее выполненных действий
+                Ordering::Acquire, // неуспех: получить актуальное значение tail
+            ) {
+                Ok(_) => {
+                    // Успешно зарезервировали слот `next_tail`.
+                    unsafe {
+                        let slot = self.buffer.as_ptr().add(next_tail) as *mut MaybeUninit<Vec<u8>>;
+                        slot.write(MaybeUninit::new(data));
+                    }
+                    return Ok(());
+                }
+                Err(actual) => {
+                    // tail изменился — пробуем снова с новым значением.
+                    tail = actual;
+                }
+            }
+        }
+    }
+
+    /// Извлекает элемент из начала очереди (со стороны потребителя).
+    /// Возвращает `None`, если буфер пуст.
+    ///
+    /// # Алгоритм с CAS
+    /// 1. Загружаем `tail` (текущий индекс для чтения).
+    /// 2. Загружаем `head`. Если `tail == head` — буфер пуст.
+    /// 3. Читаем данные из слота (опасно: используем `ptr::read` для перемещения).
+    /// 4. Пытаемся атомарно сдвинуть `tail` вперёд (освободить слот).
+    /// 5. Если CAS успешен — возвращаем данные.
+    /// 6. Если CAS не удался (конфликт с `push_front`), мы должны «забыть» данные,
+    ///    так как `ptr::read` уже переместил их из слота, но мы не можем вернуть их обратно.
+    ///    Вместо этого мы перезаписываем слот новыми данными при следующем `push_front` или `push`.
+    ///    Важно: `std::mem::forget(data)` не освобождает память, но предотвращает двойное освобождение.
+    pub fn pop(&self) -> Option<Vec<u8>> {
+        // Загружаем текущий tail.
+        let mut tail = self.tail.load(Ordering::Acquire);
+
+        loop {
+            // Загружаем head для проверки на пустоту.
+            let head = self.head.load(Ordering::Acquire);
+
+            if tail == head {
+                return None;
+            }
+
+            let next_tail = (tail + 1) % self.capacity;
+
+            // Сначала пытаемся сдвинуть tail. Успешный CAS с Ordering::Acquire
+            // гарантирует видимость записи производителя (который должен использовать Release).
+            match self.tail.compare_exchange_weak(
+                tail,
+                next_tail,
+                Ordering::Acquire,  // success: Acquire to synchronize with producer's Release
+                Ordering::Relaxed,  // failure: relaxed is sufficient here
+            ) {
+                Ok(_) => {
+                    // Теперь мы "владельцы" индекса — безопасно читать и переместить значение.
+                    unsafe {
+                        let slot = self.buffer.as_ptr().add(tail) as *mut MaybeUninit<Vec<u8>>;
+                        // Читаем Vec из слота (перемещаем).
+                        let value = ptr::read((*slot).as_mut_ptr());
+                        return Some(value);
+                    }
+                }
+                Err(actual) => {
+                    // CAS не удался — обновляем локальный tail и пробуем снова.
+                    tail = actual;
+                }
+            }
+        }
     }
 }
 
 /// Реализация `Drop` гарантирует, что все оставшиеся `Vec<u8>` будут корректно освобождены.
-/// Без этого память, выделенная внутри `Vec`, могла бы утечь, потому что `MaybeUninit`
-/// автоматически не вызывает деструкторы.
 impl Drop for RingBuffer {
     fn drop(&mut self) {
-        // Выкачиваем все элементы, которые ещё не были прочитаны.
-        // Это безопасно, потому что в момент вызова `drop` другие потоки уже не имеют доступа к `self`.
         while self.pop().is_some() {}
     }
 }

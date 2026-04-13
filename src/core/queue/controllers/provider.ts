@@ -98,7 +98,7 @@ export class TrackResolvers {
 
             // Проверяем HTTP HEAD (если это ссылка)
             if (track.link.startsWith("http")) {
-                const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null, timeout: TRACK_CHECK_WAIT });
+                const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null });
                 const status = await client.toHead;
                 const error = httpsStatusCode.parse(status);
 

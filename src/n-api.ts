@@ -1,7 +1,7 @@
 /**
  * Загружаем нативный модуль один раз
  */
-const Native = require('../native/index.js') as any; // или точный путь к .node
+const Native = require('../native/index.js') as any;
 
 /**
  * Универсальный тип для нативного класса по интерфейсу:
@@ -16,7 +16,7 @@ type NativeClass<T extends { constructor?: (...args: any[]) => any }> =
 
 /**
  * Универсальный алиас для удобного использования:
- * iType<typeof NativeTyped.AudioEngine> => тип экземпляра AudioEngine
+ * iType<typeof NativeTyped. AudioEngine> => тип экземпляра AudioEngine
  */
 export type iType<T> = T extends new (...args: any[]) => infer R ? R : never;
 
@@ -27,15 +27,15 @@ export type iType<T> = T extends new (...args: any[]) => infer R ? R : never;
  * сетью, точным таймингом, парсингом OGG/Opus и управлением аудио-очередями.
  *
  * Все классы создаются через `new`, большинство методов синхронные.
- * Асинхронность достигается через колбэки (pipeStdout, startListening, startCycle).
+ * Асинхронность достигается через функции (pipeStdout, startListening, startCycle).
  * Ошибки выбрасываются как экземпляры Error с полем code и message из нативного слоя.
  */
 
 /**
  * @support Тип пакета, обнаруженного парсером OGG/Opus.
- * - head  → OpusHead (основные параметры кодека: каналы, частота дискретизации)
- * - tags  → OpusTags (метаданные: название, артист, комментарии)
- * - frame → аудиофрейм Opus (собственно звук)
+ * - head → OpusHead (основные параметры кодека: каналы, частота дискретизации)
+ * - tags → OpusTags (метаданные: название, артист, комментарии)
+ * - frame → аудио фрейм Opus (собственно звук)
  * @type OpusPacketType
  * @extends OggOpusParser
  */
@@ -47,7 +47,7 @@ export type OpusPacketType = 'head' | 'tags' | 'frame';
 
 /**
  * @description Нативный парсер контейнера OGG с кодеком Opus.
- * Работает потоково: принимает произвольные куски байтов и выдаёт полные Opus-пакеты.
+ * Принимает произвольные куски байтов и выдаёт полные Opus-пакеты.
  * @support Подходит для:
  * - потоков из FFmpeg
  * - RTP-пакетов с OGG-инкапсуляцией
@@ -70,7 +70,7 @@ export interface iOggOpusParser {
     parse(chunk: Buffer, callback: (type: OpusPacketType, data: Buffer) => void): void;
 
     /**
-     * Полностью очищает внутренние буферы (remainder и packet_carry),
+     * Полностью очищает внутренний буфер (remainder и packet_carry),
      * сбрасывает состояние (серийный номер потока, флаг ожидания заголовка).
      * Вызывать обязательно при:
      * - смене источника потока
@@ -83,7 +83,7 @@ export interface iOggOpusParser {
 /**
  * @description Управляемый процесс FFmpeg, запущенный из нативного кода.
  * Процесс работает в отдельном потоке, не блокирует Event Loop Node.js.
- * Stdout читается асинхронно и передаётся через колбэк.
+ * Stdout читается асинхронно и передаётся через функцию.
  * @interface FfmpegProcess
  */
 export interface iFfmpegProcess {
@@ -93,7 +93,7 @@ export interface iFfmpegProcess {
      * Запускает чтение stdout и передачу данных в JS.
      * Вызывается один раз после создания экземпляра.
      *
-     * @param callback - основной колбэк: вызывается для каждого чанка stdout (обычно OGG/Opus)
+     * @param callback - основная функция: вызывается для каждого чанка stdout (обычно OGG/Opus)
      */
     pipeStdout(callback: (pul: {
         type: OpusPacketType,
@@ -292,7 +292,7 @@ export interface iUDPSocket {
  * шифрует полезную нагрузку (Opus-фрейм) с использованием режима AEAD_AES_256_GCM_RTPSIZE,
  * который требует включения заголовка RTP в дополнительные аутентифицированные данные (AAD).
  *
- * Счётчики sequence, timestamp и nonce counter управляются атомарно и потокобезопасны.
+ * Счётчики sequence, timestamp и nonce counter управляются атомарно
  */
 export interface VoiceRTPSocket {
     /**
@@ -323,7 +323,7 @@ export interface VoiceRTPSocket {
     constructor(ssrc: number, key: Uint8Array): void;
 
     /**
-     * Шифрует один аудиофрейм (Opus) и возвращает полный RTP-пакет.
+     * Шифрует один аудио фрейм (Opus) и возвращает полный RTP-пакет.
      *
      * # Процесс
      * 1. Формируется RTP-заголовок (12 байт) с текущими значениями sequence, timestamp, SSRC.
@@ -359,13 +359,13 @@ export interface VoiceRTPSocket {
 
 /**
  * DAVESession — основная сессия для протокола MLS (Messaging Layer Security), используемая в Discord для E2EE.
- * Предоставляет методы для управления групповыми ключами, шифрования/расшифрования медиапакетов (Opus/Video) и обработки proposals.
+ * Предоставляет методы для управления групповыми ключами, шифрования/расшифрования аудио пакетов (Opus/Video) и обработки proposals.
  *
  * @remarks
  * - Сессия инициализируется с версией протокола, ID пользователя, ID канала и опциональной парой ключей подписи.
  * - После инициализации может быть получен KeyPackage для отправки другим участникам.
  * - Для работы необходимо вызвать `setExternalSender` и обработать proposals/commit/welcome.
- * - Поддерживается режим passthrough (прозрачный пропуск пакетов) с опциональным таймаутом.
+ * - Поддерживается режим passthrough (прозрачный пропуск пакетов) с опциональным тайм-аутом.
  * - Ведётся статистика шифрования/расшифрования.
  *
  * @see https://github.com/discord/dave
@@ -383,7 +383,7 @@ export interface DAVESession {
      * # Ошибки
      * - Если `protocol_version == 0`
      * - Если `user_id` или `channel_id` не являются корректными числами
-     * - Если внутренняя инициализация `davey` не удалась (например, неверные параметры)
+     * - Если внутренняя инициализация `Davey` не удалась (например, неверные параметры)
      */
     constructor(protocolVersion: number, userId: string, channelId: string, keyPair?: SigningKeyPair | undefined | null): void;
 
@@ -422,7 +422,7 @@ export interface DAVESession {
     /**
      * Возвращает внутренний статус сессии в виде числа.
      *
-     * Значения определяются реализацией `davey`. Обычно:
+     * Значения определяются реализацией `Davey`. Обычно:
      * - `0` — инициализация
      * - `1` — готова
      * - `2` — ошибка
@@ -571,6 +571,7 @@ export interface DAVESession {
 export interface ProposalsResult {
     /** Commit-данные (всегда присутствуют при успешной обработке). */
     commit?: Buffer;
+
     /** Welcome-данные (требуются, если в группу добавляются новые участники). */
     welcome?: Buffer;
 }
@@ -581,8 +582,10 @@ export interface ProposalsResult {
 export interface JsEncryptionStats {
     /** Количество успешных операций шифрования. */
     successes: number;
+
     /** Количество неудачных операций. */
     failures: number;
+
     /** Общее количество попыток шифрования. */
     attempts: number;
 }
@@ -593,10 +596,13 @@ export interface JsEncryptionStats {
 export interface JsDecryptionStats {
     /** Количество успешных операций расшифрования. */
     successes: number;
+
     /** Количество неудачных операций. */
     failures: number;
+
     /** Общее количество попыток расшифрования. */
     attempts: number;
+
     /** Количество пакетов, пропущенных через passthrough (не расшифрованных). */
     passthroughs: number;
 }
@@ -608,6 +614,7 @@ export interface JsDecryptionStats {
 export interface SigningKeyPair {
     /** Приватный ключ (должен храниться в секрете). */
     private: Buffer;
+
     /** Публичный ключ (распространяется открыто). */
     public: Buffer;
 }

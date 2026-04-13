@@ -6,10 +6,20 @@ import { SetArray } from "#structures";
 /**
  * @author SNIPPIK
  * @description Класс для взаимодействия с клиентским websocket
- * @supported `@discordjs/voice`, `other`
  * @class VoiceAdapters
  * @abstract
  * @public
+ *
+ * @example
+ * ```ts
+ * class Voice<T extends DiscordClient = DiscordClient> extends VoiceAdapters<DiscordClient> {
+ *      public constructor() {
+ *          super();
+ *      };
+ *
+ *      ...methods
+ * }
+ * ```
  */
 export abstract class VoiceAdapters<T extends any> {
     /**
@@ -31,6 +41,7 @@ export abstract class VoiceAdapters<T extends any> {
      * @abstract
      * @public
      *
+     * @example
      * ```
      * public voiceAdapterCreator = (guildID: string) => {
      *         const id = this.client.shardID;
@@ -39,7 +50,7 @@ export abstract class VoiceAdapters<T extends any> {
      *             this.adapters.set(guildID, methods);
      *
      *             return {
-     *                 sendPayload: (data) => {
+     *                 send: (data) => {
      *                     this.client.ws.shards.get(id).send(data);
      *                     return true;
      *                 },
@@ -60,6 +71,7 @@ export abstract class VoiceAdapters<T extends any> {
      * @abstract
      * @public
      *
+     * @example
      * ```
      *         this.client.rest.put(`/channels/${channelId}/voice-status`, {
      *             body: {
@@ -94,9 +106,9 @@ export abstract class VoiceAdapters<T extends any> {
 
 /**
  * @author SNIPPIK
- * @description Класс для отправки данных через discord.js
+ * @description Класс адаптер, нужен для общения с голосовым подключением
  * @class VoiceAdapter
- * @private
+ * @public
  */
 export class VoiceAdapter {
     /**
@@ -120,13 +132,13 @@ export class VoiceAdapter {
          * @description Пакет состояния на сервере
          * @public
          */
-        server: undefined as GatewayVoiceServerUpdateDispatchData,
+        server: null as GatewayVoiceServerUpdateDispatchData,
 
         /**
          * @description Пакет текущего голосового состояния
          * @public
          */
-        state: undefined as GatewayVoiceStateUpdateDispatchData
+        state: null as GatewayVoiceStateUpdateDispatchData
     };
 
     /**
@@ -135,11 +147,10 @@ export class VoiceAdapter {
      * @returns boolean
      * @public
      */
-    public sendPayload = (config: VoiceConnectionConfiguration) => {
+    public send = (config: VoiceConnectionConfiguration) => {
         try {
-            return this.adapter?.sendPayload({op: GatewayOpcodes.VoiceStateUpdate, d: config });
-        } catch (e) {
-            console.error("hook error in adapter", e);
+            return this.adapter?.send({op: GatewayOpcodes.VoiceStateUpdate, d: config });
+        } catch {
             return false;
         }
     };
@@ -158,6 +169,22 @@ export class VoiceAdapter {
  * @description Шлюз Discord Адаптер, шлюза Discord.
  * @interface DiscordGatewayAdapterLibraryMethods
  * @public
+ *
+ * @example
+ * ```ts
+ * onVoiceServerUpdate: (packet) => {
+ *      // обновляем данные пакета voice_server
+ *
+ *      // Если есть точка подключения
+ *      if (packet.endpoint) {
+ *          // подключаемся к ws
+ *      }
+ * },
+ * onVoiceStateUpdate: (packet) => {
+ *      // обновляем данные пакета voice_state
+ * },
+ * destroy: this.destroy
+ * ```
  */
 export interface DiscordGatewayAdapterLibraryMethods {
     /**
@@ -194,7 +221,17 @@ export interface DiscordGatewayAdapterImplementerMethods {
      * @param payload - Полезная нагрузка для отправки на основное соединение Discord gateway
      * @returns `false`, если полезная нагрузка определенно не была отправлена - в этом случае голосовое соединение отключается
      */
-    sendPayload(payload: any): boolean;
+    send(payload: DiscordVoiceUpdate): boolean;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Тип данных, обновляет состояние клиента в голосовом канале
+ * @interface DiscordVoiceUpdate
+ */
+interface DiscordVoiceUpdate {
+    op: GatewayOpcodes.VoiceStateUpdate;
+    d: VoiceConnectionConfiguration;
 }
 
 /**

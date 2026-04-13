@@ -2,17 +2,13 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use memchr::memmem;
 
-/// Максимально допустимый размер страницы Ogg в байтах.
-/// Используется для защиты от некорректных или злонамеренных входных данных.
-const MAX_PAGE_SIZE: usize = 1024 * 1024 * 5;
-
 /// Тип пакета Opus, извлечённого из потока Ogg.
 /// Соответствует трём возможным типам пакетов в спецификации Opus over Ogg.
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum PacketType {
-    Head,   // Заголовок идентификационного пакета ("OpusHead")
-    Tags,   // Пакет с комментариями/тегами ("OpusTags")
-    Frame,  // Аудио-фрейм (сами звуковые данные)
+    Head,
+    Tags,
+    Frame,
 }
 
 impl PacketType {
@@ -24,6 +20,13 @@ impl PacketType {
             Self::Frame => "frame",
         }
     }
+}
+
+/// Объект, возвращаемый в JavaScript
+#[napi(object)]
+pub struct JsOpusPacket {
+    pub kind: String,
+    pub data: Buffer,
 }
 
 /// Парсер Ogg Opus потока, работающий в режиме потока (streaming).
@@ -53,6 +56,19 @@ pub struct OggOpusParser {
     /// (PacketType::Frame) игнорируются до тех пор, пока не встретится Head.
     /// Необходимо для синхронизации с началом потока, после переключения/сброса.
     waiting_for_head: bool,
+
+    /// Количество байт от начала буфера `remainder`, которые уже были проверены на наличие маркера "OggS".
+    ///
+    /// Оптимизация, позволяющая не сканировать уже просмотренную область при повторных вызовах `parse_core`.
+    ///
+    /// ## Как работает
+    /// - Изначально `scanned_bytes = 0`.
+    /// - При поиске маркера мы начинаем не с `cursor`, а с `max(cursor, scanned_bytes)`, пропуская уже проверенные данные.
+    /// - Если маркер найден, `scanned_bytes` обновляется до его позиции (все байты до неё теперь считаются проверенными).
+    /// - Если маркер не найден, `scanned_bytes` устанавливается в `remainder.len() - 3`, оставляя последние 3 байта
+    ///   на случай, если начало маркера "OggS" попадёт в следующий фрагмент (сигнатура длиной 4 байта, оставляем запас).
+    /// - После удаления обработанных данных из `remainder` (через `drain`) значение `scanned_bytes` уменьшается на размер удалённой части.
+    scanned_bytes: usize
 }
 
 #[napi]
@@ -61,10 +77,11 @@ impl OggOpusParser {
     #[napi(constructor)]
     pub fn new() -> Self {
         Self {
-            remainder: Vec::with_capacity(1024 * 2),
-            packet_carry: Vec::with_capacity(1024),
+            remainder: Vec::with_capacity(1024 * 5), // Чуть больше для типичного чанка
+            packet_carry: Vec::with_capacity(1024 * 2), // Хватит для большинства Opus пакетов
             bitstream_serial: -1,
             waiting_for_head: true,
+            scanned_bytes: 0,
         }
     }
 
@@ -78,28 +95,35 @@ impl OggOpusParser {
     ///   - `kind` (string) – тип пакета ("head", "tags", "frame")
     ///   - `data` (Buffer) – бинарные данные пакета
     #[napi]
-    pub fn parse(&mut self, env: Env, chunk: Buffer, emit: JsFunction) -> Result<()> {
+    pub fn parse(&mut self, chunk: Buffer) -> Result<Vec<JsOpusPacket>> {
         let data = chunk.as_ref();
+        let mut js_packets = Vec::with_capacity(10); // Эвристика для батчинга
+
         if data.is_empty() {
             // Пустой буфер — сигнал конца потока, сбрасываем остатки
             let mut remaining = Vec::new();
-            self.flush(&mut remaining)?;
-            for (packet_type, data) in remaining {
-                let kind = env.create_string(packet_type.as_str())?;
-                let buffer = env.create_buffer_with_data(data)?;
-                emit.call(None, &[kind.into_unknown(), buffer.into_unknown()])?;
+            self.flush_internal(&mut remaining)?;
+            for (packet_type, pkt_data) in remaining {
+                js_packets.push(JsOpusPacket {
+                    kind: packet_type.as_str().to_string(),
+                    data: pkt_data.into(),
+                });
             }
-            return Ok(());
+            return Ok(js_packets);
         }
 
         // Вызываем общий внутренний парсер, передавая замыкание,
         // которое для каждого пакета конвертирует данные в JS-значения и вызывает вызов.
-        self.parse_core(chunk.as_ref(), |packet_type, data| {
-            let kind = env.create_string(packet_type.as_str())?;
-            let buffer = env.create_buffer_with_data(data)?; // копирует данные в JS-буфер
-            emit.call(None, &[kind.into_unknown(), buffer.into_unknown()])?;
+        self.parse_core(data, |packet_type, packet_slice| {
+            // Копируем срез памяти напрямую в V8 Buffer, избегая промежуточного Vec
+            js_packets.push(JsOpusPacket {
+                kind: packet_type.as_str().to_string(),
+                data: Buffer::from(packet_slice),
+            });
             Ok(())
-        })
+        })?;
+
+        Ok(js_packets)
     }
 
     /// Внутренний Rust-ориентированный API (быстрый, без накладных расходов N-API).
@@ -109,10 +133,12 @@ impl OggOpusParser {
     /// * `chunk` - новые входные данные
     /// * `output` - вектор, в который будут добавлены кортежи (тип пакета, данные)
     pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<(PacketType, Vec<u8>)>) -> Result<()> {
-        if chunk.is_empty() { return self.flush(output); }
+        if chunk.is_empty() {
+            return self.flush_internal(output);
+        }
 
         self.parse_core(chunk, |packet_type, data| {
-            output.push((packet_type, data));
+            output.push((packet_type, data.to_vec()));
             Ok(())
         })
     }
@@ -141,208 +167,274 @@ impl OggOpusParser {
     /// # Возвращаемое значение
     /// - `Ok(())` — успешно обработаны остатки.
     /// - `Err` — ошибка при обработке пакета (например, недопустимый тип).
-    pub fn flush(&mut self, output: &mut Vec<(PacketType, Vec<u8>)>) -> Result<()> {
-        // Если есть необработанный остаток (неполные страницы), которые не содержат маркер "OggS",
-        // они считаются повреждёнными или незавершёнными. В корректном Ogg-потоке после закрытия
-        // все данные должны быть разобраны на страницы, поэтому этот остаток игнорируем.
-        if !self.remainder.is_empty() {
-            // Однако если в `packet_carry` накопились данные, это может быть последний пакет,
-            // который не был завершён сегментом <255 (например, последний сегмент страницы был 255,
-            // и конец пакета совпал с концом потока). В этом случае обрабатываем его.
-            if !self.packet_carry.is_empty() {
-                // Обрабатываем накопленный пакет через стандартную логику `process_packet_core`,
-                // которая определяет тип пакета и, при необходимости, добавляет его в выходной вектор.
-                Self::process_packet_core(&mut self.packet_carry, &mut self.waiting_for_head, &mut |packet_type, data| {
-                    output.push((packet_type, data));
+    fn flush_internal(&mut self, output: &mut Vec<(PacketType, Vec<u8>)>) -> Result<()> {
+        if !self.remainder.is_empty() || !self.packet_carry.is_empty() {
+            Self::process_packet_core(
+                &mut self.packet_carry,
+                &mut self.waiting_for_head,
+                &mut |packet_type, data| {
+                    output.push((packet_type, data.to_vec()));
                     Ok(())
-                })?;
-                self.packet_carry.clear();
-            }
+                },
+            )?;
+            self.packet_carry.clear();
         }
         Ok(())
     }
 
-    /// Основная логика парсинга, общая для обоих API.
-    /// Обрабатывает входной фрагмент, извлекая полные Ogg-страницы и собирая пакеты.
+    /// Принудительно извлекает все оставшиеся данные из парсера и завершает обработку потока.
     ///
-    /// Алгоритм:
-    /// 1. Добавляет новые данные в буфер `remainder`.
-    /// 2. Ищет маркер начала страницы "OggS" (магическая сигнатура).
-    /// 3. Проверяет, достаточно ли данных для чтения заголовка страницы (27 байт).
-    /// 4. Из заголовка извлекает количество сегментов, вычисляет полный размер страницы.
-    /// 5. Если все данные страницы присутствуют, передаёт её в `handle_page_core`.
-    /// 6. Повторяет до тех пор, пока не закончатся полные страницы.
-    /// 7. Оставляет неполные данные в `remainder` для следующего вызова.
-    fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
-        // Добавляем новый фрагмент к остатку предыдущих вызовов.
+    /// Этот метод должен вызываться после того, как все входные данные были переданы в парсер
+    /// (например, при закрытии потока или достижении EOF). Он обрабатывает ситуацию, когда
+    /// в буферах парсера остались неполные данные, которые не могут быть завершены обычным
+    /// способом из-за отсутствия последующих страниц Ogg.
+    ///
+    /// # Алгоритм
+    /// 1. Проверяет наличие необработанных данных в `remainder` (неполные страницы).
+    /// 2. Если в `packet_carry` есть накопленный пакет, который не был завершён из-за
+    ///    отсутствия последнего сегмента (<255), он обрабатывается как завершённый пакет.
+    /// 3. Все пакеты добавляются в `output` для отправки в JS.
+    ///
+    /// # Примечания по безопасности
+    /// - Неполные страницы в `remainder` (без маркера "OggS") отбрасываются, так как по
+    ///   спецификации Ogg пакет может быть завершён только внутри полной страницы.
+    /// - Если `packet_carry` содержит данные, они считаются последним пакетом потока.
+    /// - Флаг `waiting_for_head` игнорируется, так как при завершении потока мы всё равно
+    ///   отдаём всё, что накопили, даже если заголовок не был получен (это позволит избежать
+    ///   потери данных в случае обрыва соединения).
+    ///
+    /// # Возвращаемое значение
+    /// - `Ok(())` — успешно обработаны остатки.
+    /// - `Err` — ошибка при обработке пакета (например, недопустимый тип).
+    #[napi]
+    pub fn flush(&mut self) -> Result<Vec<JsOpusPacket>> {
+        let mut internal_output = Vec::new();
+        self.flush_internal(&mut internal_output)?;
+
+        let js_packets = internal_output.into_iter().map(|(kind, data)| JsOpusPacket {
+            kind: kind.as_str().to_string(),
+            data: Buffer::from(data),
+        }).collect();
+
+        Ok(js_packets)
+    }
+
+    /// Основная логика парсинга Ogg-потока.
+    ///
+    /// Добавляет новый фрагмент данных в буфер `remainder`, затем циклически извлекает
+    /// полные Ogg-страницы, обрабатывает их и вызывает колбэк `on_packet` для каждого
+    /// собранного пакета. Реализована оптимизация поиска маркера "OggS" с использованием
+    /// поля `scanned_bytes`, чтобы не пересканировать уже проверенные участки буфера.
+    ///
+    /// # Аргументы
+    /// * `chunk` - новый фрагмент данных (может быть пустым, но обычно не пуст)
+    /// * `on_packet` - колбэк, вызываемый для каждого завершённого пакета
+    ///                 (тип пакета + ссылка на данные без копирования)
+    ///
+    /// # Возвращает
+    /// `Result<()>` – ошибка может возникнуть при переполнении payload, слишком большой странице
+    /// или при ошибках в `handle_page_core`.
+    ///
+    /// # Примечания
+    /// - Метод сохраняет состояние между вызовами (буфер `remainder`, `scanned_bytes` и т.д.).
+    /// - Пустой `chunk` не обрабатывается здесь — вызывающий код должен самостоятельно вызвать `flush`.
+    fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()>
+    where F: FnMut(PacketType, &[u8]) -> Result<()> {
+        // Добавляем новый фрагмент в конец остатка
         self.remainder.extend_from_slice(chunk);
+        let mut cursor: usize = 0; // текущая позиция в remainder (начало необработанных данных)
 
-        let mut processed = 0;          // количество уже обработанных байт в remainder
-        let total_len = self.remainder.len();
+        loop {
+            let available = self.remainder.len().saturating_sub(cursor);
+            if available < 27 {
+                // Не хватает данных даже для минимального заголовка Ogg-страницы (27 байт)
+                break;
+            }
 
-        // Пытаемся извлечь страницы, пока достаточно данных для минимального заголовка.
-        while processed + 27 <= total_len {
-            // Ищем паттерн "OggS" начиная с текущей позиции processed.
-            let window = &self.remainder[processed..];
+            // Оптимизированный поиск маркера "OggS"
+            // Начинаем поиск с позиции, где мы ещё не искали (max(cursor, scanned_bytes))
+            let search_start = cursor + self.scanned_bytes.saturating_sub(cursor);
+            let window = &self.remainder[search_start..];
+
             let pos = match memmem::find(window, b"OggS") {
-                Some(p) => p,
-                None => { // маркер не найден — ждём ещё данных
-                    // оставляем только хвост для возможного "OggS" на границе чанков
-                    let keep = 3.min(total_len);
-                    self.remainder.drain(..total_len - keep);
-                    return Ok(());
-                },
+                Some(p) => {
+                    // Маркер найден на позиции p относительно окна; абсолютная позиция в remainder:
+                    search_start + p
+                }
+                None => {
+                    // Маркер не найден во всей оставшейся части.
+                    // Чтобы не сканировать её заново при следующем вызове, запоминаем,
+                    // что до конца буфера (минус 3 байта) маркера нет.
+                    // Вычитаем 3, потому что маркер "OggS" (4 байта) может быть разорван на границе чанков.
+                    self.scanned_bytes = self.remainder.len().saturating_sub(3);
+                    break;
+                }
             };
 
-            // Сдвигаем processed до начала предполагаемой страницы.
-            processed += pos;
+            cursor = pos;
+            self.scanned_bytes = cursor; // все байты до cursor уже проверены
 
-            // Проверяем, хватает ли данных для заголовка (27 байт) после этого сдвига.
-            if processed + 27 > total_len {
-                break;
-            }
-
-            // Читаем заголовок страницы (первые 27 байт).
-            let page = &self.remainder[processed..];
-
-            let header_type = page[5];    // флаги заголовка (например, 0x02 = начало потока)
-            let segments = page[26] as usize; // количество сегментов в таблице сегментов
-
-            let header_size = 27 + segments; // полный размер заголовка (включая таблицу сегментов)
-
-            // Проверяем, хватает ли данных для заголовка с таблицей сегментов.
-            if processed + header_size > total_len {
-                break;
-            }
+            // Читаем заголовок страницы
+            let page = &self.remainder[cursor..];
+            let segments = page[26] as usize;          // количество сегментов в таблице сегментов
+            let header_size = 27 + segments;           // полный размер заголовка (27 + таблица)
 
             // Таблица сегментов — это `segments` байт, каждый задаёт размер сегмента (0–255).
             let segment_table = &page[27..header_size];
+            let mut payload_size: usize = 0;
 
-            // Вычисляем общий размер полезной нагрузки (сумма всех размеров сегментов).
-            let payload_size: usize = segment_table
-                .iter()
-                .try_fold(0usize, |acc, &s| acc.checked_add(s as usize))
-                .ok_or_else(|| Error::from_reason("Payload size overflow"))?;
-
-            // Защита от слишком больших страниц (DoS).
-            if payload_size > MAX_PAGE_SIZE {
-                return Err(Error::from_reason("Ogg page too large"));
+            // Суммируем размеры сегментов, проверяя переполнение
+            for &s in segment_table {
+                payload_size = payload_size
+                    .checked_add(s as usize)
+                    .ok_or_else(|| Error::from_reason("Payload overflow"))?;
             }
 
-            let page_end = processed + header_size + payload_size;
+            let page_end = cursor + header_size + payload_size;
 
-            // Проверяем, полностью ли страница присутствует в буфере.
-            if page_end > total_len {
-                break;
+            // Если в текущий пакет не удается вместить все
+            if self.remainder.len() < page_end {
+                break; // страница неполная, ждём ещё данных
             }
 
-            // Извлекаем полную страницу (заголовок + данные).
-            let page = &self.remainder[processed..page_end];
+            // Извлекаем полную страницу (заголовок + сегменты + полезная нагрузка)
+            let full_page = &self.remainder[cursor..page_end];
 
-            // Передаём страницу на обработку (разбор сегментов и сборка пакетов).
-            Self::handle_page_core(
-                page,
-                header_type,
-                segments,
-                &mut self.packet_carry,
-                &mut self.bitstream_serial,
-                &mut self.waiting_for_head,
-                &mut on_packet,
-            )?;
+            // Обрабатываем страницу: разбираем сегменты, собираем пакеты
+            if let Err(_err) = Self::handle_page_core(full_page, full_page[5], segments, &mut self.packet_carry,                 &mut self.bitstream_serial,     // серийный номер потока
+                                                      &mut self.waiting_for_head, &mut on_packet) {
+                // В идеале тут нужно логирование ошибки (например, через console.warn в JS)
+                // Чтобы не зациклиться, сдвигаем курсор на 1 байт вперед, чтобы на следующей
+                // итерации memmem начал искать следующий "OggS"
+                cursor += 1;
+                self.scanned_bytes = cursor;
+                continue;
+            }
 
-            // Перемещаем указатель processed за конец обработанной страницы.
-            processed = page_end;
+            // Перемещаем курсор за обработанную страницу
+            cursor = page_end;
+            self.scanned_bytes = cursor;
         }
 
-        // Удаляем обработанные данные из буфера remainder.
-        if processed > 0 {
-            self.remainder.drain(..processed);
+        // Удаляем из `remainder` все полностью обработанные байты (от 0 до cursor)
+        if cursor > 0 {
+            self.remainder.drain(..cursor);
+            // Корректируем `scanned_bytes`: вычитаем количество удалённых байт
+            self.scanned_bytes = self.scanned_bytes.saturating_sub(cursor);
         }
 
         Ok(())
     }
 
-    /// Обрабатывает одну полную Ogg-страницу: разбирает сегменты и собирает из них пакеты.
+    /// Обрабатывает одну полную Ogg-страницу: разбирает таблицу сегментов, собирает из них пакеты
+    /// и вызывает колбэк `on_packet` для каждого завершённого пакета.
     ///
     /// # Аргументы
-    /// * `page` - полные данные страницы (включая заголовок)
-    /// * `header_type` - поле flags из заголовка страницы
-    /// * `segments` - количество сегментов в таблице сегментов
-    /// * `packet_carry` - буфер для текущего собираемого пакета (может продолжаться на след-странице)
-    /// * `bitstream_serial` - серийный номер потока (проверяется на смену)
-    /// * `waiting_for_head` - флаг ожидания заголовочного пакета
-    /// * `on_packet` - замыкание, вызываемое для каждого завершённого пакета
-    fn handle_page_core<F>(page: &[u8], header_type: u8, segments: usize, packet_carry: &mut Vec<u8>, bitstream_serial: &mut i32, waiting_for_head: &mut bool, on_packet: &mut F) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
-        let continued = header_type & 0x01 != 0;
+    /// * `page` – полные данные страницы (заголовок + сегменты + полезная нагрузка)
+    /// * `header_type` – флаги заголовка (continuation, BOS, EOS и т.д.)
+    /// * `segments` – количество сегментов в таблице сегментов
+    /// * `packet_carry` – буфер для текущего собираемого пакета (может содержать данные с предыдущей страницы)
+    /// * `bitstream_serial` – текущий серийный номер потока (будет обновлён)
+    /// * `waiting_for_head` – флаг ожидания заголовка OpusHead (может быть изменён)
+    /// * `on_packet` – колбэк, вызываемый для каждого завершённого пакета (тип пакета + ссылка на данные)
+    ///
+    /// # Алгоритм
+    /// 1. Определяем флаг `continued` – является ли эта страница продолжением предыдущего пакета.
+    /// 2. Если страница не продолжает пакет, но в `packet_carry` что-то есть – значит предыдущий пакет был оборван,
+    ///    и мы его сбрасываем (по спецификации Ogg).
+    /// 3. Извлекаем серийный номер потока из байтов 14-17 (little-endian).
+    /// 4. Если серийный номер изменился (и не равен -1) – это новый логический поток, сбрасываем состояние.
+    /// 5. Обновляем `bitstream_serial`.
+    /// 6. Если страница помечена как BOS (beginning of stream) – также сбрасываем состояние.
+    /// 7. Проходим по всем сегментам из таблицы сегментов:
+    ///    - Добавляем данные сегмента в `packet_carry`.
+    ///    - Если размер сегмента меньше 255, это сигнал конца пакета. Вызываем `process_packet_core`
+    ///      для обработки накопленного пакета, затем очищаем `packet_carry` для следующего.
+    ///    - Если сегмент равен 255, пакет продолжается на следующем сегменте (или странице).
+    /// 8. После обработки всех сегментов пакет может остаться в `packet_carry`, если последний сегмент был 255,
+    ///    и будет продолжен на следующей странице.
+    ///
+    /// # Примечания
+    /// - Функция не перемещает `packet_carry` (оставляет его владельцу), но очищает после завершённого пакета.
+    /// - Используются безопасные проверки границ через `page.get(..)`, избегая паники.
+    /// - `on_packet` получает ссылку на данные пакета без копирования (только чтение).
+    fn handle_page_core<F>(page: &[u8], header_type: u8, segments: usize, packet_carry: &mut Vec<u8>, bitstream_serial: &mut i32, waiting_for_head: &mut bool, on_packet: &mut F) -> Result<()>
+    where F: FnMut(PacketType, &[u8]) -> Result<()> {
+        // Флаг 0x01 в header_type означает, что этот пакет продолжает предыдущий (continuation)
+        let continued = (header_type & 0x01) != 0;
 
-        // Если страница продолжает пакет, но у нас нет данных — поток битый
-        if continued && packet_carry.is_empty() {
-            // Просто пропускаем данные этой страницы до первого завершённого пакета
-            // Ничего не делаем — packet_carry останется пустым
-        }
-
-        // Если НЕ continuation, но packet_carry не пуст — сбрасываем (рассинхрон)
+        // Если страница не является продолжением, но в буфере `packet_carry` уже есть данные,
+        // значит предыдущий пакет был оборван (например, из-за ошибки в потоке). Сбрасываем его.
         if !continued && !packet_carry.is_empty() {
             packet_carry.clear();
         }
 
-        // Извлекаем серийный номер потока (little-endian, байты 14-17).
+        // Извлекаем серийный номер потока из байтов 14-17 (little-endian, как в спецификации Ogg)
         let serial = i32::from_le_bytes(
             page[14..18]
                 .try_into()
                 .map_err(|_| Error::from_reason("Invalid serial"))?,
         );
 
-        // Если серийный номер изменился (и не равен -1), значит начался новый логический поток.
-        // Очищаем буфер пакета и устанавливаем флаг ожидания заголовка.
+        // Если серийный номер изменился (и не равен -1, что означает первый поток), то начался новый
+        // логический поток. Сбрасываем состояние: очищаем буфер пакета и переходим в режим ожидания заголовка.
         if *bitstream_serial != -1 && *bitstream_serial != serial {
             packet_carry.clear();
             *waiting_for_head = true;
         }
-
-        // Обновляем текущий серийный номер.
+        // Обновляем текущий серийный номер
         *bitstream_serial = serial;
 
-        // Если страница помечена как "начало потока" (header_type & 0x02 != 0),
-        // то любой недовыдушенный пакет с предыдущей страницы должен быть отброшен,
-        // и мы снова ждём заголовок (по спецификации Ogg).
-        if header_type & 0x02 != 0 {
+        // Если страница помечена как "начало потока" (BOS – header_type & 0x02), также сбрасываем состояние.
+        // BOS означает, что это первая страница в новом потоке, и предыдущее состояние невалидно.
+        if (header_type & 0x02) != 0 {
             packet_carry.clear();
             *waiting_for_head = true;
         }
 
-        // Таблица сегментов находится сразу после 27-байтового заголовка.
-        let segment_table = &page[27..27 + segments];
+        // Таблица сегментов находится сразу после 27-байтового заголовка, занимает `segments` байт.
+        let segment_table = page
+            .get(27..27 + segments)
+            .ok_or_else(|| Error::from_reason("Segment table out of bounds"))?;
+        let mut offset = 27 + segments; // начало полезной нагрузки (первый сегмент)
+        let mut skip_packet = continued && packet_carry.is_empty();
 
-        // Начало полезной нагрузки (после таблицы сегментов).
-        let mut offset = 27 + segments;
-
-        // Проходим по всем сегментам.
+        // Проходим по всем сегментам
         for &s in segment_table {
-            let s = s as usize;  // размер текущего сегмента (0-255)
-
+            let s = s as usize; // размер текущего сегмента (0-255)
             let end = offset + s;
-            if end > page.len() {
-                return Err(Error::from_reason("Segment overflow"));
+
+            // Если пакет надо откинуть
+            if skip_packet {
+                if s < 255 {
+                    skip_packet = false; // Брошенный пакет закончился, следующий сегмент будет нормальным
+                }
+                offset = end;
+                continue;
             }
 
-            // Добавляем данные сегмента в текущий собираемый пакет.
-            packet_carry.extend_from_slice(&page[offset..end]);
+            // Безопасно извлекаем данные сегмента (с проверкой границ)
+            let segment_data = page
+                .get(offset..end)
+                .ok_or_else(|| Error::from_reason("Segment data out of bounds"))?;
+
+            // Добавляем данные сегмента в текущий собираемый пакет
+            packet_carry.extend_from_slice(segment_data);
             offset = end;
 
-            // Если сегмент имеет размер меньше 255, это означает конец пакета (в Ogg пакет может
-            // занимать несколько сегментов, и последний сегмент всегда <255, либо пакет завершается
-            // на границе страницы). Если s < 255, пакет завершён.
+            // Если сегмент меньше 255, это сигнал конца пакета (по спецификации Ogg: пакет завершается,
+            // когда встречается сегмент с размером <255, либо когда заканчиваются сегменты на странице).
             if s < 255 {
-                // Обрабатываем накопленный пакет.
+                // Обрабатываем накопленный пакет (определяем тип, отбрасываем фреймы до заголовка и т.д.)
                 Self::process_packet_core(packet_carry, waiting_for_head, on_packet)?;
-                // Очищаем буфер для следующего пакета.
+                // Очищаем буфер для следующего пакета (сохраняем выделенную память)
                 packet_carry.clear();
             }
+            // Если s == 255, пакет продолжается на следующем сегменте (или на следующей странице)
         }
 
-        // Если мы дошли до конца страницы, а пакет не завершён (последний сегмент был 255),
-        // то packet_carry остаётся с данными и будет дополнен на следующей странице.
+        // Если после обработки всех сегментов `packet_carry` не пуст, значит последний сегмент был 255,
+        // и пакет будет продолжен на следующей странице. Оставляем его в буфере.
         Ok(())
     }
 
@@ -353,7 +445,8 @@ impl OggOpusParser {
     /// - Если ожидается заголовок (`waiting_for_head == true`) и пакет является фреймом,
     ///   он отбрасывается (поток ещё не синхронизирован).
     /// - Если пакет является Head, флаг `waiting_for_head` сбрасывается.
-    fn process_packet_core<F>(packet: &mut Vec<u8>, waiting_for_head: &mut bool, on_packet: &mut F) -> Result<()> where F: FnMut(PacketType, Vec<u8>) -> Result<()>, {
+    fn process_packet_core<F>(packet: &mut Vec<u8>, waiting_for_head: &mut bool, on_packet: &mut F) -> Result<()>
+    where F: FnMut(PacketType, &[u8]) -> Result<()> {
         // Пустой пакет игнорируем (не должен возникать, но на всякий случай).
         if packet.is_empty() {
             return Ok(());
@@ -362,16 +455,24 @@ impl OggOpusParser {
         // Определяем тип пакета по его содержимому.
         let packet_type = Self::detect_packet_type(packet);
 
-        // Если это заголовочный пакет (OpusHead), снимаем флаг ожидания.
-        if packet_type == PacketType::Head {
-            *waiting_for_head = false;
+        // Логика ожидания заголовка OpusHead
+        if *waiting_for_head {
+            if packet_type == PacketType::Frame {
+                // Игнорируем фреймы, но очищаем буфер, оставляя память.
+                packet.clear();
+                return Ok(());
+            } else if packet_type == PacketType::Head {
+                *waiting_for_head = false;
+            }
         }
 
-        // Забираем данные из packet (std::mem::take очищает вектор, оставляя его пустым).
-        let data = std::mem::take(packet);
+        // Передаём данные в колбэк (ссылку на срез, без копирования).
+        on_packet(packet_type, packet.as_slice())?;
 
-        // Вызываем пользовательский обработчик.
-        on_packet(packet_type, data)
+        // Очищаем буфер, сохраняя выделенную память для следующего пакета.
+        packet.clear();
+
+        Ok(())
     }
 
     /// Определяет тип пакета Opus по его начальным байтам.
@@ -394,9 +495,11 @@ impl OggOpusParser {
     /// Может быть полезно для обработки нового потока без создания нового объекта.
     #[napi]
     pub fn destroy(&mut self) {
+        // clear() обнуляет длину, но оставляет capacity, что идеально для пула
         self.remainder.clear();
         self.packet_carry.clear();
         self.bitstream_serial = -1;
         self.waiting_for_head = true;
+        self.scanned_bytes = 0;
     }
 }

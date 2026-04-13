@@ -17,7 +17,7 @@ use crate::audio::ring_buffer::RingBuffer;
 use crate::timers::scheduler::balancer::{add_global_session, remove_global_session};
 
 /// Время до отправки keepalive пакета, для работы через nat системы
-const KEEP_ALIVE_TIMEOUT: u64 = 10000;
+const KEEP_ALIVE_TIMEOUT: u64 = 5000;
 
 /// Внутренние данные UDP-сокета с буфером исходящих пакетов и статистикой.
 ///
@@ -39,6 +39,7 @@ pub struct UdpBufferedInner {
     /// без блокировок.
     pub send_drops: AtomicUsize,
 
+    /// Последнее зафиксированное время отправки пакета
     pub last_send_ms: AtomicU64
 }
 
@@ -53,6 +54,13 @@ impl UdpBufferedInner {
         }
     }
 
+    /// Проверка есть ли еще данные в кольцевом буфере
+    ///
+    /// Если нет буфера, то и нет смысла вызывать tick
+    pub fn has_ticked(&self) -> bool {
+        !self.buffer.is_empty()
+    }
+
     /// Попытка отправить один пакет из очереди.
     ///
     /// Вызывается из тика CycleManager. Пытается захватить блокировку очереди без ожидания
@@ -60,35 +68,44 @@ impl UdpBufferedInner {
     /// Если отправка завершается ошибкой WouldBlock (сокет временно недоступен),
     /// пакет возвращается в начало очереди (push_front) для повторной попытки позже,
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
-    pub fn tick(&self) {
-        let now = now_ms();
+    pub fn tick(&self, now: u64) {
+        // Первая попытка взять пакет
+        if let Some(packet) = self.buffer.pop() {
+            match self.socket.send(&packet) {
+                Ok(_) => {
+                    self.last_send_ms.store(now, Ordering::Relaxed);
+                }
+                Err(_) => {
+                    self.send_drops.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+            return;
+        }
+
+        // Нет пакета — даём шанс другим потокам и пробуем ещё раз.
+        thread::yield_now();
 
         if let Some(packet) = self.buffer.pop() {
             match self.socket.send(&packet) {
                 Ok(_) => {
                     self.last_send_ms.store(now, Ordering::Relaxed);
                 }
-
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    // Возвращаем пакет обратно без panic
-                    let _ = self.buffer.push(packet);
-                    self.send_drops.fetch_add(1, Ordering::Relaxed);
-                }
-
                 Err(_) => {
-                    let _ = self.buffer.push(packet);
                     self.send_drops.fetch_add(1, Ordering::Relaxed);
                 }
             }
-
-            return;
         }
+    }
 
-        // ===== Keep-alive =====
-        let last_ts = self.last_send_ms.load(Ordering::Relaxed);
+    /// Тот же tick, но для поддержания подключения через системы NAT
+    ///
+    /// Отправляем пакеты через KEEP_ALIVE_TIMEOUT интервалы
+    pub fn tick_alive(&self, now: u64) {
+        // Keep-alive логика
+        let last_send = self.last_send_ms.load(Ordering::Relaxed);
 
-        if now >= last_ts + KEEP_ALIVE_TIMEOUT {
-            // статический silent frame (без аллокаций)
+        if now.saturating_sub(last_send) >= KEEP_ALIVE_TIMEOUT {
+            // Стандартный тихий кадр Opus для Discord
             static SILENT_FRAME: [u8; 8] = [0u8; 8];
 
             if self.socket.send(&SILENT_FRAME).is_ok() {
@@ -123,7 +140,7 @@ pub struct UdpBuffered {
     destroyed: Arc<AtomicBool>,
 
     /// Уникальный идентификатор сессии, используемый для регистрации в глобальном балансировщике.
-    id: u32,
+    id: u32
 }
 
 #[napi]
@@ -152,9 +169,9 @@ impl UdpBuffered {
 
         let inner = Arc::new(UdpBufferedInner {
             socket: Arc::new(socket),
-            buffer: RingBuffer::new(512),
+            buffer: RingBuffer::new(1024),
             send_drops: AtomicUsize::new(0),
-            last_send_ms: AtomicU64::new(now_ms()),
+            last_send_ms: AtomicU64::new(now_ms())
         });
 
         // Генерируем случайный идентификатор для этой сессии.
@@ -284,36 +301,13 @@ impl UdpBuffered {
         }
 
         self.stop_listening();
-        self.inner.buffer.clear();
         remove_global_session(self.id);
     }
 
     /// Пытается добавить байты во внутренний буфер для последующей отправки.
-    ///
-    /// Метод выполняет фильтрацию входящих данных:
-    /// - Пакеты длиной 3 байта, начинающиеся с последовательности `[0xF8, 0xFF, 0xFE]`,
-    ///   считаются специальными и также помещаются в буфер. Эта магическая последовательность
-    ///   часто используется в аудиокодеках (например, Opus) для обозначения пустых фреймов
-    ///   или маркеров тишины, которые не должны отбрасываться.
-    /// - Любые другие пакеты длиной более 3 байт добавляются без изменений.
-    /// - Пакеты длиной 3 байта, не соответствующие магической последовательности, игнорируются.
-    /// - Пакеты короче 3 байт отбрасываются (предположительно, это невалидные данные).
     #[inline]
     fn try_push(&self, bytes: &[u8]) {
-        // Если пакет состоит ровно из 3 байт и это специальная сигнатура тишины,
-        // то он нужен для сохранения таймингов и не должен отбрасываться.
-        if bytes.len() == 3 {
-            if bytes.starts_with(&[0xF8, 0xFF, 0xFE]) {
-                self.inner.push(bytes.to_vec());
-            }
-            return;
-        }
-
-        // Все остальные пакеты, которые длиннее 3 байт, считаются полноценными
-        // фреймами и отправляются в буфер.
-        if bytes.len() > 3 {
-            self.inner.push(bytes.to_vec());
-        }
+        self.inner.push(bytes.to_vec());
     }
 
     /// Создаёт клон UdpBuffered, предназначенный для использования в менеджере (CycleManager).
@@ -332,7 +326,11 @@ impl UdpBuffered {
     /// Метод, вызываемый из CycleManager для отправки одного пакета из очереди.
     /// (Внутренний, не экспортируется в JS).
     pub fn tick(&self) {
-        self.inner.tick();
+        let now = now_ms();
+
+        // Если есть пакеты для обычной отправки
+        if self.inner.has_ticked() { self.inner.tick(now); }
+        else { self.inner.tick_alive(now); }
     }
 
     /// Количество пакетов, сброшенных из-за переполнения очереди или временных ошибок.

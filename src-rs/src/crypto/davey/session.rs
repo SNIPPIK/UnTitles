@@ -1,32 +1,3 @@
-//! # DaveSession — MLS-сессия для E2EE в Discord
-//!
-//! Этот модуль предоставляет обёртку над `davey::DaveSession` для использования в Node.js через N-API.
-//! Реализует полный цикл управления групповыми ключами, шифрование/расшифрование аудио/видео пакетов,
-//! обработку proposals, commit'ов и welcome-сообщений.
-//!
-//! ## Основные возможности
-//! - Инициализация и переинициализация сессии с параметрами пользователя/канала
-//! - Генерация `KeyPackage` для распространения среди участников
-//! - Обработка proposals (добавление/удаление участников, обновление ключей)
-//! - Шифрование и расшифрование медиапакетов (Opus/Video) с поддержкой батчевой обработки
-//! - Режим passthrough для отладки
-//! - Сбор статистики успешных/неудачных операций
-//!
-//! ## Пример использования в JavaScript
-//! ```javascript
-//! const session = new DAVESession(1, "123456", "789012");
-//! const keyPackage = session.getSerializedKeyPackage();
-//! // отправить keyPackage другим участникам...
-//! session.setExternalSender(externalSenderData);
-//! const { commit, welcome } = session.processProposals(op, proposals, recognizedIds);
-//! session.processCommit(commit);
-//! const encrypted = session.encryptOpus(opusFrame);
-//! ```
-//!
-//! ## Ссылки
-//! - [MLS Protocol (RFC 9420)](https://messaginglayersecurity.rocks/)
-//! - [Discord Dave](https://github.com/discord/dave)
-
 use crate::crypto::davey::signing_key_pair::{SigningKeyPair, JsDecryptionStats, JsEncryptionStats, ProposalsResult};
 use std::num::NonZeroU16;
 use napi::bindgen_prelude::{Buffer, Error, Result};
@@ -393,7 +364,6 @@ impl DaveSession {
   ///
   /// # Ошибки
   /// Если сессия не готова, пользователь не найден в группе, или аутентификация не пройдена.
-  #[napi]
   pub fn decrypt(&mut self, user_id: String, media_type: u8, packet: Buffer) -> Result<Buffer> {
     let uid = Self::parse_id(user_id, "user id")?;
     let mt = Self::map_media_type(media_type)?;
@@ -401,10 +371,28 @@ impl DaveSession {
     Ok(Buffer::from(out.as_ref()))
   }
 
+  /// Расшифровывает пакет, полученный от указанного пользователя.
+  ///
+  /// # Аргументы
+  /// * `user_id` - Идентификатор отправителя (snowflake).
+  /// * `packet` - Зашифрованный пакет.
+  ///
+  /// # Возвращает
+  /// Расшифрованный исходный пакет.
+  ///
+  /// # Ошибки
+  /// Если сессия не готова, пользователь не найден в группе, или аутентификация не пройдена.
+  #[napi(js_name = "decryptOpus")]
+  pub fn decrypt_fast(&mut self, user_id: String, packet: Buffer) -> Result<Buffer> {
+    let uid = Self::parse_id(user_id, "user id")?;
+    let out = self.inner.decrypt(uid, davey::MediaType::AUDIO, &packet).map_err(Self::err)?;
+    Ok(Buffer::from(out.as_ref()))
+  }
+
   /// Возвращает статистику операций шифрования для всей сессии.
   ///
   /// Статистика включает общее количество попыток, успехов и неудач с момента последнего сброса.
-  #[napi]
+  #[napi(getter)]
   pub fn get_encryption_stats(&self) -> Option<JsEncryptionStats> {
     self.inner.get_encryption_stats(None).map(|s| JsEncryptionStats {
       successes: s.successes as u32,

@@ -27,7 +27,6 @@ class BaseQueueController<T extends Queue> {
 
     /**
      * @description Хранилище циклов для работы музыки
-     * @readonly
      * @public
      */
     public cycles = new ControllerCycles();
@@ -55,7 +54,7 @@ class BaseQueueController<T extends Queue> {
                     const player = queue.player;
 
                     // Ставим на последнюю позицию
-                    if (queue.tracks.total > 0) queue.tracks.position = queue.tracks.total - 1;
+                    if (queue.tracks.size > 0) queue.tracks.position++;
 
                     // Если у плеера стоит пауза
                     if (player.status === "player/pause") player.resume();
@@ -160,10 +159,10 @@ export class ControllerQueues<T extends Queue> extends BaseQueueController<T> {
      * @public
      */
     public options = {
-        optimization: parseInt(env.get("duration.optimization")),
-        volume: parseInt(env.get("audio.volume")),
+        optimization: parseInt(env.get("duration.optimization", "15")),
+        volume: parseInt(env.get("audio.volume", "70")),
         swapFade: parseInt(env.get("audio.swap.fade", "5")),
-        fade: parseInt(env.get("audio.fade"))
+        fade: parseInt(env.get("audio.fade", "10"))
     };
 }
 

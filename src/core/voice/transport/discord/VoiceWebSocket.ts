@@ -2,7 +2,6 @@ import { VoiceCloseCodes, VoiceOpcodes } from "discord-api-types/voice/v8";
 import { type Data, type MessageEvent, WebSocket } from "ws";
 import { HeartbeatManager } from "../../structures/heartbeat";
 import { type WebSocketOpcodes } from "#core/voice";
-import { OPUS_FRAME_SIZE } from "#core/audio";
 import { TypedEmitter } from "#structures";
 
 /**
@@ -38,21 +37,19 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public sequence: number = -1;
 
     /**
-     * @description Последняя зафиксированная задержка в ms
-     * @default 120
-     * @public
-     */
-    private _latency: number = 60;
-
-    /**
      * @description Задержка WS ответа между UDP пакетами
      * @public
      */
     public get latency() {
-        if (!this._latency) return 0;
+        return this._heartbeat.latency;
+    };
 
-        // Не забываем что аудио длится 20 ms, сразу гасим ping задержки пакета
-        return this._latency - OPUS_FRAME_SIZE;
+    /**
+     * @description Текущий статус ws подключения
+     * @public
+     */
+    public get status() {
+        return this.ws.readyState;
     };
 
     /**
@@ -61,9 +58,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public set packet(payload: WebSocketOpcodes.extract | WebSocketOpcodes.dave_opcodes | Buffer) {
-        // Для отладки
-        this.emit("debug", `[WebSocket/send]:`, payload);
-
         try {
             if (payload instanceof Buffer) this.ws.send(payload);
             else this.ws.send(JSON.stringify(payload));
@@ -105,8 +99,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Получен HEARTBEAT_ACK
             onAck: (latency) => {
-                this._latency = latency;
-
                 // Отправляем событие об ответе от websocket
                 this.emit("info", `HEARTBEAT_ACK received. Latency: ${latency} ms`);
             }
@@ -123,8 +115,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public connect = (endpoint: string, code?: VoiceCloseCodes): void => {
         // Если ws клиент уже есть
         if (this.ws) {
-            if (code) this.emit("info", `[WebSocket/${code}] has reset connection`);
-
             // Удаляем ws, поскольку он будет создан заново
             this.reset();
         }
@@ -193,9 +183,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
             // Отправляем полученный буфер
             this.emit("binary", { op, payload });
-
-            // Для отладки
-            this.emit("debug", `[WebSocket/get]:`, { op, sequence, payload: !!payload });
             return null;
         }
 
@@ -217,7 +204,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @returns void
      * @private
      */
-    private onReceiveMessage = (data: MessageEvent) => {
+    private onReceiveMessage = (data: MessageEvent): void => {
         const payload = this.readRawData(data.data);
 
         // Если нет данных
@@ -290,9 +277,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 break;
             }
         }
-
-        // Для отладки
-        this.emit("debug", `[WebSocket/get]:`, payload);
     };
 
     /**
@@ -334,8 +318,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this._heartbeat.destroy();
             this._heartbeat = null;
         }
-
-        this._latency = null;
     };
 }
 
@@ -351,8 +333,11 @@ interface ClientWebSocketEvents {
      */
     "error": (err: Error) => void;
 
+    /**
+     * @description Обычное логирование действий
+     * @param text - Лог
+     */
     "info": (text: string) => void;
-    "debug": (state: string, text: any) => void;
 
     /**
      * @description Если получен код выключения от discord

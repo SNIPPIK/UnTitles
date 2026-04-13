@@ -63,15 +63,6 @@ abstract class Request {
     };
 
     /**
-     * @description Какой Agent надо будет использовать для Keep-Alive
-     * @private
-     */
-    private get agent() {
-        const protocol = this.data.protocol;
-        return protocol === "https:" ? httpsAgent : httpAgent;
-    };
-
-    /**
      * Выполняет HTTP/HTTPS-запрос с поддержкой автоматического следования редиректам (до 5).
      * Возвращает Promise с объектом `IncomingMessage` (ответ сервера).
      *
@@ -192,58 +183,67 @@ abstract class Request {
     };
 
     /**
+     * Генерирует случайный User-Agent (Firefox на Linux/Windows)
+     * @private
+     */
+    private get generateRandomUserAgent(): string {
+        // Генерируем новый User-Agent
+        const revision = Math.floor(Math.random() * 2) + 145; // Генерация числа около 140
+        const OS = ["X11; Linux x86_64", "Windows NT 10.0; Win64; x64", "X11; Linux i686"];
+        const randomOS = OS[Math.floor(Math.random() * OS.length)];
+
+        return `Mozilla/5.0 (${randomOS}; rv:${revision}.0) Gecko/20100101 Firefox/${revision}.0`;
+    };
+
+    /**
      * @description Инициализируем класс
      * @param options - Опции
      * @constructor
      * @public
      */
     public constructor(options: httpsClient["data"]) {
-        let parsedUrl: URL | undefined;
+        // Извлекаем url и userAgent отдельно, остальное сохраняем как переопределяемые поля
+        const { url, userAgent, agent, ...baseOptions } = options;
 
-        // Проверяем, является ли это корректным URL, используя try/catch с URL
-        try {
-            parsedUrl = new URL(options.url);
-        } catch (e) {
-            // Если URL не корректен, можно выбросить ошибку
-            console.error(`[httpsClient]: Invalid URL provided: ${options.url}`);
-        }
-
-        // Применяем стандартные настройки и настройки из URL
-        if (parsedUrl) {
-            this.data = {
-                ...this.data,
-                hostname: parsedUrl.hostname,
-                protocol: parsedUrl.protocol,
-                path: parsedUrl.pathname + parsedUrl.search,
-                port: parsedUrl.port || (parsedUrl.protocol === "https:" ? 443 : 80),
-            };
-        }
-
-        // Если нет Agent (Keep-Alive)
-        if (!options.agent) {
-            options.agent = new this.agent();
-        }
-
-        // Устанавливаем User-Agent
-        if (options.userAgent !== undefined) {
-            let ua: string;
-
-            if (typeof options.userAgent === "string") ua = options.userAgent;
-            else {
-                // Генерируем новый User-Agent
-                const revision = Math.floor(Math.random() * 2) + 145; // Генерация числа около 140
-                const OS = ["X11; Linux x86_64", "Windows NT 10.0; Win64; x64", "X11; Linux i686"];
-                const randomOS = OS[Math.floor(Math.random() * OS.length)];
-
-                ua = `Mozilla/5.0 (${randomOS}; rv:${revision}.0) Gecko/20100101 Firefox/${revision}.0`;
+        // Парсим URL и получаем компоненты (если URL передан)
+        let urlComponents: Partial<Pick<httpsClient["data"], "hostname" | "protocol" | "path" | "port">> = {};
+        if (url) {
+            try {
+                const parsed = new URL(url);
+                urlComponents = {
+                    protocol: parsed.protocol,
+                    hostname: parsed.hostname,
+                    path: parsed.pathname + parsed.search,
+                    port: parsed.port || (parsed.protocol === "https:" ? 443 : 80),
+                };
+            } catch {
+                // URL невалидный – выбрасываем ошибку, чтобы избежать неопределённого поведения
+                throw new TypeError(`[httpsClient] Invalid URL: ${url}`);
             }
-
-            this.data.headers = { ...this.data.headers, "User-Agent": ua };
+        } else {
+            throw new Error("[httpsClient]: Not found URL");
         }
 
-        // Чистое объединение опций: сначала удаляем, потом объединяем.
-        const { url, userAgent, ...restOptions } = options;
-        this.data = { ...this.data, ...restOptions };
+        // Готовим заголовки: базовые + User-Agent
+        const headers = { ...this.data.headers, ...baseOptions.headers };
+
+        if (userAgent !== undefined) {
+            // вынесено в отдельный метод
+            headers["User-Agent"] = typeof userAgent === "string" ? userAgent : this.generateRandomUserAgent;
+        }
+
+        // Формируем финальный объект data:
+        //    - сначала значения по умолчанию из this.data
+        //    - затем компоненты URL (если есть)
+        //    - затем явные поля из baseOptions (включая headers)
+        //    - agent передаётся отдельно: если не указан – создаём новый
+        this.data = {
+            ...this.data,
+            ...urlComponents,
+            ...baseOptions,
+            agent,
+            headers,
+        };
     };
 }
 

@@ -42,7 +42,7 @@ const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 5);
  * @const PLAYER_SEND_POOL
  * @private
  */
-const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 2);
+const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 3);
 
 /**
  * @author SNIPPIK
@@ -76,7 +76,9 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                     if ((now - this._lastAdjust >= PLAYER_SEND_NATIVE) && (this.options.duration !== quantized)) {
                         const step = this.options.duration > quantized ? -OPUS_FRAME_SIZE : OPUS_FRAME_SIZE;
                         this.options.duration = Math.max(PLAYER_SEND_NATIVE, Math.min(this.options.duration + step, quantized));
-                        this._lastAdjust = now;
+
+                        // Добавляем Cooldown
+                        this._lastAdjust = now + PLAYER_SEND_NATIVE * 5;
                     }
                 }
             },
@@ -107,24 +109,28 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 // Текущая задержка шага
                 let toSend = Math.ceil(this.options.duration / OPUS_FRAME_SIZE);
 
-                // Добавляем буфер
-                if (audio.packets > 0 && connection.udp.packets <= PLAYER_SEND_POOL) {
+                // Добавляем буфер, как и раньше
+                if (connection.udp.packets <= PLAYER_SEND_POOL) {
                     toSend += PLAYER_SEND_POOL;
                 }
 
-                // Если есть что отправлять
-                if (toSend <= 0) {
-                    if (audio.packets === 0 && connection.udp.packets === 0) {
-                        player.status = AudioPlayerState.idle;
-                        player.cycle = false;
+                //console.log(connection.udp.packets, toSend);
+
+                // вычисляем, сколько можно отправить, чтобы не превышать toSend + PLAYER_SEND_POOL
+                const maxAllowedTotal = toSend + PLAYER_SEND_POOL;
+                const allowed = Math.max(0, maxAllowedTotal - connection.udp.packets);
+
+                if (allowed > 0) {
+                    // запрашиваем ровно allowed пакетов (audio.packetAt вернёт меньше, если нет)
+                    const batch = audio.packetAt(allowed);
+                    if (batch && batch.length > 0) {
+                        connection.packet(batch);
+                        // увеличиваем локальный буферный учёт на реально отправленное количество
+                        player._buffered = (player._buffered || 0) + batch.length;
                     }
-                    return;
                 }
 
-                const batch = audio.packetAt(toSend);
-                connection.packet(batch);
-                player._buffered = batch.length;
-
+                // Если источник пуст И буфер в Rust полностью проигран:
                 if (audio.packets === 0 && connection.udp.packets === 0) {
                     player.status = AudioPlayerState.idle;
                     player.cycle = false;
@@ -193,7 +199,7 @@ const MESSAGE_COOLDOWN_TIME = 5e3;
  * - Сообщения автоматически удаляются, если очередь музыки исчезла или компоненты отсутствуют.
  *
  * @example
- * ```typescript
+ * ```ts
  * const messages = new Messages();
  * const msg = await messages.ensure(guildId, () => channel.send({ embeds: [embed] }));
  * if (msg) messages.update(msg, newComponents);

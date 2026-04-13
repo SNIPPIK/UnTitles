@@ -4,7 +4,7 @@
  * @const timeout
  * @private
  */
-const HEART_TIMEOUT_ASK = 7e3;
+const HEART_TIMEOUT_ASK = 3e3;
 
 /**
  * @author SNIPPIK

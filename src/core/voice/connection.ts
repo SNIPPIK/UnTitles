@@ -47,8 +47,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public set status(status) {
-        this.emit("info", `[Voice/Status]: ${this._status} --> ${status}`);
-
         // Производится попытка переподключения после уничтожения подключения
         if (this._status === null && status === ConnectionStatus.reconnecting) {
             return;
@@ -59,7 +57,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             // Инициализируем подключение
             if (this.adapter) {
                 // Подключаемся
-                this.adapter.sendPayload(this.configuration);
+                this.adapter.send(this.configuration);
                 return;
             }
 
@@ -185,7 +183,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         });
 
         this.transport.on("close", (code, reason) => {
-            Logger.log("DEBUG",`[Voice Layer/${this.configuration.guild_id}]: ${code} -> ${reason}`);
+            Logger.log("DEBUG",`[Voice Layer/${this.configuration.guild_id}]: ${code}: ${reason}`);
         });
     };
 
