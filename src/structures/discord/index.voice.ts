@@ -1,4 +1,4 @@
-import { VoiceAdapters, DiscordGatewayAdapterCreator } from "#core/voice/transport/adapter";
+import { VoiceAdapters, DiscordGatewayAdapterLibraryMethods} from "#core/voice/transport/adapter";
 import type { DiscordClient } from "#structures/discord/index.client";
 
 /**
@@ -17,11 +17,11 @@ export class SeyfertVoice<T extends DiscordClient> extends VoiceAdapters<Discord
      * @param guild_id - ID сервера для которого надо создать адаптер
      * @public
      */
-    public voiceAdapterCreator = (guild_id: string): DiscordGatewayAdapterCreator => {
+    public voiceAdapterCreator = (guild_id: string) => {
         // Если нет ID осколка
         const id = this.client.gateway.calculateShardId(guild_id);
 
-        return methods => {
+        return (methods: DiscordGatewayAdapterLibraryMethods) => {
             this.adapters.set(guild_id, methods);
 
             return {
