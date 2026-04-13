@@ -7,11 +7,11 @@
 <h4>The project is aimed at quality, not speed!!!</h4>
 
   <p>
-    <a href="./README.md">
-      English
-    </a>
+    English
     |
+    <a href="./README.md">
     Русский
+    </a>
   </p>
 
   <p>
@@ -49,7 +49,7 @@
 
 ---
 
-> [!WARNING]
+> [!IMPORTANT]
 > ⚠️ WatKLOK (UnTitles) is a complex technical project maintained exclusively by one author, `SNIPPIK`
 > Please respect the authorship and license of the project.
 >
