@@ -1,6 +1,6 @@
 import { BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip } from "node:zlib";
-import { request as httpsRequest, RequestOptions, Agent as httpsAgent } from "node:https";
-import { IncomingMessage, request as httpRequest, Agent as httpAgent } from "node:http";
+import { request as httpsRequest, RequestOptions } from "node:https";
+import { IncomingMessage, request as httpRequest } from "node:http";
 
 /**
  * @author SNIPPIK
