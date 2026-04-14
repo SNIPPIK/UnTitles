@@ -36,7 +36,7 @@ export class HeartbeatManager {
      * @public
      */
     public get latency() {
-        return this.lastAckTime - this.lastSentTime;
+        return Math.abs(this.lastAckTime - this.lastSentTime);
     };
 
     /**

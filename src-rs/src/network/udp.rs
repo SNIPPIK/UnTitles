@@ -82,19 +82,7 @@ impl UdpBufferedInner {
             return;
         }
 
-        // Нет пакета — даём шанс другим потокам и пробуем ещё раз.
-        thread::yield_now();
-
-        if let Some(packet) = self.buffer.pop() {
-            match self.socket.send(&packet) {
-                Ok(_) => {
-                    self.last_send_ms.store(now, Ordering::Relaxed);
-                }
-                Err(_) => {
-                    self.send_drops.fetch_add(1, Ordering::Relaxed);
-                }
-            }
-        }
+        self.send_drops.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Тот же tick, но для поддержания подключения через системы NAT

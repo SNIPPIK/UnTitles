@@ -1,6 +1,19 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use memchr::memmem;
+use crc::{Crc, Algorithm};
+
+// Конфигурация по спецификации Ogg (RFC 3533)
+const OGG_CRC: Crc<u32> = Crc::<u32>::new(&Algorithm {
+    width: 32,
+    poly: 0x04C11DB7,
+    init: 0x00000000,
+    refin: false,
+    refout: false,
+    xorout: 0x00000000,
+    check: 0x00000000, // Это технический параметр крейта
+    residue: 0xFFFFFFFF
+});
 
 /// Тип пакета Opus, извлечённого из потока Ogg.
 /// Соответствует трём возможным типам пакетов в спецификации Opus over Ogg.
@@ -77,8 +90,8 @@ impl OggOpusParser {
     #[napi(constructor)]
     pub fn new() -> Self {
         Self {
-            remainder: Vec::with_capacity(1024 * 5), // Чуть больше для типичного чанка
-            packet_carry: Vec::with_capacity(1024 * 2), // Хватит для большинства Opus пакетов
+            remainder: Vec::with_capacity(1024 * 5),
+            packet_carry: Vec::with_capacity(1024 * 2),
             bitstream_serial: -1,
             waiting_for_head: true,
             scanned_bytes: 0,
@@ -266,7 +279,7 @@ impl OggOpusParser {
                     // Чтобы не сканировать её заново при следующем вызове, запоминаем,
                     // что до конца буфера (минус 3 байта) маркера нет.
                     // Вычитаем 3, потому что маркер "OggS" (4 байта) может быть разорван на границе чанков.
-                    self.scanned_bytes = self.remainder.len().saturating_sub(3);
+                    self.scanned_bytes = search_start.saturating_sub(3);
                     break;
                 }
             };
@@ -300,15 +313,22 @@ impl OggOpusParser {
             // Извлекаем полную страницу (заголовок + сегменты + полезная нагрузка)
             let full_page = &self.remainder[cursor..page_end];
 
+            // Если CRC не прошел — страница битая, ищем следующий маркер
+            if !Self::verify_ogg_crc(full_page) {
+                println!("CRC mismatch! Skipping page...");
+                //cursor += 4; // Сдвигаемся за "OggS"
+                self.scanned_bytes = 0;//cursor;
+                break;
+            }
+
             // Обрабатываем страницу: разбираем сегменты, собираем пакеты
-            if let Err(_err) = Self::handle_page_core(full_page, full_page[5], segments, &mut self.packet_carry,                 &mut self.bitstream_serial,     // серийный номер потока
-                                                      &mut self.waiting_for_head, &mut on_packet) {
+            if let Err(_err) = Self::handle_page_core(full_page, full_page[5], segments, &mut self.packet_carry, &mut self.bitstream_serial, &mut self.waiting_for_head, &mut on_packet) {
                 // В идеале тут нужно логирование ошибки (например, через console.warn в JS)
                 // Чтобы не зациклиться, сдвигаем курсор на 1 байт вперед, чтобы на следующей
                 // итерации memmem начал искать следующий "OggS"
-                cursor += 1;
+                cursor += 4;
                 self.scanned_bytes = cursor;
-                continue;
+                break;
             }
 
             // Перемещаем курсор за обработанную страницу
@@ -363,12 +383,6 @@ impl OggOpusParser {
         // Флаг 0x01 в header_type означает, что этот пакет продолжает предыдущий (continuation)
         let continued = (header_type & 0x01) != 0;
 
-        // Если страница не является продолжением, но в буфере `packet_carry` уже есть данные,
-        // значит предыдущий пакет был оборван (например, из-за ошибки в потоке). Сбрасываем его.
-        if !continued && !packet_carry.is_empty() {
-            packet_carry.clear();
-        }
-
         // Извлекаем серийный номер потока из байтов 14-17 (little-endian, как в спецификации Ogg)
         let serial = i32::from_le_bytes(
             page[14..18]
@@ -376,42 +390,39 @@ impl OggOpusParser {
                 .map_err(|_| Error::from_reason("Invalid serial"))?,
         );
 
+        // Если страница не является продолжением, но в буфере `packet_carry` уже есть данные,
+        // значит предыдущий пакет был оборван (например, из-за ошибки в потоке). Сбрасываем его.
+        if !continued && !packet_carry.is_empty() {
+            packet_carry.clear();
+        }
+
         // Если серийный номер изменился (и не равен -1, что означает первый поток), то начался новый
         // логический поток. Сбрасываем состояние: очищаем буфер пакета и переходим в режим ожидания заголовка.
-        if *bitstream_serial != -1 && *bitstream_serial != serial {
+        else if *bitstream_serial != -1 && *bitstream_serial != serial {
             packet_carry.clear();
-            *waiting_for_head = true;
+            //*waiting_for_head = true;
         }
-        // Обновляем текущий серийный номер
-        *bitstream_serial = serial;
 
         // Если страница помечена как "начало потока" (BOS – header_type & 0x02), также сбрасываем состояние.
         // BOS означает, что это первая страница в новом потоке, и предыдущее состояние невалидно.
-        if (header_type & 0x02) != 0 {
+        else if (header_type & 0x02) != 0 {
             packet_carry.clear();
             *waiting_for_head = true;
         }
+
+        // Обновляем текущий серийный номер
+        *bitstream_serial = serial;
 
         // Таблица сегментов находится сразу после 27-байтового заголовка, занимает `segments` байт.
         let segment_table = page
             .get(27..27 + segments)
             .ok_or_else(|| Error::from_reason("Segment table out of bounds"))?;
         let mut offset = 27 + segments; // начало полезной нагрузки (первый сегмент)
-        let mut skip_packet = continued && packet_carry.is_empty();
 
         // Проходим по всем сегментам
         for &s in segment_table {
             let s = s as usize; // размер текущего сегмента (0-255)
             let end = offset + s;
-
-            // Если пакет надо откинуть
-            if skip_packet {
-                if s < 255 {
-                    skip_packet = false; // Брошенный пакет закончился, следующий сегмент будет нормальным
-                }
-                offset = end;
-                continue;
-            }
 
             // Безопасно извлекаем данные сегмента (с проверкой границ)
             let segment_data = page
@@ -489,6 +500,24 @@ impl OggOpusParser {
             }
         }
         PacketType::Frame
+    }
+
+    fn verify_ogg_crc(page: &[u8]) -> bool {
+        if page.len() < 27 { return false; }
+
+        // Извлекаем CRC из страницы (байты 22-25)
+        let original_crc = u32::from_le_bytes([page[22], page[23], page[24], page[25]]);
+
+        let mut digest = OGG_CRC.digest();
+
+        // Считаем всё, но вместо байтов CRC подставляем нули
+        digest.update(&page[0..22]);
+        digest.update(&[0, 0, 0, 0]);
+        digest.update(&page[26..]);
+
+        let calculated_crc = digest.finalize();
+
+        calculated_crc == original_crc
     }
 
     /// Сбрасывает состояние парсера в исходное.

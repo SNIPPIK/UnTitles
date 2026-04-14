@@ -8,6 +8,36 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
+ * @description Параметры encoders в FFmpeg
+ */
+const ENCODER_PARAMS = {
+    /**
+     * # Параметры
+     * - voip - Favor improved speech intelligibility
+     * - audio - Favor faithfulness to the input (the default).
+     * - lowdelay - Restrict to only the lowest delay modes by disabling voice-optimized modes.
+     */
+    mode: "voip",
+
+    /**
+     * # Параметры
+     * - off - Use constant bit rate encoding.
+     * - on - Use variable bit rate encoding (the default).
+     */
+    vbr: "off",
+
+    /** Потери при кодировании */
+    lost: {
+        /** Разрешаем терять n пакетов за 1 поток */
+        total: "0",
+
+        /** Можно ли сглаживать потери, заполнять пустотой */
+        fec: "off"
+    }
+};
+
+/**
+ * @author SNIPPIK
  * @description Базовый класс для создания аудио
  * @class BaseAudioResource
  * @extends TypedEmitter<AudioResourceEvents>
@@ -116,10 +146,11 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 
             // Указываем формат аудио (ogg/opus)
             "-c:a", "libopus",
+            "-vbr", ENCODER_PARAMS.vbr,
             "-frame_duration", "20",
-            "-vbr", "on",
-            "-compression_level", "10",
-            "-application", "audio",
+            "-fec", ENCODER_PARAMS.lost.fec,
+            "-packet_loss", ENCODER_PARAMS.lost.total,
+            "-application", ENCODER_PARAMS.mode,
             "-f", "ogg",
             "pipe:1"
         ];
