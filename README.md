@@ -9,7 +9,7 @@
   <p>
     English
     |
-    <a href="./README.md">
+    <a href="./README_RU.md">
     Русский
     </a>
   </p>
