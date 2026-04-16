@@ -11,61 +11,34 @@ import { DAVELayer } from "#core/voice/transport/layers/DAVELayer";
 
 /**
  * @author SNIPPIK
- * @description Коды игнорирования
- * @const IGNORED_OPCODES
- * @private
- */
-/*const IGNORED_OPCODES: VoiceCloseCodes[] = [
-    VoiceCloseCodes.CallTerminated
-];*/
-
-/**
- * @author SNIPPIK
  * @description Транспорт голосового соединения
  * @class Transport
  * @extends TypedEmitter
  * @public
  */
 export class Transport extends TypedEmitter<TransportEvents> {
+    /** Текущее состояние транспорта (код + полезная нагрузка). */
     private _state: TransportState = {
         code: TransportStateCode.Closed,
         payload: null
     };
 
-    /**
-     * @description Клиент UDP соединения, ключевой класс для отправки пакетов
-     * @public
-     */
+    /** Слой UDP соединения, ключевой класс для отправки пакетов */
     public _udp = new UDPLayer();
 
-    /**
-     * @description Клиент RTP, ключевой класс для шифрования пакетов для отправки через UDP
-     * @public
-     */
+    /** Слой RTP, ключевой класс для шифрования пакетов для отправки через UDP */
     public _rtp = new RTPLayer();
 
-    /**
-     * @description Клиент Dave, для работы сквозного шифрования
-     * @public
-     */
+    /** Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway */
+    public _ws = new VoiceWebSocket();
+
+    /** Клиент Dave, для работы сквозного шифрования */
     public _dave: DAVELayer;
 
-    /**
-     * @description Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway
-     * @public
-     */
-    public _ws: VoiceWebSocket;
-
-    /**
-     * @description Клиент Dave, для работы сквозного шифрования
-     * @public
-     */
+    /** SSRC (синхронизационный источник), полученный от Discord. */
     public ssrc: number;
 
-    /**
-     * @description Клиент Dave, для работы сквозного шифрования
-     * @public
-     */
+    /** Секретный ключ для AES-GCM */
     public secret_key: number[];
 
     /**
@@ -138,15 +111,15 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 // Сохраняем ключ, для повторного использования
                 this.secret_key = d.secret_key;
 
+                // Инициализируем RTP (AES)
                 this._rtp.create(this.ssrc, d.secret_key);
                 this.emit("info", `[Transport/RTP]: has created`);
 
-                // Если есть поддержка DAVE
-                if (MLSSession.max_version > 0) {
-                    this._dave.create(d.dave_protocol_version);
+                if (d.dave_protocol_version) {
+                    // Инициализируем DAVE (MLS)
+                    this._dave.create(d.dave_protocol_version, this._ws);
                     this.emit("info", `[Transport/E2EE]: has created | ${d.dave_protocol_version} | Max --> ${MLSSession.max_version}`);
                 }
-
                 return;
             }
 
@@ -177,6 +150,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      */
     public constructor(private adapter: VoiceAdapter) {
         super();
+        this._dave = new DAVELayer(this.adapter);
     };
 
     /**
@@ -207,7 +181,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
         }
 
         this._ws = new VoiceWebSocket();
-        this._dave = new DAVELayer(this.adapter, this._ws);
+
         if (last_seq) {
             this._ws.sequence = last_seq;
             this._ws.emit("resumed");
@@ -287,9 +261,6 @@ export class Transport extends TypedEmitter<TransportEvents> {
             // Сообщаем что хотим переподключится
             this.emit("close", code, `[Transport/WS]: ${reason}`);
 
-            // Коды которые просто игнорируются
-            //if (IGNORED_OPCODES.includes(code)) return;
-
             // Если можно возобновить подключение
             if ((code === 4_015 || code < 4_000) && this.ready) {
                 this.state = {
@@ -297,9 +268,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     payload: code
                 };
                 return;
-            }
-
-            else if (code !== 4006) {
+            } else if (code !== 4006) {
                 // Если соединение не было закрыто собственноручно
                 if (this.state.code !== TransportStateCode.Closed) {
                     // Пробуем поднять соединение заново

@@ -1,6 +1,6 @@
 use crate::crypto::davey::signing_key_pair::{SigningKeyPair, JsDecryptionStats, JsEncryptionStats, ProposalsResult};
-use std::num::NonZeroU16;
 use napi::bindgen_prelude::{Buffer, Error, Result};
+use std::num::NonZeroU16;
 use napi_derive::napi;
 
 /// Сессия Dave (MLS) для end-to-end шифрования в голосовых каналах Discord.

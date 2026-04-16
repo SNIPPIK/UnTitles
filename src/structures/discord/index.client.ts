@@ -1,148 +1,120 @@
-import { Client, LimitedCollection } from "seyfert";
-import { middlewares } from "#handler/middlewares";
-import { ActivityType } from "seyfert/lib/types";
+import { Client, Options, Partials } from "discord.js";
+import { ActivityType } from "discord-api-types/v10";
 import { Logger } from "#structures";
 import { env } from "#app/env";
 import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
- * @description Реализация клиента discord
+ * @description Класс клиента
  * @class DiscordClient
  * @extends Client
  * @public
  */
 export class DiscordClient extends Client {
     /**
-     * @description Коллекция для cooldown
-     * @readonly
-     * @public
+     * @description ID осколка полученный от менеджера
+     * @private
      */
-    public readonly cooldowns: LimitedCollection<string, number> = new LimitedCollection();
+    private _shard_ID = 0;
 
     /**
-     * @description Создание класса клиента
+     * @description Номер осколка
+     * @returns number
+     * @public
+     */
+    public get shardID(): number {
+        try {
+            return this._shard_ID;
+        } catch {
+            return 0;
+        }
+    };
+
+    /**
+     * @description Уникальный ID бота
+     * @public
+     */
+    public get id() {
+        return this.user.id;
+    };
+
+    /**
+     * @description Создание стандартного осколка
+     * @constructor
      * @public
      */
     public constructor() {
         super({
-            /**
-             * @description Хуки для команд
-             */
-            commands: {
-                defaults: {
-                    onBeforeOptions: (ctx) => {
-                        Logger.log("DEBUG", `[${ctx.author.name}] run autocomplete ${ctx.fullCommandName}`);
-                    },
-                    onAfterRun: (ctx) => {
-                        Logger.log("DEBUG", `[${ctx.author.name}] run command ${ctx.fullCommandName}`);
-                    },
-                    onMiddlewaresError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Command | Middleware Error\n` +
-                            `┌ Reason:  ${ctx.fullCommandName}\n` +
-                            `└ Stack:   ${error}`
-                        );
-                    },
-
-                    onRunError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Command | Run Error\n` +
-                            `┌ Reason:  ${ctx.fullCommandName}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
-                    },
-
-                    onInternalError: (_, ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Command | Internal Error\n` +
-                            `┌ Reason:  ${ctx.name} - ${ctx.description}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
-                    },
-
-                    onOptionsError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Command | Options Error\n` +
-                            `┌ Reason:  ${ctx.options}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
+            presence: {
+                status: "online",
+                activities: [
+                    {
+                        name: " 💫 Startup...",
+                        type: 4
                     }
-                }
+                ]
             },
 
-            /**
-             * @description Хуки для компонентов
-             */
-            components: {
-                defaults: {
-                    onAfterRun: (ctx) => {
-                      Logger.log("DEBUG", `[${ctx.author.name}] run component ${ctx.customId}`);
-                    },
+            // Права бота
+            intents: [
+                // Доступ к серверам
+                "Guilds",
 
-                    onMiddlewaresError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Components | Middleware Error\n` +
-                            `┌ Reason:  ${ctx.customId}\n` +
-                            `└ Stack:   ${error}`
-                        );
-                    },
+                // Отправление сообщений
+                "GuildMessages",
 
-                    onInternalError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Components | Internal Error\n` +
-                            `┌ Reason:  ${ctx.options}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
-                    },
+                // Нужен для голосовой системы
+                "GuildVoiceStates",
+            ],
 
-                    onRunError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Components | Run Error\n` +
-                            `┌ Reason:  ${ctx.customId}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
-                    }
-                }
-            },
+            // Позволяет обрабатывать частичные данные
+            partials: [
+                Partials.Channel,
+                Partials.GuildMember,
+                Partials.SoundboardSound,
+                Partials.Message,
+                Partials.Reaction,
+                Partials.User,
+                Partials.GuildScheduledEvent,
+                Partials.ThreadMember,
+            ],
 
-            globalMiddlewares: ["checkCooldown"],
-            allowedMentions: {
-                replied_user: false,
-                parse: ["roles"],
-            }
-        });
-
-        // Отключаем кеширование данных
-        this.setServices({
-            middlewares: middlewares,
-            langs: {
-                aliases: {
-                    "en-US": ["en-GB"],
-                    "es-419": ["es-ES"],
-                }
-            },
-
-            cache: {
-                disabledCache: {
-                    bans: true,
-                    emojis: true,
-                    stickers: true,
-                    roles: true,
-                    presences: true,
-                    messages: true,
-                    stageInstances: true,
-                    overwrites: true
+            // Задаем параметры кеша
+            makeCache: Options.cacheWithLimits({
+                ...Options.DefaultMakeCacheSettings,
+                ...Options.DefaultSweeperSettings,
+                MessageManager: {
+                    keepOverLimit: (value) => value.createdTimestamp > (Date.now() + 60e3 * 10)
                 },
-            },
+                GuildScheduledEventManager: 0,
+                GuildTextThreadManager: 0,
+                ReactionManager: 0,
+                ReactionUserManager: 0,
+                EntitlementManager: 0,
+                StageInstanceManager: 0,
+                GuildBanManager: 0,
+                GuildForumThreadManager: 0,
+                AutoModerationRuleManager: 0,
+                DMMessageManager: 0,
+                GuildInviteManager: 0,
+                GuildEmojiManager: 0,
+                GuildStickerManager: 0,
+                ThreadManager: 0,
+                ThreadMemberManager: 0,
+            })
         });
+
+        /**
+         * @description Получение ответа от WS
+         */
+        this.ws.on("hello", (id) => {
+            this._shard_ID = id;
+        });
+
+        // Ограничиваем кол-во событий
+        this.setMaxListeners(10);
+        this.ws.setMaxListeners(10);
     };
 
     /**
@@ -178,9 +150,8 @@ export class DiscordClient extends Client {
                 const activity = array[i];
 
                 // Установка присутствия в Seyfert
-                this.gateway.setPresence({
+                this.user.setPresence({
                     afk: false,
-                    since: Date.now(),
                     status: botStatus,
                     activities: [activity] as any[]
                 });
@@ -205,16 +176,15 @@ export class DiscordClient extends Client {
      */
     private parseStatuses = () => {
         const statuses: ActivityOptions[] = [];
-        const guilds = this.cache.guilds!.count();
-        const users = this.cache.users!.count();
+        const guilds = this.guilds.cache.size;
+        const users = this.users.cache.size;
 
         // Получаем пользовательские статусы
         try {
             const envPresents = (JSON.parse(`[${env.get("client.presence.array")}]`) as ActivityOptions[]).map((status) => {
                 const edited = status.name
-                    .replace(/{shard}/g, `${this.gateway.size}`)
+                    .replace(/{shard}/g, `${this.shardID + 1}`)
                     .replace(/{queues}|{players}/g, `${db.queues.size}`)
-                    .replace(/{version}/g, `0.5.0 Seyfert`)
                     .replace(/{guilds}/g, `${guilds}`)
                     .replace(/{users}/g, `${users}`)
 
@@ -227,7 +197,7 @@ export class DiscordClient extends Client {
             // Добавляем пользовательские статусы
             statuses.push(...envPresents);
         } catch (e) {
-            this.logger.error(`[Client/Status] Failed to parse env statuses. ${e}`);
+            Logger.log("ERROR", `[Client/Status] Failed to parse env statuses. ${e}`);
         }
 
         return statuses;
@@ -238,10 +208,23 @@ export class DiscordClient extends Client {
  * @author SNIPPIK
  * @description Параметры показа статуса
  * @interface ActivityOptions
+ * @private
  */
 interface ActivityOptions {
     name: string;
     state?: string;
     url?: string;
     type?: ActivityType;
+    shardId?: number | readonly number[];
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные статуса бота из env
+ * @interface ActivityOptionsRaw
+ * @private
+ */
+//@ts-ignore
+interface ActivityOptionsRaw extends ActivityOptions {
+    type?: string;
 }

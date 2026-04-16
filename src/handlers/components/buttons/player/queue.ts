@@ -1,18 +1,22 @@
-import { ComponentCommand, type ComponentContext } from "seyfert";
+import { Component, DeclareComponent } from "#handler/components";
+import { Middlewares } from "#handler/commands";
+import { locale, Logger } from "#structures";
 import { Colors } from "#structures/discord";
-import { MessageFlags } from "seyfert/lib/types";
-import { locale, Logger} from "#structures";
 import { db } from "#app/db";
 
-export default class extends ComponentCommand {
-    componentType = 'Button' as const;
-
-    filter(ctx: ComponentContext<typeof this.componentType>) {
-        return ctx.customId === "queue";
-    }
-
-    async run(ctx: ComponentContext<typeof this.componentType>) {
-        const lang = ctx.interaction.locale;
+/**
+ * @description Кнопка queue, отвечает за показ текущих треков
+ * @class ButtonQueue
+ * @extends Component
+ * @loadeble
+ */
+@DeclareComponent({
+    name: "queue"
+})
+@Middlewares(["queue", "another_voice", "voice"])
+class ButtonQueue extends Component<"button"> {
+    public callback: Component<"button">["callback"] = async (ctx) => {
+        const lang = ctx.locale;
         const queue = db.queues.get(ctx.guildId);
         let page = Math.max(Math.ceil(queue.tracks.position / 5), 1);
         const pages = Math.ceil(queue.tracks.total / 5);
@@ -29,11 +33,11 @@ export default class extends ComponentCommand {
                         "components": [
                             {
                                 "type": 10,
-                                "content": `## ${db.images.disk_emoji} **[${track.artist.title}](${track.artist.url})**`
+                                "content": `### ${db.images.disk_emoji} **[${track.artist.title}](${track.artist.url})**`
                             },
                             {
                                 "type": 10,
-                                "content": `### **[${track.name}](${track.url})**\n> ${track.footer}`
+                                "content": `### **[${track.name}](${track.url})**\n-# ${track.time.split} - ${track.api.name.toLowerCase()} | ${track.user.username}`
                             }
                         ],
                         "accessory": {
@@ -69,7 +73,7 @@ export default class extends ComponentCommand {
 
                         {
                             "type": 10, // Text
-                            "content": `# ${locale._(lang, "queue")} - ${ctx.guild("cache").name}`
+                            "content": `# ${locale._(lang, "queue")} - ${ctx.guild.name}`
                         },
                         ...components,
                         {
@@ -78,7 +82,7 @@ export default class extends ComponentCommand {
                         },
                         {
                             "type": 10, // Text
-                            "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page, pages, queue.tracks.total, queue.tracks.time])
+                            "content": locale._(lang, "player.button.queue.footer", [queue.tracks.track.user.username, page + 1, pages, queue.tracks.total, queue.tracks.time])
                         },
 
                         // Кнопки
@@ -118,55 +122,63 @@ export default class extends ComponentCommand {
 
         try {
             // Отправляем сообщение
-            const message = await ctx.editOrReply({ flags: MessageFlags.IsComponentsV2, components: getContainer(0) }, true);
+            const msg = await ctx.reply({flags: "IsComponentsV2", components: getContainer(0), withResponse: true});
+            const resource = msg?.resource?.message;
+
+            // Если нет ответа от API
+            if (!resource) return;
 
             // Создаем сборщик
-            const collector = message.createComponentCollector({
-                filter: (click) => click.user.id !== message.client.me.id
+            const collector = resource.createMessageComponentCollector({
+                time: 60e3, componentType: 2,
+                filter: (click) => click.user.id !== msg.client.user.id
+            });
+
+            // Собираем кнопки на которые нажал пользователь
+            collector.on("collect", (i) => {
+                // Кнопка переключения на предыдущую страницу
+                if (i.customId === "menu_back") {
+                    // Делаем перелистывание на последнею страницу
+                    if (pages === 1) return null;
+                    else if (page === 0) page = pages - 1;
+                    else page--;
+                }
+
+                // Кнопка переключения на предыдущую страницу
+                else if (i.customId === "menu_next") {
+                    // Делаем перелистывание на первую страницу
+                    if (pages === 1) return null;
+                    else if (page >= pages) page = 0;
+                    else page++;
+                }
+
+                // Кнопка отмены
+                else if (i.customId === "menu_cancel") {
+                    try {
+                        collector.stop();
+                        return resource.delete();
+                    } catch {
+                        return null;
+                    }
+                }
+
+                // Редактируем сообщение
+                return resource.edit({components: getContainer(page)});
             });
 
             // Таймер для удаления сообщения
-            const timer = setTimeout(() => {
+            setTimeout(() => {
                 collector.stop();
-                ctx.deleteResponse();
+                if (resource.deletable) resource.delete().catch(() => null);
             }, 60e3);
-
-            // Собираем кнопки на которые нажал пользователь
-            collector.run("menu_back", () => {
-                // Делаем перелистывание на последнею страницу
-                if (pages === 1) return null;
-                else if (page === 0) page = pages - 1;
-                else page--;
-
-                // Редактируем сообщение
-                return ctx.editOrReply({components: getContainer(page)});
-            });
-
-            // Собираем кнопки на которые нажал пользователь
-            collector.run("menu_next", () => {
-                // Делаем перелистывание на первую страницу
-                if (pages === 1) return null;
-                else if (page >= pages) page = 0;
-                else page++;
-
-                // Редактируем сообщение
-                return ctx.editOrReply({components: getContainer(page)});
-            });
-
-
-            // Собираем кнопки на которые нажал пользователь
-            collector.run("menu_cancel", () => {
-                clearTimeout(timer);
-
-                try {
-                    collector.stop();
-                    ctx.deleteResponse();
-                } catch {
-                    return null;
-                }
-            });
         } catch (error) {
             Logger.log("ERROR", `[Failed send message/queue]: ${error}`);
         }
-    };
+    }
 }
+
+/**
+ * @export default
+ * @description Не даем классам или объектам быть доступными везде в проекте
+ */
+export default [ButtonQueue];

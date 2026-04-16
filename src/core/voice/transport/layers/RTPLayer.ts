@@ -1,19 +1,13 @@
 import { BaseLayer } from "#core/voice/transport/layers/BaseLayer";
 import { VoiceRTPSocket, iType} from "#native";
 
-export class RTPLayer extends BaseLayer<Buffer[]> {
-    /**
-     * @description Клиент RTP, ключевой класс для шифрования пакетов для отправки через UDP
-     * @public
-     */
-    public _rtp: iType<typeof VoiceRTPSocket>;
-
+export class RTPLayer extends BaseLayer<iType<typeof VoiceRTPSocket>> {
     /**
      * @description Готовность RTP слоя
      * @public
      */
     public get ready() {
-        return !!this._rtp;
+        return !!this._client;
     };
 
     /**
@@ -22,7 +16,7 @@ export class RTPLayer extends BaseLayer<Buffer[]> {
      * @public
      */
     public packet = (frames: Buffer[]) => {
-        let rtp = this._rtp.packets(frames);
+        let rtp = this._client.packets(frames);
         /*let attempts = 0;
 
         // Даем шанс на повтор
@@ -45,13 +39,13 @@ export class RTPLayer extends BaseLayer<Buffer[]> {
      */
     public create = (ssrc: number, secret_key: number[]) => {
         // Если уже есть активный RTP
-        if (this._rtp) {
-            this._rtp.destroy();
-            this._rtp = null;
+        if (this._client) {
+            this._client.destroy();
+            this._client = null;
         }
 
         // Создаем подключение RTP
-        this._rtp = new VoiceRTPSocket(
+        this._client = new VoiceRTPSocket(
             ssrc,
             new Uint8Array(secret_key)
         );
@@ -62,7 +56,7 @@ export class RTPLayer extends BaseLayer<Buffer[]> {
      * @public
      */
     public destroy = () => {
-        this._rtp.destroy();
-        this._rtp = null;
+        this._client.destroy();
+        this._client = null;
     };
 }

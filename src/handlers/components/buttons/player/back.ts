@@ -1,18 +1,21 @@
-import { ComponentCommand, type ComponentContext, Middlewares } from 'seyfert';
+import { Component, DeclareComponent } from "#handler/components";
+import { Middlewares } from "#handler/commands";
 import { Colors } from "#structures/discord";
-import { MessageFlags } from 'seyfert/lib/types';
 import { locale } from "#structures";
 import { db } from "#app/db";
 
-@Middlewares(["checkAnotherVoice", "userVoiceChannel"])
-export default class extends ComponentCommand {
-    componentType = 'Button' as const;
-
-    filter(ctx: ComponentContext<typeof this.componentType>) {
-        return ctx.customId === "back";
-    }
-
-    async run(ctx: ComponentContext<typeof this.componentType>) {
+/**
+ * @description Кнопка back, отвечает за возврат к прошлому треку
+ * @class ButtonBack
+ * @extends Component
+ * @loadeble
+ */
+@DeclareComponent({
+    name: "back"
+})
+@Middlewares(["queue", "another_voice", "voice", "player-wait-stream"])
+class ButtonBack extends Component<"button"> {
+    public callback: Component<"button">["callback"] = (ctx) => {
         const queue = db.queues.get(ctx.guildId);
         const position = queue.tracks.position;
 
@@ -27,11 +30,11 @@ export default class extends ComponentCommand {
             queue.player.play(0, 0, queue.player.tracks.position).catch(console.error);
 
             // Сообщаем о том что музыка начата с начала
-            return ctx.write({
-                flags: MessageFlags.Ephemeral,
+            return ctx.reply({
+                flags: "Ephemeral",
                 embeds: [
                     {
-                        description: locale._(ctx.interaction.locale, "player.button.replay", [queue.tracks.track.name]),
+                        description: locale._(ctx.locale, "player.button.replay", [queue.tracks.track.name]),
                         color: Colors.Green
                     }
                 ]
@@ -49,14 +52,20 @@ export default class extends ComponentCommand {
         }
 
         // Уведомляем пользователя о смене трека
-        return ctx.write({
-            flags: MessageFlags.Ephemeral,
+        return ctx.reply({
+            flags: "Ephemeral",
             embeds: [
                 {
-                    description: locale._(ctx.interaction.locale, "player.button.last"),
+                    description: locale._(ctx.locale, "player.button.last"),
                     color: Colors.Green
                 }
             ]
         });
     };
 }
+
+/**
+ * @export default
+ * @description Не даем классам или объектам быть доступными везде в проекте
+ */
+export default [ButtonBack];

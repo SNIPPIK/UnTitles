@@ -132,6 +132,7 @@ export * from "./logger";
 export * from "./locale";
 export * from "./tools/TypedEmitter";
 export * from "./array";
+export * from "./tools/Assign";
 export * from "./tools/httpsClient";
 export * from "./tools/SimpleWorker";
 export * from "./tools/CycleManager";

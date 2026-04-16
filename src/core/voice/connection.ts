@@ -85,14 +85,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     };
 
     /**
-     * @description Текущая задержка голосового подключения
-     * @public
-     */
-    public get latency() {
-        return this?.ws?.latency || 60;
-    };
-
-    /**
      * @description Готовность голосового подключения
      * @public
      */
@@ -176,6 +168,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Задаем статус подключения
         this.status = ConnectionStatus.connecting;
+
+        // Слушаем если шлюзу пытается выключиться по какой причине
+        this.on("info", (err) => {
+            Logger.log("DEBUG",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
+        });
 
         // Слушаем если шлюзу пытается выключиться по какой причине
         this.transport.on("info", (err) => {

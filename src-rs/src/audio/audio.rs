@@ -1,6 +1,6 @@
+use std::collections::VecDeque;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::collections::VecDeque;
 
 /// Структура, представляющая движок аудио-буфера.
 /// Хранит пакеты аудиоданных (например, кадры Opus) в виде очереди.

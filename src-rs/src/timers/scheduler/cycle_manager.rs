@@ -1,3 +1,9 @@
+use crate::network::udp::UdpBuffered;
+use arc_swap::ArcSwap;
+use tokio::{
+    time,
+    time::{Instant, MissedTickBehavior}
+};
 use std::{
     collections::HashMap,
     sync::{
@@ -6,12 +12,6 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{
-    time,
-};
-use arc_swap::ArcSwap;
-use tokio::time::{sleep_until, Instant, MissedTickBehavior};
-use crate::network::udp::UdpBuffered;
 
 // Ограничиваем максимальное количество тиков за раз (чтобы не создать burst)
 const CATCH_LIMIT: u32 = 2; // или interval_duration * 2, но лучше фиксированное число
@@ -109,35 +109,41 @@ impl CycleManager {
             let mut last_ideal_tick = Instant::now();
 
             while running_flag.load(Ordering::Relaxed) {
-                // Ждём следующего тика согласно интервалу (Delay гарантирует компенсацию missed ticks)
-                interval.tick().await;
-
                 // Снимаем снапшот данных
                 let snapshot = sessions_ptr.load();
                 let items: Vec<_> = snapshot.values().collect();
 
-                if items.is_empty() { continue; }
-
-                let now = Instant::now();
-                // Вычисляем, сколько тиков мы пропустили с момента последнего идеального выполнения
-                let expected_elapsed = now.duration_since(last_ideal_tick);
-                let expected_ticks = (expected_elapsed.as_nanos() / interval_duration.as_nanos()) as u32;
-
-                // Если отставание больше 1 тика, выполняем ограниченное число компенсационных шагов
-                let missed_ticks = expected_ticks.saturating_sub(1); // вычитаем 1, т.к. текущий тик будет выполнен
-                let catch_up = missed_ticks.min(CATCH_LIMIT);
-
-                // Сначала выполняем догоняющие тики (если есть)
-                for _ in 0..catch_up {
-                    items.iter().for_each(|item| item.tick());
+                if items.is_empty() {
+                    last_ideal_tick += interval_duration;
+                    continue;
                 }
 
                 // Выполняем текущий, основной тик
                 items.iter().for_each(|item| item.tick());
 
+                let now = Instant::now();
+                // Вычисляем, сколько тиков мы пропустили с момента последнего идеального выполнения
+                let expected_elapsed = now.duration_since(last_ideal_tick);
+                let expected_ticks = (expected_elapsed.as_nanos() / interval_duration.as_nanos()) as u32;
+                let mut catch_up = 0;
+
+                if expected_ticks > 0 {
+                    // Если отставание больше 1 тика, выполняем ограниченное число компенсационных шагов
+                    let missed_ticks = expected_ticks.saturating_sub(1); // вычитаем 1, т.к. тик был выполнен
+                    catch_up = missed_ticks.min(CATCH_LIMIT);
+
+                    // Сначала выполняем догоняющие тики (если есть)
+                    for _ in 0..catch_up {
+                        items.iter().for_each(|item| item.tick());
+                    }
+                }
+
                 // Обновляем last_ideal_tick до того момента, который должен был быть
                 // для последнего выполненного тика (с учетом догоняющих)
                 last_ideal_tick += interval_duration * (1 + catch_up);
+
+                // Ждём следующего тика согласно интервалу (Delay гарантирует компенсацию missed ticks)
+                interval.tick().await;
             }
         });
 

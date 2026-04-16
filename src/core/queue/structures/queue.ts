@@ -190,7 +190,7 @@ export class Queue {
                     },
                     {
                         "type": 10, // Text
-                        "content": `> -# \`👤 ${user.username}\`  |  \`${getVolumeIndicator(vol)}\` ${tracks.footer} |  \`🌐 ${player.voice.connection.latency}ms | 📥 ${player.voice.connection.udp.lost}\`` + player.progress
+                        "content": `> -# \`👤 ${user.username}\`  |  \`${getVolumeIndicator(vol)}\` ${tracks.footer} |  \`🌐 ${player.voice.connection.ws.latency}ms | 📥 ${player.voice.connection.udp.lost}\`` + player.progress
                     },
                     ...buttons
                 ]

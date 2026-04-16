@@ -1,157 +1,157 @@
-import { DiscordClient, SeyfertVoice } from "#structures/discord";
+import { DiscordClient, DJSVoice } from "#structures/discord";
 import { ControllerQueues, type Queue } from "#core/queue";
 import { isMainThread } from "node:worker_threads";
 import { env } from "#app/env";
 
 // Database modules
+import { Middlewares } from "#handler/middlewares";
+import { Components } from "#handler/components";
+import { Commands } from "#handler/commands";
 import { RestObject } from "#handler/rest";
+import { Events } from "#handler/events";
 import { Voices } from "#core/voice";
 
 /**
  * @author SNIPPIK
- * @description Локальная база данных бота (синглтон)
+ * @description Локальная база данных бота
  * @class Database
  * @public
  */
 class Database {
     /**
-     * @description Хранилище REST-запросов к API платформ
+     * @description Загружаем класс для хранения запросов на платформы
+     * @readonly
+     * @public
      */
     public readonly api: RestObject;
 
     /**
-     * @description Адаптер для WebSocket-связи с Discord (только при наличии клиента)
+     * @description Адаптер для общения с websocket'ом клиента
+     * @readonly
+     * @public
      */
-    public readonly adapter?: SeyfertVoice<DiscordClient>;
+    public readonly adapter: DJSVoice;
 
     /**
-     * @description Хранилище очередей и плееров (один на сервер)
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения событий
+     * @readonly
+     * @public
+     */
+    public readonly events: Events;
+
+    /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения команд
+     * @readonly
+     * @public
+     */
+    public readonly commands: Commands;
+
+    /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения кнопок бота
+     * @description Класс хранящий в себе все кнопки для бота
+     * @readonly
+     * @public
+     */
+    public readonly components: Components;
+
+    /**
+     * @author SNIPPIK
+     * @description Загружаем класс для хранения кнопок бота
+     * @description Класс хранящий в себе все кнопки для бота
+     * @readonly
+     * @public
+     */
+    public readonly middlewares: Middlewares;
+
+    /**
+     * @description Загружаем класс для хранения очередей, плееров, циклов
+     * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
+     * @readonly
+     * @public
      */
     public readonly queues: ControllerQueues<Queue>;
 
     /**
-     * @description Управление голосовыми соединениями
+     * @description Загружаем класс для хранения голосовых подключений
+     * @readonly
+     * @public
      */
     public readonly voice: Voices;
 
     /**
-     * @description Данные для команд разработчика
+     * @description Для работы с командами для разработчика
+     * @readonly
+     * @public
      */
-    public readonly owner: {
-        ids: readonly string[];
-        guildID: string;
-    };
+    public readonly owner: { ids: string[]; guildID: string };
 
     /**
-     * @description Ссылки на изображения и эмодзи для embed-сообщений
+     * @description Для отображения в embed сообщениях
+     * @readonly
+     * @public
      */
-    public readonly images: {
-        disk: string;
-        no_image: string;
-        loading: string;
-        banner: string;
-        disk_emoji: string;
-    };
+    public readonly images: { disk: string; no_image: string; loading: string; banner: string; disk_emoji: string };
 
     /**
-     * @description Создаёт экземпляр базы данных. В воркер-потоке выбрасывает ошибку.
-     * @param client - клиент Discord (опционально, требуется для адаптера)
-     * @throws {Error} если вызван вне главного потока
+     * @description Создаем класс с ограничениями не для главного потока
+     * @public
      */
     public constructor(client?: DiscordClient) {
-        if (!isMainThread) {
-            throw new Error("Database cannot be initialized in a worker thread");
-        }
+        // Если запуск произведен в другим потоке
+        if (!isMainThread) return;
 
         this.api = new RestObject();
         this.queues = new ControllerQueues();
         this.voice = new Voices();
+        this.commands = new Commands();
+        this.components = new Components();
+        this.events = new Events();
+        this.middlewares = new Middlewares();
 
+        // Если реально клиент
         if (client instanceof DiscordClient) {
-            this.adapter = new SeyfertVoice(client);
+            this.adapter = new DJSVoice(client);
         }
 
-        // Валидация и нормализация переменных окружения
         this.owner = {
-            guildID: this.getRequiredEnv("owner.server"),
-            ids: this.getEnvArray("owner.list")
+            guildID: env.get("owner.server", ""),
+            ids: env.get("owner.list", "").split(",")
         };
 
         this.images = {
-            banner: this.getRequiredEnv("image.banner"),
-            disk: this.getRequiredEnv("image.currentPlay"),
-            no_image: this.getRequiredEnv("image.not"),
-            loading: this.getRequiredEnv("loading.emoji"),
-            disk_emoji: this.getRequiredEnv("disk.emoji")
+            banner: env.get("image.banner"),
+            disk: env.get("image.currentPlay"),
+            no_image: env.get("image.not"),
+            loading: env.get("loading.emoji"),
+            disk_emoji: env.get("disk.emoji")
         };
-    }
-
-    /**
-     * @description Получает обязательную переменную окружения или выбрасывает ошибку
-     * @param key - ключ переменной
-     * @returns значение переменной
-     * @private
-     */
-    private getRequiredEnv(key: string): string {
-        const value = env.get(key);
-        if (!value || typeof value !== "string") {
-            throw new Error(`Missing required environment variable: ${key}`);
-        }
-        return value;
-    }
-
-    /**
-     * @description Получает переменную окружения как массив строк, разделённых запятыми
-     * @param key - ключ переменной
-     * @returns массив строк (может быть пустым)
-     * @private
-     */
-    private getEnvArray(key: string): readonly string[] {
-        const value = env.get(key);
-        if (!value || typeof value !== "string") {
-            return [];
-        }
-        return value.split(",").filter(item => item.trim().length > 0);
-    }
+    };
 }
 
 /**
- * @description Глобальный экземпляр базы данных (синглтон)
- */
-let _db: Database | null = null;
-
-/**
- * @description Экспортируемый объект базы данных. Доступен только после вызова initDatabase().
- * @throws {Error} если обращение до инициализации
- */
-export const db = new Proxy({} as Database, {
-    get(_, prop: keyof Database) {
-        if (!_db) {
-            throw new Error("Database not initialized. Call initDatabase() first.");
-        }
-        const value = _db[prop];
-        if (typeof value === "function") {
-            // Приводим к Function, чтобы убрать ошибку типов
-            return (value as Function).bind(_db);
-        }
-        return value;
-    }
-});
-
-/**
- * @description Инициализирует глобальную базу данных.
- * @param client - клиент Discord
- * @throws {Error} если инициализация уже была произведена или произошла ошибка
+ * @author SNIPPIK
+ * @description Экспортируем базу данных глобально
+ * @class Database
  * @public
  */
-export function initDatabase(client: DiscordClient): void {
-    if (_db) {
-        throw new Error("Database already initialized");
-    }
+export let db: Database;
+
+/**
+ * @author SNIPPIK
+ * @description Инициализирует базу данных
+ * @function initDatabase
+ * @returns void
+ * @public
+ */
+export function initDatabase(client: DiscordClient) {
+    if (db) return;
 
     try {
-        _db = new Database(client);
+        db = new Database(client);
     } catch (err) {
-        throw new Error(`Failed to initialize database: ${err instanceof Error ? err.message : String(err)}`);
+        throw new Error(`Fail init database: ${err}`);
     }
 }

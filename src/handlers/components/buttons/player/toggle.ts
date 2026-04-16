@@ -1,20 +1,22 @@
-import { ComponentCommand, type ComponentContext, Middlewares } from 'seyfert';
-import { MessageFlags } from 'seyfert/lib/types';
+import { Component, DeclareComponent } from "#handler/components";
+import { Middlewares } from "#handler/commands";
 import { Colors } from "#structures/discord";
 import { locale } from "#structures";
 import { db } from "#app/db";
 
-@Middlewares(["checkAnotherVoice", "userVoiceChannel"])
-export default class extends ComponentCommand {
-    componentType = 'Button' as const;
-
-    filter(ctx: ComponentContext<typeof this.componentType>) {
-        return ctx.customId === "resume_pause";
-    }
-
-    async run(ctx: ComponentContext<typeof this.componentType>) {
+/**
+ * @description Кнопка pause/resume, отвечает за остановку проигрывания или возобновление
+ * @class ButtonPlayToggle
+ * @extends Component
+ * @loadeble
+ */
+@DeclareComponent({
+    name: "resume_pause"
+})
+@Middlewares(["queue", "another_voice", "voice", "player-wait-stream"])
+class ButtonPlayToggle extends Component<"button"> {
+    public callback: Component<"button">["callback"] = async (ctx) => {
         const queue = db.queues.get(ctx.guildId);
-
         const track = queue.tracks.track;
 
         // Если указан трек которого нет
@@ -28,11 +30,11 @@ export default class extends ComponentCommand {
             queue.player.pause();
 
             // Сообщение о паузе
-            return ctx.write({
-                flags: MessageFlags.Ephemeral,
+            return ctx.reply({
+                flags: "Ephemeral",
                 embeds: [
                     {
-                        description: locale._(ctx.interaction.locale, "player.button.pause", [`[${name}](${url})`]),
+                        description: locale._(ctx.locale, "player.button.pause", [`[${name}](${url})`]),
                         color: Colors.Green
                     }
                 ]
@@ -45,11 +47,11 @@ export default class extends ComponentCommand {
             queue.player.resume();
 
             // Сообщение о возобновлении
-            return ctx.write({
-                flags: MessageFlags.Ephemeral,
+            return ctx.reply({
+                flags: "Ephemeral",
                 embeds: [
                     {
-                        description: locale._(ctx.interaction.locale, "player.button.resume", [`[${name}](${url})`]),
+                        description: locale._(ctx.locale, "player.button.resume", [`[${name}](${url})`]),
                         color: Colors.Green
                     }
                 ]
@@ -58,3 +60,9 @@ export default class extends ComponentCommand {
         return null;
     };
 }
+
+/**
+ * @export default
+ * @description Не даем классам или объектам быть доступными везде в проекте
+ */
+export default [ButtonPlayToggle];

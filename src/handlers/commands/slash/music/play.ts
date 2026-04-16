@@ -1,137 +1,289 @@
-import { Command, createStringOption, Declare, Options, Locales, Middlewares, CommandContext } from "seyfert";
-import { RestClientSide } from "#handler/rest";
-import { locale } from "#structures";
-import { db } from "#app/db";
+import {
+    Command,
+    CommandCallback,
+    CommandIntegration,
+    Declare,
+    Middlewares,
+    Options,
+    Permissions,
+    SubCommand
+} from "#handler/commands";
+import {ApplicationCommandOptionType} from "discord.js";
+import {locale} from "#structures";
+import {db} from "#app/db";
 
 /**
- * @author SNIPPIK
- * @description Отправка данных в зависимости от текста пользователя
- * @param message - Сообщение
- * @param platform - Платформа
- * @param search - Текст или ссылка пользователя
- */
-async function allAutoComplete(message: any, platform: RestClientSide.Request, search: string) {
-    // Получаем функцию запроса данных с платформы
-    const api = platform.request(search, { audio: false });
-
-    try {
-        // Получаем данные в системе rest/API
-        const rest = await api.request();
-
-        // Если была получена ошибка
-        if (rest instanceof Error) {
-            return message.respond([
-                {
-                    name: `[REST/API] -> ${rest}`.slice(0, 120),
-                    value: search,
-                }
-            ]);
-        }
-
-        const items: { value: string; name: string }[] = [];
-
-        // Если получена ошибка или нет данных
-        if (rest instanceof Error || !rest) return;
-
-        // Обработка массива данных
-        if (Array.isArray(rest)) {
-            items.push(...rest.map((track) => {
-                return {
-                    name: `🎵 (${track.time.split}) | ${track.artist.title?.slice(0, 20)} - ${track.name?.slice(0, 60)}`,
-                    value: track.url,
-                }
-            }));
-        }
-
-        // Показываем плейлист
-        else if ("items" in rest) items.push({
-            name: `🎶 [${rest.items.length}] - ${rest.title?.slice(0, 70)}`,
-            value: rest.url
-        });
-
-        // Показываем трек
-        else {
-            items.push({
-                name: `🎵 (${rest.time.split}) | ${rest.artist.title?.slice(0, 20)} - ${rest.name?.slice(0, 60)}`,
-                value: rest.url
-            });
-        }
-
-        // Отправка ответа
-        return message.respond(items);
-    } catch (err) {
-        console.error(err);
-        return null;
-    }
-}
-
-/**
- * @description Главная команда, включаем музыку
+ * @description Под команда поиска трека
+ * @type SubCommand
  */
 @Declare({
-    name: "play",
-    description: "Turning on music, or searching for music!",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    names: {
+        "en-US": "search",
+        "ru": "поиск"
+    },
+    descriptions: {
+        "en-US": "Turn on music by link or title!",
+        "ru": "Включение музыки по ссылке или названию!"
+    }
 })
 @Options({
-    query: createStringOption({
+    select: {
+        names: {
+            "en-US": "select",
+            "ru": "платформа"
+        },
+        descriptions: {
+            "en-US": "Which platform does the request belong to?",
+            "ru": "К какой платформе относится запрос?"
+        },
+        type: ApplicationCommandOptionType.String,
         required: true,
-        name_localizations: {
+        choices: db.api.array.map((platform) => {
+            return {
+                name: `${platform.name.toLowerCase()} | ${platform.url}`,
+                value: platform.name
+            }
+        })
+    },
+    request: {
+        names: {
             "en-US": "request",
             "ru": "запрос"
         },
-        description: "Playing music",
-        description_localizations: {
+        descriptions: {
             "en-US": "You must specify the link or the name of the track!",
             "ru": "Необходимо указать ссылку или название трека!"
         },
-        autocomplete: (ctx) => {
-            try {
-                const search = ctx.getInput();
-                // Не даем делать тупые запросы
-                if (!search || search.length < 1) return null;
-
-                const platform = db.api.request(search);
-                return allAutoComplete(ctx, platform, search);
-            } catch (err) {
-                return null;
+        required: true,
+        type: ApplicationCommandOptionType["String"],
+        autocomplete: ({ctx, args}) => {
+            if (!args[1] || args[1] === "") {
+                return ctx.respond([
+                    {
+                        name: locale._(ctx.locale, "autocomplete.null"),
+                        value: "|CRITICAL_ERROR|"
+                    }
+                ])
             }
-        },
-    })
-})
-@Middlewares(["userVoiceChannel", "clientVoiceChannel", "checkAnotherVoice"])
-@Locales({
-    name: [
-        ["ru", "играть"],
-        ["en-US", "play"]
-    ],
-    description: [
-        ["ru", "Включение музыки, или поиск музыки!"],
-        ["en-US", "Turning on music, or searching for music!"]
-    ]
-})
-export default class PlayCommand extends Command {
-    async run(ctx: CommandContext) {
-        const search: string = ctx.options["query"];
-        const platform = db.api.request(search);
 
-        // Если не нашлась платформа
-        if (!platform) {
-            return ctx.client.events.runCustom("rest/error", ctx, locale._(ctx.interaction.locale, "api.platform.support"));
+            const platform = db.api.request(args[0]);
+            return db.commands.playAutocomplete(ctx, platform, args[1]);
         }
+    }
+})
+class PlaySearchCommand extends SubCommand {
+    async run({ctx, args}: CommandCallback) {
+        const platform = db.api.request(args[0]);
+        await ctx.deferReply();
 
         // Если платформа заблокирована
-        else if (platform.block) {
-            return ctx.client.events.runCustom("rest/error", ctx, locale._(ctx.interaction.locale, "api.platform.block"));
+        if (platform.block) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
+            return null;
         }
 
         // Если есть проблема с авторизацией на платформе
         else if (!platform.auth) {
-            return ctx.client.events.runCustom("rest/error", ctx, locale._(ctx.interaction.locale, "api.platform.auth"));
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.auth"));
+            return null;
         }
 
-        await ctx.deferReply();
-        return ctx.client.events.runCustom("rest/request", platform, ctx, search);
-    }
+        db.events.emitter.emit("rest/request", platform, ctx, args[1]);
+        return null;
+    };
 }
+
+
+/**
+ * @description Под команда включения похожих треков
+ * @type SubCommand
+ */
+@Declare({
+    names: {
+        "en-US": "related",
+        "ru": "похожее"
+    },
+    descriptions: {
+        "en-US": "Endless track playback mode!",
+        "ru": "Добавление себе подобных треков!"
+    }
+})
+@Options({
+    select: {
+        names: {
+            "en-US": "select",
+            "ru": "платформа"
+        },
+        descriptions: {
+            "en-US": "Which platform does the request belong to?",
+            "ru": "К какой платформе относится запрос?"
+        },
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: db.api.arrayRelated.map((platform) => {
+            return {
+                name: `${platform.name.toLowerCase()} | ${platform.url}`,
+                value: platform.name
+            }
+        })
+    },
+    request: {
+        names: {
+            "en-US": "request",
+            "ru": "запрос"
+        },
+        descriptions: {
+            "en-US": "You must specify the link or the name of the track!",
+            "ru": "Необходимо указать ссылку или название трека!"
+        },
+        required: true,
+        type: ApplicationCommandOptionType.String,
+        autocomplete: ({ctx, args}) => {
+            if (!args[1] || args[1] === "") {
+                return ctx.respond([
+                    {
+                        name: locale._(ctx.locale, "autocomplete.null"),
+                        value: "|CRITICAL_ERROR|"
+                    }
+                ])
+            }
+
+            const platform = db.api.request(args[0]);
+            return db.commands.playAutocomplete(ctx, platform, args[1]);
+        }
+    }
+})
+class PlayRelatedCommand extends SubCommand {
+    async run({ctx, args}: CommandCallback) {
+        const platform = db.api.request(args[0]);
+        await ctx.deferReply();
+
+        // Если платформа заблокирована
+        if (platform.block) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
+            return null;
+        }
+
+        // Если есть проблема с авторизацией на платформе
+        else if (!platform.auth) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.auth"));
+            return null;
+        }
+
+        db.events.emitter.emit("rest/request", platform, ctx, `${args[1]}&list=RD`);
+        return null;
+    };
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Расширенное включение музыки
+ * @class PlayAdvancedCommand
+ * @extends Command
+ * @public
+ */
+@Declare({
+    names: {
+        "en-US": "plау",
+        "ru": "игрaть"
+    },
+    descriptions: {
+        "en-US": "Advanced control of music inclusion!",
+        "ru": "Расширенное управление включение музыки!"
+    },
+    integration_types: [CommandIntegration.Guild]
+})
+@Options([PlaySearchCommand, PlayRelatedCommand])
+@Middlewares(["cooldown", "voice", "another_voice"])
+@Permissions({
+    client: ["Connect", "Speak", "SendMessages", "ViewChannel"]
+})
+class PlayAdvancedCommand extends Command {
+    async run() {}
+}
+
+
+/**
+ * @author SNIPPIK
+ * @description Базовое включение музыки
+ * @class PlayCommand
+ * @extends Assign
+ * @public
+ */
+@Declare({
+    names: {
+        "en-US": "play",
+        "ru": "играть"
+    },
+    descriptions: {
+        "en-US": "Turning on music, or searching for music!",
+        "ru": "Включение музыки, или поиск музыки!"
+    },
+    integration_types: [CommandIntegration.Guild]
+})
+@Options({
+    request: {
+        names: {
+            "en-US": "request",
+            "ru": "запрос"
+        },
+        descriptions: {
+            "en-US": "You must specify the link or the name of the track!",
+            "ru": "Необходимо указать ссылку или название трека!"
+        },
+        required: true,
+        type: ApplicationCommandOptionType.String,
+        autocomplete: ({ctx, args}) => {
+            if (!args[0] || args[0] === "") {
+                return ctx.respond([
+                    {
+                        name: locale._(ctx.locale, "autocomplete.null"),
+                        value: "|CRITICAL_ERROR|"
+                    }
+                ])
+            }
+
+            const platform = db.api.request(args[0]);
+            return db.commands.playAutocomplete(ctx, platform, args[0]);
+        }
+    }
+})
+@Middlewares(["cooldown", "voice", "another_voice"])
+@Permissions({
+    client: ["Connect", "Speak", "SendMessages", "ViewChannel"],
+})
+class PlayCommand extends Command {
+    async run({ctx, args}: CommandCallback) {
+        const platform = db.api.request(args[0]);
+        await ctx.deferReply();
+
+        // Если не нашлась платформа
+        if (!platform) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.support"));
+            return null;
+        }
+
+        // Если платформа заблокирована
+        else if (platform.block) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
+            return null;
+        }
+
+        // Если есть проблема с авторизацией на платформе
+        else if (!platform.auth) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.auth"));
+            return null;
+        }
+
+        db.events.emitter.emit("rest/request", platform, ctx, args[0]);
+        return null;
+    };
+}
+
+
+/**
+ * @export default
+ * @description Не даем классам или объектам быть доступными везде в проекте
+ */
+export default [ PlayCommand, PlayAdvancedCommand ];

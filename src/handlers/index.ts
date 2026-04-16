@@ -1,4 +1,4 @@
-import { SetArray } from "#structures";
+import { Logger, SetArray } from "#structures";
 import * as path from "node:path";
 import fs from "node:fs";
 
@@ -84,6 +84,20 @@ export abstract class handler<T = unknown> {
     };
 
     /**
+     * @description Если произойдет ошибка при запуске
+     * @param reason
+     * @protected
+     */
+    protected onRunFail = (reason: string | Error) => {
+        Logger.log(
+            "ERROR",
+            `Unhandled Execute Module | ${this.directory}\n` +
+            `┌ Reason:  ${reason instanceof Error ? reason.message : String(reason)}\n` +
+            `└ Stack:   ${reason instanceof Error ? reason.stack : "N/A"}`
+        );
+    };
+
+    /**
      * Загружает все допустимые файлы из указанной директории (рекурсивно).
      * При повторном вызове очищает предыдущие загруженные объекты.
      *
@@ -112,11 +126,11 @@ export abstract class handler<T = unknown> {
 
         // Проверка существования директории
         if (!fs.existsSync(selfDir)) {
-            throw new Error(`Directory not found: ${selfDir}`);
+            return this.onRunFail(Error(`Directory not found: ${selfDir}`));
         }
 
         // Запуск рекурсивного обхода
-        this._loadRecursive(selfDir);
+        return this._loadRecursive(selfDir);
     };
 
     /**
@@ -183,7 +197,7 @@ export abstract class handler<T = unknown> {
 
         // Проверяем наличие default экспорта
         if (!imported?.default) {
-            throw new Error(`Missing default export in ${filePath}`);
+            return this.onRunFail(Error(`Missing default export in ${filePath}`));
         }
 
         const defaultExport = imported.default;

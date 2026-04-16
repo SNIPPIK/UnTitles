@@ -260,7 +260,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const position = skip?.position ? skip?.position : current;
 
             // Выводим сообщение об ошибке
-            queue.message.client.events.runCustom("message/error", queue, error, position);
+            db.events.emitter.emit("message/error", queue, error, position);
 
             // Если надо пропустить трек
             if (skip) {
@@ -513,7 +513,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если трек включен в 1 раз
         if (seek === 0) {
             const queue = db.queues.get(this.id);
-            if (queue) queue.message.client.events.runCustom("message/playing", queue) // Отправляем сообщение, если можно
+            if (queue) db.events.emitter.emit("message/playing", queue) // Отправляем сообщение, если можно
         }
 
         // Переводим плеер в состояние чтения аудио

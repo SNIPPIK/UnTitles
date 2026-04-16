@@ -1,55 +1,49 @@
 import {
     Command,
-    CommandContext,
-    createIntegerOption,
+    CommandCallback,
+    CommandIntegration,
     Declare,
-    Locales,
     Middlewares,
     Options,
+    Permissions,
     SubCommand
-} from "seyfert";
+} from "#handler/commands";
+import {ApplicationCommandOptionType} from "discord.js";
 import {Colors} from "#structures/discord";
-import {MessageFlags} from "seyfert/lib/types";
 import {locale} from "#structures";
 import {db} from "#app/db";
+
 
 /**
  * @description Подкоманда для повторного запуска проигрывания
  */
 @Declare({
-    name: "replay",
-    description: "Restart queue!!! Necessary for re-enabling if playback has been completed!",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"]
+    names: {
+        "en-US": "replay",
+        "ru": "заново"
+    },
+    descriptions: {
+        "en-US": "Restart queue!!! Necessary for re-enabling if playback has been completed!",
+        "ru": "Перезапуск очереди!!! Необходимо для повторного включения если проигрывание было завершено!"
+    }
 })
-@Locales({
-    name: [
-        ["ru", "заново"],
-        ["en-US", "replay"]
-    ],
-    description: [
-        ["ru", "Перезапуск очереди!!! Необходимо для повторного включения если проигрывание было завершено!"],
-        ["en-US", "Restart queue!!! Necessary for re-enabling if playback has been completed!"]
-    ]
-})
-@Middlewares(["userVoiceChannel", "clientVoiceChannel", "checkAnotherVoice", "checkQueue"])
-class PlayerReplayCommand extends SubCommand {
-    async run(ctx: CommandContext) {
-        const queue = db.queues.get(ctx.guildId);
+class PlayerReplay extends SubCommand {
+    async run({ctx}: CommandCallback<string>) {
+        const queue = db.queues.get(ctx.guild.id);
 
         // Переключаем позицию трека на 0
         queue.player.tracks.position = 0;
 
         // Перезапускаем очередь
         await queue.player.play();
-        return ctx.write({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(ctx.interaction.locale, "command.play.replay", [ctx.member]),
+                    description: locale._(ctx.locale, "command.play.replay", [ctx.member]),
                     color: Colors.Green
                 }
             ],
-            flags: MessageFlags.Ephemeral
+            flags: "Ephemeral"
         });
     }
 }
@@ -58,130 +52,126 @@ class PlayerReplayCommand extends SubCommand {
  * @description Подкоманда для выключения проигрывания музыки
  */
 @Declare({
-    name: "stop",
-    description: "Forced termination of music playback!",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"]
+    names: {
+        "en-US": "stop",
+        "ru": "стоп"
+    },
+    descriptions: {
+        "en-US": "Forced termination of music playback!",
+        "ru": "Принудительное завершение проигрывания музыки!"
+    }
 })
-@Locales({
-    name: [
-        ["ru", "стоп"],
-        ["en-US", "stop"]
-    ],
-    description: [
-        ["ru", "Принудительное завершение проигрывания музыки!"],
-        ["en-US", "Forced termination of music playback!"]
-    ]
-})
-@Middlewares(["userVoiceChannel", "clientVoiceChannel", "checkAnotherVoice", "checkQueue"])
-class PlayerStopCommand extends SubCommand {
-    async run(ctx: CommandContext) {
+class PlayerStop extends SubCommand {
+    async run({ctx}: CommandCallback<string>) {
         // Удаляем очередь
         db.queues.remove(ctx.guildId);
-        return ctx.write({
+
+        // Отправляем сообщение
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(ctx.interaction.locale, "command.play.stop", [ctx.member]),
+                    description: locale._(ctx.locale, "command.play.stop", [ctx.member]),
                     color: Colors.Green
                 }
             ],
-            flags: MessageFlags.Ephemeral
+            flags: "Ephemeral"
         });
-    }
+    };
 }
 
 /**
  * @description Подкоманда для изменения громкости плеера
  */
 @Declare({
-    name: "volume",
-    description: "Change the volume of music playback!",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"]
-})
-@Locales({
-    name: [
-        ["ru", "громкость"],
-        ["en-US", "volume"]
-    ],
-    description: [
-        ["ru", "Изменение громкости проигрывания музыки!"],
-        ["en-US", "Change the volume of music playback!"]
-    ]
+    names: {
+        "en-US": "volume",
+        "ru": "громкость"
+    },
+    descriptions: {
+        "en-US": "Change the volume of music playback!",
+        "ru": "Изменение громкости проигрывания музыки!"
+    }
 })
 @Options({
-    value: createIntegerOption({
-        name_localizations: {
+    value: {
+        names: {
             "en-US": "value",
             "ru": "значение"
         },
-        description_localizations: {
-            "en-US": "Player volume value! Range 10-200",
-            "ru": "Значение громкости плеера! Диапазон 10-200"
+        descriptions: {
+            "en-US": "Значение громкости плеера! Диапазон 10-200",
+            "ru": "Player volume value! Range 10-200"
         },
         required: true,
-        description: "Player volume value! Range 10-200",
-    })
+        type: ApplicationCommandOptionType.String
+    }
 })
-@Middlewares(["userVoiceChannel", "clientVoiceChannel", "checkAnotherVoice", "checkQueue"])
-class PlayerVolumeCommand extends SubCommand {
-    async run(ctx: CommandContext) {
+class PlayerVolume extends SubCommand {
+    async run({ctx, args}: CommandCallback) {
         const { player } = db.queues.get(ctx.guildId);
         const seek: number = player.audio.current?.duration ?? 0;
 
         // Изменение громкости
-        player.audio.volume = ctx.options["value"];
+        player.audio.volume = parseInt(args[0]);
 
         // Если можно изменить громкость сейчас
-        if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
+        if (seek < player.tracks.track.time.total - db.queues.options.optimization) {
             await player.play(seek);
 
             // Отправляем сообщение о переключение громкости сейчас
-            return ctx.write({
+            return ctx.reply({
                 embeds: [
                     {
-                        description: locale._(ctx.interaction.locale, "command.value.now", [ctx.member]),
+                        description: locale._(ctx.locale, "command.value.now", [ctx.member]),
                         color: Colors.Green
                     }
                 ],
-                flags: MessageFlags.Ephemeral
+                flags: "Ephemeral"
             });
         }
 
         // Отправляем сообщение о переключение громкости со следующим треком
-        return ctx.write({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(ctx.interaction.locale, "command.value.later", [ctx.member]),
+                    description: locale._(ctx.locale, "command.value.later", [ctx.member]),
                     color: Colors.Green
                 }
             ],
-            flags: MessageFlags.Ephemeral
+            flags: "Ephemeral"
         })
     }
 }
 
 /**
- * @description Главная команда, идет как группа
+ * @author SNIPPIK
+ * @description Расширенное включение музыки
+ * @class PlayerController
+ * @extends Command
+ * @public
  */
 @Declare({
-    name: "player",
-    description: "Player control",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    names: {
+        "en-US": "player",
+        "ru": "плеер"
+    },
+    descriptions: {
+        "en-US": "Advanced control of music inclusion!",
+        "ru": "Расширенное управление включение музыки!"
+    },
+    integration_types: [CommandIntegration.Guild]
 })
-@Locales({
-    name: [
-        ["ru", "плеер"],
-        ["en-US", "player"]
-    ],
-    description: [
-        ["ru", "Управление плеером"],
-        ["en-US", "Player control"]
-    ]
+@Options([PlayerReplay, PlayerStop, PlayerVolume])
+@Middlewares(["cooldown", "queue", "voice", "another_voice"])
+@Permissions({
+    client: ["SendMessages", "ViewChannel"]
 })
-@Options([PlayerReplayCommand, PlayerStopCommand, PlayerVolumeCommand])
-@Middlewares(["userVoiceChannel", "clientVoiceChannel", "checkAnotherVoice"])
-export default class PlayerCommand extends Command {
+class PlayerController extends Command {
     async run() {}
 }
+
+/**
+ * @export default
+ * @description Не даем классам или объектам быть доступными везде в проекте
+ */
+export default [ PlayerController ];

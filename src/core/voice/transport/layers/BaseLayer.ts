@@ -8,12 +8,10 @@
 export abstract class BaseLayer<T> {
     public static MAX_RETRIES = 3;
 
+    protected _client: T;
+
     public get ready() {
         return false;
-    };
-
-    public packet = (..._: any): T => {
-        throw new TypeError("Not found packet function");
     };
 
     public create = (..._: any[]): void => {

@@ -1,40 +1,130 @@
 import {
     Command,
-    type CommandContext,
-    createNumberOption,
+    CommandCallback,
+    CommandIntegration,
     Declare,
-    Locales,
     Middlewares,
     Options,
+    Permissions,
     SubCommand
-} from "seyfert";
-import {MessageFlags} from "seyfert/lib/types";
-import {locale} from "#structures";
-import {db} from "#app/db";
+} from "#handler/commands";
+import { ApplicationCommandOptionType } from "discord.js";
+import { locale } from "#structures";
+import { db } from "#app/db";
+
+/**
+ * @description Подкоманда для перехода позиции назад
+ */
+@Declare({
+    names: {
+        "en-US": "back",
+        "ru": "назад"
+    },
+    descriptions: {
+        "en-US": "Move current track to past!",
+        "ru": "Переход от текущего трека к прошлому!"
+    }
+})
+@Options({
+    back: {
+        names: {
+            "en-US": "value",
+            "ru": "число"
+        },
+        descriptions: {
+            "en-US": "You need to specify the track number!",
+            "ru": "Нужно указать номер трека!"
+        },
+        type: ApplicationCommandOptionType.Number,
+        required: true,
+        autocomplete: ({ctx, args}) => {
+            const number = parseInt(args[0]);
+            const queue = db.queues.get(ctx.guildId);
+
+            if (!queue || isNaN(number) || number <= 0) return null;
+
+            const position = queue.tracks.position;
+            const maxSuggestions = 5;
+            const highlightIndex = 0;
+            const startIndex = Math.max(0, position - number);
+
+            // Получаем треки
+            const tracks = queue.tracks.array(maxSuggestions, startIndex);
+
+            // Если треков нет
+            if (!tracks.length) {
+                return ctx.respond([
+                    {
+                        name: locale._(ctx.locale, "autocomplete.number.null"),
+                        value: "|NumberFail|"
+                    }
+                ])
+            }
+
+            // Результаты поиска
+            const results = tracks.map((track, i) => ({
+                name: `${startIndex + i + 1}. ${i === highlightIndex ? "➡" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                value: startIndex + i
+            }));
+
+            return ctx.respond(results);
+        }
+    }
+})
+class BackPositionCommand extends SubCommand {
+    async run({ctx, args}: CommandCallback<number>) {
+        const number = args[0];
+        const { player, tracks } = db.queues.get(ctx.guildId);
+        const track = tracks.get(number);
+
+        // Если указан трек которого нет
+        if (!track) return null;
+
+        const {name, url, api} = track;
+
+        // Переходим к позиции
+        player.play(0, 0, number).catch(console.error);
+
+        return ctx.reply({
+            embeds: [
+                {
+                    description: locale._(ctx.locale, "command.position", [number - 1, `[${name}](${url})`]),
+                    color: api.color
+                }
+            ],
+            flags: "Ephemeral"
+        });
+    };
+}
+
 
 /**
  * @description Подкоманда для перехода позиции вперед
  */
 @Declare({
-    name: "next",
-    description: "Skip tracks from the current to the specified track!",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "ViewChannel"],
+    names: {
+        "en-US": "next",
+        "ru": "вперед"
+    },
+    descriptions: {
+        "en-US": "Skip tracks from the current to the specified track!",
+        "ru": "Пропуск треков от текущего до указанного трека!"
+    }
 })
 @Options({
-    value: createNumberOption({
-        name_localizations: {
+    next: {
+        names: {
             "en-US": "value",
             "ru": "число"
         },
-        description_localizations: {
+        descriptions: {
             "en-US": "You need to specify the track number!",
             "ru": "Нужно указать номер трека!"
         },
-        description: "You need to specify the track number!",
+        type: ApplicationCommandOptionType.Number,
         required: true,
-        autocomplete: (ctx) => {
-            const number = parseInt(ctx.getInput());
+        autocomplete: ({ctx, args}) => {
+            const number = parseInt(args[0]);
             const queue = db.queues.get(ctx.guildId);
 
             if (!queue || isNaN(number) || number <= 0) return null;
@@ -49,7 +139,14 @@ import {db} from "#app/db";
             const tracks = queue.tracks.array(maxSuggestions, startIndex);
 
             // Если треков нет
-            if (!tracks.length) return null;
+            if (!tracks.length) {
+                return ctx.respond([
+                    {
+                        name: locale._(ctx.locale, "autocomplete.number.null"),
+                        value: "|NumberFail|"
+                    }
+                ])
+            }
 
             // Результаты поиска
             const results = tracks.map((track, i) => ({
@@ -59,21 +156,11 @@ import {db} from "#app/db";
 
             return ctx.respond(results);
         }
-    })
+    }
 })
-@Locales({
-    name: [
-        ["ru", "вперед"],
-        ["en-US", "next"]
-    ],
-    description: [
-        ["ru", "Пропуск треков от текущего до указанного трека!"],
-        ["en-US", "Skip tracks from the current to the specified track!"]
-    ]
-})
-class SkipNext extends SubCommand {
-    async run(ctx: CommandContext<any>) {
-        const number: number = ctx.options.value;
+class SkipPositionCommand extends SubCommand {
+    async run({ctx, args}: CommandCallback<number>) {
+        const number = args[0];
         const {player, tracks} = db.queues.get(ctx.guildId);
         const track = tracks.get(number);
 
@@ -85,99 +172,14 @@ class SkipNext extends SubCommand {
         // Переходим к позиции
         player.play(0, 0, number).catch(console.error);
 
-        return ctx.write({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(ctx.interaction.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
+                    description: locale._(ctx.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
                     color: api.color
                 }
             ],
-            flags: MessageFlags.Ephemeral
-        });
-    };
-}
-
-
-/**
- * @description Подкоманда для перехода позиции назад
- */
-@Declare({
-    name: "back",
-    description: "Move current track to past!",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "ViewChannel"],
-})
-@Options({
-    value: createNumberOption({
-        name_localizations: {
-            "en-US": "value",
-            "ru": "число"
-        },
-        description_localizations: {
-            "en-US": "You need to specify the track number!",
-            "ru": "Нужно указать номер трека!"
-        },
-        description: "You need to specify the track number!",
-        required: true,
-        autocomplete: (ctx) => {
-            const number = parseInt(ctx.getInput());
-            const queue = db.queues.get(ctx.guildId);
-
-            if (!queue || isNaN(number) || number <= 0) return null;
-
-            const position = queue.tracks.position;
-            const maxSuggestions = 5;
-            const highlightIndex = 0;
-            const startIndex = Math.max(0, position - number);
-
-            // Получаем треки
-            const tracks = queue.tracks.array(maxSuggestions, startIndex);
-
-            // Если треков нет
-            if (!tracks.length) return null;
-
-            // Результаты поиска
-            const results = tracks.map((track, i) => ({
-                name: `${startIndex + i + 1}. ${i === highlightIndex ? "➡" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
-                value: startIndex + i
-            }));
-
-            return ctx.respond(results);
-        }
-    })
-})
-@Locales({
-    name: [
-        ["ru", "назад"],
-        ["en-US", "back"]
-    ],
-    description: [
-        ["ru", "Переход от текущего трека к прошлому!"],
-        ["en-US", "Move current track to past!"]
-    ]
-})
-class SkipBack extends SubCommand {
-    async run(ctx: CommandContext<any>) {
-        const number: number = ctx.options.value;
-        const {player, tracks} = db.queues.get(ctx.guildId);
-        const track = tracks.get(number);
-
-        // Если указан трек которого нет
-        if (!track) return null;
-
-        const {name, url, api} = track;
-
-        // Переходим к позиции
-        player.play(0, 0, number).catch(console.error);
-
-        return ctx.write({
-            embeds: [
-                {
-                    description: locale._(ctx.interaction.locale, "command.position", [number - 1, `[${name}](${url})`]),
-                    color: api.color
-                }
-            ],
-            flags: MessageFlags.Ephemeral
+            flags: "Ephemeral"
         });
     };
 }
@@ -187,25 +189,29 @@ class SkipBack extends SubCommand {
  * @description Подкоманда для перехода к любой позиции
  */
 @Declare({
-    name: "to",
-    description: "Go to the specified track!",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "ViewChannel"],
+    names: {
+        "en-US": "to",
+        "ru": "на"
+    },
+    descriptions: {
+        "en-US": "Go to the specified track!",
+        "ru": "Переход к указанному треку!"
+    }
 })
 @Options({
-    value: createNumberOption({
-        name_localizations: {
+    to: {
+        names: {
             "en-US": "value",
             "ru": "число"
         },
-        description_localizations: {
+        descriptions: {
             "en-US": "You need to specify the track number!",
             "ru": "Нужно указать номер трека!"
         },
-        description: "You need to specify the track number!",
+        type: ApplicationCommandOptionType.Number,
         required: true,
-        autocomplete: (ctx) => {
-            const number = parseInt(ctx.getInput());
+        autocomplete: ({ctx, args}) => {
+            const number = parseInt(args[0]);
             const queue = db.queues.get(ctx.guildId);
 
             if (!queue || isNaN(number) || number <= 0) return null;
@@ -220,10 +226,18 @@ class SkipBack extends SubCommand {
             else if (start + max > total) start = Math.max(0, total - max);
 
             const highlight = Math.max(0, index - start);
-
             // Получаем массив треков
             const tracks = queue.tracks.array(max, start);
-            if (!tracks.length) return null;
+
+            // Если треков нет
+            if (!tracks.length) {
+                return ctx.respond([
+                    {
+                        name: locale._(ctx.locale, "autocomplete.number.null"),
+                        value: "|NumberFail|"
+                    }
+                ])
+            }
 
             // Генерация результатов
             const results = tracks.map((track, i) => ({
@@ -233,21 +247,11 @@ class SkipBack extends SubCommand {
 
             return ctx.respond(results);
         }
-    })
+    }
 })
-@Locales({
-    name: [
-        ["ru", "на"],
-        ["en-US", "to"]
-    ],
-    description: [
-        ["ru", "Переход к указанному треку!"],
-        ["en-US", "Go to the specified track!"]
-    ]
-})
-class SkipTo extends SubCommand {
-    async run(ctx: CommandContext<any>) {
-        const number: number = ctx.options.value;
+class ToPositionCommand extends SubCommand {
+    async run({ctx, args}: CommandCallback<number>) {
+        const number = args[0];
         const {player, tracks} = db.queues.get(ctx.guildId);
         const track = tracks.get(number);
 
@@ -259,40 +263,48 @@ class SkipTo extends SubCommand {
         // Переходим к позиции
         player.play(0, 0, number).catch(console.error);
 
-        return ctx.write({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(ctx.interaction.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
+                    description: locale._(ctx.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
                     color: api.color
                 }
             ],
-            flags: MessageFlags.Ephemeral
+            flags: "Ephemeral"
         });
-    }
+    };
 }
 
 
 /**
- * @description Главная команда, идет как группа
+ * @author SNIPPIK
+ * @description Пропуск треков до указанного трека!
+ * @class SkipUtilityCommand
+ * @extends Command
+ * @public
  */
 @Declare({
-    name: "skip",
-    description: "Skip tracks to the specified track! The specified track will be current!",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "ViewChannel"],
+    names: {
+        "en-US": "skip",
+        "ru": "пропуск"
+    },
+    descriptions: {
+        "en-US": "Skip tracks to the specified track! The specified track will be current!",
+        "ru": "Универсальная команда для управления позицией трека!"
+    },
+    integration_types: [CommandIntegration.Guild]
 })
-@Options([SkipTo, SkipBack, SkipNext])
-@Locales({
-    name: [
-        ["ru", "пропуск"],
-        ["en-US", "skip"]
-    ],
-    description: [
-        ["ru", "Универсальная команда для управления позицией трека!"],
-        ["en-US", "Skip tracks to the specified track! The specified track will be current!"]
-    ]
+@Options([BackPositionCommand, SkipPositionCommand, ToPositionCommand])
+@Middlewares(["cooldown", "queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
+@Permissions({
+    client: ["SendMessages", "ViewChannel"]
 })
-@Middlewares(["userVoiceChannel", "clientVoiceChannel", "checkAnotherVoice", "checkQueue", "checkPlayerWaitStream", "checkPlayerIsPlaying"])
-export default class SkipCommand extends Command {
+class SkipUtilityCommand extends Command {
     async run() {}
 }
+
+/**
+ * @export default
+ * @description Не даем классам или объектам быть доступными везде в проекте
+ */
+export default [SkipUtilityCommand];

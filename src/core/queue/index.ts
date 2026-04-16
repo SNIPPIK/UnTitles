@@ -54,7 +54,10 @@ class BaseQueueController<T extends Queue> {
                     const player = queue.player;
 
                     // Ставим на последнюю позицию
-                    if (queue.tracks.size > 0) queue.tracks.position++;
+                    if (queue.tracks.size > 0) {
+                        // Меняем позицию на последнюю
+                        queue.tracks.position = queue.tracks.total - 1;//queue.tracks.last_position + 1;
+                    }
 
                     // Если у плеера стоит пауза
                     if (player.status === "player/pause") player.resume();
@@ -127,7 +130,7 @@ class BaseQueueController<T extends Queue> {
                         color: Colors.Yellow
                     }
                 ]
-            } as any).then((msg) => {
+            }).then((msg) => {
                 setTimeout(() => {
                     if (!!msg.delete) msg.delete().catch(() => null);
                 }, timeout ?? 1e3);

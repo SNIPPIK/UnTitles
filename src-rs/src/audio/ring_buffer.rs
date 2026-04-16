@@ -1,11 +1,6 @@
-//! Кольцевой буфер (ring buffer) для передачи `Vec<u8>` между потоками.
-//! Предназначен для сценария **один производитель — один потребитель** (SPSC),
-//! но с поддержкой операции `push_front` от потребителя (например, для возврата пакета при ошибке).
-//! Использует атомарные индексы и CAS для безопасного резервирования места при `push_front`.
-
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::mem::MaybeUninit;
 use std::ptr;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Ограничение по байтам MTU
 const MAX_PACKET_SIZE: usize = 1500;

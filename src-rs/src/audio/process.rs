@@ -1,11 +1,11 @@
-use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode, ErrorStrategy, ThreadSafeCallContext};
-use napi_derive::napi;
-use std::io::{BufReader, Read};
-use std::process::{Command, Child, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use crate::audio::parser::{OggOpusParser, PacketType};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::process::{Command, Child, Stdio};
+use std::io::{BufReader, Read};
+use std::sync::{Arc, Mutex};
+use napi::bindgen_prelude::*;
+use napi_derive::napi;
 
 /// Представляет запущенный процесс FFmpeg с возможностью читать его stdout
 /// и передавать аудио-фреймы в JavaScript через callback.
@@ -108,13 +108,25 @@ impl FfmpegProcess {
         let tsfn: ThreadsafeFunction<Vec<(PacketType, Vec<u8>)>, ErrorStrategy::Fatal> = callback
             .create_threadsafe_function(1024, |ctx: ThreadSafeCallContext<Vec<(PacketType, Vec<u8>)>>| {
                 let env = ctx.env;
-                let mut js_array = env.create_array_with_length(ctx.value.len())?;
-                for (i, (kind, data)) in ctx.value.into_iter().enumerate() {
-                    let mut obj = env.create_object()?;
-                    obj.set_named_property("type", env.create_string(kind.as_str())?)?;
-                    obj.set_named_property("data", env.create_buffer_with_data(data)?.into_unknown())?;
-                    js_array.set_element(i as u32, obj)?;
+
+                // Фильтруем входной вектор: оставляем только те элементы, где kind == PacketType::Frame
+                let frames: Vec<_> = ctx
+                    .value
+                    .into_iter()
+                    .filter(|(kind, _)| *kind == PacketType::Frame)
+                    .collect();
+
+                // Создаём JS-массив с длиной, равной количеству отфильтрованных элементов
+                let mut js_array = env.create_array_with_length(frames.len())?;
+
+                // Заполняем массив буферами
+                for (i, (kind, data)) in frames.into_iter().enumerate() {
+                    if kind == PacketType::Frame {
+                        let buffer = env.create_buffer_with_data(data)?.into_unknown();
+                        js_array.set_element(i as u32, buffer)?;
+                    }
                 }
+
                 Ok(vec![js_array.into_unknown()])
             })?;
 

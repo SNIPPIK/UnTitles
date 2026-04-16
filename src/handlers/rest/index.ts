@@ -20,10 +20,29 @@ export * from "./index.server";
 const normalize = (text: string) => text
     .toLowerCase()
     .normalize("NFKD")
-    .replace(/[^\p{L}\p{N}\s]/gu, "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+    // Оставляем только буквы и цифры, заменяя остальное на пробелы
+    .replace(/[^\p{L}\p{N}\s]/gui, "")
+    .trim();
+
+
+/**
+ * @author SNIPPIK
+ * @description Ищет треки из кучи мусорного текста
+ * @param original - Оригинальное название
+ * @param candidate - Название кандидата
+ * @private
+ */
+const getSmartMatch = (original: string, candidate: string) => {
+    // Разбиваем оригинал на массив слов и берем только важные (длина > 2)
+    const words = original.split(/\s+/).filter(word => word.length > 2);
+
+    if (words.length === 0) return false;
+
+    // Создаем регулярку с Lookahead для каждого слова
+    // Она сработает, только если ВСЕ слова присутствуют в строке в любом порядке
+    const pattern = new RegExp(`^${words.map(w => `(?=.*${w})`).join("")}.*$`, "i");
+    return pattern.test(candidate);
+};
 
 /**
  * @author SNIPPIK
@@ -267,7 +286,7 @@ export class RestObject {
 
                 // Ищем, кто ждет этот ID
                 const request = this.pending.get(requestId);
-                if (!request) return; // Если никто не ждет (например, уже был таймаут)
+                if (!request) return; // Если никто не ждет (например, уже был тайм-аут)
 
                 // Обработка результата
                 request.resolve(message);
@@ -293,95 +312,76 @@ export class RestObject {
      * @returns Promise<Track | Error>
      * @private
      */
-    private fetch = async (track: Track, array: RestServerSide.API[]): Promise<Track | Error> => {
+    private fetch = (track: Track, array: RestServerSide.API[]): Promise<Track | Error> => {
         const { name, artist, api } = track;
-
-        // Оригинальный трек по словам
         const original_name = `${artist.title} ${name}`;
         const original = normalize(original_name);
-        let link: Track = null, lastError: Error;
 
-        // Ищем нужную платформу
-        for (const platform of array) {
-            // Не учитываем платформу трека
-            if (platform.name === api.name) continue;
+        // Формируем массив обещаний для каждой платформы (кроме исходной)
+        const platformPromises = array
+            .filter(platform => platform.name !== api.name)
+            .map(async (platform) => {
+                const platformAPI = this.request(platform.name);
 
-            // Получаем класс для работы с Worker
-            const platformAPI = this.request(platform.name);
+                // Параллельный поиск по названию
+                const search = await platformAPI.request<"search">(original_name).request();
 
-            // Поиск трека
-            const search = await platformAPI.request<"search">(original_name).request();
+                // Если при получении треков произошла ошибка
+                if (search instanceof Error) {
+                    Logger.log("ERROR", search);
+                    throw search;
+                }
 
-            // Если при получении треков произошла ошибка
-            if (search instanceof Error) {
-                Logger.log("ERROR", search);
-                lastError = search;
-                continue;
-            }
+                // Если треков не найдено
+                else if (!search.length) {
+                    const err = Error(`[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
+                    Logger.log("ERROR", err);
+                    throw err;
+                }
 
-            // Если треков не найдено
-            else if (!search.length) {
-                Logger.log("ERROR", `[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
-                lastError = Error(`[APIs/${platform.name}/fetch] Couldn't find any tracks similar to this one`);
-                continue;
-            }
+                // Фильтрация треков по длительности и совпадению слов
+                const findTrack = search.find((song) => {
+                    const candidate = normalize(`${song.artist.title} ${song.name}`);
+                    const timeDiff = Math.abs(track.time.total - song.time.total);
+                    const candidateArr = candidate.split(/\s+/).filter(Boolean);
+                    const matchCount = candidateArr.filter(word => original.includes(word)).length;
 
-            // Ищем нужный трек
-            // Можно разбить проверку на слова, сравнивать кол-во совпадений, если больше половины то точно подходит
-            const findTrack = search.find((song) => {
-                const candidate = normalize(`${song.artist.title} ${song.name}`);
-                const matchCount = candidate.filter(word => original.includes(word)).length;
-                const time = Math.abs(track.time.total - song.time.total);
+                    return (timeDiff <= 5) && (getSmartMatch(original, candidate) || matchCount >= Math.floor(candidateArr.length * 0.75));
+                });
 
-                return (time <= 10) && // по длительности близко
-                    (
-                        matchCount === candidate.length ||               // полное совпадение
-                        matchCount === original.length ||                // Если есть полное совпадение по оригиналу
-                        matchCount >= Math.floor(candidate.length * 0.5) // ≥50% слов совпало
-                    );
+                // Если отфильтровать треки не удалось
+                if (!findTrack) {
+                    const err = Error(`[APIs/${platform.name}] The tracks found do not match the description of this`);
+                    Logger.log("ERROR", err);
+                    throw err;
+                }
+
+                // Получение деталей трека (ссылки)
+                const song = await platformAPI.request<"track">(findTrack["url"]).request();
+
+                // Если при получении трека произошла ошибка
+                if (song instanceof Error) {
+                    Logger.log("ERROR", song);
+                    throw song;
+                }
+
+                // Если нет ссылки на исходный файл
+                else if (!song.link) {
+                    throw Error(`[APIs/${platform.name}] No audio link available`);
+                }
+
+                // Возвращаем успешный результат
+                track["_duration"] = song.time;
+                return song;
             });
 
-            // Если отфильтровать треки не удалось
-            if (!findTrack) {
-                Logger.log("ERROR", `[APIs/${platform.name}/fetch] The tracks found do not match the description of this`);
-                lastError = Error(`[APIs/${platform.name}] The tracks found do not match the description of this`);
-                continue;
-            }
-
-            // Получение исходника
-            const song = await platformAPI.request<"track">(findTrack["url"]).request();
-
-            // Если при получении трека произошла ошибка
-            if (song instanceof Error) {
-                Logger.log("ERROR", song);
-                lastError = song;
-                continue;
-            }
-
-            // Если есть ссылка на аудио
-            if (song.link) {
-                // Меняем время трека на время найденного трека
-                track["_duration"] = song.time;
-
-                // Выносим ссылку из цикла
-                link = song;
-                break;
-            }
+        try {
+            // Ждём первый успешный результат (или ошибку, если все упали)
+            return Promise.any(platformPromises);
+        } catch (aggregateError) {
+            const errors = (aggregateError as AggregateError).errors;
+            return errors[errors.length - 1] || Error(`[APIs/fetch] Unable to get audio link on alternative platforms!`);
         }
-
-        // Если нет ссылки на исходный аудио файл
-        if (!link) {
-            // Если во время поиска произошла ошибка
-            if (lastError) return lastError;
-
-            // Если нет ошибки и ссылки
-            else if (!lastError) return Error(`[APIs/fetch] There were no errors and there are no audio links to the resource`);
-
-            // Если нет ссылки
-            return Error(`[APIs/fetch] Unable to get audio link on alternative platforms!`);
-        }
-
-        return link;
     };
 
     /**
@@ -401,7 +401,6 @@ export class RestObject {
 
                 // Если удалось получить аудио
                 if (!(song instanceof Error)) {
-                    track["_duration"] = song.time;
                     track.link = song.link;
                     return song;
                 }
@@ -415,7 +414,6 @@ export class RestObject {
             // Если получена ошибка
             if (song instanceof Error) return song;
 
-            track["_duration"] = song.time;
             track.link = song.link;
             return song;
         } catch (err) {

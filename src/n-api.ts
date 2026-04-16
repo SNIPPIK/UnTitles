@@ -87,18 +87,15 @@ export interface iOggOpusParser {
  * @interface FfmpegProcess
  */
 export interface iFfmpegProcess {
-    constructor(args: Array<string>, name: string): void
+    constructor(args: Array<string>, name: string): void;
 
     /**
      * Запускает чтение stdout и передачу данных в JS.
      * Вызывается один раз после создания экземпляра.
      *
-     * @param callback - основная функция: вызывается для каждого чанка stdout (обычно OGG/Opus)
+     * @param callback - основная функция: вызывается для каждого чанка stdout (Opus)
      */
-    pipeStdout(callback: (pul: {
-        type: OpusPacketType,
-        data: Buffer
-    }[]) => any): void
+    pipeStdout(callback: (pul: Buffer[]) => any): void;
 
     /**
      * Принудительно завершает процесс FFmpeg (посылает SIGKILL).
@@ -184,7 +181,7 @@ export interface iAudioEngine {
      * # Возвращает
      * Вектор Buffer (может быть меньше запрошенного, если пакетов недостаточно).
      */
-    getPackets(count: number): Array<Buffer>
+    getPackets(count: number): Array<Buffer>;
 
     /**
      * Получает пакет по индексу без удаления (прямой доступ).
@@ -286,15 +283,20 @@ export interface iUDPSocket {
 }
 
 /**
- * Буферизованный RTP-сокет для голоса с шифрованием AES-256-GCM.
+ * Объект RTP-сокета для голоса, доступный из JavaScript.
+ * Выполняет шифрование аудиофреймов (Opus) в соответствии с требованиями Discord.
  *
- * Генерирует RTP-пакеты с правильными заголовками (sequence, timestamp, SSRC),
- * шифрует полезную нагрузку (Opus-фрейм) с использованием режима AEAD_AES_256_GCM_RTPSIZE,
- * который требует включения заголовка RTP в дополнительные аутентифицированные данные (AAD).
+ * # Атомарные счётчики
+ * - `sequence` – 16-битный счётчик RTP-пакетов (оборачивается).
+ * - `timestamp` – 32-битная метка времени, увеличивается на `TIMESTAMP_INC` для каждого пакета.
+ * - `counter` – 32-битный счётчик nonce (используется как первые 4 байта 12-байтового nonce).
  *
- * Счётчики sequence, timestamp и nonce counter управляются атомарно
+ * # Потокобезопасность
+ * Все методы могут вызываться из разных потоков благодаря атомарным операциям.
+ * Однако `cipher` внутри не является `Sync`, поэтому экземпляр `VoiceRTPSocket` не должен
+ * использоваться из нескольких потоков одновременно (если только не обёрнут в Mutex).
  */
-export interface VoiceRTPSocket {
+export interface iVoiceRTPSocket {
     /**
      * @description Возвращает строку, идентифицирующую режим шифрования.
      * @public
@@ -370,7 +372,7 @@ export interface VoiceRTPSocket {
  *
  * @see https://github.com/discord/dave
  */
-export interface DAVESession {
+export interface iDAVESession {
     /**
      * Создаёт новую сессию Dave с указанной версией протокола, идентификаторами пользователя и канала.
      *
@@ -635,8 +637,8 @@ export const {
     UDPSocket,
     DAVESession
 } = Native as {
-    DAVESession:    NativeClass<DAVESession>
-    VoiceRTPSocket: NativeClass<VoiceRTPSocket>
+    DAVESession:    NativeClass<iDAVESession>
+    VoiceRTPSocket: NativeClass<iVoiceRTPSocket>
     OggOpusParser:  NativeClass<iOggOpusParser>,
     FfmpegProcess:  NativeClass<iFfmpegProcess>,
     AudioEngine:    NativeClass<iAudioEngine>,

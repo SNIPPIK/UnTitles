@@ -27,6 +27,12 @@ export class ControllerTracks<T extends Track> {
     protected _position = 0;
 
     /**
+     * @description Последняя позиция треков
+     * @protected
+     */
+    protected _last_position = 0;
+
+    /**
      * @description Тип повтора
      * @protected
      */
@@ -50,6 +56,8 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public set position(number: number) {
+        this._last_position = this._position;
+
         // Переключаем позицию на первый трек
         if (number >= this._current.length) {
             // Если указана позиция больше чем треков в списке
@@ -66,6 +74,14 @@ export class ControllerTracks<T extends Track> {
 
         // Меняем позицию
         this._position = number;
+    };
+
+    /**
+     * @description Последняя позиция, позиция до смены позиции
+     * @public
+     */
+    public get last_position() {
+        return this._last_position;
     };
 
     /**

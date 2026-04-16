@@ -1,5 +1,5 @@
 import { FfmpegProcess, AudioEngine, type iType } from "#native";
-import { OPUS_FRAME_SIZE } from "#core/audio/opus";
+import { OPUS_FRAME_SIZE, SILENT_FRAME } from "#core/audio/opus";
 import { FFMPEG_PATH } from "#core/audio/process";
 import { TypedEmitter } from "#structures";
 import type { Track } from "#core/queue";
@@ -13,16 +13,16 @@ import { db } from "#app/db";
 const ENCODER_PARAMS = {
     /**
      * # Параметры
-     * - voip - Favor improved speech intelligibility
-     * - audio - Favor faithfulness to the input (the default).
-     * - lowdelay - Restrict to only the lowest delay modes by disabling voice-optimized modes.
+     * - voip - Способствует улучшению разборчивости речи
+     * - audio - Поддерживайте верность вводимым данным (по умолчанию).
+     * - lowdelay - Ограничьтесь только режимами с наименьшей задержкой, отключив режимы, оптимизированные для передачи голоса.
      */
-    mode: "voip",
+    mode: "audio",
 
     /**
      * # Параметры
-     * - off - Use constant bit rate encoding.
-     * - on - Use variable bit rate encoding (the default).
+     * - off - Используйте кодирование с постоянной скоростью передачи данных.
+     * - on - Используйте кодировку с переменной скоростью передачи данных (по умолчанию).
      */
     vbr: "off",
 
@@ -255,7 +255,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
  * @public
  */
 export class AudioResource extends BaseAudioResource {
-    private engine: iType<typeof AudioEngine>;
+    private engine: iType<typeof AudioEngine> = new AudioEngine(20);
     private process: iType<typeof FfmpegProcess>;
     private _played_frames = 0;
 
@@ -300,9 +300,7 @@ export class AudioResource extends BaseAudioResource {
      */
     public constructor(config: AudioResourceOptions) {
         super(config);
-
         // Создаем аудио движок в Rust
-        this.engine = new AudioEngine(20);
         this.process = new FfmpegProcess(this.arguments, FFMPEG_PATH);
 
         // Привязываем события через внутренний метод input
@@ -312,22 +310,13 @@ export class AudioResource extends BaseAudioResource {
             },
             input: this.process,
             decode: (p) => p.pipeStdout((frames) => {
-                const batch: Buffer[] = [];
-
-                for (const { type, data } of frames) {
-                    if (type !== "frame") continue;
-
-                    if (!this._readable) {
-                        //batch.push(SILENT_FRAME);
-                        this._readable = true;
-                        setImmediate(() => this.emit("readable"));
-                    }
-
-                    batch.push(data);
+                if (!this._readable) {
+                    this.engine.addPacket(SILENT_FRAME);
+                    this._readable = true;
+                    setImmediate(() => this.emit("readable"));
                 }
 
-                // Отправляем одним array
-                if (batch.length > 0) this.engine.addPackets(batch);
+                this.engine.addPackets(frames);
             })
         });
     };
@@ -348,7 +337,7 @@ export class AudioResource extends BaseAudioResource {
      * @public
      */
     public destroy() {
-        //this.engine.addPacket(SILENT_FRAME);
+        this.engine.addPacket(SILENT_FRAME);
 
         if (this.process) {
             this.process.destroy();

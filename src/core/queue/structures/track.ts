@@ -234,8 +234,8 @@ export class Track extends TrackResolvers {
             if (this._lyrics || this._duration.total === 0) return resolve(this._lyrics);
 
             // Если ответ не был получен от сервера
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Timeout server request")), 10e3)
+            const timeoutPromise = new Promise((resolve) =>
+                setTimeout(() => resolve(new Error("Timeout server request")), 10e3)
             );
 
             const api = await Promise.race([
@@ -268,14 +268,6 @@ export class Track extends TrackResolvers {
     public get isBuffered() {
         const current = this._duration.total;
         return current < TRACK_BUFFERED_TIME && current !== 0;
-    };
-
-    /**
-     * @description Данные о тек треке в урезанном формате
-     * @public
-     */
-    public get footer() {
-        return `-# \`👤 ${this.user.username}\` • \`🕐 ${this.time.split}\` • \`${this.api.name.toLowerCase()}\``
     };
 
     /**

@@ -1,7 +1,7 @@
 use napi::bindgen_prelude::*;
+use crc::{Crc, Algorithm};
 use napi_derive::napi;
 use memchr::memmem;
-use crc::{Crc, Algorithm};
 
 // Конфигурация по спецификации Ogg (RFC 3533)
 const OGG_CRC: Crc<u32> = Crc::<u32>::new(&Algorithm {
@@ -11,7 +11,7 @@ const OGG_CRC: Crc<u32> = Crc::<u32>::new(&Algorithm {
     refin: false,
     refout: false,
     xorout: 0x00000000,
-    check: 0x00000000, // Это технический параметр крейта
+    check: 0x00000000,
     residue: 0xFFFFFFFF
 });
 
@@ -21,7 +21,7 @@ const OGG_CRC: Crc<u32> = Crc::<u32>::new(&Algorithm {
 pub enum PacketType {
     Head,
     Tags,
-    Frame,
+    Frame
 }
 
 impl PacketType {
@@ -30,7 +30,7 @@ impl PacketType {
         match self {
             Self::Head => "head",
             Self::Tags => "tags",
-            Self::Frame => "frame",
+            Self::Frame => "frame"
         }
     }
 }
@@ -39,7 +39,7 @@ impl PacketType {
 #[napi(object)]
 pub struct JsOpusPacket {
     pub kind: String,
-    pub data: Buffer,
+    pub data: Buffer
 }
 
 /// Парсер Ogg Opus потока, работающий в режиме потока (streaming).
@@ -65,11 +65,6 @@ pub struct OggOpusParser {
     /// или сброса состояния (при появлении страницы с новым serial).
     bitstream_serial: i32,
 
-    /// Флаг ожидания заголовочного пакета (OpusHead). Если true, все кадры
-    /// (PacketType::Frame) игнорируются до тех пор, пока не встретится Head.
-    /// Необходимо для синхронизации с началом потока, после переключения/сброса.
-    waiting_for_head: bool,
-
     /// Количество байт от начала буфера `remainder`, которые уже были проверены на наличие маркера "OggS".
     ///
     /// Оптимизация, позволяющая не сканировать уже просмотренную область при повторных вызовах `parse_core`.
@@ -93,8 +88,7 @@ impl OggOpusParser {
             remainder: Vec::with_capacity(1024 * 5),
             packet_carry: Vec::with_capacity(1024 * 2),
             bitstream_serial: -1,
-            waiting_for_head: true,
-            scanned_bytes: 0,
+            scanned_bytes: 0
         }
     }
 
@@ -162,29 +156,10 @@ impl OggOpusParser {
     /// (например, при закрытии потока или достижении EOF). Он обрабатывает ситуацию, когда
     /// в буферах парсера остались неполные данные, которые не могут быть завершены обычным
     /// способом из-за отсутствия последующих страниц Ogg.
-    ///
-    /// # Алгоритм
-    /// 1. Проверяет наличие необработанных данных в `remainder` (неполные страницы).
-    /// 2. Если в `packet_carry` есть накопленный пакет, который не был завершён из-за
-    ///    отсутствия последнего сегмента (<255), он обрабатывается как завершённый пакет.
-    /// 3. Все пакеты добавляются в `output` для отправки в JS.
-    ///
-    /// # Примечания по безопасности
-    /// - Неполные страницы в `remainder` (без маркера "OggS") отбрасываются, так как по
-    ///   спецификации Ogg пакет может быть завершён только внутри полной страницы.
-    /// - Если `packet_carry` содержит данные, они считаются последним пакетом потока.
-    /// - Флаг `waiting_for_head` игнорируется, так как при завершении потока мы всё равно
-    ///   отдаём всё, что накопили, даже если заголовок не был получен (это позволит избежать
-    ///   потери данных в случае обрыва соединения).
-    ///
-    /// # Возвращаемое значение
-    /// - `Ok(())` — успешно обработаны остатки.
-    /// - `Err` — ошибка при обработке пакета (например, недопустимый тип).
     fn flush_internal(&mut self, output: &mut Vec<(PacketType, Vec<u8>)>) -> Result<()> {
         if !self.remainder.is_empty() || !self.packet_carry.is_empty() {
             Self::process_packet_core(
                 &mut self.packet_carry,
-                &mut self.waiting_for_head,
                 &mut |packet_type, data| {
                     output.push((packet_type, data.to_vec()));
                     Ok(())
@@ -322,7 +297,7 @@ impl OggOpusParser {
             }
 
             // Обрабатываем страницу: разбираем сегменты, собираем пакеты
-            if let Err(_err) = Self::handle_page_core(full_page, full_page[5], segments, &mut self.packet_carry, &mut self.bitstream_serial, &mut self.waiting_for_head, &mut on_packet) {
+            if let Err(_err) = Self::handle_page_core(full_page, full_page[5], segments, &mut self.packet_carry, &mut self.bitstream_serial, &mut on_packet) {
                 // В идеале тут нужно логирование ошибки (например, через console.warn в JS)
                 // Чтобы не зациклиться, сдвигаем курсор на 1 байт вперед, чтобы на следующей
                 // итерации memmem начал искать следующий "OggS"
@@ -378,10 +353,11 @@ impl OggOpusParser {
     /// - Функция не перемещает `packet_carry` (оставляет его владельцу), но очищает после завершённого пакета.
     /// - Используются безопасные проверки границ через `page.get(..)`, избегая паники.
     /// - `on_packet` получает ссылку на данные пакета без копирования (только чтение).
-    fn handle_page_core<F>(page: &[u8], header_type: u8, segments: usize, packet_carry: &mut Vec<u8>, bitstream_serial: &mut i32, waiting_for_head: &mut bool, on_packet: &mut F) -> Result<()>
+    fn handle_page_core<F>(page: &[u8], header_type: u8, segments: usize, packet_carry: &mut Vec<u8>, bitstream_serial: &mut i32, on_packet: &mut F) -> Result<()>
     where F: FnMut(PacketType, &[u8]) -> Result<()> {
         // Флаг 0x01 в header_type означает, что этот пакет продолжает предыдущий (continuation)
         let continued = (header_type & 0x01) != 0;
+        let bos = (header_type & 0x02) != 0;
 
         // Извлекаем серийный номер потока из байтов 14-17 (little-endian, как в спецификации Ogg)
         let serial = i32::from_le_bytes(
@@ -398,20 +374,22 @@ impl OggOpusParser {
 
         // Если серийный номер изменился (и не равен -1, что означает первый поток), то начался новый
         // логический поток. Сбрасываем состояние: очищаем буфер пакета и переходим в режим ожидания заголовка.
-        else if *bitstream_serial != -1 && *bitstream_serial != serial {
-            packet_carry.clear();
-            //*waiting_for_head = true;
+        if *bitstream_serial != -1 || *bitstream_serial != serial {
+            if *bitstream_serial != -1 {
+                packet_carry.clear();
+            }
+            *bitstream_serial = serial;
         }
 
         // Если страница помечена как "начало потока" (BOS – header_type & 0x02), также сбрасываем состояние.
         // BOS означает, что это первая страница в новом потоке, и предыдущее состояние невалидно.
-        else if (header_type & 0x02) != 0 {
+        if bos {
             packet_carry.clear();
-            *waiting_for_head = true;
+            *bitstream_serial = 0;
         }
 
         // Обновляем текущий серийный номер
-        *bitstream_serial = serial;
+        //if serial != *bitstream_serial {*bitstream_serial = serial;}
 
         // Таблица сегментов находится сразу после 27-байтового заголовка, занимает `segments` байт.
         let segment_table = page
@@ -437,7 +415,7 @@ impl OggOpusParser {
             // когда встречается сегмент с размером <255, либо когда заканчиваются сегменты на странице).
             if s < 255 {
                 // Обрабатываем накопленный пакет (определяем тип, отбрасываем фреймы до заголовка и т.д.)
-                Self::process_packet_core(packet_carry, waiting_for_head, on_packet)?;
+                Self::process_packet_core(packet_carry, on_packet)?;
                 // Очищаем буфер для следующего пакета (сохраняем выделенную память)
                 packet_carry.clear();
             }
@@ -456,29 +434,16 @@ impl OggOpusParser {
     /// - Если ожидается заголовок (`waiting_for_head == true`) и пакет является фреймом,
     ///   он отбрасывается (поток ещё не синхронизирован).
     /// - Если пакет является Head, флаг `waiting_for_head` сбрасывается.
-    fn process_packet_core<F>(packet: &mut Vec<u8>, waiting_for_head: &mut bool, on_packet: &mut F) -> Result<()>
+    fn process_packet_core<F>(packet: &mut Vec<u8>, on_packet: &mut F) -> Result<()>
     where F: FnMut(PacketType, &[u8]) -> Result<()> {
         // Пустой пакет игнорируем (не должен возникать, но на всякий случай).
-        if packet.is_empty() {
-            return Ok(());
-        }
+        if packet.is_empty() { return Ok(()); }
 
         // Определяем тип пакета по его содержимому.
         let packet_type = Self::detect_packet_type(packet);
 
-        // Логика ожидания заголовка OpusHead
-        if *waiting_for_head {
-            if packet_type == PacketType::Frame {
-                // Игнорируем фреймы, но очищаем буфер, оставляя память.
-                packet.clear();
-                return Ok(());
-            } else if packet_type == PacketType::Head {
-                *waiting_for_head = false;
-            }
-        }
-
-        // Передаём данные в колбэк (ссылку на срез, без копирования).
-        on_packet(packet_type, packet.as_slice())?;
+        // Передаём итоговые данные
+        on_packet(packet_type, packet)?;
 
         // Очищаем буфер, сохраняя выделенную память для следующего пакета.
         packet.clear();
@@ -491,7 +456,7 @@ impl OggOpusParser {
     /// иначе — Frame.
     fn detect_packet_type(packet: &[u8]) -> PacketType {
         // Проверяем, что длина достаточна для сравнения (минимум 8 байт).
-        if packet.len() >= 8 {
+        if packet.len() == 8 {
             if &packet[..8] == b"OpusHead" {
                 return PacketType::Head;
             }
@@ -502,6 +467,7 @@ impl OggOpusParser {
         PacketType::Frame
     }
 
+    /// Проверка страницы на целостность, если страница сломана то пропуск ее
     fn verify_ogg_crc(page: &[u8]) -> bool {
         if page.len() < 27 { return false; }
 
@@ -510,7 +476,6 @@ impl OggOpusParser {
 
         let mut digest = OGG_CRC.digest();
 
-        // Считаем всё, но вместо байтов CRC подставляем нули
         digest.update(&page[0..22]);
         digest.update(&[0, 0, 0, 0]);
         digest.update(&page[26..]);
@@ -524,11 +489,9 @@ impl OggOpusParser {
     /// Может быть полезно для обработки нового потока без создания нового объекта.
     #[napi]
     pub fn destroy(&mut self) {
-        // clear() обнуляет длину, но оставляет capacity, что идеально для пула
         self.remainder.clear();
         self.packet_carry.clear();
         self.bitstream_serial = -1;
-        self.waiting_for_head = true;
         self.scanned_bytes = 0;
     }
 }

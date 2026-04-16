@@ -1,10 +1,10 @@
-import { ActionRow, Button, Embed } from "seyfert";
-import { StringSelectMenu, StringSelectOption } from "seyfert";
-import { CommandInteraction } from "#structures/discord";
-import { MessageFlags } from "seyfert/lib/types";
+import { CommandInteraction, CycleInteraction, DiscordClient } from "#structures/discord";
+import { ActionRowBuilder, StringSelectMenuBuilder } from "@discordjs/builders";
+import { MessageFlags } from "discord-api-types/v10";
 import filters from "#core/player/filters.json";
 import type { AudioPlayer } from "#core/player";
 import { RepeatType } from "#core/queue";
+import { EmbedData } from "discord.js";
 import { locale } from "#structures";
 import { env } from "#app/env";
 import { db } from "#app/db";
@@ -46,7 +46,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public get locale() {
-        return this._original?.interaction.locale;
+        return this._original?.locale ?? this._original?.guildLocale;
     };
 
     /**
@@ -82,7 +82,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public get client() {
-        return this._original.client;
+        return this._original.client as DiscordClient;
     };
 
     /**
@@ -111,7 +111,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public constructor(private _original: T) {
-        this.voice_id = _original.member.voice("cache").channelId;
+        this.voice_id = _original.member.voice.channelId;
         this.channel_id = _original.channelId;
         this.guild_id = _original.guildId;
     };
@@ -136,63 +136,26 @@ export class QueueMessage<T extends CommandInteraction> {
      * @returns Promise<CycleInteraction>
      * @public
      */
-    public send = (options: {embeds: Embed[], components?: ActionRow<Button>[], flags?: MessageFlags}) => {
+    public send = (options: {embeds?: EmbedData[], components?: any[], withResponse: boolean, flags?: MessageFlags}): Promise<CycleInteraction> => {
+        const ctx = this._original;
+
         try {
-            // Если бот уже ответил на сообщение
-            if (this.replied && !this.deferred) {
-                this._deferred = true;
-                return this._original.followup(options);
-            }
-
-            // Если можно дать ответ на сообщение
-            else if (!this.deferred && !this.replied) {
-                this._deferred = true;
-                return this._original.editOrReply(options, true);
-            }
-
             // Отправляем обычное сообщение
-            return this.send_single(options);
+            return ctx.channel.send(options as any);
         } catch {
             this._deferred = false;
 
-            try {
-                // Отправляем обычное сообщение
-                return this.send_single(options);
-            } catch {
-                return null;
-            }
-        }
-    };
-
-    /**
-     * @description Авто отправка сообщения
-     * @param options - Параметры сообщения
-     * @returns Promise<CycleInteraction>
-     * @public
-     */
-    public send_single = (options: {embeds: Embed[], components?: ActionRow<Button>[], flags?: MessageFlags}) => {
-        try {
             // Отправляем обычное сообщение
-            return this._original.client.messages.write(this.channel_id, options);
-        } catch {
-            this._deferred = false;
-
-            try {
-                // Отправляем обычное сообщение
-                return this._original.client.messages.write(this.channel_id, options);
-            } catch {
-                return null;
-            }
+            return ctx.channel.send(options as any);
         }
     };
 }
-
 
 /**
  * @author SNIPPIK
  * @description Класс для создания компонентов-кнопок
  * @class QueueButtons
- * @private
+ * @public
  */
 export class QueueButtons {
     /**
@@ -257,7 +220,7 @@ export class QueueButtons {
      * @description Строковый селектор, для выбора фильтра
      * @private
      */
-    private _selector: ActionRow;
+    private _selector: ActionRowBuilder<any>;
 
     /**
      * @description Создаем класс для обновления кнопок
@@ -265,16 +228,17 @@ export class QueueButtons {
      */
     public constructor(ctx: QueueMessage<CommandInteraction>) {
         // Разово создаем селектор для повторного использования
-        this._selector = new ActionRow().addComponents([
-            new StringSelectMenu().setCustomId("filter_select")
+        this._selector = new ActionRowBuilder().addComponents([
+            new StringSelectMenuBuilder().setCustomId("filter_select")
                 .setPlaceholder(locale._(ctx.locale, "selector.filters"))
                 .setOptions(filters.filter((filter) => !filter.args).map((filter) => {
-                    return new StringSelectOption()
-                        .setLabel(filter.name.charAt(0).toUpperCase() + filter.name.slice(1).replace("_", " "))
-                        .setValue(filter.name)
-                        .setDescription((filter.locale[ctx.locale] ?? filter.locale["en-US"]).split("]")[1])
+                    return {
+                        label: filter.name.charAt(0).toUpperCase() + filter.name.slice(1).replace("_", " "),
+                        value: filter.name,
+                        description: (filter.locale[ctx.locale] ?? filter.locale["en-US"]).split("]")[1]
+                    }
                 }))
-        ])
+        ]);
     };
 
     /**

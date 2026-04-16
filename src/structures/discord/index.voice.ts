@@ -1,41 +1,26 @@
-import { VoiceAdapters, DiscordGatewayAdapterLibraryMethods} from "#core/voice/transport/adapter";
+import { VoiceAdapters, DiscordGatewayAdapterCreator } from "#core/voice/transport/adapter";
 import type { DiscordClient } from "#structures/discord/index.client";
+import { WebSocketShardEvents, CloseCodes } from "discord.js";
 
 /**
  * @author SNIPPIK
- * @description Класс адаптера
- * @class SeyfertVoice
+ * @description Класс реализации адаптера
+ * @class DJSVoice
  * @extends VoiceAdapters
+ * @public
  */
-export class SeyfertVoice<T extends DiscordClient> extends VoiceAdapters<DiscordClient> {
+export class DJSVoice<T extends DiscordClient = DiscordClient> extends VoiceAdapters<DiscordClient> {
     public constructor(client: T) {
         super(client);
-    };
-
-    /**
-     * @description Указываем как создавать адаптер
-     * @param guild_id - ID сервера для которого надо создать адаптер
-     * @public
-     */
-    public voiceAdapterCreator = (guild_id: string) => {
-        // Если нет ID осколка
-        const id = this.client.gateway.calculateShardId(guild_id);
-
-        return (methods: DiscordGatewayAdapterLibraryMethods) => {
-            this.adapters.set(guild_id, methods);
-
-            return {
-                send: (data) => {
-                    try {
-                        this.client.gateway.send(id, data);
-                    } catch { return false; }
-                    return true;
-                },
-                destroy: () => {
-                    this.adapters.delete(guild_id);
+        client.ws.on(WebSocketShardEvents.Closed, (code, shardId) => {
+            if (code === CloseCodes.Normal) {
+                for (const [guildId, adapter] of this.adapters.entries()) {
+                    if (client.guilds.cache.get(guildId)?.shardId === shardId) {
+                        adapter.destroy();
+                    }
                 }
-            };
-        };
+            }
+        });
     };
 
     /**
@@ -44,11 +29,34 @@ export class SeyfertVoice<T extends DiscordClient> extends VoiceAdapters<Discord
      * @param status - Название заголовка
      * @public
      */
-    public status = (channelId: string, status?: string) => {
-        return this.client.rest.request("PUT", `/channels/${channelId}/voice-status`, {
+    public status = async (channelId: string, status: string = "") => {
+        return this.client.rest.put(`/channels/${channelId}/voice-status`, {
             body: {
                 status: status
             }
-        }).catch(() => {});
+        }).catch(() => null);
+    };
+
+    /**
+     * @description Создаем прослойку адаптера голосового соединения
+     * @param guildID - ID сервера
+     * @public
+     */
+    public voiceAdapterCreator = (guildID: string): DiscordGatewayAdapterCreator => {
+        const id = this.client.shardID;
+
+        return methods => {
+            this.adapters.set(guildID, methods);
+
+            return {
+                send: (data) => {
+                    this.client.ws.send(id, data as any)
+                    return true;
+                },
+                destroy: () => {
+                    this.adapters.delete(guildID);
+                }
+            };
+        };
     };
 }

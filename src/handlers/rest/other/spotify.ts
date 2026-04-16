@@ -1,4 +1,4 @@
-import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest";
+import { DeclareRest, RestServerSide } from "#handler/rest";
 import { httpsClient, locale } from "#structures";
 import { sdb } from "#worker/db";
 
@@ -9,7 +9,6 @@ import { sdb } from "#worker/db";
  * - Track - Любое трек с платформы
  * - Playlist - Любой открытый плейлист
  * - Artist - Популярные треки автора с учетом лимита
- * - Search - Поиск треков, пока не доступны плейлисты, альбомы, авторы
  * @Specification Rest Spotify API
  * @Audio Не доступно нативное получение
  */
@@ -25,33 +24,8 @@ import { sdb } from "#worker/db";
     color: 1420288,
     url: "open.spotify.com",
     audio: false,
-    auth: true,
+    auth: false,
     filter: /^(https?:\/\/)?(open\.)?(m\.)?(spotify\.com|spotify\.?ru|spotify)\/.+$/i
-})
-@OptionsRest({
-    /**
-     * @description Ссылка для работы API
-     * @protected
-     */
-    api: "https://api.spotify.com/v1",
-
-    /**
-     * @description Ссылки для авторизации
-     * @protected
-     */
-    account: "https://accounts.spotify.com/api",
-
-    /**
-     * @description Токен авторизации
-     * @protected
-     */
-    token: null,
-
-    /**
-     * @description Время жизни токена
-     * @protected
-     */
-    time: 0
 })
 class RestSpotifyAPI extends RestServerSide.API {
     readonly requests: RestServerSide.API["requests"] = [
@@ -91,7 +65,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                 try {
                     // Создаем запрос
-                    const api = await this.API(`tracks/${ID}`);
+                    const api = await this.API(`track/${ID}`);
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
@@ -150,21 +124,24 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                 try {
                     // Создаем запрос
-                    const api: Error | any = await this.API(`albums/${ID}?offset=0&limit=${Math.min(limit, 100)}`);
+                    const api: Error | any = await this.API(`album/${ID}?offset=0&limit=${Math.min(limit, 100)}`);
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
 
                     // Подготавливаем все треки
-                    const tracks = api.tracks.items.map((track: any) => this.track(track, api.images));
+                    const tracks = api.trackList.map((track: any) => this.track(track, api?.visualIdentity.image));
 
                     const album = {
                         id: ID,
                         url: `https://open.spotify/album/${ID}`,
                         title: api.name,
-                        image: api.images[0],
-                        items: tracks,
-                        artist: api?.["artists"][0]
+                        image: this.parseImages(api?.visualIdentity.image),
+                        artist: {
+                            name: api.subtitle,
+                            url: `https://open.spotify/album/${ID}`
+                        },
+                        items: tracks
                     };
 
                     // Сохраняем кеш в системе
@@ -184,7 +161,7 @@ class RestSpotifyAPI extends RestServerSide.API {
         {
             name: "playlist",
             filter: /playlist\/[a-zA-Z0-9]+/i,
-            execute: async (url, {limit}) => {
+            execute: async (url, {}) => {
                 const ID = this.getID(/playlist\/[a-zA-Z0-9]+/, url)[0]?.split("playlist\/")?.pop();
 
                 // Если ID плейлиста не удалось извлечь из ссылки
@@ -192,16 +169,16 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                 try {
                     // Создаем запрос
-                    const api: Error | any = await this.API(`playlists/${ID}?offset=0&limit=${Math.min(limit, 100)}`);
+                    const api: Error | any = await this.API(`playlist/${ID}`);
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
-                    const tracks = api.tracks.items.map(({ track }) => this.track(track));
+                    const tracks = api.trackList.map(({ track }) => this.track(track, api?.visualIdentity.image));
 
                     return {
                         url: `https://open.spotify/playlist/${ID}`,
                         title: api.name,
-                        image: api.images[0],
+                        image: this.parseImages(api?.visualIdentity.image),
                         items: tracks
                     };
                 } catch (e) {
@@ -218,7 +195,7 @@ class RestSpotifyAPI extends RestServerSide.API {
         {
             name: "artist",
             filter: /artist\/[a-zA-Z0-9]+/i,
-            execute: async (url, {limit}) => {
+            execute: async (url, {}) => {
                 const ID = this.getID(/artist\/[a-zA-Z0-9]+/, url)[0]?.split("artist\/")?.pop();
 
                 // Если ID автора не удалось извлечь из ссылки
@@ -226,12 +203,12 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                 try {
                     // Создаем запрос
-                    const api = await this.API(`artists/${ID}/top-tracks?market=ES&limit=${limit}`);
+                    const api = await this.API(`artist/${ID}`);
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
 
-                    return (api.tracks?.items ?? api.tracks).map(this.track);
+                    return (api.trackList).map(this.track);
                 } catch (e) {
                     return new Error(`[APIs]: ${e}`);
                 }
@@ -242,13 +219,14 @@ class RestSpotifyAPI extends RestServerSide.API {
          * @description Запрос данных по поиску
          * @type "search"
          * @private
+         * @deprecated
          */
-        {
+        /*{
             name: "search",
-            execute: async (query, {limit}) => {
+            execute: async (query, {}) => {
                 try {
                     // Создаем запрос
-                    const api= await this.API(`search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
+                    const api= await this.API(`search/${encodeURIComponent(query)}/tracks`);
 
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
@@ -258,7 +236,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                     return new Error(`[APIs]: ${e}`);
                 }
             }
-        }
+        }*/
     ]
 
     /**
@@ -266,58 +244,24 @@ class RestSpotifyAPI extends RestServerSide.API {
      * @param method - Метод запроса из api
      * @protected
      */
-    protected API = async (method: string): Promise<json | Error> => {
-        return new Promise(async (resolve) => {
-            // Нужно обновить токен
-            if (!this.options.token || this.options.time <= Date.now()) await this.authorization();
-
-            new httpsClient({
-                url: `${this.options.api}/${method}`,
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Authorization": "Bearer " + this.options.token
-                },
+    protected API = async (method: string) => {
+        return new httpsClient(
+            {
+                url: `https://open.spotify.com/embed/${method}`,
                 agent: this.agent
-            }).toJson.then((api) => {
-                // Если на этапе получение данных получена одна из ошибок
-                if (!api) return resolve(locale.err("api.request.fail"));
-                else if (api instanceof Error) return resolve(api);
-                else if (api.error) return resolve(locale.err("api.request.fail.msg", [api.error.message]));
+            }
+        ).toString.then((d) => {
+            if (d instanceof Error) return locale.err("api.request.fail");
+            const fragment = JSON.parse(d.split("type=\"application/json\">")[1].split("</sc")[0]);
 
-                return resolve(api);
-            }).catch((err) => {
-                return resolve(Error(`[APIs]: ${err}`));
-            });
+            if (fragment.props.pageProps.statusCode) return locale.err("api.request.fail");
+            return fragment.props.pageProps.state.data.entity;
         });
     };
 
-    /**
-     * @description Авторизация на spotify
-     * @protected
-     */
-    protected async authorization(): Promise<Error | string> {
-        try {
-            const token = await new httpsClient({
-                url: `${this.options.account}/token`,
-                headers: {
-                    "Authorization": `Basic ${Buffer.from(`${this.auth}`).toString("base64")}`,
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
-                body: "grant_type=client_credentials",
-                method: "POST",
-                agent: this.agent
-            }).toJson;
-            // Если при получении токена была получена ошибка
-            if (token instanceof Error) {
-                return new Error(`[APIs]: ${token}`);
-            }
-
-            // Вносим данные авторизации
-            this.options.time = Date.now() + token["expires_in"];
-            this.options.token = token["access_token"];
-        } catch {}
-
-        return super.authorization();
+    protected parseImages = (image: any[]) => {
+      const images = image.sort((a, b) => b.maxHeight - a.maxHeight);
+      return images[0].url;
     };
 
     /**
@@ -327,18 +271,18 @@ class RestSpotifyAPI extends RestServerSide.API {
      * @protected
      */
     protected track = (track: json, images?: any[]) => {
-        const track_images = images?.length > 0 ? images : track?.album?.images || track?.images;
+        const track_images = images?.length > 0 ? images : track?.visualIdentity?.image;
 
         return {
-            id: track.id,
-            title: track.name,
-            url: track["external_urls"]["spotify"],
+            id: track.id ?? (track.uri as string).split(":").pop(),
+            title: track.title ?? track.name,
+            url: `https://open.spotify.com/track/${track.id}`,
             artist: {
-                title: track["artists"][0].name,
-                url: track["artists"][0]["external_urls"]["spotify"]
+                title: (track.artists ? track.artists[0].name : track.subtitle)?.split?.(",")?.[0],
+                url: track.artists ? `https://open.spotify.com/artist/${((track["artists"][0].uri) as string).split(":").pop()}` : `https://open.spotify.com/track/${track.id}`
             },
-            time: { total: (track["duration_ms"] / 1000).toFixed(0) },
-            image: track_images.sort((item1: any, item2: any) => item1.width > item2.width)[0].url,
+            time: { total: (track["duration"] / 1000).toFixed(0) },
+            image: this.parseImages(track_images),
             audio: null
         };
     };

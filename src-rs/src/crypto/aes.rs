@@ -1,19 +1,9 @@
-//! Модуль `VoiceRTPSocket` реализует шифрование RTP-пакетов для голосового протокола Discord.
-//! Используется алгоритм AES-256-GCM в режиме `aead_aes256_gcm_rtpsize`, где заголовок RTP
-//! служит дополнительными аутентифицированными данными (AAD), а nonce формируется из счётчика.
-//!
-//! # Особенности
-//! - Неблокирующие атомарные счётчики для sequence, timestamp и nonce.
-//! - Поддержка пакетного шифрования (`packets`) для уменьшения накладных расходов.
-//! - Падение стойкое: ошибки шифрования возвращаются через `Result`, не паникуют.
-//! - Отсутствует динамическая аллокация при построении заголовка (используется массив фиксированного размера).
-
-use rand::RngExt;
+use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
-use std::fmt;
+use rand::RngExt;
 use rand::{rng};
+use std::fmt;
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Nonce,

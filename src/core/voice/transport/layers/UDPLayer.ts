@@ -9,19 +9,13 @@ import { BaseLayer} from "#core/voice/transport/layers/BaseLayer";
  */
 const MAX_RETRIES = 5;
 
-export class UDPLayer extends BaseLayer<void> {
-    /**
-     * @description Клиент UDP соединения, ключевой класс для отправки пакетов
-     * @public
-     */
-    public _udp: VoiceUDPSocket;
-
+export class UDPLayer extends BaseLayer<VoiceUDPSocket> {
     /**
      * @description Готовность UDP слоя
      * @public
      */
     public get ready() {
-        return this._udp.status === "connected";
+        return this._client.status === "connected";
     };
 
     /**
@@ -29,7 +23,7 @@ export class UDPLayer extends BaseLayer<void> {
      * @public
      */
     public get status() {
-        return this._udp.status;
+        return this._client.status;
     };
 
     /**
@@ -37,8 +31,8 @@ export class UDPLayer extends BaseLayer<void> {
      * @public
      */
     public get lost() {
-        if (!this._udp) return 0;
-        return this._udp.drops;
+        if (!this._client) return 0;
+        return this._client.drops;
     };
 
     /**
@@ -46,8 +40,8 @@ export class UDPLayer extends BaseLayer<void> {
      * @public
      */
     public get packets() {
-        if (!this._udp) return 0;
-        return this._udp.packets;
+        if (!this._client) return 0;
+        return this._client.packets;
     };
 
     /**
@@ -56,8 +50,8 @@ export class UDPLayer extends BaseLayer<void> {
      * @public
      */
     public packet = (frames: Buffer[]) => {
-        if (!this._udp) return;
-        return this._udp.packet(frames);
+        if (!this._client) return;
+        return this._client.packet(frames);
     };
 
     /**
@@ -67,13 +61,13 @@ export class UDPLayer extends BaseLayer<void> {
      */
     public create = (d: WebSocketOpcodes.ready["d"]): Promise<Error | {ip: string, port: number}> => {
         // Если UDP был поднят ранее
-        if (this._udp) {
-            this._udp.destroy();
-            this._udp = null;
+        if (this._client) {
+            this._client.destroy();
+            this._client = null;
         }
 
         // Создаем UDP подключение
-        const udp = this._udp = new VoiceUDPSocket();
+        const udp = this._client = new VoiceUDPSocket();
 
         // Создаем обещание
         return new Promise((resolve) => {
@@ -120,7 +114,7 @@ export class UDPLayer extends BaseLayer<void> {
      * @public
      */
     public destroy = () => {
-        this._udp.destroy();
-        this._udp = null;
+        this._client.destroy();
+        this._client = null;
     };
 }

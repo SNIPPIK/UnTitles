@@ -1,32 +1,41 @@
-import {Command, type CommandContext, createNumberOption, Declare, Locales, Middlewares, Options} from "seyfert";
-import {MessageFlags} from "seyfert/lib/types";
-import {locale} from "#structures";
-import {db} from "#app/db";
-import {Colors} from "#structures/discord";
+import { Command, CommandCallback, Declare, Options, Permissions, Middlewares } from "#handler/commands";
+import { ApplicationCommandOptionType } from "discord.js";
+import { Colors } from "#structures/discord";
+import { locale } from "#structures";
+import { db } from "#app/db";
+
 
 /**
- * @description Главная команда, удаляет треки из очереди
+ * @author SNIPPIK
+ * @description Удаление трека из очереди
+ * @class RemoveTracksCommand
+ * @extends Command
+ * @public
  */
 @Declare({
-    name: "remove",
-    description: "Deleting a track from the queue, without the possibility of recovery!",
-    integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "ViewChannel"],
+    names: {
+        "en-US": "remove",
+        "ru": "удалить"
+    },
+    descriptions: {
+        "en-US": "Deleting a track from the queue, without the possibility of recovery!",
+        "ru": "Удаление трека из очереди, без возможности восстановить!"
+    }
 })
 @Options({
-    value: createNumberOption({
-        description: "Specify the track number in the queue!",
-        name_localizations: {
+    remove: {
+        names: {
             "en-US": "value",
-            "ru": "значение",
+            "ru": "число"
         },
-        description_localizations: {
-            "en-US": "Specify the track number in the queue!",
-            "ru": "Укажите номер трека в очереди!"
+        descriptions: {
+            "en-US": "Number track in queue!",
+            "ru": "Номер трека!"
         },
+        type: ApplicationCommandOptionType.Number,
         required: true,
-        autocomplete: async (ctx) => {
-            const number = parseInt(ctx.getInput());
+        autocomplete: ({ctx, args}) => {
+            const number = args[0];
             const queue = db.queues.get(ctx.guildId);
             if (!queue || isNaN(number) || number <= 0) return null;
 
@@ -52,35 +61,28 @@ import {Colors} from "#structures/discord";
                     value: startIndex + i + 1
                 }))
             );
-        }
-    })
+        },
+    }
 })
-@Locales({
-    name: [
-        ["ru", "удалить"],
-        ["en-US", "remove"]
-    ],
-    description: [
-        ["ru", "Удаление трека из очереди, без возможности восстановить!"],
-        ["en-US", "Deleting a track from the queue, without the possibility of recovery!"]
-    ]
+@Middlewares(["cooldown", "queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
+@Permissions({
+    client: ["SendMessages", "ViewChannel"]
 })
-@Middlewares(["userVoiceChannel", "clientVoiceChannel", "checkQueue", "clientVoiceChannel", "checkPlayerIsPlaying"])
-export default class RemoveCommand extends Command {
-    async run(ctx: CommandContext<any>) {
+class RemoveTracksCommand extends Command {
+    async run({ctx, args}: CommandCallback<number>) {
         const queue = db.queues.get(ctx.guildId);
-        const number: number = ctx.options["value"] - 1;
+        const number = args[0] - 1;
         const track = queue.tracks.get(number);
 
         // Если указан трек которого нет
-        if (!track) return ctx.write({
+        if (!track) return ctx.reply({
             embeds: [
                 {
-                    description: locale._(ctx.interaction.locale, "command.remove.track.fail", [ctx.member]),
+                    description: locale._(ctx.locale, "command.remove.track.fail", [ctx.member]),
                     color: Colors.DarkRed
                 }
             ],
-            flags: MessageFlags.Ephemeral
+            flags: "Ephemeral"
         });
 
 
@@ -96,14 +98,20 @@ export default class RemoveCommand extends Command {
         // Удаляем трек и очереди
         queue.tracks.remove(number);
 
-        return ctx.write({
+        return ctx.reply({
             embeds: [
                 {
-                    description: locale._(ctx.interaction.locale, "command.remove.track", [`[${name}](${url})`]),
+                    description: locale._(ctx.locale, "command.remove.track", [`[${name}](${url})`]),
                     color: api.color
                 }
             ],
-            flags: MessageFlags.Ephemeral
+            flags: "Ephemeral"
         });
-    };
+    }
 }
+
+/**
+ * @export default
+ * @description Не даем классам или объектам быть доступными везде в проекте
+ */
+export default [ RemoveTracksCommand ];

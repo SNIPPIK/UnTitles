@@ -1,20 +1,18 @@
-use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode, ErrorStrategy};
+use crate::timers::scheduler::balancer::{add_global_session, remove_global_session};
+use crate::audio::ring_buffer::RingBuffer;
+use napi::bindgen_prelude::*;
 use napi_derive::napi;
-
 use std::{
     net::UdpSocket,
+    time::{ SystemTime, UNIX_EPOCH },
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering, AtomicU64},
         Arc, Mutex,
     },
     thread,
     time::Duration,
 };
-use std::sync::atomic::AtomicU64;
-use std::time::{SystemTime, UNIX_EPOCH};
-use crate::audio::ring_buffer::RingBuffer;
-use crate::timers::scheduler::balancer::{add_global_session, remove_global_session};
 
 /// Время до отправки keepalive пакета, для работы через nat системы
 const KEEP_ALIVE_TIMEOUT: u64 = 5000;
@@ -69,6 +67,30 @@ impl UdpBufferedInner {
     /// пакет возвращается в начало очереди (push_front) для повторной попытки позже,
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self, now: u64) {
+        /*let last_send = self.last_send_ms.load(Ordering::Relaxed);
+        let ticks: u32 = 1;
+
+        //println!("Time: {}", now.saturating_sub(last_send));
+
+        if now.saturating_sub(last_send) >= 1000 && self.buffer.len() > 1 {
+            let _ = ticks.saturating_sub(1);
+        }
+
+        for _ in 0..ticks {
+            // Первая попытка взять пакет
+            if let Some(packet) = self.buffer.pop() {
+                match self.socket.send(&packet) {
+                    Ok(_) => {
+                        self.last_send_ms.store(now, Ordering::Relaxed);
+                    }
+                    Err(_) => {
+                        self.send_drops.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+                return;
+            }
+        }*/
+
         // Первая попытка взять пакет
         if let Some(packet) = self.buffer.pop() {
             match self.socket.send(&packet) {
@@ -81,8 +103,6 @@ impl UdpBufferedInner {
             }
             return;
         }
-
-        self.send_drops.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Тот же tick, но для поддержания подключения через системы NAT
