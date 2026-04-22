@@ -108,18 +108,18 @@ export class Transport extends TypedEmitter<TransportEvents> {
             case TransportStateCode.Session: {
                 const d = state.payload;
 
-                if (this.secret_key !== d.secret_key) {
-                    // Инициализируем RTP (AES)
-                    this._rtp.create(this.ssrc, d.secret_key);
-                    this.emit("info", `[Transport/RTP]: has created`);
+                // Сохраняем ключ, для повторного использования
+                this.secret_key = d.secret_key;
 
+                if (d.dave_protocol_version) {
                     // Инициализируем DAVE (MLS)
                     this._dave.create(d.dave_protocol_version, this._ws);
                     this.emit("info", `[Transport/E2EE]: has created | ${d.dave_protocol_version} | Max --> ${MLSSession.max_version}`);
                 }
 
-                // Сохраняем ключ, для повторного использования
-                this.secret_key = d.secret_key;
+                // Инициализируем RTP (AES)
+                this._rtp.create(this.ssrc, d.secret_key);
+                this.emit("info", `[Transport/RTP]: has created`);
                 return;
             }
 
