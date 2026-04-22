@@ -13,7 +13,7 @@ const prototypes: { type: any, name: string, value: any}[] = [
             if (!str) return 0;
 
             // Формат "HH:MM:SS" или "MM:SS"
-            if (str.includes(":")) {
+            if (str.match(/^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/)) {
                 // Разбираем строку по ":" и конвертируем в числа
                 const parts = str.split(":").map(Number);
 
@@ -39,21 +39,15 @@ const prototypes: { type: any, name: string, value: any}[] = [
 
             // Формат "1h 30m 5s" (с использованием регулярных выражений)
             let totalSeconds = 0;
-
-            // Регулярное выражение для поиска H, M, S с их сокращениями
-            const regex = /(?:(\d+)\s*(?:hours?|hr|hrs|h))?\s*(?:(\d+)\s*(?:minutes?|min|mins|m))?\s*(?:(\d+)\s*(?:seconds?|sec|secs|s))?/i;
-            const match = str.match(regex);
-
-            if (match) {
-                const hours = parseInt(match[1] || '0', 10);
-                const minutes = parseInt(match[2] || '0', 10);
-                const seconds = parseInt(match[3] || '0', 10);
-
-                totalSeconds += seconds;
-                totalSeconds += minutes * 60;
-                totalSeconds += hours * 3600;
+            const timePattern = /(\d+)\s*(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b/gi;
+            let m;
+            while ((m = timePattern.exec(str)) !== null) {
+                const val = parseInt(m[1], 10);
+                const unit = m[2].toLowerCase();
+                if (unit.startsWith('h')) totalSeconds += val * 3600;
+                else if (unit.startsWith('m')) totalSeconds += val * 60;
+                else if (unit.startsWith('s')) totalSeconds += val;
             }
-
             return totalSeconds;
         }
     },

@@ -213,7 +213,13 @@ export namespace RestServerSide {
          * @description Поддерживаемые платформы в array формате, для экономии памяти
          * @private
          */
-        array?: RestServerSide.API[]
+        array?: RestServerSide.API[],
+
+        /**
+         * @description Поддерживаемые платформы в array формате, для экономии памяти
+         * @private
+         */
+        array_tex?: RestServerSide.API[]
     }
 }
 

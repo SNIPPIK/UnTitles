@@ -171,16 +171,16 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Слушаем если шлюзу пытается выключиться по какой причине
         this.on("info", (err) => {
-            Logger.log("DEBUG",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
+            Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
         });
 
         // Слушаем если шлюзу пытается выключиться по какой причине
         this.transport.on("info", (err) => {
-            Logger.log("DEBUG",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
+            Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
         });
 
         this.transport.on("close", (code, reason) => {
-            Logger.log("DEBUG",`[Voice Layer/${this.configuration.guild_id}]: ${code}: ${reason}`);
+            Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${code}: ${reason}`);
         });
     };
 

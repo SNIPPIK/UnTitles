@@ -228,8 +228,8 @@
   },
 
   "player.button.stop": {
-    "en-US": "Disable music! The queue still exists!",
-    "ru": "Выключение музыки! Очередь все еще существует!"
+    "en-US": "Stop playing!",
+    "ru": "Остановка проигрывания!"
   },
 
   "player.button.queue.footer": {
@@ -253,14 +253,9 @@
     "ru": "Не удалось получить текст трека!"
   },
 
-  "player.button.terminal.off": {
-    "en-US": "Terminal player has disabled",
-    "ru": "Терминал плеера выключен"
-  },
-
-  "player.button.terminal.on": {
-    "en-US": "Terminal player has enabled",
-    "ru": "Терминал плеера включен"
+  "queue.cleanup": {
+    "en-US": "## Playback stopped\n\nThe queue is still there, but the playback has finished, you can continue playing!",
+    "ru": "## Проигрывание остановлено\n\nОчередь все еще присутствует но проигрывание завершено, вы можете продолжить проигрывание!"
   },
 
 
@@ -344,11 +339,6 @@
     "ru": "\nТак-же {ARGUMENT} трек(ов)..."
   },
 
-  "player.search.fail": {
-    "en-US": "Not found tracks!",
-    "ru": "Не удалось что то найти, попробуй другое название!"
-  },
-
 
 
 
@@ -360,23 +350,23 @@
 
 
   "api.error": {
-    "en-US": "API error",
-    "ru": "API error"
+    "en-US": "## API error",
+    "ru": "## API error"
   },
 
   "api.platform.block": {
-    "en-US": "Error: API Blocked\nThe platform has been blocked for technical reasons, but you'll have to wait for now!",
-    "ru": "Ошибка: Блокировка API\nПлатформа была заблокирована по техническим соображениям, придется пока подождать!"
+    "en-US": "## Error: API Blocked\nThe platform has been blocked for technical reasons, but you'll have to wait for now!",
+    "ru": "## Ошибка: Блокировка API\nПлатформа была заблокирована по техническим соображениям, придется пока подождать!"
   },
 
   "api.platform.auth": {
-    "en-US": "Error: API Authorization\nThis platform is supported, but authorization data is missing!\nData cannot be retrieved!",
-    "ru": "Ошибка: API авторизации\nПоддержка данной платформы присутствует, но данные для авторизации отсутствует!\nДанные получить не получится!"
+    "en-US": "## Error: API Authorization\nThis platform is supported, but authorization data is missing!\nData cannot be retrieved!",
+    "ru": "## Ошибка: API авторизации\nПоддержка данной платформы присутствует, но данные для авторизации отсутствует!\nДанные получить не получится!"
   },
 
   "api.platform.support": {
-    "en-US": "Error: Unknown API\nThis platform is not currently supported!",
-    "ru": "Ошибка: Unknown API\nПока поддержки этой платформы нет!"
+    "en-US": "## Error: Unknown API\nThis platform is not currently supported!",
+    "ru": "## Ошибка: Unknown API\nПока поддержки этой платформы нет!"
   },
 
   "api.platform.request": {
@@ -390,13 +380,13 @@
   },
 
   "api.platform.timeout": {
-    "en-US": "Error: Timeout expired\n- The internal server refused to transmit data!",
-    "ru": "Ошибка: Истекло время ожидания\n - Внутренний сервер отказался передавать данные!"
+    "en-US": "## Error: Timeout expired\n- The internal server refused to transmit data!",
+    "ru": "## Ошибка: Истекло время ожидания\n - Внутренний сервер отказался передавать данные!"
   },
 
   "api.platform.error": {
-    "en-US": "**Critical Error:**\n{ARGUMENT}",
-    "ru": "**Критическая ошибка:**\n{ARGUMENT}"
+    "en-US": "## **Critical Error:**\n{ARGUMENT}",
+    "ru": "## **Критическая ошибка:**\n{ARGUMENT}"
   },
 
 
@@ -445,11 +435,6 @@
     "ru": "[Ошибка API]: Не удалось получить ID автора!"
   },
 
-  "api.request.audio.fail": {
-    "en-US": "[API error]: {ARGUMENT} doesn't provide an audio link!",
-    "ru": "[Ошибка API]: {ARGUMENT} не предоставляет аудио ссылку!"
-  },
-
 
 
 
@@ -484,36 +469,6 @@
     "ru": "Были пропущены все треки до {ARGUMENT}\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**"
   },
 
-  "command.skip.one.track": {
-    "en-US": "The current track was skipped\n\n**Will be played:**\n**❯** **{ARGUMENT}**",
-    "ru": "Был пропущен текущий трек\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**"
-  },
-
-  "command.go.track": {
-    "en-US": "The transition was completed\n\n**Will be played:**\n**❯** **{ARGUMENT}**",
-    "ru": "Был выполнен переход\n\n**Будет воспроизведен:**\n**❯** **{ARGUMENT}**"
-  },
-
-
-  "command.api.block": {
-    "en-US": "{ARGUMENT} | Platform is blocked!",
-    "ru": "{ARGUMENT} | Платформа заблокирована!"
-  },
-
-  "command.api.block.retry": {
-    "en-US": "{ARGUMENT} | The platform is already blocked!",
-    "ru": "{ARGUMENT} | Платформа уже заблокирована!"
-  },
-
-  "command.api.unblock": {
-    "en-US": "{ARGUMENT} | The platform is unlocked!",
-    "ru": "{ARGUMENT} | Платформа разблокирована!"
-  },
-
-  "command.api.unblock.retry": {
-    "en-US": "{ARGUMENT} | The platform is not blocked!",
-    "ru": "{ARGUMENT} | Платформа не заблокирована!"
-  },
 
   "command.bot.avatar.image.fail": {
     "en-US": "This file is not an image!",
@@ -611,18 +566,9 @@
   },
 
 
-  "command.play.replay.queue": {
-    "en-US": "{ARGUMENT} | I can't restart playing tracks, there is no queue!",
-    "ru": "{ARGUMENT} | Я не могу перезапустить воспроизведение треков, очереди нет!"
-  },
   "command.play.replay": {
     "en-US": "{ARGUMENT} | Restarting played tracks!",
     "ru": "{ARGUMENT} | Перезапуск воспроизведенных треков!"
-  },
-
-  "command.play.stop.queue": {
-    "en-US": "{ARGUMENT} | I can't turn off the music, there is no queue!",
-    "ru": "{ARGUMENT} | Я не могу выключить музыку, очереди нет!"
   },
 
   "command.play.stop": {

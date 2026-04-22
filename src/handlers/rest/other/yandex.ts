@@ -88,7 +88,7 @@ class RestYandexAPI extends RestServerSide.API {
                 if (!IDs) return locale.err( "api.request.id.track");
 
                 // Интеграция с утилитой кеширования
-                const cache = sdb.meta_saver?.get(`${this.url}/track/${IDs[0]}_${IDs[1]}`);
+                const cache = sdb.meta_saver?.get?.(`${this.url}/track/${IDs[0]}_${IDs[1]}`);
 
                 // Если трек есть в кеше
                 if (cache) {
@@ -142,7 +142,7 @@ class RestYandexAPI extends RestServerSide.API {
                     }
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(track, `${this.url}/track`);
+                    if (!cache) sdb.meta_saver?.set?.(track, `${this.url}/track`);
 
                     return track;
                 } catch (e) {
@@ -165,7 +165,7 @@ class RestYandexAPI extends RestServerSide.API {
                 if (!ID) return locale.err( "api.request.id.album");
 
                 // Интеграция с утилитой кеширования
-                const cache = sdb.meta_saver?.get(`${this.url}/album/${ID}`);
+                const cache = sdb.meta_saver?.get?.(`${this.url}/album/${ID}`);
 
                 // Если трек есть в кеше
                 if (cache) {
@@ -195,7 +195,7 @@ class RestYandexAPI extends RestServerSide.API {
                     };
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
+                    if (!cache) sdb.meta_saver?.set?.(album, `${this.url}/album`);
 
                     return album;
                 } catch (e) {

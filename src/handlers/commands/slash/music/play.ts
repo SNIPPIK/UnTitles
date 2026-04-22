@@ -8,9 +8,10 @@ import {
     Permissions,
     SubCommand
 } from "#handler/commands";
-import {ApplicationCommandOptionType} from "discord.js";
-import {locale} from "#structures";
-import {db} from "#app/db";
+import { ApplicationCommandOptionType } from "discord.js";
+import radio from "#core/player/stations.json";
+import { locale } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @description Под команда поиска трека
@@ -38,7 +39,7 @@ import {db} from "#app/db";
         },
         type: ApplicationCommandOptionType.String,
         required: true,
-        choices: db.api.array.map((platform) => {
+        choices: db.api.array_prev.map((platform) => {
             return {
                 name: `${platform.name.toLowerCase()} | ${platform.url}`,
                 value: platform.name
@@ -120,7 +121,7 @@ class PlaySearchCommand extends SubCommand {
         },
         type: ApplicationCommandOptionType.String,
         required: true,
-        choices: db.api.arrayRelated.map((platform) => {
+        choices: db.api.array_related.map((platform) => {
             return {
                 name: `${platform.name.toLowerCase()} | ${platform.url}`,
                 value: platform.name
@@ -177,6 +178,75 @@ class PlayRelatedCommand extends SubCommand {
 
 
 /**
+ * @description Под команда включения радио станций
+ * @type SubCommand
+ */
+@Declare({
+    names: {
+        "en-US": "radio",
+        "ru": "радио"
+    },
+    descriptions: {
+        "en-US": "Play radio",
+        "ru": "Play radio"
+    }
+})
+@Options({
+    select: {
+        names: {
+            "en-US": "station",
+            "ru": "станция"
+        },
+        descriptions: {
+            "en-US": "Which station shall we listen to?",
+            "ru": "Какую станцию будем слушать?"
+        },
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        autocomplete: ({ctx, args}) => {
+            // Исправляем: берем значение более безопасно
+            const focusedValue = args[0] as string;
+            const search = focusedValue.toLowerCase();
+
+            // Фильтруем станции. Используем includes для простоты или RegExp с защитой
+            const waves = radio.filter((p) =>
+                p.name.toLowerCase().includes(search) ||
+                (p.locale[ctx.locale]?.toLowerCase().includes(search))
+            );
+
+            // Discord ограничивает автокомплит 25 элементами
+            return ctx.respond(waves.slice(0, 25).map((d) => ({
+                name: d.name,
+                value: d.name // Передаем имя как уникальный идентификатор
+            })));
+        }
+    }
+})
+class PlayRadioCommand extends SubCommand {
+    async run({ctx, args}: CommandCallback) {
+        const search: string = args[0];
+        const platform = db.api.request("RADIO");
+        await ctx.deferReply();
+
+        // Если платформа заблокирована
+        if (platform.block) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.block"));
+            return null;
+        }
+
+        // Если есть проблема с авторизацией на платформе
+        else if (!platform.auth) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.auth"));
+            return null;
+        }
+
+        db.events.emitter.emit("rest/request", platform, ctx, search);
+        return null;
+    };
+}
+
+
+/**
  * @author SNIPPIK
  * @description Расширенное включение музыки
  * @class PlayAdvancedCommand
@@ -194,7 +264,7 @@ class PlayRelatedCommand extends SubCommand {
     },
     integration_types: [CommandIntegration.Guild]
 })
-@Options([PlaySearchCommand, PlayRelatedCommand])
+@Options([PlaySearchCommand, PlayRelatedCommand, PlayRadioCommand])
 @Middlewares(["cooldown", "voice", "another_voice"])
 @Permissions({
     client: ["Connect", "Speak", "SendMessages", "ViewChannel"]

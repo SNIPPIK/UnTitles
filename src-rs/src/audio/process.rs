@@ -12,20 +12,23 @@ use napi_derive::napi;
 ///
 /// Процесс запускается с заданными аргументами, его stdout читается в фоновом потоке,
 /// а разобранные фреймы Opus отправляются в JS. Гарантируется корректная очистка
-/// ресурсов при уничтожении объекта.
+/// ресурсов при уничтожении объекта
 #[napi]
 pub struct FfmpegProcess {
     /// Потоко-безопасная обёртка над дочерним процессом. Option позволяет забрать процесс
-    /// при уничтожении, чтобы убить его и дождаться завершения.
+    /// при уничтожении, чтобы убить его и дождаться завершения
     child: Arc<Mutex<Option<Child>>>,
 
     /// Флаг, сигнализирующий фоновому потоку чтения о необходимости остановиться.
-    /// Используется атомарный порядок доступа для минимизации блокировок.
+    /// Используется атомарный порядок доступа для минимизации блокировок
     reading_active: Arc<AtomicBool>,
 
     /// Handle фонового потока, который читает stdout FFmpeg и вызывает JS-вызов.
-    /// Нужен для того, чтобы дождаться завершения потока при уничтожении.
+    /// Нужен для того, чтобы дождаться завершения потока при уничтожении
     reader_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
+
+    /// Флаг паузы, разделяемый между потоками
+    paused: Arc<AtomicBool>
 }
 
 #[napi]
@@ -44,14 +47,10 @@ impl FfmpegProcess {
         if let Some(pos) = args.iter().position(|r| r == "-i") {
             if args.get(pos + 1).map_or(false, |s| s.starts_with("http")) {
                 let reconnect_flags = vec![
-                    "-reconnect".to_string(),
-                    "1".to_string(),
-                    "-reconnect_streamed".to_string(),
-                    "1".to_string(),
-                    "-reconnect_delay_max".to_string(),
-                    "10".to_string(),
-                    "-reconnect_on_network_error".to_string(),
-                    "1".to_string(),
+                    "-reconnect".to_string(), "1".to_string(),
+                    "-reconnect_streamed".to_string(), "1".to_string(),
+                    "-reconnect_delay_max".to_string(), "5".to_string(),
+                    "-reconnect_on_network_error".to_string(), "1".to_string(),
                 ];
                 args.splice(pos..pos, reconnect_flags);
             }
@@ -59,11 +58,12 @@ impl FfmpegProcess {
 
         // Базовые аргументы FFmpeg для низкой задержки и подавления видео
         let mut final_args = vec![
+            "-analyzeduration".to_string(), "0".to_string(),
+            "-probesize".to_string(), "128".to_string(),
             "-vn".to_string(),
-            "-loglevel".to_string(),
-            "error".to_string(),
-            "-nostdin".to_string(),      // не ждать ввода с stdin
-            "-hide_banner".to_string()   // скрыть баннер
+            "-loglevel".to_string(),  "error".to_string(),
+            "-nostdin".to_string(),       // не ждать ввода с stdin
+            "-hide_banner".to_string(),   // скрыть баннер
         ];
         final_args.extend(args);
 
@@ -78,7 +78,36 @@ impl FfmpegProcess {
             child: Arc::new(Mutex::new(Some(child))),
             reading_active: Arc::new(AtomicBool::new(false)),
             reader_handle: Arc::new(Mutex::new(None)),
+            paused: Arc::new(AtomicBool::new(false)), // Инициализация: не на паузе
         })
+    }
+    /// Устанавливает состояние паузы для аудиопотока.
+    ///
+    /// # Аргументы
+    /// * `value` - true = приостановить воспроизведение, false = возобновить
+    ///
+    /// # Потокобезопасность
+    /// Атомарная операция с барьером Release, безопасна для вызова из любого потока.
+    /// При изменении паузы аудиопоток перестаёт отправлять пакеты в UDP-сокет,
+    /// но продолжает потреблять данные из буфера (чтобы не терять синхронизацию).
+    #[napi(setter)]
+    pub fn set_pause(&self, value: bool) {
+        // store с Release: все предыдущие записи (например, очистка буфера) завершены
+        self.paused.store(value, Ordering::Release);
+    }
+
+    /// Возвращает текущее состояние паузы.
+    ///
+    /// # Возвращает
+    /// `true` - воспроизведение приостановлено, `false` - активно.
+    ///
+    /// # Потокобезопасность
+    /// Атомарное чтение с барьером Acquire, видит последнее значение,
+    /// установленное через `set_pause` в любом потоке.
+    #[napi(getter)]
+    pub fn get_pause(&self) -> bool {
+        // load с Acquire: гарантирует, что все предыдущие записи из сеттера видны
+        self.paused.load(Ordering::Acquire)
     }
 
     /// Начинает чтение stdout процесса и отправляет данные в JavaScript через callback.
@@ -132,6 +161,7 @@ impl FfmpegProcess {
 
         self.reading_active.store(true, Ordering::Release);
         let active = Arc::clone(&self.reading_active);
+        let paused = Arc::clone(&self.paused); // Клонируем Arc для потока
 
         let handle = tokio::spawn(async move {
             let mut reader = BufReader::new(stdout);
@@ -159,6 +189,12 @@ impl FfmpegProcess {
 
             // Основной цикл чтения с активным флагом
             while active.load(Ordering::Acquire) {
+                // НОВОЕ: Если на паузе, просто спим и пропускаем итерацию
+                if paused.load(Ordering::Acquire) {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    continue;
+                }
+
                 match reader.read(&mut buffer) {
                     Ok(0) => {
                         // EOF: выходим из цикла, чтобы выполнить финальный flush

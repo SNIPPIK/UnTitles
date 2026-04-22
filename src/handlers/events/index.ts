@@ -1,12 +1,18 @@
 import type { DiscordClient } from "#structures/discord";
-import type { AudioPlayerEvents } from "#core/player";
 import type { ClientEventTypes } from "discord.js";
-import type { QueueEvents } from "#core/queue";
 import { TypedEmitter } from "#structures";
 import { handler } from "#handler";
 
+// Events
+import type { AudioPlayerEvents } from "./index.player";
+import type { RestAPIEvents } from "./index.rest";
+import type { QueueEvents } from "./index.queue";
+
 // Export decorator
 export * from "./index.decorator";
+export type { AudioPlayerEvents } from "./index.player";
+export type { RestAPIEvents } from "./index.rest";
+export type { QueueEvents } from "./index.queue";
 
 /**
  * @author SNIPPIK
@@ -21,7 +27,7 @@ export class Events extends handler<Event<SupportKeysOfEvents>> {
      * @readonly
      * @public
      */
-    public readonly emitter = new class extends TypedEmitter<QueueEvents & AudioPlayerEvents> {};
+    public readonly emitter = new class extends TypedEmitter<EmitterEvents> {};
 
     /**
      * @description Загружаем класс вместе с дочерним
@@ -63,11 +69,19 @@ export class Events extends handler<Event<SupportKeysOfEvents>> {
 
 /**
  * @author SNIPPIK
+ * @description События для типизированного сборщика событий
+ * @type EmitterEvents
+ * @public
+ */
+type EmitterEvents = QueueEvents & AudioPlayerEvents & RestAPIEvents;
+
+/**
+ * @author SNIPPIK
  * @description Поддерживаемые названия событий
  * @type SupportKeysOfEvents
  * @public
  */
-export type SupportKeysOfEvents = keyof ClientEventTypes | keyof QueueEvents | keyof AudioPlayerEvents;
+export type SupportKeysOfEvents = keyof ClientEventTypes | keyof QueueEvents | keyof AudioPlayerEvents | keyof RestAPIEvents;
 
 /**
  * @author SNIPPIK
@@ -75,7 +89,11 @@ export type SupportKeysOfEvents = keyof ClientEventTypes | keyof QueueEvents | k
  * @type SupportEventCallback
  * @public
  */
-export type SupportEventCallback<T> = T extends keyof QueueEvents ? QueueEvents[T] : T extends keyof AudioPlayerEvents ? AudioPlayerEvents[T] : T extends keyof ClientEventTypes ? (...args: ClientEventTypes[T]) => void : never;
+export type SupportEventCallback<T> =
+    T extends keyof QueueEvents ? QueueEvents[T] :
+        T extends keyof RestAPIEvents ? RestAPIEvents[T] :
+            T extends keyof AudioPlayerEvents ? AudioPlayerEvents[T] :
+            T extends keyof ClientEventTypes ? (...args: ClientEventTypes[T]) => void : never;
 
 /**
  * @author SNIPPIK
@@ -90,7 +108,7 @@ export type SupportEvent<T extends SupportKeysOfEvents> = {
      * @readonly
      * @public
      */
-    name?: T extends keyof QueueEvents ? keyof QueueEvents : T extends keyof AudioPlayerEvents ? keyof AudioPlayerEvents : keyof ClientEventTypes;
+    name?: T extends SupportKeysOfEvents ? SupportKeysOfEvents : keyof ClientEventTypes;
 
     /**
      * @description Тип события
@@ -98,7 +116,7 @@ export type SupportEvent<T extends SupportKeysOfEvents> = {
      * @readonly
      * @public
      */
-    type?: T extends keyof QueueEvents | keyof AudioPlayerEvents ? "player" : "client";
+    type?: T extends keyof QueueEvents | keyof AudioPlayerEvents | keyof RestAPIEvents ? "player" : "client";
 }
 
 /**
@@ -107,7 +125,7 @@ export type SupportEvent<T extends SupportKeysOfEvents> = {
  * @class Event
  * @public
  */
-export abstract class Event<T extends keyof ClientEventTypes | keyof QueueEvents | keyof AudioPlayerEvents> implements SupportEvent<T> {
+export abstract class Event<T extends SupportKeysOfEvents> implements SupportEvent<T> {
     /**
      * @description Название событие
      * @default null
@@ -138,5 +156,5 @@ export abstract class Event<T extends keyof ClientEventTypes | keyof QueueEvents
      * @readonly
      * @public
      */
-    run: SupportEventCallback<T>
+    run: SupportEventCallback<T>;
 }

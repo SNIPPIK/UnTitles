@@ -44,7 +44,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                 if (!ID) return locale.err("api.request.id.track");
 
                 // Интеграция с утилитой кеширования
-                const cache = sdb.meta_saver?.get(`${this.url}/track/${ID}`);
+                const cache = sdb.meta_saver?.get?.(`${this.url}/track/${ID}`);
 
                 // Если трек есть в кеше
                 if (cache) {
@@ -89,7 +89,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                     setImmediate(() => {
                         // Сохраняем кеш в системе
-                        if (!cache) sdb.meta_saver.set(track, `${this.url}/track`);
+                        if (!cache) sdb.meta_saver?.set?.(track, `${this.url}/track`);
                     });
 
                     return track;
@@ -114,7 +114,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                 if (!ID) return locale.err( "api.request.id.album");
 
                 // Интеграция с утилитой кеширования
-                const cache = sdb.meta_saver?.get(`${this.url}/album/${ID}`);
+                const cache = sdb.meta_saver?.get?.(`${this.url}/album/${ID}`);
 
                 // Если трек есть в кеше
                 if (cache) {
@@ -145,7 +145,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                     };
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
+                    if (!cache) sdb.meta_saver?.set?.(album, `${this.url}/album`);
                     return album;
                 } catch (e) {
                     return new Error(`[APIs]: ${e}`);

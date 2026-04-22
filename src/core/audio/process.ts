@@ -10,10 +10,7 @@ import path from "node:path";
  * @public
  */
 export class Process {
-    /**
-     * @description Процесс запущенный через spawn
-     * @private
-     */
+    /** Процесс запущенный через spawn */
     private _process: ChildProcessWithoutNullStreams;
 
     /**
@@ -50,7 +47,7 @@ export class Process {
             if (isLink) args.unshift(
                 "-reconnect", "1",
                 "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "50",
+                "-reconnect_delay_max", "5",
                 "-reconnect_on_network_error", "1"
             );
         }
@@ -58,9 +55,10 @@ export class Process {
         // Добавляем аргументы отключения видео и логирования
         args.unshift(
             "-flags", "low_delay",
-            "-analyzeduration", "0",
-            "-probesize", "128",
-            "-vn", "-loglevel", "error"
+            "-loglevel", "error",
+            "-vn",
+            "-nostdin",       // не ждать ввода с stdin
+            "-hide_banner",   // скрыть баннер
         );
         this._process = spawn(name, args, {
             env: { PATH: process.env.PATH },

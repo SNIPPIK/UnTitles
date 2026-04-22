@@ -41,7 +41,7 @@ export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction |
      * @returns () => void
      * @public
      */
-    public register = this.load;
+    public register = () => this.load();
 
     /**
      * @description Производим фильтрацию по функции

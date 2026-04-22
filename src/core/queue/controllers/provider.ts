@@ -10,7 +10,7 @@ import { db } from "#app/db";
  * @const TRACK_CHECK_WAIT
  * @public
  */
-export const TRACK_CHECK_WAIT = 20e3;
+export const TRACK_CHECK_WAIT = 10e3;
 
 /**
  * @author SNIPPIK
@@ -29,8 +29,8 @@ export const TRACK_BUFFERED_TIME = 500;
 export class ResourceProvider {
     constructor(
         private readonly prepare: (track: Track) => Promise<string | Error>,
-        private readonly options = { retries: 3, initialDelay: 70 }
-    ) {}
+        private readonly options = { retries: 2, initialDelay: 70 }
+    ) {};
 
     /**
      * @description Пытается разрешить путь к ресурсу, плавно увеличивая паузы при ошибках
@@ -60,10 +60,8 @@ export class ResourceProvider {
             }
         }
 
-        return lastError instanceof Error
-            ? lastError
-            : new Error(`[ResourceResolver]: Max retries reached. Last error: ${lastError}`);
-    }
+        return lastError instanceof Error ? lastError : new Error(`[ResourceResolver]: Max retries reached. Last error: ${lastError}`);
+    };
 
     private sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -88,41 +86,57 @@ export class TrackResolvers {
 
             // Если ссылки нет — ищем через API
             if (!track.link) {
-                const song = await db.api.fetchAudioLink(track);
-                if (song instanceof Error) return song;
-                else if (!song) return Error("No link found")
+                const songs = await db.api.fetchAudioLink(track);
 
-                track.link = song.link;
-                track.proxy = song.api.proxy;
+                if (songs instanceof Error) return songs;
+
+                for (let trk of songs) {
+                    if (trk instanceof Error) continue;
+
+                    const song = await this.head(trk);
+                    if (song instanceof Error) return song;
+
+                    track.proxy = trk.api.proxy;
+                    track.link = trk.link;
+                    return song;
+                }
+                return new Error("Resource has not found");
             }
 
             // Проверяем HTTP HEAD (если это ссылка)
             if (track.link.startsWith("http")) {
-                const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null });
-                const status = await client.toHead;
-                const error = httpsStatusCode.parse(status);
-
-                // Если было перенаправление запроса
-                if (client.redirect) track.link = client.redirect;
-
-                // Резолвер поймает это, обнулит ссылку и вызовет prepare снова
-                if (error) {
-                    Logger.log(
-                        "ERROR",
-                        `\nUnhandled Rejection Track\n` +
-                        `┌ Stack:    ${error}\n` +
-                        `├ Redirect: ${client.redirect}\n` +
-                        `└ URL:      ${track.link}`
-                    );
-
-                    return error;
-                }
-
-                // Если можно сохранять аудио
-                if (sdb.audio_saver) sdb.audio_saver.add(track);
+                const song = await this.head(track);
+                if (song instanceof Error) return song;
+                return song;
             }
 
             return track.link;
         })
+    };
+
+    private static head = async (track: Track): Promise<string | Error> => {
+        const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null, sessionTimeout: 5e3, timeout: 5e3 });
+        const status = await client.toHead;
+        const error = httpsStatusCode.parse(status);
+
+        // Если было перенаправление запроса
+        if (client.redirect) track.link = client.redirect;
+
+        // Резолвер поймает это, обнулит ссылку и вызовет prepare снова
+        if (error) {
+            Logger.log(
+                "ERROR",
+                `\nUnhandled Rejection Track\n` +
+                `┌ Stack:    ${error}\n` +
+                `├ Redirect: ${client.redirect}\n` +
+                `└ URL:      ${track.link}`
+            );
+
+            return error;
+        }
+
+        // Если можно сохранять аудио
+        if (sdb.audio_saver) sdb.audio_saver.add(track);
+        return track.link;
     };
 }

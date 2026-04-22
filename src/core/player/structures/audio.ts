@@ -13,28 +13,16 @@ import { db } from "#app/db";
  * - Хранит в себе метаданные об аудио включая аудио
  */
 export class PlayerAudio<T extends AudioResource> {
-    /**
-     * @description Поток, расшифровывает ogg/opus в чистый opus он же sl16e
-     * @private
-     */
+    /** Поток, расшифровывает ogg/opus в чистый opus он же PCM */
     private _audio: T | null;
 
-    /**
-     * @description Поток, находящийся в ожидании загрузки и проигрывания
-     * @private
-     */
+    /** Поток, находящийся в ожидании загрузки и проигрывания */
     private _pre_audio: T | null;
 
-    /**
-     * @description Таймер чтения аудио потока, для авто удаления
-     * @private
-     */
+    /** Таймер чтения аудио потока, для авто удаления */
     private _timeout: NodeJS.Timeout | null;
 
-    /**
-     * @description Громкость аудио, по умолчанию берется параметр из db/env
-     * @private
-     */
+    /** Громкость аудио, по умолчанию берется параметр из db/env */
     private _volume = db.queues.options.volume;
 
     /**
@@ -45,6 +33,23 @@ export class PlayerAudio<T extends AudioResource> {
     public set volume(volume: number) {
         // Меняем параметр
         this._volume = volume > 200 ? 200 : volume < 1 ? 10 : volume;
+    };
+
+    /**
+     * @description Индикатор громкости
+     * @returns string
+     * @private
+     */
+    public get volumeIndicator(): string {
+        const clamped = Math.max(0, Math.min(this._volume, 200));
+        let text = "";
+
+        if (clamped < 30) text+= "🔈";
+        else if (clamped >= 30 && clamped < 70) text+= "🔉";
+        else if (clamped >= 70 && clamped < 150) text+= "🔊";
+        else if (clamped >= 150) text+= "📢";
+
+        return text + ` ${clamped}%`;
     };
 
     /**
@@ -93,7 +98,7 @@ export class PlayerAudio<T extends AudioResource> {
         }, TRACK_CHECK_WAIT);
 
         // Отслеживаем аудио поток на ошибки
-        (stream as AudioResource).once("error", (error) => {
+        stream.once("error", (error) => {
             // Удаляем таймер
             clearTimeout(this._timeout);
 
@@ -102,10 +107,10 @@ export class PlayerAudio<T extends AudioResource> {
             this._pre_audio = null;
 
             Logger.log("ERROR", error);
-        });
+        })
 
         // Отслеживаем аудио поток на готовность к чтению
-        (stream as AudioResource).once("readable", () => {
+        .once("readable", () => {
             // Удаляем таймер
             clearTimeout(this._timeout);
 

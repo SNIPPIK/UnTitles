@@ -4,7 +4,7 @@
  * Этот модуль запускается в отдельном потоке (worker_threads) и обрабатывает:
  * - Загрузку всех реализаций API платформ из директории `src/handlers/rest`.
  * - Хранение их конфигураций, лимитов и блок-листов.
- * - Выполнение запросов (поиск, получение треков, плейлистов, похожих треков) с таймаутами.
+ * - Выполнение запросов (поиск, получение треков, плейлистов, похожих треков) с тайм-аутами.
  * - Сериализацию данных для передачи в основной поток (удаление функций).
  *
  * Взаимодействие с основным потоком осуществляется через `parentPort`.
@@ -196,7 +196,7 @@ class RestServerLoader extends handler<RestServerSide.API> {
  * @remarks
  * Предоставляет методы для:
  * - Получения сериализованного списка платформ.
- * - Выполнения запросов к API с таймаутом.
+ * - Выполнения запросов к API с тайм-аутом.
  * - Отправки результатов (успех/ошибка) обратно в основной поток.
  */
 class RestWorkerHandler {
@@ -217,7 +217,7 @@ class RestWorkerHandler {
      *   - `block` — пустой массив (заполняется в основном потоке при ошибках).
      */
     public getSerializablePlatforms(): RestServerSide.Data {
-        // Берём только незаблокированные платформы
+        // Берём только не заблокированные платформы
         const fakeReq = this.registry.allowed.map(api => ({
             ...stripFunctions(api),
             requests: (api.requests ?? []).map(stripFunctions)
@@ -247,7 +247,7 @@ class RestWorkerHandler {
      * 1. Находит объект платформы в реестре.
      * 2. Ищет подходящий колбэк (сначала точное совпадение `type`, затем "all").
      * 3. Вызывает колбэк с payload и лимитом из реестра.
-     * 4. Оборачивает вызов таймаутом (REQUEST_TIMEOUT_MS).
+     * 4. Оборачивает вызов тайм-аутом (REQUEST_TIMEOUT_MS).
      * 5. При успехе — вызывает `sendSuccess`, при ошибке — `sendError`.
      */
     public async executeRequest(options: RestServerSide.ServerOptions & { requestId: number }): Promise<void> {
@@ -261,13 +261,13 @@ class RestWorkerHandler {
             }
 
             // Ищем обработчик: сначала по точному имени типа, затем "all"
-            const callback = restPlatform.requests?.find(req => req.name === "all" || req.name === type);
+            const callback = restPlatform.requests?.find(req => req.name === type || req.name === "all");
             if (!callback) {
                 this.sendError(requestId, new Error(`Callback not found for platform: ${platform}, type: ${type}`));
                 return;
             }
 
-            // Выполняем запрос с таймаутом
+            // Выполняем запрос с тайм-аутом
             const result = await this.withTimeout(
                 callback.execute(payload, {
                     audio: reqOpts?.audio !== undefined ? reqOpts.audio : true,
@@ -289,7 +289,7 @@ class RestWorkerHandler {
     };
 
     /**
-     * Оборачивает промис в тайм-аут.
+     * Оборачивает обещание в тайм-аут.
      *
      * @param promise - Исходный промис (запрос к API).
      * @param ms - Максимальное время ожидания в миллисекундах.
@@ -390,7 +390,7 @@ if (parentPort && workerData?.rest) {
         }
     });
 
-    // Глобальный перехват непойманных reject'ов (защита от падения воркера)
+    // Глобальный перехват не пойманных reject'ов (защита от падения воркера)
     process.on("unhandledRejection", (err) => {
         parentPort?.postMessage({
             requestId: undefined,

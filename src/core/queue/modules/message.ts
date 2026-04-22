@@ -16,28 +16,16 @@ import { db } from "#app/db";
  * @public
  */
 export class QueueMessage<T extends CommandInteraction> {
-    /**
-     * @description ID сервера, привязанный к сообщению
-     * @public
-     */
+    /** ID сервера, привязанный к сообщению */
     public guild_id: string;
 
-    /**
-     * @description ID канала, привязанный к сообщению
-     * @public
-     */
+    /** ID канала, привязанный к сообщению */
     public channel_id: string;
 
-    /**
-     * @description ID канала, привязанный к голосовому каналу
-     * @public
-     */
+    /** ID канала, привязанный к голосовому каналу */
     public voice_id: string;
 
-    /**
-     * @description Ответил ли бот на сообщение
-     * @private
-     */
+    /** Ответил ли бот на сообщение */
     private _deferred: boolean;
 
     /**
@@ -158,11 +146,7 @@ export class QueueMessage<T extends CommandInteraction> {
  * @public
  */
 export class QueueButtons {
-    /**
-     * @author SNIPPIK
-     * @description Динамические кнопки плеера
-     * @private
-     */
+    /** Динамические кнопки плеера */
     private static button = {
         resume: this.checkIDComponent("button.resume"),
         pause: this.checkIDComponent("button.pause"),
@@ -174,10 +158,7 @@ export class QueueButtons {
         stop: QueueButtons.createButton({env: "stop", style: 4}),
     };
 
-    /**
-     * @description Изменяемые кнопки, для отображения в сообщение о текущем треке
-     * @private
-     */
+    /** Изменяемые кнопки, для отображения в сообщение о текущем треке */
     private _buttons = [
         {
             type: 1,
@@ -216,10 +197,7 @@ export class QueueButtons {
         }
     ];
 
-    /**
-     * @description Строковый селектор, для выбора фильтра
-     * @private
-     */
+    /** Строковый селектор, для выбора фильтра */
     private _selector: ActionRowBuilder<any>;
 
     /**

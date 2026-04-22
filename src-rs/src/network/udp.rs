@@ -67,31 +67,7 @@ impl UdpBufferedInner {
     /// пакет возвращается в начало очереди (push_front) для повторной попытки позже,
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self, now: u64) {
-        /*let last_send = self.last_send_ms.load(Ordering::Relaxed);
-        let ticks: u32 = 1;
-
-        //println!("Time: {}", now.saturating_sub(last_send));
-
-        if now.saturating_sub(last_send) >= 1000 && self.buffer.len() > 1 {
-            let _ = ticks.saturating_sub(1);
-        }
-
-        for _ in 0..ticks {
-            // Первая попытка взять пакет
-            if let Some(packet) = self.buffer.pop() {
-                match self.socket.send(&packet) {
-                    Ok(_) => {
-                        self.last_send_ms.store(now, Ordering::Relaxed);
-                    }
-                    Err(_) => {
-                        self.send_drops.fetch_add(1, Ordering::Relaxed);
-                    }
-                }
-                return;
-            }
-        }*/
-
-        // Первая попытка взять пакет
+        // Пробуем взять пакет
         if let Some(packet) = self.buffer.pop() {
             match self.socket.send(&packet) {
                 Ok(_) => {
@@ -101,7 +77,6 @@ impl UdpBufferedInner {
                     self.send_drops.fetch_add(1, Ordering::Relaxed);
                 }
             }
-            return;
         }
     }
 
@@ -190,7 +165,7 @@ impl UdpBuffered {
             listener_active: Arc::new(AtomicBool::new(false)),
             listener_handle: Arc::new(Mutex::new(None)),
             destroyed: Arc::new(AtomicBool::new(false)),
-            id,
+            id
         };
 
         // Регистрируем сессию в глобальном балансировщике.
@@ -272,7 +247,7 @@ impl UdpBuffered {
                     }
                     // Если сокет временно недоступен (нет данных), немного спим.
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        thread::sleep(Duration::from_millis(5));
+                        thread::sleep(Duration::from_millis(10));
                     }
                     // Любая другая ошибка (например, сокет закрыт) завершает цикл.
                     Err(_) => break,
@@ -327,7 +302,7 @@ impl UdpBuffered {
             listener_active: self.listener_active.clone(),
             listener_handle: Arc::new(Mutex::new(None)), // новый пустой handle
             destroyed: self.destroyed.clone(),
-            id: self.id,
+            id: self.id
         }
     }
 

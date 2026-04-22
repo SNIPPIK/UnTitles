@@ -1,7 +1,8 @@
-import { type AudioFilter, type AudioPlayerEvents, ControllerFilters } from "#core/player";
 import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue";
 import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio";
+import { type AudioFilter, ControllerFilters } from "#core/player";
 import { PlayerProgress } from "../controllers/progress";
+import { AudioPlayerEvents } from "#handler/events";
 import { Logger, TypedEmitter } from "#structures";
 import type { VoiceConnection } from "#core/voice";
 import { PlayerAudio } from "../structures/audio";
@@ -75,22 +76,13 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     protected _status: AudioPlayerState | null = AudioPlayerState.idle;
 
-    /**
-     * @description Менеджер тайм-аутов для безопасной паузы/возобновления.
-     * @protected
-     */
+    /** Менеджер тайм-аутов для безопасной паузы/возобновления */
     protected _timer: AudioPlayerTimeout | null = new AudioPlayerTimeout();
 
-    /**
-     * @description Хранилище активных аудио фильтров (громкость, эквалайзер и т.п.).
-     * @private
-     */
+    /** Хранилище активных аудио фильтров (громкость, эквалайзер и т.п.) */
     protected _filters: ControllerFilters<AudioFilter> | null = new ControllerFilters<AudioFilter>();
 
-    /**
-     * @description Управление текущим аудиопотоком (чтение, буферизация, пред загрузка).
-     * @private
-     */
+    /** Управление текущим аудиопотоком (чтение, буферизация, пред загрузка) */
     protected _audio: PlayerAudio<AudioResource> | null = new PlayerAudio();
 
     /**

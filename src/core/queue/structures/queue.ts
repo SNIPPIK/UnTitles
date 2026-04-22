@@ -14,40 +14,22 @@ import { db } from "#app/db";
  * @public
  */
 export class Queue {
-    /**
-     * @description Время создания очереди
-     * @public
-     */
+    /** Время создания очереди */
     public timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
 
-    /**
-     * @description Текущий экземпляр плеера
-     * @protected
-     */
+    /** Текущий экземпляр плеера */
     protected _player: AudioPlayer;
 
-    /**
-     * @description Хранилище треков, с умной системой управления
-     * @public
-     */
+    /** Хранилище треков, с умной системой управления */
     public tracks = new ControllerTracks<Track>();
 
-    /**
-     * @description Голосовое подключение
-     * @public
-     */
+    /** Голосовое подключение */
     public voice = new ControllerVoice<VoiceConnection>();
 
-    /**
-     * @description Сообщение пользователя
-     * @protected
-     */
+    /** Сообщение пользователя */
     protected _message: QueueMessage<CommandInteraction>;
 
-    /**
-     * @description Создаем класс для отображения фильтров
-     * @protected
-     */
+    /** Создаем класс для отображения фильтров */
     protected _buttons: QueueButtons;
 
     /**
@@ -111,7 +93,7 @@ export class Queue {
             channel_id: voice_id,
             self_deaf: true,
             self_mute: false,
-            self_speaker: SpeakerType.priority
+            self_speaker: SpeakerType.enable
         }, db.adapter.voiceAdapterCreator(guild_id));
     };
 
@@ -157,7 +139,6 @@ export class Queue {
 
         try {
             const { api, artist, name, image, user, url } = tracks.track;
-            const vol = player.audio.volume;
 
             return [{
                 "type": 17, // Container
@@ -190,7 +171,7 @@ export class Queue {
                     },
                     {
                         "type": 10, // Text
-                        "content": `> -# \`👤 ${user.username}\`  |  \`${getVolumeIndicator(vol)}\` ${tracks.footer} |  \`🌐 ${player.voice.connection.ws.latency}ms | 📥 ${player.voice.connection.udp.lost}\`` + player.progress
+                        "content": `> -# \`👤 ${user.username}\`  |  \`${player.audio.volumeIndicator}\` ${tracks.footer} |  \`🌐 ${player.voice.connection.ws.latency}ms | 📥 ${player.voice.connection.udp.lost}\`` + player.progress
                     },
                     ...buttons
                 ]
@@ -210,6 +191,7 @@ export class Queue {
      */
     public cleanup = () => {
         Logger.log("DEBUG", `[Queue/${this.message.guild_id}] has cleanup`);
+        db.events.emitter.emit("queue/cleanup", this);
 
         // Останавливаем плеер
         this._player.cleanup();
@@ -231,6 +213,7 @@ export class Queue {
      */
     public destroy = () => {
         Logger.log("LOG", `[Queue/${this.message.guild_id}] has destroyed`);
+        db.events.emitter.emit("queue/destroy", this);
 
         this._message = null;
         this.timestamp = null;
@@ -241,22 +224,4 @@ export class Queue {
         // Удаляем плеер
         this._player.destroy();
     };
-}
-
-/**
- * @description Генератор громкости плеера
- * @param volume - Уровень громкости (0–200)
- * @returns string
- * @private
- */
-function getVolumeIndicator(volume: number): string {
-    const clamped = Math.max(0, Math.min(volume, 200));
-    let text = "";
-
-    if (clamped < 30) text+= "🔈";
-    else if (clamped >= 30 && clamped < 70) text+= "🔉";
-    else if (clamped >= 70 && clamped < 150) text+= "🔊";
-    else if (clamped >= 150) text+= "📢";
-
-    return text + ` ${clamped}%`;
 }

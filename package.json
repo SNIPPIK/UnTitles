@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@discordjs/builders": "^1.14.1",
-    "discord-api-types": "^0.38.45",
-    "discord.js": "15.0.0-dev.1776125601-58c5ebdd0",
+    "discord-api-types": "^0.38.47",
+    "discord.js": "15.0.0-dev.1776730371-8ea7c7c7e",
     "http-proxy-agent": "^7.0.2",
     "socks-proxy-agent": "^8.0.5",
     "ws": "^8.20.0"
@@ -26,10 +26,9 @@
     "@napi-rs/cli": "^2.18.4",
     "@types/node": "^25.6.0",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   },
   "scripts": {
-    "pre:build": "tsc",
     "configure": "node -e \"require('fs').copyFileSync('.env', 'build/.env')\"",
     "start": "cd build && node -r tsconfig-paths/register src --ShardManager --optimize_for_size --expose-gc --experimental-require-module --no-compilation-cache --interval-stack-size",
     "build": "tsc",

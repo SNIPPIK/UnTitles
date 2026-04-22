@@ -87,6 +87,41 @@ export interface iOggOpusParser {
  * @interface FfmpegProcess
  */
 export interface iFfmpegProcess {
+    /**
+     * Устанавливает состояние паузы для аудиопотока.
+     *
+     * # Аргументы
+     * * `value` - true = приостановить воспроизведение, false = возобновить
+     *
+     * # Потокобезопасность
+     * Атомарная операция с барьером Release, безопасна для вызова из любого потока.
+     * При изменении паузы аудиопоток перестаёт отправлять пакеты в UDP-сокет,
+     * но продолжает потреблять данные из буфера (чтобы не терять синхронизацию).
+     */
+    set pause(value: boolean);
+
+    /**
+     * Возвращает текущее состояние паузы.
+     *
+     * # Возвращает
+     * `true` - воспроизведение приостановлено, `false` - активно.
+     *
+     * # Потокобезопасность
+     * Атомарное чтение с барьером Acquire, видит последнее значение,
+     * установленное через `set_pause` в любом потоке.
+     */
+    get pause(): boolean;
+
+    /**
+     * Создаёт новый процесс FFmpeg.
+     *
+     * # Аргументы
+     * * `args` - список аргументов командной строки для FFmpeg
+     * * `name` - имя или путь к исполняемому файлу FFmpeg (обычно "ffmpeg")
+     *
+     * Автоматически добавляет параметры переподключения для HTTP-источников,
+     * а также базовые настройки для минимальной задержки и отключения видео.
+     */
     constructor(args: Array<string>, name: string): void;
 
     /**
@@ -154,6 +189,20 @@ export interface iAudioEngine {
      * Минимальная ёмкость – 1000 пакетов.
      */
     constructor(maxMinutes: number): void;
+
+    /**
+     * Проверяет, можно ли "слать" аудио в буфер.
+     * Возвращает true, если текущая нагрузка позволяет добавить данные без немедленного удаления старых.
+     * По сути, это проверка: "есть ли свободное место?".
+     */
+    canAccept(): boolean;
+    /**
+     * Более "умная" проверка для системы запросов.
+     * Возвращает true, если буфер заполнен менее чем на указанный процент.
+     * Например, если передать 80, функция вернет false, когда буфер забит на 80%+.
+     * Это позволяет оставить "запас" для плавности.
+     */
+    canAcceptThreshold(thresholdPercent: number): boolean;
 
     /**
      * Добавляет один пакет в очередь.
@@ -266,7 +315,7 @@ export interface iUDPSocket {
      * Для вызова из фонового потока используется ThreadsafeFunction.
      * @public
      */
-    startListening(callback: (...args: any[]) => any): void;
+    startListening(callback: (message: Buffer) => void): void;
 
     /**
      * @description Останавливает прослушивание входящих пакетов и дожидается завершения потока.
@@ -387,7 +436,7 @@ export interface iDAVESession {
      * - Если `user_id` или `channel_id` не являются корректными числами
      * - Если внутренняя инициализация `Davey` не удалась (например, неверные параметры)
      */
-    constructor(protocolVersion: number, userId: string, channelId: string, keyPair?: SigningKeyPair | undefined | null): void;
+    constructor(protocolVersion: number, userId: string, channelId: string, keyPair?: SigningKeyPair): void;
 
     /**
      * Переинициализирует существующую сессию новыми параметрами.
@@ -401,7 +450,7 @@ export interface iDAVESession {
      * # Ошибки
      * Аналогичны конструктору.
      */
-    reinit(protocolVersion: number, userId: string, channelId: string, keyPair?: SigningKeyPair | undefined | null): void;
+    reinit(protocolVersion: number, userId: string, channelId: string, keyPair?: SigningKeyPair): void;
 
     /**
      * Полностью сбрасывает состояние сессии, как после вызова конструктора.
@@ -463,7 +512,7 @@ export interface iDAVESession {
      * * `enabled` - Включить (`true`) или выключить (`false`) режим.
      * * `expiry` - Опциональное время жизни режима в секундах. Если указано, режим автоматически выключится по истечении.
      */
-    setPassthroughMode(enabled: boolean, expiry?: number | undefined | null): void;
+    setPassthroughMode(enabled: boolean, expiry?: number): void;
 
     /**
      * Обрабатывает proposals (предложения об изменении группы).
@@ -479,7 +528,7 @@ export interface iDAVESession {
      * # Возвращает
      * Объект `ProposalsResult`, содержащий `commit` (обязателен) и `welcome` (если нужно пригласить новых участников).
      */
-    processProposals(operationType: number, proposals: Buffer, recognizedUserIds?: Array<string> | undefined | null): ProposalsResult;
+    processProposals(operationType: number, proposals: Buffer, recognizedUserIds?: Array<string>): ProposalsResult;
 
     /**
      * Применяет commit к состоянию группы.
@@ -529,7 +578,7 @@ export interface iDAVESession {
      * # Возвращает
      * Массив той же длины, где каждый элемент — либо зашифрованный `Buffer`, либо `null` (если шифрование не удалось).
      */
-    encryptOpusBatch(packets: Array<Buffer>): Array<Buffer | undefined | null>;
+    encryptOpusBatch(packets: Array<Buffer>): Array<Buffer | null>;
 
     /**
      * Расшифровывает пакет, полученный от указанного пользователя.

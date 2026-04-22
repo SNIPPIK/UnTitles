@@ -25,7 +25,7 @@ const MIN_WORKERS: usize = 1;
 /// В отличие от `CycleManager`, здесь нам не нужен snapshot для итерации, так как `CycleManager` сам управляет циклом.
 struct Worker {
     manager: Arc<CycleManager>,
-    sessions: DashMap<u32, Arc<UdpBuffered>>,
+    sessions: DashMap<u32, Arc<UdpBuffered>>
 }
 
 /// Балансировщик нагрузки, распределяющий сессии между несколькими `Worker`.

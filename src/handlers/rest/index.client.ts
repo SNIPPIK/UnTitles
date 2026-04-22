@@ -15,12 +15,16 @@ export namespace RestClientSide {
     export interface ClientOptions {
         /** Платформа, к которой выполняется запрос (YouTube, Spotify и т.д.) */
         platform: RestServerSide.API;
+
         /** Тип запроса (search, track, related, playlist и т.п.) */
         type: APIRequestsKeys;
+
         /** Уникальный идентификатор запроса (опционально, может быть сгенерирован автоматически) */
         requestId?: string;
+
         /** Строка полезной нагрузки: URL трека, поисковый запрос, ID плейлиста и т.д. */
         payload: string;
+
         /** Дополнительные опции, например, { audio: true } для получения прямой ссылки */
         options?: { audio?: boolean };
     }
@@ -33,29 +37,21 @@ export namespace RestClientSide {
      */
     export class Request {
         /**
-         * @description Имя платформы (например, "YOUTUBE").
+         * @description Заблокирована ли платформа в текущей сессии.
+         * Если true, запросы на эту платформу не будут выполняться
          */
+        public get block() { return db.api.hasBlocked(this._api.name); }
+
+        /** Имя платформы (например, "YOUTUBE") */
         public get platform() { return this._api.name; }
 
-        /**
-         * @description Заблокирована ли платформа в текущей сессии.
-         * Если true, запросы на эту платформу не будут выполняться (пока блок не сбросится).
-         */
-        public get block() { return db.api.platforms.block.includes(this._api.name); }
-
-        /**
-         * @description Требуется ли авторизация для работы с этой платформой.
-         */
+        /** Требуется ли авторизация для работы с этой платформой */
         public get auth() { return this._api.auth !== null; }
 
-        /**
-         * @description Поддерживает ли платформа аудио-ссылку (может вернуть прямой URL).
-         */
+        /** Поддерживает ли платформа аудио-ссылку */
         public get audio() { return this._api.audio; }
 
-        /**
-         * @description Цветовой код платформы (используется в UI).
-         */
+        /** Цветовой код платформы (используется в UI) */
         public get color() { return this._api.color; }
 
         /**

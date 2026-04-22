@@ -29,7 +29,6 @@ class rest_request extends Event<"rest/request"> {
            return null;
        }
 
-
        // Получаем описание запроса от платформы
        const api = platform.request(url);
 
@@ -102,7 +101,7 @@ class rest_request extends Event<"rest/request"> {
        });
 
        // Выполняем в конце
-       setImmediate(async () => {
+       setImmediate(() => {
            // Если очередь была создана
            const queue = db.queues.get(ctx.guildId);
 

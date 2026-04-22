@@ -55,7 +55,7 @@ async function execute_shard() {
     initSharedDatabase();
 
     // Загружаем API
-    await db.api.startWorker();
+    await db.api.init();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.array.length} APIs`)}`);
 
     // Загружаем components

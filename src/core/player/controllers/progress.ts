@@ -4,46 +4,6 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
- * @description Функция для отложенной загрузки кнопок
- * @function initButtons
- * @private
- */
-function initButtons() {
-    buttons = db.api.map.keys().reduce((acc, api) => {
-        const platform = `${api}`.toLowerCase();
-        const inEnv = env.get(`progress.button.${platform}`, null);
-
-        if (inEnv) acc[`button_${platform}`] = inEnv;
-        return acc;
-    }, {
-        button: env.get("progress.button"),
-    });
-}
-
-/**
- * @author SNIPPIK
- * @description Доступные элементы для создания прогресс бара
- * @type Elements
- * @private
- */
-type Elements = "left" | "center" | "right";
-
-/**
- * @author SNIPPIK
- * @description Получение списка для создания прогресс бара
- * @param type - Тип элемента
- * @private
- */
-function initElement(type: "empty" | "not_empty") {
-    const keys = ["left", "center", "right"];
-    return keys.reduce((acc, key) => {
-        acc[key] = env.get(`progress.${type}.${key}`);
-        return acc;
-    }, {} as Record<Elements, string>);
-}
-
-/**
- * @author SNIPPIK
  * @description Эмодзи в качестве дизайнерского решения
  * @private
  */
@@ -143,4 +103,44 @@ interface PlayerProgressInput {
         // Общее время
         total: number
     }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Доступные элементы для создания прогресс бара
+ * @type Elements
+ * @private
+ */
+type Elements = "left" | "center" | "right";
+
+/**
+ * @author SNIPPIK
+ * @description Получение списка для создания прогресс бара
+ * @param type - Тип элемента
+ * @private
+ */
+function initElement(type: "empty" | "not_empty") {
+    const keys = ["left", "center", "right"];
+    return keys.reduce((acc, key) => {
+        acc[key] = env.get(`progress.${type}.${key}`);
+        return acc;
+    }, {} as Record<Elements, string>);
+}
+
+/**
+ * @author SNIPPIK
+ * @description Функция для отложенной загрузки кнопок
+ * @function initButtons
+ * @private
+ */
+function initButtons() {
+    buttons = db.api.array.reduce((acc, api) => {
+        const platform = `${api.name}`.toLowerCase();
+        const inEnv = env.get(`progress.button.${platform}`, null);
+
+        if (inEnv) acc[`button_${platform}`] = inEnv;
+        return acc;
+    }, {
+        button: env.get("progress.button"),
+    });
 }

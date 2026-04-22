@@ -7,10 +7,7 @@ import { VoiceConnection } from "#core/voice";
  * @public
  */
 export class ControllerVoice<T extends VoiceConnection> {
-    /**
-     * @description Текущее голосовое подключение к каналу на сервере
-     * @private
-     */
+    /** Текущее голосовое подключение к каналу на сервере */
     private _connection: T;
 
     /**

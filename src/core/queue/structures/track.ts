@@ -11,46 +11,25 @@ import { db } from "#app/db";
  * @public
  */
 export class Track extends TrackResolvers {
-    /**
-     * @description Здесь хранятся данные времени трека
-     * @protected
-     */
+    /** Здесь хранятся данные времени трека */
     protected _duration: TrackDuration;
 
-    /**
-     * @description Параметр для сохранения lyrics
-     * @protected
-     */
+    /** Параметр для сохранения lyrics */
     protected _lyrics: string | null;
 
-    /**
-     * @description Пользователя включивший трек
-     * @protected
-     */
+    /** Данные о пользователе включивший трек */
     protected _user: {
-        /**
-         * @description ID пользователя
-         * @readonly
-         */
+        /** ID пользователя */
         readonly id: string;
 
-        /**
-         * @description Имя/ник пользователя
-         * @readonly
-         */
+        /** Имя/ник пользователя */
         readonly username: string;
 
-        /**
-         * @description Ссылка на аватар пользователя
-         * @readonly
-         */
+        /** Ссылка на аватар пользователя */
         readonly avatar?: string | null;
     };
 
-    /**
-     * @description Можно ли включать трек с другого ip адреса
-     * @public
-     */
+    /** Надо ли обходить ограничения через proxy */
     public proxy: boolean = false;
 
     /**

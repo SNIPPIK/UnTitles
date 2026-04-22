@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use crate::audio::ring_buffer::RingBuffer;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
@@ -8,11 +8,13 @@ use napi_derive::napi;
 #[napi]
 pub struct AudioEngine {
     /// Очередь пакетов (VecDeque эффективна для добавления/удаления с обоих концов).
-    buffer: VecDeque<Vec<u8>>,
+    buffer: RingBuffer,
+
     /// Максимальная ёмкость буфера в пакетах, рассчитывается из заданного количества минут.
     max_capacity: usize,
+
     /// Текущая позиция чтения (количество прочитанных пакетов с начала или после сброса).
-    position: usize,
+    position: usize
 }
 
 #[napi]
@@ -31,10 +33,28 @@ impl AudioEngine {
         // 50 пакетов в секунду * 60 секунд * минуты
         let capacity = (50 * 60 * max_minutes) as usize;
         Self {
-            buffer: VecDeque::with_capacity(0),
+            buffer: RingBuffer::new(capacity),
             max_capacity: capacity,
             position: 0,
         }
+    }
+
+    /// Проверяет, можно ли "слать" аудио в буфер.
+    /// Возвращает true, если текущая нагрузка позволяет добавить данные без немедленного удаления старых.
+    /// По сути, это проверка: "есть ли свободное место?".
+    #[napi]
+    pub fn can_accept(&self) -> bool {
+        self.buffer.len() < self.max_capacity
+    }
+
+    /// Более "умная" проверка для системы запросов.
+    /// Возвращает true, если буфер заполнен менее чем на указанный процент.
+    /// Например, если передать 80, функция вернет false, когда буфер забит на 80%+.
+    /// Это позволяет оставить "запас" для плавности.
+    #[napi]
+    pub fn can_accept_threshold(&self, threshold_percent: u32) -> bool {
+        let threshold = (self.max_capacity * threshold_percent as usize) / 100;
+        self.buffer.len() < threshold
     }
 
     /// Добавляет один пакет в очередь.
@@ -44,13 +64,16 @@ impl AudioEngine {
     /// * `packet` – бинарный буфер с аудиоданными (из Node.js).
     #[napi]
     pub fn add_packet(&mut self, packet: Buffer) -> Result<()> {
-        // Если переполнение — удаляем старый пакет
-        if self.buffer.len() >= self.max_capacity {
-            self.buffer.pop_front();
-        }
+        let data = packet.to_vec();
 
-        // Преобразуем Buffer в Vec<u8> для хранения в очереди
-        self.buffer.push_back(packet.to_vec());
+        // Пытаемся добавить в кольцевой буфер
+        if let Err(returned_data) = self.buffer.push(data) {
+            // Если буфер полон (и это не ошибка размера) — вытесняем старый пакет (FIFO)
+            if self.buffer.len() >= self.max_capacity {
+                self.buffer.pop();
+                let _ = self.buffer.push(returned_data);
+            }
+        }
         Ok(())
     }
 
@@ -71,13 +94,8 @@ impl AudioEngine {
     /// Возвращает `Option<Buffer>`, который можно передать обратно в JavaScript.
     #[napi(getter)]
     pub fn packet(&mut self) -> Option<Buffer> {
-        self.buffer.pop_front().map(|data| {
-            // Увеличиваем позицию только если реально вытащили данные
-            if self.position < self.max_capacity {
-                self.position += 1;
-            }
-
-            // Создает буфер, копируя данные.
+        self.buffer.pop().map(|data| {
+            self.position = self.position.saturating_add(1);
             Buffer::from(data)
         })
     }
@@ -92,17 +110,14 @@ impl AudioEngine {
     #[napi]
     pub fn get_packets(&mut self, count: u32) -> Vec<Buffer> {
         let mut result = Vec::with_capacity(count as usize);
-
         for _ in 0..count {
-            if let Some(packet) = self.buffer.pop_front() {
-                // saturating_add предотвращает переполнение в очень редких случаях
+            if let Some(data) = self.buffer.pop() {
                 self.position = self.position.saturating_add(1);
-                result.push(Buffer::from(packet));
+                result.push(Buffer::from(data));
             } else {
                 break;
             }
         }
-
         result
     }
 
@@ -115,11 +130,15 @@ impl AudioEngine {
     /// Вектор Buffer, представляющих копии данных (осторожно: клонирование больших объёмов).
     #[napi]
     pub fn peek_packets(&self, count: u32) -> Vec<Buffer> {
-        self.buffer
-            .iter()
-            .take(count as usize)
-            .map(|p| Buffer::from(p.clone()))
-            .collect()
+        let mut result = Vec::with_capacity(count as usize);
+        for i in 0..count {
+            if let Some(data) = self.buffer.get_clone_at(i as usize) {
+                result.push(Buffer::from(data));
+            } else {
+                break;
+            }
+        }
+        result
     }
 
     /// Возвращает текущее количество пакетов в буфере.
@@ -151,12 +170,17 @@ impl AudioEngine {
     /// Индексация с 0.
     #[napi]
     pub fn get_packet_at(&self, idx: u32) -> Option<Buffer> {
-        self.buffer.get(idx as usize).map(|p| Buffer::from(p.clone()))
+        self.buffer.get_clone_at(idx as usize).map(Buffer::from)
     }
 
     /// Возвращает последний пакет в очереди (без удаления).
     #[napi(getter)]
     pub fn last_packet(&self) -> Option<Buffer> {
-        self.buffer.back().map(|p| Buffer::from(p.clone()))
+        let current_len = self.buffer.len();
+        if current_len == 0 {
+            None
+        } else {
+            self.get_packet_at((current_len - 1) as u32)
+        }
     }
 }

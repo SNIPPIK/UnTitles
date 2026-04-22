@@ -37,7 +37,7 @@ pub struct CycleManager {
     handle: Mutex<Option<tokio::task::JoinHandle<()>>>,
 
     /// Интервал между вызовами `tick()` для всей группы сессий.
-    interval: Duration,
+    interval: Duration
 }
 
 impl CycleManager {

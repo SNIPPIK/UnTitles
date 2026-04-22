@@ -24,7 +24,7 @@ pub struct SigningKeyPair {
 
   /// Публичный ключ (распространяется открыто, входит в состав KeyPackage).
   /// Обычно 32 байта для Ed25519.
-  pub public: Buffer,
+  pub public: Buffer
 }
 
 /// Результат обработки proposals (предложений об изменении группы).
@@ -44,7 +44,7 @@ pub struct ProposalsResult {
 
   /// Welcome-данные (требуются, если в группу добавляются новые участники).
   /// Новый участник должен вызвать `processWelcome` с этим буфером.
-  pub welcome: Option<Buffer>,
+  pub welcome: Option<Buffer>
 }
 
 /// Статистика операций шифрования для сессии Dave.
@@ -60,7 +60,7 @@ pub struct JsEncryptionStats {
   pub failures: u32,
 
   /// Общее количество попыток шифрования (successes + failures).
-  pub attempts: u32,
+  pub attempts: u32
 }
 
 /// Статистика операций расшифрования для конкретного пользователя и медиатипа.
@@ -78,5 +78,5 @@ pub struct JsDecryptionStats {
   pub attempts: u32,
 
   /// Количество пакетов, пропущенных через passthrough-режим (расшифрование не выполнялось).
-  pub passthroughs: u32,
+  pub passthroughs: u32
 }

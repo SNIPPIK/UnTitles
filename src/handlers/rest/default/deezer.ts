@@ -50,7 +50,7 @@ class RestDeezerAPI extends RestServerSide.API {
                 if (!ID) return locale.err( "api.request.id.album");
 
                 // Интеграция с утилитой кеширования
-                const cache = sdb.meta_saver?.get(`${this.url}/album/${ID}`);
+                const cache = sdb.meta_saver?.get?.(`${this.url}/album/${ID}`);
 
                 // Если трек есть в кеше
                 if (cache) {

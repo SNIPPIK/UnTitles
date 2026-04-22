@@ -22,11 +22,7 @@ import { SetArray } from "#structures";
  * ```
  */
 export abstract class VoiceAdapters<T extends any> {
-    /**
-     * @description Коллекция адаптеров для общения голоса с клиентским websocket'ом
-     * @readonly
-     * @protected
-     */
+    /** Коллекция адаптеров для общения голоса с клиентским websocket'ом */
     protected adapters = new Map<string, DiscordGatewayAdapterLibraryMethods>();
 
     /**
@@ -42,7 +38,7 @@ export abstract class VoiceAdapters<T extends any> {
      * @public
      *
      * @example
-     * ```
+     * ```ts
      * public voiceAdapterCreator = (guildID: string) => {
      *         const id = this.client.shardID;
      *
@@ -72,7 +68,7 @@ export abstract class VoiceAdapters<T extends any> {
      * @public
      *
      * @example
-     * ```
+     * ```ts
      *         this.client.rest.put(`/channels/${channelId}/voice-status`, {
      *             body: {
      *                 status: status

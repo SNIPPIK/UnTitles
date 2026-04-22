@@ -1,8 +1,6 @@
-import { Colors, CommandInteraction, CycleInteraction } from "#structures/discord";
-import { APIRequestData, RestClientSide } from "#handler/rest";
+import { Colors, CommandInteraction } from "#structures/discord";
 import { ControllerCycles } from "./controllers/cycle";
 import { Queue } from "#core/queue/structures/queue";
-import { Track } from "#core/queue/structures/track";
 import { QueueMessage } from "./modules/message";
 import { Collection, locale } from "#structures";
 import { env } from "#app/env";
@@ -167,58 +165,4 @@ export class ControllerQueues<T extends Queue> extends BaseQueueController<T> {
         swapFade: parseInt(env.get("audio.swap.fade", "5")),
         fade: parseInt(env.get("audio.fade", "10"))
     };
-}
-
-/**
- * @author SNIPPIK
- * @description События глобальной системы очередей
- * @interface QueueEvents
- * @public
- */
-export interface QueueEvents {
-    /**
-     * @description Событие при котором коллекция будет отправлять информацию о добавленном треке или плейлисте, альбоме
-     * @param queue      - Очередь сервера
-     * @param user       - Пользователь включивший трек
-     * @param items      - Трек или плейлист, альбом
-     * @returns void
-     * @readonly
-     */
-    readonly "message/push": (msg: CycleInteraction, queue: Queue, items: Track | APIRequestData.List<Track>) => void;
-
-    /**
-     * @description Событие при котором коллекция будет отправлять сообщение о текущем треке
-     * @param queue     - Очередь сервера
-     * @returns void
-     * @readonly
-     */
-    readonly "message/playing": (queue: Queue) => void;
-
-    /**
-     * @description Событие при котором коллекция будет отправлять сообщение об ошибке
-     * @param queue     - Очередь сервера
-     * @param error     - Ошибка
-     * @returns void
-     * @readonly
-     */
-    readonly "message/error": (queue: Queue, error?: string | Error, position?: number) => void;
-
-    /**
-     * @description Событие при котором будет произведен поиск данных через систему API
-     * @param api      - Класс платформы запросов
-     * @param message  - Сообщение с сервера
-     * @param url      - Ссылка на допустимый объект или текст для поиска
-     * @returns void
-     * @readonly
-     */
-    readonly "rest/request": (api: RestClientSide.Request, message: CommandInteraction, url: string) => void;
-
-    /**
-     * @description Событие при котором будут отправляться ошибки из системы API
-     * @param message    - Сообщение с сервера
-     * @param error      - Ошибка
-     * @returns void
-     * @readonly
-     */
-    readonly "rest/error": (message: CommandInteraction, error: string | Error) => void;
 }

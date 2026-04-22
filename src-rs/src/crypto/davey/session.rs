@@ -15,7 +15,7 @@ use napi_derive::napi;
 #[napi(js_name = "DAVESession")]
 pub struct DaveSession {
   /// Внутренняя сессия из библиотеки `davey`.
-  inner: davey::DaveSession,
+  inner: davey::DaveSession
 }
 
 impl DaveSession {
@@ -94,12 +94,7 @@ impl DaveSession {
   ///
   /// # Возвращает
   /// Кортеж `(protocol_version, user_id, channel_id, key_pair)` в формате, пригодном для передачи в `davey`.
-  fn common_init(
-    protocol_version: u16,
-    user_id: String,
-    channel_id: String,
-    key_pair: Option<SigningKeyPair>,
-  ) -> Result<(NonZeroU16, u64, u64, Option<davey::SigningKeyPair>)> {
+  fn common_init(protocol_version: u16, user_id: String, channel_id: String, key_pair: Option<SigningKeyPair>) -> Result<(NonZeroU16, u64, u64, Option<davey::SigningKeyPair>)> {
     let pv = NonZeroU16::new(protocol_version)
         .ok_or_else(|| Error::from_reason("Protocol version must be non-zero"))?;
 

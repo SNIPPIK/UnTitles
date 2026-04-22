@@ -198,7 +198,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     const api = await this.pAPI(`watch?v=${ID}&hl=en&has_verified=1`);
                     if (api instanceof Error) return api;
 
-                    const related = api.contents?.twoColumnWatchNextResults?.secondaryResults?.secondaryResults?.results ?? [];
+                    const related = api.contents?.twoColumnWatchNextResults?.secondaryResults?.secondaryResults?.results[0].itemSectionRenderer.contents ?? [];
                     const relatedVideos = [];
 
                     // Подготавливаем данные треков (video)
@@ -253,7 +253,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     // Если ID видео не удалось извлечь из ссылки
                     if (!ID) return locale.err("api.request.id.track");
 
-                    const cache = sdb.meta_saver.get(`${this.url}/track/${ID}`);
+                    const cache = sdb?.meta_saver?.get?.(`${this.url}/track/${ID}`);
 
                     // Если трек есть в кеше
                     if (cache) {
@@ -304,7 +304,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                         const data = api["streamingData"];
 
                         // dashManifestUrl, hlsManifestUrl
-                        if (data["hlsManifestUrl"]) track.audio = data["hlsManifestUrl"];
+                        if (data["hlsManifestUrl"]) track.audio = data["dashManifestUrl"];
                         else {
                             // Если есть расшифровка ссылки видео
                             if (data["formats"]) track.audio = data["formats"][0]["url"];
@@ -312,7 +312,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     }
 
                     // Сохраняем кеш в системе
-                    if (!cache && !api?.["videoDetails"]?.["isLive"]) sdb.meta_saver?.set(track, `${this.url}/track`);
+                    if (!cache && !api?.["videoDetails"]?.["isLive"]) sdb.meta_saver?.set?.(track, `${this.url}/track`);
 
                     return track;
                 } catch (e) {
@@ -445,7 +445,7 @@ class RestYouTubeAPI extends RestServerSide.API {
      * @protected
      */
     protected track = (track: json) => {
-        const title = track.title?.simpleText ?? track.title?.["runs"]?.[0]?.text ?? track.title;
+        const title = track?.title?.simpleText ?? track?.title?.["runs"]?.[0]?.text ?? track?.title;
         const author = track["shortBylineText"]?.["runs"]?.[0]?.text ?? track.author;
         const id = track?.["videoId"] ?? track?.["inlinePlaybackEndpoint"]?.["watchEndpoint"]?.["videoId"] ?? track.contentId;
 
@@ -528,7 +528,8 @@ class RestYouTubeAPI extends RestServerSide.API {
                 if (channel instanceof Error) return resolve(null);
 
                 const data = channel[1]?.response ?? channel?.response ?? null;
-                const info = data?.header?.["c4TabbedHeaderRenderer"], Channel = data?.metadata?.["channelMetadataRenderer"],
+                const info = data?.header?.["c4TabbedHeaderRenderer"],
+                    Channel = data?.metadata?.["channelMetadataRenderer"],
                     avatar = info?.avatar;
 
                 return resolve({

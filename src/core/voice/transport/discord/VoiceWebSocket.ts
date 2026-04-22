@@ -3,6 +3,8 @@ import { type Data, type MessageEvent, WebSocket } from "ws";
 import { HeartbeatManager } from "../../structures/heartbeat";
 import { type WebSocketOpcodes } from "#core/voice";
 import { TypedEmitter } from "#structures";
+import { RestAPIAgent } from "#handler/rest";
+import { env } from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -12,6 +14,8 @@ import { TypedEmitter } from "#structures";
  * @public
  */
 export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
+    private static isProxy = env.get<boolean>("proxy.ws", false);
+
     /**
      * @description Адрес для подключения по websocket
      * @private
@@ -41,7 +45,8 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public get latency() {
-        return this._heartbeat.latency;
+        if (!this._heartbeat) return 60;
+        return this._heartbeat?.latency;
     };
 
     /**
@@ -120,7 +125,10 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         }
 
         this._endpoint = endpoint;
-        this.ws = new WebSocket(`wss://${endpoint}?v=8`);
+        this.ws = new WebSocket(`wss://${endpoint}?v=8`, {
+            // Можно ли использовать прокси для подключения WS
+            agent: VoiceWebSocket.isProxy ? RestAPIAgent : null
+        });
 
         // Сообщение от websocket соединения
         this.ws.onmessage = this.onReceiveMessage;

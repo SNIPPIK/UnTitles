@@ -44,36 +44,23 @@ const ENCODER_PARAMS = {
  * @abstract
  */
 abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
-    /**
-     * @description Можно ли читать поток
-     * @protected
-     */
-    protected _readable: boolean;
+    protected _played_frames = 0;
 
-    /**
-     * @description Последнее заданное значение затухания
-     * @protected
-     */
+    /** Можно ли читать поток */
+    protected _readable: boolean = false;
+
+    /** Последнее заданное значение затухания */
     protected _afade = 0;
 
-    /**
-     * @description Модификатор скорости фильтров
-     * @protected
-     */
+    /** Модификатор скорости фильтров */
     protected _afade_modificator = 1;
 
-    /**
-     * @description Модификатор скорости высчитанный из фильтров
-     * @public
-     */
+    /** Модификатор скорости высчитанный из фильтров */
     public get speed() {
         return this._afade_modificator;
     };
 
-    /**
-     * @description Если чтение возможно
-     * @public
-     */
+    /** Если чтение возможно */
     public get readable(): boolean {
         return this._readable;
     };
@@ -243,6 +230,7 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
 
         this._readable = null;
         this.options = null;
+        this._played_frames = 0;
     };
 }
 
@@ -255,9 +243,8 @@ abstract class BaseAudioResource extends TypedEmitter<AudioResourceEvents> {
  * @public
  */
 export class AudioResource extends BaseAudioResource {
-    private engine: iType<typeof AudioEngine> = new AudioEngine(20);
+    private engine: iType<typeof AudioEngine>;
     private process: iType<typeof FfmpegProcess>;
-    private _played_frames = 0;
 
     /**
      * @description Выдаем фрагмент потока
@@ -279,6 +266,7 @@ export class AudioResource extends BaseAudioResource {
      * @public
      */
     public get packets(): number {
+        this.hasPossibleBuffedStream;
         return this.engine?.size ?? 0;
     };
 
@@ -294,6 +282,25 @@ export class AudioResource extends BaseAudioResource {
     };
 
     /**
+     * @description Можно ли передавать аудио в буфер аудио потока
+     * @private
+     */
+    private get hasPossibleBuffedStream() {
+        const audio = this.engine;
+        const ffmpeg = this.process;
+
+        // Если буфер почти полон (на 90%), ставим FFmpeg на паузу
+        if (!audio.canAcceptThreshold(90)) {
+            ffmpeg.pause = true;
+            return false;
+        }
+
+        // Если в буфере стало просторно (меньше 20%), возобновляем чтение
+        else if (audio.canAcceptThreshold(20)) ffmpeg.pause = false;
+        return true;
+    };
+
+    /**
      * @description Создаем класс и задаем параметры
      * @constructor
      * @public
@@ -301,6 +308,9 @@ export class AudioResource extends BaseAudioResource {
     public constructor(config: AudioResourceOptions) {
         super(config);
         // Создаем аудио движок в Rust
+        this.engine = new AudioEngine(10);
+
+        // Создаем процесс FFmpeg + OggParser в Rust
         this.process = new FfmpegProcess(this.arguments, FFMPEG_PATH);
 
         // Привязываем события через внутренний метод input
@@ -310,13 +320,16 @@ export class AudioResource extends BaseAudioResource {
             },
             input: this.process,
             decode: (p) => p.pipeStdout((frames) => {
-                if (!this._readable) {
-                    this.engine.addPacket(SILENT_FRAME);
-                    this._readable = true;
-                    setImmediate(() => this.emit("readable"));
-                }
+                if (this.engine) {
+                    // Если поток только начал чтение
+                    if (!this._readable) {
+                        this.engine.addPacket(SILENT_FRAME);
+                        this._readable = true;
+                        setImmediate(() => this.emit("readable"));
+                    }
 
-                this.engine.addPackets(frames);
+                    this.engine.addPackets(frames);
+                }
             })
         });
     };
@@ -337,18 +350,21 @@ export class AudioResource extends BaseAudioResource {
      * @public
      */
     public destroy() {
-        this.engine.addPacket(SILENT_FRAME);
-
+        // Проверяем есть ли процесс
         if (this.process) {
             this.process.destroy();
             this.process = null;
         }
 
+        // Проверяем есть ли аудио
         if (this.engine) {
+            this.engine.addPacket(SILENT_FRAME);
+
             this.engine.clear();
             this.engine = null;
         }
 
+        // Удаляем родительский класс
         super.destroy();
     };
 }

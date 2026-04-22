@@ -74,7 +74,13 @@ class RestSoundCloudAPI extends RestServerSide.API {
 
                         // Если указано получение аудио
                         if (audio) {
-                            if (api.media.transcodings) {
+                            // Если трек не доступен к загрузке
+                            if (!api.streamable) {
+                                return new Error("Resource is not available in your country");
+                            }
+
+                            // Если есть данные для получения истинного аудио
+                            else if (api.media.transcodings) {
                                 // Расшифровываем аудио формат
                                 track.audio = await this.getFormat(api.media.transcodings, ClientID);
                             }

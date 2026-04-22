@@ -114,8 +114,6 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                     toSend += PLAYER_SEND_POOL;
                 }
 
-                //console.log(connection.udp.packets, toSend);
-
                 // вычисляем, сколько можно отправить, чтобы не превышать toSend + PLAYER_SEND_POOL
                 const maxAllowedTotal = toSend + PLAYER_SEND_POOL;
                 const allowed = Math.max(0, maxAllowedTotal - connection.udp.packets);
@@ -125,8 +123,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                     const batch = audio.packetAt(allowed);
                     if (batch && batch.length > 0) {
                         connection.packet(batch);
-                        // увеличиваем локальный буферный учёт на реально отправленное количество
-                        player._buffered = (player._buffered || 0) + batch.length;
+                        player._buffered = batch.length;
                     }
                 }
 

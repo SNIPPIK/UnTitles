@@ -13,10 +13,13 @@ pub struct RingBuffer {
     /// Выделенная память для элементов. Ёмкость = реальная ёмкость (capacity + 1).
     /// Используется `Box<[MaybeUninit<Vec<u8>>]>` для фиксированного размера на куче.
     buffer: Box<[MaybeUninit<Vec<u8>>]>,
+
     /// Реальная ёмкость буфера (переданная capacity + 1). Нужна для различения пустого и полного состояний.
     capacity: usize,
+
     /// Индекс, куда будет записан следующий элемент. Изменяется только производителем (`push`).
     head: AtomicUsize,
+
     /// Индекс, откуда будет прочитан следующий элемент. Изменяется потребителем (`pop` и `push_front`).
     tail: AtomicUsize,
 }
@@ -170,6 +173,25 @@ impl RingBuffer {
         }
     }
 
+    /// Вспомогательный метод для получения копии данных по относительному индексу (для peek)
+    pub fn get_clone_at(&self, index: usize) -> Option<Vec<u8>> {
+        let tail = self.tail.load(Ordering::Acquire);
+        let head = self.head.load(Ordering::Acquire);
+
+        let current_len = if head >= tail { head - tail } else { self.capacity - tail + head };
+
+        if index >= current_len {
+            return None;
+        }
+
+        let real_idx = (tail + index) % self.capacity;
+        unsafe {
+            let slot = self.buffer.as_ptr().add(real_idx) as *const MaybeUninit<Vec<u8>>;
+            // Клонируем данные, находящиеся в Vec<u8>
+            Some((*(*slot).as_ptr()).clone())
+        }
+    }
+
     /// Внутренний метод для удаления элементов в заданном диапазоне индексов
     fn drop_range(&mut self, start: usize, end: usize) {
         unsafe {
@@ -180,6 +202,11 @@ impl RingBuffer {
                 ptr::drop_in_place(slot_ptr);
             }
         }
+    }
+    
+    /// Очищает кольцевой буфер от аудио данных
+    pub fn clear(&mut self) {
+        while self.pop().is_some() {}
     }
 }
 

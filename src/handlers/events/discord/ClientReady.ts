@@ -1,4 +1,5 @@
 import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
+import { DiscordClient } from "#structures/discord";
 import { Events } from "discord.js";
 import { Logger } from "#structures";
 
@@ -17,8 +18,10 @@ import { Logger } from "#structures";
 })
 class ClientReady extends Event<Events.ClientReady> {
     run: SupportEventCallback<Events.ClientReady> = async (client) => {
-        Logger.log("LOG", `[Core/${client["shardID"]}] on ${Logger.color(32, `${client.guilds.cache.size} guilds`)}`);
-        client["startIntervalStatuses"]();
+        const bot: DiscordClient = client as any;
+
+        Logger.log("LOG", `[Core/${bot.shardID}] on ${Logger.color(32, `${client.guilds.cache.size} guilds`)}`);
+        bot.startIntervalStatuses();
     };
 }
 

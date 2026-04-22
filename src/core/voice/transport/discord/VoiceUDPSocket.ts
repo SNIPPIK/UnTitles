@@ -137,9 +137,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         this._status = VoiceUDPSocketStatuses.connecting;
 
         // Rust создаст отдельный поток и будет вызывать этот колбэк для каждого полученного пакета
-        this.socket.startListening((msg: Buffer) => {
-            this.handleMessage(msg);
-        });
+        this.socket.startListening(this.handleMessage);
     };
 
     /**

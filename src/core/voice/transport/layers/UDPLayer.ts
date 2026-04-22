@@ -36,7 +36,7 @@ export class UDPLayer extends BaseLayer<VoiceUDPSocket> {
     };
 
     /**
-     * @description Кол-во пакетов в UDP слое
+     * @description Кол-во пакетов в кольцевом буфере UDP подключения
      * @public
      */
     public get packets() {

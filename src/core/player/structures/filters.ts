@@ -8,10 +8,7 @@ import { SetArray } from "#structures";
  * @public
  */
 export class ControllerFilters<T extends AudioFilter> extends SetArray<T> {
-    /**
-     * @description Скомпилированные фильтры, заранее подготовленные
-     * @private
-     */
+    /** Скомпилированные фильтры, заранее подготовленные */
     private _filters: string = null;
 
     /**

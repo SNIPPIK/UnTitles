@@ -21,12 +21,15 @@ const RTP_HEADER_SIZE: usize = 12;
 pub enum CryptoError {
     /// Ключ шифрования имеет неверную длину (должен быть 32 байта).
     InvalidKeyLength(usize),
+    
     /// Ошибка при шифровании (проблема с nonce, AAD или внутренняя ошибка AES-GCM).
     EncryptionFailed(String),
+    
     /// Размер фрейма превышает максимально допустимый (обычно MTU ~1200 байт).
     FrameTooLarge(usize),
+    
     /// Некорректный RTP-пакет (например, слишком короткий заголовок).
-    InvalidPacket,
+    InvalidPacket
 }
 
 impl fmt::Display for CryptoError {

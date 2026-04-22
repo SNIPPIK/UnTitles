@@ -141,8 +141,7 @@ class message_push extends Event<"message/push"> {
                 };
 
                 const local_msg = await msg.edit({
-                    components: [buildComponents() as any],
-                    //embeds: null
+                    components: [buildComponents()],
                 });
 
                 if (local_msg) setTimeout(() => local_msg.delete?.().catch(() => null), 20e3);

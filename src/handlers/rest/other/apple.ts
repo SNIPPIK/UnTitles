@@ -40,7 +40,7 @@ class RestAppleMusicAPI extends RestServerSide.API {
                 const id = url.match(/\/(song|music-video)\/([0-9]+)/i)?.[2];
                 if (!id) return locale.err("api.request.id.track");
 
-                const cache = sdb.meta_saver?.get(`${this.url}/${id}`);
+                const cache = sdb.meta_saver?.get?.(`${this.url}/${id}`);
                 if (cache) return cache;
 
                 const api = await this.API(`catalog/${this.region}/songs/${id}`);

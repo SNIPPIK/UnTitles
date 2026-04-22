@@ -65,7 +65,7 @@ export class DiscordClient extends Client {
                 "GuildMessages",
 
                 // Нужен для голосовой системы
-                "GuildVoiceStates",
+                "GuildVoiceStates"
             ],
 
             // Позволяет обрабатывать частичные данные
@@ -77,7 +77,7 @@ export class DiscordClient extends Client {
                 Partials.Reaction,
                 Partials.User,
                 Partials.GuildScheduledEvent,
-                Partials.ThreadMember,
+                Partials.ThreadMember
             ],
 
             // Задаем параметры кеша
@@ -138,7 +138,7 @@ export class DiscordClient extends Client {
         // Рекурсивная функция обновления
         const updatePresence = () => {
             try {
-                // Проверяем, пора ли перепарсить массив статусов
+                // Проверяем, пора ли парсить массив статусов
                 if (Date.now() - lastUpdateDate > arrayUpdateMs) {
                     array = this.parseStatuses();
                     lastUpdateDate = Date.now();

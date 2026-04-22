@@ -160,7 +160,7 @@ export class ControllerTracks<T extends Track> {
     };
 
     /**
-     * @description текстовое значение о тек треках
+     * @description Текстовое описание о текущих треках
      * @public
      */
     public get footer() {

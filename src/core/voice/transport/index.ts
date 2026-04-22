@@ -1,13 +1,13 @@
-import { VoiceOpcodes, VoiceCloseCodes } from "discord-api-types/voice/v8";
-import { VoiceWebSocket, WebSocketOpcodes } from "#core/voice";
-import { MLSSession } from "#core/voice/structures/MLSSession";
-import { TypedEmitter } from "#structures";
-import { VoiceAdapter } from "./adapter";
+import {VoiceCloseCodes, VoiceOpcodes} from "discord-api-types/voice/v8";
+import {VoiceWebSocket, WebSocketOpcodes} from "#core/voice";
+import {MLSSession} from "#core/voice/structures/MLSSession";
+import {TypedEmitter} from "#structures";
+import {VoiceAdapter} from "./adapter";
 
 // Layers
-import { UDPLayer } from "#core/voice/transport/layers/UDPLayer";
-import { RTPLayer } from "#core/voice/transport/layers/RTPLayer";
-import { DAVELayer } from "#core/voice/transport/layers/DAVELayer";
+import {UDPLayer} from "#core/voice/transport/layers/UDPLayer";
+import {RTPLayer} from "#core/voice/transport/layers/RTPLayer";
+import {DAVELayer} from "#core/voice/transport/layers/DAVELayer";
 
 /**
  * @author SNIPPIK
@@ -82,13 +82,13 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     this.emit("info", "[Transport/UDP]: Getting out");
 
                     if (ws instanceof Error) {
-                        this.emit("info", "[Transport/UDP]: Bad Discovery handshake");
-
+                        this.emit("close", VoiceCloseCodes.ServerNotFound, ws);
+                        this.emit("info", `[Transport/UDP]: Bad Discovery handshake`);
                         this.destroy();
                         return;
                     }
 
-                    this.emit("info", "[Transport/UDP]: Good Discovery handshake");
+                    this.emit("info", `[Transport/UDP]: Good Discovery handshake | ${ws.ip}:${ws.port}`);
                     this._ws.packet = {
                         op: VoiceOpcodes.SelectProtocol,
                         d: {
@@ -108,18 +108,18 @@ export class Transport extends TypedEmitter<TransportEvents> {
             case TransportStateCode.Session: {
                 const d = state.payload;
 
-                // Сохраняем ключ, для повторного использования
-                this.secret_key = d.secret_key;
+                if (this.secret_key !== d.secret_key) {
+                    // Инициализируем RTP (AES)
+                    this._rtp.create(this.ssrc, d.secret_key);
+                    this.emit("info", `[Transport/RTP]: has created`);
 
-                // Инициализируем RTP (AES)
-                this._rtp.create(this.ssrc, d.secret_key);
-                this.emit("info", `[Transport/RTP]: has created`);
-
-                if (d.dave_protocol_version) {
                     // Инициализируем DAVE (MLS)
                     this._dave.create(d.dave_protocol_version, this._ws);
                     this.emit("info", `[Transport/E2EE]: has created | ${d.dave_protocol_version} | Max --> ${MLSSession.max_version}`);
                 }
+
+                // Сохраняем ключ, для повторного использования
+                this.secret_key = d.secret_key;
                 return;
             }
 
@@ -268,7 +268,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     payload: code
                 };
                 return;
-            } else if (code !== 4006) {
+            }
+            else if (code !== VoiceCloseCodes.SessionNoLongerValid && code !== VoiceCloseCodes.ServerNotFound) {
                 // Если соединение не было закрыто собственноручно
                 if (this.state.code !== TransportStateCode.Closed) {
                     // Пробуем поднять соединение заново

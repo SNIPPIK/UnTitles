@@ -46,10 +46,12 @@ abstract class Request {
         // Пользовательский User-Agent
         userAgent?: string | boolean;
     } & RequestOptions = {
-        timeout: 10e3,
-        headers: {
-            "Accept-Encoding": "gzip, deflate, br"
-        }
+        //minVersion: 'TLSv1.2',
+        //maxVersion: 'TLSv1.3',
+
+        // Crypto
+        //ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256',
+        //sigalgs: 'ecdsa_secp256r1_sha256:rsa_pss_rsae_sha256:rsa_pkcs1_sha256',
     };
 
     /**
@@ -157,6 +159,8 @@ abstract class Request {
 
                 // Обработка ошибок сокета (ECONNRESET, ENOTFOUND и т.п.)
                 req.once("error", (err) => {
+                    if (err?.name?.match(/routines:ssl3_get_record:decryption/)) throw new Error("Failed to connect to Proxy!");
+
                     req.destroy();
                     resolve(
                         new Error(

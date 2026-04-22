@@ -8,10 +8,10 @@ import {
     Permissions,
     SubCommand
 } from "#handler/commands";
-import {ApplicationCommandOptionType} from "discord.js";
-import {Colors} from "#structures/discord";
-import {locale} from "#structures";
-import {db} from "#app/db";
+import { ApplicationCommandOptionType } from "discord.js";
+import { Colors } from "#structures/discord";
+import { locale } from "#structures";
+import { db } from "#app/db";
 
 
 /**
@@ -62,7 +62,7 @@ class PlayerReplay extends SubCommand {
     }
 })
 class PlayerStop extends SubCommand {
-    async run({ctx}: CommandCallback<string>) {
+    async run({ctx}: CommandCallback) {
         // Удаляем очередь
         db.queues.remove(ctx.guildId);
 
