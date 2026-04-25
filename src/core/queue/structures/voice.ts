@@ -1,4 +1,4 @@
-import { VoiceConnection } from "#core/voice";
+import { VoiceConnection } from "#core/voice/index.js";
 
 /**
  * @author SNIPPIK

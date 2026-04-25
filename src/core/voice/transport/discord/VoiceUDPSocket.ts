@@ -1,4 +1,4 @@
-import { type WebSocketOpcodes } from "#core/voice";
+import { type WebSocketOpcodes } from "#core/voice/index.js";
 import { type iType, UDPSocket } from "#native";
 import { TypedEmitter } from "#structures";
 import { isIPv4 } from "node:net";

@@ -1,2 +1,2 @@
-export * from "./structures/player";
-export * from "./structures/filters";
+export * from "./structures/player.js";
+export * from "./structures/filters.js";

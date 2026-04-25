@@ -1,5 +1,5 @@
-import { CommandInteraction } from "#structures/discord";
-import { RestClientSide } from "#handler/rest";
+import { CommandInteraction } from "#structures/discord/index.js";
+import { RestClientSide } from "#handler/rest/index.js";
 
 /**
  * @author SNIPPIK

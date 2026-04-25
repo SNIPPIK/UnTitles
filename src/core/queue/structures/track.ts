@@ -1,6 +1,5 @@
-import { TrackResolvers, TRACK_BUFFERED_TIME, TRACK_CHECK_WAIT } from "#core/queue/controllers/provider";
-import { APIRequestData, RestServerSide } from "#handler/rest";
-import { httpsClient } from "#structures";
+import { TrackResolvers, TRACK_BUFFERED_TIME } from "#core/queue/controllers/provider.js";
+import { APIRequestData, RestServerSide } from "#handler/rest/index.js";
 import { db } from "#app/db";
 
 /**
@@ -18,23 +17,13 @@ export class Track extends TrackResolvers {
     protected _lyrics: string | null;
 
     /** Данные о пользователе включивший трек */
-    protected _user: {
-        /** ID пользователя */
-        readonly id: string;
-
-        /** Имя/ник пользователя */
-        readonly username: string;
-
-        /** Ссылка на аватар пользователя */
-        readonly avatar?: string | null;
-    };
+    protected _user: TrackUser;
 
     /** Надо ли обходить ограничения через proxy */
     public proxy: boolean = false;
 
     /**
      * @description Идентификатор трека
-     * @returns string
      * @public
      */
     public get ID() {
@@ -43,7 +32,6 @@ export class Track extends TrackResolvers {
 
     /**
      * @description Ссылки трека на его самого
-     * @returns string
      * @public
      */
     public get url() {
@@ -52,7 +40,6 @@ export class Track extends TrackResolvers {
 
     /**
      * @description Наименование трека
-     * @returns string
      * @public
      */
     public get name() {
@@ -61,7 +48,6 @@ export class Track extends TrackResolvers {
 
     /**
      * @description Получаем отредактированное название трека в формате time [author](author_url) - [title](track_url)
-     * @returns string
      * @public
      */
     public get name_replace() {
@@ -75,10 +61,9 @@ export class Track extends TrackResolvers {
 
     /**
      * @description Получаем превью трека
-     * @returns { url: string }
      * @public
      */
-    public get image(): { url: string } {
+    public get image() {
         // Если нет картинки
         if (!this._track?.image) return { url: db.images.no_image };
         return {
@@ -102,7 +87,6 @@ export class Track extends TrackResolvers {
 
     /**
      * @description Получаем пользователя который включил трек
-     * @returns Track.user
      * @public
      */
     public get user() {
@@ -150,7 +134,6 @@ export class Track extends TrackResolvers {
 
     /**
      * @description Данные о платформе с которой был получен трек
-     * @returns RestServerSide.APIBase
      * @public
      */
     public get api() {
@@ -159,7 +142,6 @@ export class Track extends TrackResolvers {
 
     /**
      * @description Получаем данные времени трека
-     * @returns TrackDuration
      * @public
      */
     public get time() {
@@ -192,10 +174,17 @@ export class Track extends TrackResolvers {
         }
     };
 
+    /**
+     * @description Трек может быть буферизирован?
+     * @public
+     */
+    public get isBuffered() {
+        const current = this._duration.total;
+        return current < TRACK_BUFFERED_TIME && current !== 0;
+    };
 
     /**
      * @description Проверяем ссылку на доступность и выдаем ее если ссылка имеет код !==200, то обновляем
-     * @return Promise<string | Error>
      * @public
      */
     public get resource() {
@@ -204,49 +193,10 @@ export class Track extends TrackResolvers {
 
     /**
      * @description Получаем текст песни
-     * @return Promise<string | Error>
      * @public
      */
     public get lyrics() {
-        return new Promise(async (resolve) => {
-            // Выдаем повторно текст песни
-            if (this._lyrics || this._duration.total === 0) return resolve(this._lyrics);
-
-            // Если ответ не был получен от сервера
-            const timeoutPromise = new Promise((resolve) =>
-                setTimeout(() => resolve(new Error("Timeout server request")), 10e3)
-            );
-
-            const api = await Promise.race([
-                new httpsClient({
-                    url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(this.artist.title)}&track_name=${encodeURIComponent(this.name)}`,
-                    userAgent: "UnTitles 0.5.0, Music bot, github.com/SNIPPIK/UnTitles",
-                    timeout: TRACK_CHECK_WAIT
-                }).toJson,
-                timeoutPromise
-            ]) as json | Error;
-
-            // Если получаем вместо данных ошибку
-            if (api instanceof Error) return resolve(api);
-
-            // Если нет текста песни
-            else if (api.statusCode === 404) return resolve(undefined);
-
-            // Сохраняем текст песни
-            this._lyrics = api?.syncedLyrics || api?.plainLyrics;
-
-            // Выдаем впервые текст песни
-            return resolve(api?.syncedLyrics || api?.plainLyrics);
-        });
-    };
-
-    /**
-     * @description Трек может быть буферизирован?
-     * @public
-     */
-    public get isBuffered() {
-        const current = this._duration.total;
-        return current < TRACK_BUFFERED_TIME && current !== 0;
+        return Track.providers.lyrics.resolve(this);
     };
 
     /**
@@ -264,6 +214,23 @@ export class Track extends TrackResolvers {
         if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic|[\/()\[\]"]|[:;]/gi, "");
         _track.title = `${_track.title}`.replace(/Lyrics Video|[\/()\[\]"]|[:;]/gi, "");
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные о пользователе который включил трек
+ * @interface TrackUser
+ * @private
+ */
+interface TrackUser {
+    /** ID пользователя */
+    readonly id: string;
+
+    /** Имя/ник пользователя */
+    readonly username: string;
+
+    /** Ссылка на аватар пользователя */
+    readonly avatar?: string | null;
 }
 
 /**

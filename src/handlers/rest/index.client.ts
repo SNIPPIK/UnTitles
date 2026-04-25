@@ -1,5 +1,5 @@
-import type { RestServerSide } from "./index.server";
-import type { APIRequestsKeys } from "./index";
+import type { RestServerSide } from "./index.server.js";
+import type { APIRequestsKeys } from "./index.js";
 import { db } from "#app/db";
 
 /**

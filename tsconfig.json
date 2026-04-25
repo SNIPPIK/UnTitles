@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     /* --- Основные настройки сборки --- */
-    "target": "ES2022",                /* Собираем в современный JS (Node 18+ поддерживает ES2022 полностью) */
+    "target": "esnext",                /* Собираем в современный JS (Node 18+ поддерживает ES2022 полностью) */
     "module": "NodeNext",              /* Важно для поддержки imports (#core/...) и Top-level await */
     "moduleResolution": "NodeNext",    /* Современный алгоритм разрешения модулей Node.js */
     "lib": ["ESNext"],                 /* Включаем новейшие фичи языка */
@@ -56,8 +56,6 @@
   },
 
   "include": [
-    "package.json",
-    "tsconfig.json",
     "src/**/*"
   ],
 

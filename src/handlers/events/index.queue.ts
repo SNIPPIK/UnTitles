@@ -1,7 +1,7 @@
-import { CycleInteraction } from "#structures/discord";
-import { Queue } from "#core/queue/structures/queue";
-import { Track } from "#core/queue/structures/track";
-import { APIRequestData } from "#handler/rest";
+import { CycleInteraction } from "#structures/discord/index.js";
+import { Queue } from "#core/queue/structures/queue.js";
+import { Track } from "#core/queue/structures/track.js";
+import { APIRequestData } from "#handler/rest/index.js";
 
 /**
  * @author SNIPPIK

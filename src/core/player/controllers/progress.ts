@@ -1,4 +1,4 @@
-import type { RestAPINames } from "#handler/rest/index.decorator";
+import type { RestAPINames } from "#handler/rest/index.decorator.js";
 import { env } from "#app/env";
 import { db } from "#app/db";
 

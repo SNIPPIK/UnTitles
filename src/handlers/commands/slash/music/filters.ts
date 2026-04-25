@@ -7,13 +7,13 @@ import {
     Options,
     Permissions,
     SubCommand
-} from "#handler/commands";
-import {ApplicationCommandOptionType} from "discord.js";
-import filters from "#core/player/filters.json";
-import type {AudioFilter} from "#core/player";
-import {Colors} from "#structures/discord";
-import {locale} from "#structures";
-import {db} from "#app/db";
+} from "#handler/commands/index.js";
+import { ApplicationCommandOptionType } from "discord.js";
+import filters from "#core/player/filters.json" with { type: 'json' };
+import type { AudioFilter } from "#core/player/index.js";
+import { Colors } from "#structures/discord/index.js";
+import { locale } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @description Под команда добавления аудио фильтра

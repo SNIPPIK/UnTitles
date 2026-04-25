@@ -1,11 +1,11 @@
-import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue";
-import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio";
-import { type AudioFilter, ControllerFilters } from "#core/player";
-import { PlayerProgress } from "../controllers/progress";
-import { AudioPlayerEvents } from "#handler/events";
+import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue/index.js";
+import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio/index.js";
+import { type AudioFilter, ControllerFilters } from "#core/player/index.js";
+import { AudioPlayerEvents } from "#handler/events/index.js";
+import { PlayerProgress } from "../controllers/progress.js";
+import type { VoiceConnection } from "#core/voice/index.js";
+import { PlayerAudio } from "../structures/audio.js";
 import { Logger, TypedEmitter } from "#structures";
-import type { VoiceConnection } from "#core/voice";
-import { PlayerAudio } from "../structures/audio";
 import { db } from "#app/db";
 
 /**

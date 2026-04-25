@@ -7,9 +7,9 @@ import {
     Options,
     Permissions,
     SubCommand
-} from "#handler/commands";
+} from "#handler/commands/index.js";
 import { ApplicationCommandOptionType } from "discord.js";
-import radio from "#core/player/stations.json";
+import radio from "#core/player/stations.json" with { type: 'json' };
 import { locale } from "#structures";
 import { db } from "#app/db";
 

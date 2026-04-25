@@ -2,11 +2,11 @@ import type {
     ChatInputCommandInteraction, AutocompleteInteraction, CacheType, ButtonInteraction, Message, SelectMenuInteraction,
     MessageContextMenuCommandInteraction, PrimaryEntryPointCommandInteraction, UserContextMenuCommandInteraction
 } from "discord.js";
-import type { DiscordClient } from "#structures/discord/index.client";
+import type { DiscordClient } from "#structures/discord/index.client.js";
 
-export * from "./index.sharder";
-export * from "./index.client";
-export * from "./index.voice";
+export * from "./index.sharder.js";
+export * from "./index.client.js";
+export * from "./index.voice.js";
 
 /**
  * @description Тип всех входящих данных для команд

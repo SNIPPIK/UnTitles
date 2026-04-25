@@ -65,7 +65,9 @@ export class DiscordClient extends Client {
                 "GuildMessages",
 
                 // Нужен для голосовой системы
-                "GuildVoiceStates"
+                "GuildVoiceStates",
+
+                "DirectMessages"
             ],
 
             // Позволяет обрабатывать частичные данные

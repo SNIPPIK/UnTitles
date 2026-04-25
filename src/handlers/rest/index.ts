@@ -4,17 +4,19 @@ import {
     APIRequests,
     APIRequestsKeys,
     RestAPINames
-} from "#handler/rest/index.decorator";
+} from "#handler/rest/index.decorator.js";
+import type { RestServerSide } from "./index.server.js";
 import { Logger, SimpleWorker } from "#structures";
-import type { RestServerSide } from "./index.server";
-import { RestClientSide } from "./index.client";
+import { RestClientSide } from "./index.client.js";
 import { Worker } from "node:worker_threads";
-import { Track } from "#core/queue";
+import { Track } from "#core/queue/index.js";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 
 // Export decorator
-export * from "./index.decorator";
-export * from "./index.client";
-export * from "./index.server";
+export * from "./index.decorator.js";
+export * from "./index.client.js";
+export * from "./index.server.js";
 
 /**
  * @author SNIPPIK
@@ -98,6 +100,20 @@ class RestWorker<T extends APIRequestsKeys> {
             .filter(api => api.requests?.some(req => req.name === "related"));
     };
 
+    /**
+     * @description Общее кол-во методов запросов
+     * @public
+     */
+    public get methods() {
+        let reqs = 0;
+
+        for (let i of this.array) {
+            reqs += i.requests.length;
+        }
+
+        return reqs;
+    };
+
     public constructor() {};
 
     /**
@@ -119,11 +135,13 @@ class RestWorker<T extends APIRequestsKeys> {
             // Если поток уже есть в системе
             if (this.worker) await this.cleanup();
 
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = dirname(__filename);
+
             // Создаем поток через менеджер потоков
             const worker = this.worker = SimpleWorker.create<RestServerSide.Data>({
                 file: __dirname + "/index.worker",
                 options: {
-                    execArgv: ["-r", "tsconfig-paths/register"],
                     workerData: { rest: true },
                 },
                 postMessage: { data: true },

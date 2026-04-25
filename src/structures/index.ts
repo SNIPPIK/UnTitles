@@ -122,14 +122,14 @@ for (const {type, name, value} of prototypes) {
     Object.defineProperty(type, name, { value, writable: true, configurable: true });
 }
 
-export * from "./logger";
-export * from "./locale";
-export * from "./tools/TypedEmitter";
-export * from "./array";
-export * from "./tools/Assign";
-export * from "./tools/httpsClient";
-export * from "./tools/SimpleWorker";
-export * from "./tools/CycleManager";
+export * from "./logger/index.js";
+export * from "./locale/index.js";
+export * from "./tools/TypedEmitter.js";
+export * from "./array/index.js";
+export * from "./tools/Assign.js";
+export * from "./tools/httpsClient.js";
+export * from "./tools/SimpleWorker.js";
+export * from "./tools/CycleManager.js";
 
 /**
  * @author SNIPPIK

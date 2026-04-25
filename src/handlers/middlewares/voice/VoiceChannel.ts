@@ -1,6 +1,6 @@
-import { CommandInteraction, Colors } from "#structures/discord";
-import { QueueMessage } from "#core/queue/modules/message";
-import {middleware, MiddlewareResult} from "#handler/middlewares";
+import { middleware, MiddlewareResult } from "#handler/middlewares/index.js";
+import { CommandInteraction, Colors } from "#structures/discord/index.js";
+import { QueueMessage } from "#core/queue/modules/message.js";
 import { Assign, locale } from "#structures";
 import { db } from "#app/db";
 

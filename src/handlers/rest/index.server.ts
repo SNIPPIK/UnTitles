@@ -1,6 +1,6 @@
-import { type APIExecuteParams, APIPlatformType, type APIRequestsKeys, type APIRequestsRaw, RestAPIAgent } from "./index";
-import type { RestAPINames, RestOptions } from "./index.decorator";
-import type { RestClientSide } from "./index.client";
+import { type APIExecuteParams, APIPlatformType, type APIRequestsKeys, type APIRequestsRaw, RestAPIAgent } from "./index.js";
+import type { RestAPINames, RestOptions } from "./index.decorator.js";
+import type { RestClientSide } from "./index.client.js";
 
 /**
  * @author SNIPPIK

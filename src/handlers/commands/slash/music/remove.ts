@@ -1,6 +1,6 @@
-import { Command, CommandCallback, Declare, Options, Permissions, Middlewares } from "#handler/commands";
+import { Command, CommandCallback, Declare, Options, Permissions, Middlewares } from "#handler/commands/index.js";
 import { ApplicationCommandOptionType } from "discord.js";
-import { Colors } from "#structures/discord";
+import { Colors } from "#structures/discord/index.js";
 import { locale } from "#structures";
 import { db } from "#app/db";
 

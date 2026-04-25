@@ -70,6 +70,7 @@
 - Общая нагрузка за `1 слой + shard` (Voice + Player)
   - CPU: ~0.1%
   - RAM: `80 MB`
+    - Rust Binding: `20-30 MB`
 
 ####  Что дает сильную нагрузку
 - `scheduler` за 1 поток (50 `UDP` + `RingBuffer`) ~0.1% CPU
@@ -259,8 +260,8 @@ npm i
 # Если собирать не хочется качаем готовую сборку и закидываем все по пути build/native
 npm run build:native
 
-# Сборка Typescript + настройки + запуск
-npm run build && npm run configure && npm run start
+# Сборка Typescript + запуск
+npm run build && npm run start
 ```
 
 # 📊 Диаграмма всего проекта

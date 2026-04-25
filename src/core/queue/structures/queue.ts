@@ -1,9 +1,9 @@
-import { ControllerTracks, ControllerVoice, Track } from "#core/queue";
-import { QueueButtons, QueueMessage } from "../modules/message";
-import { SpeakerType } from "#core/voice/structures/Speaker";
-import { CommandInteraction}  from "#structures/discord";
-import { VoiceConnection } from "#core/voice";
-import { AudioPlayer } from "#core/player";
+import { ControllerTracks, ControllerVoice, Track } from "#core/queue/index.js";
+import { QueueButtons, QueueMessage } from "../modules/message.js";
+import { CommandInteraction}  from "#structures/discord/index.js";
+import { SpeakerType } from "#core/voice/structures/Speaker.js";
+import { VoiceConnection } from "#core/voice/index.js";
+import { AudioPlayer } from "#core/player/index.js";
 import { Logger } from "#structures";
 import { db } from "#app/db";
 
@@ -191,7 +191,7 @@ export class Queue {
      */
     public cleanup = () => {
         Logger.log("DEBUG", `[Queue/${this.message.guild_id}] has cleanup`);
-        db.events.emitter.emit("queue/cleanup", this);
+        if (db.queues.cycles.players.has(this._player)) db.events.emitter.emit("queue/cleanup", this);
 
         // Останавливаем плеер
         this._player.cleanup();
@@ -223,5 +223,6 @@ export class Queue {
 
         // Удаляем плеер
         this._player.destroy();
+        this._player = null;
     };
 }

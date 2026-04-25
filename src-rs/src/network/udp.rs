@@ -175,6 +175,16 @@ impl UdpBuffered {
         Ok(udp)
     }
 
+    /// Текущее количество пакетов в очереди на отправку.
+    #[napi(getter)]
+    pub fn packets(&self) -> usize {
+        self.inner.buffer.len()
+    }
+
+    /// Количество пакетов, сброшенных из-за переполнения очереди или временных ошибок.
+    #[napi(getter)]
+    pub fn drops(&self) -> usize { self.inner.send_drops.load(Ordering::Relaxed) }
+
     /// Добавляет пакет в очередь на отправку. С проверкой мусора
     ///
     /// # Аргументы
@@ -196,12 +206,6 @@ impl UdpBuffered {
         for packet in packets {
             self.try_push(packet.as_ref());
         }
-    }
-
-    /// Текущее количество пакетов в очереди на отправку.
-    #[napi(getter)]
-    pub fn packets(&self) -> usize {
-        self.inner.buffer.len()
     }
 
     /// Начинает прослушивание входящих пакетов в отдельном потоке.
@@ -315,10 +319,6 @@ impl UdpBuffered {
         if self.inner.has_ticked() { self.inner.tick(now); }
         else { self.inner.tick_alive(now); }
     }
-
-    /// Количество пакетов, сброшенных из-за переполнения очереди или временных ошибок.
-    #[napi(getter)]
-    pub fn drops(&self) -> usize { self.inner.send_drops.load(Ordering::Relaxed) }
 }
 
 /// При падении объекта автоматически вызывается destroy.

@@ -1,7 +1,7 @@
-import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./transport/adapter";
-import { SpeakerType, VoiceSpeakerManager } from "#core/voice/structures/Speaker";
+import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./transport/adapter.js";
+import { SpeakerType, VoiceSpeakerManager } from "#core/voice/structures/Speaker.js";
+import { Transport } from "#core/voice/transport/index.js";
 import { TypedEmitter, Logger } from "#structures";
-import { Transport } from "#core/voice/transport";
 
 /**
  * @author SNIPPIK

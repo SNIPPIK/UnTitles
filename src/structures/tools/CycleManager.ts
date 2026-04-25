@@ -1,4 +1,4 @@
-import { SetArray } from "#structures/array";
+import { SetArray } from "#structures/array/index.js";
 
 /**
  * @author SNIPPIK

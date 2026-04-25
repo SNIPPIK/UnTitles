@@ -7,9 +7,9 @@ import {
     Options,
     Permissions,
     SubCommand
-} from "#handler/commands";
+} from "#handler/commands/index.js";
 import {ApplicationCommandOptionType} from "discord-api-types/v10";
-import {Colors} from "#structures/discord";
+import {Colors} from "#structures/discord/index.js";
 import {locale} from "#structures";
 import {db} from "#app/db";
 

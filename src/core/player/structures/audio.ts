@@ -1,5 +1,5 @@
-import { TRACK_CHECK_WAIT } from "#core/queue/controllers/provider";
-import { AudioResource } from "#core/audio";
+import { TRACK_CHECK_WAIT } from "#core/queue/controllers/provider.js";
+import { AudioResource } from "#core/audio/index.js";
 import { Logger } from "#structures";
 import { db } from "#app/db";
 

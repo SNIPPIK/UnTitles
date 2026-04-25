@@ -1,5 +1,5 @@
-import { VoiceUDPSocket, WebSocketOpcodes } from "#core/voice";
-import { BaseLayer} from "#core/voice/transport/layers/BaseLayer";
+import { VoiceUDPSocket, WebSocketOpcodes } from "#core/voice/index.js";
+import { BaseLayer} from "#core/voice/transport/layers/BaseLayer.js";
 
 /**
  * @author SNIPPIK

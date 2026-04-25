@@ -1,4 +1,4 @@
-import type { SupportEvent, SupportKeysOfEvents } from "#handler/events";
+import type { SupportEvent, SupportKeysOfEvents } from "#handler/events/index.js";
 
 /**
  * @author SNIPPIK

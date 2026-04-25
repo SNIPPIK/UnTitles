@@ -1,8 +1,8 @@
-import {Command, CommandCallback, CommandContext, CommandIntegration, Declare, Middlewares} from "#handler/commands";
-import {ApplicationCommandType} from "discord-api-types/v10";
-import {MessageFlags, User} from "discord.js";
-import {locale} from "#structures";
-import {db} from "#app/db";
+import { Command, CommandCallback, CommandContext, CommandIntegration, Declare, Middlewares } from "#handler/commands/index.js";
+import { ApplicationCommandType } from "discord-api-types/v10";
+import { MessageFlags, User } from "discord.js";
+import { locale } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

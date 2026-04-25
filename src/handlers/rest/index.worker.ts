@@ -13,8 +13,8 @@
  */
 
 import { parentPort, workerData } from "node:worker_threads";
-import type { APIRequestsLimits } from "#handler/rest";
-import type { RestServerSide } from "./index.server";
+import type { APIRequestsLimits } from "#handler/rest/index.js";
+import type { RestServerSide } from "./index.server.js";
 import { initSharedDatabase } from "#worker/db";
 import { handler } from "#handler";
 import { env } from "#app/env";
@@ -167,7 +167,7 @@ class RestServerLoader extends handler<RestServerSide.API> {
      * @param registry - Реестр, в который будут добавлены загруженные платформы.
      */
     public constructor(registry: RestRegistry) {
-        super("src/handlers/rest");
+        super("build/src/handlers/rest");
         this.registry = registry;
         this.loadAndRegister();
     };
@@ -180,8 +180,8 @@ class RestServerLoader extends handler<RestServerSide.API> {
      * загружает файлы (кроме index) и сохраняет экземпляры в `this.files`.
      * Затем проходит по всем загруженным объектам и регистрирует их.
      */
-    private loadAndRegister(): void {
-        this.load(); // синхронный обход директории, заполнение this.files
+    private loadAndRegister = async () => {
+        await this.load(); // синхронный обход директории, заполнение this.files
         for (const file of this.files) {
             this.registry.registerPlatform(file);
         }

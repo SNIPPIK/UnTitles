@@ -84,7 +84,7 @@ export class Logger {
 
             // Если вместо текста пришла ошибка
             else if (text instanceof Error) {
-                text = `Uncaught Exception\n` +
+                text = `\nCaught Exception\n` +
                     `┌ Name:    ${text.name}\n` +
                     `├ Message: ${text.message}\n` +
                     `└ Stack:   ${text.stack}`;

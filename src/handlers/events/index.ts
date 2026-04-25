@@ -1,18 +1,18 @@
-import type { DiscordClient } from "#structures/discord";
+import type { DiscordClient } from "#structures/discord/index.js";
 import type { ClientEventTypes } from "discord.js";
 import { TypedEmitter } from "#structures";
 import { handler } from "#handler";
 
 // Events
-import type { AudioPlayerEvents } from "./index.player";
-import type { RestAPIEvents } from "./index.rest";
-import type { QueueEvents } from "./index.queue";
+import type { AudioPlayerEvents } from "./index.player.js";
+import type { RestAPIEvents } from "./index.rest.js";
+import type { QueueEvents } from "./index.queue.js";
 
 // Export decorator
-export * from "./index.decorator";
-export type { AudioPlayerEvents } from "./index.player";
-export type { RestAPIEvents } from "./index.rest";
-export type { QueueEvents } from "./index.queue";
+export * from "./index.decorator.js";
+export type { AudioPlayerEvents } from "./index.player.js";
+export type { RestAPIEvents } from "./index.rest.js";
+export type { QueueEvents } from "./index.queue.js";
 
 /**
  * @author SNIPPIK
@@ -34,7 +34,7 @@ export class Events extends handler<Event<SupportKeysOfEvents>> {
      * @public
      */
     public constructor() {
-        super("src/handlers/events");
+        super("build/src/handlers/events");
     };
 
     /**
@@ -42,7 +42,7 @@ export class Events extends handler<Event<SupportKeysOfEvents>> {
      * @returns void
      * @public
      */
-    public register = (client: DiscordClient) => {
+    public register = async (client: DiscordClient) => {
         if (this.size > 0) {
             // Отключаем только загруженные события
             for (let item of this.files) {
@@ -53,7 +53,7 @@ export class Events extends handler<Event<SupportKeysOfEvents>> {
 
         // Загружаем события заново
         this.emitter.removeAllListeners();
-        this.load();
+        await this.load();
 
         try {
             // Проверяем ивенты

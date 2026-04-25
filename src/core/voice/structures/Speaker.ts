@@ -1,6 +1,6 @@
-import { HeartbeatManager } from "#core/voice/structures/heartbeat";
+import { HeartbeatManager } from "#core/voice/structures/heartbeat.js";
 import { VoiceOpcodes } from "discord-api-types/voice";
-import { VoiceConnection } from "#core/voice";
+import { VoiceConnection } from "#core/voice/index.js";
 
 /**
  * @author SNIPPIK

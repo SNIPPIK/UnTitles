@@ -1,9 +1,9 @@
-import { buttonInteraction, SelectMenuInteract } from "#structures/discord";
-import { RegisteredMiddlewares } from "#handler/middlewares";
+import { buttonInteraction, SelectMenuInteract } from "#structures/discord/index.js";
+import { RegisteredMiddlewares } from "#handler/middlewares/index.js";
 import { handler } from "#handler";
 
 // Export decorator
-export * from "./index.decorator";
+export * from "./index.decorator.js";
 
 /**
  * @author SNIPPIK
@@ -15,7 +15,7 @@ export * from "./index.decorator";
  */
 export class Components extends handler<SupportComponent> {
     public constructor() {
-        super("src/handlers/components");
+        super("build/src/handlers/components");
     };
 
     /**
@@ -24,7 +24,7 @@ export class Components extends handler<SupportComponent> {
      * @public
      */
     public register = () => {
-        this.load();
+        return this.load();
     };
 
     /**

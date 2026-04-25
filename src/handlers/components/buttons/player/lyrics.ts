@@ -1,6 +1,6 @@
-import { Component, DeclareComponent } from "#handler/components";
-import { Colors, CycleInteraction } from "#structures/discord";
-import { Middlewares } from "#handler/commands";
+import { Component, DeclareComponent } from "#handler/components/index.js";
+import { Colors, CycleInteraction } from "#structures/discord/index.js";
+import { Middlewares } from "#handler/commands/index.js";
 import { locale, Logger } from "#structures";
 import { db } from "#app/db";
 

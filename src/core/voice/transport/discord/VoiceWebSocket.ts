@@ -1,9 +1,9 @@
 import { VoiceCloseCodes, VoiceOpcodes } from "discord-api-types/voice/v8";
+import { HeartbeatManager } from "../../structures/heartbeat.js";
+import { type WebSocketOpcodes } from "#core/voice/index.js";
 import { type Data, type MessageEvent, WebSocket } from "ws";
-import { HeartbeatManager } from "../../structures/heartbeat";
-import { type WebSocketOpcodes } from "#core/voice";
+import { RestAPIAgent } from "#handler/rest/index.js";
 import { TypedEmitter } from "#structures";
-import { RestAPIAgent } from "#handler/rest";
 import { env } from "#app/env";
 
 /**
@@ -87,11 +87,11 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         // Создаем менеджер жизни
         this._heartbeat = new HeartbeatManager({
             // Отправка heartbeat
-            send: () => {
+            send: (time) => {
                 this.packet = {
                     op: VoiceOpcodes.Heartbeat,
                     d: {
-                        t: Date.now(),
+                        t: time,
                         seq_ack: this.sequence
                     }
                 };

@@ -1,6 +1,5 @@
 use napi::bindgen_prelude::*;
 use crc::{Crc, Algorithm};
-use napi_derive::napi;
 use memchr::memmem;
 
 // Конфигурация по спецификации Ogg (RFC 3533)
@@ -24,24 +23,6 @@ pub enum PacketType {
     Frame
 }
 
-impl PacketType {
-    /// Возвращает строковое представление типа пакета для передачи в JavaScript.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Head => "head",
-            Self::Tags => "tags",
-            Self::Frame => "frame"
-        }
-    }
-}
-
-/// Объект, возвращаемый в JavaScript
-#[napi(object)]
-pub struct JsOpusPacket {
-    pub kind: String,
-    pub data: Buffer
-}
-
 /// Парсер Ogg Opus потока, работающий в режиме потока (streaming).
 ///
 /// Разбивает входящие фрагменты данных на страницы Ogg, собирает пакеты
@@ -50,7 +31,6 @@ pub struct JsOpusPacket {
 ///
 /// Предназначен для использования как из Rust (быстрый внутренний API),
 /// так и из Node.js через N-API (метод `parse` с JS-вызовом).
-#[napi]
 pub struct OggOpusParser {
     /// Буфер для неполных данных, оставшихся от предыдущего вызова parse.
     /// Позволяет обрабатывать поток фрагментарно.
@@ -79,10 +59,8 @@ pub struct OggOpusParser {
     scanned_bytes: usize
 }
 
-#[napi]
 impl OggOpusParser {
     /// Создаёт новый парсер с начальным состоянием.
-    #[napi(constructor)]
     pub fn new() -> Self {
         Self {
             remainder: Vec::with_capacity(1024),
@@ -90,47 +68,6 @@ impl OggOpusParser {
             bitstream_serial: -1,
             scanned_bytes: 0
         }
-    }
-
-    /// Node.js API: принимает фрагмент данных (Buffer) и вызывает JavaScript-функцию
-    /// для каждого обнаруженного пакета.
-    ///
-    /// # Аргументы
-    /// * `env` - окружение N-API (предоставляется автоматически)
-    /// * `chunk` - буфер с новыми данными из потока
-    /// * `emit` - JS-функция, которая будет вызвана с двумя аргументами:
-    ///   - `kind` (string) – тип пакета ("head", "tags", "frame")
-    ///   - `data` (Buffer) – бинарные данные пакета
-    #[napi]
-    pub fn parse(&mut self, chunk: Buffer) -> Result<Vec<JsOpusPacket>> {
-        let data = chunk.as_ref();
-        let mut js_packets = Vec::with_capacity(10); // Эвристика для батчинга
-
-        if data.is_empty() {
-            // Пустой буфер — сигнал конца потока, сбрасываем остатки
-            let mut remaining = Vec::new();
-            self.flush_internal(&mut remaining)?;
-            for (packet_type, pkt_data) in remaining {
-                js_packets.push(JsOpusPacket {
-                    kind: packet_type.as_str().to_string(),
-                    data: pkt_data.into(),
-                });
-            }
-            return Ok(js_packets);
-        }
-
-        // Вызываем общий внутренний парсер, передавая замыкание,
-        // которое для каждого пакета конвертирует данные в JS-значения и вызывает вызов.
-        self.parse_core(data, |packet_type, packet_slice| {
-            // Копируем срез памяти напрямую в V8 Buffer, избегая промежуточного Vec
-            js_packets.push(JsOpusPacket {
-                kind: packet_type.as_str().to_string(),
-                data: Buffer::from(packet_slice),
-            });
-            Ok(())
-        })?;
-
-        Ok(js_packets)
     }
 
     /// Внутренний Rust-ориентированный API (быстрый, без накладных расходов N-API).
@@ -168,43 +105,6 @@ impl OggOpusParser {
             self.packet_carry.clear();
         }
         Ok(())
-    }
-
-    /// Принудительно извлекает все оставшиеся данные из парсера и завершает обработку потока.
-    ///
-    /// Этот метод должен вызываться после того, как все входные данные были переданы в парсер
-    /// (например, при закрытии потока или достижении EOF). Он обрабатывает ситуацию, когда
-    /// в буферах парсера остались неполные данные, которые не могут быть завершены обычным
-    /// способом из-за отсутствия последующих страниц Ogg.
-    ///
-    /// # Алгоритм
-    /// 1. Проверяет наличие необработанных данных в `remainder` (неполные страницы).
-    /// 2. Если в `packet_carry` есть накопленный пакет, который не был завершён из-за
-    ///    отсутствия последнего сегмента (<255), он обрабатывается как завершённый пакет.
-    /// 3. Все пакеты добавляются в `output` для отправки в JS.
-    ///
-    /// # Примечания по безопасности
-    /// - Неполные страницы в `remainder` (без маркера "OggS") отбрасываются, так как по
-    ///   спецификации Ogg пакет может быть завершён только внутри полной страницы.
-    /// - Если `packet_carry` содержит данные, они считаются последним пакетом потока.
-    /// - Флаг `waiting_for_head` игнорируется, так как при завершении потока мы всё равно
-    ///   отдаём всё, что накопили, даже если заголовок не был получен (это позволит избежать
-    ///   потери данных в случае обрыва соединения).
-    ///
-    /// # Возвращаемое значение
-    /// - `Ok(())` — успешно обработаны остатки.
-    /// - `Err` — ошибка при обработке пакета (например, недопустимый тип).
-    #[napi]
-    pub fn flush(&mut self) -> Result<Vec<JsOpusPacket>> {
-        let mut internal_output = Vec::new();
-        self.flush_internal(&mut internal_output)?;
-
-        let js_packets = internal_output.into_iter().map(|(kind, data)| JsOpusPacket {
-            kind: kind.as_str().to_string(),
-            data: Buffer::from(data),
-        }).collect();
-
-        Ok(js_packets)
     }
 
     /// Основная логика парсинга Ogg-потока.
@@ -485,15 +385,5 @@ impl OggOpusParser {
 
         let calculated_crc = digest.finalize();
         calculated_crc == original_crc
-    }
-
-    /// Сбрасывает состояние парсера в исходное.
-    /// Может быть полезно для обработки нового потока без создания нового объекта.
-    #[napi]
-    pub fn destroy(&mut self) {
-        self.remainder.clear();
-        self.packet_carry.clear();
-        self.bitstream_serial = -1;
-        self.scanned_bytes = 0;
     }
 }

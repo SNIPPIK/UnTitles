@@ -1,5 +1,5 @@
-import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
-import { DiscordClient } from "#structures/discord";
+import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events/index.js";
+import { DiscordClient } from "#structures/discord/index.js";
 import { Events } from "discord.js";
 import { Logger } from "#structures";
 

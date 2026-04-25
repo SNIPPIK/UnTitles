@@ -1,7 +1,7 @@
-import { Component, DeclareComponent } from "#handler/components";
-import { Middlewares } from "#handler/commands";
-import { Colors } from "#structures/discord";
-import { RepeatType } from "#core/queue";
+import { Component, DeclareComponent } from "#handler/components/index.js";
+import { Middlewares } from "#handler/commands/index.js";
+import { Colors } from "#structures/discord/index.js";
+import { RepeatType } from "#core/queue/index.js";
 import { locale } from "#structures";
 import { db } from "#app/db";
 

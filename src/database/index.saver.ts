@@ -1,7 +1,7 @@
-import type { APIRequestData } from "#handler/rest";
+import type { APIRequestData } from "#handler/rest/index.js";
 import { Logger, PromiseCycle } from "#structures";
-import { Process } from "#core/audio/process";
-import { Track } from "#core/queue";
+import { Process } from "#core/audio/process.js";
+import { Track } from "#core/queue/index.js";
 import afs from "node:fs/promises";
 import { env } from "#app/env";
 import path from "node:path";

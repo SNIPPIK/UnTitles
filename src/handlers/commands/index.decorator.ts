@@ -1,8 +1,8 @@
 import { type ApplicationCommandOption, ApplicationCommandType, type PermissionsString } from "discord.js";
+import type { CommandInteraction, CompeteInteraction } from "#structures/discord/index.js";
 import type { Locale, LocalizationMap, Permissions } from "discord-api-types/v10";
-import type { CommandInteraction, CompeteInteraction } from "#structures/discord";
-import type { RegisteredMiddlewares } from "#handler/middlewares";
-import type { SubCommand } from "#handler/commands";
+import type { RegisteredMiddlewares } from "#handler/middlewares/index.js";
+import type { SubCommand } from "#handler/commands/index.js";
 
 /**
  * @author SNIPPIK

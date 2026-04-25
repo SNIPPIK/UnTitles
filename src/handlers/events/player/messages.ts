@@ -1,8 +1,8 @@
-import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
-import { Colors } from "#structures/discord";
+import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events/index.js";
+import { Colors } from "#structures/discord/index.js";
+import { Track } from "#core/queue/index.js";
 import { MessageFlags } from "discord.js";
 import { locale } from "#structures";
-import { Track } from "#core/queue";
 import { db } from "#app/db";
 
 /**

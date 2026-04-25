@@ -6,9 +6,9 @@ import {
     Middlewares,
     Options,
     Permissions
-} from "#handler/commands";
+} from "#handler/commands/index.js";
 import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {RepeatType} from "#core/queue";
+import {RepeatType} from "#core/queue/index.js";
 import {locale} from "#structures";
 import {db} from "#app/db";
 

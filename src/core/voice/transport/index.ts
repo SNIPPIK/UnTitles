@@ -1,13 +1,13 @@
-import {VoiceCloseCodes, VoiceOpcodes} from "discord-api-types/voice/v8";
-import {VoiceWebSocket, WebSocketOpcodes} from "#core/voice";
-import {MLSSession} from "#core/voice/structures/MLSSession";
-import {TypedEmitter} from "#structures";
-import {VoiceAdapter} from "./adapter";
+import { VoiceCloseCodes, VoiceOpcodes } from "discord-api-types/voice/v8";
+import { VoiceWebSocket, WebSocketOpcodes } from "#core/voice/index.js";
+import { MLSSession } from "#core/voice/structures/MLSSession.js";
+import { VoiceAdapter } from "./adapter.js";
+import { TypedEmitter } from "#structures";
 
 // Layers
-import {UDPLayer} from "#core/voice/transport/layers/UDPLayer";
-import {RTPLayer} from "#core/voice/transport/layers/RTPLayer";
-import {DAVELayer} from "#core/voice/transport/layers/DAVELayer";
+import { UDPLayer } from "#core/voice/transport/layers/UDPLayer.js";
+import { RTPLayer } from "#core/voice/transport/layers/RTPLayer.js";
+import { DAVELayer } from "#core/voice/transport/layers/DAVELayer.js";
 
 /**
  * @author SNIPPIK
@@ -46,7 +46,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @public
      */
     public get ready(): boolean {
-        return this.secret_key && this.ssrc && this._dave.ready && this._rtp.ready && this._udp.ready && this.state.code === TransportStateCode.Session;
+        return this._dave.ready && this._rtp.ready && this._udp.ready &&
+            this.state.code === TransportStateCode.Session;
     };
 
     /**
@@ -111,15 +112,16 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 // Сохраняем ключ, для повторного использования
                 this.secret_key = d.secret_key;
 
-                if (d.dave_protocol_version) {
-                    // Инициализируем DAVE (MLS)
-                    this._dave.create(d.dave_protocol_version, this._ws);
-                    this.emit("info", `[Transport/E2EE]: has created | ${d.dave_protocol_version} | Max --> ${MLSSession.max_version}`);
-                }
-
                 // Инициализируем RTP (AES)
                 this._rtp.create(this.ssrc, d.secret_key);
                 this.emit("info", `[Transport/RTP]: has created`);
+
+                if (this._dave && d.dave_protocol_version !== 0) {
+                    // Инициализируем DAVE (MLS)
+                    this._dave.create(d.dave_protocol_version, this._ws);
+                    this.emit("info", `[Transport/E2EE]: has created | ${d.dave_protocol_version}/${MLSSession.max_version}`);
+                }
+
                 return;
             }
 
@@ -182,7 +184,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
 
         this._ws = new VoiceWebSocket();
 
-        if (last_seq) {
+        if (last_seq >= 0) {
             this._ws.sequence = last_seq;
             this._ws.emit("resumed");
         }
@@ -196,6 +198,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
          */
         this._ws.on("open", () => {
             const { server, state } = this.adapter.packet;
+
             this.state = {
                 code: TransportStateCode.Identifying,
                 payload: {
@@ -215,6 +218,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
          */
         this._ws.on("resumed", () => {
             const { server, state } = this.adapter.packet;
+
             this.state = {
                 code: TransportStateCode.Resuming,
                 payload: {
@@ -269,6 +273,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 };
                 return;
             }
+
             else if (code !== VoiceCloseCodes.SessionNoLongerValid && code !== VoiceCloseCodes.ServerNotFound) {
                 // Если соединение не было закрыто собственноручно
                 if (this.state.code !== TransportStateCode.Closed) {

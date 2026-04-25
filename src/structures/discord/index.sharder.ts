@@ -19,7 +19,6 @@ export class ShardManager extends ShardingManager {
     public constructor(file: string, token: string) {
         super(file, {
             execArgv: [
-                "-r", "tsconfig-paths/register",
                 "--expose-gc",
                 "--optimize_for_size",
                 "--experimental-require-module",

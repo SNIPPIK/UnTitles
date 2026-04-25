@@ -1,10 +1,10 @@
-import { Colors, SelectMenuInteract, AnyCommandInteraction } from "#structures/discord";
-import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
+import { Colors, SelectMenuInteract, AnyCommandInteraction } from "#structures/discord/index.js";
+import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events/index.js";
 import { AutocompleteInteraction, ButtonInteraction } from "discord.js";
 import { ChannelType, Events, InteractionType } from "discord.js";
-import { MiddlewareResult } from "#handler/middlewares";
+import { MiddlewareResult } from "#handler/middlewares/index.js";
+import { SubCommand } from "#handler/commands/index.js";
 import { Logger, locale } from "#structures";
-import { SubCommand } from "#handler/commands";
 import { db } from "#app/db";
 
 /**

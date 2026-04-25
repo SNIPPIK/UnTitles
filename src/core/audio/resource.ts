@@ -1,8 +1,8 @@
+import { OPUS_FRAME_SIZE, SILENT_FRAME } from "#core/audio/opus.js";
 import { FfmpegProcess, AudioEngine, type iType } from "#native";
-import { OPUS_FRAME_SIZE, SILENT_FRAME } from "#core/audio/opus";
-import { FFMPEG_PATH } from "#core/audio/process";
+import { FFMPEG_PATH } from "#core/audio/process.js";
+import type { Track } from "#core/queue/index.js";
 import { TypedEmitter } from "#structures";
-import type { Track } from "#core/queue";
 import { env } from "#app/env";
 import { db } from "#app/db";
 
@@ -289,14 +289,14 @@ export class AudioResource extends BaseAudioResource {
         const audio = this.engine;
         const ffmpeg = this.process;
 
-        // Если буфер почти полон (на 90%), ставим FFmpeg на паузу
-        if (!audio.canAcceptThreshold(90)) {
+        // Если буфер почти полон (на 80%), ставим FFmpeg на паузу
+        if (!audio.canAcceptThreshold(80)) {
             ffmpeg.pause = true;
             return false;
         }
 
-        // Если в буфере стало просторно (меньше 20%), возобновляем чтение
-        else if (audio.canAcceptThreshold(20)) ffmpeg.pause = false;
+        // Если в буфере стало просторно (меньше 40%), возобновляем чтение
+        else if (audio.canAcceptThreshold(40)) ffmpeg.pause = false;
         return true;
     };
 

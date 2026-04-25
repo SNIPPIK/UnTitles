@@ -1,4 +1,4 @@
-import type { CommandInteraction, SelectMenuInteract } from "#structures/discord";
+import type { CommandInteraction, SelectMenuInteract } from "#structures/discord/index.js";
 import type { ButtonInteraction } from "discord.js";
 import { handler } from "#handler";
 
@@ -33,7 +33,7 @@ export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction |
      * @public
      */
     public constructor() {
-        super("src/handlers/middlewares");
+        super("build/src/handlers/middlewares");
     };
 
     /**

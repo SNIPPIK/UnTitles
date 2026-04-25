@@ -1,5 +1,4 @@
-import type { ChildProcessWithoutNullStreams } from "node:child_process";
-import { spawn, spawnSync } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from "node:child_process";
 import { env } from "#app/env";
 import path from "node:path";
 
@@ -54,7 +53,6 @@ export class Process {
 
         // Добавляем аргументы отключения видео и логирования
         args.unshift(
-            "-flags", "low_delay",
             "-loglevel", "error",
             "-vn",
             "-nostdin",       // не ждать ввода с stdin
@@ -107,7 +105,7 @@ export let FFMPEG_PATH = null;
  * @author SNIPPIK
  * @description Делаем проверку на наличие FFmpeg
  */
-(async () => {
+(() => {
     const cache = env.get("cache.dir");
     const names = [`${cache}/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 

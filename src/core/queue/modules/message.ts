@@ -1,9 +1,9 @@
-import { CommandInteraction, CycleInteraction, DiscordClient } from "#structures/discord";
+import { CommandInteraction, CycleInteraction, DiscordClient } from "#structures/discord/index.js";
 import { ActionRowBuilder, StringSelectMenuBuilder } from "@discordjs/builders";
+import filters from "#core/player/filters.json" with { type: 'json' };
+import type { AudioPlayer } from "#core/player/index.js";
 import { MessageFlags } from "discord-api-types/v10";
-import filters from "#core/player/filters.json";
-import type { AudioPlayer } from "#core/player";
-import { RepeatType } from "#core/queue";
+import { RepeatType } from "#core/queue/index.js";
 import { EmbedData } from "discord.js";
 import { locale } from "#structures";
 import { env } from "#app/env";
@@ -213,6 +213,7 @@ export class QueueButtons {
                     return {
                         label: filter.name.charAt(0).toUpperCase() + filter.name.slice(1).replace("_", " "),
                         value: filter.name,
+                        emoji: filter.emoji,
                         description: (filter.locale[ctx.locale] ?? filter.locale["en-US"]).split("]")[1]
                     }
                 }))

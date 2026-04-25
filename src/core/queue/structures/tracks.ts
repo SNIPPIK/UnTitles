@@ -1,5 +1,5 @@
-import type { APIRequestData } from "#handler/rest";
-import { Track } from "#core/queue";
+import type { APIRequestData } from "#handler/rest/index.js";
+import { Track } from "#core/queue/index.js";
 
 /**
  * @author SNIPPIK

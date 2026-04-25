@@ -1,12 +1,12 @@
-import type { DiscordGatewayAdapterCreator } from "#core/voice/transport/adapter";
+import type { DiscordGatewayAdapterCreator } from "#core/voice/transport/adapter.js";
+import { VoiceConnection } from "#core/voice/connection.js";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
-import { VoiceConnection } from "#core/voice/connection";
 import { Collection } from "#structures";
 
 // Voice Sockets
-export * from "./transport/discord/VoiceWebSocket";
-export * from "./transport/discord/VoiceUDPSocket";
-export * from "./connection";
+export * from "./transport/discord/VoiceWebSocket.js";
+export * from "./transport/discord/VoiceUDPSocket.js";
+export * from "./connection.js";
 
 
 /**
@@ -145,8 +145,8 @@ export namespace WebSocketOpcodes {
     export interface session {
         "op": VoiceOpcodes.SessionDescription;
         "d": {
-            mode: string;         // Выбранный режим шифрования, например "xsalsa20_poly1305"
-            secret_key: number[]; // Массив байтов (uint8) для шифрования RTP-пакетов
+            mode: string;
+            secret_key: number[];
             dave_protocol_version?: number;
         };
     }

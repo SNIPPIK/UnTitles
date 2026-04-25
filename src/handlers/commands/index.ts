@@ -9,7 +9,7 @@ import {
     CompeteInteraction,
     DiscordClient,
     SelectMenuInteract
-} from "#structures/discord";
+} from "#structures/discord/index.js";
 import {
     AutocompleteCommandOption,
     Choice,
@@ -17,19 +17,19 @@ import {
     CommandContext,
     CommandIntegration, CommandOptionsType,
     CommandPermissions
-} from "./index.decorator";
+} from "./index.decorator.js";
 import type { LocalizationMap, Permissions } from "discord-api-types/v10";
-import type { RegisteredMiddlewares } from "#handler/middlewares";
-import filters from "#core/player/filters.json";
-import type { AudioFilter } from "#core/player";
-import type { RestClientSide } from "#handler/rest";
+import type { RegisteredMiddlewares } from "#handler/middlewares/index.js";
+import filters from "#core/player/filters.json" with { type: 'json' };
+import type { RestClientSide } from "#handler/rest/index.js";
+import type { AudioFilter } from "#core/player/index.js";
 import { locale, Logger } from "#structures";
 import { handler } from "#handler";
 import { env } from "#app/env";
 
 
 // Export decorator
-export * from "./index.decorator";
+export * from "./index.decorator.js";
 
 /**
  * @author SNIPPIK
@@ -97,7 +97,7 @@ export class Commands extends handler<Command> {
      * @public
      */
     public constructor() {
-        super("src/handlers/commands");
+        super("build/src/handlers/commands");
     };
 
     /**
@@ -272,9 +272,9 @@ export class Commands extends handler<Command> {
      * @description Регистрируем команды в эко системе discord
      * @public
      */
-    public register = (client: DiscordClient) => {
+    public register = async (client: DiscordClient) => {
         const guildID = env.get("owner.server"), guild = client.guilds.cache.get(guildID);
-        this.load();
+        await this.load();
 
         // Если команды не были загружены
         if (!this.files.size) throw new Error("Not loaded commands");

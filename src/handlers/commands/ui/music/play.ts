@@ -1,7 +1,7 @@
-import {Command, CommandCallback, CommandIntegration, Declare, Middlewares, Permissions} from "#handler/commands";
-import {ApplicationCommandType, Message} from "discord.js";
-import {locale} from "#structures";
-import {db} from "#app/db";
+import { Command, CommandCallback, CommandIntegration, Declare, Middlewares, Permissions } from "#handler/commands/index.js";
+import { ApplicationCommandType, Message } from "discord.js";
+import { locale } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

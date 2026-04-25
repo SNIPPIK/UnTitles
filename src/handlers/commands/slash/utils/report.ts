@@ -1,5 +1,5 @@
-import {Command, CommandCallback, CommandContext, CommandIntegration, Declare, Middlewares} from "#handler/commands";
-import {Colors} from "#structures/discord";
+import {Command, CommandCallback, CommandContext, CommandIntegration, Declare, Middlewares} from "#handler/commands/index.js";
+import {Colors} from "#structures/discord/index.js";
 import {locale} from "#structures";
 import {db} from "#app/db";
 

@@ -1,6 +1,6 @@
 import { httpsClient, httpsStatusCode, Logger } from "#structures";
-import { RestAPIAgent } from "#handler/rest";
-import { Track } from "#core/queue";
+import { RestAPIAgent } from "#handler/rest/index.js";
+import { Track } from "#core/queue/index.js";
 import { sdb } from "#worker/db";
 import { db } from "#app/db";
 
@@ -22,11 +22,11 @@ export const TRACK_BUFFERED_TIME = 500;
 
 /**
  * @author SNIPPIK
- * @description Резолвер ресурсов с поддержкой экспоненциальной паузы и защитой от утечек
+ * @description Резолвер ресурсов с поддержкой экспоненциальной паузы
  * @class ResourceResolver
  * @private
  */
-export class ResourceProvider {
+class ResourceProvider {
     constructor(
         private readonly prepare: (track: Track) => Promise<string | Error>,
         private readonly options = { retries: 2, initialDelay: 70 }
@@ -64,6 +64,26 @@ export class ResourceProvider {
     };
 
     private sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * @author SNIPPIK
+ * @description Резолвер текстов треков
+ * @class LyricsProvider
+ * @private
+ */
+class LyricsProvider {
+    constructor(
+        private readonly prepare: (track: Track) => Promise<string | Error>,
+    ) {};
+
+    /**
+     * @description Пытается разрешить путь к ресурсу, плавно увеличивая паузы при ошибках
+     * @public
+     */
+    public async resolve(track: Track): Promise<string | Error> {
+        return this.prepare(track);
+    };
 }
 
 /**
@@ -111,6 +131,38 @@ export class TrackResolvers {
             }
 
             return track.link;
+        }),
+
+        /**
+         * @description Провайдер для получения текстов
+         * @public
+         */
+        lyrics: new LyricsProvider(async (track) => {
+            // Если ответ не был получен от сервера
+            const timeoutPromise = new Promise((resolve) =>
+                setTimeout(() => resolve(new Error("Timeout server request")), 10e3)
+            );
+
+            const api = await Promise.race([
+                new httpsClient({
+                    url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(track.artist.title)}&track_name=${encodeURIComponent(this.name)}`,
+                    userAgent: "UnTitles 0.5.0, Music bot, github.com/SNIPPIK/UnTitles",
+                    timeout: TRACK_CHECK_WAIT
+                }).toJson,
+                timeoutPromise
+            ]) as json | Error;
+
+            // Если получаем вместо данных ошибку
+            if (api instanceof Error) return api;
+
+            // Если нет текста песни
+            else if (api.statusCode === 404) return undefined;
+
+            // Сохраняем текст песни
+            track["_lyrics"] = api?.syncedLyrics || api?.plainLyrics;
+
+            // Выдаем впервые текст песни
+            return api?.syncedLyrics || api?.plainLyrics;
         })
     };
 

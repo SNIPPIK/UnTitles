@@ -103,7 +103,7 @@ impl CycleManager {
         let handle = tokio::spawn(async move {
             // Создаём интервал с поведением Delay – он компенсирует пропущенные тики
             let mut interval = time::interval(interval_duration);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Burst);
 
             // Для отслеживания идеального времени последнего выполненного тика
             let mut last_ideal_tick = Instant::now();

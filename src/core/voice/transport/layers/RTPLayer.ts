@@ -1,4 +1,4 @@
-import { BaseLayer } from "#core/voice/transport/layers/BaseLayer";
+import { BaseLayer } from "#core/voice/transport/layers/BaseLayer.js";
 import { VoiceRTPSocket, iType} from "#native";
 
 export class RTPLayer extends BaseLayer<iType<typeof VoiceRTPSocket>> {
@@ -47,7 +47,7 @@ export class RTPLayer extends BaseLayer<iType<typeof VoiceRTPSocket>> {
         // Создаем подключение RTP
         this._client = new VoiceRTPSocket(
             ssrc,
-            new Uint8Array(secret_key)
+            new Uint8Array(secret_key) as any
         );
     };
 

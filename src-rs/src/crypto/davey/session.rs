@@ -27,6 +27,12 @@ impl DaveSession {
     Error::from_reason(e.to_string())
   }
 
+  /// Выносим конвертацию ошибок в хелпер для чистоты кода
+  #[inline]
+  fn map_err<E: std::fmt::Display>(e: E) -> Error {
+    Error::from_reason(format!("[DaveSession Error] {}", e))
+  }
+
   /// Парсит строковый идентификатор (snowflake) в 64-битное целое число.
   ///
   /// # Аргументы
@@ -80,11 +86,15 @@ impl DaveSession {
   /// # Ошибки
   /// Значения больше 10 считаются недопустимыми.
   fn map_operation(v: u8) -> Result<davey::ProposalsOperationType> {
-    if v > 10 {
-      return Err(Error::from_reason("Invalid operation type"));
+    // Согласно спецификации Discord DAVE, типы операций MLS находятся в диапазоне 0..=10.
+    if v <= 10 {
+      return Ok(unsafe { std::mem::transmute(v) });
     }
-    // Трансмутирование безопасно, так как enum является C-подобным с фиксированными значениями
-    Ok(unsafe { std::mem::transmute(v) })
+
+    Err(Error::from_reason(format!(
+      "Invalid DAVE ProposalsOperationType: {}. Expected value in range 0-10.",
+      v
+    )))
   }
 
   /// Общая логика инициализации для конструктора и `reinit`.
@@ -173,9 +183,10 @@ impl DaveSession {
   /// Возвращает внутренний статус сессии в виде числа.
   ///
   /// Значения определяются реализацией `davey`. Обычно:
-  /// - `0` — инициализация
-  /// - `1` — готова
-  /// - `2` — ошибка
+  /// - `0` — ожидание
+  /// - `1` — ответ
+  /// - `2` — ожидание ответа
+  /// - `3` - Готов
   #[napi(getter)]
   pub fn status(&self) -> u8 {
     self.inner.status() as u8
@@ -268,8 +279,15 @@ impl DaveSession {
   /// # Аргументы
   /// * `commit` - Буфер с commit-данными.
   #[napi]
-  pub fn process_commit(&mut self, commit: Buffer) -> Result<()> {
-    self.inner.process_commit(&commit).map_err(Self::err)
+  pub fn process_commit(&mut self, commit: Buffer) -> Result<bool> {
+    match self.inner.process_commit(&commit) {
+      Ok(_) => Ok(true),
+      Err(e) => {
+        // Логируем ошибку, так как это критично для MLS сессии
+        eprintln!("MLS Commit Error: {}", e);
+        Err(Self::map_err(e))
+      }
+    }
   }
 
   /// Обрабатывает welcome-сообщение для вступления в группу.
@@ -323,7 +341,11 @@ impl DaveSession {
   pub fn encrypt_opus_fast(&mut self, packet: Buffer) -> Option<Buffer> {
     match self.inner.encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet) {
       Ok(out) => Some(Buffer::from(out.as_ref())),
-      Err(_) => None,
+      Err(e) => {
+        // Это поможет понять, ключей нет или эпоха не та
+        eprintln!("[Rust DAVE Error]: {}", e);
+        None
+      },
     }
   }
 
@@ -339,12 +361,16 @@ impl DaveSession {
   /// Массив той же длины, где каждый элемент — либо зашифрованный `Buffer`, либо `null` (если шифрование не удалось).
   #[napi(js_name = "encryptOpusBatch")]
   pub fn encrypt_opus_batch(&mut self, packets: Vec<Buffer>) -> Vec<Option<Buffer>> {
-    packets.into_iter().map(|packet| {
+    // Предварительно аллоцируем вектор нужной длины для избежания лишних реаллокаций
+    let mut results = Vec::with_capacity(packets.len());
+
+    for packet in packets {
       match self.inner.encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet) {
-        Ok(out) => Some(Buffer::from(out.as_ref())),
-        Err(_) => None,
+        Ok(out) => results.push(Some(Buffer::from(out.as_ref()))),
+        Err(_) => results.push(None),
       }
-    }).collect()
+    }
+    results
   }
 
   /// Расшифровывает пакет, полученный от указанного пользователя.

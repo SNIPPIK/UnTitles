@@ -1,5 +1,5 @@
-import { VoiceAdapters, DiscordGatewayAdapterCreator } from "#core/voice/transport/adapter";
-import type { DiscordClient } from "#structures/discord/index.client";
+import { VoiceAdapters, DiscordGatewayAdapterCreator } from "#core/voice/transport/adapter.js";
+import type { DiscordClient } from "#structures/discord/index.client.js";
 import { WebSocketShardEvents, CloseCodes } from "discord.js";
 
 /**

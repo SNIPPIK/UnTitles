@@ -1,7 +1,7 @@
-import type { CycleInteraction, MessageComponent } from "#structures/discord";
-import { AudioPlayer, AudioPlayerState } from "#core/player";
+import type { CycleInteraction, MessageComponent } from "#structures/discord/index.js";
+import { AudioPlayer, AudioPlayerState } from "#core/player/index.js";
+import { OPUS_FRAME_SIZE } from "#core/audio/index.js";
 import { Logger, TaskCycle } from "#structures";
-import { OPUS_FRAME_SIZE } from "#core/audio";
 import { db } from "#app/db";
 
 /**
@@ -42,7 +42,7 @@ const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 5);
  * @const PLAYER_SEND_POOL
  * @private
  */
-const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 3);
+const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 5);
 
 /**
  * @author SNIPPIK
@@ -106,8 +106,8 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 const audio = player.audio.current;
                 const connection = player.voice.connection;
 
-                // Текущая задержка шага
-                let toSend = Math.ceil(this.options.duration / OPUS_FRAME_SIZE);
+                // Текущая задержка шага + кол-во объектов
+                let toSend = Math.ceil(this.options.duration / OPUS_FRAME_SIZE) + this.size;
 
                 // Добавляем буфер, как и раньше
                 if (connection.udp.packets <= PLAYER_SEND_POOL) {

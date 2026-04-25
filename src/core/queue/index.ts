@@ -1,14 +1,14 @@
-import { Colors, CommandInteraction } from "#structures/discord";
-import { ControllerCycles } from "./controllers/cycle";
-import { Queue } from "#core/queue/structures/queue";
-import { QueueMessage } from "./modules/message";
+import { Colors, CommandInteraction } from "#structures/discord/index.js";
+import { ControllerCycles } from "./controllers/cycle.js";
+import { Queue } from "#core/queue/structures/queue.js";
+import { QueueMessage } from "./modules/message.js";
 import { Collection, locale } from "#structures";
 import { env } from "#app/env";
 
-export * from "./structures/tracks";
-export * from "./structures/voice";
-export * from "./structures/track";
-export * from "./structures/queue";
+export * from "./structures/tracks.js";
+export * from "./structures/voice.js";
+export * from "./structures/track.js";
+export * from "./structures/queue.js";
 
 /**
  * @author SNIPPIK

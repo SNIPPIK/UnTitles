@@ -1,15 +1,15 @@
-import { DiscordClient, DJSVoice } from "#structures/discord";
-import { ControllerQueues, type Queue } from "#core/queue";
+import { DiscordClient, DJSVoice } from "#structures/discord/index.js";
+import { ControllerQueues, type Queue } from "#core/queue/index.js";
 import { isMainThread } from "node:worker_threads";
 import { env } from "#app/env";
 
 // Database modules
-import { Middlewares } from "#handler/middlewares";
-import { Components } from "#handler/components";
-import { Commands } from "#handler/commands";
-import { RestObject } from "#handler/rest";
-import { Events } from "#handler/events";
-import { Voices } from "#core/voice";
+import { Middlewares } from "#handler/middlewares/index.js";
+import { Components } from "#handler/components/index.js";
+import { Commands } from "#handler/commands/index.js";
+import { RestObject } from "#handler/rest/index.js";
+import { Events } from "#handler/events/index.js";
+import { Voices } from "#core/voice/index.js";
 
 /**
  * @author SNIPPIK

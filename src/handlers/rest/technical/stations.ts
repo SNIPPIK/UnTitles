@@ -1,5 +1,5 @@
-import { APIPlatformType, DeclareRest, RestServerSide } from "#handler/rest";
-import RadioList from "#core/player/stations.json";
+import { APIPlatformType, DeclareRest, RestServerSide } from "#handler/rest/index.js";
+import RadioList from "#core/player/stations.json" with { type: 'json' };
 
 /**
  * @author SNIPPIK

@@ -1,7 +1,7 @@
-import { middleware, MiddlewareResult } from "#handler/middlewares";
+import { middleware, MiddlewareResult } from "#handler/middlewares/index.js";
+import { Colors } from "#structures/discord/index.js";
 import { CommandInteraction } from "discord.js";
 import { Assign, locale,  } from "#structures";
-import { Colors } from "#structures/discord";
 import { env } from "#app/env";
 import { db } from "#app/db";
 

@@ -1,6 +1,6 @@
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { HttpProxyAgent } from "http-proxy-agent";
-import type { Track } from "#core/queue";
+import type { Track } from "#core/queue/index.js";
 import { env } from "#app/env";
 
 /**

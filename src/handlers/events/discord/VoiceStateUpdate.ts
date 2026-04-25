@@ -1,4 +1,4 @@
-import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events";
+import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events/index.js";
 import { Events } from "discord.js";
 import { db } from "#app/db";
 
@@ -53,7 +53,6 @@ class VoiceStateUpdate extends Event<Events.VoiceStateUpdate> {
                 member: null
             });
         }
-
 
         queueMicrotask(() => {
             const guild = payload.guild;

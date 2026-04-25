@@ -7,7 +7,7 @@ import {
     Options,
     Permissions,
     SubCommand
-} from "#handler/commands";
+} from "#handler/commands/index.js";
 import { ApplicationCommandOptionType } from "discord.js";
 import { locale } from "#structures";
 import { db } from "#app/db";

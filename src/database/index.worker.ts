@@ -1,4 +1,4 @@
-import { AudioSaver, MetaSaver } from "./index.saver";
+import { AudioSaver, MetaSaver } from "./index.saver.js";
 import { isMainThread } from "node:worker_threads";
 import { env } from "#app/env";
 
@@ -12,12 +12,12 @@ class SharedDatabase {
     /**
      * @description Класс для кеширования данных о треках (доступен только в воркерах при включённом кеше)
      */
-    public readonly meta_saver?: MetaSaver<any>;
+    public readonly meta_saver?: MetaSaver<any> = null;
 
     /**
      * @description Класс для кеширования аудио (доступен в главном потоке при включённом кеше)
      */
-    public readonly audio_saver?: AudioSaver;
+    public readonly audio_saver?: AudioSaver = null;
 
     /**
      * @description Создаёт экземпляр разделяемого кеша. Поля инициализируются только если кеш включён.
@@ -26,19 +26,17 @@ class SharedDatabase {
     public constructor() {
         const isCaching = this.isCacheEnabled();
 
-        if (!isCaching) {
-            // Кеш отключён – поля остаются undefined
-            return;
-        }
+        // Если кеш отключён – поля остаются пустыми
+        if (!isCaching) return;
 
-        // audio_saver доступен только в главном потоке (или везде? судя по комментариям – только в main)
+        // audio_saver доступен только в главном потоке
         this.audio_saver = new AudioSaver();
 
-        // meta_saver доступен только в воркер-потоках (не в main)
+        // meta_saver доступен только в воркер-потоках
         if (!isMainThread) {
             this.meta_saver = new MetaSaver();
         }
-    }
+    };
 
     /**
      * @description Проверяет, включено ли кеширование в конфигурации
@@ -50,7 +48,7 @@ class SharedDatabase {
         if (typeof value === "boolean") return value;
         if (typeof value === "string") return value.toLowerCase() === "true";
         return false; // по умолчанию кеш выключен
-    }
+    };
 }
 
 /**
@@ -64,13 +62,10 @@ let _sdb: SharedDatabase | null = null;
  */
 export const sdb = new Proxy({} as SharedDatabase, {
     get(_, prop: keyof SharedDatabase) {
-        if (!_sdb) {
-            throw new Error("SharedDatabase not initialized. Call initSharedDatabase() first.");
-        }
+        if (!_sdb) throw new Error("SharedDatabase not initialized. Call initSharedDatabase() first.");
         const value = _sdb[prop];
-        if (typeof value === "function") {
-            return (value as Function).bind(_sdb);
-        }
+
+        if (typeof value === "function") return (value as Function).bind(_sdb);
         return value;
     }
 });
@@ -81,9 +76,7 @@ export const sdb = new Proxy({} as SharedDatabase, {
  * @public
  */
 export function initSharedDatabase(): void {
-    if (_sdb) {
-        throw new Error("SharedDatabase already initialized");
-    }
+    if (_sdb) throw new Error("SharedDatabase already initialized");
 
     try {
         _sdb = new SharedDatabase();

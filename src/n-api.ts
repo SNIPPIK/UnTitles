@@ -1,7 +1,8 @@
 /**
  * Загружаем нативный модуль один раз
  */
-const Native = require('../native/index.js') as any;
+//@ts-ignore
+const Native = (await import('../native/index.cjs')) as any;
 
 /**
  * Универсальный тип для нативного класса по интерфейсу:
@@ -31,54 +32,9 @@ export type iType<T> = T extends new (...args: any[]) => infer R ? R : never;
  * Ошибки выбрасываются как экземпляры Error с полем code и message из нативного слоя.
  */
 
-/**
- * @support Тип пакета, обнаруженного парсером OGG/Opus.
- * - head → OpusHead (основные параметры кодека: каналы, частота дискретизации)
- * - tags → OpusTags (метаданные: название, артист, комментарии)
- * - frame → аудио фрейм Opus (собственно звук)
- * @type OpusPacketType
- * @extends OggOpusParser
- */
-export type OpusPacketType = 'head' | 'tags' | 'frame';
-
 /* ────────────────────────────────────────────────
    Интерфейсы классов, экспортируемых из нативного модуля
 ───────────────────────────────────────────────── */
-
-/**
- * @description Нативный парсер контейнера OGG с кодеком Opus.
- * Принимает произвольные куски байтов и выдаёт полные Opus-пакеты.
- * @support Подходит для:
- * - потоков из FFmpeg
- * - RTP-пакетов с OGG-инкапсуляцией
- * - файлов .ogg
- * @interface OggOpusParser
- */
-export interface iOggOpusParser {
-    constructor(): void;
-
-    /**
-     * Основной метод парсинга.
-     * Добавляет новые данные в буфер и пытается извлечь полные страницы и пакеты.
-     * При обнаружении полного Opus-пакета **синхронно** вызывает callback.
-     *
-     * @param chunk - произвольный фрагмент байтов (может быть неполной страницей или несколькими)
-     * @param callback - вызывается сразу при нахождении пакета (не асинхронно!)
-     * @param callback.type - тип пакета
-     * @param callback.data - полные байты пакета (можно сразу передать в opus-decoder)
-     */
-    parse(chunk: Buffer, callback: (type: OpusPacketType, data: Buffer) => void): void;
-
-    /**
-     * Полностью очищает внутренний буфер (remainder и packet_carry),
-     * сбрасывает состояние (серийный номер потока, флаг ожидания заголовка).
-     * Вызывать обязательно при:
-     * - смене источника потока
-     * - переподключении к голосовому каналу
-     * - завершении сессии
-     */
-    destroy(): void;
-}
 
 /**
  * @description Управляемый процесс FFmpeg, запущенный из нативного кода.
@@ -281,6 +237,8 @@ export interface iUDPSocket {
      */
     constructor(remoteAddr: string): void;
 
+    clearPackets(): void;
+
     /**
      * Добавляет пакет в очередь на отправку. С проверкой мусора
      *
@@ -473,12 +431,13 @@ export interface iDAVESession {
     /**
      * Возвращает внутренний статус сессии в виде числа.
      *
-     * Значения определяются реализацией `Davey`. Обычно:
-     * - `0` — инициализация
-     * - `1` — готова
-     * - `2` — ошибка
+     * Значения определяются реализацией `davey`. Обычно:
+     * - `0` — ожидание
+     * - `1` — ответ
+     * - `2` — ожидание ответа
+     * - `3` - Готов
      */
-    get status(): number;
+    get status(): 0 | 1 | 2 | 3;
 
     /**
      * Генерирует и возвращает сериализованный `KeyPackage`.
@@ -680,7 +639,6 @@ export interface SigningKeyPair {
  */
 export const {
     VoiceRTPSocket,
-    OggOpusParser,
     FfmpegProcess,
     AudioEngine,
     UDPSocket,
@@ -688,7 +646,6 @@ export const {
 } = Native as {
     DAVESession:    NativeClass<iDAVESession>
     VoiceRTPSocket: NativeClass<iVoiceRTPSocket>
-    OggOpusParser:  NativeClass<iOggOpusParser>,
     FfmpegProcess:  NativeClass<iFfmpegProcess>,
     AudioEngine:    NativeClass<iAudioEngine>,
     UDPSocket:      NativeClass<iUDPSocket>,

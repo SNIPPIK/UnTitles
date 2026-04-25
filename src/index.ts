@@ -1,6 +1,7 @@
-import { DiscordClient, ShardManager } from "#structures/discord";
+import { DiscordClient, ShardManager } from "#structures/discord/index.js";
 import { initSharedDatabase } from "#worker/db";
 import { db, initDatabase } from "#app/db";
+import { fileURLToPath } from "node:url";
 import { Logger } from "#structures";
 import { env } from "#app/env";
 
@@ -32,6 +33,8 @@ function main() {
  * @private
  */
 function execute_shardManager() {
+    const __filename = fileURLToPath(import.meta.url);
+
     Logger.log("WARN", `[Manager] has running ${Logger.color(36, `ShardManager...`)}`);
     new ShardManager(__filename, env.get("token.discord"));
 }
@@ -56,14 +59,14 @@ async function execute_shard() {
 
     // Загружаем API
     await db.api.init();
-    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.array.length} APIs`)}`);
+    Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.api.array.length}|${db.api.methods} Rest/APIs`)}`);
 
     // Загружаем components
-    db.components.register();
+    await db.components.register();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.components.size} components`)}`);
 
     // Загружаем middlewares
-    db.middlewares.register();
+    await db.middlewares.register();
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.middlewares.size} middlewares`)}`);
 
 
@@ -72,11 +75,11 @@ async function execute_shard() {
 
 
     // Загружаем events
-    db.events.register(client);
+    await db.events.register(client);
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.events.size} events`)}`);
 
     // Загружаем commands
-    db.commands.register(client);
+    await db.commands.register(client);
     Logger.log("LOG", `[Core/${id}] Loaded ${Logger.color(34, `${db.commands.public.length} public, ${db.commands.owner.length} dev commands`)}`);
 
     // Запускаем отслеживание событий процесса
@@ -148,7 +151,7 @@ function init_queue_destroyer(client: DiscordClient): boolean {
         // Если плееры играют и есть остаток от аудио
         if (timeout > 0) {
             // Ожидаем выключения музыки на других серверах
-            setTimeout(() => { process.exit(0); }, timeout + 1e3)//.ref();
+            setTimeout(() => { process.exit(0); }, timeout + 1e3);//.ref();
 
             Logger.log("WARN", `[Queues/${db.queues.size}] Wait other queues. Timeout to restart ${(timeout / 1e3).duration()}`);
             return true;

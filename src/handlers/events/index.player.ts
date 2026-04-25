@@ -1,4 +1,4 @@
-import { AudioPlayer } from "#core/player";
+import { AudioPlayer } from "#core/player/index.js";
 
 /**
  * @author SNIPPIK

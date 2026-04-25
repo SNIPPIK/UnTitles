@@ -1,2 +1,2 @@
-export * from "./index.set";
-export * from "./index.collection";
+export * from "./index.set.js";
+export * from "./index.collection.js";

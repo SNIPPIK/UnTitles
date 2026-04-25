@@ -258,8 +258,8 @@ npm i
 # If you don't want to build, download the ready-made build and add everything to build/native
 npm run build:native
 
-# Build Typescript + settings + run
-npm run build && npm run configure && npm run start
+# Build Typescript + run
+npm run build && npm run start
 ```
 
 # 📊 Project Diagram

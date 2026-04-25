@@ -1,8 +1,8 @@
-import { BaseLayer } from "#core/voice/transport/layers/BaseLayer";
-import { MLSSession } from "#core/voice/structures/MLSSession";
-import { VoiceAdapter } from "#core/voice/transport/adapter";
+import { BaseLayer } from "#core/voice/transport/layers/BaseLayer.js";
+import { MLSSession } from "#core/voice/structures/MLSSession.js";
+import { VoiceAdapter } from "#core/voice/transport/adapter.js";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
-import { VoiceWebSocket } from "#core/voice";
+import { VoiceWebSocket } from "#core/voice/index.js";
 
 /**
  * @author SNIPPIK
@@ -35,14 +35,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
      *          и метод `encrypt` доступен. Иначе `false`.
      */
     public get ready(): boolean {
-        if (this._client?.session) {
-            // Сессия должна быть готова, не должна быть в состоянии перехода,
-            // и метод encrypt должен существовать (проверка на наличие).
-            if (!this._client.session.ready || this._client.isTransitioning || !this._client.encrypt) {
-                return false;
-            }
-        }
-        return true;
+        return !!(this._client && this._client.status === 3);
     };
 
     /**
@@ -68,15 +61,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
         // Вызов метода encrypt сессии; возвращает массив зашифрованных пакетов или null.
         let packets = this._client.encrypt(frames);
 
-        /*let attempts = 0;
-        while (!packets && attempts < BaseLayer.MAX_RETRIES) {
-            attempts++;
-            packets = this._dave.encrypt(frames);
-        }*/
-
-        if (!packets) {
-            throw new Error("DAVE encryption failed after retries");
-        }
+        if (!packets) throw new Error("DAVE encryption failed");
         return packets;
     };
 
@@ -137,6 +122,14 @@ export class DAVELayer extends BaseLayer<MLSSession> {
          */
         ws.on("daveSession", ({ op, d }) => {
             switch (op) {
+                /**
+                 * @description Подготовка перехода (transition) на новую версию протокола DAVE.
+                 *              Сервер уведомляет о предстоящем переходе (смена ключей, версии шифрования).
+                 *              Вызывается `session.prepareTransition(d)`, которая возвращает `true`,
+                 *              если переход требует подтверждения от клиента.
+                 *              Если требуется – отправляем серверу `DaveTransitionReady` с `transition_id`,
+                 *              сигнализируя о готовности к переключению.
+                 */
                 case VoiceOpcodes.DavePrepareTransition: {
                     const sendReady = session.prepareTransition(d);
                     if (sendReady) {
@@ -147,10 +140,26 @@ export class DAVELayer extends BaseLayer<MLSSession> {
                     }
                     return;
                 }
+
+                /**
+                 * @description Выполнение ранее подготовленного перехода.
+                 *              Сервер сообщает, что нужно активировать новое состояние (ключи, версию).
+                 *              Вызывается `session.executeTransition(d.transition_id)`,
+                 *              которая обновляет внутреннее состояние сессии.
+                 *              Ответа не требуется.
+                 */
                 case VoiceOpcodes.DaveExecuteTransition: {
-                    session.executeTransition(d.transition_id);
+                    if (!session.isTransitioning) session.executeTransition(d.transition_id);
                     return;
                 }
+
+                /**
+                 * @description Подготовка новой эпохи (epoch) в рамках MLS-группы.
+                 *              Эпоха — это версия ключей группы (инкрементируется при каждом изменении состава).
+                 *              Данные эпохи содержат новую версию протокола и другую метаинформацию.
+                 *              Сохраняем их через сеттер `session.prepareEpoch = d`.
+                 *              Подтверждение не требуется.
+                 */
                 case VoiceOpcodes.DavePrepareEpoch: {
                     session.prepareEpoch = d;
                     return;
@@ -168,10 +177,24 @@ export class DAVELayer extends BaseLayer<MLSSession> {
          */
         ws.on("binary", ({ op, payload }) => {
             switch (op) {
+                /**
+                 * @description Установка внешнего отправителя (External Sender) для MLS-сессии.
+                 *              Внешний отправитель - это данные (сертификат и публичный ключ),
+                 *              которые позволяют сессии принимать коммиты от сервера Discord.
+                 *              Приходит от сервера один раз после инициализации.
+                 */
                 case VoiceOpcodes.DaveMlsExternalSender: {
                     session.externalSender = payload;
                     return;
                 }
+
+                /**
+                 * @description Обработка предложений (Proposals) MLS:
+                 *              добавление/удаление участников, обновление ключей и т.д.
+                 *              Сервер присылает зашифрованные proposals.
+                 *              Сессия их обрабатывает и возвращает commit + опционально welcome.
+                 *              Если есть результат, отправляем его обратно серверу с префиксом-опкодом.
+                 */
                 case VoiceOpcodes.DaveMlsProposals: {
                     const proposal = session.processProposals(payload, this.adapter.clients.array);
                     if (proposal) {
@@ -179,6 +202,13 @@ export class DAVELayer extends BaseLayer<MLSSession> {
                     }
                     return;
                 }
+
+                /**
+                 * @description Обработка коммита (Commit) MLS, который сервер объявляет как часть перехода.
+                 *              Коммит фиксирует изменения группы (новые ключи, состав).
+                 *              После успешного применения коммита необходимо отправить серверу
+                 *              подтверждение `DaveTransitionReady` с идентификатором перехода.
+                 */
                 case VoiceOpcodes.DaveMlsAnnounceCommitTransition: {
                     const { transition_id, success } = session.processCommit(payload);
                     if (success && transition_id !== 0) {
@@ -189,6 +219,12 @@ export class DAVELayer extends BaseLayer<MLSSession> {
                     }
                     return;
                 }
+
+                /**
+                 * @description Обработка welcome-сообщения (новый участник входит в группу).
+                 *              Welcome приходит от сервера, когда текущая сессия добавляется в группу.
+                 *              После успешной обработки нужно подтвердить готовность к переходу.
+                 */
                 case VoiceOpcodes.DaveMlsWelcome: {
                     const { transition_id, success } = session.processWelcome(payload);
                     if (success && transition_id !== 0) {

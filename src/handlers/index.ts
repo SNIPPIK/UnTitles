@@ -1,4 +1,5 @@
 import { Logger, SetArray } from "#structures";
+import { pathToFileURL } from 'url';
 import * as path from "node:path";
 import fs from "node:fs";
 
@@ -140,7 +141,7 @@ export abstract class handler<T = unknown> {
      *
      * @private
      */
-    private _loadRecursive = (dirPath: string) => {
+    private _loadRecursive = async (dirPath: string) => {
         const entries = fs.readdirSync(dirPath, {withFileTypes: true});
 
         for (const entry of entries) {
@@ -148,7 +149,7 @@ export abstract class handler<T = unknown> {
 
             if (entry.isDirectory()) {
                 // Рекурсивный обход поддиректорий
-                this._loadRecursive(fullPath);
+                await this._loadRecursive(fullPath);
                 continue;
             }
 
@@ -163,7 +164,7 @@ export abstract class handler<T = unknown> {
                     continue;
                 }
 
-                this._push(fullPath);
+                await this._push(fullPath);
             }
         }
     };
@@ -185,28 +186,18 @@ export abstract class handler<T = unknown> {
      *
      * @private
      */
-    private _push = (filePath: string) => {
-        // Загружаем модуль
-        const imported = require(filePath);
+    private _push = async (filePath: string) => {
+        const url = pathToFileURL(filePath).href;
+        const imported = await import(url);
 
-        // Удаляем кэш после того, как текущий стек вызовов завершится.
-        // Это позволяет перезагружать файлы при повторном вызове `load()`.
-        setImmediate(() => {
-            delete require.cache[require.resolve(filePath)];
-        });
-
-        // Проверяем наличие default экспорта
         if (!imported?.default) {
-            return this.onRunFail(Error(`Missing default export in ${filePath}`));
+            return this.onRunFail(new Error(`Missing default export in ${filePath}`));
         }
 
         const defaultExport = imported.default;
-
-        if (defaultExport instanceof Array) {
-            // Массив экспортов: инициализируем каждый элемент
+        if (Array.isArray(defaultExport)) {
             for (const item of defaultExport) this._init(item);
         } else {
-            // Одиночный экспорт
             this._init(defaultExport);
         }
     };
