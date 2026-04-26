@@ -27,7 +27,7 @@ export const TRACK_BUFFERED_TIME = 500;
  * @private
  */
 class ResourceProvider {
-    constructor(
+    public constructor(
         private readonly prepare: (track: Track) => Promise<string | Error>,
         private readonly options = { retries: 2, initialDelay: 70 }
     ) {};
@@ -73,7 +73,7 @@ class ResourceProvider {
  * @private
  */
 class LyricsProvider {
-    constructor(
+    public constructor(
         private readonly prepare: (track: Track) => Promise<string | Error>,
     ) {};
 
@@ -166,6 +166,12 @@ export class TrackResolvers {
         })
     };
 
+    /**
+     * @description Запрос head заголовка от аудио ресурса
+     * @param track
+     * @private
+     * @static
+     */
     private static head = async (track: Track): Promise<string | Error> => {
         const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null, sessionTimeout: 5e3, timeout: 5e3 });
         const status = await client.toHead;

@@ -8,46 +8,25 @@ import { Track } from "#core/queue/index.js";
  * @public
  */
 export class ControllerTracks<T extends Track> {
-    /**
-     * @description Хранилище треков, хранит в себе все треки. Прошлые и новые!
-     * @protected
-     */
+    /** Хранилище треков, хранит в себе все треки. Прошлые и новые! */
     protected _current: T[] = [];
 
-    /**
-     * @description Хранилище треков в оригинальном порядке, необходимо для правильной работы shuffle
-     * @protected
-     */
+    /** Хранилище треков в оригинальном порядке, необходимо для правильной работы shuffle */
     protected _original: T[] = [];
 
-    /**
-     * @description Текущая позиция в списке
-     * @protected
-     */
+    /** Текущая позиция в списке */
     protected _position = 0;
 
-    /**
-     * @description Последняя позиция треков
-     * @protected
-     */
+    /** Последняя позиция треков */
     protected _last_position = 0;
 
-    /**
-     * @description Тип повтора
-     * @protected
-     */
+    /** Тип повтора */
     protected _repeat = RepeatType.None;
 
-    /**
-     * @description Смешивание треков
-     * @protected
-     */
+    /** Смешивание треков */
     protected _shuffle = false;
 
-    /**
-     * @description Общее время треков, считается только при добавлении и удалении треков
-     * @protected
-     */
+    /** Общее время треков, считается только при добавлении и удалении треков */
     protected _totalTime = 0;
 
     /**
@@ -333,23 +312,15 @@ export class ControllerTracks<T extends Track> {
  * @public
  */
 export enum RepeatType {
-    /**
-     * @description Повтор выключен
-     */
+    /** Повтор выключен */
     None,
 
-    /**
-     * @description Повтор одного трека
-     */
+    /** Повтор одного трека */
     Song,
 
-    /**
-     * @description Повтор всех треков
-     */
+    /** Повтор всех треков */
     Songs,
 
-    /**
-     * @description Бесконечный музыкальный поток
-     */
+    /** Бесконечный музыкальный поток */
     AutoPlay
 }

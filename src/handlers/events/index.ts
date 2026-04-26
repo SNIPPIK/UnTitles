@@ -22,11 +22,7 @@ export type { QueueEvents } from "./index.queue.js";
  * @public
  */
 export class Events extends handler<Event<SupportKeysOfEvents>> {
-    /**
-     * @description Вспомогательный класс для событий, по умолчанию используется для players, queues
-     * @readonly
-     * @public
-     */
+    /** Вспомогательный класс для событий, по умолчанию используется для players, queues и прочего */
     public readonly emitter = new class extends TypedEmitter<EmitterEvents> {};
 
     /**
@@ -102,20 +98,10 @@ export type SupportEventCallback<T> =
  * @public
  */
 export type SupportEvent<T extends SupportKeysOfEvents> = {
-    /**
-     * @description Название событие
-     * @default null
-     * @readonly
-     * @public
-     */
+    /** Название события */
     name?: T extends SupportKeysOfEvents ? SupportKeysOfEvents : keyof ClientEventTypes;
 
-    /**
-     * @description Тип события
-     * @default null
-     * @readonly
-     * @public
-     */
+    /** Тип события */
     type?: T extends keyof QueueEvents | keyof AudioPlayerEvents | keyof RestAPIEvents ? "player" : "client";
 }
 
@@ -126,35 +112,15 @@ export type SupportEvent<T extends SupportKeysOfEvents> = {
  * @public
  */
 export abstract class Event<T extends SupportKeysOfEvents> implements SupportEvent<T> {
-    /**
-     * @description Название событие
-     * @default null
-     * @readonly
-     * @public
-     */
+    /** Название событие */
     public name: SupportEvent<T>["name"];
 
-    /**
-     * @description Тип события
-     * @default null
-     * @readonly
-     * @public
-     */
+    /** Тип события */
     public type: SupportEvent<T>["type"];
 
-    /**
-     * @description Логика выполнения события
-     * @default null
-     * @readonly
-     * @public
-     */
+    /** Логика выполнения события */
     readonly once: boolean;
 
-    /**
-     * @description Функция, которая будет запущена при вызове события
-     * @default null
-     * @readonly
-     * @public
-     */
+    /** Функция, которая будет запущена при вызове события */
     run: SupportEventCallback<T>;
 }

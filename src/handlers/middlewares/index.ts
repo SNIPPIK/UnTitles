@@ -75,6 +75,9 @@ export interface middleware<T> {
  * @public
  */
 export enum MiddlewareResult {
+    /** Если все сходится и можно продолжить проверять */
     "ok",
+
+    /** Если не сходится */
     "fail"
 }

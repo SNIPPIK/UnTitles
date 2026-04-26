@@ -18,81 +18,34 @@ import { Voices } from "#core/voice/index.js";
  * @public
  */
 class Database {
-    /**
-     * @description Загружаем класс для хранения запросов на платформы
-     * @readonly
-     * @public
-     */
+    /** Загружаем класс для хранения запросов на платформы */
     public readonly api: RestObject;
 
-    /**
-     * @description Адаптер для общения с websocket'ом клиента
-     * @readonly
-     * @public
-     */
+    /** Адаптер для общения с websocket'ом клиента */
     public readonly adapter: DJSVoice;
 
-    /**
-     * @author SNIPPIK
-     * @description Загружаем класс для хранения событий
-     * @readonly
-     * @public
-     */
+    /** Загружаем класс для хранения событий */
     public readonly events: Events;
 
-    /**
-     * @author SNIPPIK
-     * @description Загружаем класс для хранения команд
-     * @readonly
-     * @public
-     */
+    /** Загружаем класс для хранения команд */
     public readonly commands: Commands;
 
-    /**
-     * @author SNIPPIK
-     * @description Загружаем класс для хранения кнопок бота
-     * @description Класс хранящий в себе все кнопки для бота
-     * @readonly
-     * @public
-     */
+    /** Загружаем класс для хранения кнопок бота */
     public readonly components: Components;
 
-    /**
-     * @author SNIPPIK
-     * @description Загружаем класс для хранения кнопок бота
-     * @description Класс хранящий в себе все кнопки для бота
-     * @readonly
-     * @public
-     */
+    /** Загружаем класс для хранения ограничений и доп проверок бота и пользователей */
     public readonly middlewares: Middlewares;
 
-    /**
-     * @description Загружаем класс для хранения очередей, плееров, циклов
-     * @description Здесь хранятся все очереди для серверов, для 1 сервера 1 очередь и плеер
-     * @readonly
-     * @public
-     */
+    /** Загружаем класс для хранения очередей, плееров, циклов */
     public readonly queues: ControllerQueues<Queue>;
 
-    /**
-     * @description Загружаем класс для хранения голосовых подключений
-     * @readonly
-     * @public
-     */
+    /** Загружаем класс для хранения голосовых подключений */
     public readonly voice: Voices;
 
-    /**
-     * @description Для работы с командами для разработчика
-     * @readonly
-     * @public
-     */
+    /** Для работы с командами для разработчика */
     public readonly owner: { ids: string[]; guildID: string };
 
-    /**
-     * @description Для отображения в embed сообщениях
-     * @readonly
-     * @public
-     */
+    /** Для отображения в embed сообщениях */
     public readonly images: { disk: string; no_image: string; loading: string; banner: string; disk_emoji: string };
 
     /**

@@ -11,20 +11,10 @@ import { db } from "#app/db";
  * @public
  */
 export class ControllerCycles {
-    /**
-     * @author SNIPPIK
-     * @description Цикл для работы плеера, необходим для отправки пакетов
-     * @class AudioPlayers
-     * @public
-     */
+    /** Цикл для работы плеера, необходим для отправки пакетов */
     public players = new AudioPlayers();
 
-    /**
-     * @author SNIPPIK
-     * @description Цикл для обновления сообщений, необходим для красивого прогресс бара. :D
-     * @class Messages
-     * @public
-     */
+    /** Цикл для обновления сообщений, необходим для красивого прогресс бара */
     public messages = new Messages();
 }
 
@@ -34,7 +24,7 @@ export class ControllerCycles {
  * @const PLAYER_SEND_NATIVE
  * @private
  */
-const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 5);
+const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 10);
 
 /**
  * @author SNIPPIK

@@ -14,18 +14,10 @@ import fs from "node:fs";
  * @public
  */
 export class MetaSaver<T extends APIRequestData.Track | APIRequestData.List> {
-    /**
-     * @description Можно ли сохранять файлы
-     * @returns boolean
-     * @public
-     */
+    /** Можно ли сохранять файлы */
     public inFile = env.get("cache.file") as boolean;
 
-    /**
-     * @description Путь до директории с кешированными данными
-     * @returns string
-     * @private
-     */
+    /** Путь до директории с кешированными данными */
     public _dirname = path.resolve(env.get("cache.dir"));
 
     /**
@@ -91,11 +83,7 @@ export class MetaSaver<T extends APIRequestData.Track | APIRequestData.List> {
  * @public
  */
 export class AudioSaver extends PromiseCycle<Track> {
-    /**
-     * @description Путь до директории с кешированными данными
-     * @returns string
-     * @private
-     */
+    /** Путь до директории с кешированными данными */
     public _dirname = path.resolve(env.get("cache.dir"));
 
     public constructor() {

@@ -41,8 +41,6 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     /**
      * Текущий статус подключения.
      * Возможные значения: `connecting`, `connected`, `disconnected`.
-     *
-     * @readonly
      */
     public get status() {
         return this._status;
@@ -52,7 +50,6 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * Количество пакетов, ожидающих отправки в Rust-очереди.
      * Полезно для мониторинга нагрузки и отладки.
      * @return number
-     * @readonly
      */
     public get packets() {
         // Обработка случая, когда сокет уничтожен (null)
@@ -201,29 +198,37 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
 }
 
 /**
- * Состояния подключения UDP-сокета.
- *
- * - `connected`: установлено активное соединение, можно отправлять и принимать данные.
- * - `connecting`: сокет создан, но discovery-пакет ещё не обработан.
- * - `disconnected`: сокет уничтожен, все ресурсы освобождены.
+ * @author SNIPPIK
+ * @description Состояния подключения UDP-сокета
+ * @enum VoiceUDPSocketStatuses
  */
 enum VoiceUDPSocketStatuses {
+    /** UDP соединение установлено | установлено активное соединение, можно отправлять и принимать данные */
     connected = "connected",
+
+    /** UDP соединение еще устанавливается | сокет создан, но discovery-пакет ещё не обработан*/
     connecting = "connecting",
+
+    /** UDP соединение разорвано | сокет уничтожен, все ресурсы освобождены */
     disconnected = "disconnected",
 }
 
 /**
- * События, которые может генерировать `VoiceUDPSocket`.
- *
- * - `message`: получен обычный UDP-пакет (например, аудио).
- * - `discovery`: получен discovery-пакет (передаётся объект с IP/port или ошибка).
- * - `error`: произошла ошибка (например, при отправке).
- * - `close`: сокет закрыт (вызывается после `destroy`).
+ * @author SNIPPIK
+ * @description События, которые может генерировать `VoiceUDPSocket`
+ * @interface UDPSocketEvents
+ * @public
  */
 export interface UDPSocketEvents {
+    /** Получен обычный UDP-пакет (например, аудио) */
     readonly "message": (message: Buffer) => void;
+
+    /** Получен discovery-пакет (передаётся объект с IP/port или ошибка) */
     readonly "discovery": (options: { ip: string; port: number } | Error) => void;
+
+    /** Произошла ошибка (например, при отправке) */
     readonly "error": (error: Error) => void;
+
+    /** Сокет закрыт (вызывается после `destroy`) */
     readonly "close": () => void;
 }

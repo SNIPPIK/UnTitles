@@ -17,16 +17,10 @@ export * from "./structures/queue.js";
  * @private
  */
 class BaseQueueController<T extends Queue> {
-    /**
-     * @description Хранилище очередей
-     * @private
-     */
+    /** Хранилище очередей */
     private queue: Collection<T> = new Collection();
 
-    /**
-     * @description Хранилище циклов для работы музыки
-     * @public
-     */
+    /** Хранилище циклов для работы музыки */
     public cycles = new ControllerCycles();
 
     /**
@@ -154,11 +148,7 @@ class BaseQueueController<T extends Queue> {
  * @public
  */
 export class ControllerQueues<T extends Queue> extends BaseQueueController<T> {
-    /**
-     * @description Здесь хранятся модификаторы аудио
-     * @readonly
-     * @public
-     */
+    /** Здесь хранятся модификаторы аудио */
     public options = {
         optimization: parseInt(env.get("duration.optimization", "15")),
         volume: parseInt(env.get("audio.volume", "70")),

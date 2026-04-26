@@ -77,7 +77,7 @@ class RestDeezerAPI extends RestServerSide.API {
                     };
 
                     // Сохраняем кеш в системе
-                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album}`);
+                    if (!cache) sdb.meta_saver.set(album, `${this.url}/album`);
 
                     return album;
                 } catch (e) {

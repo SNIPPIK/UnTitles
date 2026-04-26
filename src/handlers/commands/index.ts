@@ -310,88 +310,43 @@ export class Commands extends handler<Command> {
 export abstract class BaseCommand<T> {
     type?: T;
 
-    /**
-     * @description Название команды
-     * @private
-     */
+    /** Название команды */
     name?: string;
 
-    /**
-     * @description Переводы названия команды на другие языки
-     * @private
-     */
+    /** Переводы названия команды на другие языки */
     name_localizations?: LocalizationMap;
 
-    /**
-     * @description Описание команды
-     * @private
-     */
+    /** Описание команды */
     description?: string;
 
-    /**
-     * @description Описание команды на другие языки
-     * @private
-     */
+    /** Описание команды на других языках */
     description_localizations?: LocalizationMap;
 
-    /**
-     * @description Права на использование команды
-     * @private
-     */
+    /** Права на использование команды */
     default_member_permissions?: Permissions | null | undefined;
 
-    /**
-     * @description 18+ доступ
-     * @private
-     */
+    /** 18+ доступ */
     nsfw?: boolean;
 
-    /**
-     * @description Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения.
-     * @public
-     */
+    /** Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения */
     readonly integration_types?: CommandIntegration[];
 
-    /**
-     * @description Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия.
-     * @private
-     */
+    /** Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия */
     readonly contexts?: CommandContext[];
 
-    /**
-     * @description Доп параметры для работы slashCommand
-     * @private
-     */
+    /**  Доп параметры они же аргументы для работы slashCommand */
     readonly options?: ((AutocompleteCommandOption<any> & ChoiceOption) & ApplicationCommandOption)[];
 
-    /**
-     * @description Команду может использовать только разработчик
-     * @default false
-     * @readonly
-     * @public
-     */
+    /** Команду может использовать только разработчик */
     readonly owner?: boolean;
 
-    /**
-     * @description Управление правами
-     * @private
-     */
+    /** Для работы с правами бота и пользователя */
     readonly permissions: CommandPermissions;
 
-    /**
-     * @description Права для использования той или иной команды
-     * @default null
-     * @readonly
-     * @public
-     */
+    /** Права для использования той или иной команды */
     readonly middlewares?: RegisteredMiddlewares[]
 
-    /**
-     * @description Выполнение команды
-     * @default null
-     * @readonly
-     * @public
-     */
+    /** Выполнение команды */
     abstract run(options: CommandCallback<any>): any;
 
     /**
@@ -432,7 +387,9 @@ export abstract class BaseCommand<T> {
  * @public
  */
 export abstract class Command extends BaseCommand<ApplicationCommandType> {
+    /** Стандартный тип для взаимодействия через slash */
     type = ApplicationCommandType.ChatInput;
+
     /**
      * @description Отдаем данные в формате JSON и только необходимые
      * @public
@@ -455,7 +412,7 @@ export abstract class Command extends BaseCommand<ApplicationCommandType> {
             ...super.toJSON(),
             options,
         };
-    }
+    };
 }
 
 /**
@@ -467,6 +424,7 @@ export abstract class Command extends BaseCommand<ApplicationCommandType> {
  * @public
  */
 export abstract class SubCommand extends BaseCommand<CommandOptionsType> {
+    /** Тип под команды, для использования аргументов */
     type = CommandOptionsType.Subcommand;
 
     /**

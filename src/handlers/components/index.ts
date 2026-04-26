@@ -59,25 +59,17 @@ export type SupportSelector = "filter_select";
  * @public
  */
 export type SupportComponent<T = "button" | "selector"> = {
-    /**
-     * @description Название кнопки
-     * @public
-     */
+    /** Название кнопки */
     name?: T extends "button" ? SupportButtons : SupportSelector;
 
     /**
      * @description Функция выполнения кнопки
-     * @param msg - Сообщение пользователя
+     * @param ctx - Сообщение пользователя
      * @public
      */
     callback?: (ctx: T extends "button" ? buttonInteraction : SelectMenuInteract) => any;
 
-    /**
-     * @description Права для использования той или иной команды
-     * @default null
-     * @readonly
-     * @public
-     */
+    /** Права для использования той или иной команды */
     readonly middlewares?: RegisteredMiddlewares[];
 }
 

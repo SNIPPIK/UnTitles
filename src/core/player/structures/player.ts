@@ -60,20 +60,10 @@ const PLAYER_TIMEOUT_OFFSET = 3000;
  * ```
  */
 export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
-    /**
-     * @description Количество пакетов, ожидающих отправки в UDP-буфере (для мониторинга загрузки).
-     * @remarks
-     * Используется для расчёта задержки (latency) и принятия решения о буферизации.
-     * @public
-     */
+    /** Количество пакетов, ожидающих отправки в UDP-буфере (для мониторинга загрузки) */
     public _buffered: number | null = 1;
 
-    /**
-     * @description Текущее состояние плеера.
-     * @remarks
-     * При создании устанавливается в `idle`. Изменение статуса генерирует соответствующее событие.
-     * @private
-     */
+    /** Текущее состояние плеера */
     protected _status: AudioPlayerState | null = AudioPlayerState.idle;
 
     /** Менеджер тайм-аутов для безопасной паузы/возобновления */
@@ -316,11 +306,10 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             // Если другой аудио поток загружается, то запрещаем включение
             if (this._audio.preloaded) return null;
 
-            this.emit("player/log", `[AudioPlayer/${this.id}|${this._filters?.size}] has read ${track.isBuffered ? "buffered" : "piped"} stream ${resource}`);
+            this.emit("player/log", `[AudioPlayer/${this.id}|${this._filters?.size}] has read ${!track.isLive ? "buffered" : "piped"} stream ${resource}`);
 
             // Выбираем тип аудио
-            const audio = track.isBuffered ? AudioResource : AudioResource;
-            const stream = this._audio.preload = new audio(
+            const stream = this._audio.preload = new AudioResource(
                 {
                     seek,
                     filters: this._filters.filters,
@@ -432,7 +421,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Включение следующего трека
      * @private
      */
-    private _PlayerNextTrack = (): void => {
+    private readonly _PlayerNextTrack = (): void => {
         const tracks = this.tracks;
 
         const repeat = tracks.repeat;
@@ -501,7 +490,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @returns void
      * @private
      */
-    private _onPlayerReadable = (index: number, seek: number) => {
+    private readonly _onPlayerReadable = (index: number, seek: number) => {
         // Если трек включен в 1 раз
         if (seek === 0) {
             const queue = db.queues.get(this.id);
@@ -567,11 +556,20 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
  * @public
  */
 export enum AudioPlayerState {
-    idle = "player/wait",      // Ожидание, нет активного трека
-    playing = "player/playing", // Воспроизведение
-    ended = "player/ended",     // Трек завершён (используется для автоматического переключения)
-    pause = "player/pause",     // Пауза
-    error = "player/error",     // Ошибка
+    /** Ожидание, нет активного трека */
+    idle = "player/wait",
+
+    /** Воспроизведение аудио */
+    playing = "player/playing",
+
+    /** Трек завершён (используется для автоматического переключения) */
+    ended = "player/ended",
+
+    /** Статус пауза плеера */
+    pause = "player/pause",
+
+    /** Статус ошибки плеера */
+    error = "player/error",
 }
 
 /**
@@ -583,16 +581,10 @@ export enum AudioPlayerState {
  * @private
  */
 class AudioPlayerTimeout {
-    /**
-     * @description Время (мс), после которого разрешено возобновление (включает PLAYER_PAUSE_OFFSET).
-     * @protected
-     */
+    /** Время (мс), после которого разрешено возобновление (включает PLAYER_PAUSE_OFFSET) */
     protected _resumeAllowedAt: number = null;
 
-    /**
-     * @description Ссылка на активный таймер (для отмены).
-     * @private
-     */
+    /** Ссылка на активный таймер (для отмены) */
     private _resumeTimer: NodeJS.Timeout | null = null;
 
     /**

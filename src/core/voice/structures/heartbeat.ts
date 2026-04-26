@@ -141,25 +141,12 @@ export class HeartbeatManager {
  * @type HeartbeatHooks
  */
 type HeartbeatHooks = {
-    /**
-     * @description Метод вызывается при необходимости отправки heartbeat-пакета
-     * @readonly
-     * @private
-     */
+    /** Метод вызывается при необходимости отправки heartbeat-пакета */
     readonly send?: (time: number) => void;
 
-    /**
-     * @description Метод вызывается, если не получен HEARTBEAT_ACK вовремя
-     * @readonly
-     * @private
-     */
+    /** Метод вызывается, если не получен HEARTBEAT_ACK вовремя */
     readonly onTimeout: () => void;
 
-    /**
-     * @description Метод вызывается при получении HEARTBEAT_ACK
-     * @param latency - Задержка между отправкой и получением ack
-     * @readonly
-     * @private
-     */
+    /** Метод вызывается при получении HEARTBEAT_ACK */
     readonly onAck?: (latency: number) => void;
 };

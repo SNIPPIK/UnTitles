@@ -14,23 +14,23 @@ import { db } from "#app/db";
  * @public
  */
 export class Queue {
-    /** Время создания очереди */
-    public timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
-
     /** Текущий экземпляр плеера */
     protected _player: AudioPlayer;
-
-    /** Хранилище треков, с умной системой управления */
-    public tracks = new ControllerTracks<Track>();
-
-    /** Голосовое подключение */
-    public voice = new ControllerVoice<VoiceConnection>();
 
     /** Сообщение пользователя */
     protected _message: QueueMessage<CommandInteraction>;
 
     /** Создаем класс для отображения фильтров */
     protected _buttons: QueueButtons;
+
+    /** Время создания очереди */
+    public timestamp: number = parseInt(Math.max(Date.now() / 1e3).toFixed(0));
+
+    /** Хранилище треков, с умной системой управления */
+    public tracks = new ControllerTracks<Track>();
+
+    /** Голосовое подключение */
+    public voice = new ControllerVoice<VoiceConnection>();
 
     /**
      * @description Записываем сообщение в базу для дальнейшего использования

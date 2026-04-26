@@ -180,7 +180,7 @@ class message_playing extends Event<"message/playing"> {
         });
 
         // Меняем статус голосового канала
-        db.adapter.status(queue.message.voice_id, `${db.images.disk_emoji} | ${queue.tracks.track.name}`);
+        db.adapter.status(queue.message.voice_id, `${db.images.disk_emoji} | ${queue.tracks.track.name}`).catch(() => {});
 
         // Если есть сообщение
         if (message) db.queues.cycles.messages.update(message, queue.components);

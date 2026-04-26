@@ -284,7 +284,7 @@ impl OggOpusParser {
 
         // Если серийный номер изменился (и не равен -1, что означает первый поток), то начался новый
         // логический поток. Сбрасываем состояние: очищаем буфер пакета и переходим в режим ожидания заголовка.
-        else if *bitstream_serial != -1 || *bitstream_serial != serial {
+        if *bitstream_serial != -1 || *bitstream_serial != serial {
             if *bitstream_serial != -1 {
                 packet_carry.clear();
             }
@@ -295,7 +295,7 @@ impl OggOpusParser {
 
         // Если страница помечена как "начало потока" (BOS – header_type & 0x02), также сбрасываем состояние.
         // BOS означает, что это первая страница в новом потоке, и предыдущее состояние невалидно.
-        else if bos {
+        if bos {
             packet_carry.clear();
             *bitstream_serial = serial;
         }

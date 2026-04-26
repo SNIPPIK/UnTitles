@@ -107,33 +107,18 @@ export abstract class VoiceAdapters<T extends any> {
  * @public
  */
 export class VoiceAdapter {
-    /**
-     * @description Внутренний интерфейс адаптера
-     * @public
-     */
+    /** Внутренний интерфейс адаптера */
     public adapter: DiscordGatewayAdapterImplementerMethods;
 
-    /**
-     * @description Список пользователей в голосовом канале, для работы E2EE
-     * @public
-     */
+    /** Список пользователей в голосовом канале, для работы E2EE */
     public clients = new SetArray<string>();
 
-    /**
-     * @description Пакеты для работы с голосовым подключением
-     * @public
-     */
+    /** Пакеты для работы с голосовым подключением */
     public packet = {
-        /**
-         * @description Пакет состояния на сервере
-         * @public
-         */
+        /** Пакет состояния на сервере */
         server: null as GatewayVoiceServerUpdateDispatchData,
 
-        /**
-         * @description Пакет текущего голосового состояния
-         * @public
-         */
+        /** Пакет текущего голосового состояния */
         state: null as GatewayVoiceStateUpdateDispatchData
     };
 

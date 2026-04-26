@@ -36,6 +36,14 @@ export class PlayerAudio<T extends AudioResource> {
     };
 
     /**
+     * @description Текущая громкость аудио
+     * @public
+     */
+    public get volume() {
+        return this._volume;
+    };
+
+    /**
      * @description Индикатор громкости
      * @returns string
      * @private
@@ -50,14 +58,6 @@ export class PlayerAudio<T extends AudioResource> {
         else if (clamped >= 150) text+= "📢";
 
         return text + ` ${clamped}%`;
-    };
-
-    /**
-     * @description Текущая громкость аудио
-     * @public
-     */
-    public get volume() {
-        return this._volume;
     };
 
     /**

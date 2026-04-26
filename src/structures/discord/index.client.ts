@@ -12,10 +12,7 @@ import { db } from "#app/db";
  * @public
  */
 export class DiscordClient extends Client {
-    /**
-     * @description ID осколка полученный от менеджера
-     * @private
-     */
+    /** ID осколка полученный от менеджера */
     private _shard_ID = 0;
 
     /**

@@ -94,39 +94,21 @@ export class ControllerFilters<T extends AudioFilter> extends SetArray<T> {
  * @public
  */
 export interface AudioFilter {
-    /**
-     * @description Имя фильтра
-     * @readonly
-     */
+    /** Имя фильтра */
     readonly name: string;
 
-    /**
-     * @description Имена переводов
-     * @readonly
-     */
+    /** Имена переводов */
     readonly locale: LocalizationMap;
 
-    /**
-     * @description Имена несовместимых фильтров
-     * @readonly
-     */
+    /** Имена несовместимых фильтров */
     readonly unsupported: string[];
 
-    /**
-     * @description Параметр фильтра для ffmpeg
-     * @readonly
-     */
+    /** Параметр фильтра для ffmpeg */
     readonly filter: string;
 
-    /**
-     * @description Аргументы для фильтра
-     * @readonly
-     */
+    /** Аргументы для фильтра */
     readonly args: false | [number, number];
 
-    /**
-     * @description Аргументы указанные пользователем
-     * @readonly
-     */
+    /** Аргументы указанные пользователем */
     argument?: number;
 }

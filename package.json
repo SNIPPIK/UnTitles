@@ -48,7 +48,7 @@
     "typescript": "^6.0.3"
   },
   "scripts": {
-    "start": "node ./build/src/index.js --ShardManager --optimize_for_size --expose-gc --no-compilation-cache --interval-stack-size",
+    "start": "node ./build/src/index.js --ShardManager --optimize_for_size --expose-gc --no-compilation-cache --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
     "build": "tsc",
     "build:native": "napi build --platform --release --cargo-cwd ./src-rs --js index.cjs && npm run build:bindings",
     "build:native:dev": "napi build --platform --cargo-cwd ./src-rs --js index.cjs && npm run build:bindings",

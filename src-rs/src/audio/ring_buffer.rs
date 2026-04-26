@@ -21,7 +21,7 @@ pub struct RingBuffer {
     head: AtomicUsize,
 
     /// Индекс, откуда будет прочитан следующий элемент. Изменяется потребителем (`pop` и `push_front`).
-    tail: AtomicUsize,
+    tail: AtomicUsize
 }
 
 impl RingBuffer {
@@ -51,7 +51,7 @@ impl RingBuffer {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.buffer.len() == 0
     }
 
     /// Возвращает текущее количество элементов в буфере.

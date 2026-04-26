@@ -17,16 +17,10 @@ const KEEP_SWITCH_SPEAKING = 10e3;
  * @public
  */
 export class VoiceSpeakerManager {
-    /**
-     * @description Текущий тип спикера
-     * @private
-     */
+    /** Текущий тип спикера */
     private _type: SpeakerType = SpeakerType.disable;
 
-    /**
-     * @description Менеджер жизни спикера
-     * @private
-     */
+    /** Менеджер жизни спикера */
     private _heartbeat: HeartbeatManager;
 
     /**
@@ -112,8 +106,15 @@ export class VoiceSpeakerManager {
  * @private
  */
 export enum SpeakerType {
+    /** Спикер выключен */
     "disable",
+
+    /** Спикер включен */
     "enable",
+
+    /** Фальшивое включение спикера | Бот будет всегда что-то говорить */
     "fake",
+
+    /** Приоритетное включение спикера | У бота будет больший приоритет когда идет аудио, может не будет слышно других участников */
     "priority" = 4
 }

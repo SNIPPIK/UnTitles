@@ -21,8 +21,9 @@ export class ShardManager extends ShardingManager {
             execArgv: [
                 "--expose-gc",
                 "--optimize_for_size",
-                "--experimental-require-module",
-                "--no-compilation-cache"
+                "--no-compilation-cache",
+                "--max-semi-space-size=10",
+                "--enable-source-maps"
             ],
             token: token,
             mode: "process",

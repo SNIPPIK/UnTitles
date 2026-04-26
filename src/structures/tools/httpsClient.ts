@@ -45,14 +45,7 @@ abstract class Request {
 
         // Пользовательский User-Agent
         userAgent?: string | boolean;
-    } & RequestOptions = {
-        //minVersion: 'TLSv1.2',
-        //maxVersion: 'TLSv1.3',
-
-        // Crypto
-        //ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256',
-        //sigalgs: 'ecdsa_secp256r1_sha256:rsa_pss_rsae_sha256:rsa_pkcs1_sha256',
-    };
+    } & RequestOptions = {};
 
     /**
      * @description Получаем протокол ссылки

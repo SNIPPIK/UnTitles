@@ -16,29 +16,20 @@ import { env } from "#app/env";
 export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     private static isProxy = env.get<boolean>("proxy.ws", false);
 
-    /**
-     * @description Адрес для подключения по websocket
-     * @private
-     */
+    /** Адрес для подключения по websocket */
     private _endpoint: string;
 
-    /**
-     * @description Менеджер жизни подключения
-     * @private
-     */
+    /** Менеджер жизни подключения */
     private _heartbeat: HeartbeatManager;
 
-    /**
-     * @description Клиент websocket secure
-     * @private
-     */
+    /** Клиент WSS подключения к endpoint */
     private ws: WebSocket;
 
-    /**
-     * @description Последовательность запроса
-     * @public
-     */
-    public sequence: number = -1;
+    /** Очередь исходящих сообщений, пока нет активного подключения */
+    private queue: Array<Buffer | string> = [];
+
+    /** Последовательность запроса */
+    public sequence: number = 0;
 
     /**
      * @description Задержка WS ответа между UDP пакетами
@@ -58,11 +49,22 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     };
 
     /**
-     * @description Отправляем пакет для работы discord
+     * @description Отправляем пакет для работы discord.
+     * Если нет активного подключения, пакет помещается в очередь.
      * @param payload - Данные Discord Voice Opcodes
      * @public
      */
     public set packet(payload: WebSocketOpcodes.extract | WebSocketOpcodes.dave_opcodes | Buffer) {
+        // Если ws нет или он не готов — ставим в очередь
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            if (payload instanceof Buffer) {
+                this.queue.push(payload);
+            } else {
+                this.queue.push(JSON.stringify(payload));
+            }
+            return;
+        }
+
         try {
             if (payload instanceof Buffer) this.ws.send(payload);
             else this.ws.send(JSON.stringify(payload));
@@ -124,6 +126,9 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             this.reset();
         }
 
+        // Очищаем очередь перед новым подключением
+        this.queue = [];
+
         this._endpoint = endpoint;
         this.ws = new WebSocket(`wss://${endpoint}?v=8`, {
             // Можно ли использовать прокси для подключения WS
@@ -137,6 +142,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.ws.onopen = () => {
             this.emit("open");
             this.emit("info", `[WebSocket] has open connection`);
+            this.flushQueue();
         };
 
         // Закрытие websocket соединения
@@ -174,14 +180,31 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     };
 
     /**
+     * @description Отправляет все сообщения из очереди по открытому соединению
+     * @private
+     */
+    private flushQueue = (): void => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+        while (this.queue.length > 0) {
+            const msg = this.queue.shift();
+            try {
+                this.ws.send(msg);
+            } catch (err) {
+                this.emit("error", err instanceof Error ? err : new Error(String(err)));
+            }
+        }
+    };
+
+    /**
      * @description Читаем буфер или json в виде строчки
      * @param data - Raw данные из websocket
      * @private
      */
     private readRawData = (data: Data) => {
         // Если пришел буфер
-        if (data instanceof Buffer || data instanceof ArrayBuffer) {
-            const buffer = data instanceof ArrayBuffer ? Buffer.from(data) : data;
+        if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
+            const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
             const op = buffer.readUInt8(2) as WebSocketOpcodes.dave_opcodes["op"];
             const payload = buffer.subarray(3);
             const sequence = buffer.readUInt16BE(0);
@@ -216,7 +239,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         const payload = this.readRawData(data.data);
 
         // Если нет данных
-        if (!payload) return null;
+        if (!payload) return;
 
         // Если есть последний seq
         if ("seq" in payload) this.sequence = payload.seq;
@@ -321,6 +344,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         super.destroy();
         this.sequence = null;
         this._endpoint = null;
+        this.queue = [];
 
         if (this._heartbeat) {
             this._heartbeat.destroy();

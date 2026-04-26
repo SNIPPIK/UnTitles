@@ -10,28 +10,16 @@ import { TypedEmitter, Logger } from "#structures";
  * @public
  */
 export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
-    /**
-     * @description Текущий статус подключения
-     * @private
-     */
+    /** Текущий статус подключения */
     private _status: ConnectionStatus = ConnectionStatus.disconnected;
 
-    /**
-     * @description Менеджер спикера
-     * @private
-     */
+    /** Менеджер спикера */
     private speaker: VoiceSpeakerManager | null = new VoiceSpeakerManager(this);
 
-    /**
-     * @description Функции для общения с websocket клиента
-     * @public
-     */
+    /** Функции для общения с websocket клиента */
     public adapter: VoiceAdapter | null = new VoiceAdapter();
 
-    /**
-     * @description Транспортный класс, соединяющий в себе весь функционал
-     * @public
-     */
+    /** Транспортный класс, соединяющий в себе весь функционал */
     public transport: Transport = null;
 
     /**
@@ -222,22 +210,13 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
  * @private
  */
 interface VoiceConnectionEvents {
-    /**
-     * @description Событие получения лога от голосового канала
-     * @readonly
-     */
+    /** Событие получения лога от голосового канала */
     readonly "info": (status: string | Error) => void;
 
-    /**
-     * @description Событие подключения к голосовому каналу
-     * @readonly
-     */
+    /** Событие подключения к голосовому каналу */
     readonly "connect": () => void;
 
-    /**
-     * @description Событие отключения от голосового канала
-     * @readonly
-     */
+    /** Событие отключения от голосового канала */
     readonly "disconnect": () => void;
 }
 
@@ -249,10 +228,17 @@ interface VoiceConnectionEvents {
  * @private
  */
 enum ConnectionStatus {
+    /** Статус при котором голосовое подключение отключено */
     disconnected = "disconnected",
+
+    /** Статус при котором производится переподключение*/
     reconnecting = "reconnecting",
+
+    /** Статус при котором голосовое соединение начало соединение (WS, UDP, RTP, DAVE и тп) */
     connecting = "connecting",
-    connected = "connected",
+
+    /** Статус при котором голосовое соединение с каналом установлено (WS, UDP, RTP, DAVE и тп) */
+    connected = "connected"
 }
 
 /**
@@ -262,39 +248,21 @@ enum ConnectionStatus {
  * @public
  */
 export interface VoiceConnectionConfiguration {
-    /**
-     * @description Идентификатор гильдии
-     * @private
-     */
+    /** Идентификатор гильдии */
     guild_id?:    string;
 
-    /**
-     * @description Идентификатор канала
-     * @private
-     */
+    /** Идентификатор канала */
     channel_id:   string;
 
-    /**
-     * @description Отключен ли звук
-     * @private
-     */
+    /** Отключен ли звук */
     self_deaf:    boolean;
 
-    /**
-     * @description Приглушен ли бот (отключен микрофон)
-     * @private
-     */
+    /** Приглушен ли бот (отключен микрофон/спикер) */
     self_mute:    boolean;
 
-    /**
-     * @description Будет ли бот транслировать с помощью "Go Live"
-     * @deprecated
-     */
+    /** Будет ли бот транслировать с помощью "Go Live" */
     self_stream?: boolean;
 
-    /**
-     * @description Тип спикера, для отправки аудио пакетов в голосовой канал
-     * @private
-     */
+    /** Тип спикера, для отправки аудио пакетов в голосовой канал */
     self_speaker?: SpeakerType;
 }

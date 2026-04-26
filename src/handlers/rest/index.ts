@@ -142,6 +142,10 @@ class RestWorker<T extends APIRequestsKeys> {
             const worker = this.worker = SimpleWorker.create<RestServerSide.Data>({
                 file: __dirname + "/index.worker",
                 options: {
+                    execArgv: [
+                        "--experimental-require-module",
+                        "--enable-source-maps"
+                    ],
                     workerData: { rest: true },
                 },
                 postMessage: { data: true },

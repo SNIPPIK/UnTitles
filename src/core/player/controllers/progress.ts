@@ -33,12 +33,6 @@ let buttons: { [key: string]: string; } = null;
  * @public
  */
 export class PlayerProgress {
-    /**
-     * @description Создаем класс для отображения прогресс бара
-     * @param size - Размер
-     * @constructor
-     * @public
-     */
     public constructor(private size: number = 15) {};
 
     /**
@@ -86,23 +80,17 @@ export class PlayerProgress {
  * @private
  */
 interface PlayerProgressInput {
-    /**
-     * @description Название платформы
-     * @public
-     */
+    /** Название платформы */
     platform: RestAPINames;
 
-    /**
-     * @description Данные о времени трека
-     * @public
-     */
+    /** Данные о времени трека */
     duration: {
-        // Текущее время
+        /** Текущее время */
         current: number;
 
-        // Общее время
+        /** Общее время */
         total: number
-    }
+    };
 }
 
 /**

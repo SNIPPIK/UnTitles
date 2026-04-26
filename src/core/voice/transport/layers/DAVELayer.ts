@@ -96,7 +96,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
          * Обработчик события `"key"`: вызывается, когда сессия генерирует новый KeyPackage.
          * Отправляет его через WebSocket с префиксом-опкодом.
          */
-        session.on("key", (key) => {
+        session.on("key", async (key) => {
             ws.packet = Buffer.concat([OPCODE_DAVE_MLS_KEY, key]);
         });
 
@@ -104,7 +104,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
          * Обработчик события `"invalidateTransition"`: вызывается, когда переход признан недействительным.
          * Отправляет серверу сообщение с идентификатором перехода.
          */
-        session.on("invalidateTransition", (transitionId) => {
+        session.on("invalidateTransition", async (transitionId) => {
             ws.packet = {
                 op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,
                 d: {
@@ -120,7 +120,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
          * - `DaveExecuteTransition` – выполнение перехода
          * - `DavePrepareEpoch` – подготовка новой эпохи
          */
-        ws.on("daveSession", ({ op, d }) => {
+        ws.on("daveSession", async ({ op, d }) => {
             switch (op) {
                 /**
                  * @description Подготовка перехода (transition) на новую версию протокола DAVE.
@@ -149,7 +149,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
                  *              Ответа не требуется.
                  */
                 case VoiceOpcodes.DaveExecuteTransition: {
-                    if (!session.isTransitioning) session.executeTransition(d.transition_id);
+                    session.executeTransition(d.transition_id);
                     return;
                 }
 
@@ -175,7 +175,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
          * - `DaveMlsAnnounceCommitTransition` – обработка коммита для перехода.
          * - `DaveMlsWelcome` – обработка welcome-сообщения.
          */
-        ws.on("binary", ({ op, payload }) => {
+        ws.on("binary", async ({ op, payload }) => {
             switch (op) {
                 /**
                  * @description Установка внешнего отправителя (External Sender) для MLS-сессии.
@@ -211,7 +211,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
                  */
                 case VoiceOpcodes.DaveMlsAnnounceCommitTransition: {
                     const { transition_id, success } = session.processCommit(payload);
-                    if (success && transition_id !== 0) {
+                    if (success) {
                         ws.packet = {
                             op: VoiceOpcodes.DaveTransitionReady,
                             d: { transition_id },
@@ -227,7 +227,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
                  */
                 case VoiceOpcodes.DaveMlsWelcome: {
                     const { transition_id, success } = session.processWelcome(payload);
-                    if (success && transition_id !== 0) {
+                    if (success) {
                         ws.packet = {
                             op: VoiceOpcodes.DaveTransitionReady,
                             d: { transition_id },

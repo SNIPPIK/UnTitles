@@ -175,12 +175,12 @@ export class Track extends TrackResolvers {
     };
 
     /**
-     * @description Трек может быть буферизирован?
+     * @description Является ли трек потоковым
      * @public
      */
-    public get isBuffered() {
+    public get isLive() {
         const current = this._duration.total;
-        return current < TRACK_BUFFERED_TIME && current !== 0;
+        return !(current < TRACK_BUFFERED_TIME && current !== 0);
     };
 
     /**
@@ -240,17 +240,9 @@ interface TrackUser {
  * @private
  */
 interface TrackDuration {
-    /**
-     * @description Время визуальное 00:00
-     * @readonly
-     * @private
-     */
+    /** Время визуальное 00:00 */
     split?: string;
 
-    /**
-     * @description Время в секундах
-     * @readonly
-     * @private
-     */
+    /** Время трека в секундах */
     total: number;
 }
