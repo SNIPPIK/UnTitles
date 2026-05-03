@@ -22,8 +22,6 @@ jobs:
           - host: windows-latest
             target: x86_64-pc-windows-msvc
           - host: windows-latest
-            target: i686-pc-windows-msvc
-          - host: windows-latest
             target: aarch64-pc-windows-msvc
 
           # Linux (glibc)
@@ -92,6 +90,11 @@ jobs:
           
           if [ "${{ matrix.settings.cross }}" == "true" ]; then
             ARGS="$ARGS --cross-compile"
+          fi
+          
+          # MACOS:
+          if [[ "${{ matrix.settings.target }}" == *"-apple-darwin"* ]]; then
+            export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
           fi
           
           npx napi build $ARGS --cwd ./rs --js index.cjs
