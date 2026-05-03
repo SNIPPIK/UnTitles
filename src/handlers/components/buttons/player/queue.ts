@@ -33,7 +33,7 @@ class ButtonQueue extends Component<"button"> {
                         "components": [
                             {
                                 "type": 10,
-                                "content": `### ${db.images.disk_emoji} **[${track.artist.title}](${track.artist.url})**`
+                                "content": `### ${db.emoji.disk} **[${track.artist.title}](${track.artist.url})**`
                             },
                             {
                                 "type": 10,

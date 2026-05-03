@@ -5,4 +5,4 @@ IRG
 build
 node_modules
 package-lock.json
-src-rs/target
+rs/target

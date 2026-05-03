@@ -302,7 +302,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @description Если подключились новые клиенты
          * @event ClientConnect
          */
-        this._ws.on("UsersRJC", ({d}) => {
+        this._ws.on("Users", ({d}) => {
             if ("user_id" in d) this.adapter.clients.delete(d.user_id);
             else {
                 for (const id of d.user_ids) this.adapter.clients.add(id);

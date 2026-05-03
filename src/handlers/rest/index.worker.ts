@@ -167,7 +167,7 @@ class RestServerLoader extends handler<RestServerSide.API> {
      * @param registry - Реестр, в который будут добавлены загруженные платформы.
      */
     public constructor(registry: RestRegistry) {
-        super("build/src/handlers/rest");
+        super("src/handlers/rest");
         this.registry = registry;
         this.loadAndRegister();
     };

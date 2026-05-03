@@ -61,7 +61,7 @@ class rest_request extends Event<"rest/request"> {
                                    {type: 10, content: `### ${platform.platform}.${api.type}`},
                                    {
                                        type: 10,
-                                       content: `${locale._(ctx.locale, platform.audio ? "api.platform.request" : "api.platform.request.long", [db.images.loading, platform.platform])}`
+                                       content: `${locale._(ctx.locale, platform.audio ? "api.platform.request" : "api.platform.request.long", [db.emoji.loading, platform.platform])}`
                                    },
                                    {type: 10, content: `-# ${ctx.user.username}`},
                                ],

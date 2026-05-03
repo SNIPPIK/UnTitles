@@ -29,20 +29,14 @@ impl RingBuffer {
     /// Реально выделяется `capacity + 1` слотов, чтобы отличать пустоту от заполненности.
     pub fn new(capacity: usize) -> Self {
         assert!(capacity > 0, "Capacity must be greater than 0");
-
-        // Для кольцевого буфера нужно на 1 слот больше, чтобы отличать состояние "пуст" от "полон".
         let real_capacity = capacity + 1;
-        let mut buffer = Vec::with_capacity(real_capacity);
-        
-        // Выделяем память с инициализацией MaybeUninit для избежания Undefined Behavior
-        unsafe {
-            for _ in 0..real_capacity {
-                buffer.push(MaybeUninit::new(Vec::new()));
-            }
-            buffer.set_len(real_capacity);
-        }
 
-        Self {
+        // Создаём полностью неинициализированные слоты
+        let buffer: Vec<MaybeUninit<Vec<u8>>> = (0..real_capacity)
+            .map(|_| MaybeUninit::uninit())
+            .collect();
+
+        RingBuffer {
             buffer: buffer.into_boxed_slice(),
             capacity: real_capacity,
             head: AtomicUsize::new(0),
@@ -51,7 +45,7 @@ impl RingBuffer {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.buffer.len() == 0
+        self.head.load(Ordering::Relaxed) == self.tail.load(Ordering::Relaxed)
     }
 
     /// Возвращает текущее количество элементов в буфере.
@@ -119,7 +113,7 @@ impl RingBuffer {
     /// 4. Пытаемся атомарно заменить `tail` на `next_tail` с помощью `compare_exchange_weak`.
     /// 5. Если успешно — записываем данные в зарезервированный слот.
     /// 6. Если CAS не удался (другой поток изменил `tail`), повторяем с новым значением.
-    pub fn push_front(&self, data: Vec<u8>) -> Result<(), Vec<u8>> {
+    /*pub fn push_front(&self, data: Vec<u8>) -> Result<(), Vec<u8>> {
         let tail = self.tail.load(Ordering::Relaxed);
         let next_tail = if tail == 0 { self.capacity - 1 } else { tail - 1 };
 
@@ -138,7 +132,7 @@ impl RingBuffer {
         // Release нужен, чтобы производитель увидел, что места в буфере стало МЕНЬШЕ.
         self.tail.store(next_tail, Ordering::Release);
         Ok(())
-    }
+    }*/
 
     /// Извлекает элемент из начала очереди (со стороны потребителя).
     /// Возвращает `None`, если буфер пуст.
@@ -186,24 +180,25 @@ impl RingBuffer {
 
         let real_idx = (tail + index) % self.capacity;
         unsafe {
-            let slot = self.buffer.as_ptr().add(real_idx) as *const MaybeUninit<Vec<u8>>;
+            let slot = self.buffer.as_ptr().add(real_idx);
             // Клонируем данные, находящиеся в Vec<u8>
             Some((*(*slot).as_ptr()).clone())
         }
     }
 
-    /// Внутренний метод для удаления элементов в заданном диапазоне индексов
+    /// Удаляет элементы в заданном диапазоне индексов (полуинтервал [start, end)).
+    /// # Safety
+    /// Все слоты в диапазоне должны быть инициализированы (содержать валидный `Vec<u8>`).
+    /// Вызывающий обязан гарантировать это.
     fn drop_range(&mut self, start: usize, end: usize) {
         unsafe {
             for i in start..end {
-                // Получаем указатель на данные внутри MaybeUninit
-                let slot_ptr = self.buffer.as_mut_ptr().add(i) as *mut Vec<u8>;
-                // Вызываем деструктор Vec<u8> прямо по адресу
-                ptr::drop_in_place(slot_ptr);
+                let slot = self.buffer.as_mut_ptr().add(i);
+                ptr::drop_in_place((*slot).as_mut_ptr());
             }
         }
     }
-    
+
     /// Очищает кольцевой буфер от аудио данных
     pub fn clear(&mut self) {
         while self.pop().is_some() {}
@@ -216,12 +211,15 @@ impl Drop for RingBuffer {
         let head = self.head.load(Ordering::Acquire);
         let tail = self.tail.load(Ordering::Acquire);
 
-        // Вспомогательная логика для удаления диапазона
-        if tail <= head {
-            // Данные лежат сплошным куском: [....tailSSSShead....]
+        if head == tail {
+            return; // Уже пусто
+        }
+
+        if tail < head {
+            // [tail, head) – непрерывный диапазон
             self.drop_range(tail, head);
         } else {
-            // Данные завернулись: [SShead........tailSSSS]
+            // Два диапазона: [tail, capacity) и [0, head)
             self.drop_range(tail, self.capacity);
             self.drop_range(0, head);
         }

@@ -17,15 +17,6 @@ import { isIPv4 } from "node:net";
  * Все сетевые операции (отправка, приём, буферизация) выполняются на стороне Rust
  * в отдельных потоках, что обеспечивает высокую производительность и не блокирует
  * цикл событий Node.js. JavaScript-слой только передаёт данные и реагирует на события.
- *
- * @example
- * ```ts
- * const udp = new VoiceUDPSocket();
- * udp.on('discovery', (info) => console.log('IP:', info.ip, 'Port:', info.port));
- * udp.on('message', (buffer) => console.log('Received:', buffer));
- * udp.connect(readyData);
- * ```
- *
  * @public
  */
 export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
@@ -76,16 +67,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      *
      * @throws Не выбрасывает ошибку напрямую, но при ошибке (например, переполнение
      *         внутренней очереди Rust) генерирует событие `error`.
-     *
      * @public
-     *
-     * @example
-     * // Отправить один пакет
-     * socket.packet(opusFrame);
-     *
-     * @example
-     * // Отправить несколько пакетов за раз
-     * socket.packet([frame1, frame2, frame3]);
      */
     public packet = (packet: Buffer[] | Buffer): void => {
         try {
@@ -122,8 +104,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @remarks
      * Если сокет уже существовал, он будет уничтожен (`reset()`) перед созданием нового.
      * Сразу после создания сокета запускается внутренний поток Rust, который слушает
-     * входящие пакеты и вызывает переданный колбэк для каждого сообщения.
-     *
+     * входящие пакеты и вызывает функцию для каждого сообщения.
      * @public
      */
     public connect = (options: WebSocketOpcodes.ready["d"]): void => {
@@ -133,7 +114,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
         this.socket = new UDPSocket(`${options.ip}:${options.port}`);
         this._status = VoiceUDPSocketStatuses.connecting;
 
-        // Rust создаст отдельный поток и будет вызывать этот колбэк для каждого полученного пакета
+        // Rust создаст отдельный поток и будет вызывать для каждого полученного пакета
         this.socket.startListening(this.handleMessage);
     };
 

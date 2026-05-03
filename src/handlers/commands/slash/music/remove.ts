@@ -57,7 +57,7 @@ import { db } from "#app/db";
             const highlightIndex = index - startIndex;
             return ctx.respond(
                 tracks.map((track, i) => ({
-                    name: `${startIndex + i + 1}. ${i === highlightIndex ? "🗑️" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                    name: `${startIndex + i + 1}. ${i === highlightIndex ? "🗑️" : `${db.emoji.queue}`} (${track.time.split}) ${track.name.slice(0, 75)}`,
                     value: startIndex + i + 1
                 }))
             );

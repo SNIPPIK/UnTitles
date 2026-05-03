@@ -126,14 +126,16 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected scheduleStep(): void {
-        const delay = Math.max(0, this.nextExecutionTime - this.time);
+        const delay = Math.max(this.options.duration, this.nextExecutionTime - this.time);
         this.clearTimer();
 
-        if (delay > 0) this.timer = setTimeout(() => this.step(), delay);
-        else process.nextTick(() => {
-            this._stepCycle();
-            this.timer = setTimeout(() => this.step(), this.options.duration * 0.8);
-        });
+        if (delay <= 0) {
+            // Мы уже отстаем, выполняем следующий шаг максимально быстро
+            this.timer = setImmediate(this.step);
+        } else {
+            // Обычное планирование
+            this.timer = setTimeout(this.step, delay);
+        }
     };
 
     /**
@@ -141,28 +143,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @private
      */
     private step = (): void => {
-        if (this.size === 0) return this.reset();
-
-        const start = this.time;
-        try {
-            this._stepCycle();
-        } catch (error) {
-            console.error("[CycleSystem] Unhandled error in _stepCycle:", error);
-        }
-        const elapsed = this.time - start; // реальное время выполнения шага
-
-        // Вычисляем задержку до следующего старта
-        let delay = this.options.duration - elapsed;
-        if (delay < 0) delay = 0; // не может быть отрицательной
-
-        // Следующее время выполнения = сейчас + скорректированная задержка
-        this.nextExecutionTime = this.time + delay;
-        this.lastDuration = this.options.duration;
-
-        this.scheduleStep(); // scheduleStep использует nextExecutionTime для setTimeout
-    };
-
-    /*private step = (): void => {
         // Если очередь пуста – останавливаем цикл
         if (this.size === 0) return this.reset();
 
@@ -180,7 +160,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
         // Если мы сильно отстали (например, из-за долгой обработки),
         // сбрасываем nextExecutionTime, чтобы избежать каскадного отставания
-        if (this.nextExecutionTime < now) {
+        if (this.nextExecutionTime <= now) {
             this.nextExecutionTime = now + this.options.duration;
         }
 
@@ -188,7 +168,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
         // Планируем следующий шаг
         this.scheduleStep();
-    };*/
+    };
 
     /**
      * @description Абстрактный метод, выполняющий полезную работу на каждом шаге
@@ -216,13 +196,16 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
 
             try {
                 const result = this.options.execute(item);
-                // Если результат – Promise, обрабатываем возможные ошибки асинхронно
-                if (result instanceof Promise) {
-                    result.catch((err) => {
-                        console.error("[TaskCycle] Async execution error:", err);
-                        this.delete(item);
-                    });
-                }
+
+                setImmediate(() => {
+                    // Если результат – Promise, обрабатываем возможные ошибки асинхронно
+                    if (result instanceof Promise) {
+                        result.catch((err) => {
+                            console.error("[TaskCycle] Async execution error:", err);
+                            this.delete(item);
+                        });
+                    }
+                });
             } catch (error) {
                 // Синхронная ошибка – удаляем элемент и логируем
                 console.error("[TaskCycle] Sync execution error:", error);
@@ -234,7 +217,7 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
         if (this.options.custom?.step) {
             this.options.custom.step();
         }
-    }
+    };
 }
 
 /**
@@ -245,45 +228,31 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
  */
 export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
     /**
-     * @description Используем Date.now() для совместимости с оригиналом
-     * @protected
-     */
-    protected get time(): number {
-        return Date.now();
-    }
-
-    /**
      * @description Выполняет все подходящие элементы, не дожидаясь Promise
      * @protected
      */
     protected _stepCycle(): void {
         for (const item of this) {
             if (!this.options.filter(item)) continue;
-            this.runItem(item);
+            setImmediate(() => {
+                Promise.resolve(this.options.execute(item))
+                    .then((keep) => {
+                        if (keep === false) {
+                            this.delete(item);
+                        }
+                    })
+                    .catch((err) => {
+                        console.error("[PromiseCycle] Promise execution error:", err);
+                        this.delete(item);
+                    });
+            })
         }
 
+        // Вызов пользовательского хука после шага
         if (this.options.custom?.step) {
             this.options.custom.step();
         }
-    }
-
-    /**
-     * @description Запускает асинхронную обработку элемента с автоматическим удалением при ошибке или возврате false
-     * @param item - элемент для обработки
-     * @private
-     */
-    private runItem(item: T): void {
-        Promise.resolve(this.options.execute(item))
-            .then((keep) => {
-                if (keep === false) {
-                    this.delete(item);
-                }
-            })
-            .catch((err) => {
-                console.error("[PromiseCycle] Promise execution error:", err);
-                this.delete(item);
-            });
-    }
+    };
 }
 
 /**
@@ -301,8 +270,10 @@ interface BaseCycleConfig<T> {
     readonly custom?: {
         /** Вызывается перед добавлением элемента */
         readonly push?: (item: T) => void;
+
         /** Вызывается перед удалением элемента */
         readonly remove?: (item: T) => void;
+
         /** Вызывается после завершения шага цикла */
         readonly step?: () => void;
     };
@@ -322,6 +293,6 @@ interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
  * @interface AsyncCycleConfig
  */
 interface AsyncCycleConfig<T> extends BaseCycleConfig<T> {
-    /** Функция обработки элемента, должна вернуть Promise<boolean> – true чтобы оставить элемент, false – удалить */
+    /** Функция обработки элемента, должна вернуть Promise<boolean> – true, чтобы оставить элемент, false – удалить */
     readonly execute: (item: T) => Promise<boolean>;
 }

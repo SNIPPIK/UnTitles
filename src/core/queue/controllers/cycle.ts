@@ -24,7 +24,7 @@ export class ControllerCycles {
  * @const PLAYER_SEND_NATIVE
  * @private
  */
-const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 10);
+const PLAYER_SEND_NATIVE = Math.floor(OPUS_FRAME_SIZE * 5);
 
 /**
  * @author SNIPPIK
@@ -36,14 +36,20 @@ const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 5);
 
 /**
  * @author SNIPPIK
+ * @description Кол-во пакетов, которые могут быть в буфере UDP, если превысить лимит то, пакеты будут потеряны
+ * @const PLAYER_SEND_LIMIT
+ * @private
+ */
+const PLAYER_SEND_LIMIT = PLAYER_SEND_POOL * 3;
+
+/**
+ * @author SNIPPIK
  * @description Циклическая система плееров, используется для отправки аудио пакетов
  * @class AudioPlayers
  * @extends TaskCycle
  * @private
  */
 class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
-    private _lastAdjust = 0;
-
     /**
      * @description Запускаем циклическую систему плееров, весь логический функционал здесь
      * @constructor
@@ -57,19 +63,41 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             // Кастомные функции (если хочется немного изменить логику выполнения)
             custom: {
                 step: () => {
-                    const now = this.time;
-                    const drift = Math.abs(now - this.insideTime);
-                    const frames = drift > PLAYER_SEND_NATIVE ? drift + PLAYER_SEND_NATIVE : PLAYER_SEND_NATIVE;
-                    const quantized = Math.max(PLAYER_SEND_NATIVE, Math.ceil(frames / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE);
+                    let anyStarving = false;
+                    let anyOverloaded = false;
+                    let activePlayers = 0;
 
-                    // Коррекция только если нужно и время пришло
-                    if ((now - this._lastAdjust >= PLAYER_SEND_NATIVE) && (this.options.duration !== quantized)) {
-                        const step = this.options.duration > quantized ? -OPUS_FRAME_SIZE : OPUS_FRAME_SIZE;
-                        this.options.duration = Math.max(PLAYER_SEND_NATIVE, Math.min(this.options.duration + step, quantized));
-
-                        // Добавляем Cooldown
-                        this._lastAdjust = now + PLAYER_SEND_NATIVE * 5;
+                    for (const p of this) {
+                        if (!this.options.filter(p)) continue;
+                        activePlayers++;
+                        if ((p as any)._starving) anyStarving = true;
+                        // Перегрузка: буфер UDP больше 80% лимита
+                        const packets = p.voice?.connection?.udp?.packets ?? 0;
+                        if (packets > PLAYER_SEND_LIMIT * 0.8) anyOverloaded = true;
+                        // Сбрасываем флаг для следующего тика
+                        (p as any)._starving = false;
                     }
+
+                    if (activePlayers === 0) return;
+
+                    let newDuration = this.options.duration;
+
+                    if (anyStarving) {
+                        // Голодание – увеличиваем интервал (замедляемся), даём накопиться данным
+                        newDuration = Math.min(PLAYER_SEND_NATIVE * 2, this.options.duration + OPUS_FRAME_SIZE);
+                    } else if (anyOverloaded) {
+                        // Буфер переполнен – уменьшаем интервал (ускоряем отправку)
+                        newDuration = Math.max(PLAYER_SEND_NATIVE / 2, this.options.duration - OPUS_FRAME_SIZE);
+                    } else {
+                        // Плавно возвращаемся к базовому интервалу
+                        if (this.options.duration > PLAYER_SEND_NATIVE) {
+                            newDuration = Math.max(PLAYER_SEND_NATIVE, this.options.duration - OPUS_FRAME_SIZE);
+                        } else if (this.options.duration < PLAYER_SEND_NATIVE) {
+                            newDuration = Math.min(PLAYER_SEND_NATIVE, this.options.duration + OPUS_FRAME_SIZE);
+                        }
+                    }
+
+                    this.options.duration = newDuration;
                 }
             },
 
@@ -82,7 +110,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
              *              Пакеты извлекаются из очереди аудиоданных и передаются в сокет.
              *              Если пакетов нет и очереди пусты, плеер переводится в состояние idle.
              *
-             * @param player - Экземпляр аудиоплеера, содержащий буфер аудиоданных и UDP-соединение.
+             * @param player - Экземпляр аудио плеера, содержащий буфер аудиоданных и UDP-соединение.
              *
              * @remarks
              * - Количество пакетов для отправки рассчитывается как `длительность фрейма / размер фрейма` + запас.
@@ -96,31 +124,43 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 const audio = player.audio.current;
                 const connection = player.voice.connection;
 
-                // Текущая задержка шага + кол-во объектов
+                // База: сколько пакетов нужно отправить, чтобы покрыть длительность шага
                 let toSend = Math.ceil(this.options.duration / OPUS_FRAME_SIZE) + this.size;
 
-                // Добавляем буфер, как и раньше
+                // Защита от переполнения буфера
+                if (connection.udp.packets > PLAYER_SEND_LIMIT) return;
+
+                // Если буфер почти пуст – запросим больше (запас)
                 if (connection.udp.packets <= PLAYER_SEND_POOL) {
                     toSend += PLAYER_SEND_POOL;
                 }
 
-                // вычисляем, сколько можно отправить, чтобы не превышать toSend + PLAYER_SEND_POOL
+                // Сколько пакетов можно взять, чтобы не переполнить буфер
                 const maxAllowedTotal = toSend + PLAYER_SEND_POOL;
-                const allowed = Math.max(0, maxAllowedTotal - connection.udp.packets);
+                let allowed = Math.max(0, maxAllowedTotal - connection.udp.packets);
 
+                let requested = 0;
                 if (allowed > 0) {
-                    // запрашиваем ровно allowed пакетов (audio.packetAt вернёт меньше, если нет)
                     const batch = audio.packetAt(allowed);
                     if (batch && batch.length > 0) {
                         connection.packet(batch);
                         player._buffered = batch.length;
+                        requested = batch.length;
                     }
                 }
 
-                // Если источник пуст И буфер в Rust полностью проигран:
+                // --- Главное: определяем голодание ---
+                // Если запросили хотя бы 1 пакет, но получили 0 – источник пуст, плеер голодает
+                // Или получили сильно меньше половины запрошенного – тоже не успевает
+                // Запоминаем на плеере для использования в custom.step
+                (player as any)._starving = (allowed > 0 && requested === 0) ||
+                    (allowed > 2 && requested < allowed / 2);
+
+                // Остановка плеера, если нет данных вообще
                 if (audio.packets === 0 && connection.udp.packets === 0) {
                     player.status = AudioPlayerState.idle;
                     player.cycle = false;
+                    (player as any)._starving = false;
                 }
             }
         });

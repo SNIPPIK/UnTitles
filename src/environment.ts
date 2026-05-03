@@ -14,12 +14,15 @@ export class Environment {
     public constructor() {
         try {
             if (fs.existsSync("node_modules/dotenv")) {
-                const dotenv = require("dotenv");
-                if (dotenv) dotenv.config();
+                (async () => {
+                    //@ts-ignore
+                    const { dotenv } = (await import('dotenv'))
+                    if (dotenv) dotenv.config();
+                })();
                 return;
             }
 
-            process.loadEnvFile(".env");
+            process?.["loadEnvFile"]?.(".env");
         } catch (error) {
             const path = __dirname.split(/\|\//);
             throw new Error(`[Environment] has not found .env file in directory ${path.splice(path.length, 1).join("/")}`);

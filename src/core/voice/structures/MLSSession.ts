@@ -252,7 +252,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
 
     /**
      * @description Обрабатывает welcome-сообщение от группы MLS (при добавлении нового участника).
-     * @param payload – бинарные данные welcome (первые 2 байта – transition_id, остальное – данные).
+     * @param payload - бинарные данные welcome (первые 2 байта – transition_id, остальное – данные).
      * @returns Результат перехода (успех/неудача и идентификатор).
      */
     public processWelcome = (payload: Buffer): TransitionResult => {
@@ -277,7 +277,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
 
     /**
      * @description Шифрует массив Opus-пакетов с использованием текущего состояния сессии.
-     * @param packets – массив исходных (не зашифрованных) пакетов.
+     * @param packets массив исходных (не зашифрованных) пакетов.
      * @returns Массив зашифрованных пакетов (или null, если шифрование невозможно).
      */
     public encrypt = (packets: Buffer[]) => {

@@ -15,7 +15,7 @@ export * from "./index.decorator.js";
  */
 export class Components extends handler<SupportComponent> {
     public constructor() {
-        super("build/src/handlers/components");
+        super("src/handlers/components");
     };
 
     /**

@@ -246,7 +246,7 @@ class RestYouTubeAPI extends RestServerSide.API {
         {
             name: "track",
             filter: /(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/,
-            execute: async (url, options) => {
+            execute: async (url, { audio }) => {
                 const ID = this.getID(/(watch|embed|youtu\.be|v\/)?([a-zA-Z0-9-_]{11})/, url)[0];
 
                 try {
@@ -257,7 +257,7 @@ class RestYouTubeAPI extends RestServerSide.API {
 
                     // Если трек есть в кеше
                     if (cache) {
-                        if (!options.audio) return cache;
+                        if (!audio) return cache;
 
                         // Если включена утилита кеширования аудио
                         else if (sdb.audio_saver) {
@@ -274,7 +274,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                         if (!this.audio) return cache;
                     }
 
-                    let api = await this.API(ID, options.audio);
+                    let api = await this.API(ID, audio);
 
                     // Если при получении данных возникла ошибка
                     if (api instanceof Error || api["playabilityStatus"]["status"] !== "OK") {
@@ -289,7 +289,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     const track = this.track(api["videoDetails"]);
 
                     // Если указано получение аудио
-                    if (options.audio) {
+                    if (audio && this.audio) {
                         // Если включена утилита кеширования
                         if (sdb.audio_saver) {
                             const check = sdb.audio_saver.status(`${this.url}/${ID}`);

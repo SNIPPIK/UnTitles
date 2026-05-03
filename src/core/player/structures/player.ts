@@ -480,7 +480,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Через время запускаем трек, что-бы не нарушать работу VoiceSocket
         // Что будет если нарушить работу VoiceSocket, пинг >=1000
-        this.play(0, PLAYER_TIMEOUT_OFFSET);
+        this.play(0, PLAYER_TIMEOUT_OFFSET).catch((err) => this.emit("player/error", this, err));
         return;
     };
 

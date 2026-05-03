@@ -1,6 +1,6 @@
-import { OPUS_FRAME_SIZE, SILENT_FRAME } from "#core/audio/opus.js";
-import { FfmpegProcess, AudioEngine, type iType } from "#native";
+import { OPUS_FRAME_SIZE } from "#core/audio/opus.js";
 import { FFMPEG_PATH } from "#core/audio/process.js";
+import { AudioEngine, type iType } from "#native";
 import type { Track } from "#core/queue/index.js";
 import { TypedEmitter } from "#structures";
 import { env } from "#app/env";
@@ -15,7 +15,7 @@ import { db } from "#app/db";
 const ENCODER_PARAMS = {
     /**
      * # Параметры
-     * - voip - Способствует улучшению разборчивости речи
+     * - voip - Способствует улучшению разборчивости речи, discord лучше работает с этим режимом
      * - audio - Поддерживайте верность вводимым данным (по умолчанию).
      * - lowdelay - Ограничьтесь только режимами с наименьшей задержкой, отключив режимы, оптимизированные для передачи голоса.
      */
@@ -26,7 +26,7 @@ const ENCODER_PARAMS = {
      * - off - Используйте кодирование с постоянной скоростью передачи данных.
      * - on - Используйте кодировку с переменной скоростью передачи данных (по умолчанию).
      */
-    vbr: "off",
+    vbr: "on",
 
     /** Потери при кодировании */
     lost: {
@@ -46,24 +46,22 @@ const ENCODER_PARAMS = {
  * @abstract
  */
 export class AudioResource extends TypedEmitter<AudioResourceEvents> {
-    protected engine: iType<typeof AudioEngine>;
-    protected process: iType<typeof FfmpegProcess>;
+    protected engine: iType<typeof AudioEngine> = new AudioEngine(10);
 
     /** Кол-во отданных пакетов */
     protected _played_frames = 0;
 
-    /** Можно ли читать поток */
-    protected _readable: boolean = false;
-
     /** Последнее заданное значение затухания */
     protected _afade = 0;
+
+    protected _timeout: NodeJS.Timeout;
 
     /**
      * @description Геттер состояния чтения, можно ли читать аудио поток
      * @public
      */
     public get readable(): boolean {
-        return this._readable;
+        return this.engine.size > 0;
     };
 
     /**
@@ -107,16 +105,15 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     private get hasPossibleBuffedStream() {
         const audio = this.engine;
-        const ffmpeg = this.process;
 
         // Если буфер почти полон (на 80%), ставим FFmpeg на паузу
         if (!audio.canAcceptThreshold(80)) {
-            ffmpeg.pause = true;
+            audio.pause = true;
             return false;
         }
 
         // Если в буфере стало просторно (меньше 40%), возобновляем чтение
-        else if (audio.canAcceptThreshold(40)) ffmpeg.pause = false;
+        else if (audio.canAcceptThreshold(40)) audio.pause = false;
         return true;
     };
 
@@ -213,31 +210,16 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         super();
         this._afade = !this.options.swapped ? db.queues.options.fade : db.queues.options.swapFade;
 
-        // Создаем аудио движок в Rust
-        this.engine = new AudioEngine(10);
+        // Запускаем получение аудио
+        this.engine.start(this.arguments, FFMPEG_PATH);
 
-        // Создаем процесс FFmpeg + OggParser в Rust
-        this.process = new FfmpegProcess(this.arguments, FFMPEG_PATH);
-
-        // Привязываем события через внутренний метод input
-        this.input({
-            events: {
-                destroy_callback: (p) => p.destroy
-            },
-            input: this.process,
-            decode: (p) => p.pipeStdout((frames) => {
-                if (this.engine) {
-                    // Если поток только начал чтение
-                    if (!this._readable) {
-                        this.engine.addPacket(SILENT_FRAME);
-                        this._readable = true;
-                        setImmediate(() => this.emit("readable"));
-                    }
-
-                    this.engine.addPackets(frames);
-                }
-            })
-        });
+        // Запускаем цикл для получения ответа от движка
+        this._timeout = setInterval(() => {
+            if (this.readable) {
+                clearInterval(this._timeout);
+                this.emit("readable");
+            }
+        }, 100);
     };
 
     /**
@@ -252,57 +234,24 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
     };
 
     /**
-     * @description Подключаем поток к ffmpeg
-     * @param options - Параметры для запуска
-     * @protected
-     */
-    protected input<T>(options: AudioResourceInput<T>) {
-        if (options.events.destroy) {
-            // Запускаем все события
-            for (const event of options.events.destroy) {
-                const path = options.events.path ? options.input[options.events.path] : options.input;
-
-                // Запускаем прослушивание события
-                path["once"](event, (err: Error) => {
-                    if (event === "error") this.emit("error", new Error(`AudioResource get ${err}`));
-                    options.events.destroy_callback(options.input);
-                });
-            }
-        }
-
-        // Разовая функция для удаления потока
-        this.once("close", () => options.events.destroy_callback(options.input));
-
-        // Выполняем функцию декодирования
-        return options.decode(options.input);
-    };
-
-    /**
      * @description Удаляем ненужные данные
      * @protected
      */
     public destroy() {
+        clearInterval(this._timeout);
+
         // Чистим все потоки от мусора
         this.emit("close", `[AudioResource] has destroyed`);
-
-        // Проверяем есть ли процесс
-        if (this.process) {
-            this.process.destroy();
-            this.process = null;
-        }
-
-        // Проверяем есть ли аудио
-        if (this.engine) {
-            this.engine.addPacket(SILENT_FRAME);
-
-            this.engine.clear();
-            this.engine = null;
-        }
 
         // Удаляем все вызовы функций
         super.destroy();
 
-        this._readable = null;
+        // Проверяем есть ли аудио
+        if (this.engine) {
+            this.engine.clear();
+            this.engine = null;
+        }
+
         this.options = null;
         this._played_frames = 0;
     };
@@ -349,30 +298,4 @@ interface AudioResourceEvents {
 
     /** Событие при котором поток получил ошибку */
     readonly "error": (error: Error) => void;
-}
-
-/**
- * @author SNIPPIK
- * @description Параметры для функции совмещения потоков
- * @interface AudioResourceInput
- * @private
- */
-interface AudioResourceInput<T> {
-    /** Входящий поток */
-    readonly input: T;
-
-    /** Отслеживаемые события для удаления */
-    readonly events: {
-        /** Имена событий для удаления потока */
-        destroy?: string[];
-
-        /** Функция для очистки потока */
-        destroy_callback: (input: T) => void;
-
-        /** Если надо конкретно откуда-то отслеживать события */
-        path?: string;
-    };
-
-    /** Как начать передавать данные из потока */
-    readonly decode?: (input: T) => void;
 }

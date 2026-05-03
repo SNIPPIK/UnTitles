@@ -50,19 +50,15 @@
 ---
 
 > [!IMPORTANT]
-> ⚠️ WatKLOK (UnTitles) is a complex technical project maintained exclusively by one author, `SNIPPIK`
+> ⚠️ WatKLOK (UnTitles) is a complex technical project maintained exclusively by one author, `SNIPPIK`  
 > Please respect the authorship and license of the project.
->
-> Audio issues
-> If your internet is unstable, losses will occur in any case.
-> It is impossible to completely eliminate `packet lost` due to the `UDP` protocol and other `discord` limitations.
 
 > [!TIP]
 > I recommend enabling the caching system in `.env`. This will allow you to play tracks even if the platform is completely blocked.
 > However, the voice system is simply not allowed to lose audio packets, even under critical load!
 
 > [!WARNING]
-> If you use a proxy, keep in mind that `FFmpeg` does not support socks. For such tasks, there's [`STH`](https://github.com/SNIPPIK/SHS)
+> If you use a proxy, keep in mind that `FFmpeg` does not support socks. For such tasks, there's [`STH`](https://github.com/SNIPPIK/SHS)  
 > ⚠️ Some functions require proper environment configuration (FFmpeg, proxy, native modules)
 ---
 
@@ -78,6 +74,8 @@
 
 ## 🚀 Advantages (WatKLOK)
 - The most complex operations are handled by Rust via n-api, providing almost complete independence from Node.js limitations.
+- You can define the decoder mode (`voip`, `audio`, `lowdelay`), enable/disable `VBR`, enable/disable packet loss during the download phase, and also enable `FEC`.
+- There are strict delay limits to limit audio corruption, which can also be changed!
 
 <details>
 <summary>Click to open</summary>
@@ -130,6 +128,12 @@ setInterval(() => {
 - **Audio Effects**: Smooth fade-in/fade-out for any actions (skip, seek, pause)
 - **Filters: 16+** built-in **audio filters** with the ability to easily add your own via the JSON config [(filters.json)](src/core/player/filters.json)
 - **Sync**: Direct synchronization of the audio stream without distortion introduced by software filters.
+
+> [!WARNING]
+> Losses on the client side are impossible, if a loss occurs accidentally you will see it in the `current track` message  
+> If your internet is unstable, losses will occur in any case.  
+> It is impossible to completely eliminate `packet lost` due to the `UDP` protocol and other `discord` limitations.
+
 
 ### Entire Audio Path
 <details>

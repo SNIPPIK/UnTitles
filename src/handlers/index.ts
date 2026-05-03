@@ -82,6 +82,7 @@ export abstract class handler<T = unknown> {
      * @protected
      */
     protected constructor(private readonly directory: string) {
+        if (fs.existsSync("build")) this.directory = `build/${this.directory}`;
     };
 
     /**

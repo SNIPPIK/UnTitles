@@ -26,6 +26,7 @@ import type { AudioFilter } from "#core/player/index.js";
 import { locale, Logger } from "#structures";
 import { handler } from "#handler";
 import { env } from "#app/env";
+import { db } from "#app/db";
 
 
 // Export decorator
@@ -97,7 +98,7 @@ export class Commands extends handler<Command> {
      * @public
      */
     public constructor() {
-        super("build/src/handlers/commands");
+        super("src/handlers/commands");
     };
 
     /**
@@ -213,7 +214,7 @@ export class Commands extends handler<Command> {
 
             // Показываем плейлист
             else if ("items" in rest) items.push({
-                name: `🎶 [${rest.items.length}] - ${rest.title?.slice(0, 70)}`,
+                name: `${db.emoji.queue} [${rest.items.length}] - ${rest.title?.slice(0, 70)}`,
                 value: rest.url
             });
 

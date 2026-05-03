@@ -15,7 +15,6 @@
   "engines": {
     "node": ">=24.0.0"
   },
-
   "imports": {
     "#core/*": "./build/src/core/*",
     "#handler": "./build/src/handlers/index.js",
@@ -29,11 +28,9 @@
     "#worker/db": "./build/src/database/index.worker.js",
     "#native": "./build/src/n-api.js"
   },
-
   "napi": {
-    "name": "watklok"
+    "binaryName": "watklok"
   },
-
   "dependencies": {
     "@discordjs/builders": "^1.14.1",
     "discord-api-types": "^0.38.47",
@@ -42,16 +39,23 @@
     "socks-proxy-agent": "^8.0.5",
     "ws": "^8.20.0"
   },
+  "optionalDependencies": {
+    "bufferutil": "^4.1.0",
+    "utf-8-validate": "^6.0.6"
+  },
   "devDependencies": {
-    "@napi-rs/cli": "^2.18.4",
+    "@napi-rs/cli": "^3.6.2",
     "@types/node": "^25.6.0",
     "typescript": "^6.0.3"
   },
   "scripts": {
     "start": "node ./build/src/index.js --ShardManager --optimize_for_size --expose-gc --no-compilation-cache --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
+    "start:bun": "bun ./src/index.ts --ShardManager --optimize_for_size --expose-gc --no-compilation-cache --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
+    
     "build": "tsc",
-    "build:native": "napi build --platform --release --cargo-cwd ./src-rs --js index.cjs && npm run build:bindings",
-    "build:native:dev": "napi build --platform --cargo-cwd ./src-rs --js index.cjs && npm run build:bindings",
-    "build:bindings": "node -e \"const fs = require('fs'); const p = 'build/native'; if (!fs.existsSync(p)) fs.mkdirSync(p, {recursive:true}); const f = fs.readdirSync('.').find(x => x.endsWith('.node')); if (f) { fs.renameSync(f, p + '/' + f); ['index.d.ts', 'index.cjs'].forEach(x => { if(fs.existsSync(x)) fs.renameSync(x, p + '/' + x) }); console.log('Moved ' + f + ' to ' + p); } else { console.log('Current dir: ' + process.cwd()); console.error('No .node file found here'); process.exit(1); }\""
+    "build:native": "npm run build:copy && napi build --platform --release --cwd ./rs --js index.cjs && npm run build:bindings",
+    "build:native:dev": "npm run build:copy && napi build --platform --cwd ./rs --js index.cjs && npm run build:bindings",
+    "build:copy": "node -e \"const fs=require('fs');fs.mkdirSync('rs',{recursive:true});fs.copyFileSync('package.json','rs/package.json')\"",
+    "build:bindings": "node -e \"const fs = require('fs'); const src = 'rs'; const dest = 'build/native'; if (!fs.existsSync(dest)) fs.mkdirSync(dest, {recursive:true}); const f = fs.readdirSync(src).find(x => x.endsWith('.node')); if (f) { fs.renameSync(src + '/' + f, dest + '/' + f); ['index.d.ts', 'index.cjs'].forEach(x => { const p = src + '/' + x; if(fs.existsSync(p)) fs.renameSync(p, dest + '/' + x) }); console.log('Moved ' + f + ' from ' + src + ' to ' + dest); } else { console.log('Source dir: ' + src); console.error('No .node file found in ' + src); process.exit(1); }\""
   }
 }

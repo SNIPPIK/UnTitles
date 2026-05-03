@@ -56,7 +56,7 @@ import {db} from "#app/db";
                     const Selected = center === value;
 
                     return {
-                        name: `${value + 1}. ${isCurrent && !Selected ? "▶️" : Selected && !isCurrent ? "➡️" : Selected && isCurrent ? "➡ 🎵️" : "🎶"} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
+                        name: `${value + 1}. ${isCurrent && !Selected ? db.emoji.current : Selected && !isCurrent ? db.emoji.select : Selected && isCurrent ? db.emoji.select : `${db.emoji.queue}`} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
                         value
                     };
                 })

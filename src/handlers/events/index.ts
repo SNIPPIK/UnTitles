@@ -30,7 +30,7 @@ export class Events extends handler<Event<SupportKeysOfEvents>> {
      * @public
      */
     public constructor() {
-        super("build/src/handlers/events");
+        super("src/handlers/events");
     };
 
     /**

@@ -40,10 +40,11 @@ pub struct AutoBalancer {
 
 impl AutoBalancer {
     pub fn new() -> Self {
-        let mut balancer = Self {
+        let mut balancer = AutoBalancer {
             workers: Vec::new(),
             session_map: DashMap::new()
         };
+        
         balancer.create_worker();
         balancer
     }
@@ -74,10 +75,7 @@ impl AutoBalancer {
 
                 // Чтобы не держать блокировку self.workers, выгружаем менеджер
                 let manager = w.lock().unwrap().manager.clone();
-                tokio::spawn(async move {
-                    manager.shutdown().await;
-                });
-
+                manager.shutdown();
                 false // Удаляем
             } else {
                 true // Оставляем
@@ -126,6 +124,7 @@ impl AutoBalancer {
                 let w_lock = worker.lock().unwrap();
                 // Удаляем из DashMap внутри воркера
                 w_lock.sessions.remove(&id);
+                
                 // Удаляем из CycleManager
                 w_lock.manager.remove_session(id);
             }

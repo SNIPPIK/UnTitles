@@ -1,5 +1,6 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest/index.js";
 import { httpsClient, locale } from "#structures";
+import { sdb } from "#worker/db";
 
 /**
  * @author SNIPPIK
@@ -23,7 +24,7 @@ import { httpsClient, locale } from "#structures";
     name: "SOUNDCLOUD",
     url: "soundcloud.com",
     color: 15105570,
-    audio: true,
+    audio: false,
     auth: false,
     filter: /^(?:(https?):\/\/)?(?:(?:www|m)\.)?(api\.soundcloud\.com|soundcloud\.com|snd\.sc)\/(.*)$/,
 })
@@ -59,6 +60,28 @@ class RestSoundCloudAPI extends RestServerSide.API {
             execute: async (url, { audio }) => {
                 const fixed = url.split("?")[0];
 
+                // Интеграция с утилитой кеширования
+                const cache = sdb.meta_saver?.get?.(`${this.url}/track/${fixed}`);
+
+                // Если трек есть в кеше
+                if (cache) {
+                    if (!audio) return cache;
+
+                    // Если включена утилита кеширования аудио
+                    else if (sdb.audio_saver) {
+                        const check = sdb.audio_saver.status(`${this.url}/${fixed}`);
+
+                        // Если есть кеш аудио
+                        if (check.status === "ended") {
+                            cache.audio = check.path;
+                            return cache;
+                        }
+                    }
+
+                    // Если нет возможности получить аудио
+                    if (!this.audio) return cache;
+                }
+
                 try {
                     // Создаем запрос
                     const request = await this.API(`resolve?url=${fixed}`);
@@ -73,7 +96,18 @@ class RestSoundCloudAPI extends RestServerSide.API {
                         const track = this.track(api);
 
                         // Если указано получение аудио
-                        if (audio) {
+                        if (audio && this.audio) {
+                            // Если включена утилита кеширования
+                            if (sdb.audio_saver) {
+                                const check = sdb.audio_saver.status(`${this.url}/${fixed}`);
+
+                                // Если есть кеш аудио
+                                if (check.status === "ended") {
+                                    track.audio = check.path;
+                                    return track;
+                                }
+                            }
+
                             // Если трек не доступен к загрузке
                             if (!api.streamable) {
                                 return new Error("Resource is not available in your country");
@@ -85,6 +119,9 @@ class RestSoundCloudAPI extends RestServerSide.API {
                                 track.audio = await this.getFormat(api.media.transcodings, ClientID);
                             }
                         }
+
+                        // Сохраняем кеш в системе
+                        if (!cache) sdb.meta_saver?.set?.(track, `${this.url}/track`);
 
                         return track;
                     }
@@ -262,7 +299,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
      */
     protected track = (track: json) => {
         return {
-            id: track.id,
+            id: `${track.user.username}/${track.title}`,
             url: track.permalink_url,
             title: track.title,
             artist: {

@@ -45,7 +45,14 @@ abstract class Request {
 
         // Пользовательский User-Agent
         userAgent?: string | boolean;
-    } & RequestOptions = {};
+    } & RequestOptions = {
+        sessionTimeout: 5e3,
+        headers: {
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Priority": "u=5, i"
+        }
+    };
 
     /**
      * @description Получаем протокол ссылки
@@ -101,7 +108,7 @@ abstract class Request {
                 // Создаём запрос с использованием протокола (http/https)
                 const req = this.protocol(opts, (res) => {
                     // Проверяем, является ли ответ редиректом и есть ли заголовок Location
-                    if (res.headers.location) {
+                    if (res.headers.location && res.statusCode >= 300 && res.statusCode < 400) {
                         const newUrl = res.headers.location;
 
                         let newOptions = { ...opts };
@@ -185,7 +192,7 @@ abstract class Request {
      */
     private get generateRandomUserAgent(): string {
         // Генерируем новый User-Agent
-        const revision = Math.floor(Math.random() * 2) + 145; // Генерация числа около 140
+        const revision = Math.floor(Math.random() * 2) + 147; // Генерация числа около 140
         const OS = ["X11; Linux x86_64", "Windows NT 10.0; Win64; x64", "X11; Linux i686"];
         const randomOS = OS[Math.floor(Math.random() * OS.length)];
 

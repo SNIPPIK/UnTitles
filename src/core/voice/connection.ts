@@ -178,8 +178,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public packet = (frames: Buffer[] | Buffer) => {
-        this.transport.packet(frames);
         this.speaker.speaking = this.speaker.default;
+        if (frames) this.transport.packet(frames);
+        return;
     };
 
     /**

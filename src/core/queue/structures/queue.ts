@@ -149,7 +149,7 @@ export class Queue {
                         "components": [
                             {
                                 "type": 10,
-                                "content": `## ${db.images.disk_emoji} [${artist.title}](${artist.url})`
+                                "content": `## ${db.emoji.disk} [${artist.title}](${artist.url})`
                             },
                             {
                                 "type": 10,
@@ -171,7 +171,7 @@ export class Queue {
                     },
                     {
                         "type": 10, // Text
-                        "content": `> -# \`👤 ${user.username}\`  |  \`${player.audio.volumeIndicator}\` ${tracks.footer} |  \`🌐 ${player.voice.connection.ws.latency}ms | 📥 ${player.voice.connection.udp.lost}\`` + player.progress
+                        "content": `> -# \`${db.emoji.user} ${user.username}\`  |  \`${player.audio.volumeIndicator}\` ${tracks.footer} |  \`${db.emoji.buffer} ${player.latency}ms | ${db.emoji.lost} ${player.voice.connection.udp.lost}\`` + player.progress
                     },
                     ...buttons
                 ]

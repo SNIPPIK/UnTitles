@@ -1,8 +1,19 @@
 /**
  * Загружаем нативный модуль один раз
  */
-//@ts-ignore
-const Native = (await import('../native/index.cjs')) as any;
+let Native: any;
+
+try {
+    //@ts-ignore
+    Native = (await import('../build/native/index.cjs'));
+} catch {
+    try {
+        //@ts-ignore
+        Native = (await import('../native/index.cjs'));
+    } catch {
+        throw Error("Native layer has not found, pls download or build rust module!");
+    }
+}
 
 /**
  * Универсальный тип для нативного класса по интерфейсу:
@@ -35,66 +46,6 @@ export type iType<T> = T extends new (...args: any[]) => infer R ? R : never;
 /* ────────────────────────────────────────────────
    Интерфейсы классов, экспортируемых из нативного модуля
 ───────────────────────────────────────────────── */
-
-/**
- * @description Управляемый процесс FFmpeg, запущенный из нативного кода.
- * Процесс работает в отдельном потоке, не блокирует Event Loop Node.js.
- * Stdout читается асинхронно и передаётся через функцию.
- * @interface FfmpegProcess
- */
-export interface iFfmpegProcess {
-    /**
-     * Устанавливает состояние паузы для аудиопотока.
-     *
-     * # Аргументы
-     * * `value` - true = приостановить воспроизведение, false = возобновить
-     *
-     * # Потокобезопасность
-     * Атомарная операция с барьером Release, безопасна для вызова из любого потока.
-     * При изменении паузы аудиопоток перестаёт отправлять пакеты в UDP-сокет,
-     * но продолжает потреблять данные из буфера (чтобы не терять синхронизацию).
-     */
-    set pause(value: boolean);
-
-    /**
-     * Возвращает текущее состояние паузы.
-     *
-     * # Возвращает
-     * `true` - воспроизведение приостановлено, `false` - активно.
-     *
-     * # Потокобезопасность
-     * Атомарное чтение с барьером Acquire, видит последнее значение,
-     * установленное через `set_pause` в любом потоке.
-     */
-    get pause(): boolean;
-
-    /**
-     * Создаёт новый процесс FFmpeg.
-     *
-     * # Аргументы
-     * * `args` - список аргументов командной строки для FFmpeg
-     * * `name` - имя или путь к исполняемому файлу FFmpeg (обычно "ffmpeg")
-     *
-     * Автоматически добавляет параметры переподключения для HTTP-источников,
-     * а также базовые настройки для минимальной задержки и отключения видео.
-     */
-    constructor(args: Array<string>, name: string): void;
-
-    /**
-     * Запускает чтение stdout и передачу данных в JS.
-     * Вызывается один раз после создания экземпляра.
-     *
-     * @param callback - основная функция: вызывается для каждого чанка stdout (Opus)
-     */
-    pipeStdout(callback: (pul: Buffer[]) => any): void;
-
-    /**
-     * Принудительно завершает процесс FFmpeg (посылает SIGKILL).
-     * Освобождает все ресурсы (память, потоки, дескрипторы).
-     * После вызова объект становится невалидным — повторный вызов pipeStdout приведёт к ошибке.
-     */
-    destroy(): void;
-}
 
 /**
  * Структура, представляющая движок аудио-буфера.
@@ -133,6 +84,15 @@ export interface iAudioEngine {
      */
     set position(pos: number);
 
+    /** Возвращает состояние паузы. */
+    get pause(): boolean;
+
+    /**
+     * Устанавливает состояние паузы.
+     * При `true` фоновый парсер не будет пополнять буфер, но продолжит читать stdout FFmpeg.
+     */
+    set pause(value: boolean);
+
     /**
      * Создаёт новый экземпляр AudioEngine.
      *
@@ -145,6 +105,26 @@ export interface iAudioEngine {
      * Минимальная ёмкость – 1000 пакетов.
      */
     constructor(maxMinutes: number): void;
+
+    /**
+     * Запускает FFmpeg и фоновый парсинг Ogg Opus.
+     *
+     * # Аргументы
+     * * `args` — аргументы командной строки для FFmpeg (после автоматически добавленных настроек).
+     * * `ffmpeg_path` — путь к исполняемому файлу FFmpeg.
+     *
+     * # Автоматические аргументы
+     * Метод добавляет следующие флаги для ускорения и стабильности:
+     * - `-analyzeduration 0` и `-probesize 128` — минимальный анализ для быстрого старта.
+     * - `-vn` — отключение видео.
+     * - `-loglevel error` — только ошибки.
+     * - `-nostdin` — предотвращает случайное ожидание ввода.
+     *
+     * # Ошибки
+     * Возвращает `Error`, если FFmpeg не удалось запустить или не удалось получить `stdout`.
+     * Повторный вызов `start` на уже работающем движке вызовет ошибку.
+     */
+    start(args: Array<string>, ffmpegPath: string): void;
 
     /**
      * Проверяет, можно ли "слать" аудио в буфер.
@@ -639,14 +619,12 @@ export interface SigningKeyPair {
  */
 export const {
     VoiceRTPSocket,
-    FfmpegProcess,
     AudioEngine,
     UDPSocket,
     DAVESession
 } = Native as {
     DAVESession:    NativeClass<iDAVESession>
     VoiceRTPSocket: NativeClass<iVoiceRTPSocket>
-    FfmpegProcess:  NativeClass<iFfmpegProcess>,
     AudioEngine:    NativeClass<iAudioEngine>,
     UDPSocket:      NativeClass<iUDPSocket>,
 };

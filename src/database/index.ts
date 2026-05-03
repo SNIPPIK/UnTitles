@@ -46,7 +46,10 @@ class Database {
     public readonly owner: { ids: string[]; guildID: string };
 
     /** Для отображения в embed сообщениях */
-    public readonly images: { disk: string; no_image: string; loading: string; banner: string; disk_emoji: string };
+    public readonly images: { disk: string; no_image: string; banner: string; };
+
+    /** Для отображения кастомных иконок */
+    public readonly emoji: { disk: string; loading: string; buffer: string; user: string; lost: string; queue: string; current: string; select: string };
 
     /**
      * @description Создаем класс с ограничениями не для главного потока
@@ -74,12 +77,21 @@ class Database {
             ids: env.get("owner.list", "").split(",")
         };
 
+        this.emoji = {
+            loading: env.get("loading.emoji", "🔗"),
+            disk: env.get("disk.emoji", "💿"),
+            buffer: env.get("buffer.emoji", "📦"),
+            user: env.get("user.emoji", "👤"),
+            lost: env.get("lost.emoji", "📥"),
+            queue: env.get("queue.emoji", "🎶"),
+            current: env.get("current.emoji", "▶️"),
+            select: env.get("selected.emoji", "➡ 🎵️")
+        };
+
         this.images = {
             banner: env.get("image.banner"),
             disk: env.get("image.currentPlay"),
-            no_image: env.get("image.not"),
-            loading: env.get("loading.emoji"),
-            disk_emoji: env.get("disk.emoji")
+            no_image: env.get("image.not")
         };
     };
 }

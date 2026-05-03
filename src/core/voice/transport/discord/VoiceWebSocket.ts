@@ -276,7 +276,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Проверка подключения/отключения клиента
             case VoiceOpcodes.ClientDisconnect:
             case VoiceOpcodes.ClientsConnect: {
-                this.emit("UsersRJC", payload);
+                this.emit("Users", payload);
                 break;
             }
 
@@ -387,7 +387,7 @@ interface ClientWebSocketEvents {
      * @description Если добавлен новый пользователь или удален старый
      * @constructor
      */
-    "UsersRJC": (d: WebSocketOpcodes.connect | WebSocketOpcodes.disconnect) => void;
+    "Users": (d: WebSocketOpcodes.connect | WebSocketOpcodes.disconnect) => void;
 
     /**
      * @description Если клиент был отключен из-за отключения бота от голосового канала

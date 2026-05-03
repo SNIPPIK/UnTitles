@@ -33,7 +33,7 @@ export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction |
      * @public
      */
     public constructor() {
-        super("build/src/handlers/middlewares");
+        super("src/handlers/middlewares");
     };
 
     /**

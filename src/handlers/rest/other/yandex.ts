@@ -81,7 +81,7 @@ class RestYandexAPI extends RestServerSide.API {
         {
             name: "track",
             filter: /track\/[0-9]+/i,
-            execute: async (url, options) => {
+            execute: async (url, { audio }) => {
                 const IDs = this.getID(/[0-9]+\/track\/[0-9]+/gi, url)?.[0]?.split("/track/");
 
                 // Если ID трека не удалось извлечь из ссылки
@@ -92,7 +92,7 @@ class RestYandexAPI extends RestServerSide.API {
 
                 // Если трек есть в кеше
                 if (cache) {
-                    if (!options.audio) return cache;
+                    if (!audio) return cache;
 
                     // Если включена утилита кеширования аудио
                     else if (sdb.audio_saver) {
@@ -122,7 +122,7 @@ class RestYandexAPI extends RestServerSide.API {
                     else return locale.err( "api.request.fail");
 
                     // Если указано получение аудио
-                    if (options.audio) {
+                    if (audio && this.audio) {
                         // Если включена утилита кеширования
                         if (sdb.audio_saver) {
                             const check = sdb.audio_saver.status(`${this.url}/${IDs[0]}_${IDs[1]}`);

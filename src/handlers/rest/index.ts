@@ -378,8 +378,10 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
                     const timeDiff = Math.abs(track.time.total - song.time.total);
                     const candidateArr = candidate.split(/\s+/).filter(Boolean);
                     const matchCount = candidateArr.filter(word => original.includes(word)).length;
+                    const namer = getSmartMatch(original, candidate);
 
-                    return (timeDiff <= 5) && (getSmartMatch(original, candidate) || matchCount >= Math.floor(candidateArr.length * 0.75));
+
+                    return (timeDiff <= 5) && namer || namer || (timeDiff <= 5) && (matchCount >= Math.floor(candidateArr.length * 0.75));
                 });
 
                 // Если отфильтровать треки не удалось
@@ -423,16 +425,17 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
     /**
      * @description Если надо обновить ссылку на трек или аудио недоступно у платформы, получаем с другой
      * @param track - Трек у которого надо получить ссылку на исходный файл
+     * @param hasReply - Если не удается получить аудио от платформы которая в теории может дать аудио
      * @returns Promise<string | Error>
      * @public
      */
-    public fetchAudioLink = async (track: Track): Promise<Track[] | Error> => {
+    public fetchAudioLink = async (track: Track, hasReply = true): Promise<Track[] | Error> => {
         const { url, api } = track;
         const { authorization, audio, block } = this.platforms;
 
         try {
             // Если платформа поддерживает получение аудио и может получать данные
-            if (authorization.includes(api.name) && audio.includes(api.name) && !block.includes(api.name)) {
+            if (authorization.includes(api.name) && audio.includes(api.name) && !block.includes(api.name) && hasReply) {
                 const song = await this.request(api.name).request<"track">(url, { audio: true }).request();
 
                 // Если удалось получить аудио
@@ -519,7 +522,7 @@ const normalize = (text: string) => text
     .toLowerCase()
     .normalize("NFKD")
     // Оставляем только буквы и цифры, заменяя остальное на пробелы
-    .replace(/[^\p{L}\p{N}\s]/gui, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .trim();
 
 /**
@@ -529,14 +532,67 @@ const normalize = (text: string) => text
  * @param candidate - Название кандидата
  * @private
  */
+/**
+ * @author SNIPPIK
+ * @description Ультимативный поиск с весовыми коэффициентами и нечетким сравнением
+ */
 const getSmartMatch = (original: string, candidate: string) => {
-    // Разбиваем оригинал на массив слов и берем только важные (длина > 2)
-    const words = original.split(/\s+/).filter(word => word.length > 2);
+    const normOriginal = normalize(original);
+    const normCandidate = normalize(candidate);
 
-    if (words.length === 0) return false;
+    const queryWords = normOriginal.split(/\s+/).filter(word => word.length > 1);
+    if (queryWords.length === 0) return false;
 
-    // Создаем регулярку с Lookahead для каждого слова
-    // Она сработает, только если ВСЕ слова присутствуют в строке в любом порядке
-    const pattern = new RegExp(`^${words.map(w => `(?=.*${w})`).join("")}.*$`, "i");
-    return pattern.test(candidate);
+    // Убираем пробелы полностью для поиска "слипшихся" слов
+    const compressedCandidate = normCandidate.replace(/\s+/g, "");
+
+    let totalScore = 0;
+
+    for (const word of queryWords) {
+        // Точное вхождение слова (самый высокий приоритет)
+        if (normCandidate.includes(word)) {
+            totalScore += 1;
+            continue;
+        }
+
+        // Вхождение без учета пробелов (для японского и слитых тегов)
+        if (compressedCandidate.includes(word)) {
+            totalScore += 0.8;
+            continue;
+        }
+
+        // Нечеткое сравнение (Levenshtein Lite)
+        // Если слово длинное (4+ символа) и отличается всего на 1-2 буквы
+        if (word.length > 3) {
+            if (fuzzyCheck(word, normCandidate)) {
+                totalScore += 0.5;
+            }
+        }
+    }
+
+    const finalScore = totalScore / queryWords.length;
+
+    // Порог вхождения: 0.8 обычно идеально для музыки
+    return finalScore >= 0.8;
+};
+
+/**
+ * Упрощенный нечеткий поиск: ищет, есть ли в строке слово,
+ * похожее на искомое с дистанцией в 1 символ.
+ */
+const fuzzyCheck = (word: string, target: string): boolean => {
+    if (target.length < word.length) return false;
+
+    // Для скорости можно использовать упрощенную проверку:
+    // Разбить таргет на слова и сравнить каждое по Левенштейну
+    const targetWords = target.split(/\s+/);
+    return targetWords.some(tWord => {
+        if (Math.abs(tWord.length - word.length) > 1) return false;
+        let mistakes = 0;
+        for (let i = 0; i < Math.min(word.length, tWord.length); i++) {
+            if (word[i] !== tWord[i]) mistakes++;
+            if (mistakes > 1) return false;
+        }
+        return true;
+    });
 };

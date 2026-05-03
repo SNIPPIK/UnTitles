@@ -34,11 +34,6 @@ export class SetArray<T> extends Set<T> {
      * @public
      */
     public delete(item: T) {
-        if (!this.has(item)) {
-            this.delete(item);
-            return true;
-        }
-
         super.delete(item);
         return true;
     };

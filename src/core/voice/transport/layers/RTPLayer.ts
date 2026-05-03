@@ -17,17 +17,7 @@ export class RTPLayer extends BaseLayer<iType<typeof VoiceRTPSocket>> {
      */
     public packet = (frames: Buffer[]) => {
         let rtp = this._client.packets(frames);
-        /*let attempts = 0;
-
-        // Даем шанс на повтор
-        while (!rtp && attempts < BaseLayer.MAX_RETRIES) {
-            attempts++;
-            rtp = this._rtp.packets(frames);
-        }*/
-
-        if (!rtp) {
-            throw new Error("RTP packet creation failed after retries");
-        }
+        if (!rtp) throw new Error("RTP packet creation failed after retries");
 
         return rtp;
     };

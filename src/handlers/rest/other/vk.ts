@@ -42,7 +42,7 @@ class RestVKAPI extends RestServerSide.API {
         {
             name: "track",
             filter: /(audio)/i,
-            execute: async (url, options) => {
+            execute: async (url, { audio }) => {
                 const ID = this.getID(/(|-)[0-9]+_[0-9]+/i, url)?.at(0);
 
                 // Если ID трека не удалось извлечь из ссылки
@@ -53,7 +53,7 @@ class RestVKAPI extends RestServerSide.API {
 
                 // Если трек есть в кеше
                 if (cache) {
-                    if (!options.audio) return cache;
+                    if (!audio) return cache;
 
                     // Если включена утилита кеширования аудио
                     else if (sdb.audio_saver) {
@@ -80,7 +80,7 @@ class RestVKAPI extends RestServerSide.API {
                     const track = this.track(api.response.pop());
 
                     // Если указано получение аудио
-                    if (options.audio) {
+                    if (audio && this.audio) {
                         // Если включена утилита кеширования
                         if (sdb.audio_saver) {
                             const check = sdb.audio_saver.status(`${this.url}/${ID}`);

@@ -35,7 +35,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
      *          и метод `encrypt` доступен. Иначе `false`.
      */
     public get ready(): boolean {
-        return !!(this._client && this._client.status === 3);
+        return this._client && this._client.status === 3 && !this._client.isTransitioning;
     };
 
     /**
@@ -137,7 +137,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
                             op: VoiceOpcodes.DaveTransitionReady,
                             d: { transition_id: d.transition_id },
                         };
-                    }
+                    } else session.reinit();
                     return;
                 }
 
@@ -211,7 +211,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
                  */
                 case VoiceOpcodes.DaveMlsAnnounceCommitTransition: {
                     const { transition_id, success } = session.processCommit(payload);
-                    if (success) {
+                    if (success && transition_id !== 0) {
                         ws.packet = {
                             op: VoiceOpcodes.DaveTransitionReady,
                             d: { transition_id },
@@ -227,7 +227,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
                  */
                 case VoiceOpcodes.DaveMlsWelcome: {
                     const { transition_id, success } = session.processWelcome(payload);
-                    if (success) {
+                    if (success && transition_id !== 0) {
                         ws.packet = {
                             op: VoiceOpcodes.DaveTransitionReady,
                             d: { transition_id },

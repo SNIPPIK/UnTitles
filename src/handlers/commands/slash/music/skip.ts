@@ -63,7 +63,7 @@ import { db } from "#app/db";
 
             // Результаты поиска
             const results = tracks.map((track, i) => ({
-                name: `${startIndex + i + 1}. ${i === highlightIndex ? "➡" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                name: `${startIndex + i + 1}. ${i === highlightIndex ? db.emoji.select : db.emoji.queue} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: startIndex + i
             }));
 
@@ -150,7 +150,7 @@ class BackPositionCommand extends SubCommand {
 
             // Результаты поиска
             const results = tracks.map((track, i) => ({
-                name: `${startIndex + i + 1}. ${i === highlightIndex ? "➡" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                name: `${startIndex + i + 1}. ${i === highlightIndex ? db.emoji.select : db.emoji.queue} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: startIndex + i
             }));
 
@@ -241,7 +241,7 @@ class SkipPositionCommand extends SubCommand {
 
             // Генерация результатов
             const results = tracks.map((track, i) => ({
-                name: `${start + i + 1}. ${i === highlight ? "➡" : "🎶"} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                name: `${start + i + 1}. ${i === highlight ? db.emoji.select : db.emoji.queue} (${track.time.split}) ${track.name.slice(0, 75)}`,
                 value: start + i
             }));
 

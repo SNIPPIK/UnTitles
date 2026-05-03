@@ -32,7 +32,7 @@ class message_error extends Event<"message/error"> {
                 color: api.color, thumbnail: image, timestamp: new Date(),
                 fields: [
                     {
-                        name: locale._(queue.message.locale, "player.current.playing"),
+                        name: locale._(queue.message.locale, "player.has.playing.fail"),
                         value: `\`\`\`${name}\`\`\``
                     },
                     {
@@ -42,7 +42,7 @@ class message_error extends Event<"message/error"> {
                 ],
                 author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
                 footer: {
-                    text: `${user.username} | ${queue.tracks.time} | 🎶: ${queue.tracks.size}`,
+                    text: `\`${user.username}\` | \`🕐 ${queue.tracks.time}\` • \`${db.emoji.queue} ${queue.tracks.total}\``,
                     iconURL: user?.avatar
                 }
             }],
@@ -115,7 +115,7 @@ class message_push extends Event<"message/push"> {
                             { type: 14, spacing: 2, divider: true },
                             {
                                 type: 10,
-                                content: `> -# \`👤 ${msg.author.username}\` | \`🕐 ${totalTime.duration(false)}\` • \`🎶 ${queue.tracks.total}\``
+                                content: `> -# \`${db.emoji.user} ${msg.author.username}\` | \`🕐 ${totalTime.duration(false)}\` • \`${db.emoji.queue} ${queue.tracks.total}\``
                             },
                             // Кнопки
                             {
@@ -180,7 +180,7 @@ class message_playing extends Event<"message/playing"> {
         });
 
         // Меняем статус голосового канала
-        db.adapter.status(queue.message.voice_id, `${db.images.disk_emoji} | ${queue.tracks.track.name}`).catch(() => {});
+        db.adapter.status(queue.message.voice_id, `${db.emoji.disk} | ${queue.tracks.track.name}`).catch(() => {});
 
         // Если есть сообщение
         if (message) db.queues.cycles.messages.update(message, queue.components);

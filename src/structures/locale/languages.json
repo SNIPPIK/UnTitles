@@ -324,6 +324,11 @@
     "ru": "Сейчас играет:"
   },
 
+  "player.has.playing.fail": {
+    "en-US": "Attempt to turn on:",
+    "ru": "Попытка включить:"
+  },
+
   "player.current.error": {
     "en-US": "**Error:**",
     "ru": "**Error:**"

@@ -4,6 +4,7 @@ use napi_derive::napi;
 use rand::RngExt;
 use rand::{rng};
 use std::fmt;
+use std::sync::Mutex;
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Nonce,
@@ -76,7 +77,7 @@ pub struct VoiceRTPSocket {
     sequence: AtomicU16,
     timestamp: AtomicU32,
     counter: AtomicU32,
-    cipher: Aes256Gcm
+    cipher: Mutex<Aes256Gcm>
 }
 
 #[napi]
@@ -106,12 +107,12 @@ impl VoiceRTPSocket {
 
         let mut rng = rng();
 
-        Ok(Self {
-            cipher,
+        Ok(VoiceRTPSocket {
+            cipher: Mutex::new(cipher),
             options: EncryptorOptions { ssrc },
             sequence: AtomicU16::new(rng.random()),
             timestamp: AtomicU32::new(rng.random()),
-            counter: AtomicU32::new(rng.random()),
+            counter: AtomicU32::new(rng.random())
         })
     }
 
@@ -137,25 +138,26 @@ impl VoiceRTPSocket {
     /// - Если размер фрейма превышает допустимый (проверка отсутствует, но можно добавить).
     #[napi]
     pub fn packet(&self, frame: Buffer) -> Result<Buffer> {
-        let frame_ref = frame.as_ref();
         let header = self.build_header();
-
         let nonce_bytes = self.generate_nonce();
         let nonce = Nonce::from(nonce_bytes);
 
         let payload = Payload {
-            msg: frame_ref,
-            aad: &header,
+            msg: frame.as_ref(),
+            aad: &header
         };
 
-        // `encrypt` возвращает Vec<u8>, содержащий шифротекст с тегом аутентификации в конце.
-        let encrypted = self
-            .cipher
+        // Блокируем мьютекс только на время шифрования
+        let cipher = self.cipher.lock().map_err(|_| {
+            Error::new(Status::GenericFailure, "Mutex poison error".to_string())
+        })?;
+
+        let encrypted = cipher
             .encrypt(&nonce, payload)
             .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
         // Формируем итоговый пакет: заголовок + шифротекст/тег + tail nonce.
-        let mut out = Vec::with_capacity(header.len() + encrypted.len() + 4);
+        let mut out = Vec::with_capacity(RTP_HEADER_SIZE + encrypted.len() + 4);
         out.extend_from_slice(&header);
         out.extend_from_slice(&encrypted);
         out.extend_from_slice(&nonce_bytes[0..4]);

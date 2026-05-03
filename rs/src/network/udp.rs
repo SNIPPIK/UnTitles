@@ -1,4 +1,4 @@
-use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode, ErrorStrategy};
+use napi::threadsafe_function::{ThreadsafeFunctionCallMode};
 use crate::timers::scheduler::balancer::{add_global_session, remove_global_session};
 use crate::audio::ring_buffer::RingBuffer;
 use napi::bindgen_prelude::*;
@@ -7,15 +7,18 @@ use std::{
     net::UdpSocket,
     time::{ SystemTime, UNIX_EPOCH },
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering, AtomicU64},
+        atomic::{AtomicBool, AtomicUsize, Ordering, AtomicU64, AtomicU32},
         Arc, Mutex,
     },
     thread,
-    time::Duration,
+    time::Duration
 };
 
-/// Время до отправки keepalive пакета, для работы через nat системы
-const KEEP_ALIVE_TIMEOUT: u64 = 5000;
+/// Время до отправки keepalive пакета, для работы через NAT системы
+const KEEP_ALIVE_INTERVAL: u64 = 10000;
+
+/// Порог "тишины", после которого разрешена двойная отправка.
+const BURST_SILENCE_MS: u64 = 500;
 
 /// Внутренние данные UDP-сокета с буфером исходящих пакетов и статистикой.
 ///
@@ -38,7 +41,9 @@ pub struct UdpBufferedInner {
     pub send_drops: AtomicUsize,
 
     /// Последнее зафиксированное время отправки пакета
-    pub last_send_ms: AtomicU64
+    pub last_send_ms: AtomicU64,
+
+    pub counter: AtomicU32
 }
 
 impl UdpBufferedInner {
@@ -71,6 +76,7 @@ impl UdpBufferedInner {
         if let Some(packet) = self.buffer.pop() {
             match self.socket.send(&packet) {
                 Ok(_) => {
+                    self.counter.store(0, Ordering::Relaxed);
                     self.last_send_ms.store(now, Ordering::Relaxed);
                 }
                 Err(_) => {
@@ -87,11 +93,13 @@ impl UdpBufferedInner {
         // Keep-alive логика
         let last_send = self.last_send_ms.load(Ordering::Relaxed);
 
-        if now.saturating_sub(last_send) >= KEEP_ALIVE_TIMEOUT {
-            // Стандартный тихий кадр Opus для Discord
-            static SILENT_FRAME: [u8; 8] = [0u8; 8];
+        if now.saturating_sub(last_send) >= KEEP_ALIVE_INTERVAL {
+            let count = self.counter.fetch_add(1, Ordering::Relaxed);
+            let mut keep_alive_packet = [0u8; 8];
 
-            if self.socket.send(&SILENT_FRAME).is_ok() {
+            keep_alive_packet[0..4].copy_from_slice(&count.to_le_bytes());
+
+            if self.socket.send(&keep_alive_packet).is_ok() {
                 self.last_send_ms.store(now, Ordering::Relaxed);
             }
         }
@@ -99,14 +107,6 @@ impl UdpBufferedInner {
 }
 
 /// Буферизованный UDP-сокет, доступный из JavaScript через N-API.
-///
-/// Предоставляет методы для отправки дейтаграмм (с буферизацией), получения входящих
-/// пакетов через вызов, а также статистику. Интегрируется с глобальным балансировщиком
-/// CycleManager для регулярного вызова tick(), который отправляет накопленные пакеты.
-///
-/// Конструктор создаёт сокет, привязывается к случайному порту, подключается к указанному
-/// удалённому адресу и регистрирует себя в глобальном балансировщике для автоматической
-/// отправки.
 #[napi(js_name = "UDPSocket")]
 #[derive(Clone)]
 pub struct UdpBuffered {
@@ -140,32 +140,33 @@ impl UdpBuffered {
     pub fn new(remote_addr: String) -> Result<Self> {
         // Привязываемся к любому свободному порту на всех интерфейсах.
         let socket = UdpSocket::bind("0.0.0.0:0")
-            .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+            .map_err(|e| Error::from_reason(format!("Bind error: {}", e)))?;
 
         // Устанавливаем соединение (фильтрует входящие пакеты только от этого адреса).
         socket
             .connect(&remote_addr)
-            .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+            .map_err(|e| Error::from_reason(format!("Connect error: {}", e)))?;
 
-        // Переводим в неблокирующий режим.
-        socket.set_nonblocking(true).ok();
+        socket.set_nonblocking(true)
+            .map_err(|e| Error::from_reason(format!("Non-blocking error: {}", e)))?;
 
         let inner = Arc::new(UdpBufferedInner {
             socket: Arc::new(socket),
             buffer: RingBuffer::new(1024),
             send_drops: AtomicUsize::new(0),
-            last_send_ms: AtomicU64::new(now_ms())
+            last_send_ms: AtomicU64::new(now_ms()),
+            counter: AtomicU32::new(0),
         });
 
         // Генерируем случайный идентификатор для этой сессии.
         let id = rand::random::<u32>();
 
-        let udp = Self {
+        let udp = UdpBuffered {
             inner,
             listener_active: Arc::new(AtomicBool::new(false)),
             listener_handle: Arc::new(Mutex::new(None)),
             destroyed: Arc::new(AtomicBool::new(false)),
-            id
+            id,
         };
 
         // Регистрируем сессию в глобальном балансировщике.
@@ -177,13 +178,15 @@ impl UdpBuffered {
 
     /// Текущее количество пакетов в очереди на отправку.
     #[napi(getter)]
-    pub fn packets(&self) -> usize {
-        self.inner.buffer.len()
+    pub fn packets(&self) -> u32 {
+        self.inner.buffer.len() as u32
     }
 
     /// Количество пакетов, сброшенных из-за переполнения очереди или временных ошибок.
     #[napi(getter)]
-    pub fn drops(&self) -> usize { self.inner.send_drops.load(Ordering::Relaxed) }
+    pub fn drops(&self) -> u32 {
+        self.inner.send_drops.load(Ordering::Relaxed) as u32
+    }
 
     /// Добавляет пакет в очередь на отправку. С проверкой мусора
     ///
@@ -218,8 +221,8 @@ impl UdpBuffered {
     /// Поток работает, пока не будет вызван `stop_listening` или уничтожен объект.
     /// Для вызова из фонового потока используется ThreadsafeFunction.
     #[napi]
-    pub fn start_listening(&self, callback: JsFunction) -> Result<()> {
-        // Проверяем, не запущен ли уже поток.
+    pub fn start_listening(&self, callback: Function<Buffer, ()>) -> Result<()> {
+        // Защита от повторного запуска
         if self.listener_active.load(Ordering::SeqCst) {
             return Ok(());
         }
@@ -227,27 +230,25 @@ impl UdpBuffered {
         self.listener_active.store(true, Ordering::SeqCst);
 
         // Создаём потоко-безопасную обёртку над JS-вызовом.
-        let tsfn: ThreadsafeFunction<Vec<u8>, ErrorStrategy::Fatal> =
-            callback.create_threadsafe_function(0, |ctx| {
-                // Преобразуем полученные данные в Buffer и передаём как единственный аргумент.
-                ctx.env
-                    .create_buffer_with_data(ctx.value)
-                    .map(|b| vec![b.into_unknown()])
-            })?;
+        let tsfn = callback
+            .build_threadsafe_function()
+            .build()?;
 
         let socket = self.inner.socket.clone();
         let active = self.listener_active.clone();
 
-        // Запускаем поток для чтения из сокета.
+        // Основной рабочий поток
         let handle = thread::spawn(move || {
-            let mut buf = [0u8; 2048]; // буфер для входящих данных
+            let mut buf = [0u8; 2048];
 
             while active.load(Ordering::SeqCst) {
                 match socket.recv(&mut buf) {
                     Ok(size) if size > 0 => {
-                        let data = buf[..size].to_vec();
-                        // Вызываем вызов
-                        tsfn.call(data, ThreadsafeFunctionCallMode::NonBlocking);
+                        let raw_data = buf[..size].to_vec();
+                        let js_buffer = Buffer::from(raw_data);
+
+                        // Метод call сам поймет, как доставить его в главный поток.
+                        tsfn.call(js_buffer, ThreadsafeFunctionCallMode::Blocking);
                     }
                     // Если сокет временно недоступен (нет данных), немного спим.
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -258,11 +259,9 @@ impl UdpBuffered {
                     _ => {}
                 }
             }
-
-            // Сообщаем JS-стороне, что больше данных не будет.
-            let _ = tsfn.abort();
         });
 
+        // Сохраняем поток, чтобы иметь возможность его остановить
         *self.listener_handle.lock().unwrap() = Some(handle);
 
         Ok(())
@@ -274,7 +273,7 @@ impl UdpBuffered {
         self.listener_active.store(false, Ordering::Release);
 
         if let Some(handle) = self.listener_handle.lock().unwrap().take() {
-            let _ = handle.join(); // дожидаемся завершения потока
+            let _ = handle.join();
         }
     }
 
@@ -294,6 +293,7 @@ impl UdpBuffered {
     /// Пытается добавить байты во внутренний буфер для последующей отправки.
     #[inline]
     fn try_push(&self, bytes: &[u8]) {
+        if bytes.is_empty() { return; }
         self.inner.push(bytes.to_vec());
     }
 
@@ -301,10 +301,10 @@ impl UdpBuffered {
     /// В таком клоне поле listener_handle не копируется (оно остаётся пустым), чтобы
     /// управление потоком прослушивания оставалось только у основного экземпляра.
     fn clone_for_manager(&self) -> Self {
-        Self {
+        UdpBuffered {
             inner: self.inner.clone(),
             listener_active: self.listener_active.clone(),
-            listener_handle: Arc::new(Mutex::new(None)), // новый пустой handle
+            listener_handle: Arc::new(Mutex::new(None)),
             destroyed: self.destroyed.clone(),
             id: self.id
         }
@@ -314,10 +314,36 @@ impl UdpBuffered {
     /// (Внутренний, не экспортируется в JS).
     pub fn tick(&self) {
         let now = now_ms();
+        let last_ms = self.inner.last_send_ms.load(Ordering::Relaxed);
 
-        // Если есть пакеты для обычной отправки
-        if self.inner.has_ticked() { self.inner.tick(now); }
-        else { self.inner.tick_alive(now); }
+        // Если с последней отправки прошло KEEP_ALIVE_INTERVAL или больше...
+        if now.saturating_sub(last_ms) >= KEEP_ALIVE_INTERVAL {
+            // ... но есть пакеты для отправки — шлём их, а не keepalive.
+            if self.inner.has_ticked() {
+                // Если тишина затянулась дольше BURST_SILENCE_MS, делаем два тика.
+                if now.saturating_sub(last_ms) >= BURST_SILENCE_MS {
+                    self.inner.tick(now);
+                    // После первого тика last_send_ms обновится, но мы форсируем второй.
+                    self.inner.tick(now);
+                } else {
+                    self.inner.tick(now);
+                }
+            } else {
+                // Пакетов нет — обычный keepalive.
+                self.inner.tick_alive(now);
+            }
+        } else {
+            // keepalive не нужен.
+            if self.inner.has_ticked() {
+                // Даже если keepalive не требуется, при долгой тишине можно удвоить.
+                if now.saturating_sub(last_ms) >= BURST_SILENCE_MS {
+                    self.inner.tick(now);
+                    self.inner.tick(now);
+                } else {
+                    self.inner.tick(now);
+                }
+            }
+        }
     }
 }
 
