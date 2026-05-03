@@ -6,9 +6,6 @@ on:
       - '**'
   pull_request:
 
-env:
-  DEBUG: 'napi:*' # Помогает отладить, если билд упадет
-
 jobs:
   build:
     strategy:
@@ -21,24 +18,6 @@ jobs:
           - host: macos-latest
             target: aarch64-apple-darwin
 
-          # Linux (glibc)
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - host: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            use-zig: true
-          - host: ubuntu-latest
-            target: armv7-unknown-linux-gnueabihf
-            use-zig: true
-
-          # Linux (musl) - важно для Alpine
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            use-zig: true
-          - host: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            use-zig: true
-
           # Windows
           - host: windows-latest
             target: x86_64-pc-windows-msvc
@@ -47,18 +26,31 @@ jobs:
           - host: windows-latest
             target: aarch64-pc-windows-msvc
 
+          # Linux (glibc)
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            cross: true
+          - host: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+            cross: true
+
+          # Linux (musl - для Alpine Docker)
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            cross: true
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            cross: true
+
           # Android
           - host: ubuntu-latest
             target: aarch64-linux-android
-            use-zig: true
+            cross: true
           - host: ubuntu-latest
             target: armv7-linux-androideabi
-            use-zig: true
-
-          # FreeBSD
-          - host: ubuntu-latest
-            target: x86_64-unknown-freebsd
-            use-zig: true
+            cross: true
 
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
@@ -86,7 +78,7 @@ jobs:
           key: ${{ matrix.settings.target }}
 
       - name: Install Zig
-        if: ${{ matrix.settings.use-zig }}
+        if: ${{ matrix.settings.cross }}
         uses: goto-bus-stop/setup-zig@v2
 
       - name: Install dependencies
@@ -95,21 +87,20 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          # Формируем аргументы сборки
+          # Используем флаги, которые точно есть в вашей версии CLI
           ARGS="--release --target ${{ matrix.settings.target }} --platform"
           
-          # Если используем Zig для кросс-компиляции
-          if [ "${{ matrix.settings.use-zig }}" == "true" ]; then
-            ARGS="$ARGS --use-zig"
+          if [ "${{ matrix.settings.cross }}" == "true" ]; then
+            ARGS="$ARGS --cross-compile"
           fi
           
-          # Запуск сборки
           npx napi build $ARGS --cwd ./rs --js index.cjs
 
       - name: Prepare native build folder
         shell: bash
         run: |
           mkdir -p build/native
+          # Копируем всё, что может понадобиться (с подавлением ошибок если файлов нет)
           cp index.cjs build/native/ 2>/dev/null || true
           cp *.ts build/native/ 2>/dev/null || true
           cp *.node build/native/ 2>/dev/null || true
