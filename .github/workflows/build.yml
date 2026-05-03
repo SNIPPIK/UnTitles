@@ -103,10 +103,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p build/native
-          # Копируем всё, что может понадобиться (с подавлением ошибок если файлов нет)
-          cp index.cjs build/native/ 2>/dev/null || true
-          cp *.ts build/native/ 2>/dev/null || true
-          cp *.node build/native/ 2>/dev/null || true
+          cp rs/*.ts build/native/ 2>/dev/null || true
+          cp rs/*.cjs build/native/ 2>/dev/null || true
           cp rs/*.node build/native/ 2>/dev/null || true
 
       - name: Upload artifact
