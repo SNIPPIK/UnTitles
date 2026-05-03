@@ -141,7 +141,7 @@ impl AudioEngine {
                             for (kind, data) in frames {
 
                                 if kind != PacketType::Broken {
-                                    //if buf.len() >= max_cap { let _ = buf.pop(); }
+                                    if buf.len() >= max_cap { let _ = buf.pop(); }
                                     let _ = buf.push(data);
                                 }
                             }
@@ -305,6 +305,10 @@ impl AudioEngine {
         // Сигнал остановки фоновому потоку.
         self.reading_active.store(false, Ordering::SeqCst);
 
+        // Будим поток
+        let (_, cvar) = &*self.pause_state;
+        cvar.notify_one();
+
         // Убиваем процесс FFmpeg, если он ещё жив.
         let maybe_child = self.child.lock().unwrap().take();
         if let Some(mut child) = maybe_child {
@@ -331,6 +335,11 @@ impl AudioEngine {
 impl Drop for AudioEngine {
     fn drop(&mut self) {
         self.reading_active.store(false, Ordering::SeqCst);
+
+        // Будим поток
+        let (_, cvar) = &*self.pause_state;
+        cvar.notify_one();
+
         if let Ok(mut guard) = self.child.lock() {
             if let Some(mut child) = guard.take() {
                 let _ = child.kill();
