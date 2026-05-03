@@ -6,42 +6,59 @@ on:
       - '**'
   pull_request:
 
+env:
+  DEBUG: 'napi:*' # Помогает отладить, если билд упадет
+
 jobs:
   build:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         settings:
-          # Linux
+          # macOS
+          - host: macos-latest
+            target: x86_64-apple-darwin
+          - host: macos-latest
+            target: aarch64-apple-darwin
+
+          # Linux (glibc)
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            build: npx napi build --release --platform --js index.cjs --cwd ./rs
-
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: npx napi build --release --platform --js index.cjs --cwd ./rs
-
+            use-zig: true
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
-            build: npx napi build --release --platform --js index.cjs --cwd ./rs
+            use-zig: true
+
+          # Linux (musl) - важно для Alpine
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            use-zig: true
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            use-zig: true
 
           # Windows
           - host: windows-latest
             target: x86_64-pc-windows-msvc
-            build: npx napi build --release --platform --js index.cjs --cwd ./rs
-
+          - host: windows-latest
+            target: i686-pc-windows-msvc
           - host: windows-latest
             target: aarch64-pc-windows-msvc
-            build: npx napi build --release --platform --js index.cjs --cwd ./rs
 
           # Android
           - host: ubuntu-latest
             target: aarch64-linux-android
-            build: npx napi build --release --platform --js index.cjs --cwd ./rs
-
+            use-zig: true
           - host: ubuntu-latest
             target: armv7-linux-androideabi
-            build: npx napi build --release --platform --js index.cjs --cwd ./rs
+            use-zig: true
+
+          # FreeBSD
+          - host: ubuntu-latest
+            target: x86_64-unknown-freebsd
+            use-zig: true
 
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
@@ -63,19 +80,40 @@ jobs:
         with:
           targets: ${{ matrix.settings.target }}
 
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.settings.target }}
+
+      - name: Install Zig
+        if: ${{ matrix.settings.use-zig }}
+        uses: goto-bus-stop/setup-zig@v2
+
       - name: Install dependencies
         run: npm install
 
       - name: Build
-        run: ${{ matrix.settings.build }}
+        shell: bash
+        run: |
+          # Формируем аргументы сборки
+          ARGS="--release --target ${{ matrix.settings.target }} --platform"
+          
+          # Если используем Zig для кросс-компиляции
+          if [ "${{ matrix.settings.use-zig }}" == "true" ]; then
+            ARGS="$ARGS --use-zig"
+          fi
+          
+          # Запуск сборки
+          npx napi build $ARGS --cwd ./rs --js index.cjs
 
       - name: Prepare native build folder
+        shell: bash
         run: |
           mkdir -p build/native
-          cp index.js build/native/ || true
-          cp *.ts build/native/ || true
-          cp *.node build/native/ || true
-          cp rs/*.node build/native/ || true
+          cp index.cjs build/native/ 2>/dev/null || true
+          cp *.ts build/native/ 2>/dev/null || true
+          cp *.node build/native/ 2>/dev/null || true
+          cp rs/*.node build/native/ 2>/dev/null || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
