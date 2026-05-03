@@ -51,7 +51,6 @@ jobs:
 
       - name: Setup node
         uses: actions/setup-node@v4
-        run: npm run build:copy
         with:
           node-version: 25
           cache: 'npm'
