@@ -18,8 +18,10 @@ memchr = "2.8.0"
 arc-swap = "1.9.1"
 davey = "0.1.3"
 
+# Профиль релиза (лучшая оптимизация)
 [profile.release]
-# Оптимизации для максимальной точности таймера
-lto = true
 opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
 strip = "symbols"

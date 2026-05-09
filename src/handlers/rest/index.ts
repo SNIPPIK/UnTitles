@@ -357,7 +357,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
                 const platformAPI = this.request(platform.name);
 
                 // Параллельный поиск по названию
-                const search = await platformAPI.request<"search">(original_name).request();
+                const search = await platformAPI.request<"search">(original).request();
 
                 // Если при получении треков произошла ошибка
                 if (search instanceof Error) {
@@ -519,8 +519,12 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
  * @private
  */
 const normalize = (text: string) => text
+    // Удаление лишнего текста
+    .replaceAll(/█/gi, "")
+
     .toLowerCase()
     .normalize("NFKD")
+
     // Оставляем только буквы и цифры, заменяя остальное на пробелы
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .trim();

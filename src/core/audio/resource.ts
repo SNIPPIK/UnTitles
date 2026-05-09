@@ -19,21 +19,21 @@ const ENCODER_PARAMS = {
      * - audio - Поддерживайте верность вводимым данным (по умолчанию).
      * - lowdelay - Ограничьтесь только режимами с наименьшей задержкой, отключив режимы, оптимизированные для передачи голоса.
      */
-    mode: "audio",
+    mode: "voip",
 
     /**
      * # Параметры
      * - off - Используйте кодирование с постоянной скоростью передачи данных.
      * - on - Используйте кодировку с переменной скоростью передачи данных (по умолчанию).
      */
-    vbr: "on",
+    vbr: "off",
 
     /** Потери при кодировании */
     lost: {
         /** Разрешаем терять n пакетов за 1 поток */
         total: "0",
 
-        /** Можно ли сглаживать потери, заполнять пустотой */
+        /** Можно ли сглаживать потери, заполнять пустотой. (Не рекомендуется включать) */
         fec: "off"
     }
 };
@@ -74,7 +74,10 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         if (!this.engine?.size) return null;
 
         const frame: Buffer = this.engine.packet;
-        if (frame) this._played_frames++;
+        if (frame) {
+            this.hasPossibleBuffedStream;
+            this._played_frames++;
+        }
         return frame;
     };
 
@@ -84,7 +87,6 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @public
      */
     public get packets(): number {
-        this.hasPossibleBuffedStream;
         return this.engine?.size ?? 0;
     };
 
@@ -175,7 +177,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
     };
 
     /**
-     * @description Собираем фильтры для ffmpeg
+     * @description Собираем фильтры для FFmpeg
      * @protected
      */
     protected get filters(): string {
@@ -229,7 +231,10 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     public packetAt = (size: number) => {
         const frames = this.engine.getPackets(size);
-        if (frames) this._played_frames += frames.length;
+        if (frames) {
+            this.hasPossibleBuffedStream;
+            this._played_frames += frames.length;
+        }
         return frames;
     };
 
@@ -273,7 +278,7 @@ interface AudioResourceOptions {
     /** Время пропуска, с этой временной точки включится аудио */
     seek?: number;
 
-    /** Фильтры ffmpeg для включения через filter_complex */
+    /** Фильтры FFmpeg для включения через af */
     filters: string;
 
     /** Смена аудио потока? */

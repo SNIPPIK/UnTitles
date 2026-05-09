@@ -16,7 +16,7 @@
     "emoji": {
       "name": "🌃"
     },
-    "locale": { "en-US": "Increases speed by 20 % and raises pitch.", "ru": "Ускоряет воспроизведение на 20 % и повышает тональность." },
+    "locale": { "en-US": "Increases speed by 25% and raises pitch.", "ru": "Ускоряет воспроизведение на 25% и повышает тональность." },
     "unsupported": ["vaporwave","demonic","reverse","phaser","vinyl","normalize"],
     "filter": "asetrate=48000*1.25,aresample=128000",
     "args": false

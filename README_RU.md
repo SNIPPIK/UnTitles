@@ -113,7 +113,6 @@
 <details>
 <summary>Нажми, чтобы открыть</summary>
 
-В текущий момент это не работает! Ближе к 0.5.0 будет снова работать!!!
 ```ts
 // 💣 Event Loop Blocking Test (x4)
 setInterval(() => {

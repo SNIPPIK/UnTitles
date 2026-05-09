@@ -69,7 +69,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
 
                     // Если включена утилита кеширования аудио
                     else if (sdb.audio_saver) {
-                        const check = sdb.audio_saver.status(`${this.url}/${fixed}`);
+                        const check = await sdb.audio_saver.status(`${this.url}/${fixed}`);
 
                         // Если есть кеш аудио
                         if (check.status === "ended") {
@@ -99,7 +99,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
                         if (audio && this.audio) {
                             // Если включена утилита кеширования
                             if (sdb.audio_saver) {
-                                const check = sdb.audio_saver.status(`${this.url}/${fixed}`);
+                                const check = await sdb.audio_saver.status(`${this.url}/${fixed}`);
 
                                 // Если есть кеш аудио
                                 if (check.status === "ended") {

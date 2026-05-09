@@ -1,6 +1,7 @@
 import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./transport/adapter.js";
 import { SpeakerType, VoiceSpeakerManager } from "#core/voice/structures/Speaker.js";
 import { Transport } from "#core/voice/transport/index.js";
+import { VoiceCloseCodes } from "discord-api-types/voice";
 import { TypedEmitter, Logger } from "#structures";
 
 /**
@@ -157,18 +158,20 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         // Задаем статус подключения
         this.status = ConnectionStatus.connecting;
 
-        // Слушаем если шлюзу пытается выключиться по какой причине
+        // Слушаем подключение
         this.on("info", (err) => {
             Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
         });
 
-        // Слушаем если шлюзу пытается выключиться по какой причине
+        // Слушаем шлюз
         this.transport.on("info", (err) => {
             Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
         });
 
+        // Слушаем если шлюз пытается выключиться по какой причине
         this.transport.on("close", (code, reason) => {
             Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${code}: ${reason}`);
+            if (code !== VoiceCloseCodes.CallTerminated) this.destroy();
         });
     };
 
@@ -260,9 +263,6 @@ export interface VoiceConnectionConfiguration {
 
     /** Приглушен ли бот (отключен микрофон/спикер) */
     self_mute:    boolean;
-
-    /** Будет ли бот транслировать с помощью "Go Live" */
-    self_stream?: boolean;
 
     /** Тип спикера, для отправки аудио пакетов в голосовой канал */
     self_speaker?: SpeakerType;

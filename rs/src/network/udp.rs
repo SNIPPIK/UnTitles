@@ -61,7 +61,7 @@ impl UdpBufferedInner {
     ///
     /// Если нет буфера, то и нет смысла вызывать tick
     pub fn has_ticked(&self) -> bool {
-        !self.buffer.is_empty()
+        !self.buffer.is_empty() && self.socket.local_addr().is_ok()
     }
 
     /// Попытка отправить один пакет из очереди.

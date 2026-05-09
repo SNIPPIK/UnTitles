@@ -165,11 +165,6 @@ export class Queue {
                         }
                     },
                     {
-                        "type": 14, // Separator
-                        "divider": true,
-                        "spacing": 1
-                    },
-                    {
                         "type": 10, // Text
                         "content": `> -# \`${db.emoji.user} ${user.username}\`  |  \`${player.audio.volumeIndicator}\` ${tracks.footer} |  \`${db.emoji.buffer} ${player.latency}ms | ${db.emoji.lost} ${player.voice.connection.udp.lost}\`` + player.progress
                     },

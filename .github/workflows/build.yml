@@ -85,7 +85,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          # Используем флаги, которые точно есть в вашей версии CLI
+          # Общие флаги CLI
           ARGS="--release --target ${{ matrix.settings.target }} --platform"
           
           if [ "${{ matrix.settings.cross }}" == "true" ]; then

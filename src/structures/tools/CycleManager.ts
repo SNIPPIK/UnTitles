@@ -233,18 +233,19 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      */
     protected _stepCycle(): void {
         for (const item of this) {
-            if (!this.options.filter(item)) continue;
-            setImmediate(() => {
-                Promise.resolve(this.options.execute(item))
-                    .then((keep) => {
-                        if (keep === false) {
+            setImmediate(async () => {
+                if (await this.options.filter(item)) {
+                    Promise.resolve(this.options.execute(item))
+                        .then((keep) => {
+                            if (keep === false) {
+                                this.delete(item);
+                            }
+                        })
+                        .catch((err) => {
+                            console.error("[PromiseCycle] Promise execution error:", err);
                             this.delete(item);
-                        }
-                    })
-                    .catch((err) => {
-                        console.error("[PromiseCycle] Promise execution error:", err);
-                        this.delete(item);
-                    });
+                        });
+                }
             })
         }
 
@@ -262,9 +263,6 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
 interface BaseCycleConfig<T> {
     /** Интервал между шагами (мс) */
     duration: number;
-
-    /** Фильтр для пропуска элементов, не готовых к обработке */
-    readonly filter: (item: T) => boolean;
 
     /** Дополнительные кастомные хуки */
     readonly custom?: {
@@ -284,6 +282,9 @@ interface BaseCycleConfig<T> {
  * @interface SyncCycleConfig
  */
 interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
+    /** Фильтр для пропуска элементов, не готовых к обработке */
+    readonly filter: (item: T) => boolean;
+
     /** Функция обработки элемента (может быть синхронной или возвращать Promise) */
     readonly execute: (item: T) => Promise<void> | void;
 }
@@ -293,6 +294,9 @@ interface SyncCycleConfig<T> extends BaseCycleConfig<T> {
  * @interface AsyncCycleConfig
  */
 interface AsyncCycleConfig<T> extends BaseCycleConfig<T> {
+    /** Фильтр для пропуска элементов, не готовых к обработке */
+    readonly filter: (item: T) => Promise<boolean>;
+
     /** Функция обработки элемента, должна вернуть Promise<boolean> – true, чтобы оставить элемент, false – удалить */
     readonly execute: (item: T) => Promise<boolean>;
 }

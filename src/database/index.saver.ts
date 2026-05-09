@@ -93,15 +93,15 @@ export class AudioSaver extends PromiseCycle<Track> {
                 push: (track) => {
                     // Удаляем дубликаты по URL (асинхронно, чтобы избежать мутации во время итерации)
                     setImmediate(() => {
-                        const duplicates = Array.from(this).filter(t => t.url === track.url);
+                        const duplicates = this.filter(t => t.url === track.url);
                         for (let i = 1; i < duplicates.length; i++) {
                             this.delete(duplicates[i]);
                         }
                     })
                 }
             },
-            filter: (item) => {
-                const names = this.status(item);
+            filter: async (item) => {
+                const names = await this.status(item);
 
                 // Если такой трек уже есть в системе кеширования
                 if (names.status === "ended" || item.time.total > 500 || item.time.total === 0 || item.api.type === "technical") {
@@ -113,109 +113,161 @@ export class AudioSaver extends PromiseCycle<Track> {
                 else if (!fs.existsSync(names.path)) {
                     let dirs = names.path.split("/");
                     if (!names.path.endsWith("/")) dirs.splice(dirs.length - 1);
-                    afs.mkdir(dirs.join("/"), { recursive: true });
+                    await afs.mkdir(dirs.join("/"), { recursive: true });
                 }
 
                 return true;
             },
-            execute: (track) => new Promise<boolean>((resolve) => {
-                if (track.api.type === "technical") return resolve(false);
-
-                const status = this.status(track);
-                const args = [
-                    "-i", track.link,
-                    "-f", `opus`,
-                    `${status.path}.opus`
-                ];
-
-                Logger.log("DEBUG", `[AudioCache/Start]: Save ${status.path}.opus`);
-
-                // Если платформа не может играть нативно из сети
-                if (track.proxy && track.link.startsWith("http")) {
-                    const proxy = env.get("APIs.proxy", null);
-
-                    // Если есть прокси
-                    if (proxy) {
-                        const isSocks = proxy.startsWith("socks");
-
-                        // Если протокол socks
-                        if (isSocks) {
-                            const path = proxy.split(":/")[1];
-
-                            // Если нашлись данные для входа
-                            if (path.match(/@/)) {
-                                args.unshift("-http_proxy", `http:/${proxy.split(":/")[1].split("@")[1]}`);
-                            }
-
-                            // Если данных для входа нет
-                            else args.unshift("-http_proxy", `http:/${proxy.split(":/")[1]}`);
-                        }
-
-                        // Если протокол http
-                        else args.unshift("-http_proxy", `http:/${proxy.split(":/")[1]}`);
-                    }
-                }
-
-                // Создаем ffmpeg для скачивания трека
-                const ffmpeg = new Process(args);
-
-                // Если была получена ошибка
-                ffmpeg.stdout.once("error", async () => {
-                    ffmpeg.destroy();
-                    this.delete(track);
-
-                    // Удаляем файл
-                    if (fs.existsSync(status.path)) await afs.unlink(`${status.path}.opus`);
-                    return resolve(false);
-                });
-
-                // Если запись была завершена
-                ffmpeg.stdout.once("end", async () => {
-                    if (fs.existsSync(status.path)) {
-                        const data = await afs.stat(`${status.path}.opus`);
-
-                        // Если файл не проходит проверку
-                        if (data.size < 10) await afs.unlink(`${status.path}.opus`);
-                    }
-
-                    Logger.log("DEBUG", `[AudioCache/End]: Saved ${status.path}.opus`);
-
-                    ffmpeg.destroy();
-                    this.delete(track);
-                    return resolve(true);
-                });
-            })
+            execute: (track) => this.lowPriorityExecute(track)
         });
     }
+
+    /**
+     * Опускаем приоритет задачи в самый низ очереди Event Loop
+     */
+    private async lowPriorityExecute(track: Track): Promise<boolean> {
+        return this.download(track);
+    };
+
+    /**
+     * @description Старт скачивания аудио
+     * @param track
+     * @private
+     */
+    private async download(track: Track): Promise<boolean> {
+        const status = await this.status(track);
+        const targetFile = status.path;
+        const tmp = targetFile + ".tmp";
+
+        const similarPath = (track as any).similarTrackPath;
+        const isLocalFile = track.link.startsWith("/") || track.link.includes(":\\");
+
+        // --- ЛИНКОВКА (Второй проход или локальный файл) ---
+        await this.symlink(track);
+
+        // --- СКАЧИВАНИЕ ---
+        if (!isLocalFile) {
+            const args = ["-i", track.link, "-f", "opus", tmp];
+            this.applyProxy(args, track);
+
+            return new Promise((resolve) => {
+                const ffmpeg = new Process(args);
+
+                const timeout = setTimeout(() => {
+                    ffmpeg.destroy();
+                    fail();
+                }, 60_000);
+
+                const fail = async () => {
+                    clearTimeout(timeout);
+                    ffmpeg.destroy();
+                    await afs.rm(tmp, { force: true }).catch(() => {});
+                    resolve(false);
+                };
+
+                ffmpeg.stdout.once("error", fail);
+                ffmpeg.stdout.once("end", async () => {
+                    clearTimeout(timeout);
+                    try {
+                        const stat = await afs.stat(tmp);
+                        if (stat.size < 1024) return fail();
+
+                        await afs.rename(tmp, targetFile);
+                        Logger.log("DEBUG", `[AudioSaver/Success]: ${track.ID}`);
+
+                        if (similarPath) {
+                            setImmediate(async () => {
+                                // Теперь в track.link путь к реально существующему файлу
+                                track.link = targetFile;
+                                await this.symlink(track);
+                            });
+                        }
+
+                        resolve(true);
+                    } catch {
+                        fail();
+                    } finally {
+                        ffmpeg.destroy();
+                    }
+                });
+            });
+        }
+        return false;
+    };
+
+    /**
+     * @description Создание ссылок на аудио
+     * @param track
+     * @public
+     */
+    public symlink = async (track: Track) => {
+        const similarPath = (track as any).similarTrackPath;
+        const isLocalFile = track.link.startsWith("/") || track.link.includes(":\\");
+
+        // --- ЛИНКОВКА (Второй проход или локальный файл) ---
+        if (similarPath && isLocalFile) {
+            try {
+                // Путь ссылки (path)
+                const linkPath = similarPath;
+                // На что ссылаемся (target)
+                const target = track.link;
+
+                // Не позволяем линковать одно и тоже
+                if (linkPath === target) return false;
+
+                await afs.mkdir(path.dirname(linkPath), { recursive: true }).catch(() => {});
+                await afs.rm(linkPath, { force: true }).catch(() => {});
+
+                // symlink(цель, путь_ссылки)
+                await afs.symlink(target, linkPath);
+
+                Logger.log("DEBUG", `[AudioSaver/Link]: Linked \n${target} -> \n${linkPath}`);
+
+                (track as any).similarTrackPath = null;
+                return true;
+            } catch (e: any) {
+                Logger.log("DEBUG", `[AudioSaver/Link] Failed: ${e.message}`);
+                return false;
+            }
+        }
+
+        return false;
+    };
 
     /**
      * @description Получаем статус скачивания и путь до файла
      * @param track
      * @public
      */
-    public status = (track: Track | string): { status: "not-ended" | "ended" | "download", path: string } => {
-        let file: string = `${this._dirname}/Audio/${track}`;
+    public status = async (track: Track | string) => {
+        const basePath = typeof track === "string"
+            ? `${this._dirname}/Audio/${track}`
+            : `${this._dirname}/Audio/${track.api.url}/${track.ID}`;
+        const file = basePath + '.opus';
+        const tmp  = file + '.tmp';
+        const dir  = path.dirname(file);
 
-        if (typeof track !== "string") {
-            file = `${this._dirname}/Audio/${track.api.url}/${track.ID}`;
-
-            // Если трека нет в очереди, значит он есть
-            if (!this.has(track)) {
-                // Если файл есть
-                if (fs.existsSync(`${file}.opus`)) return {status: "ended", path: `${file}.opus`};
-            }
-
-            // Выдаем что ничего нет
-            return { status: "not-ended", path: file };
-        } else {
-            // Если файл все-таки есть
-            if (fs.existsSync(`${file}.opus`)) return {status: "ended", path: `${file}.opus`};
+        try {
+            const entries = await afs.readdir(dir);
+            if (entries.includes(path.basename(file))) return { status: 'ended', path: file };
+            if (entries.includes(path.basename(tmp)))  return { status: 'download', path: file };
+            return { status: 'not-ended', path: file };
+        } catch {
+            return { status: 'not-ended', path: file };
         }
+    };
 
-        // Выдаем что ничего нет
-        return {
-            status: "not-ended",
-            path: file
-        };
+    /**
+     * @description Применение прокси для FFmpeg
+     * @param args - Текущие аргументы
+     * @param track - Трек
+     * @private
+     */
+    private applyProxy(args: string[], track: Track) {
+        if (!track.proxy || !track.link.startsWith("http")) return;
+        const proxy = env.get("APIs.proxy", null);
+        if (proxy) {
+            args.unshift("-http_proxy", `http:/${proxy.split(":/")[1]}`);
+        }
     };
 }

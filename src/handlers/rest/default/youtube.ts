@@ -261,7 +261,7 @@ class RestYouTubeAPI extends RestServerSide.API {
 
                         // Если включена утилита кеширования аудио
                         else if (sdb.audio_saver) {
-                            const check = sdb.audio_saver.status(`${this.url}/${ID}`);
+                            const check = await sdb.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {
@@ -292,7 +292,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     if (audio && this.audio) {
                         // Если включена утилита кеширования
                         if (sdb.audio_saver) {
-                            const check = sdb.audio_saver.status(`${this.url}/${ID}`);
+                            const check = await sdb.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {

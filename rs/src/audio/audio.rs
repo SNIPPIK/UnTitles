@@ -9,9 +9,22 @@ use std::{
         Arc, Condvar, Mutex,
     }
 };
-
+use std::sync::OnceLock;
 use crate::audio::parser::{OggOpusParser, PacketType};
 use crate::audio::ring_buffer::RingBuffer;
+
+static SILENT_FRAME: OnceLock<Vec<u8>> = OnceLock::new();
+
+/// Аудио пакет тишины, требуется для encoder Discord.
+/// Нужен для разделения аудио потока, предотвращается разрывы Jitter Buffer
+fn get_silent_data() -> Vec<u8> {
+    SILENT_FRAME.get_or_init(|| vec![0xF8, 0xFF, 0xFE]).clone()
+}
+
+/// Кол-во создаваемых пустых пакетов для аудио потока
+const SILENT_FRAMES: u32 = 1;
+
+
 
 /// Основной управляющий класс, доступный из JavaScript.
 #[napi]
@@ -82,6 +95,7 @@ impl AudioEngine {
             "-vn".to_string(),
             "-loglevel".to_string(), "error".to_string(),
             "-nostdin".to_string(),
+            "-hide_banner".to_string(),
         ];
         final_args.extend(args);
 
@@ -108,6 +122,8 @@ impl AudioEngine {
         let handle = thread::spawn(move || {
             let mut read_buf = [0u8; 16384];
             let mut parser = OggOpusParser::new();
+            // Флаг: получили ли мы первый реальный звук
+            let mut first_packet_received = false;
 
             loop {
                 // Проверка флага остановки
@@ -131,15 +147,29 @@ impl AudioEngine {
 
                 // Чтение данных из BufReader
                 match reader.read(&mut read_buf) {
-                    Ok(0) => break, // EOF
+                    Ok(0) => { break; }, // EOF
+
                     Ok(n) => {
                         let mut frames = Vec::new();
                         if parser.parse_internal(&read_buf[..n], &mut frames).is_ok() {
                             // Минимизируем время удержания мьютекса буфера
                             let buf = buffer_ptr.lock().unwrap();
 
-                            for (kind, data) in frames {
+                            // --- ЛОГИКА ТИШИНЫ ПРИ СТАРТЕ ---
+                            if !first_packet_received {
+                                let silent = get_silent_data();
 
+                                // Вставляем SILENT_FRAMES пакетов тишины ПЕРЕД первым реальным пакетом
+                                for _ in 0..SILENT_FRAMES {
+                                    if buf.len() < max_cap {
+                                        let _ = buf.push(silent.clone());
+                                    }
+                                }
+
+                                first_packet_received = true;
+                            }
+
+                            for (kind, data) in frames {
                                 if kind != PacketType::Broken {
                                     if buf.len() >= max_cap { let _ = buf.pop(); }
                                     let _ = buf.push(data);

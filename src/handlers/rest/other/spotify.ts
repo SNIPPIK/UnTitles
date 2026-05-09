@@ -50,7 +50,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                 if (cache) {
                     // Если включена утилита кеширования аудио
                     if (sdb.audio_saver) {
-                        const check = sdb.audio_saver.status(`${this.url}/${ID}`);
+                        const check = await sdb.audio_saver.status(`${this.url}/${ID}`);
 
                         // Если есть кеш аудио
                         if (check.status === "ended") {
@@ -75,7 +75,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                     if (options.audio) {
                         // Если включена утилита кеширования
                         if (sdb.audio_saver) {
-                            const check = sdb.audio_saver.status(`${this.url}/${ID}`);
+                            const check = await sdb.audio_saver.status(`${this.url}/${ID}`);
 
                             // Если есть кеш аудио
                             if (check.status === "ended") {

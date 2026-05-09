@@ -44,142 +44,198 @@ const PLAYER_SEND_LIMIT = PLAYER_SEND_POOL * 3;
 
 /**
  * @author SNIPPIK
- * @description Циклическая система плееров, используется для отправки аудио пакетов
+ * @description Циклическая система плееров для плавной отправки аудиопакетов.
+ * Адаптирует скорость работы цикла в зависимости от нагрузки Event Loop.
+ *
  * @class AudioPlayers
  * @extends TaskCycle
  * @private
  */
 class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
+    // Храним время последней корректировки цикла (для предотвращения слишком частых изменений)
+    private _lastAdjust = 0;
+
+    // Используем WeakMap для безопасного хранения состояний (метрик) каждого плеера.
+    // Это избавляет нас от необходимости принудительно писать данные в сам объект плеера через `any`.
+    private _playerMetrics = new WeakMap<T, { starving: boolean; buffered: number }>();
+
     /**
-     * @description Запускаем циклическую систему плееров, весь логический функционал здесь
+     * @description Инициализирует цикл обработки аудио-плееров
      * @constructor
      * @public
      */
     public constructor() {
         super({
-            // Время до следующего прогона цикла
+            // Базовое время до следующего прогона цикла
             duration: PLAYER_SEND_NATIVE,
 
-            // Кастомные функции (если хочется немного изменить логику выполнения)
+            // Кастомные функции для управления циклом
             custom: {
                 step: () => {
                     let anyStarving = false;
                     let anyOverloaded = false;
                     let activePlayers = 0;
 
+                    // Проходимся по всем плеерам в текущем цикле
                     for (const p of this) {
+                        // Если плеер не проходит фильтр (например, не играет) — пропускаем его
                         if (!this.options.filter(p)) continue;
+
                         activePlayers++;
-                        if ((p as any)._starving) anyStarving = true;
-                        // Перегрузка: буфер UDP больше 80% лимита
+
+                        // Получаем или создаем метрики для текущего плеера
+                        const metrics = this._getOrCreateMetrics(p);
+
+                        // Проверяем статус "голодания" (не хватает пакетов для отправки)
+                        if (metrics.starving) {
+                            anyStarving = true;
+                        }
+
+                        // Проверяем статус "перегрузки" (буфер UDP забит более чем на 80%)
                         const packets = p.voice?.connection?.udp?.packets ?? 0;
-                        if (packets > PLAYER_SEND_LIMIT * 0.8) anyOverloaded = true;
-                        // Сбрасываем флаг для следующего тика
-                        (p as any)._starving = false;
+                        if (packets > PLAYER_SEND_LIMIT * 0.8) {
+                            anyOverloaded = true;
+                        }
+
+                        // Сбрасываем флаг голодания для следующего шага цикла
+                        metrics.starving = false;
                     }
 
-                    if (activePlayers === 0) return;
-
-                    let newDuration = this.options.duration;
-
-                    if (anyStarving) {
-                        // Голодание – увеличиваем интервал (замедляемся), даём накопиться данным
-                        newDuration = Math.min(PLAYER_SEND_NATIVE * 2, this.options.duration + OPUS_FRAME_SIZE);
-                    } else if (anyOverloaded) {
-                        // Буфер переполнен – уменьшаем интервал (ускоряем отправку)
-                        newDuration = Math.max(PLAYER_SEND_NATIVE / 2, this.options.duration - OPUS_FRAME_SIZE);
-                    } else {
-                        // Плавно возвращаемся к базовому интервалу
-                        if (this.options.duration > PLAYER_SEND_NATIVE) {
-                            newDuration = Math.max(PLAYER_SEND_NATIVE, this.options.duration - OPUS_FRAME_SIZE);
-                        } else if (this.options.duration < PLAYER_SEND_NATIVE) {
-                            newDuration = Math.min(PLAYER_SEND_NATIVE, this.options.duration + OPUS_FRAME_SIZE);
+                    // --- Адаптация скорости цикла ---
+                    // Если есть активные плееры, решаем, нужно ли нам ускорить или замедлить цикл
+                    if (activePlayers > 0) {
+                        if (anyStarving) {
+                            // Если кому-то не хватает пакетов, замедляем цикл (увеличиваем интервал),
+                            // чтобы дать системе время накопить аудиоданные.
+                            this.options.duration = Math.min(
+                                PLAYER_SEND_NATIVE * 2,
+                                this.options.duration + OPUS_FRAME_SIZE
+                            );
+                        } else if (anyOverloaded) {
+                            // Если буфер переполнен, ускоряем цикл (уменьшаем интервал),
+                            // чтобы быстрее разгрести очередь пакетов.
+                            this.options.duration = Math.max(
+                                PLAYER_SEND_NATIVE / 2,
+                                this.options.duration - OPUS_FRAME_SIZE
+                            );
+                        } else {
+                            // Если всё в порядке, плавно возвращаемся к стандартной скорости (базовому интервалу)
+                            if (this.options.duration > PLAYER_SEND_NATIVE) {
+                                this.options.duration = Math.max(PLAYER_SEND_NATIVE, this.options.duration - OPUS_FRAME_SIZE);
+                            } else if (this.options.duration < PLAYER_SEND_NATIVE) {
+                                this.options.duration = Math.min(PLAYER_SEND_NATIVE, this.options.duration + OPUS_FRAME_SIZE);
+                            }
                         }
                     }
 
-                    this.options.duration = newDuration;
+                    // --- Коррекция времени (компенсация микро-задержек процессора) ---
+                    const now = this.time;
+                    const drift = Math.abs(now - this.insideTime);
+
+                    // Вычисляем, насколько кадров мы сдвинулись
+                    const frames = drift > PLAYER_SEND_NATIVE ? drift + PLAYER_SEND_NATIVE : PLAYER_SEND_NATIVE;
+                    const quantized = Math.max(PLAYER_SEND_NATIVE, Math.ceil(frames / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE);
+
+                    // Применяем корректировку только раз в определенное время (Cooldown)
+                    if ((now - this._lastAdjust >= PLAYER_SEND_NATIVE) && (this.options.duration !== quantized)) {
+                        const step = this.options.duration > quantized ? -OPUS_FRAME_SIZE : OPUS_FRAME_SIZE;
+                        this.options.duration = Math.max(PLAYER_SEND_NATIVE, Math.min(this.options.duration + step, quantized));
+
+                        // Устанавливаем задержку до следующей корректировки
+                        this._lastAdjust = now + PLAYER_SEND_NATIVE * 5;
+                    }
                 }
             },
 
-            // Функция проверки
+            // Оставляем в цикле только те плееры, которые сейчас проигрывают аудио и готовы к работе
             filter: (item) => item.playing && item.voice?.connection?.ready,
 
             /**
-             * @author SNIPPIK
-             * @description Выполняет отправку аудиопакетов из буфера в UDP-соединение.
-             *              Пакеты извлекаются из очереди аудиоданных и передаются в сокет.
-             *              Если пакетов нет и очереди пусты, плеер переводится в состояние idle.
-             *
-             * @param player - Экземпляр аудио плеера, содержащий буфер аудиоданных и UDP-соединение.
-             *
-             * @remarks
-             * - Количество пакетов для отправки рассчитывается как `длительность фрейма / размер фрейма` + запас.
-             * - Запас (PLAYER_SEND_POOL) позволяет поддерживать буфер в соединении заполненным,
-             *   предотвращая микро-заикания.
-             * - Если пакетов в очереди аудиоданных нет и буфер соединения пуст, плеер переходит в idle.
-             *
+             * @description Выполняет отправку аудиопакетов из буфера в UDP-соединение для одного плеера.
+             * @param player - Экземпляр аудио плеера
              * @public
              */
             execute: (player) => {
-                const audio = player.audio.current;
                 const connection = player.voice.connection;
+                const metrics = this._getOrCreateMetrics(player);
 
-                // База: сколько пакетов нужно отправить, чтобы покрыть длительность шага
-                let toSend = Math.ceil(this.options.duration / OPUS_FRAME_SIZE) + this.size;
-
-                // Защита от переполнения буфера
+                // Защита от переполнения: если пакетов уже слишком много, ничего не отправляем
                 if (connection.udp.packets > PLAYER_SEND_LIMIT) return;
 
-                // Если буфер почти пуст – запросим больше (запас)
+                // Считаем базовое количество пакетов, которые нужно отправить за текущий шаг
+                let toSend = Math.ceil(this.options.duration / OPUS_FRAME_SIZE);
+
+                // Добавляем запас пакетов, если буфер соединения почти пуст (предотвращает заикания)
                 if (connection.udp.packets <= PLAYER_SEND_POOL) {
                     toSend += PLAYER_SEND_POOL;
                 }
 
-                // Сколько пакетов можно взять, чтобы не переполнить буфер
+                // Рассчитываем, сколько максимум мы можем безопасно добавить
                 const maxAllowedTotal = toSend + PLAYER_SEND_POOL;
                 let allowed = Math.max(0, maxAllowedTotal - connection.udp.packets);
 
-                let requested = 0;
+                const audio = player.audio.current;
+
+                // Сбрасываем метрику буферизации перед новой попыткой
+                metrics.buffered = 0;
+
+                // Берем пакеты из источника аудио и отправляем их в соединение
                 if (allowed > 0) {
-                    const batch = audio.packetAt(allowed);
+                    const batch = audio.packetAt(allowed + 2); // Запрашиваем с небольшим запасом
                     if (batch && batch.length > 0) {
                         connection.packet(batch);
-                        player._buffered = batch.length;
-                        requested = batch.length;
+                        metrics.buffered = batch.length; // Сохраняем информацию о том, сколько реально взяли
                     }
                 }
 
-                // --- Главное: определяем голодание ---
-                // Если запросили хотя бы 1 пакет, но получили 0 – источник пуст, плеер голодает
-                // Или получили сильно меньше половины запрошенного – тоже не успевает
-                // Запоминаем на плеере для использования в custom.step
-                (player as any)._starving = (allowed > 0 && requested === 0) ||
-                    (allowed > 2 && requested < allowed / 2);
+                // --- Проверка на "голодание" источника ---
+                // Если мы хотели взять пакеты (allowed > 0), но источник ничего не дал (buffered === 0)
+                // ИЛИ если мы запросили много, а получили меньше половины — плеер не справляется (голодает).
+                metrics.starving = (allowed > 0 && metrics.buffered === 0) ||
+                    (allowed > 2 && metrics.buffered < allowed / 2);
 
-                // Остановка плеера, если нет данных вообще
+                // Если и в источнике, и в буфере UDP закончились пакеты — останавливаем плеер
                 if (audio.packets === 0 && connection.udp.packets === 0) {
                     player.status = AudioPlayerState.idle;
                     player.cycle = false;
-                    (player as any)._starving = false;
+                    metrics.starving = false;
                 }
             }
         });
-    };
+    }
 
     /**
-     * @description Чистка цикла от всего + выполнение gc
+     * @description Вспомогательный метод для безопасного получения метрик плеера
+     * @private
+     */
+    private _getOrCreateMetrics(player: T) {
+        let metrics = this._playerMetrics.get(player);
+        if (!metrics) {
+            metrics = { starving: false, buffered: 0 };
+            this._playerMetrics.set(player, metrics);
+        }
+        return metrics;
+    }
+
+    /**
+     * @description Очистка цикла и принудительный запуск сборщика мусора (Garbage Collector)
      * @returns void
      * @public
      */
-    public reset = () => {
-        // Запускаем Garbage Collector
+    public reset = (): void => {
+        // Оборачиваем вызов GC в проверку, чтобы избежать падения программы,
+        // если скрипт запущен без флага --expose-gc
         setImmediate(() => {
-            if (typeof global.gc === "function") {
+            if (typeof global !== "undefined" && typeof global.gc === "function") {
                 Logger.log("DEBUG", "[Node] running Garbage Collector - running in player cycle");
                 global.gc();
+            } else {
+                Logger.log("DEBUG", "[Node] Garbage Collector is not exposed. Skipping.");
             }
         });
 
+        // Сбрасываем кэш метрик для надежности
+        this._playerMetrics = new WeakMap();
         super.reset();
     };
 }
@@ -268,9 +324,15 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
                  * При добавлении нового сообщения удаляет старое для той же гильдии,
                  * чтобы в системе всегда было только одно активное сообщение на гильдию.
                  */
-                push: (item) => {
+                push: async (item) => {
                     const old = this.find(msg => msg.guildId === item.guildId);
-                    if (old) this.delete(old);
+                    if (old) {
+                        try {
+                            if (!!old.delete) await old.delete();
+                        } catch {
+                            Logger.log("ERROR", `Failed delete message in cycle!`);
+                        }
+                    }
                 }
             },
 
@@ -287,7 +349,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
              * Основная функция обновления, вызываемая циклически.
              * - Получает очередь музыки по `guildId`.
              * - Если очереди нет – удаляет сообщение.
-             * - Если есть компоненты (кнопки, селекты) – вызывает `update`.
+             * - Если есть компоненты (кнопки) – вызывает `update`.
              * - Если компонентов нет – удаляет сообщение.
              */
             execute: (message) => {
@@ -316,7 +378,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
      *              В случае ошибки (например, сообщение удалено) удаляет сообщение из цикла.
      *
      * @param message - Объект сообщения, которое нужно обновить.
-     * @param component - Новые компоненты (кнопки, селекты) для встраивания.
+     * @param component - Новые компоненты (кнопки) для встраивания.
      *
      * @remarks
      * - Редактирование происходит только если у сообщения есть поле `createdTimestamp`
@@ -357,14 +419,14 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
     public ensure = async (guildId: string, factory: () => Promise<T>): Promise<T | null> => {
         let message = this.find(m => m.guildId === guildId);
 
-        // Случай 1: сообщения в цикле нет – создаём новое
+        // Сообщения в цикле нет – создаём новое
         if (!message) {
             try {
                 const msg = await factory();
                 msg.guildId = guildId;
                 this.add(msg);
             } catch (err) {
-                console.error(`TIMEOUT1: ${err}`)
+                Logger.log("ERROR", err as Error);
             }
 
             return null;
@@ -378,7 +440,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
                 msg.guildId = guildId;
                 this.add(msg);
             } catch (err) {
-                console.error(`TIMEOUT2: ${err}`)
+                Logger.log("ERROR", err as Error);
             }
 
             return null;

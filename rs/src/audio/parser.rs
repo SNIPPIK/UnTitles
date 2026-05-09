@@ -11,6 +11,9 @@ pub enum PacketType {
     Broken
 }
 
+/// Новый тип для выходных пакетов
+pub type ParsedPacket = (PacketType, Vec<u8>); // (тип, данные)
+
 /// Парсер Ogg Opus потока, работающий в режиме потока (streaming).
 ///
 /// Разбивает входящие фрагменты данных на страницы Ogg, собирает пакеты
@@ -64,7 +67,7 @@ impl OggOpusParser {
     /// # Аргументы
     /// * `chunk` - новые входные данные
     /// * `output` - вектор, в который будут добавлены кортежи (тип пакета, данные)
-    pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<(PacketType, Vec<u8>)>) -> Result<()> {
+    pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<ParsedPacket>) -> Result<()> {
         if chunk.is_empty() {
             return self.flush_internal(output);
         }
@@ -81,7 +84,7 @@ impl OggOpusParser {
     /// (например, при закрытии потока или достижении EOF). Он обрабатывает ситуацию, когда
     /// в буферах парсера остались неполные данные, которые не могут быть завершены обычным
     /// способом из-за отсутствия последующих страниц Ogg.
-    fn flush_internal(&mut self, output: &mut Vec<(PacketType, Vec<u8>)>) -> Result<()> {
+    fn flush_internal(&mut self, output: &mut Vec<ParsedPacket>) -> Result<()> {
         if !self.remainder.is_empty() || !self.packet_carry.is_empty() {
             Self::process_packet_core(
                 &mut self.packet_carry,

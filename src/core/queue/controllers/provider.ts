@@ -26,9 +26,9 @@ export const TRACK_BUFFERED_TIME = 500;
  * @class ResourceResolver
  * @private
  */
-class ResourceProvider {
+class ResourceProvider<T extends Track> {
     public constructor(
-        private readonly prepare: (track: Track, attempt: number) => Promise<string | Error>,
+        private readonly prepare: (track: T, attempt: number) => Promise<string | Error>,
         private readonly options = { retries: 2, initialDelay: 70 }
     ) {};
 
@@ -36,7 +36,7 @@ class ResourceProvider {
      * @description Пытается разрешить путь к ресурсу, плавно увеличивая паузы при ошибках
      * @public
      */
-    public async resolve(track: Track): Promise<string | Error> {
+    public async resolve(track: T): Promise<string | Error> {
         let lastError: Error | string = "Unknown error";
 
         for (let attempt = 0; attempt < this.options.retries; attempt++) {
@@ -72,16 +72,16 @@ class ResourceProvider {
  * @class LyricsProvider
  * @private
  */
-class LyricsProvider {
+class LyricsProvider<T extends Track> {
     public constructor(
-        private readonly prepare: (track: Track) => Promise<string | Error>,
+        private readonly prepare: (track: T) => Promise<string | Error>,
     ) {};
 
     /**
      * @description Пытается разрешить путь к ресурсу, плавно увеличивая паузы при ошибках
      * @public
      */
-    public async resolve(track: Track): Promise<string | Error> {
+    public async resolve(track: T): Promise<string | Error> {
         return this.prepare(track);
     };
 }
@@ -99,34 +99,46 @@ export class TrackResolvers {
          * @public
          */
         audio: new ResourceProvider(async (track, attempt) => {
-            const status = sdb.audio_saver?.status(track);
+            const status = await sdb.audio_saver?.status(track);
 
             // Проверка кеша (мгновенно)
             if (status?.status === "ended") return status.path;
 
-            // Если ссылки нет — ищем через API
+            // Если ссылки нет — ищем через Rest/API
             if (!track.link) {
-                const songs = await db.api.fetchAudioLink(track, attempt > 1);
+                const songs = await db.api.fetchAudioLink(track, attempt < 1);
 
+                // Если была получена ошибка вместо треков
                 if (songs instanceof Error) return songs;
 
+                // Проверяем полученные треки
                 for (let trk of songs) {
                     if (trk instanceof Error) continue;
 
+                    (trk as any).similarTrackPath = status.path;
+
+                    // Проверяем заголовок трека
                     const song = await this.head(trk);
-                    if (song instanceof Error) return song;
+
+                    // Если получена ошибка, то отбрасываем трек
+                    if (song instanceof Error) continue;
 
                     track.proxy = trk.api.proxy;
                     track.link = trk.link;
                     return song;
                 }
+
+                // Если ничего не нашлось
                 return new Error("Resource has not found");
             }
 
             // Проверяем HTTP HEAD (если это ссылка)
             if (track.link.startsWith("http")) {
+                (track as any).similarTrackPath = status.path;
                 const song = await this.head(track);
                 if (song instanceof Error) return song;
+
+                track.link = song;
                 return song;
             }
 
@@ -174,9 +186,13 @@ export class TrackResolvers {
      */
     private static head = async (track: Track): Promise<string | Error> => {
         // Если вдруг попадет не ссылка
-        if (!track.link?.startsWith("http")) return track.link;
+        if (!track.link?.startsWith("http")) {
+            // Делаем линковку
+            if (sdb.audio_saver) await sdb.audio_saver.symlink(track);
+            return track.link;
+        }
 
-        const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null, sessionTimeout: 5e3, timeout: 5e3 });
+        const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null, sessionTimeout: TRACK_CHECK_WAIT, timeout: TRACK_CHECK_WAIT });
         const status = await client.toHead;
         const error = httpsStatusCode.parse(status);
 
