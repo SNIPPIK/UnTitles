@@ -1,74 +1,121 @@
+import { TypedEmitter } from "#structures/tools/TypedEmitter.js";
 import { Worker, WorkerOptions } from "node:worker_threads";
-import { Logger } from "#structures";
 import path from "node:path";
 
 /**
  * @author SNIPPIK
- * @description Класс упрощающий работу с потоками, позволяет за несколько сек запускать и удалять потоки
- * @class SimpleWorker
+ * @description События, которые может генерировать SimpleWorker
+ * @interface WorkerEvents
  * @public
  */
-export class SimpleWorker {
-    /**
-     * @description Создаем или заменяем поток
-     * @static
-     * @public
-     */
-    public static create<T>({options, file, callback, postMessage, not_destroyed}: WorkerInput<T>): Worker {
-        // Используем абсолютный путь
-        const workerPath = path.isAbsolute(file) ? file : path.resolve(file);
-        const worker = new Worker(workerPath, options);
+interface WorkerEvents<TOutput = any> {
+    /** @description Получено сообщение от воркера */
+    message: (data: TOutput) => void;
 
-        // Отправляем данные
-        if (postMessage) worker.postMessage(postMessage);
+    /** @description Ошибка в воркере */
+    error: (error: Error) => void;
 
-        // События для упрощенного удаления
-        worker.once("error", () => this.destroy(worker));
-        worker.once("exit", () => this.destroy(worker));
-
-        // Отвечаем на получение данных
-        worker.once("message", (message) => {
-            callback(message);
-
-            // Если поток должен остаться активным
-            if (!not_destroyed) this.destroy(worker).catch((err) => {
-                throw err;
-            });
-        });
-
-        return worker;
-    };
-
-    /**
-     * @description Уничтожаем поток
-     * @param worker - Поток
-     * @static
-     * @private
-     */
-    private static destroy = async (worker: Worker) => {
-        // Снимаем все слушатели, чтобы не триггерить повторные вызовы
-        worker.removeAllListeners();
-
-        try {
-            // terminate() возвращает обещание
-            await worker.terminate();
-        } catch (err) {
-            Logger.log("ERROR", err as Error);
-        }
-    };
+    /** @description Воркер завершил выполнение */
+    exit: (code: number) => void;
 }
-
 
 /**
  * @author SNIPPIK
- * @description Интерфейс для работы с потоком
- * @interface WorkerInput
- * @private
+ * @description Улучшенный класс для работы с Worker Threads с автоматическим управлением жизненным циклом,
+ *              типизированными событиями и поддержкой TypedEmitter.
+ * @template TInput - Тип данных, отправляемых в воркер
+ * @template TOutput - Тип данных, получаемых от воркера
+ * @class SimpleWorker
+ * @extends TypedEmitter<WorkerEvents<TOutput>>
+ * @public
  */
-interface WorkerInput<T> {
-    file: string;
-    options: WorkerOptions;
-    postMessage: any;
-    not_destroyed?: boolean;
-    callback(data: T): void;
+export class SimpleWorker<TInput = any, TOutput = any> extends TypedEmitter<WorkerEvents<TOutput>> {
+    private logger: Console | { log: (level: string, ...args: any[]) => void };
+    private readonly autoDestroy: boolean;
+    private worker: Worker | null = null;
+
+    /**
+     * @description Конструктор SimpleWorker
+     * @param file - Путь к файлу воркера (абсолютный или относительный)
+     * @param options - Опции для Worker (WorkerOptions)
+     * @param autoDestroy - Уничтожать воркер после первого полученного сообщения
+     * @param logger - Логгер для ошибок (по умолчанию console)
+     * @public
+     */
+    public constructor(
+        private file: string,
+        private options: WorkerOptions = {},
+        autoDestroy = true,
+        logger: { log: (level: any, ...args: any[]) => void } = console
+    ) {
+        super();
+        this.autoDestroy = autoDestroy;
+        this.logger = logger;
+    };
+
+    /**
+     * @description Запускает воркер и отправляет начальные данные (если указаны)
+     * @param initialData - Данные, которые будут отправлены в воркер сразу после запуска
+     * @returns Promise<void>
+     * @throws {Error} Если воркер уже запущен
+     * @public
+     */
+    public async start(initialData?: TInput): Promise<void> {
+        if (this.worker) throw new Error("Worker already started");
+
+        const workerPath = path.isAbsolute(this.file) ? this.file : path.resolve(this.file);
+        this.worker = new Worker(workerPath, this.options);
+
+        // Обработчики событий (без автоматического удаления)
+        this.worker.on("message", (data: TOutput) => {
+            this.emit("message", data);
+            if (this.autoDestroy) this.destroy();
+        });
+
+        // Обработчик ошибок
+        this.worker.on("error", (err) => {
+            //@ts-ignore
+            this.emit("error", err);
+            if (this.autoDestroy) this.destroy();
+        });
+
+        // Обработчик выхода процесса
+        this.worker.on("exit", (code) => {
+            this.emit("exit", code);
+            if (this.autoDestroy) this.destroy();
+        });
+
+        if (initialData !== undefined) {
+            this.send(initialData);
+        }
+    };
+
+    /**
+     * @description Отправляет данные в работающий воркер
+     * @param data - Данные для отправки
+     * @throws {Error} Если воркер не запущен
+     * @public
+     */
+    public send(data: TInput): void {
+        if (!this.worker) throw new Error("Worker not started");
+        this.worker.postMessage(data);
+    };
+
+    /**
+     * @description Принудительно завершает воркер и очищает ресурсы
+     * @returns Promise<void>
+     * @public
+     */
+    public async destroy(): Promise<void> {
+        if (!this.worker) return;
+        this.worker.removeAllListeners();
+        try {
+            await this.worker.terminate();
+        } catch (err) {
+            this.logger.log("ERROR", err);
+            throw err;
+        } finally {
+            this.worker = null;
+        }
+    };
 }

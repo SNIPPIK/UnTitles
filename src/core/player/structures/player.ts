@@ -183,12 +183,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (isActive) {
             // Если нет плеера в цикле
             if (!db.queues.cycles.players.has(this)) {
+                // Отправляем пустышку
+                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
 
                 // Добавляем плеер в цикл
                 db.queues.cycles.players.add(this);
-
-                // Отправляем пустышку
-                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
                 this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`)
             }
         }
@@ -197,11 +196,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         else if (!isActive) {
             // Если есть плеер в цикле
             if (db.queues.cycles.players.has(this)) {
-                // Отправляем пустышку
-                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
-
                 // Удаляем плеер из цикла
                 db.queues.cycles.players.delete(this);
+
+                // Отправляем пустышку
+                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
                 this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`)
             }
         }

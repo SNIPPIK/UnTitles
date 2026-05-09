@@ -49,8 +49,8 @@
     "typescript": "^6.0.3"
   },
   "scripts": {
-    "start": "node ./build/src/index.js --ShardManager --optimize_for_size --expose-gc --no-compilation-cache --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
-    "start:bun": "bun ./src/index.ts --ShardManager --optimize_for_size --expose-gc --no-compilation-cache --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
+    "start": "node ./build/src/index.js --ShardManager --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
+    "start:bun": "bun ./src/index.ts --ShardManager --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
     
     "build": "tsc",
     "build:native": "npm run build:copy && napi build --platform --release --cwd ./rs --js index.cjs && npm run build:bindings",

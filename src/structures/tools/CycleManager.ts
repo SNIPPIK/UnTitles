@@ -189,8 +189,8 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @description Выполняет все подходящие элементы цикла
      * @protected
      */
-    protected _stepCycle(): void {
-        for (const item of this) {
+    protected async _stepCycle() {
+        for await (const item of this) {
             // Пропускаем элементы, не прошедшие фильтр
             if (!this.options.filter(item)) continue;
 
@@ -231,8 +231,8 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @description Выполняет все подходящие элементы, не дожидаясь Promise
      * @protected
      */
-    protected _stepCycle(): void {
-        for (const item of this) {
+    protected async _stepCycle() {
+        for await (const item of this) {
             setImmediate(async () => {
                 if (await this.options.filter(item)) {
                     Promise.resolve(this.options.execute(item))

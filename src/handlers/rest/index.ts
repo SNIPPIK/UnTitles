@@ -8,7 +8,6 @@ import {
 import type { RestServerSide } from "./index.server.js";
 import { Logger, SimpleWorker } from "#structures";
 import { RestClientSide } from "./index.client.js";
-import { Worker } from "node:worker_threads";
 import { Track } from "#core/queue/index.js";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
@@ -26,7 +25,7 @@ export * from "./index.server.js";
  */
 class RestWorker<T extends APIRequestsKeys> {
     /**  Второстепенный поток, динамически создается и удаляется когда не требуется */
-    protected worker: Worker;
+    protected worker: SimpleWorker;
 
     /** Последний уникальный ID запроса */
     protected lastID: number = 0;
@@ -126,67 +125,76 @@ class RestWorker<T extends APIRequestsKeys> {
     };
 
     /**
-     * @description Функция для инициализации worker
+     * @description Функция для инициализации worker (адаптированная под нестатический SimpleWorker)
      * @returns Promise<boolean>
      * @public
      */
     public init = (): Promise<boolean> => {
         return new Promise(async (resolve) => {
-            // Если поток уже есть в системе
-            if (this.worker) await this.cleanup();
+            // Если поток уже есть, уничтожаем старый
+            if (this.worker) {
+                await this.worker.destroy();
+                this.worker = null;
+            }
 
             const __filename = fileURLToPath(import.meta.url);
             const __dirname = dirname(__filename);
 
-            // Создаем поток через менеджер потоков
-            const worker = this.worker = SimpleWorker.create<RestServerSide.Data>({
-                file: __dirname + "/index.worker",
-                options: {
+            // Создаём экземпляр SimpleWorker (нестатический)
+            const worker = new SimpleWorker<RestServerSide.Data | any, RestServerSide.Result<T> & { requestId?: number }>(
+                __dirname + "/index.worker",
+                {
                     execArgv: [
                         "--experimental-require-module",
                         "--enable-source-maps"
                     ],
                     workerData: { rest: true },
                 },
-                postMessage: { data: true },
-                not_destroyed: true,
-                callback: (data) => {
-                    this.platforms = data;
-                    this.map.clear();
+                false,
+                Logger
+            );
 
-                    // Заполняем Map для O(1) доступа
-                    for (const api of this.array) {
-                        if (api.auth !== null) {
-                            this.map.set(api.name.toUpperCase(), api);
-                        }
+            // Подписываемся на постоянные сообщения (для обработки запросов)
+            worker.on("message", (message) => {
+                const { requestId } = message;
+                if (requestId !== undefined) {
+                    const request = this.pending.get(requestId);
+                    if (request) {
+                        request.resolve(message);
+                        this.pending.delete(requestId);
                     }
-
-                    return resolve(true);
                 }
             });
 
-            // Если возникнет ошибка, пересоздадим worker
-            worker.once("error", (error) => {
-                console.log(error);
-
-                // Делам небольшую задержку для запуска
-                setTimeout(() => {
-                    return this.init();
-                }, 2e3);
+            // Обработка ошибок — пересоздаём воркер
+            worker.once("error", async (error) => {
+                console.error(error);
+                // Уничтожаем текущий экземпляр
+                await worker.destroy();
+                // Перезапускаем через задержку
+                setTimeout(() => this.init(), 2000);
             });
 
-            // Внутри startWorker, после создания this.worker
-            worker.on("message", (message: RestServerSide.Result<T> & { requestId?: number }) => {
-                const { requestId } = message;
+            // Запускаем воркер и отправляем начальные данные
+            await worker.start({ data: true });
 
-                // Ищем, кто ждет этот ID
-                const request = this.pending.get(requestId);
-                if (!request) return; // Если никто не ждет (например, уже был тайм-аут)
-
-                // Обработка результата
-                request.resolve(message);
-                this.pending.delete(requestId);
+            // Ждём первое сообщение (инициализация платформ)
+            // Используем once, чтобы дождаться именно первого сообщения.
+            // Обрабатываем инициализацию
+            this.platforms = await new Promise<RestServerSide.Data>((resolveFirst) => {
+                worker.once("message", (data) => resolveFirst(data as any));
             });
+
+            this.map.clear();
+            for (const api of this.array) {
+                if (api.auth !== null) {
+                    this.map.set(api.name.toUpperCase(), api);
+                }
+            }
+
+            // Сохраняем worker в поле класса для дальнейшего использования (отправка запросов)
+            this.worker = worker;
+            resolve(true);
         });
     };
 
@@ -223,7 +231,7 @@ class RestWorker<T extends APIRequestsKeys> {
 
         // Если поток уже есть в системе
         if (this.worker) {
-            await this.worker.terminate();
+            await this.worker.destroy();
             this.worker = null;
         }
 
@@ -333,7 +341,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
             });
 
             // Отправляем запрос
-            this.worker.postMessage({ platform: platform.name, payload, options, requestId, type });
+            this.worker.send({ platform: platform.name, payload, options, requestId, type });
             Logger.log("DEBUG", `[Rest/API |${type}| SEND - ${platform.name}]: ${payload}`);
         });
     };

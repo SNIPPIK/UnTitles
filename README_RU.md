@@ -106,7 +106,7 @@
 - **Масштабируемость**: Легкое добавление любых языков, поддерживаемых Discord.
 
 ---
-</details>
+</details>![ELLx4.png](.github/images/ELLx4.png)
 
 ## 🎖️ Устойчивость к блокировке Event Loop
 Даже при жёстком блокировании основного потока Node.js звук продолжает воспроизводиться **без лагов и искажений**.
@@ -120,6 +120,12 @@ setInterval(() => {
     while (performance.now() - start < 100) {}
 }, 100);
 ```
+
+<p>
+    <a href="">
+      <img src=".github/images/ELLx4.png" alt="Title" />
+    </a>
+  </p>
 </details>
 
 ---
