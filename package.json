@@ -34,9 +34,9 @@
   "dependencies": {
     "@discordjs/builders": "^1.14.1",
     "discord-api-types": "^0.38.47",
-    "discord.js": "15.0.0-dev.1777075897-40ce0791a",
-    "http-proxy-agent": "^7.0.2",
-    "socks-proxy-agent": "^8.0.5",
+    "discord.js": "15.0.0-pr-11006.1765452229-e636950b2",
+    "http-proxy-agent": "^9.0.0",
+    "socks-proxy-agent": "^10.0.0",
     "ws": "^8.20.0"
   },
   "optionalDependencies": {
