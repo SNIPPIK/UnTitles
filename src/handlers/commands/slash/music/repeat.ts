@@ -46,32 +46,32 @@ import {db} from "#app/db";
             {
                 name: "song",
                 nameLocalizations: {
-                    "en-US": "song",
-                    "ru": "трек"
+                    "en-US": "song - Repeat one track",
+                    "ru": "трек - Повтор одного трека"
                 },
                 value: `${RepeatType.Song}`
             },
             {
                 name: "songs",
                 nameLocalizations: {
-                    "en-US": "songs",
-                    "ru": "треки"
+                    "en-US": "songs - Repeat the entire queue",
+                    "ru": "треки - Повтор всей очереди"
                 },
                 value: `${RepeatType.Songs}`
             },
             {
                 name: "autoplay",
                 nameLocalizations: {
-                    "en-US": "autoplay",
-                    "ru": "похожее"
+                    "en-US": "autoplay - Infinite Audio Stream [BETA]",
+                    "ru": "похожее - Бесконечный аудио поток [BETA]"
                 },
                 value: `${RepeatType.AutoPlay}`
             },
             {
                 name: "off",
                 nameLocalizations: {
-                    "en-US": "off",
-                    "ru": "выкл"
+                    "en-US": "off - Disabling repeat",
+                    "ru": "выкл - Отключение повтора"
                 },
                 value: `${RepeatType.None}`
             },
