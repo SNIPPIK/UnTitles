@@ -108,7 +108,7 @@ jobs:
           cp rs/*.node build/native/ 2>/dev/null || true
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bindings-${{ matrix.settings.target }}
           path: build/native
