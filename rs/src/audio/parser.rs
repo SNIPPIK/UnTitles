@@ -8,7 +8,9 @@ pub enum PacketType {
     Head,
     Tags,
     Frame,
-    Broken
+    Silent,
+    Broken,
+    End
 }
 
 /// Новый тип для выходных пакетов
@@ -34,20 +36,7 @@ pub struct OggOpusParser {
     /// Серийный номер битового потока (bitstream serial) текущей логической
     /// последовательности страниц. Используется для детектирования смены потока
     /// или сброса состояния (при появлении страницы с новым serial).
-    bitstream_serial: Option<i32>,
-
-    /// Количество байт от начала буфера `remainder`, которые уже были проверены на наличие маркера "OggS".
-    ///
-    /// Оптимизация, позволяющая не сканировать уже просмотренную область при повторных вызовах `parse_core`.
-    ///
-    /// ## Как работает
-    /// - Изначально `scanned_bytes = 0`.
-    /// - При поиске маркера мы начинаем не с `cursor`, а с `max(cursor, scanned_bytes)`, пропуская уже проверенные данные.
-    /// - Если маркер найден, `scanned_bytes` обновляется до его позиции (все байты до неё теперь считаются проверенными).
-    /// - Если маркер не найден, `scanned_bytes` устанавливается в `remainder.len() - 3`, оставляя последние 3 байта
-    ///   на случай, если начало маркера "OggS" попадёт в следующий фрагмент (сигнатура длиной 4 байта, оставляем запас).
-    /// - После удаления обработанных данных из `remainder` (через `drain`) значение `scanned_bytes` уменьшается на размер удалённой части.
-    scanned_bytes: usize
+    bitstream_serial: Option<i32>
 }
 
 impl OggOpusParser {
@@ -56,8 +45,7 @@ impl OggOpusParser {
         OggOpusParser {
             remainder: Vec::with_capacity(1024),
             packet_carry: Vec::with_capacity(1024),
-            bitstream_serial: None,
-            scanned_bytes: 0
+            bitstream_serial: None
         }
     }
 
@@ -119,29 +107,17 @@ impl OggOpusParser {
     /// - Пустой `chunk` не обрабатывается здесь — вызывающий код должен самостоятельно вызвать `flush`.
     fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()>
     where F: FnMut(PacketType, &[u8]) -> Result<()> {
-        // Добавляем новый фрагмент в конец остатка
         self.remainder.extend_from_slice(chunk);
-        let mut cursor: usize = 0;
-
+        let mut cursor = 0;
         loop {
-            let available = self.remainder.len().saturating_sub(cursor);
-            if available < 27 { break; }
+            // Минимальный размер заголовка страницы (27 байт)
+            if self.remainder.len().saturating_sub(cursor) < 27 { break; }
 
-            // Поиск сигнатуры OggS
-            let search_start = cursor + self.scanned_bytes.saturating_sub(cursor);
-            let window = &self.remainder[search_start..];
-
-            let pos = match memmem::find(window, b"OggS") {
-                Some(p) => search_start + p,
-                None => {
-                    // Мы сдвигаем курсор в самый конец буфера (оставляя 3 байта
-                    cursor = self.remainder.len().saturating_sub(3);
-                    self.scanned_bytes = cursor;
-                    break;
-                }
+            // Ищем маркер «OggS» начиная с текущего курсора
+            let pos = match memmem::find(&self.remainder[cursor..], b"OggS") {
+                Some(p) => cursor + p,
+                None => break,           // не нашли – оставляем всё как есть
             };
-
-            // Перемещаем курсор к началу найденной страницы
             cursor = pos;
 
             // Читаем заголовок страницы
@@ -174,19 +150,15 @@ impl OggOpusParser {
             ) {
                 // Если страница битая, пропускаем сигнатуру и ищем дальше
                 cursor += 4;
-                self.scanned_bytes = cursor;
                 continue;
             }
 
             cursor += page_end;
-            self.scanned_bytes = cursor;
         }
 
         // Удаляем весь отработанный мусор и собранные страницы одним махом
         if cursor > 0 {
             self.remainder.drain(..cursor);
-            // Корректируем `scanned_bytes`: вычитаем количество удалённых байт
-            self.scanned_bytes = self.scanned_bytes.saturating_sub(cursor);
         }
 
         Ok(())
@@ -233,13 +205,24 @@ impl OggOpusParser {
         // Извлекаем серийный номер потока из байтов 14-17 (little-endian, как в спецификации Ogg)
         let serial = i32::from_le_bytes(page[14..18].try_into().unwrap());
 
+        // Смена потока → сброс накопленного пакета
+        if *bitstream_serial != Some(serial) {
+            packet_carry.clear();
+        }
+
         // Обновляем текущий серийный номер
         *bitstream_serial = Some(serial);
+
+        let eos = (header_type & 0x04) != 0;
+        if eos {
+            packet_carry.clear();          // сбросим остатки
+            // можно вызвать отдельный callback, если нужен сигнал завершения
+        }
 
         // Если страница не является продолжением, но в буфере `packet_carry` уже есть данные,
         // значит предыдущий пакет был оборван (например, из-за ошибки в потоке). Сбрасываем его.
         // Сброс только при реальной смене потока
-        if !continued || bos {
+        else if !continued || bos {
             packet_carry.clear();
         }
 
@@ -300,9 +283,18 @@ impl OggOpusParser {
     /// Возвращает PacketType только если пакет соответствует спецификации.
     #[inline]
     fn detect_packet_type(packet: &[u8]) -> PacketType {
+        // SILENT_FRAME — 1 байт, значение 0x80 (или иногда 0xFF)
+        if packet.len() == 1 && packet[0] == 0x80 {
+            return PacketType::Silent;
+        }
+
+        else if packet.len() == 1 && packet[0] == 0xFF {
+            return PacketType::End; // или SilentFrame, если используется как маркер конца
+        }
+
         match packet.len() {
-            0 => PacketType::Broken, // Пустой пакет
-            3 => PacketType::Frame, // SILENT_FRAME
+            0..=2 => PacketType::Broken, // Пустой пакет
+            3 => PacketType::Silent, // SILENT_FRAME
             1..=7 => PacketType::Broken, // Слишком короткий для Head/Tags
             _ => {
                 match &packet[..8] {

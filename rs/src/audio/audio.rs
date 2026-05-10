@@ -170,7 +170,7 @@ impl AudioEngine {
                             }
 
                             for (kind, data) in frames {
-                                if kind != PacketType::Broken {
+                                if kind == PacketType::Frame || kind == PacketType::Silent || kind == PacketType::End {
                                     if buf.len() >= max_cap { let _ = buf.pop(); }
                                     let _ = buf.push(data);
                                 }

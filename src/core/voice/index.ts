@@ -2,6 +2,7 @@ import type { DiscordGatewayAdapterCreator } from "#core/voice/transport/adapter
 import { VoiceConnection } from "#core/voice/connection.js";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
 import { Collection } from "#structures";
+import { db } from "#app/db";
 
 // Voice Sockets
 export * from "./transport/discord/VoiceWebSocket.js";
@@ -26,6 +27,7 @@ export class Voices extends Collection<VoiceConnection> {
      */
     public join = (config: VoiceConnection["configuration"], adapterCreator: DiscordGatewayAdapterCreator) => {
         let connection = this.get(config.guild_id);
+        let queue = db.queues.get(config.guild_id);
 
         // Если нет голосового подключения
         if (!connection) {
@@ -39,6 +41,12 @@ export class Voices extends Collection<VoiceConnection> {
             this.remove(config.guild_id);
             connection = new VoiceConnection(config, adapterCreator);
             this.set(config.guild_id, connection);
+        }
+
+        // Если есть очередь
+        if (queue) {
+            // Подключаем голосовое подключение к очереди
+            queue.voice.connection = connection;
         }
 
         // Отдаем голосовое подключение

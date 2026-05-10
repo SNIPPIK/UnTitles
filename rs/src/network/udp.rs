@@ -76,11 +76,11 @@ impl UdpBufferedInner {
         if let Some(packet) = self.buffer.pop() {
             match self.socket.send(&packet) {
                 Ok(_) => {
-                    self.counter.store(0, Ordering::Relaxed);
-                    self.last_send_ms.store(now, Ordering::Relaxed);
+                    self.counter.store(0, Ordering::SeqCst);
+                    self.last_send_ms.store(now, Ordering::SeqCst);
                 }
                 Err(_) => {
-                    self.send_drops.fetch_add(1, Ordering::Relaxed);
+                    self.send_drops.fetch_add(1, Ordering::SeqCst);
                 }
             }
         }
@@ -91,16 +91,16 @@ impl UdpBufferedInner {
     /// Отправляем пакеты через KEEP_ALIVE_TIMEOUT интервалы
     pub fn tick_alive(&self, now: u64) {
         // Keep-alive логика
-        let last_send = self.last_send_ms.load(Ordering::Relaxed);
+        let last_send = self.last_send_ms.load(Ordering::SeqCst);
 
         if now.saturating_sub(last_send) >= KEEP_ALIVE_INTERVAL {
-            let count = self.counter.fetch_add(1, Ordering::Relaxed);
+            let count = self.counter.fetch_add(1, Ordering::SeqCst);
             let mut keep_alive_packet = [0u8; 8];
 
             keep_alive_packet[0..4].copy_from_slice(&count.to_le_bytes());
 
             if self.socket.send(&keep_alive_packet).is_ok() {
-                self.last_send_ms.store(now, Ordering::Relaxed);
+                self.last_send_ms.store(now, Ordering::SeqCst);
             }
         }
     }
@@ -197,7 +197,7 @@ impl UdpBuffered {
     /// Если размер пакета более 3, то позволяем ему отправится в циклической системе
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        self.try_push(packet.as_ref());
+        self.try_push(packet);
     }
 
     /// Добавляет несколько пакетов в очередь с проверкой мусора.
@@ -207,7 +207,7 @@ impl UdpBuffered {
     #[napi]
     pub fn push_packets(&self, packets: Vec<Buffer>) {
         for packet in packets {
-            self.try_push(packet.as_ref());
+            self.try_push(packet);
         }
     }
 
@@ -270,7 +270,7 @@ impl UdpBuffered {
     /// Останавливает прослушивание входящих пакетов и дожидается завершения потока.
     #[napi]
     pub fn stop_listening(&self) {
-        self.listener_active.store(false, Ordering::Release);
+        self.listener_active.store(false, Ordering::SeqCst);
 
         if let Some(handle) = self.listener_handle.lock().unwrap().take() {
             let _ = handle.join();
@@ -292,7 +292,7 @@ impl UdpBuffered {
 
     /// Пытается добавить байты во внутренний буфер для последующей отправки.
     #[inline]
-    fn try_push(&self, bytes: &[u8]) {
+    fn try_push(&self, bytes: Buffer) {
         if bytes.is_empty() { return; }
         self.inner.push(bytes.to_vec());
     }
@@ -314,7 +314,7 @@ impl UdpBuffered {
     /// (Внутренний, не экспортируется в JS).
     pub fn tick(&self) {
         let now = now_ms();
-        let last_ms = self.inner.last_send_ms.load(Ordering::Relaxed);
+        let last_ms = self.inner.last_send_ms.load(Ordering::SeqCst);
 
         // Если с последней отправки прошло KEEP_ALIVE_INTERVAL или больше...
         if now.saturating_sub(last_ms) >= KEEP_ALIVE_INTERVAL {

@@ -3,6 +3,7 @@ import { VoiceWebSocket, WebSocketOpcodes } from "#core/voice/index.js";
 import { MLSSession } from "#core/voice/structures/MLSSession.js";
 import { VoiceAdapter } from "./adapter.js";
 import { TypedEmitter } from "#structures";
+import { db } from "#app/db";
 
 // Layers
 import { UDPLayer } from "#core/voice/transport/layers/UDPLayer.js";
@@ -38,7 +39,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
     /** SSRC (синхронизационный источник), полученный от Discord. */
     public ssrc: number;
 
-    /** Секретный ключ для AES-GCM */
+    /** Секретный ключ для AES-GCM шифрования */
     public secret_key: number[];
 
     /**
@@ -286,7 +287,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 }
             }
 
-            // Если нет больше методов подъема соединения, то уничтожаем окончательно
+            // Если нет больше методов подъема соединения, то уничтожаем транспортный канал окончательно
             this.destroy();
         });
 
@@ -315,8 +316,12 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @public
      */
     public destroy = () => {
+        this.emit("destroyed", VoiceCloseCodes.CallTerminated);
         this._state.code = TransportStateCode.Closed;
         super.destroy();
+
+        // Сносим голосовое подключение
+        db.voice.remove(this.adapter.packet.state.guild_id);
 
         // Использование Optional Chaining для безопасного вызова
         this._ws?.destroy?.();
@@ -426,12 +431,23 @@ type TransportState =
  * @enum TransportStateCode
  */
 enum TransportStateCode {
+    /** Код поднятия WSS подключения */
     OpeningWs = "open_ws_connection",
+
+    /** Код отправки данных подключения */
     Identifying = "identifying",
+
+    /** Код получения данных о сессии*/
     Session = "session_description",
+
+    /** Код готовности к поднятию UDP */
     Ready = "ready",
+
+    /** Код при котором возобновляется подключения WSS */
     Resuming = "resume",
-    Closed = "closed",
+
+    /** Код полного закрытия */
+    Closed = "closed"
 }
 
 /**
@@ -440,6 +456,12 @@ enum TransportStateCode {
  * @interface TransportEvents
  */
 interface TransportEvents {
+    /** Событие с информацией от транспортного узла */
     info: (log: string) => void;
+
+    /** Событие закрытия транспортного узла */
     close: (code: VoiceCloseCodes, error: Error | string) => void;
+
+    /** Событие уничтожения транспортного узла */
+    destroyed: (code: VoiceCloseCodes) => void;
 }
