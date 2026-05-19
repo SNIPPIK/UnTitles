@@ -171,7 +171,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         // Слушаем если шлюз пытается выключиться по какой причине
         this.transport.on("close", (code, reason) => {
             Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${code}: ${reason}`);
-            if (code !== VoiceCloseCodes.CallTerminated) this.destroy();
+
+            //@ts-ignore
+            if (code !== VoiceCloseCodes.CallTerminated || code !== VoiceCloseCodes.SessionTimeout || code !== VoiceCloseCodes.SessionNoLongerValid) this.destroy();
         });
     };
 
@@ -192,6 +194,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      */
     public destroy = () => {
         this.emit("info", `[Voice/Cleaner] has destroyed`);
+        this.emit("disconnect");
+        this.disconnect();
 
         if (this._status === ConnectionStatus.disconnected) return;
         this.status = ConnectionStatus.disconnected;
@@ -199,6 +203,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Очищаем адаптер последним
         this.adapter.destroy();
+
+        // Уничтожаем транспортный канал
+        this.transport.destroy();
+        this.transport = null;
 
         // Nullify
         this.adapter = null;

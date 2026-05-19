@@ -176,7 +176,7 @@ export class TypedEmitter<L extends Record<string, any>> {
             }
         }
 
-        const arr = this._events.get(event);
+        const arr = this._events?.get(event);
         if (!arr || arr.length === 0) return false;
 
         // Копируем массив, чтобы изменения во время вызова не влияли на итерацию
@@ -185,12 +185,12 @@ export class TypedEmitter<L extends Record<string, any>> {
         for (const bucket of listeners) {
             // Для once-слушателей удаляем из исходного массива (не из копии)
             if (bucket.type === 'once') {
-                const originalArr = this._events.get(event);
+                const originalArr = this._events?.get(event);
                 if (originalArr) {
                     const idx = originalArr.findIndex(b => b.listener === bucket.listener);
                     if (idx !== -1) {
                         TypedEmitter.spliceOne(originalArr, idx);
-                        if (originalArr.length === 0) this._events.delete(event);
+                        if (originalArr.length === 0) this._events?.delete(event);
                     }
                 }
             }

@@ -13,7 +13,7 @@
   "engineStrict": true,
   "types": "src/index.ts",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=25.0.0"
   },
   "imports": {
     "#core/*": "./build/src/core/*",
@@ -32,7 +32,6 @@
     "binaryName": "watklok"
   },
   "dependencies": {
-    "@discordjs/builders": "^1.14.1",
     "discord-api-types": "^0.38.47",
     "discord.js": "15.0.0-dev.1777075897-40ce0791a",
     "http-proxy-agent": "^9.0.0",
@@ -50,8 +49,9 @@
   },
   "scripts": {
     "start": "node ./build/src/index.js --ShardManager --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
+    "start:ts": "node ./src/index.ts --ShardManager --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
     "start:bun": "bun ./src/index.ts --ShardManager --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
-    
+
     "build": "tsc",
     "build:native": "npm run build:copy && napi build --platform --release --cwd ./rs --js index.cjs && npm run build:bindings",
     "build:native:dev": "npm run build:copy && napi build --platform --cwd ./rs --js index.cjs && npm run build:bindings",

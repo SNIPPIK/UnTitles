@@ -17,9 +17,6 @@ use std::{
 /// Время до отправки keepalive пакета, для работы через NAT системы
 const KEEP_ALIVE_INTERVAL: u64 = 10000;
 
-/// Порог "тишины", после которого разрешена двойная отправка.
-const BURST_SILENCE_MS: u64 = 500;
-
 /// Внутренние данные UDP-сокета с буфером исходящих пакетов и статистикой.
 ///
 /// Хранит сам сокет (в Arc для разделения между несколькими экземплярами UdpBuffered,
@@ -320,14 +317,7 @@ impl UdpBuffered {
         if now.saturating_sub(last_ms) >= KEEP_ALIVE_INTERVAL {
             // ... но есть пакеты для отправки — шлём их, а не keepalive.
             if self.inner.has_ticked() {
-                // Если тишина затянулась дольше BURST_SILENCE_MS, делаем два тика.
-                if now.saturating_sub(last_ms) >= BURST_SILENCE_MS {
-                    self.inner.tick(now);
-                    // После первого тика last_send_ms обновится, но мы форсируем второй.
-                    self.inner.tick(now);
-                } else {
-                    self.inner.tick(now);
-                }
+                self.inner.tick(now);
             } else {
                 // Пакетов нет — обычный keepalive.
                 self.inner.tick_alive(now);
@@ -335,13 +325,7 @@ impl UdpBuffered {
         } else {
             // keepalive не нужен.
             if self.inner.has_ticked() {
-                // Даже если keepalive не требуется, при долгой тишине можно удвоить.
-                if now.saturating_sub(last_ms) >= BURST_SILENCE_MS {
-                    self.inner.tick(now);
-                    self.inner.tick(now);
-                } else {
-                    self.inner.tick(now);
-                }
+                self.inner.tick(now);
             }
         }
     }

@@ -186,7 +186,7 @@ impl VoiceRTPSocket {
     ///
     /// Счётчик увеличивается атомарно на единицу каждый раз (Acquire/Release гарантирует видимость).
     fn generate_nonce(&self) -> [u8; 12] {
-        let counter = self.counter.fetch_add(1, Ordering::AcqRel);
+        let counter = self.counter.fetch_add(1, Ordering::SeqCst);
         let mut nonce = [0u8; 12];
         nonce[0..4].copy_from_slice(&counter.to_be_bytes());
         nonce
@@ -206,10 +206,10 @@ impl VoiceRTPSocket {
         header[0] = 0x80;
         header[1] = 0x78;
 
-        let seq = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let seq = self.sequence.fetch_add(1, Ordering::SeqCst);
         header[2..4].copy_from_slice(&seq.to_be_bytes());
 
-        let ts = self.timestamp.fetch_add(TIMESTAMP_INC, Ordering::Relaxed);
+        let ts = self.timestamp.fetch_add(TIMESTAMP_INC, Ordering::SeqCst);
         header[4..8].copy_from_slice(&ts.to_be_bytes());
 
         header[8..12].copy_from_slice(&self.options.ssrc.to_be_bytes());
@@ -221,8 +221,8 @@ impl VoiceRTPSocket {
     /// Используется при уничтожении экземпляра или для очистки состояния.
     #[napi]
     pub fn destroy(&mut self) {
-        self.sequence.store(0, Ordering::Relaxed);
-        self.timestamp.store(0, Ordering::Relaxed);
-        self.counter.store(0, Ordering::Relaxed);
+        self.sequence.store(0, Ordering::SeqCst);
+        self.timestamp.store(0, Ordering::SeqCst);
+        self.counter.store(0, Ordering::SeqCst);
     }
 }

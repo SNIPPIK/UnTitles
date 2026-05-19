@@ -1,383 +1,472 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
+
 use std::{
-    thread,
     io::{BufReader, Read},
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Condvar, Mutex,
-    }
+    },
+    thread,
 };
-use std::sync::OnceLock;
+
 use crate::audio::parser::{OggOpusParser, PacketType};
 use crate::audio::ring_buffer::RingBuffer;
 
-static SILENT_FRAME: OnceLock<Vec<u8>> = OnceLock::new();
+// ============================================================================
+// CONSTANTS
+// ============================================================================
 
-/// Аудио пакет тишины, требуется для encoder Discord.
-/// Нужен для разделения аудио потока, предотвращается разрывы Jitter Buffer
-fn get_silent_data() -> Vec<u8> {
-    SILENT_FRAME.get_or_init(|| vec![0xF8, 0xFF, 0xFE]).clone()
-}
+/// Opus silent frame (3 байта, код F8 FF FE – это не‑TLV, а конкретный паттерн для PLC).
+/// Вставляется в начало потока, чтобы звуковая карта/декодер не щёлкали.
+static SILENT_FRAME: &[u8] = &[0xF8, 0xFF, 0xFE];
 
-/// Кол-во создаваемых пустых пакетов для аудио потока
-const SILENT_FRAMES: u32 = 1;
+/// Количество молчаливых фреймов перед первым реальным пакетом.
+/// Даём время аудиосистеме стабилизироваться.
+const SILENT_FRAMES: usize = 3;
 
+/// Максимальный размер внутреннего буфера парсера OggOpusParser (байт).
+/// Если парсер накопил больше – стрим битый, выходим.
+const MAX_PARSER_PENDING: usize = 8 * 1024 * 1024;
 
+// ============================================================================
+// AUDIO ENGINE
+// ============================================================================
 
-/// Основной управляющий класс, доступный из JavaScript.
 #[napi]
 pub struct AudioEngine {
-    /// Процесс FFmpeg
+    /// FFmpeg child process.
+    /// Обёрнут в Mutex, потому что kill() вызывается из cleanup (drop / destroy), а чтение идёт из reader thread.
     child: Arc<Mutex<Option<Child>>>,
 
-    /// Флаг активности фонового потока
+    /// Флаг активности reader thread. Выставляется в false при destroy() или при ошибке чтения.
     reading_active: Arc<AtomicBool>,
 
-    /// Дескриптор потока-читателя
+    /// Флаг, что destroy уже отработал. Предотвращает двойную очистку.
+    destroyed: Arc<AtomicBool>,
+
+    /// Хэндлер потока-читателя. Join-ится в cleanup.
     reader_handle: Arc<Mutex<Option<thread::JoinHandle<()>>>>,
 
-    /// Состояние паузы, защищённое мьютексом и условной переменной
+    /// Пауза: (флаг, condvar).
+    /// Reader thread внутри цикла ожидает на condvar, пока флаг паузы не сбросится.
     pause_state: Arc<(Mutex<bool>, Condvar)>,
 
-    /// Кольцевой буфер аудио фреймов
+    /// Сам кольцевой буфер с пакетами Vec<u8>.
+    /// Mutex нужен, потому что доступ идёт из reader thread (push) и из main thread (pop / get_packet).
+    /// SPSC RingBuffer не поддерживает конкурентный доступ, поэтому внешний Mutex.
     buffer: Arc<Mutex<RingBuffer>>,
 
-    /// Максимальная ёмкость буфера
+    /// Максимальная ёмкость буфера (количество пакетов).
+    /// Передаётся в RingBuffer::new при создании.
     max_capacity: usize,
 
-    /// Логическая позиция (сколько фреймов выдано) – атомарный счётчик
-    position: Arc<AtomicUsize>
+    /// Логическая позиция воспроизведения (количество выданных наружу пакетов).
+    /// Атомарная, инкрементируется при get_packet / get_packets.
+    /// Не синхронизирована с буфером – может расходиться, если буфер очистили.
+    position: Arc<AtomicUsize>,
 }
 
 #[napi]
 impl AudioEngine {
-    /// Создаёт новый движок. Ёмкость буфера = 50 кадров/с * 60 с * max_minutes (минимум 1000).
+    // =========================================================================
+    // CONSTRUCTOR
+    // =========================================================================
+
     #[napi(constructor)]
     pub fn new(max_minutes: u32) -> Self {
-        let capacity = (50 * 60 * max_minutes).max(1000) as usize;
-        AudioEngine {
+        // Расчёт ёмкости буфера: 50 пакетов/сек * 60 сек * минуты.
+        // Почему 50? Opus в Ogg контейнере обычно идёт с частотой кадров 50 Гц (20 мс фреймы).
+        // Ну и 1500 – минимальный размер буфера (чтобы не создавать слишком маленький).
+        let capacity = (50 * 60 * max_minutes).max(1500) as usize;
+
+        Self {
             child: Arc::new(Mutex::new(None)),
             reading_active: Arc::new(AtomicBool::new(false)),
+            destroyed: Arc::new(AtomicBool::new(false)),
             reader_handle: Arc::new(Mutex::new(None)),
             pause_state: Arc::new((Mutex::new(false), Condvar::new())),
             buffer: Arc::new(Mutex::new(RingBuffer::new(capacity))),
             max_capacity: capacity,
-            position: Arc::new(AtomicUsize::new(0))
+            position: Arc::new(AtomicUsize::new(0)),
         }
     }
 
-    /// Запускает FFmpeg с оптимизированными параметрами и фоновый поток парсинга.
+    // =========================================================================
+    // START
+    // =========================================================================
+
     #[napi]
     pub fn start(&self, mut args: Vec<String>, ffmpeg_path: String) -> Result<()> {
+        // Атомарный swap: если уже true – повторный вызов start не разрешён.
         if self.reading_active.swap(true, Ordering::SeqCst) {
-            return Err(Error::from_reason("Engine is already running"));
+            return Err(Error::from_reason("Engine already running"));
         }
 
-        // Вставляем параметры переподключения прямо перед аргументом -i, если источник — http
-        if let Some(pos) = args.iter().position(|r| r == "-i") {
-            if args.get(pos + 1).map_or(false, |s| s.starts_with("http")) {
-                let reconnect_flags = vec![
-                    "-reconnect".to_string(), "1".to_string(),
-                    "-reconnect_streamed".to_string(), "1".to_string(),
-                    "-reconnect_delay_max".to_string(), "5".to_string(),
-                    "-reconnect_on_network_error".to_string(), "1".to_string(),
-                ];
-                args.splice(pos..pos, reconnect_flags);
+        self.destroyed.store(false, Ordering::SeqCst);
+
+        // ===== HTTP source specific flags =====
+        // Если входной URL начинается с http, добавляем параметры reconnect для FFmpeg.
+        // Это позволяет переживать временные разрывы сети.
+        if let Some(pos) = args.iter().position(|v| v == "-i") {
+            if let Some(src) = args.get(pos + 1) {
+                if src.starts_with("http") {
+                    let reconnect = [
+                        "-reconnect",
+                        "1",
+                        "-reconnect_streamed",
+                        "1",
+                        "-reconnect_delay_max",
+                        "5",
+                        "-reconnect_on_network_error",
+                        "1",
+                    ]
+                        .iter()
+                        .map(|s| s.to_string());
+
+                    args.splice(pos..pos, reconnect);
+                }
             }
         }
 
-        // Формируем финальные аргументы: сначала наши оптимизации, потом пользовательские.
+        // ===== Базовые аргументы FFmpeg =====
+        // -analyzeduration 0 / -probesize 32 – минимальный анализ, быстрое начало.
+        // -vn – отключаем видео.
+        // -loglevel error – только ошибки, stdout чистый от логов.
+        // -nostdin – запрещаем интерактивный ввод.
         let mut final_args = vec![
-            "-analyzeduration".to_string(), "0".to_string(),
-            "-probesize".to_string(), "32".to_string(),
-            "-vn".to_string(),
-            "-loglevel".to_string(), "error".to_string(),
-            "-nostdin".to_string(),
-            "-hide_banner".to_string(),
-        ];
+            "-analyzeduration",
+            "0",
+            "-probesize",
+            "32",
+            "-vn",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-hide_banner",
+        ]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+
         final_args.extend(args);
 
-        let mut child = Command::new(ffmpeg_path)
-            .args(final_args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+        // ===== Запуск FFmpeg =====
+        let mut child = Command::new(&ffmpeg_path)
+            .args(&final_args)
+            .stdout(Stdio::piped())    // читаем аудиоданные из stdout
+            .stderr(Stdio::null())     // stderr игнорируем (в нём только логи)
             .spawn()
             .map_err(|e| Error::from_reason(format!("FFmpeg spawn error: {}", e)))?;
 
-        // Оборачиваем stdout в BufReader для эффективного чтения (буфер 64 КБ)
-        let stdout = child.stdout.take().ok_or_else(|| {
-            Error::from_reason("Failed to open FFmpeg stdout")
-        })?;
-        let mut reader = BufReader::with_capacity(65536, stdout);
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| Error::from_reason("Failed to open FFmpeg stdout"))?;
 
         *self.child.lock().unwrap() = Some(child);
 
+        // ===== Reader thread =====
+        // Клонируем Arc'и, чтобы передать в поток.
         let active = Arc::clone(&self.reading_active);
         let pause_state = Arc::clone(&self.pause_state);
         let buffer_ptr = Arc::clone(&self.buffer);
         let max_cap = self.max_capacity;
 
         let handle = thread::spawn(move || {
-            let mut read_buf = [0u8; 16384];
+            // Буферизованный ридер: буфер 64KB уменьшает количество syscall'ов.
+            let mut reader = BufReader::with_capacity(65536, stdout);
+
             let mut parser = OggOpusParser::new();
-            // Флаг: получили ли мы первый реальный звук
+
+            let mut read_buf = [0u8; 16384];
+
             let mut first_packet_received = false;
 
+            // Переиспользуемые векторы, чтобы не аллоцировать на каждой итерации.
+            let mut frames = Vec::with_capacity(64);
+            let mut pending_push = Vec::with_capacity(128);
+
             loop {
-                // Проверка флага остановки
+                // Проверка внешнего флага остановки.
                 if !active.load(Ordering::SeqCst) {
                     break;
                 }
 
-                // Обработка паузы через Condvar (мгновенное пробуждение)
+                // ===== Пауза =====
+                // Condvar: ждём, пока флаг pause_state не станет false.
+                // Важно: проверка active внутри цикла, чтобы при destroy мы могли выйти.
                 {
                     let (lock, cvar) = &*pause_state;
-                    let mut paused_guard = lock.lock().unwrap();
-                    // Ожидаем, пока пауза не будет снята ИЛИ движок не остановлен
-                    while *paused_guard && active.load(Ordering::SeqCst) {
-                        paused_guard = cvar.wait(paused_guard).unwrap();
+                    let mut paused = lock.lock().unwrap();
+                    while *paused && active.load(Ordering::SeqCst) {
+                        paused = cvar.wait(paused).unwrap();
                     }
-                    // После выхода – либо пауза снята, либо active = false
                     if !active.load(Ordering::SeqCst) {
                         break;
                     }
                 }
 
-                // Чтение данных из BufReader
+                // ===== Чтение из FFmpeg =====
                 match reader.read(&mut read_buf) {
-                    Ok(0) => { break; }, // EOF
-
+                    Ok(0) => break, // EOF
                     Ok(n) => {
-                        let mut frames = Vec::new();
-                        if parser.parse_internal(&read_buf[..n], &mut frames).is_ok() {
-                            // Минимизируем время удержания мьютекса буфера
-                            let buf = buffer_ptr.lock().unwrap();
-
-                            // --- ЛОГИКА ТИШИНЫ ПРИ СТАРТЕ ---
-                            if !first_packet_received {
-                                let silent = get_silent_data();
-
-                                // Вставляем SILENT_FRAMES пакетов тишины ПЕРЕД первым реальным пакетом
-                                for _ in 0..SILENT_FRAMES {
-                                    if buf.len() < max_cap {
-                                        let _ = buf.push(silent.clone());
-                                    }
-                                }
-
-                                first_packet_received = true;
-                            }
-
-                            for (kind, data) in frames {
-                                if kind == PacketType::Frame || kind == PacketType::Silent || kind == PacketType::End {
-                                    if buf.len() >= max_cap { let _ = buf.pop(); }
-                                    let _ = buf.push(data);
-                                }
-                            }
-                        } else {
+                        // Защита от переполнения парсера: если накопилось слишком много сырых данных – битый стрим.
+                        if parser.pending_len() > MAX_PARSER_PENDING {
                             break;
+                        }
+
+                        frames.clear();
+                        // Парсим Ogg страницы, извлекаем Opus пакеты.
+                        // parse_internal возвращает Result; ошибка – выходим из потока.
+                        if parser.parse_internal(&read_buf[..n], &mut frames).is_err() {
+                            break;
+                        }
+
+                        pending_push.clear();
+
+                        // Первые SILENT_FRAMES пакетов – тишина, чтобы аудиоустройство успело инициализироваться.
+                        if !first_packet_received {
+                            for _ in 0..SILENT_FRAMES {
+                                pending_push.push(SILENT_FRAME.to_vec());
+                            }
+                            first_packet_received = true;
+                        }
+
+                        // Добавляем реальные Opus фреймы (PacketType::Frame или Silent) в pending_push.
+                        pending_push.extend(
+                            frames.drain(..).filter_map(|(kind, data)| match kind {
+                                PacketType::Frame | PacketType::Silent => Some(data),
+                                _ => None, // Комментарии, заголовки и прочее отбрасываем.
+                            }),
+                        );
+
+                        // ===== Запись в кольцевой буфер =====
+                        if !pending_push.is_empty() {
+                            let buffer = buffer_ptr.lock().unwrap();
+                            for packet in pending_push.drain(..) {
+                                // Если буфер переполнен (len >= max_cap), выбрасываем самый старый пакет (pop).
+                                // RingBuffer сам умеет отказывать при push, но здесь политика "drop oldest".
+                                // Это костыль: в идеале проверять buffer.is_full() и не пушить, но мы перестраховываемся.
+                                while buffer.len() >= max_cap {
+                                    buffer.pop();
+                                }
+                                let _ = buffer.push(packet);
+                            }
                         }
                     }
                     Err(_) => break,
                 }
             }
 
+            // При выходе из цикла сбрасываем флаг активности.
             active.store(false, Ordering::SeqCst);
         });
 
         *self.reader_handle.lock().unwrap() = Some(handle);
+
         Ok(())
     }
 
-    // ---------- Геттеры и сеттеры ----------
+    // =========================================================================
+    // DESTROY
+    // =========================================================================
 
-    /// Возвращает текущее состояние паузы.
+    fn cleanup(&self) {
+        // Защита от повторного вызова.
+        if self.destroyed.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        // Сигнал потоку остановиться.
+        self.reading_active.store(false, Ordering::SeqCst);
+
+        // Пробуждение потока, если он висит на condvar (пауза).
+        let (_, cvar) = &*self.pause_state;
+        cvar.notify_all();
+
+        // Убиваем FFmpeg процесс, если он ещё жив.
+        if let Ok(mut guard) = self.child.lock() {
+            if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+                let _ = child.wait(); // ждём, чтобы не осталось зомби
+            }
+        }
+
+        // Дожидаемся завершения reader thread.
+        if let Ok(mut guard) = self.reader_handle.lock() {
+            if let Some(handle) = guard.take() {
+                let _ = handle.join();
+            }
+        }
+
+        // Очищаем буфер от оставшихся данных.
+        if let Ok(mut buffer) = self.buffer.lock() {
+            buffer.clear();
+        }
+
+        // Сбрасываем логическую позицию.
+        self.position.store(0, Ordering::Relaxed);
+    }
+
+    #[napi]
+    pub fn destroy(&self) -> Result<()> {
+        self.cleanup();
+        Ok(())
+    }
+
+    // =========================================================================
+    // PAUSE
+    // =========================================================================
+
     #[napi(getter)]
     pub fn get_pause(&self) -> bool {
         let (lock, _) = &*self.pause_state;
         *lock.lock().unwrap()
     }
 
-    /// Устанавливает паузу. При `true` фоновый поток не будет пополнять буфер,
-    /// но продолжит читать `stdout`, чтобы не блокировать трубу.
     #[napi(setter)]
     pub fn set_pause(&self, value: bool) {
         let (lock, cvar) = &*self.pause_state;
         let mut paused = lock.lock().unwrap();
         *paused = value;
         if !value {
-            cvar.notify_one(); // мгновенно будим поток, если пауза снята
+            cvar.notify_all(); // если снимаем паузу – будим reader thread.
         }
     }
 
-    /// Текущий размер буфера (количество фреймов).
+    // =========================================================================
+    // BUFFER INFO
+    // =========================================================================
+
     #[napi(getter)]
     pub fn get_size(&self) -> u32 {
         self.buffer.lock().unwrap().len() as u32
     }
 
-    /// Текущая логическая позиция (сколько фреймов было отдано через `get_packet` и `get_packets`).
     #[napi(getter)]
     pub fn get_position(&self) -> u32 {
         self.position.load(Ordering::Relaxed) as u32
     }
 
-    /// Устанавливает позицию (обычно используется при перемотке / seek).
-    /// Не влияет на буфер, только на значение счётчика.
     #[napi(setter)]
     pub fn set_position(&self, pos: u32) {
         self.position.store(pos as usize, Ordering::Relaxed);
     }
 
-    // ---------- Получение аудиоданных ----------
+    // =========================================================================
+    // PACKETS
+    // =========================================================================
 
-    /// Извлекает один фрейм из начала буфера (FIFO).
-    /// Увеличивает позицию на 1. Возвращает `null`, если буфер пуст.
+    /// Выдать один пакет (FIFO). Если буфер не пуст – увеличиваем position.
     #[napi(getter)]
     pub fn get_packet(&self) -> Option<Buffer> {
-        let buf = self.buffer.lock().unwrap();
-        buf.pop().map(|data| {
-            // Инкремент позиции вне мьютекса
+        let buffer = self.buffer.lock().unwrap();
+        buffer.pop().map(|packet| {
             self.position.fetch_add(1, Ordering::Relaxed);
-            Buffer::from(data)
+            Buffer::from(packet)
         })
     }
 
-    /// Возвращает последний фрейм в буфере (без удаления).
-    /// Полезно для отладки или получения текущего «хвоста» очереди.
-    #[napi(getter)]
-    pub fn get_last_packet(&self) -> Option<Buffer> {
-        let buf_guard = self.buffer.lock().unwrap();
-        let len = buf_guard.len();
-        if len == 0 {
-            None
-        } else {
-            buf_guard.get_clone_at(len - 1).map(Buffer::from)
-        }
-    }
-
-    /// Извлекает фрейм по индексу (от 0 до size-1), не удаляя его.
-    /// Используется редко, в основном для предпросмотра.
-    #[napi]
-    pub fn get_packet_at(&self, idx: u32) -> Option<Buffer> {
-        self.buffer.lock().unwrap().get_clone_at(idx as usize).map(Buffer::from)
-    }
-
-    /// Извлекает до `count` фреймов из начала буфера и увеличивает позицию на количество извлечённых.
-    /// Возвращает массив `Buffer` (может быть короче запрошенного, если в буфере недостаточно данных).
+    /// Выдать `count` пакетов за раз (уменьшает количество вызовов через FFI).
     #[napi]
     pub fn get_packets(&self, count: u32) -> Vec<Buffer> {
-        let buf = self.buffer.lock().unwrap();
-        let mut result = Vec::with_capacity(count.min(buf.len() as u32) as usize);
+        let buffer = self.buffer.lock().unwrap();
+        let mut packets = Vec::with_capacity(count.min(buffer.len() as u32) as usize);
         for _ in 0..count {
-            if let Some(data) = buf.pop() {
-                self.position.fetch_add(1, Ordering::Relaxed);
-                result.push(Buffer::from(data));
-            } else {
-                break;
+            match buffer.pop() {
+                Some(packet) => {
+                    self.position.fetch_add(1, Ordering::Relaxed);
+                    packets.push(Buffer::from(packet));
+                }
+                None => break,
             }
         }
-        result
+        packets
     }
 
-    // ---------- Ручное добавление пакетов (альтернативный источник) ----------
-    // Эти методы позволяют наполнять буфер вручную, минуя FFmpeg.
+    /// Клонировать самый свежий (последний) пакет без извлечения.
+    /// Используется для визуализации текущего аудио или отладки.
+    #[napi(getter)]
+    pub fn get_last_packet(&self) -> Option<Buffer> {
+        let buffer = self.buffer.lock().unwrap();
+        if buffer.len() == 0 {
+            return None;
+        }
+        // get_clone_at требует внешней синхронизации – но мы уже внутри Mutex, так что безопасно.
+        buffer.get_clone_at(buffer.len() - 1).map(Buffer::from)
+    }
 
-    /// Добавляет один фрейм в конец буфера. Если буфер переполнен, удаляется самый старый фрейм.
+    /// Клонировать пакет по абсолютной позиции (не извлекая).
+    #[napi]
+    pub fn get_packet_at(&self, idx: u32) -> Option<Buffer> {
+        self.buffer
+            .lock()
+            .unwrap()
+            .get_clone_at(idx as usize)
+            .map(Buffer::from)
+    }
+
+    // =========================================================================
+    // MANUAL PUSH
+    // =========================================================================
+
+    /// Ручное добавление пакета (для тестов, либо для прямого внедрения данных).
+    /// При превышении max_capacity вытесняет старые пакеты (pop).
     #[napi]
     pub fn add_packet(&self, packet: Buffer) {
-        let buf_guard = self.buffer.lock().unwrap();
-        if buf_guard.len() >= self.max_capacity {
-            buf_guard.pop(); // discard oldest
+        let buffer = self.buffer.lock().unwrap();
+        while buffer.len() >= self.max_capacity {
+            buffer.pop();
         }
-        let _ = buf_guard.push(packet.to_vec());
+        let _ = buffer.push(packet.to_vec());
     }
 
-    /// Добавляет массив фреймов (каждый через `add_packet`).
+    /// Массовое добавление пакетов.
     #[napi]
     pub fn add_packets(&self, packets: Vec<Buffer>) {
-        for p in packets {
-            self.add_packet(p);
+        let buffer = self.buffer.lock().unwrap();
+        for packet in packets {
+            while buffer.len() >= self.max_capacity {
+                buffer.pop();
+            }
+            let _ = buffer.push(packet.to_vec());
         }
     }
 
-    // ---------- Состояние буфера ----------
+    // =========================================================================
+    // BUFFER CONTROL
+    // =========================================================================
 
-    /// Проверяет, можно ли добавить хотя бы один фрейм (буфер не полностью заполнен).
+    /// Проверка, есть ли место хотя бы для одного нового пакета.
     #[napi]
     pub fn can_accept(&self) -> bool {
         self.buffer.lock().unwrap().len() < self.max_capacity
     }
 
-    /// Проверяет, что заполненность буфера ниже указанного процента от максимальной ёмкости.
-    /// Например, `engine.can_accept_threshold(80)` вернёт `true`, если занято менее 80% буфера.
-    /// Полезно для управления потоком данных.
+    /// Проверка, что заполненность буфера ниже указанного процента от max_capacity.
+    /// Используется для backpressure из JavaScript.
     #[napi]
     pub fn can_accept_threshold(&self, threshold_percent: u32) -> bool {
         let threshold = (self.max_capacity * threshold_percent as usize) / 100;
         self.buffer.lock().unwrap().len() < threshold
     }
 
-    /// Полностью очищает буфер и сбрасывает позицию в 0.
-    /// Фоновый поток продолжит наполнение, если активен.
+    /// Полная очистка буфера и сброс позиции.
     #[napi]
     pub fn clear(&self) {
         self.buffer.lock().unwrap().clear();
         self.position.store(0, Ordering::Relaxed);
     }
-
-    /// Останавливает FFmpeg, фоновый поток и освобождает все ресурсы.
-    /// Метод синхронный – дожидается завершения потока (`.join()`).
-    /// Это безопасно для Node.js, так как вызов происходит в отдельном потоке N-API.
-    #[napi]
-    pub fn destroy(&self) -> Result<()> {
-        // Сигнал остановки фоновому потоку.
-        self.reading_active.store(false, Ordering::SeqCst);
-
-        // Будим поток
-        let (_, cvar) = &*self.pause_state;
-        cvar.notify_one();
-
-        // Убиваем процесс FFmpeg, если он ещё жив.
-        let maybe_child = self.child.lock().unwrap().take();
-        if let Some(mut child) = maybe_child {
-            let _ = child.kill();   // отправляем SIGTERM
-            let _ = child.wait();   // ожидаем, чтобы не оставалось зомби
-        }
-
-        // Ждём завершения фонового потока (join).
-        let maybe_handle = self.reader_handle.lock().unwrap().take();
-        if let Some(handle) = maybe_handle {
-            let _ = handle.join();
-        }
-
-        // Очищаем буфер и позицию.
-        self.clear();
-        Ok(())
-    }
 }
 
-/// Реализация `Drop` для дополнительной безопасности: если программист забыл вызвать `destroy`,
-/// ресурсы будут освобождены при уничтожении объекта (например, при завершении приложения).
-/// Однако в этом случае возможны паники, если попытаться `join` из асинхронного контекста,
-/// поэтому предпочтительно всегда вызывать `destroy()` явно.
+// ============================================================================
+// DROP
+// ============================================================================
+
 impl Drop for AudioEngine {
     fn drop(&mut self) {
-        self.reading_active.store(false, Ordering::SeqCst);
-
-        // Будим поток
-        let (_, cvar) = &*self.pause_state;
-        cvar.notify_one();
-
-        if let Ok(mut guard) = self.child.lock() {
-            if let Some(mut child) = guard.take() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
-        }
-        // Поток будет завершён при разрушении runtime, но явного `join` здесь нет,
-        // потому что `Drop` вызывается из любого контекста и `join` мог бы заблокировать.
-        // В идеальной реализации мы должны были бы также дождаться потока, но для краткости опустим.
+        self.cleanup();
     }
 }

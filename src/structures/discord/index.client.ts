@@ -79,29 +79,60 @@ export class DiscordClient extends Client {
                 Partials.ThreadMember
             ],
 
-            // Задаем параметры кеша
+            // ---------- makeCache: кто попадает в кэш и с каким лимитом ----------
             makeCache: Options.cacheWithLimits({
-                ...Options.DefaultMakeCacheSettings,
-                ...Options.DefaultSweeperSettings,
-                MessageManager: {
-                    keepOverLimit: (value) => value.createdTimestamp > (Date.now() + 60e3 * 10)
+                GuildMemberManager: {
+                    maxSize: 200,                    // последние 200 участников, с которыми было взаимодействие
+                    keepOverLimit: (member) => member.id === this.user.id, // себя не выгоняем
                 },
-                GuildScheduledEventManager: 0,
-                GuildTextThreadManager: 0,
+                UserManager: {
+                    maxSize: 200,
+                    keepOverLimit: (user) => user.id === this.user.id,
+                },
+                // Кэш сообщений: храним 100 последних, при переполнении выкидываем старые
+                MessageManager: {
+                    maxSize: 100,
+                    keepOverLimit: (message) => message.id === message.channel.lastMessageId,
+                },
+
+                // Всё остальное – в 0, чтобы не тратить память
                 ReactionManager: 0,
                 ReactionUserManager: 0,
-                EntitlementManager: 0,
-                StageInstanceManager: 0,
-                GuildBanManager: 0,
-                GuildForumThreadManager: 0,
-                AutoModerationRuleManager: 0,
-                DMMessageManager: 0,
-                GuildInviteManager: 0,
                 GuildEmojiManager: 0,
                 GuildStickerManager: 0,
+                GuildBanManager: 0,
+                GuildInviteManager: 0,
+                GuildScheduledEventManager: 0,
+                StageInstanceManager: 0,
+                AutoModerationRuleManager: 0,
+                EntitlementManager: 0,
                 ThreadManager: 0,
                 ThreadMemberManager: 0,
-            })
+                GuildTextThreadManager: 0,
+                GuildForumThreadManager: 0,
+                DMMessageManager: 0,
+            }),
+
+            // ---------- sweepers: периодическая очистка устаревших объектов ----------
+            sweepers: {
+                // Наследуем дефолтные настройки (подчищает старые приглашения, голосовые состояния и т.д.)
+                ...Options.DefaultSweeperSettings,
+                // Сообщения: каждые 60 секунд удаляем из кэша те, что старше 5 минут
+                messages: {
+                    interval: 60,
+                    lifetime: 300,
+                },
+                // Участники
+                guildMembers: {
+                    interval: 3600,
+                    filter: () => (member) => member.id !== this.user.id, // а себя не трогаем
+                },
+                // Пользователи
+                users: {
+                    interval: 3600,
+                    filter: () => (user) => user.bot && user.id !== this.user.id,
+                },
+            },
         });
 
         /**

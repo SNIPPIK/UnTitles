@@ -1,5 +1,6 @@
 import type { APIRequestData } from "#handler/rest/index.js";
 import { Track } from "#core/queue/index.js";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -155,34 +156,39 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public push = (track: T | T[] | APIRequestData.List<T>, user: Track["_user"]): void => {
-        // Приводим всё к массиву треков
-        const tracks: T[] =
-            track instanceof Track
-                ? [track as T]
-                : Array.isArray(track)
-                    ? [track[0] as T]
-                    : (track.items as T[]);
+        try {
+            // Приводим всё к массиву треков
+            const tracks: T[] =
+                track instanceof Track
+                    ? [track as T]
+                    : Array.isArray(track)
+                        ? [track[0] as T]
+                        : (track.items as T[]);
 
-        // Проставляем пользователя
-        if (user) {
-            for (const tr of tracks) {
-                tr.user = user;
+            // Проставляем пользователя
+            if (user) {
+                for (const tr of tracks) {
+                    // Если есть возможность добавить пользователя
+                    tr.user = user;
+                }
             }
+
+            // Если включена перетасовка — сохраняем оригинальный порядок
+            if (this._shuffle) {
+                this._original.push(...tracks);
+            }
+
+            // Добавляем в текущую очередь
+            this._current.push(...tracks);
+
+            // Считаем общее время
+            this._totalTime += tracks.reduce(
+                (sum, t) => sum + (t?.time?.total ?? 0),
+                0
+            );
+        } catch (err) {
+            throw err;
         }
-
-        // Если включена перетасовка — сохраняем оригинальный порядок
-        if (this._shuffle) {
-            this._original.push(...tracks);
-        }
-
-        // Добавляем в текущую очередь
-        this._current.push(...tracks);
-
-        // Считаем общее время
-        this._totalTime += tracks.reduce(
-            (sum, t) => sum + (t?.time?.total ?? 0),
-            0
-        );
     };
 
 
@@ -288,6 +294,33 @@ export class ControllerTracks<T extends Track> {
     };
 
     /**
+     * @description
+     */
+    public relatedTracks = async () => {
+        try {
+            const tracks = await (db.api.fetchRelatedTracks(this.track) as Promise<T[] | Error>);
+
+            // Если вместо треков, получена ошибка
+            if (tracks instanceof Error) return tracks;
+
+            // Если нет похожих треков
+            else if (!tracks.length) return Error("Autoplay System: failed get related tracks");
+
+            // Добавляем треки
+            else {
+                const user = this.track.user;
+
+                tracks.forEach((song) => {
+                    this.push(song, user);
+                });
+            }
+            return true;
+        } catch (err) {
+            return err as Error;
+        }
+    };
+
+    /**
      * @description Очищаем текущий класс от треков и прочих параметров
      * @returns void
      * @public
@@ -300,6 +333,7 @@ export class ControllerTracks<T extends Track> {
         this._totalTime = null;
 
         this._position = null;
+        this._last_position = null;
         this._repeat = null;
         this._shuffle = null;
     };

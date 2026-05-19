@@ -203,7 +203,13 @@ class RestWorkerHandler {
     /**
      * @param registry - Реестр платформ, используемый для поиска API и лимитов.
      */
-    public constructor(private registry: RestRegistry) {};
+    public constructor(private registry: RestRegistry) {
+        setInterval(async () => {
+            if (typeof global !== "undefined" && typeof global.gc === "function") {
+                global.gc();
+            }
+        }, 60e3 * 5);
+    };
 
     /**
      * Формирует объект с данными о платформах, готовый для передачи в основной поток.

@@ -91,9 +91,9 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                             anyStarving = true;
                         }
 
-                        // Проверяем статус "перегрузки" (буфер UDP забит более чем на 80%)
+                        // Проверяем статус "перегрузки" (буфер UDP забит более чем на 180%)
                         const packets = p.voice?.connection?.udp?.packets ?? 0;
-                        if (packets > PLAYER_SEND_LIMIT * 0.8) {
+                        if (packets > PLAYER_SEND_LIMIT * 1.8) {
                             anyOverloaded = true;
                         }
 
@@ -223,17 +223,6 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
      * @public
      */
     public reset = (): void => {
-        // Оборачиваем вызов GC в проверку, чтобы избежать падения программы,
-        // если скрипт запущен без флага --expose-gc
-        setImmediate(() => {
-            if (typeof global !== "undefined" && typeof global.gc === "function") {
-                Logger.log("DEBUG", "[Node] running Garbage Collector - running in player cycle");
-                global.gc();
-            } else {
-                Logger.log("DEBUG", "[Node] Garbage Collector is not exposed. Skipping.");
-            }
-        });
-
         // Сбрасываем кэш метрик для надежности
         this._playerMetrics = new WeakMap();
         super.reset();

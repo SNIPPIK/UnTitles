@@ -388,8 +388,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
                     const matchCount = candidateArr.filter(word => original.includes(word)).length;
                     const namer = getSmartMatch(original, candidate);
 
-
-                    return (timeDiff <= 5) && namer || namer || (timeDiff <= 5) && (matchCount >= Math.floor(candidateArr.length * 0.75));
+                    return (timeDiff <= 5) && namer || (timeDiff <= 5) && (matchCount >= Math.floor(candidateArr.length * 0.75)) || namer;
                 });
 
                 // Если отфильтровать треки не удалось

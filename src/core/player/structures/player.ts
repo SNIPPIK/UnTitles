@@ -75,6 +75,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     /** Управление текущим аудиопотоком (чтение, буферизация, пред загрузка) */
     protected _audio: PlayerAudio<AudioResource> | null = new PlayerAudio();
 
+    /** Защита от одновременного вызова play() */
+    private _playLock: boolean = false;
+
     /**
      * @description Делаем tracks параметр публичным для использования вне класса
      * @public
@@ -188,7 +191,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                 // Добавляем плеер в цикл
                 db.queues.cycles.players.add(this);
-                this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`)
+                this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
             }
         }
 
@@ -201,7 +204,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
                 // Отправляем пустышку
                 if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
-                this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`)
+                this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
             }
         }
     };
@@ -227,7 +230,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         super();
 
         // Используем arrow function чтобы не потерять контекст и обработать ошибку
-        setImmediate(() => this.play().catch(err => this.emit("player/error", this, err)));
+        setImmediate(() => this.play().catch(err => this.emit("player/error", this, err, { skip: true, position: this.tracks.position })));
 
         /**
          * @description Событие получения ошибки плеера
@@ -253,7 +256,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Если следующих треков нет
-                else if (player.tracks.size === 0) return queue.cleanup();
+                if (player.tracks.size === 1 && !player.playing) return queue.cleanup();
                 player.tracks.remove(skip.position);
             }
         });
@@ -275,78 +278,89 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public play = async (seek: number = 0, timeout: number = 500, position: number = null): Promise<void> => {
-        let track: Track, index: number;
-
-        // Если позиция явно указана
-        if (typeof position === "number") {
-            track = this._tracks.get(position);
-            index = position;
-        }
-
-        // Если не указана позиция
-        else {
-            track = this._tracks.track;
-            index = this._tracks.position;
-        }
-
-        // Если нет такого трека или статуса
-        if (!track || this._status === null) return;
+        // Защита от одновременных вызовов
+        if (this._playLock) return;
+        this._playLock = true;
 
         try {
-            // Получаем путь до аудио файла
-            const resource = await track?.resource;
+            let track: Track, index: number;
 
-            // Если получена ошибка вместо исходника
-            if (resource instanceof Error) {
-                this.emit("player/error", this, `${resource}`, { skip: true, position: index });
-                return;
+            // Если позиция явно указана
+            if (typeof position === "number") {
+                track = this._tracks.get(position);
+                index = position;
             }
 
-            // Если другой аудио поток загружается, то запрещаем включение
-            if (this._audio.preloaded) return null;
+            // Если не указана позиция
+            else {
+                track = this._tracks.track;
+                index = this._tracks.position;
+            }
 
-            this.emit("player/log", `[AudioPlayer/${this.id}|${this._filters?.size}] has read ${!track.isLive ? "buffered" : "piped"} stream ${resource}`);
+            // Если нет такого трека или статуса
+            if (!track || this._status === null) return;
 
-            // Выбираем тип аудио
-            const stream = this._audio.preload = new AudioResource(
-                {
-                    seek,
-                    filters: this._filters.filters,
-                    volume: this._audio.volume,
-                    swapped: this._audio.current?.packets > 0,
-                    track
+            // Сбрасываем предыдущий таймер, если он был
+            this._timer.timer = null;
+
+            try {
+                // Получаем путь до аудио файла
+                const resource = await track?.resource;
+
+                // Если получена ошибка вместо исходника
+                if (resource instanceof Error) {
+                    this.emit("player/error", this, `${resource}`, { skip: true, position: index });
+                    return;
                 }
-            );
 
-            // Подключаем события для отслеживания работы потока (временные)
-            (stream as AudioResource)
-                // Если чтение возможно
-                .once("readable", () => {
-                    // Время паузы плеера
-                    const pauseTimeout = Math.max(this._timer.timeout - Date.now(), timeout, 0);
+                // Если другой аудио поток загружается, то запрещаем включение
+                if (this._audio.preloaded) return null;
 
-                    // Если включить трек сейчас не выйдет
-                    if (pauseTimeout > 0) this._timer.timer = setTimeout(() => this._onPlayerReadable(index, seek), pauseTimeout);
-                    else this._onPlayerReadable(index, seek);
-                    return null;
-                })
+                this.emit("player/log", `[AudioPlayer/${this.id}|${this._filters?.size}] has read ${!track.isLive ? "buffered" : "piped"} stream ${resource}`);
 
-                // Если была получена ошибка при чтении
-                .once("error", (error: Error) => {
-                    // Отправляем данные событию для отображения ошибки
-                    this.emit("player/error", this, `${error}`, { skip: true, position: index });
-                })
+                // Выбираем тип аудио
+                const stream = this._audio.preload = new AudioResource(
+                    {
+                        seek,
+                        filters: this._filters.filters,
+                        volume: this._audio.volume,
+                        swapped: this._audio.current?.packets > 0,
+                        track
+                    }
+                );
 
-                // Если аудио поток был закрыт
-                .once("close", (status) => {
-                    // Отправляем данные событию
-                    this.emit("player/log", status);
-                });
-        } catch (error) {
-            this.emit("player/error", this, `${error}`, { skip: true, position: index });
+                // Подключаем события для отслеживания работы потока (временные)
+                (stream as AudioResource)
+                    // Если чтение возможно
+                    .once("readable", () => {
+                        // Время паузы плеера
+                        const pauseTimeout = Math.max(this._timer.timeout - Date.now(), timeout, 0);
 
-            // Сообщаем об ошибке
-            this.emit("player/log", `[Player/${this.id}] ${error}`);
+                        // Если включить трек сейчас не выйдет
+                        if (pauseTimeout > 0) this._timer.timer = setTimeout(() => this._onPlayerReadable(index, seek), pauseTimeout);
+                        else this._onPlayerReadable(index, seek);
+                        return null;
+                    })
+
+                    // Если была получена ошибка при чтении
+                    .once("error", (error: Error) => {
+                        // Отправляем данные событию для отображения ошибки
+                        this.emit("player/error", this, `${error}`, { skip: true, position: index });
+                    })
+
+                    // Если аудио поток был закрыт
+                    .once("close", (status) => {
+                        // Отправляем данные событию
+                        this.emit("player/log", status);
+                    });
+            } catch (error) {
+                this.emit("player/error", this, `${error}`, { skip: true, position: index });
+
+                // Сообщаем об ошибке
+                this.emit("player/log", `[Player/${this.id}] ${error}`);
+            }
+        } finally {
+            this._playLock = false;
         }
     };
 
@@ -386,7 +400,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (remaining === 0) {
             // Можно сразу возобновлять
             this.status = AudioPlayerState.playing;
-            this._timer.timeout = null; // очищаем
+            this._timer.timeout = 0; // очищаем
             this.cycle = true;
 
             this.emit("player/log", `[AudioPlayer/${this.id}] resumed immediately`);
@@ -398,7 +412,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             // Если плеер ещё в паузе
             if (this._status === AudioPlayerState.pause) {
                 this.status = AudioPlayerState.playing;
-                this._timer.timeout = null;
+                this._timer.timeout = 0;
                 this.cycle = true;
 
                 this.emit("player/log", `[AudioPlayer/${this.id}] resumed after delay`);
@@ -420,7 +434,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @description Включение следующего трека
      * @private
      */
-    private readonly _PlayerNextTrack = (): void => {
+    private readonly _PlayerNextTrack = async () => {
         const tracks = this.tracks;
 
         const repeat = tracks.repeat;
@@ -434,26 +448,15 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             // Если последняя позиция
             if (current === tracks.total - 1) {
                 try {
-                    db.api.fetchRelatedTracks(tracks.track).then((related) => {
-                        // Если получена ошибка
-                        if (related instanceof Error) {
-                            this.emit("player/log", related)
-                        }
+                    const related = await this._tracks.relatedTracks();
 
-                        // Если нет похожих треков
-                        else if (!related.length) this.emit("player/error", this, "Autoplay System: failed get related tracks");
+                    // Если получена ошибка
+                    if (related instanceof Error) {
+                        this.emit("player/log", related)
+                        this.emit("player/error", this, related?.message);
+                        return;
+                    }
 
-                        // Добавляем треки
-                        else {
-                            const user = tracks.track.user;
-
-                            related.forEach((song) => {
-                                tracks.push(song, user);
-                            });
-                        }
-                    }).catch((err) => {
-                        this.emit("player/log", err as Error)
-                    })
                 } catch (err) {
                     this.emit("player/log", err as Error)
                 }
@@ -489,7 +492,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @returns void
      * @private
      */
-    private readonly _onPlayerReadable = (index: number, seek: number) => {
+    private readonly _onPlayerReadable = async (index: number, seek: number) => {
         // Если трек включен в 1 раз
         if (seek === 0) {
             const queue = db.queues.get(this.id);
@@ -521,10 +524,15 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         this.cycle = false;
 
         // Удаляем текущий поток, поскольку он больше не нужен
+        // Снимаем обработчики, чтобы избежать утечек памяти
+        if (this._audio.current) {
+            this._audio.current.removeAllListeners();
+        }
         this._audio.destroy();
 
-        // Ставим timeout для проигрывания
-        this._timer.timeout = Date.now();
+        // Сбрасываем тайм-аут и таймер
+        this._timer.timer = null;
+        this._timer.timeout = 0; // теперь числовой 0
 
         // Переводим плеер в режим ожидания
         this._status = AudioPlayerState.idle;
@@ -581,26 +589,26 @@ export enum AudioPlayerState {
  */
 class AudioPlayerTimeout {
     /** Время (мс), после которого разрешено возобновление (включает PLAYER_PAUSE_OFFSET) */
-    protected _resumeAllowedAt: number = null;
+    protected _resumeAllowedAt: number = 0;
 
     /** Ссылка на активный таймер (для отмены) */
     private _resumeTimer: NodeJS.Timeout | null = null;
 
     /**
-     * @description Возвращает время, когда будет разрешено возобновление, или null.
+     * @description Возвращает время, когда будет разрешено возобновление, или 0.
      * @public
      */
-    public get timeout(): number | null {
+    public get timeout(): number {
         return this._resumeAllowedAt;
     };
 
     /**
      * @description Устанавливает время разрешения возобновления с учётом PLAYER_PAUSE_OFFSET.
-     * @param time - Базовое время (обычно момент паузы), если null – сброс.
+     * @param time - Базовое время (обычно момент паузы), если null – сброс в 0.
      * @public
      */
     public set timeout(time: number | null) {
-        this._resumeAllowedAt = time !== null ? time + PLAYER_PAUSE_OFFSET : null;
+        this._resumeAllowedAt = time !== null ? time + PLAYER_PAUSE_OFFSET : 0;
     };
 
     /**
@@ -632,6 +640,6 @@ class AudioPlayerTimeout {
             clearTimeout(this._resumeTimer);
             this._resumeTimer = null;
         }
-        this._resumeAllowedAt = null;
+        this._resumeAllowedAt = 0;
     };
 }

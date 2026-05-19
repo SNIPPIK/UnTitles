@@ -219,5 +219,13 @@ export class Queue {
         // Удаляем плеер
         this._player.destroy();
         this._player = null;
+
+        // Удаляем треки
+        this.tracks.clear();
+        this.tracks = null;
+
+        // Удаляем подключение
+        this.voice.connection.destroy();
+        this.voice = null;
     };
 }

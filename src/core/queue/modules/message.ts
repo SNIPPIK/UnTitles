@@ -1,5 +1,4 @@
 import { CommandInteraction, CycleInteraction, DiscordClient } from "#structures/discord/index.js";
-import { ActionRowBuilder, StringSelectMenuBuilder } from "@discordjs/builders";
 import filters from "#core/player/filters.json" with { type: 'json' };
 import type { AudioPlayer } from "#core/player/index.js";
 import { MessageFlags } from "discord-api-types/v10";
@@ -198,7 +197,7 @@ export class QueueButtons {
     ];
 
     /** Строковый селектор, для выбора фильтра */
-    private _selector: ActionRowBuilder<any>;
+    private _selector: json;
 
     /**
      * @description Создаем класс для обновления кнопок
@@ -206,18 +205,24 @@ export class QueueButtons {
      */
     public constructor(ctx: QueueMessage<CommandInteraction>) {
         // Разово создаем селектор для повторного использования
-        this._selector = new ActionRowBuilder().addComponents([
-            new StringSelectMenuBuilder().setCustomId("filter_select")
-                .setPlaceholder(locale._(ctx.locale, "selector.filters"))
-                .setOptions(filters.filter((filter) => !filter.args).map((filter) => {
-                    return {
-                        label: filter.name.charAt(0).toUpperCase() + filter.name.slice(1).replace("_", " "),
-                        value: filter.name,
-                        emoji: filter.emoji,
-                        description: (filter.locale[ctx.locale] ?? filter.locale["en-US"]).split("]")[1]
-                    }
-                }))
-        ]);
+        this._selector = {
+            "type": 1,
+            "components": [
+                {
+                    "type": 3,
+                    "custom_id": "filter_select",
+                    "placeholder": locale._(ctx.locale, "selector.filters"),
+                    "options": filters.filter((filter) => !filter.args).map((filter) => {
+                        return {
+                            label: filter.name.charAt(0).toUpperCase() + filter.name.slice(1).replace("_", " "),
+                            value: filter.name,
+                            emoji: filter.emoji,
+                            description: (filter.locale[ctx.locale] ?? filter.locale["en-US"]).split("]")[1]
+                        }
+                    })
+                }
+            ]
+        };
     };
 
     /**

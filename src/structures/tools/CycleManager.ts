@@ -22,7 +22,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected get time(): number {
-        return performance.now();
+        return (Number(process.hrtime.bigint()) / 1_000_000) + performance.now();
     };
 
     /**
@@ -76,7 +76,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
             const now = this.time;
             this.nextExecutionTime = now + this.options.duration;
             // Используем setImmediate для немедленного, но асинхронного старта
-            this.timer = setImmediate(this.step);
+            setImmediate(this.step);
         }
 
         return this;
