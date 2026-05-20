@@ -50,7 +50,7 @@ export interface RestOptions {
 
     /**
      * @description Тип платформы, платформа может быть технической или же прямой
-     * @default APIPlatformType.primary
+     * @default APIPlatformType
      * @readonly
      */
     readonly type?: APIPlatformType;
@@ -208,7 +208,7 @@ export namespace APIRequestData {
          * @description Уникальный id трека
          * @readonly
          */
-        readonly id?: string
+        readonly id?: string;
 
         /**
          * @description Название трека

@@ -328,6 +328,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             }
         }
 
+        // Чистим данные о подключении
         this.ws = null;
 
         // Если есть менеджер жизни ws
@@ -348,8 +349,9 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
 
         if (this._heartbeat) {
             this._heartbeat.destroy();
-            this._heartbeat = null;
         }
+
+        this._heartbeat = null;
     };
 }
 

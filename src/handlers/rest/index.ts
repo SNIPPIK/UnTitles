@@ -106,14 +106,13 @@ class RestWorker<T extends APIRequestsKeys> {
     public get methods() {
         let reqs = 0;
 
+        // Прогоняем платформы и собираем кол-во доступных запросов
         for (let i of this.array) {
             reqs += i.requests.length;
         }
 
         return reqs;
     };
-
-    public constructor() {};
 
     /**
      * @description Заблокирована ли платформа?

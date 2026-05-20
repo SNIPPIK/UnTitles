@@ -43,13 +43,13 @@ class Database {
     public readonly voice: Voices;
 
     /** Для работы с командами для разработчика */
-    public readonly owner: { ids: string[]; guildID: string };
+    public readonly owner: { ids: string[]; guildID: string; };
 
     /** Для отображения в embed сообщениях */
     public readonly images: { disk: string; no_image: string; banner: string; };
 
     /** Для отображения кастомных иконок */
-    public readonly emoji: { disk: string; loading: string; buffer: string; user: string; lost: string; queue: string; current: string; select: string };
+    public readonly emoji: { disk: string; loading: string; buffer: string; user: string; lost: string; queue: string; current: string; select: string; };
 
     /**
      * @description Создаем класс с ограничениями не для главного потока

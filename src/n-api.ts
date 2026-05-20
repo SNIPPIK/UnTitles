@@ -28,7 +28,7 @@ type NativeClass<T extends { constructor?: (...args: any[]) => any }> =
 
 /**
  * Универсальный алиас для удобного использования:
- * iType<typeof NativeTyped. AudioEngine> => тип экземпляра AudioEngine
+ * iType<typeof AudioEngine> => тип экземпляра AudioEngine
  */
 export type iType<T> = T extends new (...args: any[]) => infer R ? R : never;
 
@@ -217,6 +217,9 @@ export interface iUDPSocket {
      */
     constructor(remoteAddr: string): void;
 
+    /**
+     * Очистка от всех аудио пакетов, которые находятся в очереди на отправку
+     */
     clearPackets(): void;
 
     /**

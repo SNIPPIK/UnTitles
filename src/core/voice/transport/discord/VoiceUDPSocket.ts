@@ -76,6 +76,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
                 this.socket.pushPackets(list);
             }
         } catch (error) {
+            // Если не удалось отправить пакет или пакеты в rust слой
             this.emit("error", error as Error);
         }
     };
@@ -109,10 +110,12 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      */
     public connect = (options: WebSocketOpcodes.ready["d"]): void => {
         this.options = options;
+
+        // Если уже есть UDP подключение
         if (this.socket) this.reset();
 
         this.socket = new UDPSocket(`${options.ip}:${options.port}`);
-        this._status = VoiceUDPSocketStatuses.connecting;
+        this._status = VoiceUDPSocketStatuses.connecting; // Устанавливаем статус подключения
 
         // Rust создаст отдельный поток и будет вызывать для каждого полученного пакета
         this.socket.startListening(this.handleMessage);
@@ -136,8 +139,10 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
             const port = msg.readUInt16BE(msg.length - 2);
 
             if (!isIPv4(ip)) {
+                // Если не удалось получить IPv4
                 this.emit("discovery", new Error("Not found IPv4 address"));
             } else {
+                // Если данные для подключения были получены
                 this._status = VoiceUDPSocketStatuses.connected;
                 this.emit("discovery", { ip, port });
             }
@@ -155,10 +160,13 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @private
      */
     private reset = () => {
+        // Если есть UDP подключение
         if (this.socket) {
             this.socket.destroy();
-            this.socket = null;
         }
+
+        // Чистим данные о подключении
+        this.socket = null;
     };
 
     /**
@@ -171,10 +179,12 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public destroy = () => {
+        super.destroy(); // Удаляем TypedEmitter
+
         if (this._status === VoiceUDPSocketStatuses.disconnected) return;
         this._status = VoiceUDPSocketStatuses.disconnected;
-        this.reset();
-        super.destroy();
+        
+        this.reset(); // Удаляем UDP
     };
 }
 

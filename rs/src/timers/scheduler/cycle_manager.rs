@@ -1,17 +1,10 @@
 use crate::network::udp::UdpBuffered;
 use arc_swap::ArcSwap;   // атомарная замена Arc<HashMap> без мьютексов (RCU стиль)
-use std::{
-    collections::HashMap,
-    io,
-    panic::{catch_unwind, AssertUnwindSafe},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-        Mutex,
-    },
-    thread,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, io, panic::{catch_unwind, AssertUnwindSafe}, sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+    Mutex,
+}, thread, time::{Duration, Instant}};
 
 // ============================================================================
 // PLATFORM BACKEND (trait для унификации ожидания)
@@ -282,6 +275,8 @@ impl CycleManager {
         self.backend.wake();                         // будим цикл, чтобы он не спал до следующего тика
     }
 
+    /// Удаление сессии из цикла
+    /// После удаления, поток может работать дальше если есть еще активные сессии
     pub fn remove_session(&self, id: u32) {
         let mut map = self.sessions.load_full();
         Arc::make_mut(&mut map).remove(&id);

@@ -203,7 +203,7 @@ export class TrackResolvers {
         if (error) {
             Logger.log(
                 "ERROR",
-                `\nUnhandled Rejection Track\n` +
+                `\nUnhandled Rejection Header Track\n` +
                 `┌ Stack:    ${error}\n` +
                 `├ Redirect: ${client.redirect}\n` +
                 `└ URL:      ${track.link}`

@@ -133,6 +133,7 @@ export class Commands extends handler<Command> {
     public onUserPermissionFail = (ctx: AnyCommandInteraction) => {
         const member = ctx.member;
 
+        // Если пользователь является пользователем сервера
         if (member instanceof GuildMember) {
             return member.send(locale._(ctx.locale, "interaction.permission.client", [member]));
         }
@@ -345,7 +346,7 @@ export abstract class BaseCommand<T> {
     readonly permissions: CommandPermissions;
 
     /** Права для использования той или иной команды */
-    readonly middlewares?: RegisteredMiddlewares[]
+    readonly middlewares?: RegisteredMiddlewares[];
 
     /** Выполнение команды */
     abstract run(options: CommandCallback<any>): any;
@@ -411,7 +412,7 @@ export abstract class Command extends BaseCommand<ApplicationCommandType> {
 
         return {
             ...super.toJSON(),
-            options,
+            options
         };
     };
 }
@@ -437,7 +438,7 @@ export abstract class SubCommand extends BaseCommand<CommandOptionsType> {
             ...super.toJSON(),
 
             // Изменяем данные autocomplete на boolean
-            options: this.options?.map(x => ({ ...x, autocomplete: "autocomplete" in x }) as ApplicationCommandOption) ?? [],
+            options: this.options?.map(x => ({ ...x, autocomplete: "autocomplete" in x }) as ApplicationCommandOption) ?? []
         };
     };
 }

@@ -54,7 +54,7 @@ export class HeartbeatManager {
      * @constructor
      * @public
      */
-    public constructor(private hooks: HeartbeatHooks) {}
+    public constructor(private hooks: HeartbeatHooks) {};
 
     /**
      * @description Запускаем heartbeat с заданным интервалом

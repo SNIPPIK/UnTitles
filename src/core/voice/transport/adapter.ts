@@ -130,8 +130,10 @@ export class VoiceAdapter {
      */
     public send = (config: VoiceConnectionConfiguration) => {
         try {
+            // Если удается отправить данные через адаптер
             return this.adapter?.send({op: GatewayOpcodes.VoiceStateUpdate, d: config });
         } catch {
+            // Если не удалось отправить данные через адаптер
             return false;
         }
     };
@@ -211,7 +213,10 @@ export interface DiscordGatewayAdapterImplementerMethods {
  * @interface DiscordVoiceUpdate
  */
 interface DiscordVoiceUpdate {
+    /** Код обновления состояния о подключении */
     op: GatewayOpcodes.VoiceStateUpdate;
+
+    /** Данные подключения */
     d: VoiceConnectionConfiguration;
 }
 

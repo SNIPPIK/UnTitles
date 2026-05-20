@@ -18,8 +18,11 @@ const MIN_WORKERS: usize = 1;
 
 /// Воркер теперь без Mutex
 struct Worker {
+    /// Менеджер потов, хранящий в себе udp сессии
     manager: Arc<CycleManager>,
-    sessions: DashMap<u32, Arc<UdpBuffered>>,
+    
+    /// Ссылки на udp сессии, для быстрого поиска и распределения между потоками
+    sessions: DashMap<u32, Arc<UdpBuffered>>
 }
 
 impl Worker {
@@ -27,7 +30,7 @@ impl Worker {
         let manager = CycleManager::new().expect("Failed to create timer");
         Worker {
             manager: Arc::new(manager),
-            sessions: DashMap::new(),
+            sessions: DashMap::new()
         }
     }
 }

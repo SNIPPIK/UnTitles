@@ -291,7 +291,7 @@ impl DaveSession {
     let cd = Self::map_codec(codec)?;
     let out = self.inner.encrypt(mt, cd, &packet).map_err(Self::map_err)?;
     // Передаём владение, чтобы избежать лишнего копирования
-    Ok(Buffer::from(out.into_owned()))
+    Ok(Buffer::from(out.as_ref()))
   }
 
   /// Быстрое шифрование одного Opus-пакета (без проверки типа медиа и кодека).
@@ -310,8 +310,8 @@ impl DaveSession {
         .inner
         .encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet)
     {
-      Ok(out) => Some(Buffer::from(out.into_owned())),
-      Err(_) => Some(packet), // возвращаем исходный пакет, не null
+      Ok(out) => Some(Buffer::from(out.as_ref())),
+      Err(_) => None, // возвращаем исходный пакет, не null
     }
   }
 
@@ -333,7 +333,7 @@ impl DaveSession {
           .inner
           .encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet)
       {
-        results.push(Buffer::from(out.into_owned()));
+        results.push(Buffer::from(out.as_ref()));
       }
       else {
         println!("[DaveSession] encrypt failed");
@@ -359,7 +359,7 @@ impl DaveSession {
     let uid = Self::parse_id(user_id, "user id")?;
     let mt = Self::map_media_type(media_type)?;
     let out = self.inner.decrypt(uid, mt, &packet).map_err(Self::map_err)?;
-    Ok(Buffer::from(out.to_owned()))
+    Ok(Buffer::from(out))
   }
 
   /// Расшифровывает пакет, полученный от указанного пользователя.
@@ -377,7 +377,7 @@ impl DaveSession {
   pub fn decrypt_fast(&mut self, user_id: String, packet: Buffer) -> Result<Buffer> {
     let uid = Self::parse_id(user_id, "user id")?;
     let out = self.inner.decrypt(uid, davey::MediaType::AUDIO, &packet).map_err(Self::map_err)?;
-    Ok(Buffer::from(out.to_owned()))
+    Ok(Buffer::from(out))
   }
 
   /// Возвращает статистику операций шифрования для всей сессии.

@@ -94,6 +94,7 @@ export class VoiceSpeakerManager {
      * @public
      */
     public destroy = () => {
+        this._type = null;
         this._heartbeat.destroy();
         this._heartbeat = null;
     };

@@ -6,13 +6,16 @@
  * @public
  */
 export class SetArray<T> extends Set<T> {
+    /** Параметр со списком ссылок на объекты для использования функций Array */
+    private _array: Array<T> = [];
+
     /**
      * @description Выдаем коллекцию... Для дальнейшего использования
      * @returns T[]
      * @public
      */
     public get array(): T[] {
-        return Array.from(this.values());
+        return this._array;
     };
 
     /**
@@ -23,6 +26,10 @@ export class SetArray<T> extends Set<T> {
     public add(task: T) {
         if (this.has(task)) this.delete(task);
 
+        // Если нет обьекта в списке
+        if (this._array && !this._array?.includes?.(task)) this._array.push(task);
+
+        // Стандартный метод добавления
         super.add(task);
         return this;
     };
@@ -34,6 +41,14 @@ export class SetArray<T> extends Set<T> {
      * @public
      */
     public delete(item: T) {
+        const index = this.array.indexOf(item);
+
+        // Если есть данный объект в списке
+        if (index !== -1) {
+            this._array.splice(index);
+        }
+
+        // Стандартный метод удаления
         super.delete(item);
         return true;
     };
@@ -65,5 +80,17 @@ export class SetArray<T> extends Set<T> {
      */
     public find = (predicate: (item: T) => boolean): T => {
         return this.array.find(predicate);
+    };
+
+    /**
+     * @description Функция удаления данных из мульти класса
+     * @public
+     */
+    public clear(): void {
+        super.clear();
+
+        // Удаления всех данных из списка
+        this._array.splice(0, this._array.length);
+        this._array = null;
     };
 }

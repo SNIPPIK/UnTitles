@@ -187,10 +187,10 @@ export type CommandCallback<T = string> = {
  */
 export interface CommandPermissions {
     /** Права для пользователя */
-    readonly user?: PermissionsString[],
+    readonly user?: PermissionsString[];
 
     /** Права для клиента (бота) */
-    readonly client: PermissionsString[]
+    readonly client: PermissionsString[];
 }
 
 /**

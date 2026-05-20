@@ -54,6 +54,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
     /** Последнее заданное значение затухания */
     protected _afade = 0;
 
+    /** Таймер для отслеживания данных от AudioEngine */
     protected _timeout: NodeJS.Timeout;
 
     /**

@@ -24,6 +24,7 @@ export class DiscordClient extends Client {
         try {
             return this._shard_ID;
         } catch {
+            // Если не удалось получить ID, возможно ShardManager не включен!
             return 0;
         }
     };
@@ -110,13 +111,14 @@ export class DiscordClient extends Client {
                 ThreadMemberManager: 0,
                 GuildTextThreadManager: 0,
                 GuildForumThreadManager: 0,
-                DMMessageManager: 0,
+                DMMessageManager: 0
             }),
 
             // ---------- sweepers: периодическая очистка устаревших объектов ----------
             sweepers: {
                 // Наследуем дефолтные настройки (подчищает старые приглашения, голосовые состояния и т.д.)
                 ...Options.DefaultSweeperSettings,
+
                 // Сообщения: каждые 60 секунд удаляем из кэша те, что старше 5 минут
                 messages: {
                     interval: 60,
@@ -124,14 +126,14 @@ export class DiscordClient extends Client {
                 },
                 // Участники
                 guildMembers: {
-                    interval: 3600,
+                    interval: 1200,
                     filter: () => (member) => member.id !== this.user.id, // а себя не трогаем
                 },
                 // Пользователи
                 users: {
-                    interval: 3600,
+                    interval: 1200,
                     filter: () => (user) => user.bot && user.id !== this.user.id,
-                },
+                }
             },
         });
 

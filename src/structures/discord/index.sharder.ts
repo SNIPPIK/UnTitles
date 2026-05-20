@@ -47,7 +47,7 @@ export class ShardManager extends ShardingManager {
         // Создаем дубликат
         this.spawn({
             amount: "auto",
-            delay: -1
+            delay: 75
         })
             // Перехватываем ошибку
             .catch((err: Error) => Logger.log("ERROR", err));

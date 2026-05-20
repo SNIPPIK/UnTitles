@@ -40,6 +40,7 @@ pub struct UdpBufferedInner {
     /// Последнее зафиксированное время отправки пакета
     pub last_send_ms: AtomicU64,
 
+    /// Номер отправленного Keep-Alive пакета
     pub counter: AtomicU32
 }
 

@@ -261,6 +261,8 @@ class RestWorkerHandler {
 
         try {
             const restPlatform = this.registry.supported[platform];
+
+            // Если не найдена платформа
             if (!restPlatform) {
                 this.sendError(requestId, new Error(`Platform not found: ${platform}`));
                 return;

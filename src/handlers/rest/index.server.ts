@@ -26,7 +26,7 @@ export namespace RestServerSide {
         platform: RestAPINames;
 
         // Надо ли получить данные в ответ
-        data?: boolean
+        data?: boolean;
     };
 
     /**
@@ -167,8 +167,21 @@ export namespace RestServerSide {
      * @public
      */
     export interface RequestDef<T extends APIRequestsKeys> {
+        /** Имя запроса */
         name: T;
+
+        /**
+         * @description Фильтр для поиска через ссылку
+         * @warn Для search запросов данный параметр не требуется
+         */
         filter?: RegExp;
+
+        /**
+         * @description Функция запроса, основной код для получения данных от запроса
+         * @param url - Ссылка или для поиска строка
+         * @param options - Параметры передаваемые при запросе
+         * @returns Promise<APIRequestsRaw<T> | Error>
+         */
         execute: (url: string, options: APIExecuteParams<T>) => Promise<APIRequestsRaw<T> | Error>;
     }
 
@@ -213,13 +226,13 @@ export namespace RestServerSide {
          * @description Поддерживаемые платформы в array формате, для экономии памяти
          * @private
          */
-        array?: RestServerSide.API[],
+        array?: RestServerSide.API[];
 
         /**
          * @description Поддерживаемые платформы в array формате, для экономии памяти
          * @private
          */
-        array_tex?: RestServerSide.API[]
+        array_tex?: RestServerSide.API[];
     }
 }
 
@@ -229,8 +242,13 @@ export namespace RestServerSide {
  * @private
  */
 type ResultSuccess<T extends APIRequestsKeys> = {
+    /** Статус запроса */
     status: "success";
+
+    /** Тип ответа */
     type: T;
+
+    /** Ответ */
     result: APIRequestsRaw<T>;
 };
 
@@ -240,6 +258,9 @@ type ResultSuccess<T extends APIRequestsKeys> = {
  * @private
  */
 type ResultError = {
+    /** Статус запроса */
     status: "error";
+
+    /** Ответ */
     result: Error;
 };

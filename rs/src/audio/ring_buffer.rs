@@ -37,9 +37,9 @@ pub struct RingBuffer {
     /// Индекс продьюсера (куда писать следующий элемент). Всегда указывает на **свободный** слот.
     head: AtomicUsize,
 
-    /// Индекс консьюмера (откуда читать следующий элемент). Всегда указывает на **занятый** слот или
+    /// Индекс (откуда читать следующий элемент). Всегда указывает на **занятый** слот или
     /// равен head, если очередь пуста.
-    tail: AtomicUsize,
+    tail: AtomicUsize
 }
 
 // ============================================================================
@@ -52,7 +52,6 @@ pub struct RingBuffer {
 unsafe impl Send for RingBuffer {}
 
 /// `Sync`: разделяемый доступ (&RingBuffer) из нескольких потоков безопасен благодаря:
-/// - продьюсер и консьюмер обращаются к разным атомарным переменным (head/tail)
 /// - доступ к слотам через UnsafeCell защищён логикой SPSC (один поток пишет, другой читает, никогда одновременно в один слот)
 /// - Ordering::Release/Ordering::Acquire синхронизируют операции записи/чтения данных.
 unsafe impl Sync for RingBuffer {}
@@ -77,11 +76,11 @@ impl RingBuffer {
             vec.push(UnsafeCell::new(MaybeUninit::uninit()));
         }
 
-        Self {
+        RingBuffer {
             buffer: vec.into_boxed_slice(),
             capacity: real_capacity,
             head: AtomicUsize::new(0),
-            tail: AtomicUsize::new(0),
+            tail: AtomicUsize::new(0)
         }
     }
 

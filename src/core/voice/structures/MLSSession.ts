@@ -6,6 +6,7 @@ import { TypedEmitter } from "#structures";
  * @author SNIPPIK
  * @description Текущая максимальная версия протокола DAVE, поддерживаемая этой реализацией.
  *              Используется для согласования версий с сервером Discord.
+ * @version 1.3
  * @public
  */
 let MAX_DAVE_PROTOCOL: number = 1;
@@ -291,14 +292,18 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      *              Останавливает шифрование, очищает ожидающие переходы и сбрасывает ссылки.
      */
     public destroy = () => {
-        super.destroy();
         this._isTransitioning = true; // Сразу блокируем шифрование
 
         if (this.session) {
             try {
                 this.session.reset();
-            } catch (e) { /* игнорируем ошибки при уничтожении */ }
+            } catch (e) {
+                // Сообщаем что сесиия уничтожилась с ошибкой
+                this.emit("error", Error(`[Critical Error] get error for destroy dave session!!!\n${e}`));
+            }
         }
+
+        super.destroy();
 
         this.session = null;
         this.reinitializing = false;

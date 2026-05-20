@@ -1,5 +1,21 @@
 /**
  * @author SNIPPIK
+ * @description Тихие методы удаления данных
+ * @const SILENT_METHODS
+ * @private
+ */
+const SILENT_METHODS = ["silent_destroy"];
+
+/**
+ * @author SNIPPIK
+ * @description Стандартные методы удаления данных
+ * @const DEFAULT_METHODS
+ * @private
+ */
+const DEFAULT_METHODS = ["disconnect", "cleanup", "destroy"];
+
+/**
+ * @author SNIPPIK
  * @description Коллекция
  * @abstract
  * @public
@@ -9,7 +25,7 @@ export class Collection<K, T = string> {
     private _map = new Map<T, K>();
 
     /**
-     * @description Получаем случайный объект из MAP
+     * @description Получаем объекты из MAP
      * @public
      */
     public get array() {
@@ -70,7 +86,7 @@ export class Collection<K, T = string> {
         // Если не найден объект
         if (!item) return null;
 
-        const cleanupMethods = silent ? ["silent_destroy"] : ["disconnect", "cleanup", "destroy"];
+        const cleanupMethods = silent ? SILENT_METHODS : DEFAULT_METHODS;
         // Если объект имеет функции удаления от они будут выполнены до удаления
         for (const key of cleanupMethods) {
             const fn = (item as any)[key];

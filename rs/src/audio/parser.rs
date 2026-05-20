@@ -23,10 +23,10 @@ const MAX_PACKET_SIZE: usize = 1024 * 1024;  // 1 MiB — запас для "з�
 pub enum PacketType {
     Head,      // OpusHead (первые 8 байт "OpusHead", полный заголовок 19+)
     Tags,      // OpusTags (комментарии)
-    Frame,     // обычный аудиофрейм
+    Frame,     // обычный аудио фрейм
     Silent,    // специальный маркер тишины (0x80 + data)
     Broken,    // повреждённый/некорректный пакет
-    End,       // 0xFF — сигнал конца потока (не Ogg end-of-stream, а наш внутренний)
+    End        // 0xFF — сигнал конца потока (не Ogg end-of-stream, а наш внутренний)
 }
 
 /// Выходной пакет: (тип, данные).
@@ -55,7 +55,7 @@ pub struct OggOpusParser {
     /// Serial number текущего логического потока (первые 4 байта страницы).
     /// Если встретили страницу с другим serial — поток сменился (например, переход на другой стрим в файле),
     /// сбрасываем carry.
-    bitstream_serial: Option<i32>,
+    bitstream_serial: Option<i32>
 }
 
 impl OggOpusParser {
@@ -64,10 +64,10 @@ impl OggOpusParser {
     // =========================================================================
 
     pub fn new() -> Self {
-        Self {
+        OggOpusParser {
             remainder: Vec::with_capacity(16 * 1024),
             packet_carry: Vec::with_capacity(4096),
-            bitstream_serial: None,
+            bitstream_serial: None
         }
     }
 
@@ -86,14 +86,13 @@ impl OggOpusParser {
 
     /// Основная точка входа: подаём кусок данных, получаем на выход готовые пакеты.
     /// Если chunk пустой — флашим остатки (flush).
-    pub fn parse_internal(
-        &mut self,
-        chunk: &[u8],
-        output: &mut Vec<ParsedPacket>,
-    ) -> Result<()> {
+    pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<ParsedPacket>) -> Result<()> {
+        // Если входящий пакет пуст
         if chunk.is_empty() {
             return self.flush_internal(output);
         }
+
+        // Передаем на дальнейший разбор пакета
         self.parse_core(chunk, |packet_type, data| {
             output.push((packet_type, data.to_vec()));
             Ok(())
@@ -106,6 +105,8 @@ impl OggOpusParser {
 
     /// Вызывается при EOF (chunk пустой). Выдаёт последний собираемый пакет, если есть.
     fn flush_internal(&mut self, output: &mut Vec<ParsedPacket>) -> Result<()> {
+
+        // Если есть в буфере еще данные о последних пакетах
         if !self.packet_carry.is_empty() {
             let packet = std::mem::replace(&mut self.packet_carry, Vec::with_capacity(4096));
             let packet_type = Self::detect_packet_type(&packet);
@@ -129,13 +130,12 @@ impl OggOpusParser {
     /// - on_packet: колбэк, получает (PacketType, &[u8]) — владение данных остаётся за парсером.
     ///              В текущей реализации `parse_internal` копирует в Vec, но можно оптимизировать.
     fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()>
-    where
-        F: FnMut(PacketType, &[u8]) -> Result<()>,
-    {
+    where F: FnMut(PacketType, &[u8]) -> Result<()> {
         self.remainder.extend_from_slice(chunk);
 
+        // Если достигнут лимит то просто выдаем ошибку переполнения
         if self.remainder.len() > MAX_REMAINDER_SIZE {
-            // Защита от переполнения: чистим всё и выходим с ошибкой.
+            // Защита от переполнения: чистим всё и выходим с ошибкой
             self.remainder.clear();
             self.packet_carry.clear();
             return Err(Error::from_reason("Ogg parser remainder overflow"));
@@ -169,7 +169,6 @@ impl OggOpusParser {
             cursor = pos;
 
             let page = &self.remainder[cursor..];
-
             let segments_count = match page.get(26) {
                 Some(v) => *v as usize,
                 None => break,
@@ -182,7 +181,6 @@ impl OggOpusParser {
 
             let segment_table = &page[27..header_size];
             let payload_size: usize = segment_table.iter().map(|&s| s as usize).sum();
-
             let page_end = header_size + payload_size;
             if page.len() < page_end {
                 break; // не хватает данных полезной нагрузки
@@ -228,15 +226,8 @@ impl OggOpusParser {
     ///   - Если segment_len < 255 → пакет завершён.
     ///   - Если segment_len == 255 → пакет продолжается на следующем сегменте / странице.
     /// - При каждом завершении пакета вызываем on_packet с детектированным типом.
-    fn handle_page_core<F>(
-        page: &[u8],
-        packet_carry: &mut Vec<u8>,
-        bitstream_serial: &mut Option<i32>,
-        on_packet: &mut F,
-    ) -> Result<()>
-    where
-        F: FnMut(PacketType, &[u8]) -> Result<()>,
-    {
+    fn handle_page_core<F>(page: &[u8], packet_carry: &mut Vec<u8>, bitstream_serial: &mut Option<i32>, on_packet: &mut F) -> Result<()>
+    where F: FnMut(PacketType, &[u8]) -> Result<()> {
         if page.len() < 27 {
             return Err(Error::from_reason("Invalid OGG page"));
         }
@@ -313,37 +304,53 @@ impl OggOpusParser {
     /// - Иначе — если длина >=8 → считаем Frame (здесь также может быть Silent с ведущим 0x80,
     #[inline]
     fn detect_packet_type(packet: &[u8]) -> PacketType {
+        // Если пакет полностью пуст
         if packet.is_empty() {
             return PacketType::Broken;
         }
 
+        // Если размер пакета равен 0
         if packet.len() == 1 {
             return match packet[0] {
-                0x80 => PacketType::Broken,
+                // Пакет тишины
+                0x80 => PacketType::Silent,
+
+                // Пакет окончания
                 0xFF => PacketType::End,
+
+                // Пустой аудио пакет
                 _ => PacketType::Broken,
             };
-        } else if packet.len() > 1 && packet.len() <= 10 {
+        } 
+        
+        // Если пакет больше 1 и меньше или равен 8
+        else if packet.len() > 1 && packet.len() < 8 {
             return match packet[0] {
+                // Пакет тишины
                 0x80 => PacketType::Silent,
+
+                // Пакет окончания
                 0xFF => PacketType::End,
+
+                // Пустой аудио пакет
                 _ => PacketType::Broken,
             };
         }
 
+        // Если пакет является заголовком
         if packet.len() >= 8 {
+            // Если пакет является заголовком
             if packet.starts_with(b"OpusHead") {
                 return if packet.len() >= 19 { PacketType::Head } else { PacketType::Broken };
             }
-            if packet.starts_with(b"OpusTags") {
+
+            // Если пакет является тегом
+            else if packet.starts_with(b"OpusTags") {
                 return PacketType::Tags;
             }
         }
 
-        if packet.len() <= 7 {
-            PacketType::Broken
-        } else {
-            PacketType::Frame
-        }
+        // Если проверка пройдена, то скорее всего это нормальный фрейм
+        PacketType::Frame
     }
 }

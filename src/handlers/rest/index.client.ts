@@ -26,7 +26,9 @@ export namespace RestClientSide {
         payload: string;
 
         /** Дополнительные опции, например, { audio: true } для получения прямой ссылки */
-        options?: { audio?: boolean };
+        options?: { 
+            audio?: boolean;
+        };
     }
 
     /**
@@ -40,25 +42,25 @@ export namespace RestClientSide {
          * @description Заблокирована ли платформа в текущей сессии.
          * Если true, запросы на эту платформу не будут выполняться
          */
-        public get block() { return db.api.hasBlocked(this._api.name); }
+        public get block() { return db.api.hasBlocked(this._api.name); };
 
         /** Имя платформы (например, "YOUTUBE") */
-        public get platform() { return this._api.name; }
+        public get platform() { return this._api.name; };
 
         /** Требуется ли авторизация для работы с этой платформой */
-        public get auth() { return this._api.auth !== null; }
+        public get auth() { return this._api.auth !== null; };
 
         /** Поддерживает ли платформа аудио-ссылку */
-        public get audio() { return this._api.audio; }
+        public get audio() { return this._api.audio; };
 
         /** Цветовой код платформы (используется в UI) */
-        public get color() { return this._api.color; }
+        public get color() { return this._api.color; };
 
         /**
          * @constructor
          * @param _api - Объект API платформы, полученный от серверной части.
          */
-        public constructor(private _api: RestServerSide.API) {}
+        public constructor(private _api: RestServerSide.API) {};
 
         /**
          * @description Создаёт объект запроса к платформе.
@@ -76,7 +78,7 @@ export namespace RestClientSide {
          * 4. Если и search не подошёл, берётся тип "all" (обычно для универсальных запросов).
          *
          * @example
-         * ```typescript
+         * ```ts
          * const req = new Request(youtubeApi);
          * const { type, request } = req.request("https://youtu.be/...", { audio: true });
          * console.log(type); // "track"
@@ -101,6 +103,6 @@ export namespace RestClientSide {
                 // Функция, выполняющая фактический запрос через глобальный RestObject
                 request: () => db.api.request_worker<T>({ platform, payload, options, type })
             };
-        }
+        };
     }
 }
