@@ -7,7 +7,7 @@
  */
 export class SetArray<T> extends Set<T> {
     /** Параметр со списком ссылок на объекты для использования функций Array */
-    private _array: Array<T> = [];
+    private _array: Array<T> = new Array<T>();
 
     /**
      * @description Выдаем коллекцию... Для дальнейшего использования
@@ -27,7 +27,7 @@ export class SetArray<T> extends Set<T> {
         if (this.has(task)) this.delete(task);
 
         // Если нет обьекта в списке
-        if (this._array && !this._array?.includes?.(task)) this._array.push(task);
+        if (!this._array?.includes?.(task)) this._array.push(task);
 
         // Стандартный метод добавления
         super.add(task);
@@ -91,6 +91,5 @@ export class SetArray<T> extends Set<T> {
 
         // Удаления всех данных из списка
         this._array.splice(0, this._array.length);
-        this._array = null;
     };
 }
