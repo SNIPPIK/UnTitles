@@ -210,9 +210,9 @@ class RestYandexAPI extends RestServerSide.API {
          */
         {
             name: "playlist",
-            filter: /(playlists\/[0-9a-f-]+)/i,
+            filter: /playlists\/(?:[a-z]+\.)?[0-9a-f-]+/i,
             execute: async (url, {limit}) => {
-                const ID = this.getID(/(playlists\/[0-9a-f-]+)/i, url)[0].split("/")[1];
+                const ID = this.getID(/playlists\/(?:[a-z]+\.)?[0-9a-f-]+/i, url)[0].split("/")[1];
 
                 // Если ID альбома не удалось извлечь из ссылки
                 if (!ID) return locale.err("api.request.id.playlist");

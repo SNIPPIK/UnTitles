@@ -216,13 +216,19 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         // Запускаем получение аудио
         this.engine.start(this.arguments, FFMPEG_PATH);
 
-        // Запускаем цикл для получения ответа от движка
-        this._timeout = setInterval(() => {
-            if (this.readable) {
-                clearInterval(this._timeout);
-                this.emit("readable");
-            }
-        }, 100);
+        // Если поток не запустился сразу
+        if (!this.readable) {
+            // Запускаем цикл для получения ответа от движка
+            this._timeout = setInterval(() => {
+                if (this.readable) {
+                    clearInterval(this._timeout);
+                    this.emit("readable");
+                }
+            }, 100);
+        }
+
+        // Сообщаем о запуске потока
+        else this.emit("readable");
     };
 
     /**

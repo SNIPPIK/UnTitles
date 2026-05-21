@@ -169,7 +169,6 @@ class RestServerLoader extends handler<RestServerSide.API> {
     public constructor(registry: RestRegistry) {
         super("src/handlers/rest");
         this.registry = registry;
-        this.loadAndRegister();
     };
 
     /**
@@ -180,7 +179,7 @@ class RestServerLoader extends handler<RestServerSide.API> {
      * загружает файлы (кроме index) и сохраняет экземпляры в `this.files`.
      * Затем проходит по всем загруженным объектам и регистрирует их.
      */
-    private loadAndRegister = async () => {
+    public initialize = async () => {
         await this.load(); // синхронный обход директории, заполнение this.files
         for (const file of this.files) {
             this.registry.registerPlatform(file);
@@ -324,7 +323,7 @@ class RestWorkerHandler {
      * @param type - Тип запроса (например, "search").
      * @param result - Данные ответа (трек, массив треков и т.п.).
      */
-    private sendSuccess(requestId: number, type: string, result: any): void {
+    public sendSuccess(requestId: number, type: string, result: any): void {
         parentPort?.postMessage({ requestId, status: "success", type, result });
     };
 
@@ -334,10 +333,11 @@ class RestWorkerHandler {
      * @param requestId - Идентификатор запроса.
      * @param err - Объект ошибки (Error или любой другой).
      */
-    private sendError(requestId: number, err: any): void {
+    public sendError(requestId: number | undefined, err: any): void {
         const errorObj = err instanceof Error
             ? { name: err.name, message: err.message, stack: err.stack }
             : { name: "UnknownError", message: String(err), stack: undefined };
+
         parentPort?.postMessage({ requestId, status: "error", result: errorObj });
     };
 }
@@ -358,52 +358,57 @@ class RestWorkerHandler {
  *
  * @throws Ошибки, возникающие при инициализации, логируются, но не останавливают воркер.
  */
-if (parentPort && workerData?.rest) {
-    // Инициализируем общие ресурсы (например, кеш, логгер)
-    initSharedDatabase();
+(async () => {
+    if (!parentPort || !workerData?.rest) return;
 
-    const registry = new RestRegistry();
-    // Загружаем все платформы (синхронно)
-    new RestServerLoader(registry);
-    const handler = new RestWorkerHandler(registry);
+    try {
+        // Инициализируем общие ресурсы (база данных, кеш)
+        initSharedDatabase();
 
-    // Обработка сообщений от основного потока
-    parentPort.on("message", async (message: RestServerSide.ServerOptions & { requestId?: number }) => {
-        try {
-            // Сообщение-запрос на получение списка платформ (при старте)
-            if (message.data) {
-                const platforms = handler.getSerializablePlatforms();
-                parentPort.postMessage(platforms);
-                return;
+        const registry = new RestRegistry();
+        const loader = new RestServerLoader(registry);
+
+        // Ждем ПОЛНОЙ загрузки всех платформ перед тем как начать слушать события
+        await loader.initialize();
+
+        const workerHandler = new RestWorkerHandler(registry);
+
+        // Обработка сообщений от основного потока
+        parentPort.on("message", async (message: RestServerSide.ServerOptions & { requestId?: number, data?: boolean }) => {
+            try {
+                // Запрос на получение метаданных всех платформ при старте
+                if (message.data) {
+                    const platforms = workerHandler.getSerializablePlatforms();
+                    parentPort.postMessage(platforms);
+                    return;
+                }
+
+                // Обычный запрос к API платформы
+                if (message.platform && typeof message.requestId === "number") {
+                    await workerHandler.executeRequest(message as any);
+                    return;
+                }
+
+                // Неизвестный формат сообщения
+                workerHandler.sendError(message.requestId, new Error("Unsupported request type"));
+            } catch (err) {
+                workerHandler.sendError(message.requestId, err);
             }
+        });
 
-            // Обычный запрос к платформе (должен содержать platform и числовой requestId)
-            if (message.platform && typeof message.requestId === "number") {
-                await handler.executeRequest(message as any);
-                return;
-            }
+        // Глобальный перехват необработанных исключений
+        process.on("unhandledRejection", (err) => {
+            workerHandler.sendError(undefined, err);
+        });
 
-            // Неподдерживаемый тип сообщения
-            parentPort.postMessage({
-                status: "error",
-                requestId: message.requestId,
-                result: new Error("Unsupported request type")
-            });
-        } catch (err) {
-            parentPort.postMessage({
-                status: "error",
-                requestId: message.requestId,
-                result: err instanceof Error ? err : new Error(err as any)
-            });
-        }
-    });
-
-    // Глобальный перехват не пойманных reject'ов (защита от падения воркера)
-    process.on("unhandledRejection", (err) => {
+    } catch (initError) {
+        // Если воркер упал на этапе инициализации — сообщаем основному потоку
         parentPort?.postMessage({
             requestId: undefined,
             status: "error",
-            result: err instanceof Error ? err : new Error(err as any)
+            result: initError instanceof Error
+                ? { name: initError.name, message: initError.message, stack: initError.stack }
+                : { name: "InitializationError", message: String(initError) }
         });
-    });
-}
+    }
+})();

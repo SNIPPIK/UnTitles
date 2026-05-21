@@ -1,6 +1,7 @@
-import { BrotliDecompress, createBrotliDecompress, createDeflate, createGunzip, Deflate, Gunzip } from "node:zlib";
+import { createBrotliDecompress, createDeflate, createGunzip } from "node:zlib";
 import { request as httpsRequest, RequestOptions } from "node:https";
 import { IncomingMessage, request as httpRequest } from "node:http";
+import { pipeline } from "node:stream";
 
 /**
  * @author SNIPPIK
@@ -26,7 +27,7 @@ export interface httpsClient_head {
  * @abstract
  */
 abstract class Request {
-    protected _redirect_url = null;
+    protected _redirect_url: string | null = null;
 
     /**
      * @description Данные для создания запроса
@@ -49,19 +50,9 @@ abstract class Request {
         sessionTimeout: 5e3,
         headers: {
             "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
+            //"Connection": "keep-alive",
             "Priority": "u=5, i"
         }
-    };
-
-    /**
-     * @description Получаем протокол ссылки
-     * @returns httpsRequest | httpRequest
-     * @private
-     */
-    private get protocol() {
-        const protocol = this.data.protocol;
-        return protocol === "https:" ? httpsRequest : httpRequest;
     };
 
     /**
@@ -100,35 +91,39 @@ abstract class Request {
              * @param redirectCount - Текущее количество выполненных редиректов
              */
             const makeRequest = (opts: typeof options, redirectCount = 0) => {
-                // Защита от бесконечных циклов редиректов (RFC позволяет не более 5)
+                // Строгий лимит редиректов (RFC)
                 if (redirectCount > 5) {
                     return resolve(new Error(`[httpsClient]: Too many redirects`));
                 }
 
                 // Создаём запрос с использованием протокола (http/https)
-                const req = this.protocol(opts, (res) => {
-                    // Проверяем, является ли ответ редиректом и есть ли заголовок Location
-                    if (res.headers.location && res.statusCode >= 300 && res.statusCode < 400) {
+                const protocol = this.getProtocolRequest(opts.protocol);
+
+                const req = protocol(opts, (res) => {
+                    if (res.headers.location && res.statusCode && res.statusCode >= 300 && res.statusCode < 400) {
                         const newUrl = res.headers.location;
+                        const newOptions = { ...opts };
 
-                        let newOptions = { ...opts };
-
-                        // Парсим новый URL, чтобы извлечь hostname, protocol, path, port
                         try {
-                            const parsedUrl = new URL(newUrl);
+                            // Корректно обрабатываем относительные редиректы
+                            const base = `${opts.protocol}//${opts.hostname}${opts.port ? `:${opts.port}` : ""}`;
+                            const parsedUrl = new URL(newUrl, base);
 
                             newOptions.hostname = parsedUrl.hostname;
                             newOptions.protocol = parsedUrl.protocol;
                             newOptions.path = parsedUrl.pathname + parsedUrl.search;
-                            newOptions.port = parsedUrl.port;
+                            newOptions.port = parsedUrl.port || (parsedUrl.protocol === "https:" ? "443" : "80");
 
-                            this._redirect_url = `${parsedUrl.href}`;
+                            this._redirect_url = parsedUrl.href;
                         } catch (e) {
                             return resolve(new Error(`[httpsClient]: Invalid redirect URL: ${newUrl}`));
                         }
 
-                        // Повторяем запрос с новыми опциями, увеличивая счётчик редиректов
-                        return makeRequest(newOptions, redirectCount++);
+                        // Потребляем поток старого ответа, чтобы избежать зависания сокетов
+                        res.resume();
+
+                        // Префиксный инкремент (++redirectCount или + 1)
+                        return makeRequest(newOptions, redirectCount + 1);
                     }
 
                     // Не редирект – возвращаем ответ
@@ -137,12 +132,7 @@ abstract class Request {
 
                 // Если в опциях есть тело и метод не GET/HEAD, отправляем тело
                 if (opts.body && opts.method !== "GET" && opts.method !== "HEAD") {
-                    const body =
-                        typeof opts.body === "string"
-                            ? Buffer.from(opts.body)
-                            : opts.body;
-
-                    // Устанавливаем заголовок Content-Length (обязателен для некоторых серверов)
+                    const body = typeof opts.body === "string" ? Buffer.from(opts.body) : opts.body;
                     req.setHeader("Content-Length", body.length);
                     req.write(body);
                 }
@@ -151,9 +141,7 @@ abstract class Request {
                 req.once("timeout", () => {
                     req.destroy();
                     resolve(
-                        new Error(
-                            `[httpsClient]: Connection Timeout Exceeded ${opts.hostname}:${opts.port || 443}`
-                        )
+                        new Error(`[httpsClient]: Connection Timeout Exceeded ${opts.hostname}:${opts.port || 443}`)
                     );
                 });
 
@@ -162,11 +150,11 @@ abstract class Request {
                     if (err?.name?.match(/routines:ssl3_get_record:decryption/)) throw new Error("Failed to connect to Proxy!");
 
                     req.destroy();
-                    resolve(
-                        new Error(
-                            `[httpsClient]: Connection Error: ${err.message}`
-                        )
-                    );
+                    // Исправлено: Вместо throw возвращаем ошибку через Promise, предотвращая краш приложения
+                    if (err?.name?.match(/routines:ssl3_get_record:decryption/)) {
+                        return resolve(new Error("[httpsClient]: Failed to connect to Proxy!"));
+                    }
+                    resolve(new Error(`[httpsClient]: Connection Error: ${err.message}`));
                 });
 
                 // Завершаем запрос (отправляем заголовки и тело, если не отправлено ранее)
@@ -192,7 +180,7 @@ abstract class Request {
      */
     private get generateRandomUserAgent(): string {
         // Генерируем новый User-Agent
-        const revision = Math.floor(Math.random() * 2) + 147; // Генерация числа около 140
+        const revision = Math.floor(Math.random() * 2) + 147;
         const OS = ["X11; Linux x86_64", "Windows NT 10.0; Win64; x64", "X11; Linux i686"];
         const randomOS = OS[Math.floor(Math.random() * OS.length)];
 
@@ -205,8 +193,7 @@ abstract class Request {
      * @constructor
      * @public
      */
-    public constructor(options: httpsClient["data"]) {
-        // Извлекаем url и userAgent отдельно, остальное сохраняем как переопределяемые поля
+    public constructor(options: Request["data"]) {
         const { url, userAgent, agent, ...baseOptions } = options;
 
         // Парсим URL и получаем компоненты (если URL передан)
@@ -249,6 +236,15 @@ abstract class Request {
             headers,
         };
     };
+
+    /**
+     * @description Получаем протокол ссылки
+     * @returns httpsRequest | httpRequest
+     * @private
+     */
+    private getProtocolRequest(protocol?: string) {
+        return protocol === "https:" ? httpsRequest : httpRequest;
+    };
 }
 
 /**
@@ -273,10 +269,13 @@ export class httpsClient extends Request {
             if (response instanceof Error) {
                 return resolve({
                     statusCode: undefined,
-                    statusMessage: `${response}`,
+                    statusMessage: response.message,
                     headers: {}
                 });
             }
+
+            // Потребляем поток (даже пустой для HEAD), чтобы освободить сокет в пул
+            response.resume();
 
             return resolve({
                 statusCode: response.statusCode,
@@ -297,20 +296,32 @@ export class httpsClient extends Request {
                 if (res instanceof Error) return resolve(res);
 
                 const encoding = res.headers["content-encoding"];
-                let decoder: BrotliDecompress | Gunzip | Deflate | IncomingMessage = res;
+                const streams: Array<any> = [res];
 
-                if (encoding === "br") decoder = res.pipe(createBrotliDecompress()  as any);
-                else if (encoding === "gzip") decoder = res.pipe(createGunzip()     as any);
-                else if (encoding === "deflate") decoder = res.pipe(createDeflate() as any);
+                // Настраиваем цепочку декомпрессии
+                if (encoding === "br") streams.push(createBrotliDecompress());
+                else if (encoding === "gzip") streams.push(createGunzip());
+                else if (encoding === "deflate") streams.push(createDeflate());
 
-                const chunks: string[] = [];
-                decoder.setEncoding("utf-8")
-                    .on("data", (c: string) => chunks.push(c))
-                    .once("end", () => resolve(chunks.join("")))
-                    .once("error", (err) => resolve(Error(`[httpsClient]: Decoding Error: ${err.message}`)));
-            }).catch((err) => {
-                return resolve(err);
-            });
+                const chunks: Buffer[] = [];
+
+                // Используем безопасный pipeline для предотвращения утечек памяти при декомпрессии
+                pipeline(
+                    streams[0],
+                    ...(streams.slice(1) as []),
+                    (err) => {
+                        if (err) {
+                            return resolve(Error(`[httpsClient]: Decoding Error: ${err.message}`));
+                        }
+                        const buffer = Buffer.concat(chunks);
+                        resolve(buffer.toString("utf-8"));
+                    }
+                );
+
+                // Собираем бинарные фреймы (безопаснее, чем строковые, во избежание разрывов мульти байтовых UTF-8 символов)
+                const targetStream = streams[streams.length - 1];
+                targetStream.on("data", (chunk: Buffer) => chunks.push(chunk));
+            }).catch((err) => resolve(err));
         });
     };
 
@@ -324,19 +335,17 @@ export class httpsClient extends Request {
             this.toString.then((body) => {
                 if (body instanceof Error) return resolve(body);
 
-                try {
-                    // Добавляем проверку на пустой/короткий body
-                    if (typeof body !== 'string' || body.trim().length === 0) {
-                        return resolve(Error(`Empty response body from ${this.data.hostname}`));
-                    }
+                // Добавляем проверку на пустой/короткий body
+                if (typeof body !== "string" || body.trim().length === 0) {
+                    return resolve(Error(`Empty response body from ${this.data.hostname}`));
+                }
 
+                try {
                     return resolve(JSON.parse(body));
                 } catch {
                     return resolve(Error(`Invalid json response body at ${this.data.hostname}`));
                 }
-            }).catch((err) => {
-                return resolve(err);
-            });
+            }).catch((err) => resolve(err));
         });
     };
 
@@ -360,10 +369,9 @@ export class httpsClient extends Request {
                 // Если нет данных xml в странице
                 if (!items) return resolve([]);
 
-                // ⚡️ Ускорение: Используем map с try/catch для обработки ошибок парсинга
                 const filtered = items
                     .map(tag => tag.replace(/<\/?[^<>]+>/gi, "").trim())
-                    .filter(text => text.length > 0); // Проверка на пустую строку через length
+                    .filter(text => text.length > 0);
 
                 return resolve(filtered);
             } catch (error) {
@@ -386,7 +394,7 @@ export class httpsStatusCode {
      * @public
      */
     public static parse = ({ statusCode, statusMessage }: httpsClient_head): Error | null => {
-        if (statusCode < 400 && statusCode >= 200) return null;
+        if (statusCode && statusCode < 400 && statusCode >= 200) return null;
 
         // Статус коды
         switch (statusCode) {
@@ -400,7 +408,6 @@ export class httpsStatusCode {
                 return Error(`[403]: Access forbidden due to restrictions`);
         }
 
-        // Если неизвестный статус код
-        return Error(`[${statusCode}]: ${statusMessage}`);
+        return Error(`[${statusCode || "Unknown"}]: ${statusMessage || "Unknown Error"}`);
     };
 }

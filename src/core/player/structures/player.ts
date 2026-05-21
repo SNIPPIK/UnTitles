@@ -530,9 +530,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         }
         this._audio.destroy();
 
-        // Сбрасываем тайм-аут и таймер
-        this._timer.timer = null;
-        this._timer.timeout = 0; // теперь числовой 0
+        // Устанавливаем время паузы (Для предотвращения рассинхрона Jitter)
+        this._timer.timeout = Date.now();
 
         // Переводим плеер в режим ожидания
         this._status = AudioPlayerState.idle;

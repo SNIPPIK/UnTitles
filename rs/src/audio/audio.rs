@@ -65,7 +65,7 @@ pub struct AudioEngine {
     /// Логическая позиция воспроизведения (количество выданных наружу пакетов).
     /// Атомарная, инкрементируется при get_packet / get_packets.
     /// Не синхронизирована с буфером – может расходиться, если буфер очистили.
-    position: Arc<AtomicUsize>,
+    position: Arc<AtomicUsize>
 }
 
 #[napi]
@@ -89,7 +89,7 @@ impl AudioEngine {
             pause_state: Arc::new((Mutex::new(false), Condvar::new())),
             buffer: Arc::new(Mutex::new(RingBuffer::new(capacity))),
             max_capacity: capacity,
-            position: Arc::new(AtomicUsize::new(0)),
+            position: Arc::new(AtomicUsize::new(0))
         }
     }
 
@@ -177,14 +177,11 @@ impl AudioEngine {
         let handle = thread::spawn(move || {
             // Буферизованный ридер: буфер 64KB уменьшает количество syscall'ов.
             let mut reader = BufReader::with_capacity(65536, stdout);
-
             let mut parser = OggOpusParser::new();
-
             let mut read_buf = [0u8; 16384];
-
             let mut first_packet_received = false;
 
-            // Переиспользуемые векторы, чтобы не аллоцировать на каждой итерации.
+            // Используем векторы повторно, чтобы не аллоцировать на каждой итерации.
             let mut frames = Vec::with_capacity(64);
             let mut pending_push = Vec::with_capacity(128);
 
@@ -226,11 +223,12 @@ impl AudioEngine {
 
                         pending_push.clear();
 
-                        // Первые SILENT_FRAMES пакетов – тишина, чтобы аудиоустройство успело инициализироваться.
+                        // Первые SILENT_FRAMES пакетов – тишина, чтобы аудио успело инициализироваться.
                         if !first_packet_received {
                             for _ in 0..SILENT_FRAMES {
                                 pending_push.push(SILENT_FRAME.to_vec());
                             }
+                            
                             first_packet_received = true;
                         }
 

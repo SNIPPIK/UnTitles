@@ -167,9 +167,22 @@ class RestWorker<T extends APIRequestsKeys> {
 
             // Обработка ошибок — пересоздаём воркер
             worker.once("error", async (error) => {
-                console.error(error);
+                Logger.log("ERROR", error);
+
+                // Если в этот момент появились запросы
+                for (let [key, value] of this.pending) {
+                    value.resolve({
+                        requestId: key,
+                        status: "error",
+                        result: Error("Worker has dead, need a retry request!")
+                    });
+                }
+
+                this.pending.clear(); // Очищаем Map
+
                 // Уничтожаем текущий экземпляр
                 await worker.destroy();
+
                 // Перезапускаем через задержку
                 setTimeout(() => this.init(), 2000);
             });
@@ -310,7 +323,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
 
                             // Если пришел плейлист
                             else if (typeof result === "object" && "items" in result) {
-                                return resolve({ ...result, items: result.items.map(parseTrack) } as any);
+                                return resolve({ ...result, items: result.items.map(parseTrack) } as APIRequests<T>);
                             }
 
                             // Если просто трек

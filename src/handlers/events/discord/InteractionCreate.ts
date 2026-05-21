@@ -1,9 +1,8 @@
 import { Colors, SelectMenuInteract, AnyCommandInteraction } from "#structures/discord/index.js";
+import { AutocompleteInteraction, ButtonInteraction, Events, InteractionType } from "discord.js";
 import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events/index.js";
-import { AutocompleteInteraction, ButtonInteraction } from "discord.js";
-import { ChannelType, Events, InteractionType } from "discord.js";
+import { CommandOptionsType, SubCommand } from "#handler/commands/index.js";
 import { MiddlewareResult } from "#handler/middlewares/index.js";
-import { SubCommand } from "#handler/commands/index.js";
 import { Logger, locale } from "#structures";
 import { db } from "#app/db";
 
@@ -73,7 +72,7 @@ class Interaction extends Event<Events.InteractionCreate> {
         }
 
         // Проверка прав
-        if (command.permissions && isBased(ctx) === "guild") {
+        if (command.permissions && ctx.inGuild()) {
             const { user: userPerms, client: botPerms } = command.permissions;
             const memberPerm = ctx.member?.permissions;
 
@@ -132,7 +131,7 @@ class Interaction extends Event<Events.InteractionCreate> {
 
         if (!args.length) return null;
 
-        const subName = ctx.options["_subcommand"];
+        const subName = ctx.options["_subcommand"] as string;
         // Проходим по опциям команды один раз
         for (const opt of command.options) {
             // Проверяем, подходит ли нам эта опция по имени или по наличию autocomplete
@@ -236,28 +235,13 @@ function checkMiddlewares(ctx: Interaction, middlewares: string[]): boolean {
  * ```
  */
 function parseArgs(ctx: AnyCommandInteraction | AutocompleteInteraction): string[] {
-    return ctx.options?.["_hoistedOptions"]?.map(f => f.name === "type" ? f.value : f[f.name] ?? f.value) ?? [];
-}
-
-/**
- * @author SNIPPIK
- * @description Получаем тип канала, для работы все сервера
- * @function isBased
- */
-function isBased(ctx: AnyCommandInteraction) {
-    const type = ctx.channel?.type;
-
-    // Проверяем на наличие типа канала
-    if (type !== undefined) {
-        // Если используется на сервере
-        if (type === ChannelType.GuildText || type === ChannelType.GuildAnnouncement || type === ChannelType.GuildStageVoice || type === ChannelType.GuildVoice) return "guild";
-
-        // Если используется в личном чате
-        else if (type === ChannelType.PrivateThread) return "private";
-    }
-
-    // Если используется на стороннем сервере
-    return "public";
+    return ctx.options["data"].map(opt => {
+        // Если это саб команда, аргументы лежат внутри её options
+        if (opt.type === CommandOptionsType.Subcommand && opt.options) {
+            return opt.options.map(subOpt => subOpt.value);
+        }
+        return opt.value;
+    }).flat(); // Выравниваем массив, если были вложенные опции
 }
 
 /**

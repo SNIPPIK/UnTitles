@@ -114,13 +114,13 @@ export class VoiceAdapter {
     public clients = new SetArray<string>();
 
     /** Пакеты для работы с голосовым подключением */
-    public packet = {
+    public packet: {
         /** Пакет состояния на сервере */
-        server: null as GatewayVoiceServerUpdateDispatchData,
+        server: GatewayVoiceServerUpdateDispatchData,
 
         /** Пакет текущего голосового состояния */
-        state: null as GatewayVoiceStateUpdateDispatchData
-    };
+        state: GatewayVoiceStateUpdateDispatchData
+    } = { server: null, state: null };
 
     /**
      * @description Отправка данных о голосовом состоянии в Discord
