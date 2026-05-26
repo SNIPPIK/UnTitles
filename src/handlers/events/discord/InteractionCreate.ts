@@ -1,8 +1,8 @@
 import { Colors, SelectMenuInteract, AnyCommandInteraction } from "#structures/discord/index.js";
 import { AutocompleteInteraction, ButtonInteraction, Events, InteractionType } from "discord.js";
 import { DeclareEvent, Event, EventOn, SupportEventCallback } from "#handler/events/index.js";
-import { CommandOptionsType, SubCommand } from "#handler/commands/index.js";
 import { MiddlewareResult } from "#handler/middlewares/index.js";
+import { SubCommand } from "#handler/commands/index.js";
 import { Logger, locale } from "#structures";
 import { db } from "#app/db";
 
@@ -68,6 +68,7 @@ class Interaction extends Event<Events.InteractionCreate> {
 
         // Проверка middleware
         if (command.middlewares?.length > 0) {
+            // Прогон команды через систему Middlewares
             if (!checkMiddlewares(ctx as any, command.middlewares)) return;
         }
 
@@ -132,6 +133,7 @@ class Interaction extends Event<Events.InteractionCreate> {
         if (!args.length) return null;
 
         const subName = ctx.options["_subcommand"] as string;
+
         // Проходим по опциям команды один раз
         for (const opt of command.options) {
             // Проверяем, подходит ли нам эта опция по имени или по наличию autocomplete
@@ -175,6 +177,7 @@ class Interaction extends Event<Events.InteractionCreate> {
 
         // Делаем проверку ограничений
         if (middlewares?.length > 0) {
+            // Прогон команды через систему Middlewares
             if (!checkMiddlewares(ctx as any, middlewares)) return;
         }
 
@@ -204,6 +207,7 @@ class Interaction extends Event<Events.InteractionCreate> {
 function checkMiddlewares(ctx: Interaction, middlewares: string[]): boolean {
     for (const name of middlewares) {
         const rule = db.middlewares.map.get(name);
+        
         // Если правило существует и его проверка не пройдена – возвращаем false
         if (rule && rule.callback(ctx as any) === MiddlewareResult.fail) return false;
     }
@@ -235,13 +239,7 @@ function checkMiddlewares(ctx: Interaction, middlewares: string[]): boolean {
  * ```
  */
 function parseArgs(ctx: AnyCommandInteraction | AutocompleteInteraction): string[] {
-    return ctx.options["data"].map(opt => {
-        // Если это саб команда, аргументы лежат внутри её options
-        if (opt.type === CommandOptionsType.Subcommand && opt.options) {
-            return opt.options.map(subOpt => subOpt.value);
-        }
-        return opt.value;
-    }).flat(); // Выравниваем массив, если были вложенные опции
+    return ctx.options?.["_hoistedOptions"]?.map(f => f.name === "type" ? f.value : f[f.name] ?? f.value) ?? [];
 }
 
 /**

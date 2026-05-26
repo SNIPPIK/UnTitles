@@ -26,7 +26,8 @@ export namespace RestClientSide {
         payload: string;
 
         /** Дополнительные опции, например, { audio: true } для получения прямой ссылки */
-        options?: { 
+        options?: {
+            /** Надо ли получить аудио вместе с запросом */
             audio?: boolean;
         };
     }

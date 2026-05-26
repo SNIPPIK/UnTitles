@@ -154,16 +154,12 @@ export abstract class handler<T = unknown> {
                 continue;
             }
 
-            if (entry.isFile()) {
+            else if (entry.isFile()) {
                 // Фильтрация по расширению
-                if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) {
-                    continue;
-                }
+                if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) continue;
 
                 // Игнорирование индексных файлов (предполагается, что они являются точками входа)
-                if (entry.name.startsWith("index")) {
-                    continue;
-                }
+                else if (entry.name.startsWith("index")) continue;
 
                 await this._push(fullPath);
             }
@@ -191,16 +187,20 @@ export abstract class handler<T = unknown> {
         const url = pathToFileURL(filePath).href;
         const imported = await import(url);
 
+        // Если нет данных для загрузки
         if (!imported?.default) {
-            return this.onRunFail(new Error(`Missing default export in ${filePath}`));
+            return this.onRunFail(Error(`Missing default export in ${filePath}`));
         }
 
         const defaultExport = imported.default;
+        
+        // Если получен список
         if (Array.isArray(defaultExport)) {
             for (const item of defaultExport) this._init(item);
-        } else {
-            this._init(defaultExport);
-        }
+        } 
+        
+        // Если получен объект
+        else this._init(defaultExport);
     };
 
     /**
@@ -226,11 +226,13 @@ export abstract class handler<T = unknown> {
             // Создаём экземпляр класса
             const instance = new exported();
             this._files.add(instance);
+
             // Сохраняем по имени, если оно определено (например, Command.name)
             if (instance.name) this.map.set(instance.name, instance);
         } else {
             // Обычный объект или функция – добавляем напрямую
             this._files.add(exported);
+
             // Если объект имеет строковое свойство "name", тоже сохраняем в карту
             if (exported?.["name"]) this.map.set(exported["name"], exported);
         }

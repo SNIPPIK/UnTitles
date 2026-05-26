@@ -1,3 +1,4 @@
+use crate::timers::scheduler::cycle_manager::{TICK_INTERVAL_MS};
 use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -12,7 +13,7 @@ use aes_gcm::{
 
 /// Приращение временной метки RTP для одного пакета.
 /// Рассчитывается как `48000 samples/sec * 0.02 sec = 960 samples` для кадров Opus длительностью 20 мс.
-const TIMESTAMP_INC: u32 = 960;
+const TIMESTAMP_INC: u64 = 48000 * TICK_INTERVAL_MS / 1000;
 
 /// Размер стандартного заголовка RTP в байтах (без CSRC и расширений).
 const RTP_HEADER_SIZE: usize = 12;
@@ -56,7 +57,7 @@ impl From<CryptoError> for Error {
 /// Внутренние параметры шифрования (пока только SSRC, в будущем можно расширить).
 #[derive(Clone)]
 struct EncryptorOptions {
-    ssrc: u32,
+    ssrc: u32
 }
 
 /// Объект RTP-сокета для голоса, доступный из JavaScript.
@@ -209,7 +210,7 @@ impl VoiceRTPSocket {
         let seq = self.sequence.fetch_add(1, Ordering::SeqCst);
         header[2..4].copy_from_slice(&seq.to_be_bytes());
 
-        let ts = self.timestamp.fetch_add(TIMESTAMP_INC, Ordering::SeqCst);
+        let ts = self.timestamp.fetch_add(TIMESTAMP_INC as u32, Ordering::SeqCst);
         header[4..8].copy_from_slice(&ts.to_be_bytes());
 
         header[8..12].copy_from_slice(&self.options.ssrc.to_be_bytes());

@@ -67,10 +67,11 @@ export class HeartbeatManager {
         if (intervalMs) this.intervalMs = intervalMs;
 
         // Устанавливаем интервал отправки heartbeat
-        this.interval = setInterval(() => {
+        this.interval = setTimeout(() => {
             this.lastSentTime = Date.now();
             this.hooks?.send?.(this.lastSentTime); // отправляем heartbeat
             this.setTimeout(); // запускаем ожидание ack
+            this.start();
         }, this.intervalMs);
     };
 

@@ -138,6 +138,18 @@ export class QueueMessage<T extends CommandInteraction> {
     };
 }
 
+
+/**
+ *  Хелпер для обновления кнопки
+ *
+ *  @const setButton
+ */
+const setButton = (btn: any, { disabled, style, emoji }: { disabled?: boolean; style?: number; emoji?: any }) => {
+    if (disabled !== undefined) btn.disabled = disabled;
+    if (style !== undefined) btn.style = style;
+    if (emoji !== undefined) btn.emoji = emoji;
+};
+
 /**
  * @author SNIPPIK
  * @description Класс для создания компонентов-кнопок
@@ -239,13 +251,6 @@ export class QueueButtons {
         const currentRepeatType = player.tracks.repeat;
         const hasFilters = player.filters.size > 0;
 
-        // Хелпер для обновления кнопки
-        const setButton = (btn: any, { disabled, style, emoji }: { disabled?: boolean; style?: number; emoji?: any }) => {
-            if (disabled !== undefined) btn.disabled = disabled;
-            if (style !== undefined) btn.style = style;
-            if (emoji !== undefined) btn.emoji = emoji;
-        };
-
         // 🔀 Shuffle
         setButton(firstRow[0], {
             disabled: !isMultipleTracks,
@@ -307,6 +312,7 @@ export class QueueButtons {
         const id = env.get(name);
         const int = parseInt(id);
 
+        // Если ID не числовой
         if (isNaN(int)) return { name: `${id}` };
         return { id };
     };

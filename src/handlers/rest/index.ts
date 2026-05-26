@@ -197,6 +197,7 @@ class RestWorker<T extends APIRequestsKeys> {
                 worker.once("message", (data) => resolveFirst(data as any));
             });
 
+            // Чистим map
             this.map.clear();
             for (const api of this.array) {
                 if (api.auth !== null) {
@@ -276,6 +277,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
      * @private
      */
     private platform = (name: RestServerSide.API["name"] | string): RestServerSide.API => {
+        // Если не указана платформа
         if (!name) return this.random;
 
         const upperName = name.toUpperCase();
@@ -346,7 +348,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
                         // Если получен неожиданный ответ
                         default: {
                             Logger.log("WARN", `An unknown response was received from another thread!`);
-                            return resolve(new Error(`Unknown response!!!`))
+                            return resolve(Error(`Unknown response!!!`))
                         }
                     }
                 }

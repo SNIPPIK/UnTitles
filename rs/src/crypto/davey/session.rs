@@ -104,8 +104,8 @@ impl DaveSession {
     channel_id: String,
     key_pair: Option<SigningKeyPair>,
   ) -> Result<Self> {
-    let (pv, uid, cid, kp) =
-        Self::common_init(protocol_version, user_id, channel_id, key_pair)?;
+    let (pv, uid, cid, kp) = Self::common_init(protocol_version, user_id, channel_id, key_pair)?;
+
     Ok(DaveSession {
       inner: davey::DaveSession::new(pv, uid, cid, kp.as_ref()).map_err(Self::map_err)?,
     })
@@ -172,7 +172,7 @@ impl DaveSession {
   #[napi(js_name = "getSerializedKeyPackage")]
   pub fn get_serialized_key_package(&mut self) -> Result<Buffer> {
     let kp = self.inner.create_key_package().map_err(Self::map_err)?;
-    Ok(Buffer::from(kp)) // kp уже Vec<u8>, владение передаётся без копии
+    Ok(Buffer::from(kp))
   }
 
   /// Устанавливает данные внешнего отправителя (`External Sender`).
@@ -290,6 +290,7 @@ impl DaveSession {
     let mt = Self::map_media_type(media_type)?;
     let cd = Self::map_codec(codec)?;
     let out = self.inner.encrypt(mt, cd, &packet).map_err(Self::map_err)?;
+
     // Передаём владение, чтобы избежать лишнего копирования
     Ok(Buffer::from(out.as_ref()))
   }
@@ -388,7 +389,7 @@ impl DaveSession {
     self.inner.get_encryption_stats(None).map(|s| JsEncryptionStats {
       successes: s.successes,
       failures: s.failures,
-      attempts: s.attempts,
+      attempts: s.attempts
     })
   }
 
@@ -411,7 +412,7 @@ impl DaveSession {
       successes: s.successes as u32,
       failures: s.failures as u32,
       attempts: s.attempts as u32,
-      passthroughs: s.passthroughs as u32,
+      passthroughs: s.passthroughs as u32
     }))
   }
 }

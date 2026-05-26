@@ -1,7 +1,6 @@
 import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./transport/adapter.js";
 import { SpeakerType, VoiceSpeakerManager } from "#core/voice/structures/Speaker.js";
 import { Transport } from "#core/voice/transport/index.js";
-import { VoiceCloseCodes } from "discord-api-types/voice";
 import { TypedEmitter, Logger } from "#structures";
 
 /**
@@ -171,10 +170,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         // Слушаем если шлюз пытается выключиться по какой причине
         this.transport.on("close", (code, reason) => {
             Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${code}: ${reason}`);
-
-            //@ts-ignore
-            if (code !== VoiceCloseCodes.CallTerminated || code !== VoiceCloseCodes.SessionTimeout || code !== VoiceCloseCodes.SessionNoLongerValid) this.destroy();
         });
+
+        // Если транспортный слой будет уничтожен
+        this.transport.once("destroyed", this.destroy);
     };
 
     /**
@@ -189,15 +188,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     };
 
     /**
-     * @description Уничтожаем голосовое соединение
-     * @public
+     * @description Удаление голосового соединения без отключения от голосового канала
+     * @protected
      */
-    public destroy = () => {
-        this.emit("info", `[Voice/Cleaner] has destroyed`);
-        this.emit("disconnect");
-        this.disconnect();
-
-        if (this._status === ConnectionStatus.disconnected) return;
+    protected silent_destroy = () => {
+        if (this._status === ConnectionStatus.disconnected || !this.adapter) return;
         this.status = ConnectionStatus.disconnected;
         this.speaker.destroy();
 
@@ -212,6 +207,19 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         this.adapter = null;
         this.speaker = null;
         this._status = null;
+    };
+
+    /**
+     * @description Уничтожаем голосовое соединение
+     * @public
+     */
+    public destroy = () => {
+        if (this._status === ConnectionStatus.disconnected || !this.adapter) return;
+        this.emit("info", `[Voice/Cleaner] has destroyed`);
+        this.emit("disconnect");
+        this.disconnect();
+
+        this.silent_destroy();
     };
 }
 

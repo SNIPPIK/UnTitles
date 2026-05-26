@@ -10,7 +10,7 @@ import type { RestClientSide } from "./index.client.js";
  */
 export namespace RestServerSide {
     /**
-     * @description Пример класса с типами
+     * @description Запросы в формате Object
      * @type APIs
      * @public
      */
@@ -130,7 +130,11 @@ export namespace RestServerSide {
          * @protected
          */
         protected getID?(regexp: RegExp, query: string) {
-            return (regexp).exec(query);
+            try {
+                return (regexp).exec(query);
+            } catch {
+                return query?.split("/")?.at(-1);
+            }
         };
 
         /**
@@ -139,7 +143,7 @@ export namespace RestServerSide {
          * @protected
          */
         protected async API?(...args: any): Promise<Error | json> {
-            return new Error(`Not found method API | ${args}`);
+            return Error(`Not found method API | ${args}`);
         };
 
         /**

@@ -18,7 +18,7 @@ import { DAVELayer } from "#core/voice/transport/layers/DAVELayer.js";
  * @public
  */
 export class Transport extends TypedEmitter<TransportEvents> {
-    /** Текущее состояние транспорта (код + полезная нагрузка). */
+    /** Текущее состояние транспорта */
     private _state: TransportState = {
         code: TransportStateCode.Closed,
         payload: null
@@ -27,28 +27,33 @@ export class Transport extends TypedEmitter<TransportEvents> {
     /** Слой UDP соединения, ключевой класс для отправки пакетов */
     public _udp = new UDPLayer();
 
-    /** Слой RTP, ключевой класс для шифрования пакетов для отправки через UDP */
-    public _rtp = new RTPLayer();
-
     /** Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway */
     public _ws = new VoiceWebSocket();
 
-    /** Клиент Dave, для работы сквозного шифрования */
-    public _dave: DAVELayer;
+    /** Слой RTP, ключевой класс для шифрования пакетов для отправки через UDP */
+    private _rtp = new RTPLayer();
 
     /** SSRC (синхронизационный источник), полученный от Discord. */
     public ssrc: number;
 
-    /** Секретный ключ для AES-GCM шифрования */
-    public secret_key: number[];
+    /** Клиент Dave, для работы сквозного шифрования */
+    private _dave: DAVELayer;
+
+    /** Кол-во переподключений, требуется для безопасного отключения */
+    private reconnecting = 0;
 
     /**
-     * @description Готовность транспорта к передаче данных
+     * @description Готовность транспорта к безопасной передаче аудио-данных
      * @public
      */
     public get ready(): boolean {
-        return this._dave.ready && this._rtp.ready && this._udp.ready &&
-            this.state.code === TransportStateCode.Session;
+        // Используем опциональную цепочку, чтобы избежать TypeError, если транспорт уничтожен
+        return !!(
+            this._dave?.ready &&
+            this._rtp?.ready &&
+            this._udp?.ready &&
+            this._state.code === TransportStateCode.Session
+        );
     };
 
     /**
@@ -80,24 +85,23 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 const d = state.payload;
                 this.ssrc = d.ssrc;
 
-                this._udp.create(d).then((ws) => {
+                this._udp.create(d).then((discovery) => {
                     this.emit("info", "[Transport/UDP]: Getting out");
 
-                    if (ws instanceof Error) {
-                        this.emit("close", VoiceCloseCodes.ServerNotFound, ws);
+                    if (discovery instanceof Error) {
+                        this.emit("close", VoiceCloseCodes.ServerNotFound, discovery);
                         this.emit("info", `[Transport/UDP]: Bad Discovery handshake`);
                         this.destroy();
                         return;
                     }
 
-                    this.emit("info", `[Transport/UDP]: Good Discovery handshake | ${ws.ip}:${ws.port}`);
+                    this.emit("info", `[Transport/UDP]: Good Discovery handshake | ${discovery.address}:${discovery.port}`);
                     this._ws.packet = {
                         op: VoiceOpcodes.SelectProtocol,
                         d: {
                             protocol: "udp",
                             data: {
-                                address: ws.ip,
-                                port: ws.port,
+                                ...discovery,
                                 mode: "aead_aes256_gcm_rtpsize"
                             }
                         }
@@ -109,9 +113,6 @@ export class Transport extends TypedEmitter<TransportEvents> {
             // Получение данных о сессии
             case TransportStateCode.Session: {
                 const d = state.payload;
-
-                // Сохраняем ключ, для повторного использования
-                this.secret_key = d.secret_key;
 
                 // Инициализируем RTP (AES)
                 this._rtp.create(this.ssrc, d.secret_key);
@@ -175,7 +176,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @private
      */
     public connect = (endpoint: string) => {
-        const last_seq = this._ws?.sequence;
+        // Сохраняем прошлую последовательность до очистки старого сокета
+        const last_seq = this._ws?.sequence ?? -1;
 
         if (this._ws) {
             this._ws.removeAllListeners();
@@ -183,14 +185,10 @@ export class Transport extends TypedEmitter<TransportEvents> {
             this._ws = null;
         }
 
+        // Создаем новый экземпляр сокета
         this._ws = new VoiceWebSocket();
 
-        if (last_seq >= 0) {
-            this._ws.sequence = last_seq;
-            this._ws.emit("resumed");
-        }
-
-        this._ws.connect(endpoint); // Подключаемся к endpoint
+        // --- РЕГИСТРАЦИЯ СОБЫТИЙ (Строго ДО вызова методов отправки/подключения) ---
 
         /**
          * @description Отправляем Identify данные, для регистрации голосового подключения
@@ -237,6 +235,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @code 2
          */
         this._ws.on("ready", ({d}) => {
+            this.reconnecting = 0; // Делаем сброс попыток
+
             this.state = {
                 code: TransportStateCode.Ready,
                 payload: d
@@ -266,29 +266,20 @@ export class Transport extends TypedEmitter<TransportEvents> {
             // Сообщаем что хотим переподключится
             this.emit("close", code, `[Transport/WS]: ${reason}`);
 
-            // Если можно возобновить подключение
-            if ((code === 4_015 || code < 4_000) && this.ready) {
-                this.state = {
-                    code: TransportStateCode.OpeningWs,
-                    payload: code
-                };
+            // Если достигли лимита попыток
+            if (this.reconnecting >= 3 || !this.reconnecting) {
+                this.destroy();
                 return;
             }
 
-            else if (code !== VoiceCloseCodes.SessionNoLongerValid && code !== VoiceCloseCodes.ServerNotFound) {
-                // Если соединение не было закрыто собственноручно
-                if (this.state.code !== TransportStateCode.Closed) {
-                    // Пробуем поднять соединение заново
-                    this.state = {
-                        code: TransportStateCode.OpeningWs,
-                        payload: code
-                    };
-                    return;
-                }
-            }
+            // Добавляем попытку
+            this.reconnecting++;
 
-            // Если нет больше методов подъема соединения, то уничтожаем транспортный канал окончательно
-            this.destroy();
+            // Пробуем поднять соединение заново
+            this.state = {
+                code: TransportStateCode.OpeningWs,
+                payload: code
+            };
         });
 
         /**
@@ -309,6 +300,17 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 for (const id of d.user_ids) this.adapter.clients.add(id);
             }
         });
+
+        // --- ЗАПУСК ПОДКЛЮЧЕНИЯ ---
+
+        // Передаем сохраненную последовательность новому сокету
+        if (last_seq >= 0) {
+            this._ws.sequence = last_seq;
+            // Теперь это выполнится безопасно, так как слушатель "resumed" уже зарегистрирован выше
+            this._ws.emit("resumed");
+        }
+
+        this._ws.connect(endpoint);
     };
 
     /**
@@ -318,22 +320,31 @@ export class Transport extends TypedEmitter<TransportEvents> {
     public destroy = () => {
         this.emit("destroyed", VoiceCloseCodes.CallTerminated);
         this._state.code = TransportStateCode.Closed;
-        super.destroy();
 
-        // Сносим голосовое подключение
-        db.voice.remove(this.adapter.packet.state.guild_id);
+        setImmediate(() => {
+            // Безопасный вызов родительского destroy, если он существует в TypedEmitter
+            if (typeof super.destroy === "function") {
+                super.destroy();
+            }
 
-        // Использование Optional Chaining для безопасного вызова
-        this._ws?.destroy?.();
-        this._udp?.destroy?.();
-        this._rtp?.destroy?.();
-        this._dave?.destroy?.();
+            // Удаляем информацию о сессии из глобальной/импортируемой БД
+            if (this.adapter.packet?.state?.guild_id) {
+                db.voice.remove(this.adapter.packet.state.guild_id);
+            }
 
-        // Nullify
-        this._rtp = null;
-        this._ws = null;
-        this._udp = null;
-        this._dave = null;
+            // Безопасный вызов деструкторов внутренних слоев
+            this._ws?.destroy?.();
+            this._udp?.destroy?.();
+            this._rtp?.destroy?.();
+            this._dave?.destroy?.();
+
+            // Nullify для предотвращения утечек памяти
+            this._rtp = null;
+            this._ws = null;
+            this._udp = null;
+            this._dave = null;
+            this.reconnecting = null;
+        });
     };
 }
 

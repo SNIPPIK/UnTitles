@@ -82,6 +82,14 @@ impl UdpBufferedInner {
                 }
             }
         }
+
+        // Время последней отправки
+        let last_send = self.last_send_ms.load(Ordering::SeqCst);
+
+        // Если время превышает норму
+        if now.saturating_sub(last_send) >= 22 {
+            self.send_drops.fetch_add(1, Ordering::SeqCst);
+        }
     }
 
     /// Тот же tick, но для поддержания подключения через системы NAT
@@ -152,7 +160,7 @@ impl UdpBuffered {
             socket: Arc::new(socket),
             buffer: RingBuffer::new(1024),
             send_drops: AtomicUsize::new(0),
-            last_send_ms: AtomicU64::new(now_ms()),
+            last_send_ms: AtomicU64::new(0),
             counter: AtomicU32::new(0),
         });
 

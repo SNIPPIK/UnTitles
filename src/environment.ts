@@ -14,7 +14,7 @@ export class Environment {
             process?.["loadEnvFile"]?.(".env");
         } catch (error) {
             const path = __dirname.split(/\|\//);
-            throw new Error(`[Environment] has not found .env file in directory ${path.splice(path.length, 1).join("/")}`);
+            throw Error(`[Environment] has not found .env file in directory ${path.splice(path.length, 1).join("/")}`);
         }
     };
 
@@ -29,10 +29,11 @@ export class Environment {
 
         // Если нет параметра в файле .env
         if (!env) {
+            // Если есть безопасный параметр, то передаем его вместо ошибки
             if (safe !== undefined) return safe;
 
             // Если нет <safe> параметра
-            throw new Error(`[Environment] Not found key ${name} in .env file`);
+            throw Error(`[Environment] Not found key ${name} in .env file`);
         }
 
         // Если параметр имеет правду
@@ -73,6 +74,6 @@ export var env: Environment;
     try {
         env = new Environment();
     } catch (err) {
-        throw new Error(`Fail init environment: ${err}`);
+        throw Error(`Fail init environment: ${err}`);
     }
 })();

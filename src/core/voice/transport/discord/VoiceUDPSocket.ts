@@ -135,16 +135,16 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     private handleMessage = (msg: Buffer): void => {
         // Проверка discovery-пакета (RFC для Discord Voice)
         if (msg && msg.length === 74 && msg.readUInt16BE(0) === 2) {
-            const ip = msg.subarray(8, msg.indexOf(0, 8)).toString("utf8");
+            const address = msg.subarray(8, msg.indexOf(0, 8)).toString("utf8");
             const port = msg.readUInt16BE(msg.length - 2);
 
-            if (!isIPv4(ip)) {
+            if (!isIPv4(address)) {
                 // Если не удалось получить IPv4
-                this.emit("discovery", new Error("Not found IPv4 address"));
+                this.emit("discovery", Error("Not found IPv4 address"));
             } else {
                 // Если данные для подключения были получены
                 this._status = VoiceUDPSocketStatuses.connected;
-                this.emit("discovery", { ip, port });
+                this.emit("discovery", { address, port });
             }
             return;
         }
@@ -215,11 +215,25 @@ export interface UDPSocketEvents {
     readonly "message": (message: Buffer) => void;
 
     /** Получен discovery-пакет (передаётся объект с IP/port или ошибка) */
-    readonly "discovery": (options: { ip: string; port: number } | Error) => void;
+    readonly "discovery": (options: handshake | Error) => void;
 
     /** Произошла ошибка (например, при отправке) */
     readonly "error": (error: Error) => void;
 
     /** Сокет закрыт (вызывается после `destroy`) */
     readonly "close": () => void;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Данные для подключения по UDP
+ * @interface handshake
+ * @public
+ */
+export interface handshake {
+    /** Адресс UDP подключения */
+    address: string;
+
+    /** Порт для подключения */
+    port: number;
 }

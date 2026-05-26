@@ -94,7 +94,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                     return track;
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -148,7 +148,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                     if (!cache) sdb.meta_saver?.set?.(album, `${this.url}/album`);
                     return album;
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -182,7 +182,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                         items: tracks
                     };
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -210,7 +210,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                     return (api.trackList).map(this.track);
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -233,7 +233,7 @@ class RestSpotifyAPI extends RestServerSide.API {
 
                     return api.tracks.items.map(this.track);
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         }*/

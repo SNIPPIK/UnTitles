@@ -24,7 +24,7 @@ export class Middlewares<T = middleware<CommandInteraction | ButtonInteraction |
      * @public
      */
     public get array() {
-        return this.files.values();
+        return this.files.array;
     };
 
     /**

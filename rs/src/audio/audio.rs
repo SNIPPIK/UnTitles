@@ -77,7 +77,6 @@ impl AudioEngine {
     #[napi(constructor)]
     pub fn new(max_minutes: u32) -> Self {
         // Расчёт ёмкости буфера: 50 пакетов/сек * 60 сек * минуты.
-        // Почему 50? Opus в Ogg контейнере обычно идёт с частотой кадров 50 Гц (20 мс фреймы).
         // Ну и 1500 – минимальный размер буфера (чтобы не создавать слишком маленький).
         let capacity = (50 * 60 * max_minutes).max(1500) as usize;
 
@@ -113,14 +112,10 @@ impl AudioEngine {
             if let Some(src) = args.get(pos + 1) {
                 if src.starts_with("http") {
                     let reconnect = [
-                        "-reconnect",
-                        "1",
-                        "-reconnect_streamed",
-                        "1",
-                        "-reconnect_delay_max",
-                        "5",
-                        "-reconnect_on_network_error",
-                        "1",
+                        "-reconnect",                   "1",
+                        "-reconnect_streamed",          "1",
+                        "-reconnect_delay_max",         "5",
+                        "-reconnect_on_network_error",  "1",
                     ]
                         .iter()
                         .map(|s| s.to_string());
@@ -136,13 +131,10 @@ impl AudioEngine {
         // -loglevel error – только ошибки, stdout чистый от логов.
         // -nostdin – запрещаем интерактивный ввод.
         let mut final_args = vec![
-            "-analyzeduration",
-            "0",
-            "-probesize",
-            "32",
-            "-vn",
-            "-loglevel",
-            "error",
+            "-analyzeduration",      "0",
+            "-probesize",            "32",
+            "-vn",            
+            "-loglevel",             "error",            
             "-nostdin",
             "-hide_banner",
         ]
@@ -172,7 +164,6 @@ impl AudioEngine {
         let active = Arc::clone(&self.reading_active);
         let pause_state = Arc::clone(&self.pause_state);
         let buffer_ptr = Arc::clone(&self.buffer);
-        let max_cap = self.max_capacity;
 
         let handle = thread::spawn(move || {
             // Буферизованный ридер: буфер 64KB уменьшает количество syscall'ов.
@@ -243,13 +234,10 @@ impl AudioEngine {
                         // ===== Запись в кольцевой буфер =====
                         if !pending_push.is_empty() {
                             let buffer = buffer_ptr.lock().unwrap();
+
                             for packet in pending_push.drain(..) {
                                 // Если буфер переполнен (len >= max_cap), выбрасываем самый старый пакет (pop).
-                                // RingBuffer сам умеет отказывать при push, но здесь политика "drop oldest".
-                                // Это костыль: в идеале проверять buffer.is_full() и не пушить, но мы перестраховываемся.
-                                while buffer.len() >= max_cap {
-                                    buffer.pop();
-                                }
+                                if buffer.is_full() { buffer.pop(); }
                                 let _ = buffer.push(packet);
                             }
                         }
@@ -389,9 +377,8 @@ impl AudioEngine {
     #[napi(getter)]
     pub fn get_last_packet(&self) -> Option<Buffer> {
         let buffer = self.buffer.lock().unwrap();
-        if buffer.len() == 0 {
-            return None;
-        }
+        if buffer.len() == 0 { return None; }
+
         // get_clone_at требует внешней синхронизации – но мы уже внутри Mutex, так что безопасно.
         buffer.get_clone_at(buffer.len() - 1).map(Buffer::from)
     }
@@ -415,9 +402,10 @@ impl AudioEngine {
     #[napi]
     pub fn add_packet(&self, packet: Buffer) {
         let buffer = self.buffer.lock().unwrap();
-        while buffer.len() >= self.max_capacity {
-            buffer.pop();
-        }
+
+        // Если в буфере уже достигнут лимит
+        if buffer.is_full() { buffer.pop(); }
+
         let _ = buffer.push(packet.to_vec());
     }
 
@@ -426,9 +414,9 @@ impl AudioEngine {
     pub fn add_packets(&self, packets: Vec<Buffer>) {
         let buffer = self.buffer.lock().unwrap();
         for packet in packets {
-            while buffer.len() >= self.max_capacity {
-                buffer.pop();
-            }
+            // Если в буфере уже достигнут лимит
+            if buffer.is_full() { buffer.pop(); }
+
             let _ = buffer.push(packet.to_vec());
         }
     }

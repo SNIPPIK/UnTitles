@@ -32,11 +32,11 @@
     "binaryName": "watklok"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.47",
+    "discord-api-types": "^0.38.48",
     "discord.js": "15.0.0-dev.1777075897-40ce0791a",
     "http-proxy-agent": "^9.0.0",
     "socks-proxy-agent": "^10.0.0",
-    "ws": "^8.20.1"
+    "ws": "^8.21.0"
   },
   "optionalDependencies": {
     "bufferutil": "^4.1.0",

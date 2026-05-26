@@ -121,7 +121,7 @@ class RestAppleMusicAPI extends RestServerSide.API {
 
     // Авторизация через MusicKit Developer Token (JWT)
     protected async authorization(): Promise<Error | string> {
-        if (!this.auth) return new Error("Apple Music: developer token not set");
+        if (!this.auth) return Error("Apple Music: developer token not set");
 
         // Токен уже в env — просто кладём его
         this.options.token = this.auth;
@@ -149,7 +149,7 @@ class RestAppleMusicAPI extends RestServerSide.API {
                     if (api.errors) return resolve(locale.err("api.request.fail.msg", [api.errors[0].title]));
                     resolve(api);
                 })
-                .catch(err => resolve(new Error(`[AppleMusic]: ${err}`)));
+                .catch(err => resolve(Error(`[AppleMusic]: ${err}`)));
         });
     };
 

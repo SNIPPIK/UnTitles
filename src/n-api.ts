@@ -11,7 +11,7 @@ try {
         //@ts-ignore
         Native = (await import('../native/index.cjs'));
     } catch {
-        throw Error("Native layer has not found, pls download or build rust module!");
+        throw Error("Native layer has not found, need download or build rust module!");
     }
 }
 
@@ -210,7 +210,7 @@ export interface iUDPSocket {
      * регистрируется в глобальном балансировщике.
      *
      * # Аргументы
-     * * `remote_addr` - адрес удалённого хоста в формате "ip:port" (например, "127.0.0.1:12345").
+     * * `remote_addr` - адрес удалённого хоста в формате "address:port" (например, "127.0.0.1:12345").
      *
      * Сокет создаётся с неблокирующим режимом (set_nonblocking(true)), чтобы операции
      * send/recv не блокировали поток.
@@ -626,8 +626,8 @@ export const {
     UDPSocket,
     DAVESession
 } = Native as {
-    DAVESession:    NativeClass<iDAVESession>
-    VoiceRTPSocket: NativeClass<iVoiceRTPSocket>
-    AudioEngine:    NativeClass<iAudioEngine>,
-    UDPSocket:      NativeClass<iUDPSocket>,
+    DAVESession:    NativeClass<iDAVESession>;
+    VoiceRTPSocket: NativeClass<iVoiceRTPSocket>;
+    AudioEngine:    NativeClass<iAudioEngine>;
+    UDPSocket:      NativeClass<iUDPSocket>;
 };

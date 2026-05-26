@@ -178,7 +178,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     };
                 } catch (e) {
                     console.error(e);
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -233,7 +233,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     };
                 } catch (e) {
                     console.error(e);
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -317,7 +317,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     return track;
                 } catch (e) {
                     console.error(e);
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -360,7 +360,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     });
                 } catch (e) {
                     console.error(e);
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             },
         },
@@ -390,7 +390,7 @@ class RestYouTubeAPI extends RestServerSide.API {
                     return filtered_.map(({videoRenderer}: json) => this.track(videoRenderer));
                 } catch (e) {
                     console.error(e);
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         }
@@ -585,7 +585,7 @@ class RestYouTubeAPI extends RestServerSide.API {
         const status = endData.playabilityStatus?.status;
         if (status && status !== "OK") {
             const reason = endData.playabilityStatus?.reason || "Not found status error";
-            return new Error(locale._(locale.language, "api.request.fail.msg", [reason]));
+            return Error(locale._(locale.language, "api.request.fail.msg", [reason]));
         }
 
         return endData;

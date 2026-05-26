@@ -117,6 +117,6 @@ export function initDatabase(client: DiscordClient) {
     try {
         db = new Database(client);
     } catch (err) {
-        throw new Error(`Fail init database: ${err}`);
+        throw Error(`Fail init database: ${err}`);
     }
 }

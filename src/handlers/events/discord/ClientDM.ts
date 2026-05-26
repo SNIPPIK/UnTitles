@@ -33,6 +33,7 @@ class ClientDM extends Event<Events.MessageCreate> {
             }
         }
 
+        // Сообщаем GC что данное сообщение не требуется
         ctx = null;
     };
 }

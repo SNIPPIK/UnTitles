@@ -27,6 +27,7 @@ export interface httpsClient_head {
  * @abstract
  */
 abstract class Request {
+    /** Требуется если есть редирект */
     protected _redirect_url: string | null = null;
 
     /**
@@ -50,7 +51,6 @@ abstract class Request {
         sessionTimeout: 5e3,
         headers: {
             "Accept-Encoding": "gzip, deflate, br",
-            //"Connection": "keep-alive",
             "Priority": "u=5, i"
         }
     };
@@ -93,7 +93,7 @@ abstract class Request {
             const makeRequest = (opts: typeof options, redirectCount = 0) => {
                 // Строгий лимит редиректов (RFC)
                 if (redirectCount > 5) {
-                    return resolve(new Error(`[httpsClient]: Too many redirects`));
+                    return resolve(Error(`[httpsClient]: Too many redirects`));
                 }
 
                 // Создаём запрос с использованием протокола (http/https)
@@ -116,7 +116,7 @@ abstract class Request {
 
                             this._redirect_url = parsedUrl.href;
                         } catch (e) {
-                            return resolve(new Error(`[httpsClient]: Invalid redirect URL: ${newUrl}`));
+                            return resolve(Error(`[httpsClient]: Invalid redirect URL: ${newUrl}`));
                         }
 
                         // Потребляем поток старого ответа, чтобы избежать зависания сокетов
@@ -141,20 +141,22 @@ abstract class Request {
                 req.once("timeout", () => {
                     req.destroy();
                     resolve(
-                        new Error(`[httpsClient]: Connection Timeout Exceeded ${opts.hostname}:${opts.port || 443}`)
+                        Error(`[httpsClient]: Connection Timeout Exceeded ${opts.hostname}:${opts.port || 443}`)
                     );
                 });
 
                 // Обработка ошибок сокета (ECONNRESET, ENOTFOUND и т.п.)
                 req.once("error", (err) => {
-                    if (err?.name?.match(/routines:ssl3_get_record:decryption/)) throw new Error("Failed to connect to Proxy!");
+                    if (err?.name?.match(/routines:ssl3_get_record:decryption/)) throw Error("Failed to connect to Proxy!");
+
+                    // Вместо throw возвращаем ошибку через Promise, предотвращая краш приложения
+                    if (err?.name?.match(/routines:ssl3_get_record:decryption/)) {
+                        return resolve(Error("[httpsClient]: Failed to connect to Proxy!"));
+                    }
+
+                    resolve(Error(`[httpsClient]: Connection Error: ${err.message}`));
 
                     req.destroy();
-                    // Исправлено: Вместо throw возвращаем ошибку через Promise, предотвращая краш приложения
-                    if (err?.name?.match(/routines:ssl3_get_record:decryption/)) {
-                        return resolve(new Error("[httpsClient]: Failed to connect to Proxy!"));
-                    }
-                    resolve(new Error(`[httpsClient]: Connection Error: ${err.message}`));
                 });
 
                 // Завершаем запрос (отправляем заголовки и тело, если не отправлено ранее)
@@ -209,10 +211,10 @@ abstract class Request {
                 };
             } catch {
                 // URL невалидный – выбрасываем ошибку, чтобы избежать неопределённого поведения
-                throw new TypeError(`[httpsClient] Invalid URL: ${url}`);
+                throw TypeError(`[httpsClient] Invalid URL: ${url}`);
             }
         } else {
-            throw new Error("[httpsClient]: Not found URL");
+            throw Error("[httpsClient]: Not found URL");
         }
 
         // Готовим заголовки: базовые + User-Agent
@@ -310,9 +312,9 @@ export class httpsClient extends Request {
                     streams[0],
                     ...(streams.slice(1) as []),
                     (err) => {
-                        if (err) {
-                            return resolve(Error(`[httpsClient]: Decoding Error: ${err.message}`));
-                        }
+                        // Если получена ошибка
+                        if (err) return resolve(Error(`[httpsClient]: Decoding Error: ${err.message}`));
+
                         const buffer = Buffer.concat(chunks);
                         resolve(buffer.toString("utf-8"));
                     }

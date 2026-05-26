@@ -80,7 +80,7 @@ class rest_request extends Event<"rest/request"> {
            // Вставляем оригинального автора
            msg.author = ctx.user;
        } catch (err) {
-           console.log(err)
+           console.log(err);
        }
 
        /**
@@ -95,9 +95,9 @@ class rest_request extends Event<"rest/request"> {
            15_000,
 
            // Ошибка по таймауту
-           new Error(locale._(ctx.locale, "api.platform.timeout"))
+           Error(locale._(ctx.locale, "api.platform.timeout"))
        ).catch(() => {
-           return new Error("Request error");
+           return Error("Request error");
        });
 
        // Выполняем в конце

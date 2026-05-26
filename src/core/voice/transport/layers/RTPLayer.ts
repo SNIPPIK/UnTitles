@@ -17,7 +17,7 @@ export class RTPLayer extends BaseLayer<iType<typeof VoiceRTPSocket>> {
      */
     public packet = (frames: Buffer[]) => {
         let rtp = this._client.packets(frames);
-        if (!rtp) throw new Error("RTP packet creation failed after retries");
+        if (!rtp) throw Error("RTP packet creation failed after retries");
 
         return rtp;
     };
@@ -39,14 +39,5 @@ export class RTPLayer extends BaseLayer<iType<typeof VoiceRTPSocket>> {
             ssrc,
             new Uint8Array(secret_key) as any
         );
-    };
-
-    /**
-     * @description Метод удаления RTP слоя
-     * @public
-     */
-    public destroy = () => {
-        this._client.destroy();
-        this._client = null;
     };
 }

@@ -51,7 +51,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     public constructor(public options: SyncCycleConfig<T> | AsyncCycleConfig<T>) {
         super();
         if (options.duration <= 0) {
-            throw new Error("Duration must be a positive number");
+            throw Error("Duration must be a positive number");
         }
         this.lastDuration = options.duration;
     };

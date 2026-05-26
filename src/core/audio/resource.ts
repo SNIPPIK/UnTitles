@@ -5,6 +5,7 @@ import type { Track } from "#core/queue/index.js";
 import { TypedEmitter } from "#structures";
 import { env } from "#app/env";
 import { db } from "#app/db";
+import {clearTimeout} from "node:timers";
 
 /**
  * @author SNIPPIK
@@ -62,7 +63,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @public
      */
     public get readable(): boolean {
-        return this.engine.size > 0;
+        return this.engine?.size > 0;
     };
 
     /**
@@ -216,15 +217,15 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         // Запускаем получение аудио
         this.engine.start(this.arguments, FFMPEG_PATH);
 
-        // Если поток не запустился сразу
         if (!this.readable) {
-            // Запускаем цикл для получения ответа от движка
-            this._timeout = setInterval(() => {
+            const check = () => {
                 if (this.readable) {
-                    clearInterval(this._timeout);
                     this.emit("readable");
+                } else {
+                    this._timeout = setTimeout(check, 10);
                 }
-            }, 100);
+            };
+            setImmediate(check); // первая проверка почти мгновенно
         }
 
         // Сообщаем о запуске потока
@@ -250,7 +251,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @protected
      */
     public destroy() {
-        clearInterval(this._timeout);
+        clearTimeout(this._timeout);
 
         // Чистим все потоки от мусора
         this.emit("close", `[AudioResource] has destroyed`);
@@ -265,7 +266,9 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         }
 
         this.options = null;
-        this._played_frames = 0;
+        this._played_frames = null;
+        this._afade = null;
+        this._timeout = null;
     };
 }
 

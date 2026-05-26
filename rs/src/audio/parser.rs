@@ -19,6 +19,8 @@ const MAX_PACKET_SIZE: usize = 1024 * 1024;  // 1 MiB — запас для "з�
 // PACKET TYPES
 // ============================================================================
 
+/// Типы пакетов для OPUS, рекомендуется некоторые просто не пушить в исходное аудио
+/// Для Discord - Frame, Silent. Поскольку остальные не требуются и будут откинуты и это уже потеря пакета
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum PacketType {
     Head,      // OpusHead (первые 8 байт "OpusHead", полный заголовок 19+)
@@ -85,7 +87,7 @@ impl OggOpusParser {
     // =========================================================================
 
     /// Основная точка входа: подаём кусок данных, получаем на выход готовые пакеты.
-    /// Если chunk пустой — флашим остатки (flush).
+    /// Если chunk пустой — получаем остатки (flush).
     pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<ParsedPacket>) -> Result<()> {
         // Если входящий пакет пуст
         if chunk.is_empty() {
@@ -122,18 +124,18 @@ impl OggOpusParser {
     /// Внутренний цикл разбора.
     /// Принцип: ищем сигнатуру "OggS" в remainder начиная с cursor.
     /// Каждый раз, когда находим полную страницу (хватает заголовка + таблицы сегментов + полезной нагрузки),
-    /// отдаём её в `handle_page_core`, которая через колбэк on_packet выдаёт готовые пакеты.
+    /// отдаём её в `handle_page_core`, которая через функцию on_packet выдаёт готовые пакеты.
     /// Оставшиеся необработанные байты сдвигаем в начало remainder.
     ///
     /// Параметры:
     /// - chunk: новые данные, добавляются в remainder.
-    /// - on_packet: колбэк, получает (PacketType, &[u8]) — владение данных остаётся за парсером.
+    /// - on_packet: функция, получает (PacketType, &[u8]) — владение данных остаётся за парсером.
     ///              В текущей реализации `parse_internal` копирует в Vec, но можно оптимизировать.
     fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()>
     where F: FnMut(PacketType, &[u8]) -> Result<()> {
         self.remainder.extend_from_slice(chunk);
 
-        // Если достигнут лимит то просто выдаем ошибку переполнения
+        // Если достигнут лимит, то просто выдаем ошибку переполнения
         if self.remainder.len() > MAX_REMAINDER_SIZE {
             // Защита от переполнения: чистим всё и выходим с ошибкой
             self.remainder.clear();
@@ -149,14 +151,14 @@ impl OggOpusParser {
                 break; // не хватает даже на минимальный заголовок Ogg page
             }
 
-            // Ищем сигнатуру "OggS". Используем memmem для быстрого поиска.
+            // Ищем сигнатуру "OggS". Используем "memmem" для быстрого поиска.
             // Это критично, так как поток может содержать мусор до первого OggS.
             let pos = match memmem::find(&self.remainder[cursor..], b"OggS") {
                 Some(pos) => cursor + pos,
                 None => {
                     // Не нашли ни одного "OggS" в остатке.
                     // Оставляем только последние 3 байта, так как сигнатура длиной 4,
-                    // и следующий чанк может добавить недостающий байт для завершения "OggS".
+                    // и следующий фрейм может добавить недостающий байт для завершения "OggS".
                     if self.remainder.len() > 3 {
                         let keep_from = self.remainder.len() - 3;
                         self.remainder.copy_within(keep_from.., 0);
@@ -176,7 +178,7 @@ impl OggOpusParser {
 
             let header_size = 27 + segments_count;
             if page.len() < header_size {
-                break; // ждём следующий чанк для полного заголовка
+                break; // ждём следующий фрейм для полного заголовка
             }
 
             let segment_table = &page[27..header_size];
@@ -254,7 +256,7 @@ impl OggOpusParser {
         let segment_table = &page[27..27 + segments_count];
         let mut offset = 27 + segments_count;
 
-        // Если эта страница не является продолжением (continued == false) и у нас есть недопакет из прошлых страниц,
+        // Если эта страница не является продолжением (continued == false) и у нас есть битый фрейм из прошлых страниц,
         // значит поток повреждён (прошлый пакет не был завершён, но новая страница его не продолжает).
         // Согласно спецификации, такое не должно происходить, но для устойчивости очищаем carry.
         if !continued && !packet_carry.is_empty() {

@@ -76,7 +76,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 return;
             }
 
-            this.emit("error", err instanceof Error ? err : new Error(String(err)));
+            this.emit("error", err instanceof Error ? err : Error(String(err)));
         }
     };
 
@@ -191,7 +191,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             try {
                 this.ws.send(msg);
             } catch (err) {
-                this.emit("error", err instanceof Error ? err : new Error(String(err)));
+                this.emit("error", err instanceof Error ? err : Error(String(err)));
             }
         }
     };
@@ -222,7 +222,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         try {
             payload = JSON.parse(data.toString()) as WebSocketOpcodes.extract | WebSocketOpcodes.dave_opcodes;
         } catch {
-            this.emit("error", new Error("Invalid JSON"));
+            this.emit("error", Error("Invalid JSON"));
             return null;
         }
 

@@ -54,6 +54,7 @@ export abstract class BaseLayer<T> {
      * @throws {TypeError} При вызове не переопределённого метода.
      */
     public destroy = (): void => {
-        throw new TypeError("Not found destroy function");
+        if (this._client) this._client["destroy"]();
+        this._client = null;
     };
 }

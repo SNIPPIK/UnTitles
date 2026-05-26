@@ -110,7 +110,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
 
                             // Если трек не доступен к загрузке
                             if (!api.streamable) {
-                                return new Error("Resource is not available in your country");
+                                return Error("Resource is not available in your country");
                             }
 
                             // Если есть данные для получения истинного аудио
@@ -128,7 +128,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
 
                     return null;
                 } catch (e) {
-                    return new Error(`[APIs/track]: ${e}`);
+                    return Error(`[APIs/track]: ${e}`);
                 }
             }
         },
@@ -175,7 +175,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
                     }
                     return null;
                 } catch (e) {
-                    return new Error(`[APIs/playlist]: ${e}`);
+                    return Error(`[APIs/playlist]: ${e}`);
                 }
             }
         },
@@ -198,7 +198,7 @@ class RestSoundCloudAPI extends RestServerSide.API {
 
                     return api.collection.filter((i) => i.user).map(this.track);
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         }

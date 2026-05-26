@@ -46,29 +46,37 @@ export class PlayerProgress {
         const { current, total } = duration;
         const button = buttons[`button_${platform?.toLowerCase()}`] ?? buttons["button"];
 
-        // Если live-трек
-        if (total === 0) {
-            return emoji.upped.left + button + emoji.empty.center.repeat(this.size) + emoji.empty.right;
+        // Для live-трека длина бара была на 1 символ больше из-за button + repeat(this.size)
+        if (total === 0 || total === Infinity) {
+            // Вычитаем 1 под саму кнопку, чтобы общая длина всегда равнялась this.size
+            return emoji.upped.left + button + emoji.empty.center.repeat(Math.max(0, this.size - 1)) + emoji.empty.right;
         }
 
         const clamped = Math.min(Math.max(current / total, 0), 1);
         const filled = Math.floor(this.size * clamped);
 
-        const left = current >= 1 ? emoji.upped.left : emoji.empty.left;
+        // Логичнее проверять > 0 (если current в секундах, то 0.5 — это уже не начало)
+        const left = current > 0 ? emoji.upped.left : emoji.empty.left;
         const right = filled >= this.size ? emoji.upped.right : emoji.empty.right;
 
-        // Если в самом начале — просто пустой бар без кнопки
-        if (current < 1) {
+        // В самом начале (полностью пустой)
+        if (current <= 0) {
             return left + emoji.empty.center.repeat(this.size) + right;
+
+            // Совет: Если вы хотите, чтобы кнопка (ползунок) стояла в начале, а не исчезала, используйте это:
+            // return left + button + emoji.empty.center.repeat(Math.max(0, this.size - 1)) + right;
         }
 
-        // Если в самом конце — полностью заполненный бар
-        else if (filled >= this.size || current >= total) {
+        // В самом конце (полностью заполненный)
+        if (filled >= this.size || current >= total) {
             return left + emoji.upped.center.repeat(this.size) + right;
         }
 
         // Стандартный случай: середина с кнопкой
-        const middle = emoji.upped.center.repeat(filled) + button + emoji.empty.center.repeat(this.size - filled - 1); // -1 под кнопку
+        // Добавлено Math.max(0, ...), чтобы избежать RangeError: Invalid count value
+        const emptyCount = Math.max(0, this.size - filled - 1);
+        const middle = emoji.upped.center.repeat(filled) + button + emoji.empty.center.repeat(emptyCount);
+
         return left + middle + right;
     };
 }

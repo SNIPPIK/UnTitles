@@ -1,4 +1,4 @@
-import { VoiceUDPSocket, WebSocketOpcodes } from "#core/voice/index.js";
+import { VoiceUDPSocket, WebSocketOpcodes, handshake } from "#core/voice/index.js";
 import { BaseLayer} from "#core/voice/transport/layers/BaseLayer.js";
 
 /**
@@ -59,7 +59,7 @@ export class UDPLayer extends BaseLayer<VoiceUDPSocket> {
      * @param d - Пакет Ready полученный от WS
      * @public
      */
-    public create = (d: WebSocketOpcodes.ready["d"]): Promise<Error | {ip: string, port: number}> => {
+    public create = (d: WebSocketOpcodes.ready["d"]): Promise<Error | handshake> => {
         // Если UDP был поднят ранее
         if (this._client) {
             this._client.destroy();
@@ -70,7 +70,7 @@ export class UDPLayer extends BaseLayer<VoiceUDPSocket> {
         const udp = this._client = new VoiceUDPSocket();
 
         // Создаем обещание
-        return new Promise((resolve) => {
+        return new Promise(async (resolve) => {
             udp.connect(d); // Подключаемся
 
             const discoveryPacket = udp.discovery(d.ssrc);
@@ -93,7 +93,7 @@ export class UDPLayer extends BaseLayer<VoiceUDPSocket> {
             // Таймер отключения, если не удастся получить ответ discovery
             const timeout = setTimeout(() => {
                 if (retryTimer) clearTimeout(retryTimer);
-                return resolve(new Error("[Transport/UDP]: Timeout to send Discovery handshake"));
+                return resolve(Error("[Transport/UDP]: Timeout to send Discovery handshake"));
             }, 2e3);
 
             /**
@@ -101,20 +101,11 @@ export class UDPLayer extends BaseLayer<VoiceUDPSocket> {
              * @event discovery
              * @private
              */
-            udp.once("discovery", (data) => {
+            udp.once("discovery", data => {
                 clearTimeout(timeout);
                 clearTimeout(retryTimer); // отменяем повторные отправки
                 resolve(data); // предполагаем, что здесь нужен resolve
             });
         });
-    };
-
-    /**
-     * @description Метод удаления UDP слоя
-     * @public
-     */
-    public destroy = () => {
-        this._client.destroy();
-        this._client = null;
     };
 }

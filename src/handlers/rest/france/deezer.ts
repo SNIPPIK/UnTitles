@@ -146,7 +146,7 @@ class RestDeezerAPI extends RestServerSide.API {
                     if (api instanceof Error) return api;
                     return api.data.splice(0, limit).map(this.track);
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -168,7 +168,7 @@ class RestDeezerAPI extends RestServerSide.API {
 
                     return api.data.splice(0, limit).map(this.track);
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         }

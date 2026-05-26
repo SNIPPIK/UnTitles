@@ -26,31 +26,36 @@ class message_error extends Event<"message/error"> {
         // Данные трека
         const { api, artist, image, user, name } = position ? queue.tracks.get(position) : queue.tracks.track;
 
-        // Создаем сообщение
-        const message = await queue.message.send({
-            embeds: [{
-                color: api.color, thumbnail: image, timestamp: new Date(),
-                fields: [
-                    {
-                        name: locale._(queue.message.locale, "player.has.playing.fail"),
-                        value: `\`\`\`${name}\`\`\``
-                    },
-                    {
-                        name: locale._(queue.message.locale, "player.current.error"),
-                        value: `\`\`\`js\n${error}\`\`\``
+        try {
+            // Создаем сообщение
+            const message = await queue.message.send({
+                embeds: [{
+                    color: api.color, thumbnail: image, timestamp: new Date(),
+                    fields: [
+                        {   // Заголовок сообщающий что произошла ошибка
+                            name: locale._(queue.message.locale, "player.has.playing.fail"),
+                            value: `\`\`\`${name}\`\`\``
+                        },
+                        {   // Заголовок сообщающий об ошибке
+                            name: locale._(queue.message.locale, "player.current.error"),
+                            value: `\`\`\`js\n${error}\`\`\``
+                        }
+                    ],
+                    author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
+                    footer: {
+                        // Данные об авторе и данные очереди
+                        text: `${user.username} | 🕐 ${queue.tracks.time} • ${db.emoji.queue} ${queue.tracks.total}`,
+                        iconURL: user?.avatar
                     }
-                ],
-                author: {name: artist.title, url: artist.url, iconURL: artist.image.url},
-                footer: {
-                    text: `\`${user.username}\` | \`🕐 ${queue.tracks.time}\` • \`${db.emoji.queue} ${queue.tracks.total}\``,
-                    iconURL: user?.avatar
-                }
-            }],
-            withResponse: true
-        });
+                }],
+                withResponse: true
+            });
 
-        // Если есть ответ от отправленного сообщения
-        if (message) setTimeout(() => message.deletable ? message.delete().catch(() => null) : null, 20e3);
+            // Если есть ответ от отправленного сообщения
+            if (message) setTimeout(() => message.deletable ? message.delete().catch(() => null) : null, 20e3);
+        } catch (err) {
+            console.log(err);
+        }
     }
 }
 
@@ -69,10 +74,9 @@ class message_error extends Event<"message/error"> {
 })
 class message_push extends Event<"message/push"> {
     run: SupportEventCallback<"message/push"> = async (msg, queue, obj) => {
-        if (!msg?.author) {
-            throw Error("[Message/push]: Not found author in get data");
-        }
-
+        // Если у сообщения нет
+        if (!msg?.author) throw Error("[Message/push]: Not found author in get data");
+    
         // Ловим ошибку если она будет связана с api discord
         try {
             // Если есть очередь и треки для показа
@@ -179,8 +183,12 @@ class message_playing extends Event<"message/playing"> {
             });
         });
 
-        // Меняем статус голосового канала
-        db.adapter.status(queue.message.voice_id, `${db.emoji.disk} | ${queue.tracks.track.name}`).catch(() => {});
+        try {
+            // Меняем статус голосового канала
+            db.adapter.status(queue.message.voice_id, `${db.emoji.disk} | ${queue.tracks.track.name}`).catch(() => {});
+        } catch (err) {
+            console.log(err);
+        }
 
         // Если есть сообщение
         if (message) db.queues.cycles.messages.update(message, queue.components);

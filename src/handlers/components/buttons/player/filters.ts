@@ -47,7 +47,7 @@ class ButtonFilters extends Component<"button"> {
                         url: ctx.guild.iconURL()
                     },
 
-                    fields: filters.values().map((item) => {
+                    fields: filters.array.map((item) => {
                         return {
                             name: item.name,
                             value: item.locale[ctx.locale] ?? item.locale["en-US"],

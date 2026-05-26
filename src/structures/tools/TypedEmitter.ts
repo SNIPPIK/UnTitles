@@ -68,6 +68,7 @@ export class TypedEmitter<L extends Record<string, any>> {
         for (let i = index + 1; i < list.length; i++) {
             list[i - 1] = list[i];
         }
+
         list.pop();
     };
 
@@ -83,11 +84,9 @@ export class TypedEmitter<L extends Record<string, any>> {
         this.emit('newListener' as any, event, bucket.listener);
 
         const arr = this._events.get(event) ?? [];
-        if (prepend) {
-            arr.unshift(bucket);
-        } else {
-            arr.push(bucket);
-        }
+        if (prepend) arr.unshift(bucket);
+        else arr.push(bucket);
+
         this._events.set(event, arr);
 
         // Проверка на превышение maxListeners
@@ -169,7 +168,7 @@ export class TypedEmitter<L extends Record<string, any>> {
     public emit(event: string, ...args: any[]): boolean {
         // Специальная обработка события 'error'
         if (event === 'error') {
-            const err = args[0] instanceof Error ? args[0] : new Error(String(args[0]));
+            const err = args[0] instanceof Error ? args[0] : Error(String(args[0]));
             const hasErrorListeners = this.listenerCount('error') > 0;
             if (!hasErrorListeners) {
                 throw err; // Неперехваченная ошибка (как в Node.js)
@@ -221,6 +220,8 @@ export class TypedEmitter<L extends Record<string, any>> {
     public off<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener?: DefaultListener): this;
     public off(event: string, listener?: DefaultListener): this {
         if (!this._events) return this;
+
+        // Если надо удалить событие без вызова функции
         if (!listener) {
             this._events.delete(event);
             return this;
@@ -238,6 +239,7 @@ export class TypedEmitter<L extends Record<string, any>> {
             }
         }
 
+        // Если есть тчо удалить
         if (removed) {
             this.emit('removeListener' as any, event, listener);
             if (arr.length === 0) this._events.delete(event);
@@ -284,9 +286,11 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @public
      */
     public setMaxListeners = (n: number): this => {
+        // Если указывается не число а что-то другое
         if (typeof n !== 'number' || n < 0 || Number.isNaN(n)) {
             throw new RangeError(`Expected non-negative number, got ${n}`);
         }
+
         this._maxListeners = n;
         this._warned = false;
         return this;
@@ -308,11 +312,12 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @public
      */
     public removeAllListeners = (event?: string): this => {
-        if (event) {
-            this._events.delete(event);
-        } else {
-            this._events.clear();
-        }
+        // Если есть имя события
+        if (event) this._events.delete(event);
+        
+        // Если нет указания имени, то полное удаление
+        else this._events?.clear();
+        
         return this;
     };
 
@@ -323,5 +328,7 @@ export class TypedEmitter<L extends Record<string, any>> {
     public destroy(): void {
         this.removeAllListeners();
         this._events = null;
+        this._maxListeners = 10;
+        this._warned = null;
     };
 }

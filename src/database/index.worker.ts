@@ -58,7 +58,7 @@ let _sdb: SharedDatabase | null = null;
  */
 export const sdb = new Proxy({} as SharedDatabase, {
     get(_, prop: keyof SharedDatabase) {
-        if (!_sdb) throw new Error("SharedDatabase not initialized. Call initSharedDatabase() first.");
+        if (!_sdb) throw Error("SharedDatabase not initialized. Call initSharedDatabase() first.");
         const value = _sdb[prop];
 
         if (typeof value === "function") return (value as Function).bind(_sdb);
@@ -72,11 +72,11 @@ export const sdb = new Proxy({} as SharedDatabase, {
  * @public
  */
 export function initSharedDatabase(): void {
-    if (_sdb) throw new Error("SharedDatabase already initialized");
+    if (_sdb) throw Error("SharedDatabase already initialized");
 
     try {
         _sdb = new SharedDatabase();
     } catch (err) {
-        throw new Error(`Failed to initialize shared database: ${err instanceof Error ? err.message : String(err)}`);
+        throw Error(`Failed to initialize shared database: ${err instanceof Error ? err.message : String(err)}`);
     }
 }

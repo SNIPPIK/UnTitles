@@ -79,16 +79,6 @@ mod platform {
                     return Err(err);
                 }
 
-                // Добавляем event_fd, user data = 2
-                ev.u64 = 2;
-                if libc::epoll_ctl(epoll_fd, libc::EPOLL_CTL_ADD, event_fd, &mut ev) < 0 {
-                    let err = io::Error::last_os_error();
-                    libc::close(timer_fd);
-                    libc::close(event_fd);
-                    libc::close(epoll_fd);
-                    return Err(err);
-                }
-
                 Ok(Self { timer_fd, event_fd, epoll_fd })
             }
         }
@@ -163,7 +153,7 @@ mod platform {
 // ============================================================================
 // WINDOWS / MACOS FALLBACK: Condvar + Mutex
 // ============================================================================
-// Для Windows и macOS (и любых других) используем условную переменную с таймаутом.
+// Для Windows и macOS (и любых других) используем условную переменную.
 // Минус: точность зависит от системного таймера (обычно ~1-10 мс), но для наших целей (20 мс) достаточно.
 // Плюс: просто и без зависимостей от libc на Windows (мы не используем WinAPI таймеры с высоким разрешением,
 // чтобы не усложнять код). При необходимости можно заменить на WaitableTimer, но Condvar проще и кроссплатформенно.
@@ -201,7 +191,6 @@ mod platform {
             let timeout = deadline - now;
             let guard = self.state.lock().unwrap();
             let _ = self.cvar.wait_timeout(guard, timeout);
-            // При пробуждении (по таймауту или по wake) просто выходим.
         }
 
         // Пробуждение: посылаем сигнал condvar.
@@ -222,7 +211,7 @@ compile_error!("Unsupported platform for CycleManager");
 // CONFIG
 // ============================================================================
 
-const TICK_INTERVAL_MS: u64 = 20;      // период вызова tick() 20 мс (50 Гц)
+pub const TICK_INTERVAL_MS: u64 = 20;      // период вызова tick() 20 мс (50 Гц)
 const MAX_CATCH_UP_TICKS: u32 = 1;     // максимальное количество "догоняющих" тиков за одну итерацию
 // (чтобы не уходить в бесконечный цикл при сильной задержке)
 
@@ -269,7 +258,7 @@ impl CycleManager {
     // После изменения карты – пробуждаем цикл, чтобы он пересчитал таймеры (необязательно, но безопасно).
     pub fn add_session(&self, id: u32, session: Arc<UdpBuffered>) {
         let mut map = self.sessions.load_full();      // клонируем Arc<HashMap>
-        Arc::make_mut(&mut map).insert(id, session); // делаем мутабельную копию если нужно
+        Arc::make_mut(&mut map).insert(id, session); // делаем копию
         self.sessions.store(map);                    // атомарно заменяем указатель
         self.start_if_needed();
         self.backend.wake();                         // будим цикл, чтобы он не спал до следующего тика
@@ -353,7 +342,7 @@ impl CycleManager {
                 // Если отставание слишком большое (>4 интервалов), сбрасываем next_tick на текущее время + интервал.
                 // Иначе просто прибавляем интервал (это предотвращает накопление ошибки).
                 let now = Instant::now();
-                if now > next_tick + interval {
+                if now >= next_tick + interval {
                     next_tick = now + interval;
                 } else {
                     next_tick += interval;

@@ -60,7 +60,7 @@ class ResourceProvider<T extends Track> {
             }
         }
 
-        return lastError instanceof Error ? lastError : new Error(`[ResourceResolver]: Max retries reached. Last error: ${lastError}`);
+        return lastError instanceof Error ? lastError : Error(`[ResourceResolver]: Max retries reached. Last error: ${lastError}`);
     };
 
     private sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -129,13 +129,15 @@ export class TrackResolvers {
                 }
 
                 // Если ничего не нашлось
-                return new Error("Resource has not found");
+                return Error("Resource has not found");
             }
 
             // Проверяем HTTP HEAD (если это ссылка)
             if (track.link.startsWith("http")) {
                 (track as any).similarTrackPath = status.path;
                 const song = await this.head(track);
+
+                // Если при проверке получена ошибка
                 if (song instanceof Error) return song;
 
                 track.link = song;
@@ -152,7 +154,7 @@ export class TrackResolvers {
         lyrics: new LyricsProvider(async (track) => {
             // Если ответ не был получен от сервера
             const timeoutPromise = new Promise((resolve) =>
-                setTimeout(() => resolve(new Error("Timeout server request")), 10e3)
+                setTimeout(() => resolve(Error("Timeout server request")), 10e3)
             );
 
             const api = await Promise.race([

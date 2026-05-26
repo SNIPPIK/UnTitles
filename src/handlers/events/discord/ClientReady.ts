@@ -21,7 +21,7 @@ class ClientReady extends Event<Events.ClientReady> {
         const bot: DiscordClient = client as any;
 
         Logger.log("LOG", `[Core/${bot.shardID}] on ${Logger.color(32, `${client.guilds.cache.size} guilds`)}`);
-        bot.startIntervalStatuses();
+        return bot.startIntervalStatuses();
     };
 }
 

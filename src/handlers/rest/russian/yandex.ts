@@ -146,7 +146,7 @@ class RestYandexAPI extends RestServerSide.API {
 
                     return track;
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -265,7 +265,7 @@ class RestYandexAPI extends RestServerSide.API {
                     if (api instanceof Error) return api;
                     return api.tracks.splice(0, limit).map(this.track);
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`)
+                    return Error(`[APIs]: ${e}`)
                 }
             }
         },
@@ -286,7 +286,7 @@ class RestYandexAPI extends RestServerSide.API {
                     else if (!api.tracks) return [];
                     return api.tracks["results"].splice(0, limit).map(this.track);
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`)
+                    return Error(`[APIs]: ${e}`)
                 }
             }
         }
@@ -378,10 +378,9 @@ class RestYandexAPI extends RestServerSide.API {
 
                 // Успех, возвращаем результат и прерываем цикл
                 return `https://${xml[0]}/get-mp3/${sign}/${xml[2]}${path}`;
-
-            } catch (mp3Error) {
-                // Если MP3 handler также бросил ошибку, выводим её и продолжаем цикл (i++)
-                console.error("MP3 Handler Failed. Retrying...", mp3Error);
+            } catch (err) {
+                // Если Audio handler бросил ошибку, выводим её и продолжаем цикл (i++)
+                console.error("Audio Handler Failed. Retrying...", err);
             }
         }
 

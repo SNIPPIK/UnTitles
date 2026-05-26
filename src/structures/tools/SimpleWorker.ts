@@ -61,7 +61,7 @@ export class SimpleWorker<TInput = any, TOutput = any> extends TypedEmitter<Work
      * @public
      */
     public async start(initialData?: TInput): Promise<void> {
-        if (this.worker) throw new Error("Worker already started");
+        if (this.worker) throw Error("Worker already started");
 
         const workerPath = path.isAbsolute(this.file) ? this.file : path.resolve(this.file);
         this.worker = new Worker(workerPath, this.options);
@@ -97,7 +97,7 @@ export class SimpleWorker<TInput = any, TOutput = any> extends TypedEmitter<Work
      * @public
      */
     public send(data: TInput): void {
-        if (!this.worker) throw new Error("Worker not started");
+        if (!this.worker) throw Error("Worker not started");
         this.worker.postMessage(data);
     };
 

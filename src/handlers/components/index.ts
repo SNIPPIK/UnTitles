@@ -81,5 +81,6 @@ export type SupportComponent<T = "button" | "selector"> = {
  * @public
  */
 export class Component<T = "button" | "selector"> implements SupportComponent<T> {
+    /** Функция вызова компонента */
     public callback: SupportComponent<T>["callback"];
 }

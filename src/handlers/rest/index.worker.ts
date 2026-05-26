@@ -22,11 +22,18 @@ import { env } from "#app/env";
 // ========== КОНСТАНТЫ ==========
 
 /**
+ * Время чистки мусора, через n произойдет чистка от мусора
+ *
+ * @const CLEAN_TIMEOUT
+ */
+const CLEAN_TIMEOUT = 60e3 * 5;
+
+/**
  * Значение лимита по умолчанию (количество элементов, возвращаемых при поиске,
  * получении плейлиста, похожих треков и т.д.).
  * Используется, если переменная окружения не задана.
  *
- * @constant
+ * @const DEFAULT_LIMIT
  * @default 10
  */
 const DEFAULT_LIMIT = 10;
@@ -36,7 +43,7 @@ const DEFAULT_LIMIT = 10;
  * Защита от зависания: если платформа не отвечает, запрос будет прерван,
  * а в основной поток отправится ошибка.
  *
- * @constant
+ * @const REQUEST_TIMEOUT_MS
  * @default 20000
  */
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -203,11 +210,21 @@ class RestWorkerHandler {
      * @param registry - Реестр платформ, используемый для поиска API и лимитов.
      */
     public constructor(private registry: RestRegistry) {
-        setInterval(async () => {
+        this.regulateCleaner();
+    };
+
+    /**
+     * @description Чистильщик сборщика мусора
+     * @private
+     */
+    private regulateCleaner = () => {
+        setTimeout(async () => {
             if (typeof global !== "undefined" && typeof global.gc === "function") {
                 global.gc();
             }
-        }, 60e3 * 5);
+
+            setTimeout(this.regulateCleaner, CLEAN_TIMEOUT);
+        }, CLEAN_TIMEOUT);
     };
 
     /**
@@ -263,14 +280,14 @@ class RestWorkerHandler {
 
             // Если не найдена платформа
             if (!restPlatform) {
-                this.sendError(requestId, new Error(`Platform not found: ${platform}`));
+                this.sendError(requestId, Error(`Platform not found: ${platform}`));
                 return;
             }
 
             // Ищем обработчик: сначала по точному имени типа, затем "all"
-            const callback = restPlatform.requests?.find(req => req.name === type || req.name === "all");
+            const callback = restPlatform.requests?.find((req) => req.name === type || req.name === "all");
             if (!callback) {
-                this.sendError(requestId, new Error(`Callback not found for platform: ${platform}, type: ${type}`));
+                this.sendError(requestId, Error(`Callback not found for platform: ${platform}, type: ${type}`));
                 return;
             }
 
@@ -284,6 +301,7 @@ class RestWorkerHandler {
                 `Request timeout for ${platform}.${callback.name}`
             );
 
+            // Если при запросе произошла ошибка
             if (result instanceof Error) {
                 this.sendError(requestId, result);
                 return;
@@ -309,7 +327,7 @@ class RestWorkerHandler {
      */
     private withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T | Error> {
         return new Promise((resolve) => {
-            const timer = setTimeout(() => resolve(new Error(timeoutMessage)), ms);
+            const timer = setTimeout(() => resolve(Error(timeoutMessage)), ms);
             promise
                 .then(res => { clearTimeout(timer); resolve(res); })
                 .catch(err => { clearTimeout(timer); resolve(err); });
@@ -384,13 +402,13 @@ class RestWorkerHandler {
                 }
 
                 // Обычный запрос к API платформы
-                if (message.platform && typeof message.requestId === "number") {
+                else if (message.platform && typeof message.requestId === "number") {
                     await workerHandler.executeRequest(message as any);
                     return;
                 }
 
                 // Неизвестный формат сообщения
-                workerHandler.sendError(message.requestId, new Error("Unsupported request type"));
+                workerHandler.sendError(message.requestId, Error("Unsupported request type"));
             } catch (err) {
                 workerHandler.sendError(message.requestId, err);
             }

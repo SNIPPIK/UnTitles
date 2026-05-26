@@ -134,7 +134,10 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             this.emit(status, this);
 
             // Если пришло событие ожидания
-            if (status === AudioPlayerState.idle) this._PlayerNextTrack();
+            if (status === AudioPlayerState.idle) {
+                // Запускаем функцию которая проверят что делать с позицией
+                this._PlayerNextTrack();
+            }
         }
     };
 
@@ -156,6 +159,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             }
         );
 
+        // Собираем красивую строчку для EMBED
         return `\n\`\`${current.duration()}\`\` ${bar} \`\`${time.split}\`\``;
     };
 
@@ -186,8 +190,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (isActive) {
             // Если нет плеера в цикле
             if (!db.queues.cycles.players.has(this)) {
-                // Отправляем пустышку
-                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
+                // Отправляем пустышку если такая возможность есть
+                if (this._voice.connection.ready && this._audio?.current?.readable) this._voice.connection.packet(SILENT_FRAME);
 
                 // Добавляем плеер в цикл
                 db.queues.cycles.players.add(this);
@@ -202,8 +206,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 // Удаляем плеер из цикла
                 db.queues.cycles.players.delete(this);
 
-                // Отправляем пустышку
-                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
+                // Отправляем пустышку если такая возможность есть
+                if (this._voice.connection.ready && this._audio?.current?.readable) this._voice.connection.packet(SILENT_FRAME);
                 this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
             }
         }

@@ -85,7 +85,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      * @throws {Error} если сессия не инициализирована.
      */
     public set externalSender(externalSender: Buffer) {
-        if (!this.session) throw new Error("No session available");
+        if (!this.session) throw Error("No session available");
         this.session.setExternalSender(externalSender);
         this.emit("debug", "Set MLS external sender");
     };
@@ -214,7 +214,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      * @returns Буфер, содержащий commit и (опционально) welcome, либо null, если commit отсутствует.
      */
     public processProposals = (payload: Buffer, connectedClients: Array<string>): Buffer | null => {
-        if (!this.session) throw new Error("No session available");
+        if (!this.session) throw Error("No session available");
         const { commit, welcome } = this.session.processProposals(
             payload.readUInt8(0) as 0 | 1,
             payload.subarray(1),
@@ -231,7 +231,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      * @returns Результат перехода (успех/неудача и идентификатор).
      */
     public processCommit = (payload: Buffer): TransitionResult => {
-        if (!this.session) throw new Error('No session available');
+        if (!this.session) throw Error('No session available');
         const transition_id = payload.readUInt16BE(0);
         try {
             this.session.processCommit(payload.subarray(2));
@@ -257,7 +257,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      * @returns Результат перехода (успех/неудача и идентификатор).
      */
     public processWelcome = (payload: Buffer): TransitionResult => {
-        if (!this.session) throw new Error('No session available');
+        if (!this.session) throw Error('No session available');
         const transition_id = payload.readUInt16BE(0);
         try {
             this.session.processWelcome(payload.subarray(2));

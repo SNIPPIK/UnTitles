@@ -5,7 +5,7 @@
  * Использовать с умом, если попадут не те данные то могут быть ошибки
  */
 const prototypes: { type: any, name: string, value: any}[] = [
-// String.prototype.duration
+    // String.prototype.duration
     {
         type: String.prototype, name: "duration",
         value: function (): number {

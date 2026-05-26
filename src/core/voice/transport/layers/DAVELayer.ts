@@ -61,7 +61,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
         // Вызов метода encrypt сессии; возвращает массив зашифрованных пакетов или null.
         let packets = this._client.encrypt(frames);
 
-        if (!packets) throw new Error("DAVE encryption failed");
+        if (!packets) throw Error("DAVE encryption failed");
         return packets;
     };
 
@@ -240,14 +240,5 @@ export class DAVELayer extends BaseLayer<MLSSession> {
 
         // Запускаем (пере)инициализацию сессии.
         session.reinit();
-    };
-
-    /**
-     * @description Уничтожает слой DAVE, освобождая ресурсы сессии.
-     *              Вызывается при завершении работы голосового соединения.
-     */
-    public destroy = () => {
-        this._client.destroy();
-        this._client = null;
     };
 }

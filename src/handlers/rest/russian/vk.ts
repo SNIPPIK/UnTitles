@@ -101,7 +101,7 @@ class RestVKAPI extends RestServerSide.API {
 
                     return track;
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -114,6 +114,7 @@ class RestVKAPI extends RestServerSide.API {
             name: "playlist",
             filter: /(playlist|album)/i,
             execute: async (url, { limit }) => {
+                //@ts-ignore
                 const ID = this.getID(/(?:playlist|album)\/(?<owner_id>-?\d+)_(?<playlist_id>\d+)(?:_(?<access_hash>[a-f0-9]+))?/, url)?.groups ?? null;
 
                 // Если ID трека не удалось извлечь из ссылки
@@ -147,7 +148,7 @@ class RestVKAPI extends RestServerSide.API {
                         items: tracks
                     }
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         },
@@ -167,7 +168,7 @@ class RestVKAPI extends RestServerSide.API {
                     if (api instanceof Error) return api;
                     return (api.response.items.splice(0, limit)).map(this.track);
                 } catch (e) {
-                    return new Error(`[APIs]: ${e}`);
+                    return Error(`[APIs]: ${e}`);
                 }
             }
         }

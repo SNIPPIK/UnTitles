@@ -36,9 +36,9 @@ export class Voices extends Collection<VoiceConnection> {
             this.set(config.guild_id, connection);
         }
 
-        // Если голосовое соединение не может принимать пакеты
-        else if (connection.status === "disconnected" || connection.adapter?.packet?.state?.channel_id !== config.channel_id) {
-            this.remove(config.guild_id);
+        // Если канал не совпадает с подключением
+        else if (connection.adapter?.packet?.state?.channel_id !== config.channel_id) {
+            this.remove(config.guild_id, true);
             connection = new VoiceConnection(config, adapterCreator);
             this.set(config.guild_id, connection);
         }

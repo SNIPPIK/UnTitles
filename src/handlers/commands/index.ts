@@ -279,7 +279,7 @@ export class Commands extends handler<Command> {
         await this.load();
 
         // Если команды не были загружены
-        if (!this.files.size) throw new Error("Not loaded commands");
+        if (!this.files.size) throw Error("Not loaded commands");
 
         // Загрузка глобальных команд
         client.application.commands.set(this.parseJsonData(this.public) as any)
@@ -310,6 +310,7 @@ export class Commands extends handler<Command> {
  * @public
  */
 export abstract class BaseCommand<T> {
+    /** Тип команды */
     type?: T;
 
     /** Название команды */
