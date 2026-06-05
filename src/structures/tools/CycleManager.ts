@@ -8,9 +8,6 @@ import { SetArray } from "#structures/array/index.js";
  * @abstract
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Последняя зафиксированная длительность цикла (целевая) */
-    private lastDuration: number = 0;
-
     /** Абсолютное время следующего запланированного выполнения (ms) */
     private nextExecutionTime: number = 0;
 
@@ -35,15 +32,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     };
 
     /**
-     * @description Последний целевой интервал цикла
-     * @returns number
-     * @public
-     */
-    public get delay(): number {
-        return this.lastDuration;
-    };
-
-    /**
      * @description Конструктор
      * @param options - конфигурация цикла
      * @throws {Error} если duration <= 0
@@ -53,7 +41,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         if (options.duration <= 0) {
             throw Error("Duration must be a positive number");
         }
-        this.lastDuration = options.duration;
     };
 
     /**
@@ -106,7 +93,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         this.clearTimer();
         this.clear();          // очистка SetArray
         this.nextExecutionTime = 0;
-        this.lastDuration = 0;
     };
 
     /**
@@ -126,12 +112,12 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected scheduleStep(): void {
-        const delay = Math.max(this.options.duration, this.nextExecutionTime - this.time);
+        const delay = this.nextExecutionTime - this.time;
         this.clearTimer();
 
         if (delay <= 0) {
             // Мы уже отстаем, выполняем следующий шаг максимально быстро
-            this.timer = setImmediate(this.step);
+            process.nextTick(this.step);
         } else {
             // Обычное планирование
             this.timer = setTimeout(this.step, delay);
@@ -155,19 +141,17 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         }
 
         // Обновляем время следующего выполнения (устойчиво к дрейфу)
-        const now = this.time;
         this.nextExecutionTime += this.options.duration;
+        const now = this.time;
 
         // Если мы сильно отстали (например, из-за долгой обработки),
         // сбрасываем nextExecutionTime, чтобы избежать каскадного отставания
-        if (this.nextExecutionTime <= now) {
+        if (this.nextExecutionTime < now) {
             this.nextExecutionTime = now + this.options.duration;
         }
 
-        this.lastDuration = this.options.duration;
-
         // Планируем следующий шаг
-        this.scheduleStep();
+        return this.scheduleStep();
     };
 
     /**
@@ -189,8 +173,8 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @description Выполняет все подходящие элементы цикла
      * @protected
      */
-    protected async _stepCycle() {
-        for await (const item of this) {
+    protected _stepCycle() {
+        for (const item of this) {
             // Пропускаем элементы, не прошедшие фильтр
             if (!this.options.filter(item)) continue;
 
@@ -231,8 +215,8 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @description Выполняет все подходящие элементы, не дожидаясь Promise
      * @protected
      */
-    protected async _stepCycle() {
-        for await (const item of this) {
+    protected _stepCycle() {
+        for (const item of this) {
             setImmediate(async () => {
                 if (await this.options.filter(item)) {
                     Promise.resolve(this.options.execute(item))

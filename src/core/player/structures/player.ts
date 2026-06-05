@@ -1,5 +1,5 @@
 import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue/index.js";
-import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio/index.js";
+import { AudioResource, OPUS_FRAME_SIZE } from "#core/audio/index.js";
 import { type AudioFilter, ControllerFilters } from "#core/player/index.js";
 import { AudioPlayerEvents } from "#handler/events/index.js";
 import { PlayerProgress } from "../controllers/progress.js";
@@ -190,9 +190,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (isActive) {
             // Если нет плеера в цикле
             if (!db.queues.cycles.players.has(this)) {
-                // Отправляем пустышку если такая возможность есть
-                if (this._voice.connection.ready && this._audio?.current?.readable) this._voice.connection.packet(SILENT_FRAME);
-
                 // Добавляем плеер в цикл
                 db.queues.cycles.players.add(this);
                 this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
@@ -205,9 +202,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             if (db.queues.cycles.players.has(this)) {
                 // Удаляем плеер из цикла
                 db.queues.cycles.players.delete(this);
-
-                // Отправляем пустышку если такая возможность есть
-                if (this._voice.connection.ready && this._audio?.current?.readable) this._voice.connection.packet(SILENT_FRAME);
                 this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
             }
         }

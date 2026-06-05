@@ -54,7 +54,7 @@ class ResourceProvider<T extends Track> {
             track.link = null; // Сбрасываем битую ссылку, чтобы prepare искал заново
 
             // Если это не последняя попытка — ждем (Exponential Backoff)
-            if (attempt < this.options.retries - 1) {
+            if (attempt < this.options.retries) {
                 const delay = this.options.initialDelay * Math.pow(2, attempt);
                 await this.sleep(delay);
             }

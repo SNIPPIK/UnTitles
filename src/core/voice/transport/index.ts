@@ -267,7 +267,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
             this.emit("close", code, `[Transport/WS]: ${reason}`);
 
             // Если достигли лимита попыток
-            if (this.reconnecting >= 3 || !this.reconnecting) {
+            if (this.reconnecting >= 3 && this.reconnecting !== null) {
                 this.destroy();
                 return;
             }

@@ -18,125 +18,109 @@ import { db } from "#app/db";
     type: "player"
 })
 class rest_request extends Event<"rest/request"> {
-   run: SupportEventCallback<"rest/request"> = async (platform, ctx, url) => {
-       // Если было получено ничего!
-       if (url === undefined) {
-           db.events.emitter.emit(
-               "rest/error",
-               ctx,
-               locale._(ctx.locale, "api.request.fail")
-           );
-           return null;
-       }
+    run: SupportEventCallback<"rest/request"> = async (platform, ctx, url) => {
+        // Если было получено ничего!
+        if (url === undefined) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.request.fail"));
+            return null;
+        }
 
-       // Получаем описание запроса от платформы
-       const api = platform.request(url);
+        // Получаем описание запроса от платформы
+        const api = platform.request(url);
 
-       // Платформа не поддерживает данный тип запроса
-       if (!api?.type) {
-           db.events.emitter.emit(
-               "rest/error",
-               ctx,
-               locale._(ctx.locale, "api.platform.support")
-           );
-           return null;
-       }
+        // Платформа не поддерживает данный тип запроса
+        if (!api?.type) {
+            db.events.emitter.emit("rest/error", ctx, locale._(ctx.locale, "api.platform.support"));
+            return null;
+        }
 
-       let msg: any = null, result: any = null;
-       try {
-           /**
-            * @description Отправляем временное уведомление о начале запроса
-            * @protected
-            */
-           msg = await ctx.followUp({
-               flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications,
-               components: [
-                   {
-                       type: 17,
-                       accent_color: platform.color,
-                       components: [
-                           {
-                               type: 9,
-                               components: [
-                                   {type: 10, content: `### ${platform.platform} | ${api.type}`},
-                                   {
-                                       type: 10,
-                                       content: `${locale._(ctx.locale, platform.audio ? "api.platform.request" : "api.platform.request.long", [db.emoji.loading, platform.platform])}`
-                                   },
-                                   {type: 10, content: `-# ${ctx.user.username}`},
-                               ],
-                               accessory: {
-                                   type: 11,
-                                   media: {
-                                       url: ctx.user.avatarURL()
-                                   }
-                               }
-                           }
-                       ]
-                   }
-               ],
-           });
+        // Запускаем отправку сообщения в фоне (БЕЗ await)
+        // Это вернет Promise, который мы обработаем позже
+        const msgPromise = this.sendLoadingMessage(ctx, platform, api);
 
-           // Вставляем оригинального автора
-           msg.author = ctx.user;
-       } catch (err) {
-           console.log(err);
-       }
+        // СРАЗУ ЖЕ запускаем выполнение REST-запроса с тайм-аутом
+        const result = await _withTimeout(
+            api.request(),
+            15_000,
+            Error(locale._(ctx.locale, "api.platform.timeout"))
+        ).catch(() => {
+            return Error("Request error");
+        });
 
-       /**
-        * @description Выполнение REST-запроса с тайм-аутом
-        * @protected
-        */
-       result = await _withTimeout(
-           // Основной запрос к платформе
-           api.request(),
+        // Проверяем наличие ошибок (если есть - выходим до создания очереди)
+        if (result instanceof Error || result["message"]) {
+            db.events.emitter.emit(
+                "rest/error",
+                ctx,
+                `**${platform.platform}.${api.type}**\n**❯** **${result["message"] ?? result}**`
+            );
+            return null;
+        }
 
-           // Тайм-аут выполнения запроса (15 секунд)
-           15_000,
+        // Создаем очередь и добавляем результат
+        const queue = db.queues.set(ctx);
+        queue.tracks.push(result, ctx.member.user);
 
-           // Ошибка по таймауту
-           Error(locale._(ctx.locale, "api.platform.timeout"))
-       ).catch(() => {
-           return Error("Request error");
-       });
+        // Когда сообщение точно отправится (или если оно уже отправилось, пока шел REST-запрос)
+        // Эмитим "message/push"
+        msgPromise.then((msg) => {
+            if (msg) {
+                const currentQueue = db.queues.get(ctx.guildId);
+                db.events.emitter.emit(
+                    "message/push",
+                    msg,
+                    currentQueue,
+                    !Array.isArray(result) ? result : result[0]
+                );
+            }
+        });
 
-       // Выполняем в конце
-       setImmediate(() => {
-           // Если очередь была создана
-           const queue = db.queues.get(ctx.guildId);
+        return null;
+    };
 
-           /**
-            * @description Отправляем сообщение о добавлении трека
-            * @protected
-            */
-           db.events.emitter.emit("message/push",
-               msg,
-               queue,
-               !Array.isArray(result) ? result : result[0],
-           );
-       });
+    /**
+     * @description Отделенный метод для отправки followUp без блокировки основного потока
+     * @private
+     */
+    private async sendLoadingMessage(ctx: any, platform: any, api: any) {
+        try {
+            const msg = await ctx.followUp({
+                flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications,
+                components: [
+                    {
+                        type: 17,
+                        accent_color: platform.color,
+                        components: [
+                            {
+                                type: 9,
+                                components: [
+                                    {type: 10, content: `### ${platform.platform} | ${api.type}`},
+                                    {
+                                        type: 10,
+                                        content: `${locale._(ctx.locale, platform.audio ? "api.platform.request" : "api.platform.request.long", [db.emoji.loading, platform.platform])}`
+                                    },
+                                    {type: 10, content: `-# ${ctx.user.username}`},
+                                ],
+                                accessory: {
+                                    type: 11,
+                                    media: {
+                                        url: ctx.user.avatarURL()
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ],
+            });
 
-       /**
-        * @description Если произошла ошибка, сообщаем о ней
-        * @protected
-        */
-       if (result instanceof Error || result["message"]) {
-           db.events.emitter.emit(
-               "rest/error",
-               ctx,
-               `**${platform.platform}.${api.type}**\n**❯** **${result["message"] ?? result}**`
-           );
-           return null;
-       }
-
-       /**
-        * @description Создаем очередь
-        * @protected
-        */
-       const queue = db.queues.set(ctx);
-       queue.tracks.push(result, ctx.member.user); // Добавляем результат (трек / список / плейлист) в очередь
-       return null;
-   };
+            // Вставляем оригинального автора
+            msg.author = ctx.user;
+            return msg;
+        } catch (err) {
+            console.log(err);
+            return null;
+        }
+    }
 }
 
 /**

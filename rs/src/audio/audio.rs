@@ -19,15 +19,14 @@ use crate::audio::ring_buffer::RingBuffer;
 // ============================================================================
 
 /// Opus silent frame (3 байта, код F8 FF FE – это не‑TLV, а конкретный паттерн для PLC).
-/// Вставляется в начало потока, чтобы звуковая карта/декодер не щёлкали.
+/// Вставляется в начало и конец потока, чтобы звуковая карта/декодер не щёлкал.
 static SILENT_FRAME: &[u8] = &[0xF8, 0xFF, 0xFE];
 
-/// Количество молчаливых фреймов перед первым реальным пакетом.
-/// Даём время аудиосистеме стабилизироваться.
-const SILENT_FRAMES: usize = 3;
+/// Количество молчаливых фреймов для стабилизации аудиосистемы.
+const START_SILENT_FRAMES: usize = 5;
+const END_SILENT_FRAMES: usize = 5;
 
 /// Максимальный размер внутреннего буфера парсера OggOpusParser (байт).
-/// Если парсер накопил больше – стрим битый, выходим.
 const MAX_PARSER_PENDING: usize = 8 * 1024 * 1024;
 
 // ============================================================================
@@ -62,9 +61,7 @@ pub struct AudioEngine {
     /// Передаётся в RingBuffer::new при создании.
     max_capacity: usize,
 
-    /// Логическая позиция воспроизведения (количество выданных наружу пакетов).
-    /// Атомарная, инкрементируется при get_packet / get_packets.
-    /// Не синхронизирована с буфером – может расходиться, если буфер очистили.
+    /// Логическая позиция воспроизведения.
     position: Arc<AtomicUsize>
 }
 
@@ -98,12 +95,11 @@ impl AudioEngine {
 
     #[napi]
     pub fn start(&self, mut args: Vec<String>, ffmpeg_path: String) -> Result<()> {
-        // Атомарный swap: если уже true – повторный вызов start не разрешён.
-        if self.reading_active.swap(true, Ordering::SeqCst) {
+        if self.reading_active.swap(true, Ordering::Relaxed) {
             return Err(Error::from_reason("Engine already running"));
         }
 
-        self.destroyed.store(false, Ordering::SeqCst);
+        self.destroyed.store(false, Ordering::Relaxed);
 
         // ===== HTTP source specific flags =====
         // Если входной URL начинается с http, добавляем параметры reconnect для FFmpeg.
@@ -126,29 +122,25 @@ impl AudioEngine {
         }
 
         // ===== Базовые аргументы FFmpeg =====
-        // -analyzeduration 0 / -probesize 32 – минимальный анализ, быстрое начало.
-        // -vn – отключаем видео.
-        // -loglevel error – только ошибки, stdout чистый от логов.
-        // -nostdin – запрещаем интерактивный ввод.
-        let mut final_args = vec![
+        let mut final_args: Vec<String> = vec![
             "-analyzeduration",      "0",
             "-probesize",            "32",
-            "-vn",            
-            "-loglevel",             "error",            
+            "-vn",
+            "-loglevel",             "error",
             "-nostdin",
             "-hide_banner",
         ]
             .into_iter()
             .map(String::from)
-            .collect::<Vec<_>>();
+            .collect();
 
         final_args.extend(args);
 
         // ===== Запуск FFmpeg =====
         let mut child = Command::new(&ffmpeg_path)
             .args(&final_args)
-            .stdout(Stdio::piped())    // читаем аудиоданные из stdout
-            .stderr(Stdio::null())     // stderr игнорируем (в нём только логи)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
             .spawn()
             .map_err(|e| Error::from_reason(format!("FFmpeg spawn error: {}", e)))?;
 
@@ -176,11 +168,10 @@ impl AudioEngine {
             let mut frames = Vec::with_capacity(64);
             let mut pending_push = Vec::with_capacity(128);
 
+            // Внутри потока:
             loop {
                 // Проверка внешнего флага остановки.
-                if !active.load(Ordering::SeqCst) {
-                    break;
-                }
+                if !active.load(Ordering::Relaxed) { break; }
 
                 // ===== Пауза =====
                 // Condvar: ждём, пока флаг pause_state не станет false.
@@ -188,17 +179,28 @@ impl AudioEngine {
                 {
                     let (lock, cvar) = &*pause_state;
                     let mut paused = lock.lock().unwrap();
+                    // Используем wait_timeout или проверяем активен ли поток после пробуждения
                     while *paused && active.load(Ordering::SeqCst) {
-                        paused = cvar.wait(paused).unwrap();
-                    }
-                    if !active.load(Ordering::SeqCst) {
-                        break;
+                        let result = cvar.wait_timeout(paused, std::time::Duration::from_millis(500)).unwrap();
+                        paused = result.0;
+                        // Если после пробуждения (или таймаута) поток стал неактивен — выходим
+                        if !active.load(Ordering::SeqCst) { return; }
                     }
                 }
 
                 // ===== Чтение из FFmpeg =====
                 match reader.read(&mut read_buf) {
-                    Ok(0) => break, // EOF
+                    Ok(0) => {
+                        // Если поток не был закрыт принудительно, плавно завершаем его тишиной
+                        if active.load(Ordering::Relaxed) {
+                            let buffer = buffer_ptr.lock().unwrap();
+                            for _ in 0..END_SILENT_FRAMES {
+                                if buffer.is_full() { buffer.pop(); }
+                                let _ = buffer.push(SILENT_FRAME.to_vec());
+                            }
+                        }
+                        break; // Выходим из цикла, так как достигли конца файла/стрима
+                    }
                     Ok(n) => {
                         // Защита от переполнения парсера: если накопилось слишком много сырых данных – битый стрим.
                         if parser.pending_len() > MAX_PARSER_PENDING {
@@ -214,9 +216,9 @@ impl AudioEngine {
 
                         pending_push.clear();
 
-                        // Первые SILENT_FRAMES пакетов – тишина, чтобы аудио успело инициализироваться.
+                        // Первые SILENT_FRAMES пакетов – тишина в начале
                         if !first_packet_received {
-                            for _ in 0..SILENT_FRAMES {
+                            for _ in 0..START_SILENT_FRAMES {
                                 pending_push.push(SILENT_FRAME.to_vec());
                             }
                             
@@ -227,7 +229,7 @@ impl AudioEngine {
                         pending_push.extend(
                             frames.drain(..).filter_map(|(kind, data)| match kind {
                                 PacketType::Frame | PacketType::Silent => Some(data),
-                                _ => None, // Комментарии, заголовки и прочее отбрасываем.
+                                _ => None,
                             }),
                         );
 
@@ -246,8 +248,7 @@ impl AudioEngine {
                 }
             }
 
-            // При выходе из цикла сбрасываем флаг активности.
-            active.store(false, Ordering::SeqCst);
+            active.store(false, Ordering::Relaxed);
         });
 
         *self.reader_handle.lock().unwrap() = Some(handle);
@@ -256,44 +257,37 @@ impl AudioEngine {
     }
 
     // =========================================================================
-    // DESTROY
+    // DESTROY & CLEANUP
     // =========================================================================
 
     fn cleanup(&self) {
-        // Защита от повторного вызова.
-        if self.destroyed.swap(true, Ordering::SeqCst) {
+        if self.destroyed.swap(true, Ordering::Relaxed) {
             return;
         }
 
         // Сигнал потоку остановиться.
-        self.reading_active.store(false, Ordering::SeqCst);
+        self.reading_active.store(false, Ordering::Relaxed);
 
         // Пробуждение потока, если он висит на condvar (пауза).
-        let (_, cvar) = &*self.pause_state;
-        cvar.notify_all();
+        {
+            let (lock, cvar) = &*self.pause_state;
+            *lock.lock().unwrap() = false;
+            cvar.notify_all();
+        }
 
         // Убиваем FFmpeg процесс, если он ещё жив.
         if let Ok(mut guard) = self.child.lock() {
             if let Some(mut child) = guard.take() {
                 let _ = child.kill();
-                let _ = child.wait(); // ждём, чтобы не осталось зомби
+                let _ = child.wait();
             }
         }
 
         // Дожидаемся завершения reader thread.
-        if let Ok(mut guard) = self.reader_handle.lock() {
-            if let Some(handle) = guard.take() {
-                let _ = handle.join();
-            }
+        let mut handle_guard = self.reader_handle.lock().unwrap();
+        if let Some(handle) = handle_guard.take() {
+            let _ = handle.join();
         }
-
-        // Очищаем буфер от оставшихся данных.
-        if let Ok(mut buffer) = self.buffer.lock() {
-            buffer.clear();
-        }
-
-        // Сбрасываем логическую позицию.
-        self.position.store(0, Ordering::Relaxed);
     }
 
     #[napi]
@@ -303,13 +297,12 @@ impl AudioEngine {
     }
 
     // =========================================================================
-    // PAUSE
+    // PAUSE & INFO
     // =========================================================================
 
     #[napi(getter)]
     pub fn get_pause(&self) -> bool {
-        let (lock, _) = &*self.pause_state;
-        *lock.lock().unwrap()
+        *self.pause_state.0.lock().unwrap()
     }
 
     #[napi(setter)]
@@ -318,7 +311,7 @@ impl AudioEngine {
         let mut paused = lock.lock().unwrap();
         *paused = value;
         if !value {
-            cvar.notify_all(); // если снимаем паузу – будим reader thread.
+            cvar.notify_all();
         }
     }
 
@@ -342,14 +335,18 @@ impl AudioEngine {
     }
 
     // =========================================================================
-    // PACKETS
+    // PACKETS GETTERS
     // =========================================================================
 
     /// Выдать один пакет (FIFO). Если буфер не пуст – увеличиваем position.
     #[napi(getter)]
     pub fn get_packet(&self) -> Option<Buffer> {
-        let buffer = self.buffer.lock().unwrap();
-        buffer.pop().map(|packet| {
+        let raw_packet = {
+            let buffer = self.buffer.lock().unwrap();
+            buffer.pop()
+        };
+
+        raw_packet.map(|packet| {
             self.position.fetch_add(1, Ordering::Relaxed);
             Buffer::from(packet)
         })
@@ -401,23 +398,23 @@ impl AudioEngine {
     /// При превышении max_capacity вытесняет старые пакеты (pop).
     #[napi]
     pub fn add_packet(&self, packet: Buffer) {
+        let data = packet.to_vec();
         let buffer = self.buffer.lock().unwrap();
 
         // Если в буфере уже достигнут лимит
         if buffer.is_full() { buffer.pop(); }
-
-        let _ = buffer.push(packet.to_vec());
+        let _ = buffer.push(data);
     }
 
     /// Массовое добавление пакетов.
     #[napi]
     pub fn add_packets(&self, packets: Vec<Buffer>) {
+        let raw_packets: Vec<Vec<u8>> = packets.iter().map(|p| p.to_vec()).collect();
         let buffer = self.buffer.lock().unwrap();
-        for packet in packets {
-            // Если в буфере уже достигнут лимит
-            if buffer.is_full() { buffer.pop(); }
 
-            let _ = buffer.push(packet.to_vec());
+        for packet in raw_packets {
+            if buffer.is_full() { buffer.pop(); }
+            let _ = buffer.push(packet);
         }
     }
 

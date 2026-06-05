@@ -11,18 +11,13 @@ use std::sync::{Arc, Mutex};
 /// - При большем количестве возрастает задержка обработки (jitter) из-за последовательного обхода.
 const MAX_PER_WORKER: usize = 50;
 
-/// Минимальное количество рабочих потоков, которое всегда должно существовать,
-/// даже если они пусты (чтобы избежать лишних созданий/удалений).
-/// При активной работе частое создание/удаление потоков вызывает накладные расходы.
-const MIN_WORKERS: usize = 1;
-
 /// Воркер теперь без Mutex
 struct Worker {
     /// Менеджер потов, хранящий в себе udp сессии
     manager: Arc<CycleManager>,
     
     /// Ссылки на udp сессии, для быстрого поиска и распределения между потоками
-    sessions: DashMap<u32, Arc<UdpBuffered>>
+    sessions: DashMap<u32, UdpBuffered>
 }
 
 impl Worker {
@@ -74,7 +69,7 @@ impl AutoBalancer {
         let mut current_len = self.workers.len();
 
         self.workers.retain(|w| {
-            if w.sessions.is_empty() && current_len > MIN_WORKERS {
+            if w.sessions.is_empty() {
                 current_len -= 1;
                 w.manager.shutdown();
                 false
@@ -88,7 +83,7 @@ impl AutoBalancer {
     /// Ищет первый воркер с числом сессий < MAX_PER_WORKER. Если такого нет, создаёт новый воркер.
     /// Затем вставляет сессию в выбранный воркер и добавляет её в `CycleManager` этого воркера.
     /// В конце удаляет пустые воркеры.
-    pub fn add_session(&mut self, id: u32, session: Arc<UdpBuffered>) {
+    pub fn add_session(&mut self, id: u32, session: UdpBuffered) {
         // Ищем подходящий воркер.
         // Если воркеров много, можно хранить индекс последнего неполного воркера,
         // чтобы не итерироваться с самого начала каждый раз.
@@ -127,7 +122,7 @@ pub static GLOBAL_BALANCER: Lazy<Mutex<AutoBalancer>> = Lazy::new(|| {
 
 /// Добавляет сессию в глобальный балансировщик
 /// Обычно вызывается из конструктора `UdpBuffered`.
-pub fn add_global_session(id: u32, session: Arc<UdpBuffered>) {
+pub fn add_global_session(id: u32, session: UdpBuffered) {
     GLOBAL_BALANCER.lock().unwrap().add_session(id, session);
 }
 

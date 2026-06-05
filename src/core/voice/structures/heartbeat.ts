@@ -66,13 +66,17 @@ export class HeartbeatManager {
         this.stop(); // останавливаем старый таймер если есть
         if (intervalMs) this.intervalMs = intervalMs;
 
+        const timeout = () => {
+            return setTimeout(() => {
+                this.lastSentTime = Date.now();
+                this.hooks?.send?.(this.lastSentTime); // отправляем heartbeat
+                this.setTimeout(); // запускаем ожидание ack
+                return timeout();
+            }, this.intervalMs);
+        }
+
         // Устанавливаем интервал отправки heartbeat
-        this.interval = setTimeout(() => {
-            this.lastSentTime = Date.now();
-            this.hooks?.send?.(this.lastSentTime); // отправляем heartbeat
-            this.setTimeout(); // запускаем ожидание ack
-            this.start();
-        }, this.intervalMs);
+        this.interval = timeout();
     };
 
     /**

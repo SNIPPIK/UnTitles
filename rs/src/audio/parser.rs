@@ -1,3 +1,4 @@
+use bytes::{Buf, BufMut, BytesMut};
 use napi::bindgen_prelude::*;
 use memchr::memmem;
 
@@ -20,7 +21,7 @@ const MAX_PACKET_SIZE: usize = 1024 * 1024;  // 1 MiB — запас для "з�
 // ============================================================================
 
 /// Типы пакетов для OPUS, рекомендуется некоторые просто не пушить в исходное аудио
-/// Для Discord - Frame, Silent. Поскольку остальные не требуются и будут откинуты и это уже потеря пакета
+/// Для Discord - Frame, Silent. Поскольку остальные не требуются и будут откинуты, это уже потеря пакета.
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum PacketType {
     Head,      // OpusHead (первые 8 байт "OpusHead", полный заголовок 19+)
@@ -39,17 +40,9 @@ pub type ParsedPacket = (PacketType, Vec<u8>);
 // ============================================================================
 
 /// Streaming Ogg Opus parser.
-///
-/// Особенности реализации:
-/// - Инкрементальный: принимает куски (chunk), которые могут быть разорваны на границе заголовка OggS.
-/// - Не копирует лишний раз: данные накапливаются в `remainder`, потом сдвигаются.
-/// - Поддерживает packet continuation: если пакет разбит на несколько сегментов/страниц,
-///   склеивает через `packet_carry`.
-/// - Следит за сменой logical bitstream (serial) — при переключении сбрасывает текущий carry.
-/// - Защита от malformed: проверка границ, ограничение на MAX_REMAINDER_SIZE и MAX_PACKET_SIZE.
 pub struct OggOpusParser {
     /// Неполные входные данные, которые не удалось обработать за прошлый раз (нет полной страницы).
-    remainder: Vec<u8>,
+    remainder: BytesMut,
 
     /// Буфер текущего собираемого пакета (может быть начат на одной странице и продолжиться на следующей).
     packet_carry: Vec<u8>,
@@ -60,6 +53,12 @@ pub struct OggOpusParser {
     bitstream_serial: Option<i32>
 }
 
+impl Default for OggOpusParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OggOpusParser {
     // =========================================================================
     // CONSTRUCTOR
@@ -67,7 +66,7 @@ impl OggOpusParser {
 
     pub fn new() -> Self {
         OggOpusParser {
-            remainder: Vec::with_capacity(16 * 1024),
+            remainder: BytesMut::with_capacity(8 * 1024),
             packet_carry: Vec::with_capacity(4096),
             bitstream_serial: None
         }
@@ -107,10 +106,9 @@ impl OggOpusParser {
 
     /// Вызывается при EOF (chunk пустой). Выдаёт последний собираемый пакет, если есть.
     fn flush_internal(&mut self, output: &mut Vec<ParsedPacket>) -> Result<()> {
-
         // Если есть в буфере еще данные о последних пакетах
         if !self.packet_carry.is_empty() {
-            let packet = std::mem::replace(&mut self.packet_carry, Vec::with_capacity(4096));
+            let packet = std::mem::take(&mut self.packet_carry);
             let packet_type = Self::detect_packet_type(&packet);
             output.push((packet_type, packet));
         }
@@ -132,80 +130,73 @@ impl OggOpusParser {
     /// - on_packet: функция, получает (PacketType, &[u8]) — владение данных остаётся за парсером.
     ///              В текущей реализации `parse_internal` копирует в Vec, но можно оптимизировать.
     fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()>
-    where F: FnMut(PacketType, &[u8]) -> Result<()> {
-        self.remainder.extend_from_slice(chunk);
+    where
+        F: FnMut(PacketType, &[u8]) -> Result<()>,
+    {
+        // put_slice работает гораздо умнее, чем extend_from_slice для Vec
+        self.remainder.put_slice(chunk);
 
-        // Если достигнут лимит, то просто выдаем ошибку переполнения
+        // Защита от переполнения (бесконечный рост при битом стриме)
         if self.remainder.len() > MAX_REMAINDER_SIZE {
-            // Защита от переполнения: чистим всё и выходим с ошибкой
             self.remainder.clear();
             self.packet_carry.clear();
             return Err(Error::from_reason("Ogg parser remainder overflow"));
         }
 
-        let mut cursor = 0;
-
         loop {
-            let available = self.remainder.len().saturating_sub(cursor);
-            if available < 27 {
-                break; // не хватает даже на минимальный заголовок Ogg page
+            if self.remainder.len() < 27 {
+                break; // Не хватает даже на минимальный заголовок
             }
 
-            // Ищем сигнатуру "OggS". Используем "memmem" для быстрого поиска.
-            // Это критично, так как поток может содержать мусор до первого OggS.
-            let pos = match memmem::find(&self.remainder[cursor..], b"OggS") {
-                Some(pos) => cursor + pos,
+            // Ищем сигнатуру "OggS"
+            let pos = match memmem::find(&self.remainder, b"OggS") {
+                Some(pos) => pos,
                 None => {
-                    // Не нашли ни одного "OggS" в остатке.
-                    // Оставляем только последние 3 байта, так как сигнатура длиной 4,
-                    // и следующий фрейм может добавить недостающий байт для завершения "OggS".
+                    // Если OggS не найден, безопасно отбрасываем весь мусор,
+                    // оставляя только последние 3 байта (на случай, если "OggS" разорван между чанками)
                     if self.remainder.len() > 3 {
-                        let keep_from = self.remainder.len() - 3;
-                        self.remainder.copy_within(keep_from.., 0);
-                        self.remainder.truncate(3);
+                        let discard_len = self.remainder.len() - 3;
+                        self.remainder.advance(discard_len);
                     }
                     return Ok(());
                 }
             };
 
-            cursor = pos;
+            // Сдвигаем окно прямо к началу сигнатуры OggS
+            if pos > 0 {
+                self.remainder.advance(pos);
+            }
 
-            let page = &self.remainder[cursor..];
-            let segments_count = match page.get(26) {
-                Some(v) => *v as usize,
+            // Теперь remainder гарантированно начинается с "OggS"
+            let segments_count = match self.remainder.get(26) {
+                Some(&v) => v as usize,
                 None => break,
             };
 
             let header_size = 27 + segments_count;
-            if page.len() < header_size {
-                break; // ждём следующий фрейм для полного заголовка
+            if self.remainder.len() < header_size {
+                break; // Ждём следующего чанка для загрузки таблицы сегментов
             }
 
-            let segment_table = &page[27..header_size];
+            let segment_table = &self.remainder[27..header_size];
             let payload_size: usize = segment_table.iter().map(|&s| s as usize).sum();
             let page_end = header_size + payload_size;
-            if page.len() < page_end {
-                break; // не хватает данных полезной нагрузки
+
+            if self.remainder.len() < page_end {
+                break; // Ждём загрузки данных (payload)
             }
 
-            // У нас есть полная страница.
-            let full_page = &page[..page_end];
+            // У нас есть полная страница
+            let full_page = &self.remainder[..page_end];
 
-            // Обрабатываем страницу. Если ошибка (некорректная сигнатура или выход за границы),
-            // пропускаем 4 байта (попытка восстановления синхронизации).
+            // Обрабатываем. Если ошибка, пропускаем сигнатуру (4 байта), чтобы найти следующий OggS
             if Self::handle_page_core(full_page, &mut self.packet_carry, &mut self.bitstream_serial, &mut on_packet).is_err() {
-                cursor += 4;
+                self.remainder.advance(4);
                 continue;
             }
 
-            cursor += page_end;
-        }
-
-        // Удаляем обработанные байты из remainder
-        if cursor > 0 {
-            let len = self.remainder.len();
-            self.remainder.copy_within(cursor.., 0);
-            self.remainder.truncate(len - cursor);
+            // УСПЕХ: страница обработана. Просто "проглатываем" её из буфера за O(1)
+            self.remainder.advance(page_end);
         }
 
         Ok(())
@@ -295,64 +286,42 @@ impl OggOpusParser {
     // PACKET DETECTION
     // =========================================================================
 
-    /// Определяет тип пакета по содержимому.
     /// Логика:
     /// - Пустой → Broken
-    /// - Длина 1: 0x80 → Broken? (раньше мог использоваться как маркер)
-    ///   0xFF → End (наш внутренний маркер конца потока)
+    /// - Длина 1: 0x80 → Silent, 0xFF → End
     /// - Длина <8 → Broken (не может быть валидным Opus фреймом)
     /// - Проверяет строки "OpusHead" и "OpusTags" в начале.
-    ///   OpusHead должен быть не менее 19 байт (как минимум версия + каналы + ...)
     /// - Иначе — если длина >=8 → считаем Frame (здесь также может быть Silent с ведущим 0x80,
+    ///   но мы относим их к Frame, так как структурно это валидные пакеты).
     #[inline]
-    fn detect_packet_type(packet: &[u8]) -> PacketType {
-        // Если пакет полностью пуст
+    pub fn detect_packet_type(packet: &[u8]) -> PacketType {
         if packet.is_empty() {
             return PacketType::Broken;
         }
 
-        // Если размер пакета равен 0
-        if packet.len() == 1 {
-            return match packet[0] {
-                // Пакет тишины
-                0x80 => PacketType::Silent,
-
-                // Пакет окончания
-                0xFF => PacketType::End,
-
-                // Пустой аудио пакет
-                _ => PacketType::Broken,
-            };
-        } 
-        
-        // Если пакет больше 1 и меньше или равен 8
-        else if packet.len() > 1 && packet.len() < 8 {
-            return match packet[0] {
-                // Пакет тишины
-                0x80 => PacketType::Silent,
-
-                // Пакет окончания
-                0xFF => PacketType::End,
-
-                // Пустой аудио пакет
-                _ => PacketType::Broken,
-            };
-        }
-
-        // Если пакет является заголовком
-        if packet.len() >= 8 {
-            // Если пакет является заголовком
+        // Проверяем заголовки Ogg (длинные строки)
+        else if packet.len() >= 8 {
             if packet.starts_with(b"OpusHead") {
                 return if packet.len() >= 19 { PacketType::Head } else { PacketType::Broken };
             }
-
-            // Если пакет является тегом
             else if packet.starts_with(b"OpusTags") {
                 return PacketType::Tags;
             }
         }
 
-        // Если проверка пройдена, то скорее всего это нормальный фрейм
+        // Стандартный кадр тишины Opus (20 мс, стерео) — то, что нужно Discord
+        else if packet == [0xF8, 0xFF, 0xFE] || packet == [0xFC, 0xFF, 0xFE] {
+            return PacketType::Silent;
+        }
+
+        // Внутренний сигнал конца потока (если ты используешь 1 байт 0xFF для управления)
+        else if packet.len() == 1 && packet[0] == 0xFF {
+            return PacketType::End;
+        }
+
+        // Всё остальное — валидный аудиофрейм.
+        // Opus имеет TOC-байт под индексом 0. Не проверяем длину, так как
+        // фрейм может быть размером от 1 байта до 1275 байт.
         PacketType::Frame
     }
 }

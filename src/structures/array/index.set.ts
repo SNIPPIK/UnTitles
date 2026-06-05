@@ -26,10 +26,8 @@ export class SetArray<T> extends Set<T> {
     public add(task: T) {
         if (this.has(task)) this.delete(task);
 
-        // Если нет обьекта в списке
-        if (!this._array?.includes?.(task)) this._array.push(task);
-
         // Стандартный метод добавления
+        this._array.push(task);
         super.add(task);
         return this;
     };
@@ -45,7 +43,7 @@ export class SetArray<T> extends Set<T> {
 
         // Если есть данный объект в списке
         if (index !== -1) {
-            this._array.splice(index);
+            this._array.splice(index, 1);
         }
 
         // Стандартный метод удаления

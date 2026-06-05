@@ -195,7 +195,7 @@ export class Queue {
         this._message.delete();
 
         // Удаляем статус гс канала
-        db.adapter.status(this.message.voice_id, null).catch(() => {
+        db.adapter.status(this.message.voice_id, "").catch(() => {
             return null;
         });
     };

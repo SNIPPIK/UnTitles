@@ -5,26 +5,16 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-/// Максимальный размер UDP/Opus пакета (MTU-like ограничение).
-/// Используется для валидации входных данных в push().
-const MAX_PACKET_SIZE: usize = 1500;
+#[repr(align(64))]
+struct CacheAlignedAtomic(AtomicUsize);
 
-/// Lock-free SPSC кольцевой буфер для Vec<u8>.
-///
-/// **Ключевые особенности:**
-/// - Single Producer, Single Consumer (без блокировок, только атомарные операции)
-/// - Вместимость: реальный размер буфера = requested_capacity + 1 (техника "одна дыра")
-/// - Все слоты выделены в Box<[UnsafeCell<MaybeUninit<Vec<u8>>>]>
-/// - Никогда не перераспределяет память (realloc отсутствует)
-/// - Zero UB при корректном использовании (нарушение SPSC может привести к гонкам)
-/// - Для `get_clone_at` требуется внешняя синхронизация с `pop` (предупреждение в документации)
-///
-/// **Потокобезопасность:**
-/// - `Send` + `Sync` реализованы вручную, т.к. компилятор не может вывести их из-за UnsafeCell.
-///   Но наша логика гарантирует, что продьюсер пишет только в `head`, консьюмер только в `tail`,
-///   а доступ к слотам разделён во времени: продьюсер работает с "свободными" (неинициализированными или уже вычитанными) слотами,
-///   консьюмер — с "занятыми" (инициализированными). Конкурентного доступа к одному слоту на запись/чтение нет.
-///   Атомарные Ordering'и обеспечивают видимость изменений между потоками.
+impl CacheAlignedAtomic {
+    #[inline]
+    const fn new(val: usize) -> Self {
+        Self(AtomicUsize::new(val))
+    }
+}
+
 pub struct RingBuffer {
     /// Хранилище: массив фиксированной длины, каждый элемент — UnsafeCell<MaybeUninit<Vec<u8>>>.
     /// - `UnsafeCell` нужен для внутренней мутабельности через разделяемую ссылку &self.
@@ -33,13 +23,8 @@ pub struct RingBuffer {
 
     /// Реальная ёмкость = capacity + 1 (см. алгоритм с отличием head и tail).
     capacity: usize,
-
-    /// Индекс продьюсера (куда писать следующий элемент). Всегда указывает на **свободный** слот.
-    head: AtomicUsize,
-
-    /// Индекс (откуда читать следующий элемент). Всегда указывает на **занятый** слот или
-    /// равен head, если очередь пуста.
-    tail: AtomicUsize
+    head: CacheAlignedAtomic,
+    tail: CacheAlignedAtomic
 }
 
 // ============================================================================
@@ -65,7 +50,7 @@ impl RingBuffer {
     /// Внутренний реальный размер = capacity + 1, поэтому буфер может хранить максимум `capacity` элементов.
     /// Передаваемый `capacity` должен быть > 0.
     pub fn new(capacity: usize) -> Self {
-        assert!(capacity > 0);
+        assert!(capacity > 0, "Capacity must be greater than 0");
 
         let real_capacity = capacity + 1;
 
@@ -79,8 +64,8 @@ impl RingBuffer {
         RingBuffer {
             buffer: vec.into_boxed_slice(),
             capacity: real_capacity,
-            head: AtomicUsize::new(0),
-            tail: AtomicUsize::new(0)
+            head: CacheAlignedAtomic::new(0),
+            tail: CacheAlignedAtomic::new(0),
         }
     }
 
@@ -93,15 +78,15 @@ impl RingBuffer {
     /// то все предыдущие записи head (от продьюсера) стали видимы, а также мы не «заглядываем» вперёд.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.head.load(Ordering::Acquire) == self.tail.load(Ordering::Acquire)
+        self.head.0.load(Ordering::Acquire) == self.tail.0.load(Ordering::Acquire)
     }
 
     /// Текущее количество элементов в очереди.
     /// Вычисляет разницу между head и tail по модулю capacity (кольцевая арифметика).
     #[inline]
     pub fn len(&self) -> usize {
-        let head = self.head.load(Ordering::Acquire);
-        let tail = self.tail.load(Ordering::Acquire);
+        let head = self.head.0.load(Ordering::Acquire);
+        let tail = self.tail.0.load(Ordering::Acquire);
 
         if head >= tail {
             head - tail
@@ -115,9 +100,9 @@ impl RingBuffer {
     /// который мы не используем для различения состояний "полный" и "пустой").
     #[inline]
     pub fn is_full(&self) -> bool {
-        let head = self.head.load(Ordering::Acquire);
+        let head = self.head.0.load(Ordering::Relaxed);
         let next = (head + 1) % self.capacity;
-        next == self.tail.load(Ordering::Acquire)
+        next == self.tail.0.load(Ordering::Acquire)
     }
 
     // =========================================================================
@@ -136,15 +121,11 @@ impl RingBuffer {
     /// - Запись в слот делается через указатель (`*slot.write(data)`), после чего публикуем новый `head`
     ///   с `Release`, чтобы все записи данных стали видимы консьюмеру, который загрузит `head` с `Acquire`.
     pub fn push(&self, data: Vec<u8>) -> Result<(), Vec<u8>> {
-        if data.is_empty() || data.len() < 3 || data.len() > MAX_PACKET_SIZE {
-            return Err(data);
-        }
-
-        let head = self.head.load(Ordering::Relaxed);
+        let head = self.head.0.load(Ordering::Relaxed);
         let next_head = (head + 1) % self.capacity;
 
-        if next_head == self.tail.load(Ordering::Acquire) {
-            return Err(data); // полный
+        if next_head == self.tail.0.load(Ordering::Acquire) {
+            return Err(data);
         }
 
         unsafe {
@@ -156,7 +137,7 @@ impl RingBuffer {
             (*slot).write(data);
         }
 
-        self.head.store(next_head, Ordering::Release);
+        self.head.0.store(next_head, Ordering::Release);
         Ok(())
     }
 
@@ -175,9 +156,9 @@ impl RingBuffer {
     ///   Слот после этого становится неинициализированным (содержит «дырку»). Потом просто запишет новый Vec через write,
     ///   что корректно (MaybeUninit позволяет повторную инициализацию).
     pub fn pop(&self) -> Option<Vec<u8>> {
-        let tail = self.tail.load(Ordering::Relaxed);
+        let tail = self.tail.0.load(Ordering::Relaxed);
 
-        if tail == self.head.load(Ordering::Acquire) {
+        if tail == self.head.0.load(Ordering::Acquire) {
             return None;
         }
 
@@ -190,7 +171,7 @@ impl RingBuffer {
             ptr::read((*slot).as_ptr())
         };
 
-        self.tail.store(next_tail, Ordering::Release);
+        self.tail.0.store(next_tail, Ordering::Release);
         Some(value)
     }
 
@@ -207,17 +188,16 @@ impl RingBuffer {
     /// Для SPSC это нарушает гарантии – метод добавлен для удобного доступа "только для чтения" в однопоточном
     /// контексте или с дополнительной синхронизацией.
     pub fn get_clone_at(&self, index: usize) -> Option<Vec<u8>> {
-        let tail = self.tail.load(Ordering::Acquire);
-        let head = self.head.load(Ordering::Acquire);
+        let tail = self.tail.0.load(Ordering::Relaxed);
+        let head = self.head.0.load(Ordering::Acquire);
 
-        let len = if head >= tail {
+        let current_len = if head >= tail {
             head - tail
         } else {
             self.capacity - tail + head
         };
 
-        // Если требуется больше чем есть в потоке
-        if index > len { // Возможна не точность!!!
+        if index >= current_len {
             return None;
         }
 
@@ -225,8 +205,8 @@ impl RingBuffer {
 
         unsafe {
             let slot = self.buffer[real_index].get();
-            // clone() вызывает копирование данных Vec (глубокое). Это безопасно, так как слот инициализирован (индекс валиден).
-            Some((*(*slot).as_ptr()).clone())
+            // ИСПРАВЛЕНИЕ: Правильное и безопасное разыменование указателя для клонирования
+            Some((&*(slot as *const _ as *const Vec<u8>)).clone())
         }
     }
 
@@ -252,8 +232,8 @@ impl Drop for RingBuffer {
     /// а `MaybeUninit` не вызывает деструктор автоматически. Нужно вручную пройти по всем занятым слотам (от tail до head)
     /// и вызвать `drop_in_place` для каждого `Vec`. После этого память самой `Box` будет освобождена.
     fn drop(&mut self) {
-        let head = self.head.load(Ordering::Acquire);
-        let mut tail = self.tail.load(Ordering::Acquire);
+        let head = self.head.0.load(Ordering::Relaxed);
+        let mut tail = self.tail.0.load(Ordering::Relaxed);
 
         while tail != head {
             unsafe {

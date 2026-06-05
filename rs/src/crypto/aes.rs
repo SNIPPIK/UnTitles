@@ -1,35 +1,41 @@
-use crate::timers::scheduler::cycle_manager::{TICK_INTERVAL_MS};
+use crate::timers::scheduler::cycle_manager::TICK_INTERVAL_MS;
 use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use rand::RngExt;
 use rand::{rng};
 use std::fmt;
-use std::sync::Mutex;
 use aes_gcm::{
-    aead::{Aead, KeyInit, Payload},
-    Aes256Gcm, Nonce,
+    aead::{AeadInPlace, KeyInit},
+    Aes256Gcm, Nonce
 };
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
 
 /// Приращение временной метки RTP для одного пакета.
 /// Рассчитывается как `48000 samples/sec * 0.02 sec = 960 samples` для кадров Opus длительностью 20 мс.
-const TIMESTAMP_INC: u64 = 48000 * TICK_INTERVAL_MS / 1000;
+const TIMESTAMP_INC: u32 = (48000 * TICK_INTERVAL_MS / 1000) as u32;
 
 /// Размер стандартного заголовка RTP в байтах (без CSRC и расширений).
 const RTP_HEADER_SIZE: usize = 12;
 
-/// Типы ошибок, специфичные для криптографических операций.
+// ============================================================================
+// ERRORS
+// ============================================================================
+
 #[derive(Debug)]
 pub enum CryptoError {
     /// Ключ шифрования имеет неверную длину (должен быть 32 байта).
     InvalidKeyLength(usize),
-    
+
     /// Ошибка при шифровании (проблема с nonce, AAD или внутренняя ошибка AES-GCM).
     EncryptionFailed(String),
-    
+
     /// Размер фрейма превышает максимально допустимый (обычно MTU ~1200 байт).
     FrameTooLarge(usize),
-    
+
     /// Некорректный RTP-пакет (например, слишком короткий заголовок).
     InvalidPacket
 }
@@ -54,7 +60,10 @@ impl From<CryptoError> for Error {
     }
 }
 
-/// Внутренние параметры шифрования (пока только SSRC, в будущем можно расширить).
+// ============================================================================
+// STATE
+// ============================================================================
+
 #[derive(Clone)]
 struct EncryptorOptions {
     ssrc: u32
@@ -63,22 +72,16 @@ struct EncryptorOptions {
 /// Объект RTP-сокета для голоса, доступный из JavaScript.
 /// Выполняет шифрование аудиофреймов (Opus) в соответствии с требованиями Discord.
 ///
-/// # Атомарные счётчики
-/// - `sequence` – 16-битный счётчик RTP-пакетов (оборачивается).
-/// - `timestamp` – 32-битная метка времени, увеличивается на `TIMESTAMP_INC` для каждого пакета.
-/// - `counter` – 32-битный счётчик nonce (используется как первые 4 байта 12-байтового nonce).
-///
 /// # Потокобезопасность
-/// Все методы могут вызываться из разных потоков благодаря атомарным операциям.
-/// Однако `cipher` внутри не является `Sync`, поэтому экземпляр `VoiceRTPSocket` не должен
-/// использоваться из нескольких потоков одновременно (если только не обёрнут в Mutex).
+/// Структура полностью Send + Sync. `Aes256Gcm` не имеет внутреннего мутируемого
+/// состояния, а все счетчики атомарны. Можно безопасно дергать `packet()` из пула потоков.
 #[napi(js_name = "VoiceRTPSocket")]
 pub struct VoiceRTPSocket {
     options: EncryptorOptions,
     sequence: AtomicU16,
     timestamp: AtomicU32,
     counter: AtomicU32,
-    cipher: Mutex<Aes256Gcm>
+    cipher: Aes256Gcm
 }
 
 #[napi]
@@ -109,7 +112,7 @@ impl VoiceRTPSocket {
         let mut rng = rng();
 
         Ok(VoiceRTPSocket {
-            cipher: Mutex::new(cipher),
+            cipher,
             options: EncryptorOptions { ssrc },
             sequence: AtomicU16::new(rng.random()),
             timestamp: AtomicU32::new(rng.random()),
@@ -123,7 +126,7 @@ impl VoiceRTPSocket {
         "aead_aes256_gcm_rtpsize".to_string()
     }
 
-    /// Шифрует один аудиофрейм (Opus) и возвращает полный RTP-пакет.
+    /// Шифрует один аудио фрейм (Opus) и возвращает полный RTP-пакет.
     ///
     /// # Процесс
     /// 1. Формируется RTP-заголовок (12 байт) с текущими значениями sequence, timestamp, SSRC.
@@ -139,31 +142,43 @@ impl VoiceRTPSocket {
     /// - Если размер фрейма превышает допустимый (проверка отсутствует, но можно добавить).
     #[napi]
     pub fn packet(&self, frame: Buffer) -> Result<Buffer> {
+        let frame_len = frame.len();
+        let total_len = RTP_HEADER_SIZE + frame_len + 16 + 4;
+        let mut out = Vec::with_capacity(total_len);
+        unsafe {
+            out.set_len(total_len);
+        }
+
+        // ===== HEADER =====
         let header = self.build_header();
+        out[..RTP_HEADER_SIZE].copy_from_slice(&header);
+
+        // ===== PAYLOAD =====
+        let payload_end = RTP_HEADER_SIZE + frame_len;
+        out[RTP_HEADER_SIZE..payload_end].copy_from_slice(frame.as_ref());
+
+        // ===== NONCE =====
         let nonce_bytes = self.generate_nonce();
         let nonce = Nonce::from(nonce_bytes);
 
-        let payload = Payload {
-            msg: frame.as_ref(),
-            aad: &header
-        };
-
-        // Блокируем мьютекс только на время шифрования
-        let cipher = self.cipher.lock().map_err(|_| {
-            Error::new(Status::GenericFailure, "Mutex poison error".to_string())
-        })?;
-
-        let encrypted = cipher
-            .encrypt(&nonce, payload)
+        // ===== ENCRYPT =====
+        let tag = self.cipher
+            .encrypt_in_place_detached(
+                &nonce,
+                &header,
+                &mut out[RTP_HEADER_SIZE..payload_end],
+            )
             .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
-        // Формируем итоговый пакет: заголовок + шифротекст/тег + tail nonce.
-        let mut out = Vec::with_capacity(RTP_HEADER_SIZE + encrypted.len() + 4);
-        out.extend_from_slice(&header);
-        out.extend_from_slice(&encrypted);
-        out.extend_from_slice(&nonce_bytes[0..4]);
+        // ===== TAG =====
+        let tag_end = payload_end + 16;
+        out[payload_end..tag_end].copy_from_slice(tag.as_slice());
 
-        Ok(Buffer::from(out))
+        // ===== NONCE TAIL =====
+        out[tag_end..total_len].copy_from_slice(&nonce_bytes[..4]);
+
+        // Передача владения Vec в Node.js без копирования (zero-copy)
+        Ok(Buffer::from(out.as_slice()))
     }
 
     /// Пакетное шифрование нескольких фреймов.
@@ -176,8 +191,7 @@ impl VoiceRTPSocket {
     pub fn packets(&self, frames: Vec<Buffer>) -> Result<Vec<Buffer>> {
         let mut out = Vec::with_capacity(frames.len());
         for frame in frames {
-            let packet = self.packet(frame)?;
-            out.push(packet);
+            out.push(self.packet(frame)?);
         }
         Ok(out)
     }
@@ -187,7 +201,7 @@ impl VoiceRTPSocket {
     ///
     /// Счётчик увеличивается атомарно на единицу каждый раз (Acquire/Release гарантирует видимость).
     fn generate_nonce(&self) -> [u8; 12] {
-        let counter = self.counter.fetch_add(1, Ordering::SeqCst);
+        let counter = self.counter.fetch_add(1, Ordering::Relaxed);
         let mut nonce = [0u8; 12];
         nonce[0..4].copy_from_slice(&counter.to_be_bytes());
         nonce
@@ -201,29 +215,29 @@ impl VoiceRTPSocket {
     /// - Sequence number (16 бит, big-endian) – увеличивается атомарно.
     /// - Timestamp (32 бита, big-endian) – увеличивается на TIMESTAMP_INC.
     /// - SSRC (32 бита, big-endian) – фиксированный.
-    fn build_header(&self) -> Vec<u8> {
+    fn build_header(&self) -> [u8; RTP_HEADER_SIZE] {
         let mut header = [0u8; RTP_HEADER_SIZE];
 
-        header[0] = 0x80;
-        header[1] = 0x78;
+        header[0] = 0x80; // V=2
+        header[1] = 0x78; // PT=120 (Opus)
 
-        let seq = self.sequence.fetch_add(1, Ordering::SeqCst);
+        let seq = self.sequence.fetch_add(1, Ordering::Relaxed);
         header[2..4].copy_from_slice(&seq.to_be_bytes());
 
-        let ts = self.timestamp.fetch_add(TIMESTAMP_INC as u32, Ordering::SeqCst);
+        let ts = self.timestamp.fetch_add(TIMESTAMP_INC, Ordering::Relaxed);
         header[4..8].copy_from_slice(&ts.to_be_bytes());
 
         header[8..12].copy_from_slice(&self.options.ssrc.to_be_bytes());
 
-        header.to_vec()
+        header
     }
 
     /// Сбрасывает все внутренние счётчики в ноль.
     /// Используется при уничтожении экземпляра или для очистки состояния.
     #[napi]
-    pub fn destroy(&mut self) {
-        self.sequence.store(0, Ordering::SeqCst);
-        self.timestamp.store(0, Ordering::SeqCst);
-        self.counter.store(0, Ordering::SeqCst);
+    pub fn destroy(&self) {
+        self.sequence.store(0, Ordering::Relaxed);
+        self.timestamp.store(0, Ordering::Relaxed);
+        self.counter.store(0, Ordering::Relaxed);
     }
 }

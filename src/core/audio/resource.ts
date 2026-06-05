@@ -169,7 +169,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
             // Указываем формат аудио (ogg/opus)
             "-c:a", "libopus",
             "-vbr", ENCODER_PARAMS.vbr,
-            "-frame_duration", "20",
+            "-frame_duration", `${OPUS_FRAME_SIZE}`,
             "-fec", ENCODER_PARAMS.lost.fec,
             "-packet_loss", ENCODER_PARAMS.lost.total,
             "-application", ENCODER_PARAMS.mode,

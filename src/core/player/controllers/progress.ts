@@ -62,13 +62,10 @@ export class PlayerProgress {
         // В самом начале (полностью пустой)
         if (current <= 0) {
             return left + emoji.empty.center.repeat(this.size) + right;
-
-            // Совет: Если вы хотите, чтобы кнопка (ползунок) стояла в начале, а не исчезала, используйте это:
-            // return left + button + emoji.empty.center.repeat(Math.max(0, this.size - 1)) + right;
         }
 
         // В самом конце (полностью заполненный)
-        if (filled >= this.size || current >= total) {
+        else if (filled >= this.size || current >= total) {
             return left + emoji.upped.center.repeat(this.size) + right;
         }
 

@@ -1,17 +1,16 @@
-use napi::threadsafe_function::{ThreadsafeFunctionCallMode};
+use napi::threadsafe_function::ThreadsafeFunctionCallMode;
 use crate::timers::scheduler::balancer::{add_global_session, remove_global_session};
 use crate::audio::ring_buffer::RingBuffer;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::{
     net::UdpSocket,
-    time::{ SystemTime, UNIX_EPOCH },
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering, AtomicU64, AtomicU32},
+        atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
         Arc, Mutex,
     },
     thread,
-    time::Duration
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 /// Время до отправки keepalive пакета, для работы через NAT системы
@@ -46,19 +45,14 @@ pub struct UdpBufferedInner {
 
 impl UdpBufferedInner {
     /// Добавляет пакет в очередь на отправку.
-    ///
-    /// Если очередь переполнена (достигнут MAX_BUFFER_ITEMS), удаляет самый старый пакет
-    /// (pop_front) и увеличивает счётчик сброшенных пакетов.
     pub fn push(&self, data: Vec<u8>) {
         if self.buffer.push(data).is_err() {
             self.send_drops.fetch_add(1, Ordering::Relaxed);
         }
     }
 
-    /// Проверка есть ли еще данные в кольцевом буфере
-    ///
-    /// Если нет буфера, то и нет смысла вызывать tick
-    pub fn has_ticked(&self) -> bool {
+    /// Проверка, есть ли еще данные в кольцевом буфере и валиден ли сокет.
+    pub fn has_pending_packets(&self) -> bool {
         !self.buffer.is_empty() && self.socket.local_addr().is_ok()
     }
 
@@ -74,40 +68,28 @@ impl UdpBufferedInner {
         if let Some(packet) = self.buffer.pop() {
             match self.socket.send(&packet) {
                 Ok(_) => {
-                    self.counter.store(0, Ordering::SeqCst);
-                    self.last_send_ms.store(now, Ordering::SeqCst);
+                    self.counter.store(0, Ordering::Relaxed);
+                    self.last_send_ms.store(now, Ordering::Relaxed);
                 }
                 Err(_) => {
-                    self.send_drops.fetch_add(1, Ordering::SeqCst);
+                    self.send_drops.fetch_add(1, Ordering::Relaxed);
+                    // В зависимости от реализации RingBuffer, возможно стоит 
+                    // вернуть пакет обратно в начало очереди (push_front),
+                    // как указано в твоем комментарии.
                 }
             }
-        }
-
-        // Время последней отправки
-        let last_send = self.last_send_ms.load(Ordering::SeqCst);
-
-        // Если время превышает норму
-        if now.saturating_sub(last_send) >= 22 {
-            self.send_drops.fetch_add(1, Ordering::SeqCst);
         }
     }
 
-    /// Тот же tick, но для поддержания подключения через системы NAT
-    ///
-    /// Отправляем пакеты через KEEP_ALIVE_TIMEOUT интервалы
+    /// Отправка keep-alive пакета для поддержания NAT.
     pub fn tick_alive(&self, now: u64) {
-        // Keep-alive логика
-        let last_send = self.last_send_ms.load(Ordering::SeqCst);
+        let count = self.counter.fetch_add(1, Ordering::Relaxed);
+        let mut keep_alive_packet = [0u8; 8];
 
-        if now.saturating_sub(last_send) >= KEEP_ALIVE_INTERVAL {
-            let count = self.counter.fetch_add(1, Ordering::SeqCst);
-            let mut keep_alive_packet = [0u8; 8];
+        keep_alive_packet[0..4].copy_from_slice(&count.to_le_bytes());
 
-            keep_alive_packet[0..4].copy_from_slice(&count.to_le_bytes());
-
-            if self.socket.send(&keep_alive_packet).is_ok() {
-                self.last_send_ms.store(now, Ordering::SeqCst);
-            }
+        if self.socket.send(&keep_alive_packet).is_ok() {
+            self.last_send_ms.store(now, Ordering::Relaxed);
         }
     }
 }
@@ -148,9 +130,7 @@ impl UdpBuffered {
         let socket = UdpSocket::bind("0.0.0.0:0")
             .map_err(|e| Error::from_reason(format!("Bind error: {}", e)))?;
 
-        // Устанавливаем соединение (фильтрует входящие пакеты только от этого адреса).
-        socket
-            .connect(&remote_addr)
+        socket.connect(&remote_addr)
             .map_err(|e| Error::from_reason(format!("Connect error: {}", e)))?;
 
         socket.set_nonblocking(true)
@@ -177,8 +157,7 @@ impl UdpBuffered {
 
         // Регистрируем сессию в глобальном балансировщике.
         // Передаём клон, специально подготовленный для менеджера (без listener_handle).
-        add_global_session(id, Arc::new(udp.clone_for_manager()));
-
+        add_global_session(id, udp.clone());
         Ok(udp)
     }
 
@@ -194,16 +173,10 @@ impl UdpBuffered {
         self.inner.send_drops.load(Ordering::Relaxed) as u32
     }
 
-    /// Добавляет пакет в очередь на отправку. С проверкой мусора
-    ///
-    /// # Аргументы
-    /// * `packet` - Buffer с данными для отправки.
-    ///
-    /// Если длина пакета будет равна 3, он будет проверен, допустим ли он!
-    /// Если размер пакета более 3, то позволяем ему отправится в циклической системе
+    /// Добавляет пакет в очередь на отправку. С проверкой мусора.
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        self.try_push(packet);
+        self.try_push(packet.to_owned());
     }
 
     /// Добавляет несколько пакетов в очередь с проверкой мусора.
@@ -213,7 +186,7 @@ impl UdpBuffered {
     #[napi]
     pub fn push_packets(&self, packets: Vec<Buffer>) {
         for packet in packets {
-            self.try_push(packet);
+            self.try_push(packet.to_owned());
         }
     }
 
@@ -228,18 +201,11 @@ impl UdpBuffered {
     /// Для вызова из фонового потока используется ThreadsafeFunction.
     #[napi]
     pub fn start_listening(&self, callback: Function<Buffer, ()>) -> Result<()> {
-        // Защита от повторного запуска
-        if self.listener_active.load(Ordering::SeqCst) {
-            return Ok(());
+        if self.listener_active.swap(true, Ordering::SeqCst) {
+            return Ok(()); // Поток уже запущен
         }
 
-        self.listener_active.store(true, Ordering::SeqCst);
-
-        // Создаём потоко-безопасную обёртку над JS-вызовом.
-        let tsfn = callback
-            .build_threadsafe_function()
-            .build()?;
-
+        let tsfn = callback.build_threadsafe_function().build()?;
         let socket = self.inner.socket.clone();
         let active = self.listener_active.clone();
 
@@ -247,14 +213,12 @@ impl UdpBuffered {
         let handle = thread::spawn(move || {
             let mut buf = [0u8; 2048];
 
-            while active.load(Ordering::SeqCst) {
+            while active.load(Ordering::Relaxed) {
                 match socket.recv(&mut buf) {
                     Ok(size) if size > 0 => {
-                        let raw_data = buf[..size].to_vec();
-                        let js_buffer = Buffer::from(raw_data);
-
-                        // Метод call сам поймет, как доставить его в главный поток.
-                        tsfn.call(js_buffer, ThreadsafeFunctionCallMode::Blocking);
+                        // Передача Vec<u8> в Buffer::from обеспечивает zero-copy перенос в JS
+                        let js_buffer = Buffer::from(buf[..size].to_vec());
+                        tsfn.call(js_buffer, ThreadsafeFunctionCallMode::NonBlocking);
                     }
                     // Если сокет временно недоступен (нет данных), немного спим.
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -265,10 +229,18 @@ impl UdpBuffered {
                     _ => {}
                 }
             }
+
+            drop(tsfn);
         });
 
-        // Сохраняем поток, чтобы иметь возможность его остановить
-        *self.listener_handle.lock().unwrap() = Some(handle);
+        // Безопасное снятие блокировки с обработкой poisoning
+        match self.listener_handle.lock() {
+            Ok(mut lock) => { *lock = Some(handle); }
+            Err(poisoned) => {
+                let mut lock = poisoned.into_inner();
+                *lock = Some(handle);
+            }
+        }
 
         Ok(())
     }
@@ -276,31 +248,33 @@ impl UdpBuffered {
     /// Останавливает прослушивание входящих пакетов и дожидается завершения потока.
     #[napi]
     pub fn stop_listening(&self) {
-        self.listener_active.store(false, Ordering::SeqCst);
+        self.listener_active.store(false, Ordering::Relaxed);
 
-        if let Some(handle) = self.listener_handle.lock().unwrap().take() {
-            let _ = handle.join();
-        }
+        // Безопасное извлечение handle и ожидание завершения потока
+        let handle = match self.listener_handle.lock() {
+            Ok(mut lock) => lock.take(),
+            Err(poisoned) => poisoned.into_inner().take()
+        };
+
+        if let Some(handle) = handle { let _ = handle.join(); }
     }
 
     /// Полностью уничтожает сессию: останавливает прослушивание, очищает очередь,
     /// удаляет себя из глобального балансировщика. Повторные вызовы игнорируются.
     #[napi]
     pub fn destroy(&self) {
-        // Предотвращаем повторное уничтожение.
-        if self.destroyed.swap(true, Ordering::AcqRel) {
-            return;
-        }
+        if self.destroyed.swap(true, Ordering::Relaxed) { return; }
 
+        self.listener_active.store(false, Ordering::Relaxed);
         self.stop_listening();
         remove_global_session(self.id);
     }
 
     /// Пытается добавить байты во внутренний буфер для последующей отправки.
     #[inline]
-    fn try_push(&self, bytes: Buffer) {
+    fn try_push(&self, bytes: Vec<u8>) {
         if bytes.is_empty() { return; }
-        self.inner.push(bytes.to_vec());
+        self.inner.push(bytes);
     }
 
     /// Создаёт клон UdpBuffered, предназначенный для использования в менеджере (CycleManager).
@@ -310,9 +284,9 @@ impl UdpBuffered {
         UdpBuffered {
             inner: self.inner.clone(),
             listener_active: self.listener_active.clone(),
-            listener_handle: Arc::new(Mutex::new(None)),
+            listener_handle: Arc::new(Mutex::new(None)), // Менеджер не управляет потоком
             destroyed: self.destroyed.clone(),
-            id: self.id
+            id: self.id,
         }
     }
 
@@ -320,21 +294,15 @@ impl UdpBuffered {
     /// (Внутренний, не экспортируется в JS).
     pub fn tick(&self) {
         let now = now_ms();
-        let last_ms = self.inner.last_send_ms.load(Ordering::SeqCst);
 
-        // Если с последней отправки прошло KEEP_ALIVE_INTERVAL или больше...
-        if now.saturating_sub(last_ms) >= KEEP_ALIVE_INTERVAL {
-            // ... но есть пакеты для отправки — шлём их, а не keepalive.
-            if self.inner.has_ticked() {
-                self.inner.tick(now);
-            } else {
-                // Пакетов нет — обычный keepalive.
-                self.inner.tick_alive(now);
-            }
+        if self.inner.has_pending_packets() {
+            // Если есть полезная нагрузка, отправляем её (сбросит таймер keepalive внутри)
+            self.inner.tick(now);
         } else {
-            // keepalive не нужен.
-            if self.inner.has_ticked() {
-                self.inner.tick(now);
+            // Если полезной нагрузки нет, проверяем, пора ли слать keepalive
+            let last_ms = self.inner.last_send_ms.load(Ordering::Relaxed);
+            if now.saturating_sub(last_ms) >= KEEP_ALIVE_INTERVAL {
+                self.inner.tick_alive(now);
             }
         }
     }

@@ -43,7 +43,7 @@
     "utf-8-validate": "^6.0.6"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.6.2",
+    "@napi-rs/cli": "^3.7.0",
     "@types/node": "^25.9.1",
     "typescript": "^6.0.3"
   },
