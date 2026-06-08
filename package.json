@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "discord-api-types": "^0.38.48",
-    "discord.js": "15.0.0-dev.1777075897-40ce0791a",
+    "discord.js": "15.0.0-pr-11006.1765452229-e636950b2",
     "http-proxy-agent": "^9.0.0",
     "socks-proxy-agent": "^10.0.0",
     "ws": "^8.21.0"
@@ -43,8 +43,8 @@
     "utf-8-validate": "^6.0.6"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.6.2",
-    "@types/node": "^25.9.1",
+    "@napi-rs/cli": "^3.7.0",
+    "@types/node": "^25.9.2",
     "typescript": "^6.0.3"
   },
   "scripts": {
