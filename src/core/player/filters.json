@@ -17,8 +17,21 @@
       "name": "🌃"
     },
     "locale": { "en-US": "Increases speed by 25% and raises pitch.", "ru": "Ускоряет воспроизведение на 25% и повышает тональность." },
-    "unsupported": ["vaporwave","demonic","reverse","phaser","vinyl","normalize"],
+    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl", "normalize", "hardstyle"],
     "filter": "asetrate=48000*1.25,aresample=128000",
+    "args": false
+  },
+  {
+    "name": "hardstyle",
+    "emoji": {
+      "name": "⚡"
+    },
+    "locale": {
+      "en-US": "Features a heavy, distorted kick drum with a rolling bassline, energetic synth leads, and a high BPM typically ranging from 150 to 160.",
+      "ru": "Отличается тяжелой искаженной «бочкой» (kick) с раскатистой басовой линией, энергичными синтезаторными партиями и высоким темпом, обычно от 150 до 160 ударов в минуту."
+    },
+    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl", "normalize", "nightcore", "bass", "subboost"],
+    "filter": "asetrate=48000*1.05,aresample=48000,bass=g=15,equalizer=f=120:t=q:w=1:g=6,equalizer=f=5000:t=q:w=1:g=3",
     "args": false
   },
   {
@@ -30,7 +43,7 @@
       "en-US": "Slows down playback and lowers pitch.",
       "ru": "Замедляет воспроизведение и понижает тональность."
     },
-    "unsupported": ["nightcore","demonic","speed","treble","reverse","vinyl","normalize"],
+    "unsupported": ["nightcore", "demonic", "speed", "treble", "reverse", "vinyl", "normalize", "hardstyle"],
     "filter": "asetrate=48000*0.8,aresample=48000,atempo=1.1",
     "args": false
   },
@@ -43,7 +56,7 @@
       "en-US": "Deepens voice with distortion and echo.",
       "ru": "Понижает голос с добавлением искажения и эха."
     },
-    "unsupported": ["normalize","nightcore","vaporwave","bass","speed","vinyl"],
+    "unsupported": ["normalize", "nightcore", "vaporwave", "bass", "speed", "vinyl", "hardstyle"],
     "filter": "loudnorm=I=-16:TP=-1.5:LRA=11,asetrate=48000*1.20,aresample=128000,bass=g=5,aecho=0.8:0.9:1000:0.3",
     "args": false
   },
@@ -53,7 +66,7 @@
       "name": "📀"
     },
     "locale": { "en-US": "Adds vinyl record noise and slight distortion.", "ru": "Добавляет шум и потрескивания виниловой пластинки." },
-    "unsupported": ["nightcore","demonic","vaporwave","normalize"],
+    "unsupported": ["nightcore", "demonic", "vaporwave", "normalize", "hardstyle"],
     "filter": "acrusher=bits=8:mode=log:mix=0.7,highpass=f=200,lowpass=f=5000",
     "args": false
   },
@@ -72,7 +85,7 @@
       "name": "📳"
     },
     "locale": { "en-US": "Boosts low frequencies.", "ru": "Усиливает низкие частоты." },
-    "unsupported": ["demonic"],
+    "unsupported": ["demonic", "hardstyle"],
     "filter": "bass=g=",
     "args": [1, 30]
   },
@@ -82,7 +95,7 @@
       "name": "📳"
     },
     "locale": { "en-US": "Enhances sub-bass frequencies (30–60 Hz).", "ru": "Усиливает суб-бас (30–60 Гц)." },
-    "unsupported": ["demonic"],
+    "unsupported": ["demonic", "hardstyle"],
     "filter": "asubboost",
     "args": false
   },
