@@ -41,9 +41,7 @@ pub struct UdpBufferedInner {
     pub last_send_ms: AtomicU64,
 
     /// Номер отправленного Keep-Alive пакета
-    pub counter: AtomicU32,
-
-    next_send_ms: AtomicU64
+    pub counter: AtomicU32
 }
 
 impl UdpBufferedInner {
@@ -144,8 +142,7 @@ impl UdpBuffered {
             buffer: RingBuffer::new(2048),
             send_drops: AtomicUsize::new(0),
             last_send_ms: AtomicU64::new(0),
-            counter: AtomicU32::new(0),
-            next_send_ms: AtomicU64::new(0),
+            counter: AtomicU32::new(0)
         });
 
         // Генерируем случайный идентификатор для этой сессии.
@@ -228,7 +225,9 @@ impl UdpBuffered {
                         // Поток будет спать сам
                     }
                     // Любая другая ошибка (например, сокет закрыт) завершает цикл.
-                    Err(_) => break,
+                    Err(_) => {
+                        break;
+                    },
                     _ => {}
                 }
             }

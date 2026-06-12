@@ -69,7 +69,7 @@
 
 #### What causes a heavy load
 - `Scheduler` for 1 thread (50 UDP + RingBuffer) ~0.1% CPU
-- `OggOpusParser` for 1 conversion cycle ~0.5 CPU (1.2 sec)
+- `OggOpusParser` for 1 conversion cycle ~0.5% CPU (1.2 sec)
 ---
 
 ## 🚀 Advantages (WatKLOK)

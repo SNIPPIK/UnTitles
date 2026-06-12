@@ -306,6 +306,11 @@ impl DaveSession {
   /// Зашифрованный пакет или `null`.
   #[napi(js_name = "encryptOpus")]
   pub fn encrypt_opus_fast(&mut self, packet: Buffer) -> Option<Buffer> {
+    // Не шифруем Silent Frame
+    if packet.len() <= 3 {
+      return Some(packet);
+    }
+
     match self
         .inner
         .encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet)
@@ -330,6 +335,12 @@ impl DaveSession {
     let mut results = Vec::with_capacity(packets.len());
 
     for packet in packets {
+      // Не шифруем Silent Frame
+      if packet.len() <= 3 {
+        results.push(Some(packet));
+        continue;
+      }
+
       if let Ok(out) = self
           .inner
           .encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet)

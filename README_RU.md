@@ -70,7 +70,7 @@
 
 ####  Что дает сильную нагрузку
 - `scheduler` за 1 поток (50 `UDP` + `RingBuffer`) ~0.1% CPU
-- `OggOpusParser` за 1 цикл конвертации ~0.5 CPU (1.2 sec)
+- `OggOpusParser` за 1 цикл конвертации ~0.5% CPU (1.2 sec)
 ---
 
 ## 🚀 Преимущества (WatKLOK)

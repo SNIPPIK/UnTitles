@@ -1,4 +1,4 @@
-use crate::audio::parser::{OggOpusParser, PacketType};
+use crate::audio::demuxers::ogg::{OggOpusDemuxer, PacketType};
 use crate::audio::ring_buffer::RingBuffer;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -154,7 +154,7 @@ impl AudioEngine {
         let handle = thread::spawn(move || {
             // Буферизованный ридер: буфер 64KB уменьшает количество syscall'ов.
             let mut reader = BufReader::with_capacity(65536, stdout);
-            let mut parser = OggOpusParser::new();
+            let mut parser = OggOpusDemuxer::new();
             let mut read_buf = [0u8; 16384];
 
             // Используем векторы повторно, чтобы не аллоцировать на каждой итерации.
@@ -181,13 +181,15 @@ impl AudioEngine {
 
                 // ===== Чтение из FFmpeg =====
                 match reader.read(&mut read_buf) {
-                    Ok(0) => break,
+                    Ok(0) => {
+                        break;
+                    },
                     Ok(n) => {
                         if parser.pending_len() > MAX_PARSER_PENDING { break; }
 
                         frames.clear();
+
                         // Парсим Ogg страницы, извлекаем Opus пакеты.
-                        // parse_internal возвращает Result; ошибка – выходим из потока.
                         if parser.parse_internal(&read_buf[..n], &mut frames).is_err() {
                             break;
                         }
@@ -222,7 +224,11 @@ impl AudioEngine {
                             }
                         }
                     }
-                    Err(_) => break,
+                    Err(_) => {
+                        frames.clear();
+                        pending_push.clear();
+                        break;
+                    },
                 }
             }
 
