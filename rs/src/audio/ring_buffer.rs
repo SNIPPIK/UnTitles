@@ -205,8 +205,7 @@ impl RingBuffer {
 
         unsafe {
             let slot = self.buffer[real_index].get();
-            // ИСПРАВЛЕНИЕ: Правильное и безопасное разыменование указателя для клонирования
-            Some((&*(slot as *const _ as *const Vec<u8>)).clone())
+            Some((*slot).assume_init_ref().clone())
         }
     }
 

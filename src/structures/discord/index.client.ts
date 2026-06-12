@@ -30,7 +30,7 @@ export class DiscordClient extends Client {
     };
 
     /**
-     * @description Уникальный ID бота
+     * @description Уникальный ID бота присвоенный Discord
      * @public
      */
     public get id() {
@@ -137,12 +137,16 @@ export class DiscordClient extends Client {
             },
         });
 
-        /**
-         * @description Получение ответа от WS
-         */
-        this.ws.on("hello", (id) => {
+        const wsHello = (id: number) => {
             this._shard_ID = id;
-        });
+            this.ws.removeListener("hello", wsHello);
+        };
+
+        /**
+         * @description Получение номера осколка от Websocket клиента
+         * @private
+         */
+        this.ws.once("hello", wsHello);
 
         // Ограничиваем кол-во событий
         this.setMaxListeners(10);

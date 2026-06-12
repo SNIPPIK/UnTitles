@@ -1,5 +1,5 @@
 import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue/index.js";
-import { AudioResource, OPUS_FRAME_SIZE } from "#core/audio/index.js";
+import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio/index.js";
 import { type AudioFilter, ControllerFilters } from "#core/player/index.js";
 import { AudioPlayerEvents } from "#handler/events/index.js";
 import { PlayerProgress } from "../controllers/progress.js";
@@ -27,7 +27,7 @@ const Progress = new PlayerProgress();
  * @const
  * @private
  */
-const PLAYER_PAUSE_OFFSET = 3000;
+const PLAYER_PAUSE_OFFSET = 5e3;
 
 /**
  * @author SNIPPIK
@@ -38,7 +38,7 @@ const PLAYER_PAUSE_OFFSET = 3000;
  * @const
  * @private
  */
-const PLAYER_TIMEOUT_OFFSET = 3000;
+const PLAYER_TIMEOUT_OFFSET = 3e3;
 
 /**
  * @author SNIPPIK
@@ -135,8 +135,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
             // Если пришло событие ожидания
             if (status === AudioPlayerState.idle) {
-                // Запускаем функцию которая проверят что делать с позицией
-                this._PlayerNextTrack();
+                // Запускаем функцию, которая проверят что делать с позицией
+                this._PlayerNextTrack().catch(() => {});
             }
         }
     };
@@ -190,6 +190,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         if (isActive) {
             // Если нет плеера в цикле
             if (!db.queues.cycles.players.has(this)) {
+                // Отправляем пустышку если такая возможность есть
+                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
+
                 // Добавляем плеер в цикл
                 db.queues.cycles.players.add(this);
                 this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
@@ -202,6 +205,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             if (db.queues.cycles.players.has(this)) {
                 // Удаляем плеер из цикла
                 db.queues.cycles.players.delete(this);
+
+                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
                 this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
             }
         }
@@ -522,7 +527,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         this.cycle = false;
 
         // Удаляем текущий поток, поскольку он больше не нужен
-        // Снимаем обработчики, чтобы избежать утечек памяти
+        // Пропускаем обработчики, чтобы избежать утечек памяти
         if (this._audio.current) {
             this._audio.current.removeAllListeners();
         }

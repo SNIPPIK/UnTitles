@@ -1,3 +1,3 @@
-pub mod parser;
-pub mod audio;
+mod parser;
+mod audio;
 pub mod ring_buffer;

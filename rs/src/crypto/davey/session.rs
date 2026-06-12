@@ -152,7 +152,7 @@ impl DaveSession {
 
   /// Возвращает внутренний статус сессии в виде числа.
   ///
-  /// Значения определяются реализацией `davey`. Обычно:
+  /// Значения определяются реализацией `davey`:
   /// - `0` — ожидание
   /// - `1` — ответ
   /// - `2` — ожидание ответа
@@ -240,7 +240,7 @@ impl DaveSession {
       None => ProposalsResult {
         commit: None,
         welcome: None,
-      },
+      }
     })
   }
 
@@ -291,11 +291,10 @@ impl DaveSession {
     let cd = Self::map_codec(codec)?;
     let out = self.inner.encrypt(mt, cd, &packet).map_err(Self::map_err)?;
 
-    // Передаём владение, чтобы избежать лишнего копирования
     Ok(Buffer::from(out.as_ref()))
   }
 
-  /// Быстрое шифрование одного Opus-пакета (без проверки типа медиа и кодека).
+  /// Быстрое шифрование одного Opus-пакета (с заренне заговленным типом медиа и кодека).
   ///
   /// В отличие от `encrypt`, этот метод не выбрасывает исключения при ошибке,
   /// а возвращает `null`. Это удобно для потоковой обработки, где потеря одного пакета допустима.
@@ -311,12 +310,12 @@ impl DaveSession {
         .inner
         .encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet)
     {
-      Ok(out) => Some(Buffer::from(out.as_ref())),
-      Err(_) => None, // возвращаем исходный пакет, не null
+      Ok(out) => Some(Buffer::from(out.into_owned())),
+      Err(_) => Some(packet),
     }
   }
 
-  /// Шифрует пачку Opus-пакетов за один вызов.
+  /// Шифрует пачку Opus-пакетов за один вызов,с зараниие заготовленним типом медиа и кодека
   ///
   /// Оптимизирует множество вызовов шифрования, уменьшая накладные расходы на пересылку между потоками.
   /// Для каждого пакета в массиве возвращается соответствующий результат.
@@ -327,20 +326,21 @@ impl DaveSession {
   /// # Возвращает
   /// Массив той же длины, где каждый элемент — либо зашифрованный `Buffer`, либо `null` (если шифрование не удалось).
   #[napi(js_name = "encryptOpusBatch")]
-  pub fn encrypt_opus_batch(&mut self, packets: Vec<Buffer>) -> Vec<Buffer> {
+  pub fn encrypt_opus_batch(&mut self, packets: Vec<Buffer>) -> Vec<Option<Buffer>> {
     let mut results = Vec::with_capacity(packets.len());
+
     for packet in packets {
       if let Ok(out) = self
           .inner
           .encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet)
       {
-        results.push(Buffer::from(out.as_ref()));
-      }
-      else {
+        results.push(Some(Buffer::from(out.into_owned())));
+      } else {
         println!("[DaveSession] encrypt failed");
+        results.push(None);
       }
-      // Ошибка → пакет игнорируется, в результат не добавляется
     }
+
     results
   }
 
@@ -414,5 +414,20 @@ impl DaveSession {
       attempts: s.attempts as u32,
       passthroughs: s.passthroughs as u32
     }))
+  }
+
+  /// Удаление данных, включая слой davey
+  pub fn cleanup(&mut self) {
+    let _ = self.inner.reset();
+  }
+}
+
+// ============================================================================
+// DROP
+// ============================================================================
+
+impl Drop for DaveSession {
+  fn drop(&mut self) {
+    self.cleanup();
   }
 }

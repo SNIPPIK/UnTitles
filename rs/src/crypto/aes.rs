@@ -139,46 +139,42 @@ impl VoiceRTPSocket {
     ///
     /// # Ошибки
     /// - Если шифрование провалилось (например, из-за неправильного nonce).
-    /// - Если размер фрейма превышает допустимый (проверка отсутствует, но можно добавить).
+    /// - Если размер фрейма превышает допустимый MTU, произойдет фрагментация пакета на 2 отдельный к примеру на 1499 и 20
     #[napi]
     pub fn packet(&self, frame: Buffer) -> Result<Buffer> {
         let frame_len = frame.len();
-        let total_len = RTP_HEADER_SIZE + frame_len + 16 + 4;
-        let mut out = Vec::with_capacity(total_len);
-        unsafe {
-            out.set_len(total_len);
+
+        // Если размер пакета нулевой
+        if frame_len == 0 {
+            return Err(CryptoError::InvalidPacket.into());
         }
 
-        // ===== HEADER =====
+        let total_len = RTP_HEADER_SIZE + frame_len + 16 + 4;
+        let mut packet = Vec::with_capacity(total_len);
+
+        // Создание пустого RTP заголовка
         let header = self.build_header();
-        out[..RTP_HEADER_SIZE].copy_from_slice(&header);
+        packet.extend_from_slice(&header);
 
-        // ===== PAYLOAD =====
-        let payload_end = RTP_HEADER_SIZE + frame_len;
-        out[RTP_HEADER_SIZE..payload_end].copy_from_slice(frame.as_ref());
+        // Payload (будет зашифрован на месте)
+        let payload_start = packet.len();
+        packet.extend_from_slice(frame.as_ref());
 
-        // ===== NONCE =====
+        // генерация заголовка Nonce
         let nonce_bytes = self.generate_nonce();
-        let nonce = Nonce::from(nonce_bytes);
+        let nonce = Nonce::from_slice(&nonce_bytes);
 
-        // ===== ENCRYPT =====
-        let tag = self.cipher
-            .encrypt_in_place_detached(
-                &nonce,
-                &header,
-                &mut out[RTP_HEADER_SIZE..payload_end],
-            )
-            .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+        // === Шифрование (AeadInPlace) ===
+        let tag = self
+            .cipher
+            .encrypt_in_place_detached(nonce, &header, &mut packet[payload_start..])
+            .map_err(|e| CryptoError::EncryptionFailed(format!("{:?}", e)))?;
 
-        // ===== TAG =====
-        let tag_end = payload_end + 16;
-        out[payload_end..tag_end].copy_from_slice(tag.as_slice());
+        // Tag + Nonce tail
+        packet.extend_from_slice(tag.as_slice());
+        packet.extend_from_slice(&nonce_bytes[..4]);
 
-        // ===== NONCE TAIL =====
-        out[tag_end..total_len].copy_from_slice(&nonce_bytes[..4]);
-
-        // Передача владения Vec в Node.js без копирования (zero-copy)
-        Ok(Buffer::from(out.as_slice()))
+        Ok(Buffer::from(packet))
     }
 
     /// Пакетное шифрование нескольких фреймов.
@@ -239,5 +235,15 @@ impl VoiceRTPSocket {
         self.sequence.store(0, Ordering::Relaxed);
         self.timestamp.store(0, Ordering::Relaxed);
         self.counter.store(0, Ordering::Relaxed);
+    }
+}
+
+// ============================================================================
+// DROP
+// ============================================================================
+
+impl Drop for VoiceRTPSocket {
+    fn drop(&mut self) {
+        self.destroy();
     }
 }

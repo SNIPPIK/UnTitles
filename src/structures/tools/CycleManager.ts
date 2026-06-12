@@ -19,7 +19,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected get time(): number {
-        return (Number(process.hrtime.bigint()) / 1_000_000) + performance.now();
+        return performance.now();
     };
 
     /**

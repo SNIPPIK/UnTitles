@@ -50,7 +50,7 @@
 
       "#worker/db": ["./src/database/index.worker"],
 
-      // Нативные модули написанные на C++
+      // Нативные модули написанные на Rust
       "#native": ["./src/n-api"],
     }
   },

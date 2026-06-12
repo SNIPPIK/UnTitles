@@ -14,17 +14,17 @@ const MAX_PER_WORKER: usize = 50;
 /// Воркер теперь без Mutex
 struct Worker {
     /// Менеджер потов, хранящий в себе udp сессии
-    manager: Arc<CycleManager>,
-    
+    manager: CycleManager,
+
     /// Ссылки на udp сессии, для быстрого поиска и распределения между потоками
-    sessions: DashMap<u32, UdpBuffered>
+    sessions: DashMap<u32, Arc<UdpBuffered>>
 }
 
 impl Worker {
     fn new() -> Self {
         let manager = CycleManager::new().expect("Failed to create timer");
         Worker {
-            manager: Arc::new(manager),
+            manager,
             sessions: DashMap::new()
         }
     }
@@ -38,7 +38,7 @@ impl Worker {
 pub struct AutoBalancer {
     // Вектор воркеров защищён собственным мьютексом (или блокировкой AutoBalancer)
     workers: Vec<Arc<Worker>>,
-    
+
     // Быстрый поиск воркера по session_id
     session_map: DashMap<u32, Arc<Worker>>
 }
@@ -49,7 +49,7 @@ impl AutoBalancer {
             workers: Vec::new(),
             session_map: DashMap::new()
         };
-        
+
         balancer.create_worker();
         balancer
     }
@@ -83,7 +83,7 @@ impl AutoBalancer {
     /// Ищет первый воркер с числом сессий < MAX_PER_WORKER. Если такого нет, создаёт новый воркер.
     /// Затем вставляет сессию в выбранный воркер и добавляет её в `CycleManager` этого воркера.
     /// В конце удаляет пустые воркеры.
-    pub fn add_session(&mut self, id: u32, session: UdpBuffered) {
+    pub fn add_session(&mut self, id: u32, session: Arc<UdpBuffered>) {
         // Ищем подходящий воркер.
         // Если воркеров много, можно хранить индекс последнего неполного воркера,
         // чтобы не итерироваться с самого начала каждый раз.
@@ -123,7 +123,7 @@ pub static GLOBAL_BALANCER: Lazy<Mutex<AutoBalancer>> = Lazy::new(|| {
 /// Добавляет сессию в глобальный балансировщик
 /// Обычно вызывается из конструктора `UdpBuffered`.
 pub fn add_global_session(id: u32, session: UdpBuffered) {
-    GLOBAL_BALANCER.lock().unwrap().add_session(id, session);
+    GLOBAL_BALANCER.lock().unwrap().add_session(id, Arc::new(session));
 }
 
 /// Удаляет сессию из глобального балансировщика.

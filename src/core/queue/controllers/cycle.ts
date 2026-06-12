@@ -134,6 +134,11 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
      */
     public reset = (): void => {
         super.reset();
+
+        if (typeof global.gc === "function") {
+            Logger.log("DEBUG", "[Node] running Garbage Collector - running main thread");
+            global.gc();
+        }
     };
 }
 

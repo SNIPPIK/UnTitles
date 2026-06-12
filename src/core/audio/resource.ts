@@ -5,7 +5,6 @@ import type { Track } from "#core/queue/index.js";
 import { TypedEmitter } from "#structures";
 import { env } from "#app/env";
 import { db } from "#app/db";
-import {clearTimeout} from "node:timers";
 
 /**
  * @author SNIPPIK
@@ -47,7 +46,7 @@ const ENCODER_PARAMS = {
  * @abstract
  */
 export class AudioResource extends TypedEmitter<AudioResourceEvents> {
-    protected engine: iType<typeof AudioEngine> = new AudioEngine(10);
+    protected engine: iType<typeof AudioEngine> = new AudioEngine(2);
 
     /** Кол-во отданных пакетов */
     protected _played_frames = 0;
@@ -64,23 +63,6 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     public get readable(): boolean {
         return this.engine?.size > 0;
-    };
-
-    /**
-     * @description Выдаем фрагмент потока
-     * @help (время пакета 20ms)
-     * @return Buffer
-     * @public
-     */
-    public get packet(): Buffer {
-        if (!this.engine?.size) return null;
-
-        const frame: Buffer = this.engine.packet;
-        if (frame) {
-            this.hasPossibleBuffedStream;
-            this._played_frames++;
-        }
-        return frame;
     };
 
     /**
@@ -101,24 +83,6 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
         const time = currentPosition * OPUS_FRAME_SIZE;
         return time / 1e3 + this.options.seek;
-    };
-
-    /**
-     * @description Можно ли передавать аудио в буфер аудио потока
-     * @private
-     */
-    private get hasPossibleBuffedStream() {
-        const audio = this.engine;
-
-        // Если буфер почти полон (на 80%), ставим FFmpeg на паузу
-        if (!audio.canAcceptThreshold(80)) {
-            audio.pause = true;
-            return false;
-        }
-
-        // Если в буфере стало просторно (меньше 40%), возобновляем чтение
-        else if (audio.canAcceptThreshold(40)) audio.pause = false;
-        return true;
     };
 
     /**
@@ -239,10 +203,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     public packetAt = (size: number) => {
         const frames = this.engine.getPackets(size);
-        if (frames) {
-            this.hasPossibleBuffedStream;
-            this._played_frames += frames.length;
-        }
+        if (frames) this._played_frames += frames.length;
         return frames;
     };
 

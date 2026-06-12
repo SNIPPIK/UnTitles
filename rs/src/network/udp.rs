@@ -1,6 +1,7 @@
 use napi::threadsafe_function::ThreadsafeFunctionCallMode;
 use crate::timers::scheduler::balancer::{add_global_session, remove_global_session};
 use crate::audio::ring_buffer::RingBuffer;
+use crate::timers::scheduler::cycle_manager::TICK_INTERVAL_MS;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::{
@@ -10,7 +11,7 @@ use std::{
         Arc, Mutex,
     },
     thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH}
 };
 
 /// Время до отправки keepalive пакета, для работы через NAT системы
@@ -40,7 +41,9 @@ pub struct UdpBufferedInner {
     pub last_send_ms: AtomicU64,
 
     /// Номер отправленного Keep-Alive пакета
-    pub counter: AtomicU32
+    pub counter: AtomicU32,
+
+    next_send_ms: AtomicU64
 }
 
 impl UdpBufferedInner {
@@ -53,7 +56,7 @@ impl UdpBufferedInner {
 
     /// Проверка, есть ли еще данные в кольцевом буфере и валиден ли сокет.
     pub fn has_pending_packets(&self) -> bool {
-        !self.buffer.is_empty() && self.socket.local_addr().is_ok()
+        !self.buffer.is_empty()
     }
 
     /// Попытка отправить один пакет из очереди.
@@ -73,7 +76,7 @@ impl UdpBufferedInner {
                 }
                 Err(_) => {
                     self.send_drops.fetch_add(1, Ordering::Relaxed);
-                    // В зависимости от реализации RingBuffer, возможно стоит 
+                    // В зависимости от реализации RingBuffer, возможно стоит
                     // вернуть пакет обратно в начало очереди (push_front),
                     // как указано в твоем комментарии.
                 }
@@ -133,15 +136,16 @@ impl UdpBuffered {
         socket.connect(&remote_addr)
             .map_err(|e| Error::from_reason(format!("Connect error: {}", e)))?;
 
-        socket.set_nonblocking(true)
-            .map_err(|e| Error::from_reason(format!("Non-blocking error: {}", e)))?;
+        socket.set_read_timeout(Some(Duration::from_millis(100)))
+            .map_err(|e| Error::from_reason(format!("Read timeout error: {}", e)))?;
 
         let inner = Arc::new(UdpBufferedInner {
             socket: Arc::new(socket),
-            buffer: RingBuffer::new(1024),
+            buffer: RingBuffer::new(2048),
             send_drops: AtomicUsize::new(0),
             last_send_ms: AtomicU64::new(0),
             counter: AtomicU32::new(0),
+            next_send_ms: AtomicU64::new(0),
         });
 
         // Генерируем случайный идентификатор для этой сессии.
@@ -152,7 +156,7 @@ impl UdpBuffered {
             listener_active: Arc::new(AtomicBool::new(false)),
             listener_handle: Arc::new(Mutex::new(None)),
             destroyed: Arc::new(AtomicBool::new(false)),
-            id,
+            id
         };
 
         // Регистрируем сессию в глобальном балансировщике.
@@ -202,7 +206,7 @@ impl UdpBuffered {
     #[napi]
     pub fn start_listening(&self, callback: Function<Buffer, ()>) -> Result<()> {
         if self.listener_active.swap(true, Ordering::SeqCst) {
-            return Ok(()); // Поток уже запущен
+            return Ok(());
         }
 
         let tsfn = callback.build_threadsafe_function().build()?;
@@ -216,13 +220,12 @@ impl UdpBuffered {
             while active.load(Ordering::Relaxed) {
                 match socket.recv(&mut buf) {
                     Ok(size) if size > 0 => {
-                        // Передача Vec<u8> в Buffer::from обеспечивает zero-copy перенос в JS
-                        let js_buffer = Buffer::from(buf[..size].to_vec());
+                        let js_buffer = Buffer::from(buf[..size].as_ref());
                         tsfn.call(js_buffer, ThreadsafeFunctionCallMode::NonBlocking);
                     }
                     // Если сокет временно недоступен (нет данных), немного спим.
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        thread::sleep(Duration::from_millis(10));
+                        // Поток будет спать сам
                     }
                     // Любая другая ошибка (например, сокет закрыт) завершает цикл.
                     Err(_) => break,
@@ -266,35 +269,21 @@ impl UdpBuffered {
         if self.destroyed.swap(true, Ordering::Relaxed) { return; }
 
         self.listener_active.store(false, Ordering::Relaxed);
+
+        // Отключаем режим прослушивания UDP потока
         self.stop_listening();
+
+        // Отключаем UDP сесиию от циклической системы
         remove_global_session(self.id);
     }
 
     /// Пытается добавить байты во внутренний буфер для последующей отправки.
-    #[inline]
     fn try_push(&self, bytes: Vec<u8>) {
-        if bytes.is_empty() { return; }
         self.inner.push(bytes);
     }
 
-    /// Создаёт клон UdpBuffered, предназначенный для использования в менеджере (CycleManager).
-    /// В таком клоне поле listener_handle не копируется (оно остаётся пустым), чтобы
-    /// управление потоком прослушивания оставалось только у основного экземпляра.
-    fn clone_for_manager(&self) -> Self {
-        UdpBuffered {
-            inner: self.inner.clone(),
-            listener_active: self.listener_active.clone(),
-            listener_handle: Arc::new(Mutex::new(None)), // Менеджер не управляет потоком
-            destroyed: self.destroyed.clone(),
-            id: self.id,
-        }
-    }
-
-    /// Метод, вызываемый из CycleManager для отправки одного пакета из очереди.
-    /// (Внутренний, не экспортируется в JS).
-    pub fn tick(&self) {
-        let now = now_ms();
-
+    /// Вычисляем когда надо отправить пакет или же надо догнать таймлайн
+    pub fn process(&self, now: u64) {
         if self.inner.has_pending_packets() {
             // Если есть полезная нагрузка, отправляем её (сбросит таймер keepalive внутри)
             self.inner.tick(now);
@@ -317,7 +306,7 @@ impl Drop for UdpBuffered {
 
 
 /// Вспомогательная функция для получения текущего времени в мс
-fn now_ms() -> u64 {
+pub fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()

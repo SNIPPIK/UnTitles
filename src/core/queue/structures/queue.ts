@@ -166,7 +166,7 @@ export class Queue {
                     },
                     {
                         "type": 10, // Text
-                        "content": `> -# \`${db.emoji.user} ${user.username}\`  |  \`${player.audio.volumeIndicator}\` ${tracks.footer} |  \`${db.emoji.buffer} ${player.latency}ms | ${db.emoji.lost} ${player.voice.connection.udp.lost}\`` + player.progress
+                        "content": `> -# \`${db.emoji.user} ${user.username}\`  |  \`${player.audio.volumeIndicator}\` ${tracks.footer} |  \`${db.emoji.buffer} ${player.latency}ms | ${db.emoji.lost} ${player.voice.connection.udp.lost ?? 0}\`` + player.progress
                     },
                     ...buttons
                 ]

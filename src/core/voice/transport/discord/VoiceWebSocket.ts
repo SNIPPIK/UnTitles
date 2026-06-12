@@ -29,7 +29,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     private queue: Array<Buffer | string> = [];
 
     /** Последовательность запроса */
-    public sequence: number = 0;
+    public sequence: number = -1;
 
     /**
      * @description Задержка WS ответа между UDP пакетами

@@ -10,6 +10,15 @@ import { UDPLayer } from "#core/voice/transport/layers/UDPLayer.js";
 import { RTPLayer } from "#core/voice/transport/layers/RTPLayer.js";
 import { DAVELayer } from "#core/voice/transport/layers/DAVELayer.js";
 
+
+/**
+ * @author SNIPPIK
+ * @description Коды закрытия, из-за этох кодов не выйдет переподключится
+ * @const CLOSE_CODES
+ * @private
+ */
+const CLOSE_CODES: VoiceCloseCodes[] = [VoiceCloseCodes.SessionNoLongerValid];
+
 /**
  * @author SNIPPIK
  * @description Транспорт голосового соединения
@@ -267,7 +276,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
             this.emit("close", code, `[Transport/WS]: ${reason}`);
 
             // Если достигли лимита попыток
-            if (this.reconnecting >= 3 && this.reconnecting !== null) {
+            if (this.reconnecting >= 3 && this.reconnecting !== null || CLOSE_CODES.includes(code)) {
                 this.destroy();
                 return;
             }

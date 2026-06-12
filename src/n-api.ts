@@ -5,11 +5,11 @@ let Native: any;
 
 try {
     //@ts-ignore
-    Native = (await import('../build/native/index.cjs'));
+    Native = (await import('../build/native/index.mjs'));
 } catch {
     try {
         //@ts-ignore
-        Native = (await import('../native/index.cjs'));
+        Native = (await import('../native/index.mjs'));
     } catch {
         throw Error("Native layer has not found, need download or build rust module!");
     }
@@ -54,19 +54,6 @@ export type iType<T> = T extends new (...args: any[]) => infer R ? R : never;
  */
 export interface iAudioEngine {
     /**
-     * @description Возвращает последний пакет в очереди (без удаления).
-     * @public
-     */
-    get lastPacket(): Buffer | null;
-
-    /**
-     * Получает следующий пакет из очереди (удаляя его) и увеличивает позицию чтения.
-     * Возвращает `Option<Buffer>`, который можно передать обратно в JavaScript.
-     * @public
-     */
-    get packet(): Buffer | null;
-
-    /**
      * @description Возвращает текущее количество пакетов в буфере.
      * @public
      */
@@ -83,15 +70,6 @@ export interface iAudioEngine {
      * @public
      */
     set position(pos: number);
-
-    /** Возвращает состояние паузы. */
-    get pause(): boolean;
-
-    /**
-     * Устанавливает состояние паузы.
-     * При `true` фоновый парсер не будет пополнять буфер, но продолжит читать stdout FFmpeg.
-     */
-    set pause(value: boolean);
 
     /**
      * Создаёт новый экземпляр AudioEngine.
@@ -132,22 +110,6 @@ export interface iAudioEngine {
      * По сути, это проверка: "есть ли свободное место?".
      */
     canAccept(): boolean;
-    /**
-     * Более "умная" проверка для системы запросов.
-     * Возвращает true, если буфер заполнен менее чем на указанный процент.
-     * Например, если передать 80, функция вернет false, когда буфер забит на 80%+.
-     * Это позволяет оставить "запас" для плавности.
-     */
-    canAcceptThreshold(thresholdPercent: number): boolean;
-
-    /**
-     * Добавляет один пакет в очередь.
-     * Если буфер переполнен (достигнут лимит по времени), удаляется самый старый пакет (FIFO).
-     *
-     * # Аргументы
-     * * `packet` – бинарный буфер с аудиоданными (из Node.js).
-     */
-    addPacket(packet: Buffer): void;
 
     /**
      * Добавляет несколько пакетов в очередь.
@@ -216,11 +178,6 @@ export interface iUDPSocket {
      * send/recv не блокировали поток.
      */
     constructor(remoteAddr: string): void;
-
-    /**
-     * Очистка от всех аудио пакетов, которые находятся в очереди на отправку
-     */
-    clearPackets(): void;
 
     /**
      * Добавляет пакет в очередь на отправку. С проверкой мусора
@@ -294,15 +251,6 @@ export interface iVoiceRTPSocket {
     get mode(): "aead_aes256_gcm_rtpsize";
 
     /**
-     * Возвращает текущий nonce (12 байт) и его первые 4 байта (tail).
-     *
-     * Nonce формируется как:
-     * - первые 4 байта: значение счётчика `counter` (увеличивается при каждом вызове)
-     * - остальные 8 байт: нули (согласно спецификации Discord/RTP)
-     */
-    get nonce(): Array<Buffer>;
-
-    /**
      * Создаёт новый экземпляр VoiceRTPSocket.
      *
      * # Аргументы
@@ -363,6 +311,34 @@ export interface iVoiceRTPSocket {
  * @see https://github.com/discord/dave
  */
 export interface iDAVESession {
+    /** Возвращает текущую версию протокола, с которой работает сессия. */
+    get protocolVersion(): number;
+
+    /**
+     * Указывает, готова ли сессия к выполнению шифрования/расшифрования.
+     *
+     * Для готовности обычно требуется успешно обработать начальный `commit` или `welcome`.
+     */
+    get ready(): boolean;
+
+    /**
+     * Возвращает статистику операций шифрования для всей сессии.
+     *
+     * Статистика включает общее количество попыток, успехов и неудач с момента последнего сброса.
+     */
+    get getEncryptionStats(): JsEncryptionStats | null;
+
+    /**
+     * Возвращает внутренний статус сессии в виде числа.
+     *
+     * Значения определяются реализацией `davey`. Обычно:
+     * - `0` — ожидание
+     * - `1` — ответ
+     * - `2` — ожидание ответа
+     * - `3` - Готов
+     */
+    get status(): 0 | 1 | 2 | 3;
+
     /**
      * Создаёт новую сессию Dave с указанной версией протокола, идентификаторами пользователя и канала.
      *
@@ -400,27 +376,6 @@ export interface iDAVESession {
      * Сессия становится непригодной для шифрования/расшифрования до повторной инициализации.
      */
     reset(): void;
-
-    /** Возвращает текущую версию протокола, с которой работает сессия. */
-    get protocolVersion(): number;
-
-    /**
-     * Указывает, готова ли сессия к выполнению шифрования/расшифрования.
-     *
-     * Для готовности обычно требуется успешно обработать начальный `commit` или `welcome`.
-     */
-    get ready(): boolean;
-
-    /**
-     * Возвращает внутренний статус сессии в виде числа.
-     *
-     * Значения определяются реализацией `davey`. Обычно:
-     * - `0` — ожидание
-     * - `1` — ответ
-     * - `2` — ожидание ответа
-     * - `3` - Готов
-     */
-    get status(): 0 | 1 | 2 | 3;
 
     /**
      * Генерирует и возвращает сериализованный `KeyPackage`.
@@ -536,14 +491,7 @@ export interface iDAVESession {
      * # Ошибки
      * Если сессия не готова, пользователь не найден в группе, или аутентификация не пройдена.
      */
-    decrypt(userId: string, mediaType: number, packet: Buffer): Buffer;
-
-    /**
-     * Возвращает статистику операций шифрования для всей сессии.
-     *
-     * Статистика включает общее количество попыток, успехов и неудач с момента последнего сброса.
-     */
-    getEncryptionStats(): JsEncryptionStats | null;
+    decryptOpus(userId: string, mediaType: number, packet: Buffer): Buffer;
 
     /**
      * Возвращает статистику расшифрования для конкретного пользователя и аудиопотока.

@@ -10,10 +10,10 @@ import { TypedEmitter, Logger } from "#structures";
  * @public
  */
 export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
-    /** Текущий статус подключения */
+    /** Текущий статус голосового подключения */
     private _status: ConnectionStatus = ConnectionStatus.disconnected;
 
-    /** Менеджер спикера */
+    /** Менеджер голосового состояния */
     private speaker: VoiceSpeakerManager | null = new VoiceSpeakerManager(this);
 
     /** Функции для общения с websocket клиента */
@@ -23,7 +23,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     public transport: Transport = null;
 
     /**
-     * @description Получаем текущий статус подключения
+     * @description Получаем текущий статус голосового подключения
      * @public
      */
     public get status() {
@@ -57,7 +57,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     };
 
     /**
-     * @description WebSocket подключение к discord
+     * @description Подключение к Discord по Websocket
      * @public
      */
     public get ws() {
@@ -65,7 +65,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     };
 
     /**
-     * @description UDP подключение к discord
+     * @description Подключение к Discord по UDP
      * @public
      */
     public get udp() {

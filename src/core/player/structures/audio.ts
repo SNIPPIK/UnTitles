@@ -32,7 +32,7 @@ export class PlayerAudio<T extends AudioResource> {
      */
     public set volume(volume: number) {
         // Меняем параметр
-        this._volume = volume > 200 ? 200 : volume < 1 ? 10 : volume;
+        this._volume = volume > 200 ? 200 : volume < 10 ? 10 : volume;
     };
 
     /**

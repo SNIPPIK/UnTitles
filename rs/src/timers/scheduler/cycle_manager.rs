@@ -1,4 +1,4 @@
-use crate::network::udp::UdpBuffered;
+use crate::network::udp::{now_ms, UdpBuffered};
 use arc_swap::ArcSwap;
 use std::{
     collections::HashMap,
@@ -15,20 +15,20 @@ use std::{
 // CONFIG
 // ============================================================================
 
-pub const TICK_INTERVAL_MS: u64 = 20;      // 50 Гц
-const MAX_CATCH_UP_TICKS: u32 = 1;         // Ограничение догоняющих тиков
+pub const TICK_INTERVAL_MS: u64 = 20;
 
 // ============================================================================
-// CYCLE MANAGER (Универсальный кроссплатформенный вариант)
+// CYCLE MANAGER
 // ============================================================================
 
 pub struct CycleManager {
-    sessions: Arc<ArcSwap<HashMap<u32, UdpBuffered>>>,
+    sessions: Arc<ArcSwap<HashMap<u32, Arc<UdpBuffered>>>>,
+
     running: Arc<AtomicBool>,
+
     handle: Mutex<Option<JoinHandle<()>>>,
 
-    // Связка для управления ожиданием и пробуждением потока (Condvar + фиктивный Mutex)
-    wake_state: Arc<(Mutex<()>, Condvar)>
+    wake_state: Arc<(Mutex<()>, Condvar)>,
 }
 
 impl CycleManager {
@@ -49,34 +49,38 @@ impl CycleManager {
     // API
     // =========================================================================
 
-    // Добавить сессию. Если поток ещё не запущен – запускаем (lazy start).
-    // После изменения карты – пробуждаем цикл, чтобы он пересчитал таймеры (необязательно, но безопасно).
-    pub fn add_session(&self, id: u32, session: UdpBuffered) {
+    pub fn add_session(&self, id: u32, session: Arc<UdpBuffered>) {
         let mut map = self.sessions.load_full();
+
         Arc::make_mut(&mut map).insert(id, session);
+
         self.sessions.store(map);
 
         self.start_if_needed();
         self.wake_thread();
     }
 
-    /// Удаление сессии из цикла
-    /// После удаления, поток может работать дальше если есть еще активные сессии
     pub fn remove_session(&self, id: u32) {
         let mut map = self.sessions.load_full();
+
         Arc::make_mut(&mut map).remove(&id);
+
         self.sessions.store(map);
 
         self.wake_thread();
+    }
+
+    pub fn session_count(&self) -> usize {
+        self.sessions.load().len()
     }
 
     // =========================================================================
     // SHUTDOWN
     // =========================================================================
 
-    // Остановка цикла и ожидание завершения потока.
     pub fn shutdown(&self) {
         self.running.store(false, Ordering::Release);
+
         self.wake_thread();
 
         if let Some(handle) = self.handle.lock().unwrap().take() {
@@ -85,77 +89,112 @@ impl CycleManager {
     }
 
     // =========================================================================
-    // INTERNAL LOGIC
+    // INTERNAL
     // =========================================================================
 
-    /// Будит рабочий поток, прерывая его ожидание (Condvar::notify_one)
+    #[inline(always)]
     fn wake_thread(&self) {
         self.wake_state.1.notify_one();
     }
 
     fn start_if_needed(&self) {
-        // Защита от гонок: поток запускается только если running был false
-        if self.running.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        if self
+            .running
+            .compare_exchange(
+                false,
+                true,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_err()
+        {
             return;
         }
 
-        let mut guard = self.handle.lock().unwrap();
-        if guard.is_some() { return; }
+        let mut handle_guard = self.handle.lock().unwrap();
+
+        if handle_guard.is_some() {
+            return;
+        }
 
         let sessions = Arc::clone(&self.sessions);
         let running = Arc::clone(&self.running);
         let wake_state = Arc::clone(&self.wake_state);
-        let interval = Duration::from_millis(TICK_INTERVAL_MS);
 
-        let handle = thread::spawn(move || {
-            let mut next_tick = Instant::now() + interval;
+        let handle = thread::Builder::new()
+            .name("udp-cycle".into())
+            .spawn(move || {
+                let interval =
+                    Duration::from_millis(TICK_INTERVAL_MS);
 
-            while running.load(Ordering::Acquire) {
-                let now = Instant::now();
-                let mut ticks_to_run = 0;
+                let mut next_tick = Instant::now();
 
-                // ---- Вычисление тиков и коррекция дрейфа ----
-                if now >= next_tick {
-                    let elapsed = now - next_tick;
-                    let missed = (elapsed.as_nanos() / interval.as_nanos()) as u32;
-
-                    // Ограничиваем количество "догоняющих" тиков за одну итерацию
-                    ticks_to_run = 1 + missed.min(MAX_CATCH_UP_TICKS);
-
-                    if missed > 2 {
-                        // Жесткий сброс: если лаг слишком большой, не пытаемся догнать
-                        next_tick = now + interval;
-                    } else {
-                        // Плавная коррекция: прибавляем точное время
-                        next_tick += interval * (1 + missed);
-                    }
-                }
-
-                // ---- Выполнение сессий ----
-                if ticks_to_run > 0 {
+                while running.load(Ordering::Acquire) {
                     let snapshot = sessions.load();
 
-                    if !snapshot.is_empty() {
-                        for _ in 0..ticks_to_run {
-                            for session in snapshot.values() {
-                                session.tick();
-                            }
+                    // =========================================================
+                    // Нет активных сессий -> спим до пробуждения
+                    // =========================================================
+
+                    if snapshot.is_empty() {
+                        let (lock, cvar) = &*wake_state;
+
+                        let guard = lock.lock().unwrap();
+
+                        let _unused = cvar.wait(guard);
+
+                        next_tick = Instant::now();
+
+                        continue;
+                    }
+
+                    // =========================================================
+                    // Tick
+                    // =========================================================
+
+                    let now = now_ms();
+
+                    for session in snapshot.values() {
+                        session.process(now);
+                    }
+
+                    // =========================================================
+                    // Drift compensation
+                    // =========================================================
+
+                    next_tick += interval;
+
+                    let current = Instant::now();
+
+                    if current < next_tick {
+                        let sleep_duration =
+                            next_tick - current;
+
+                        let (lock, cvar) = &*wake_state;
+
+                        let guard = lock.lock().unwrap();
+
+                        let _ = cvar
+                            .wait_timeout(
+                                guard,
+                                sleep_duration,
+                            )
+                            .unwrap();
+                    } else {
+                        let lag =
+                            current.duration_since(next_tick);
+
+                        // Если сильно отстали —
+                        // пересинхронизируем цикл.
+                        if lag > interval * 5 {
+                            next_tick = current;
                         }
                     }
                 }
+            })
+            .expect("Failed to spawn udp-cycle thread");
 
-                // ---- Ожидание до следующего тика (или пробуждения) ----
-                let now = Instant::now();
-                if let Some(timeout) = next_tick.checked_duration_since(now) {
-                    let (lock, cvar) = &*wake_state;
-                    let guard = lock.lock().unwrap();
-                    // wait_timeout усыпляет поток, не расходуя CPU
-                    let _ = cvar.wait_timeout(guard, timeout).unwrap();
-                }
-            }
-        });
-
-        *guard = Some(handle);
+        *handle_guard = Some(handle);
     }
 }
 

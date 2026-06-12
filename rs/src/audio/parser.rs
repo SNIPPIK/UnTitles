@@ -33,7 +33,7 @@ pub enum PacketType {
 }
 
 /// Выходной пакет: (тип, данные).
-pub type ParsedPacket = (PacketType, Vec<u8>);
+pub type ParsedPacket = (PacketType, bytes::Bytes);
 
 // ============================================================================
 // PARSER
@@ -66,8 +66,8 @@ impl OggOpusParser {
 
     pub fn new() -> Self {
         OggOpusParser {
-            remainder: BytesMut::with_capacity(8 * 1024),
-            packet_carry: Vec::with_capacity(4096),
+            remainder: BytesMut::with_capacity(2 * 1024),
+            packet_carry: Vec::with_capacity(1024),
             bitstream_serial: None
         }
     }
@@ -75,8 +75,6 @@ impl OggOpusParser {
     // =========================================================================
     // INFO
     // =========================================================================
-
-    #[inline]
     pub fn pending_len(&self) -> usize {
         self.remainder.len() + self.packet_carry.len()
     }
@@ -89,13 +87,11 @@ impl OggOpusParser {
     /// Если chunk пустой — получаем остатки (flush).
     pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<ParsedPacket>) -> Result<()> {
         // Если входящий пакет пуст
-        if chunk.is_empty() {
-            return self.flush_internal(output);
-        }
+        if chunk.is_empty() { return self.flush_internal(output); }
 
         // Передаем на дальнейший разбор пакета
         self.parse_core(chunk, |packet_type, data| {
-            output.push((packet_type, data.to_vec()));
+            output.push((packet_type, bytes::Bytes::copy_from_slice(data)));
             Ok(())
         })
     }
@@ -110,7 +106,8 @@ impl OggOpusParser {
         if !self.packet_carry.is_empty() {
             let packet = std::mem::take(&mut self.packet_carry);
             let packet_type = Self::detect_packet_type(&packet);
-            output.push((packet_type, packet));
+            // Превращаем старый Vec в Bytes без лишнего копирования содержимого
+            output.push((packet_type, bytes::Bytes::from(packet)));
         }
         Ok(())
     }
@@ -153,7 +150,7 @@ impl OggOpusParser {
                 Some(pos) => pos,
                 None => {
                     // Если OggS не найден, безопасно отбрасываем весь мусор,
-                    // оставляя только последние 3 байта (на случай, если "OggS" разорван между чанками)
+                    // оставляя только последние 3 байта (на случай, если "OggS" разорван между фреймами)
                     if self.remainder.len() > 3 {
                         let discard_len = self.remainder.len() - 3;
                         self.remainder.advance(discard_len);
@@ -272,8 +269,8 @@ impl OggOpusParser {
             // Если segment_len == 255 — пакет продолжается.
             if segment_len < 255 {
                 if !packet_carry.is_empty() {
-                    let packet_type = Self::detect_packet_type(packet_carry);
-                    on_packet(packet_type, packet_carry)?;
+                    let packet_type = Self::detect_packet_type(&packet_carry);
+                    on_packet(packet_type, &packet_carry)?;
                     packet_carry.clear();
                 }
             }
@@ -319,9 +316,25 @@ impl OggOpusParser {
             return PacketType::End;
         }
 
-        // Всё остальное — валидный аудиофрейм.
+        // Всё остальное — валидный аудио фрейм.
         // Opus имеет TOC-байт под индексом 0. Не проверяем длину, так как
         // фрейм может быть размером от 1 байта до 1275 байт.
         PacketType::Frame
+    }
+
+    pub fn cleanup(&mut self) {
+        self.remainder.clear();
+        self.packet_carry.clear();
+        self.bitstream_serial = None;
+    }
+}
+
+// ============================================================================
+// DROP
+// ============================================================================
+
+impl Drop for OggOpusParser {
+    fn drop(&mut self) {
+        self.cleanup();
     }
 }
