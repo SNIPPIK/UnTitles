@@ -97,7 +97,7 @@ jobs:
             export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
           fi
           
-          npx napi build $ARGS --cwd ./rs ---esm --js index.mjs
+          npx napi build $ARGS --cwd ./rs --esm --js index.mjs
 
       - name: Prepare native build folder
         shell: bash
