@@ -189,6 +189,7 @@ impl CycleManager {
         let mut handle_guard = self.handle.lock().unwrap();
         // Двойная проверка: другой поток мог успеть создать поток, пока мы ждали мьютекс.
         if handle_guard.is_some() {
+            self.running.store(true, Ordering::Release);
             return;
         }
 
@@ -207,9 +208,9 @@ impl CycleManager {
                 let mut next_tick = Instant::now();
 
                 // Главный цикл: крутится, пока running == true.
-                while running.load(Ordering::Acquire) {
+                while running.load(Ordering::Relaxed) {
                     // Делаем snapshot карты сессий.
-                    let sessions = sessions.load();
+                    let sessions = sessions.load_full();
 
                     // Если есть хотя бы одна сессия, обходим все и вызываем process.
                     if !sessions.is_empty() {
@@ -218,6 +219,8 @@ impl CycleManager {
                             session.process(now);
                         }
                     }
+
+                    drop(sessions);
 
                     // Планируем следующий такт.
                     next_tick += interval;

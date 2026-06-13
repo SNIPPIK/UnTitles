@@ -182,6 +182,9 @@ impl AudioEngine {
                 // ===== Чтение из FFmpeg =====
                 match reader.read(&mut read_buf) {
                     Ok(0) => {
+                        drop(parser);
+                        drop(frames);
+                        drop(pending_push);
                         break;
                     },
                     Ok(n) => {
@@ -225,8 +228,9 @@ impl AudioEngine {
                         }
                     }
                     Err(_) => {
-                        frames.clear();
-                        pending_push.clear();
+                        drop(parser);
+                        drop(frames);
+                        drop(pending_push);
                         break;
                     },
                 }

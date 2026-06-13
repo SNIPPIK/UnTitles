@@ -248,13 +248,13 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const current = player.tracks.position;
 
             // Позиция трека для сообщения
-            const position = skip?.position ? skip?.position : current;
+            const position = skip?.position !== null ? skip?.position : current;
 
             // Выводим сообщение об ошибке
             db.events.emitter.emit("message/error", queue, error, position);
 
             // Если надо пропустить трек
-            if (skip) {
+            if (skip.skip) {
                 // Если надо пропустить текущую позицию
                 if (skip.position === current) {
                     // Если плеер играет, то не пропускаем

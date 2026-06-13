@@ -113,10 +113,12 @@ Even if the main Node.js thread is hard blocked, audio continues playing **witho
 
 ```ts
 // 💣 Event Loop Blocking Test (x4)
-setInterval(() => {
-    const start = performance.now();
-    while (performance.now() - start < 100) {}
-}, 100);
+for (let i = 0; i < 4; i++) {
+    setInterval(() => {
+        const start = performance.now();
+        while (performance.now() - start < 100) {}
+    }, 100 + (i * 10));
+}
 ```
 <p>
     <a href="">

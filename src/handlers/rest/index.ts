@@ -402,7 +402,8 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
                     const matchCount = candidateArr.filter(word => original.includes(word)).length;
                     const namer = getSmartMatch(original, candidate);
 
-                    return (timeDiff <= 5) && namer || (timeDiff <= 5) && (matchCount >= Math.floor(candidateArr.length * 0.75)) || namer;
+                    return (timeDiff <= 5) && namer || (timeDiff <= 5) && (matchCount >= Math.floor(candidateArr.length * 0.75)) ||
+                        namer || song.name.toLowerCase().includes(track.name.toLowerCase());
                 });
 
                 // Если отфильтровать треки не удалось
@@ -540,11 +541,11 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
  * @private
  */
 const normalize = (text: string) => text
+    .normalize("NFKD")
+
     // Удаление лишнего текста
     .replaceAll(/█/gi, "")
-
     .toLowerCase()
-    .normalize("NFKD")
 
     // Оставляем только буквы и цифры, заменяя остальное на пробелы
     .replace(/[^\p{L}\p{N}\s]/gu, " ")

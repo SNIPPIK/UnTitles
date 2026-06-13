@@ -281,7 +281,7 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
             try {
                 const result = this.options.execute(item);
 
-                setImmediate(() => {
+                process.nextTick(() => {
                     // Если результат – Promise, обрабатываем возможные ошибки асинхронно
                     if (result instanceof Promise) {
                         result.catch((err) => {
@@ -317,7 +317,7 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      */
     protected _stepCycle() {
         for (const item of this) {
-            setImmediate(async () => {
+            queueMicrotask(async () => {
                 if (await this.options.filter(item)) {
                     Promise.resolve(this.options.execute(item))
                         .then((keep) => {
