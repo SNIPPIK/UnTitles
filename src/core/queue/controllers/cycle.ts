@@ -138,8 +138,9 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
 
                     // Применяем корректировку только раз в определенное время (Cooldown)
                     if ((now - this._lastAdjust >= PLAYER_SEND_NATIVE) && (this.options.duration !== quantized)) {
+                        // Уменьшаем плавно, повышаем резко
                         const step = this.options.duration > quantized ? -OPUS_FRAME_SIZE : OPUS_FRAME_SIZE;
-                        this.options.duration = Math.max(PLAYER_SEND_NATIVE, this.options.duration + step);
+                        this.options.duration = Math.max(PLAYER_SEND_LIMIT, this.options.duration + step);
 
                         // Устанавливаем задержку до следующей корректировки
                         this._lastAdjust = now + PLAYER_SEND_NATIVE * 5;

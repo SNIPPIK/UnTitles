@@ -156,6 +156,9 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         // Если очередь пуста – останавливаем цикл
         if (this.size === 0) return this.reset();
 
+        // Обновляем время следующего выполнения (устойчиво к дрейфу)
+        const start = this.time;
+
         try {
             // Выполнение полезной нагрузки (переопределяется в наследниках)
             this._stepCycle();
@@ -164,11 +167,8 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
             console.error("[CycleSystem] Unhandled error in _stepCycle:", error);
         }
 
-        // Обновляем время следующего выполнения (устойчиво к дрейфу)
+        this._drift = Math.max(this._drift / 0.25, start - this.time);
         const now = this.time;
-
-        this.nextExecutionTime += this.options.duration;
-        this._drift = Math.max(0, now - this.nextExecutionTime);
 
         // Если мы сильно отстали (например, из-за долгой обработки),
         // сбрасываем nextExecutionTime, чтобы избежать каскадного отставания

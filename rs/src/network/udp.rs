@@ -1,7 +1,6 @@
 use napi::threadsafe_function::ThreadsafeFunctionCallMode;
 use crate::timers::scheduler::balancer::{add_global_session, remove_global_session};
 use crate::audio::ring_buffer::RingBuffer;
-use crate::timers::scheduler::cycle_manager::TICK_INTERVAL_MS;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::{
@@ -65,18 +64,40 @@ impl UdpBufferedInner {
     /// пакет возвращается в начало очереди (push_front) для повторной попытки позже,
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self, now: u64) {
-        // Пробуем взять пакет
-        if let Some(packet) = self.buffer.pop() {
+        // Пробуем отправить хотя бы один пакет за тик
+        for _ in 0..1 {  // небольшой burst limit, чтобы не виснуть в одном session'е
+            let Some(packet) = self.buffer.pop() else {
+                break;
+            };
+
             match self.socket.send(&packet) {
                 Ok(_) => {
                     self.counter.store(0, Ordering::Relaxed);
                     self.last_send_ms.store(now, Ordering::Relaxed);
+                    // пакет успешно ушёл — продолжаем, вдруг есть ещё
                 }
-                Err(_) => {
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    // Сокет временно перегружен — возвращаем пакет в начало очереди
+                    if let Err(_) = self.buffer.push_front(packet) {
+                        // Если даже push_front не удался — пакет потерян (очень редкий случай)
+                        self.send_drops.fetch_add(1, Ordering::Relaxed);
+
+                        #[cfg(debug_assertions)]
+                        {
+                            println!("UDP buffer full, packet dropped");
+                        }
+                    }
+                    break; // не пытаемся дальше в этом тике
+                }
+                Err(_e) => {
+                    // Другие ошибки (NetworkUnreachable, InvalidInput и т.д.)
                     self.send_drops.fetch_add(1, Ordering::Relaxed);
-                    // В зависимости от реализации RingBuffer, возможно стоит
-                    // вернуть пакет обратно в начало очереди (push_front),
-                    // как указано в твоем комментарии.
+
+                    // пакет потерян
+                    #[cfg(debug_assertions)]
+                    {
+                        println!("UDP send error: {}", _e);
+                    }
                 }
             }
         }
@@ -86,11 +107,21 @@ impl UdpBufferedInner {
     pub fn tick_alive(&self, now: u64) {
         let count = self.counter.fetch_add(1, Ordering::Relaxed);
         let mut keep_alive_packet = [0u8; 8];
-
         keep_alive_packet[0..4].copy_from_slice(&count.to_le_bytes());
 
-        if self.socket.send(&keep_alive_packet).is_ok() {
-            self.last_send_ms.store(now, Ordering::Relaxed);
+        match self.socket.send(&keep_alive_packet) {
+            Ok(_) => {
+                self.last_send_ms.store(now, Ordering::Relaxed);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                // keepalive не критичен, можно просто пропустить
+            }
+            Err(_e) => {
+                #[cfg(debug_assertions)]
+                {
+                    println!("Keepalive send failed: {}", _e);
+                }
+            }
         }
     }
 }

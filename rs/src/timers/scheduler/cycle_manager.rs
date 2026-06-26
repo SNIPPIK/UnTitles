@@ -126,9 +126,9 @@ impl CycleManager {
     }
 
     /// Возвращает текущее количество активных сессий.
-    pub fn session_count(&self) -> usize {
+    /*pub fn session_count(&self) -> usize {
         self.sessions.load().len()
-    }
+    }*/
 
     // =========================================================================
     // Остановка
@@ -196,51 +196,85 @@ impl CycleManager {
         // Клонируем Arс'и для передачи в замыкание потока.
         let sessions = Arc::clone(&self.sessions);
         let running = Arc::clone(&self.running);
-        let wake_state = Arc::clone(&self.wake_state);
 
-        // Запускаем поток с фиксированной частотой тактов.
         let handle = thread::Builder::new()
             .name("udp-cycle".into())
             .spawn(move || {
+                // Базовый интервал между тактами (20 мс).
                 let interval = Duration::from_millis(TICK_INTERVAL_MS);
-                // Момент следующего такта; инициализируем текущим временем,
-                // чтобы первый такт произошёл сразу (без задержки).
-                let mut next_tick = Instant::now();
+                // Момент следующего «идеального» срабатывания.
+                let mut next_deadline = Instant::now() + interval;
+                // Порядковый номер такта (монотонно возрастает, используется только для отладки).
+                let mut tick: u64 = 0;
 
-                // Главный цикл: крутится, пока running == true.
                 while running.load(Ordering::Relaxed) {
-                    // Делаем snapshot карты сессий.
-                    let sessions = sessions.load_full();
+                    #[cfg(debug_assertions)]
+                    {
+                        tick += 1;
+                    }
 
-                    // Если есть хотя бы одна сессия, обходим все и вызываем process.
+                    // Захватываем актуальный снапшот сессий (ArcSwap даёт полную копию без блокировок).
+                    let sessions = sessions.load_full();
                     if !sessions.is_empty() {
                         let now = now_ms();
                         for session in sessions.values() {
                             session.process(now);
                         }
                     }
-
+                    // Явно освобождаем снапшот, чтобы не держать ссылку дольше необходимого.
                     drop(sessions);
 
-                    // Планируем следующий такт.
-                    next_tick += interval;
-                    let current = Instant::now();
+                    // ===== Контроль времени =====
+                    let now = Instant::now();
 
-                    if current < next_tick {
-                        // Мы не опаздываем – спим оставшееся время.
-                        let wait = next_tick - current;
-                        thread::sleep(wait);
-                    } else {
-                        // Опаздываем – «догоняем» таймер, сдвигая next_tick вперёд
-                        // до тех пор, пока он не перегонит текущее время.
-                        // Это позволяет избежать накопления отставания.
-                        while next_tick <= current {
-                            next_tick += interval;
+                    if now < next_deadline {
+                        // Мы не опаздываем — нужно дождаться дедлайна.
+                        let sleep_time = next_deadline - now;
+
+                        // Спим на всё оставшееся время, за вычетом 250 мкс.
+                        // Этот запас нужен, чтобы компенсировать неточность пробуждения
+                        // и успеть войти в активный цикл ожидания до точного дедлайна.
+                        // Минимальный порог в 600 мкс предохраняет от сна на слишком
+                        // короткое время (меньше минимальной гранулярности ОС).
+                        if sleep_time > Duration::from_micros(600) {
+                            thread::sleep(sleep_time - Duration::from_micros(250));
                         }
+
+                        // Активный цикл ожидания (busy-wait) для точного попадания в дедлайн.
+                        // spin_loop — это подсказка процессору (на x86 аналог PAUSE),
+                        // снижающая энергопотребление и улучшающая производительность SMT.
+                        while Instant::now() < next_deadline {
+                            std::hint::spin_loop();
+                        }
+                    } else {
+                        // Опаздываем — вычисляем, сколько тактов мы пропустили.
+                        let lag = now.duration_since(next_deadline);
+                        let skipped = (lag.as_millis() as u64 / TICK_INTERVAL_MS) + 1;
+
+                        #[cfg(debug_assertions)] {
+                            // Логируем только при значительном отставании (>2 тактов).
+                            if skipped > 2 {
+                                println!(
+                                    "udp-cycle lag: skipped {} ticks, lag {}ms, total {} ticks",
+                                    skipped,
+                                    lag.as_millis(),
+                                    tick
+                                );
+                                tick += skipped - 1;
+                            }
+                        }
+
+                        // Компенсируем отставание: сдвигаем дедлайн вперёд
+                        // на пропущенные интервалы. Это сохраняет «идеальное» расписание
+                        // без накопления фазового сдвига.
+                        next_deadline += interval * skipped as u32;
                     }
+
+                    // Планируем следующий дедлайн.
+                    next_deadline += interval;
                 }
             })
-            .expect("Failed to spawn udp-cycle thread");
+            .unwrap();
 
         *handle_guard = Some(handle);
     }

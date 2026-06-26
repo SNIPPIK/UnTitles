@@ -196,6 +196,43 @@ impl RingBuffer {
         }
     }
 
+    /// Добавляет элемент в **начало** очереди (push_front)
+    /// Используется при неудачной отправке, чтобы вернуть пакет обратно
+    pub fn push_front(&self, value: Vec<u8>) -> Result<(), Vec<u8>> {
+        let mut head = self.head.0.load(Ordering::Relaxed);
+
+        loop {
+            let slot = &self.buffer[head % self.capacity];
+            let seq = slot.seq.load(Ordering::Acquire);
+
+            // head должен указывать на свободный слот для записи "слева"
+            if seq == head.wrapping_add(1) {
+                // Можно писать в начало
+                let next_head = head.wrapping_sub(1);
+
+                if self.head.0.compare_exchange_weak(
+                    head,
+                    next_head,
+                    Ordering::Release,
+                    Ordering::Relaxed,
+                ).is_ok() {
+                    unsafe {
+                        (*slot.data.get()).write(value);
+                    }
+                    slot.seq.store(next_head, Ordering::Release);
+                    return Ok(());
+                }
+                // CAS не удался — retry
+            } else if seq == head {
+                // Буфер пуст (или кто-то уже двигает head)
+                head = self.head.0.load(Ordering::Relaxed);
+            } else {
+                // Буфер полон (или race condition)
+                return Err(value);
+            }
+        }
+    }
+
     // =========================================================================
     // Извлечение (pop)
     // =========================================================================
