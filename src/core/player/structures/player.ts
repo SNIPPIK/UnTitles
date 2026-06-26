@@ -186,17 +186,24 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public set cycle(isActive: boolean) {
+        // Проверяем читается ли текущий поток
+        if (!this._audio?.preload?.readable && this._audio?.current?.readable && this.status !== AudioPlayerState.playing) {
+            // Отправляем пустышку если такая возможность есть
+            if (this._voice.connection.ready) {
+                if (isActive) this._voice.connection.packet(SILENT_FRAME);
+                else setImmediate(() => {
+                    this._voice.connection.packet(SILENT_FRAME);
+                })
+            }
+        }
+
+
         // Подключаем плеер к циклу
         if (isActive) {
             // Если нет плеера в цикле
             if (!db.queues.cycles.players.has(this)) {
-                // Отправляем пустышку если такая возможность есть
-                if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
-
-                setImmediate(() => {
-                    // Добавляем плеер в цикл
-                    db.queues.cycles.players.add(this);
-                });
+                // Добавляем плеер в цикл
+                db.queues.cycles.players.add(this);
                 this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
             }
         }
@@ -207,10 +214,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             if (db.queues.cycles.players.has(this)) {
                 // Удаляем плеер из цикла
                 db.queues.cycles.players.delete(this);
-
-                setImmediate(() => {
-                    if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAME);
-                });
                 this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
             }
         }
@@ -506,11 +509,11 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             if (queue) db.events.emitter.emit("message/playing", queue) // Отправляем сообщение, если можно
         }
 
-        // Переводим плеер в состояние чтения аудио
-        this.status = AudioPlayerState.playing;
-
         // Передаем плеер в цикл
         this.cycle = true;
+
+        // Переводим плеер в состояние чтения аудио
+        this.status = AudioPlayerState.playing;
 
         // Меняем позицию если удачно
         this._tracks.position = index;

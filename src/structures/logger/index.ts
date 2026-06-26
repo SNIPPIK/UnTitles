@@ -1,6 +1,5 @@
 import * as process from "node:process";
 import { inspect } from "node:util";
-import { env } from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -60,7 +59,7 @@ export class Logger {
      * @public
      * @static
      */
-    public static debug = env.get("NODE_ENV") === "development";
+    public static debug = process.env["NODE_ENV"] === "development";
 
     /**
      * @description Отправляем лог в консоль
@@ -74,7 +73,7 @@ export class Logger {
 
             // Получаем память в мегабайтах с двумя знаками после запятой
             const mem = process.memoryUsage();
-            const memUsedMB = ((mem.heapUsed + mem.external + mem.arrayBuffers + mem.heapTotal) / 1024 / 1024).toFixed(2);
+            const memUsedMB = ((mem.rss) / 1024 / 1024).toFixed(2);
             const time = createDate();
 
             // Если пришел текст

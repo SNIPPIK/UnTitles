@@ -410,13 +410,6 @@ impl OggOpusDemuxer {
                 if len < 2 {
                     return PacketType::Broken;
                 }
-                let frame_count = packet[1] & 0x7F;
-
-                // Mod RFC 6716;
-                // Это нестандартное расширение для Discord/PLC-потоков
-                if frame_count == 0 || frame_count > 120 {
-                    return PacketType::Broken;
-                }
 
                 let count = packet[1] & 0x3F;
 

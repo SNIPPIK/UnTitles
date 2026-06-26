@@ -8,256 +8,178 @@ import { SetArray } from "#structures/array/index.js";
  * @abstract
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /**
-     * Время (в миллисекундах, относительно `performance.timing.navigationStart` или аналогичного
-     * origin), в которое должен выполниться следующий шаг цикла.
-     *
-     * Изначально `NaN` — признак отсутствия запущенного цикла.
-     */
-    private nextExecutionTime = NaN;
+    /** Последняя зафиксированная длительность цикла (целевая) */
+    private lastDuration: number = 0;
+    private _drift = 0;
+
+    /** Абсолютное время следующего запланированного выполнения (ms) */
+    private nextExecutionTime: number = 0;
+
+    /** Идентификатор активного таймера */
+    private timer: NodeJS.Timeout | NodeJS.Immediate | null = null;
 
     /**
-     * Идентификатор активного таймера (`setTimeout`), либо `null`, если таймер не установлен.
-     */
-    private timer: NodeJS.Timeout | null = null;
-
-    /**
-     * Флаг, указывающий, запущен ли цикл.
-     * Управляет возможностью добавления новых элементов и продолжением шагов.
-     */
-    private running = false;
-
-    /**
-     * Возвращает текущее время в миллисекундах с высокой точностью (`performance.now()`).
-     * Используется для вычисления задержек и предотвращения дрейфа времени.
+     * @description Текущее время в миллисекундах (высокая точность)
+     * @protected
      */
     protected get time(): number {
-        return performance.now();
-    }
+        return (Number(process.hrtime.bigint()) / 1_000_000) + performance.now();
+    };
 
     /**
-     * Оставшееся время до следующего запланированного шага (в миллисекундах).
-     *
-     * - `0`, если цикл не запущен (`nextExecutionTime === NaN`).
-     * - Положительное число, если шаг ещё ожидается.
-     * - Отрицательное число, если шаг просрочен (теоретически при отставании).
+     * @description Ожидаемое время следующего шага цикла
+     * @returns number (0 если цикл не активен)
+     * @public
      */
     public get insideTime(): number {
-        return Number.isNaN(this.nextExecutionTime)
-            ? 0
-            : this.nextExecutionTime - this.time;
-    }
+        return this.nextExecutionTime;
+    };
 
     /**
-     * Создаёт экземпляр циклической системы.
-     *
-     * @param options - конфигурация цикла.
-     * @param options.duration - интервал между шагами в миллисекундах (должен быть > 0).
-     * @param options.custom - необязательные хуки для синхронизации с внешней логикой
-     * (например, оповещение о добавлении/удалении элементов).
-     *
-     * @throws {Error} Если `duration <= 0`.
+     * @description Последний целевой интервал цикла
+     * @returns number
+     * @public
      */
-    public constructor(
-        public readonly options: SyncCycleConfig<T> | AsyncCycleConfig<T>
-    ) {
-        super();
-
-        if (options.duration <= 0) {
-            throw new Error("Duration must be positive");
-        }
-    }
+    public get delay(): number {
+        return this.lastDuration;
+    };
 
     /**
-     * Добавляет элемент в коллекцию и автоматически запускает цикл, если он ещё не запущен.
-     *
-     * Если элемент уже присутствует, он будет сначала удалён, а затем добавлен заново
-     * (это гарантирует сброс возможного внутреннего состояния, связанного с элементом).
-     *
-     * @param item - добавляемый элемент.
-     * @returns `this` для цепочечных вызовов.
+     * @description Конструктор
+     * @param options - конфигурация цикла
+     * @throws {Error} если duration <= 0
+     */
+    public constructor(public options: SyncCycleConfig<T> | AsyncCycleConfig<T>) {
+        super();
+        if (options.duration <= 0) {
+            throw Error("Duration must be a positive number");
+        }
+        this.lastDuration = options.duration;
+    };
+
+    /**
+     * @description Добавляет элемент в очередь и запускает цикл при необходимости
+     * @param item - элемент для добавления
+     * @returns this
      */
     public add(item: T): this {
-        // Уведомляем внешний хук о добавлении (если задан).
-        this.options.custom?.push?.(item);
-
-        // Принудительно удаляем существующий элемент, чтобы обновить его позицию/состояние.
-        if (this.has(item)) {
-            super.delete(item);
+        // Вызов кастомного обработчика добавления
+        if (this.options.custom?.push) {
+            this.options.custom.push(item);
         }
 
+        // Удаляем дубликат, если уже существует
+        if (this.has(item)) this.delete(item);
         super.add(item);
 
-        // Если цикл ещё не запущен — стартуем.
-        if (!this.running) {
-            this.start();
+        // Запуск цикла при первом добавленном элементе
+        if (this.size === 1 && !this.nextExecutionTime) {
+            const now = this.time;
+            this.nextExecutionTime = now + this.options.duration;
+            // Используем setImmediate для немедленного, но асинхронного старта
+            setImmediate(this.step);
         }
 
         return this;
-    }
+    };
 
     /**
-     * Удаляет элемент из коллекции. Если элемент отсутствует, ничего не делает.
-     *
-     * @param item - удаляемый элемент.
-     * @returns `true`, если элемент был удалён, иначе `false`.
+     * @description Удаляет элемент из очереди
+     * @param item - элемент для удаления
+     * @returns true если элемент был удалён, иначе false
      */
     public delete(item: T): boolean {
-        if (!this.has(item)) {
-            return false;
+        const existed = this.has(item);
+        if (!existed) return false;
+
+        if (this.options.custom?.remove) {
+            this.options.custom.remove(item);
         }
 
-        // Уведомляем внешний хук об удалении.
-        this.options.custom?.remove?.(item);
-
-        return super.delete(item);
-    }
+        super.delete(item);
+        return true;
+    };
 
     /**
-     * Полностью очищает коллекцию, останавливает цикл и сбрасывает внутреннее состояние.
-     *
-     * Для каждого элемента вызывается внешний хук `remove` (если задан).
+     * @description Полная очистка очереди и остановка цикла
      */
     public reset(): void {
-        for (const item of this) {
-            this.options.custom?.remove?.(item);
-        }
-
-        this.clear();
-        this.stop();
-    }
-
-    /**
-     * Запускает цикл, если он ещё не запущен.
-     *
-     * Устанавливает `running = true`, вычисляет время первого шага
-     * и инициирует планирование через `scheduleStep()`.
-     */
-    protected start(): void {
-        if (this.running) {
-            return;
-        }
-
-        this.running = true;
-        this.nextExecutionTime = this.time + this.options.duration;
-        this.scheduleStep();
-    }
-
-    /**
-     * Останавливает цикл: снимает флаг `running`, сбрасывает `nextExecutionTime`
-     * в `NaN` и удаляет активный таймер.
-     */
-    protected stop(): void {
-        this.running = false;
-        this.nextExecutionTime = NaN;
         this.clearTimer();
-    }
+        this.clear();          // очистка SetArray
+        this.nextExecutionTime = 0;
+        this.lastDuration = 0;
+    };
 
     /**
-     * Безопасно очищает активный таймер, если он установлен.
+     * @description Очищает активный таймер, если он существует
+     * @protected
      */
     protected clearTimer(): void {
-        if (!this.timer) {
-            return;
-        }
+        if (!this.timer) return;
 
-        clearTimeout(this.timer);
+        if ("hasRef" in this.timer) clearTimeout(this.timer as NodeJS.Timeout);
+        else clearImmediate(this.timer as NodeJS.Immediate);
         this.timer = null;
-    }
+    };
 
     /**
-     * Планирует следующий шаг цикла.
-     *
-     * Вычисляет задержку до `nextExecutionTime`:
-     * - Если задержка <= 0, шаг запускается немедленно через `queueMicrotask`,
-     *   чтобы избежать блокировки события и дать возможность обработать микрозадачи.
-     * - Иначе устанавливается `setTimeout` на оставшееся время.
-     *
-     * Перед установкой нового таймера предыдущий гарантированно очищается.
+     * @description Планирует следующий шаг цикла с учётом времени выполнения
+     * @protected
      */
     protected scheduleStep(): void {
-        if (!this.running) {
-            return;
-        }
-
-        const delay = this.nextExecutionTime - this.time;
+        const delay = Math.max(-1, this.nextExecutionTime - this.time);
         this.clearTimer();
 
-        if (delay <= 0) {
-            queueMicrotask(this.step);
-            return;
+        if (delay <= 3) {
+            // Мы уже отстаем, выполняем следующий шаг максимально быстро
+            this.timer = setImmediate(this.step);
+        } else {
+            // Обычное планирование
+            this.timer = setTimeout(this.step, delay);
         }
-
-        this.timer = setTimeout(
-            this.step,
-            delay
-        );
-    }
+    };
 
     /**
-     * Непосредственно выполняет один шаг цикла.
-     *
-     * Логика:
-     * 1. Если цикл остановлен или коллекция пуста — сбрасывает состояние через `reset()`.
-     * 2. Вызывает абстрактный `_stepCycle()`.
-     * 3. В случае ошибки делегирует её в `onError`.
-     * 4. Вычисляет время следующего выполнения, корректируя `nextExecutionTime`:
-     *    - Прибавляет `duration`, сохраняя «идеальное» расписание.
-     *    - Если после прибавления `nextExecutionTime` всё ещё не превышает текущее время,
-     *      происходит пересинхронизация: `nextExecutionTime` устанавливается в
-     *      `now + duration`, чтобы избежать накопления отставания.
-     * 5. Запускает планирование следующего шага.
-     *
-     * Оформлен как стрелочное свойство для сохранения контекста `this` при передаче
-     * в `setTimeout` / `queueMicrotask`.
+     * @description Основной шаг цикла
+     * @private
      */
     private step = (): void => {
-        if (!this.running || this.size === 0) {
-            this.reset();
-            return;
-        }
+        // Если очередь пуста – останавливаем цикл
+        if (this.size === 0) return this.reset();
 
-        try {
-            this._stepCycle();
-        } catch (error) {
-            this.onError(error);
-        }
-
+        // Обновляем время следующего выполнения (устойчиво к дрейфу)
         const now = this.time;
 
-        this.nextExecutionTime += this.options.duration;
-
-        /**
-         * Если цикл ушёл слишком далеко назад,
-         * пересинхронизируемся.
-         */
-        if (this.nextExecutionTime <= now) {
-            this.nextExecutionTime =
-                now + this.options.duration;
+        try {
+            // Выполнение полезной нагрузки (переопределяется в наследниках)
+            this._stepCycle();
+        } catch (error) {
+            // Логируем критические ошибки, но не даём циклу упасть
+            console.error("[CycleSystem] Unhandled error in _stepCycle:", error);
         }
 
+        this.nextExecutionTime += this.options.duration;
+        this._drift = Math.max(0, now - this.nextExecutionTime);
+
+        // Если мы сильно отстали (например, из-за долгой обработки),
+        // сбрасываем nextExecutionTime, чтобы избежать каскадного отставания
+        if (this.nextExecutionTime <= now) {
+            this.nextExecutionTime = now + this.options.duration;
+        }
+
+        this.lastDuration = this.options.duration;
+
+        // TODO DEBUG Drift Cycle System
+        console.log(this.options.duration, this._drift)
+
+        // Планируем следующий шаг
         this.scheduleStep();
     };
 
     /**
-     * Обработчик ошибок, возникших во время выполнения `_stepCycle()`.
-     *
-     * По умолчанию выводит ошибку в консоль. Может быть переопределён в наследниках.
-     *
-     * @param error - перехваченная ошибка.
-     */
-    protected onError(error: unknown): void {
-        console.error(
-            "[CycleSystem] cycle error:",
-            error
-        );
-    }
-
-    /**
-     * Абстрактный метод, реализующий полезную нагрузку одного шага цикла.
-     *
-     * Вызывается периодически с интервалом `duration`, пока коллекция не пуста
-     * и цикл запущен. Должен быть определён в конкретном классе-наследнике.
+     * @description Абстрактный метод, выполняющий полезную работу на каждом шаге
+     * @protected
+     * @abstract
      */
     protected abstract _stepCycle(): void;
 }
@@ -273,23 +195,23 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @description Выполняет все подходящие элементы цикла
      * @protected
      */
-    protected _stepCycle() {
-        for (const item of this) {
+    protected async _stepCycle() {
+        for (const item of this.array) {
             // Пропускаем элементы, не прошедшие фильтр
             if (!this.options.filter(item)) continue;
 
             try {
                 const result = this.options.execute(item);
 
-                process.nextTick(() => {
-                    // Если результат – Promise, обрабатываем возможные ошибки асинхронно
-                    if (result instanceof Promise) {
+                // Если результат – Promise, обрабатываем возможные ошибки асинхронно
+                if (result instanceof Promise) {
+                    queueMicrotask(() => {
                         result.catch((err) => {
                             console.error("[TaskCycle] Async execution error:", err);
                             this.delete(item);
                         });
-                    }
-                });
+                    });
+                }
             } catch (error) {
                 // Синхронная ошибка – удаляем элемент и логируем
                 console.error("[TaskCycle] Sync execution error:", error);
@@ -315,9 +237,9 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      * @description Выполняет все подходящие элементы, не дожидаясь Promise
      * @protected
      */
-    protected _stepCycle() {
-        for (const item of this) {
-            queueMicrotask(async () => {
+    protected async _stepCycle() {
+        for await (const item of this.array) {
+            setImmediate(async () => {
                 if (await this.options.filter(item)) {
                     Promise.resolve(this.options.execute(item))
                         .then((keep) => {

@@ -253,6 +253,11 @@
     "ru": "Не удалось получить текст трека!"
   },
 
+  "player.button.like": {
+    "en-US": "This functionality will be available in version 0.6.0!!!",
+    "ru": "Данный функционал будет доступен в 0.6.0!!!"
+  },
+
   "queue.cleanup": {
     "en-US": "## Playback stopped\n\nThe queue is still there, but the playback has finished, you can continue playing!",
     "ru": "## Проигрывание остановлено\n\nОчередь все еще присутствует но проигрывание завершено, вы можете продолжить проигрывание!"

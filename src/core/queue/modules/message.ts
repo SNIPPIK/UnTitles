@@ -167,6 +167,7 @@ export class QueueButtons {
 
         lyrics: QueueButtons.createButton({env: "lyrics"}),
         stop: QueueButtons.createButton({env: "stop", style: 4}),
+        like: QueueButtons.createButton({env: "like"}),
     };
 
     /** Изменяемые кнопки, для отображения в сообщение о текущем треке */
@@ -204,6 +205,9 @@ export class QueueButtons {
 
                 // Кнопка текущих фильтров
                 QueueButtons.createButton({env: "filters", disabled: true}),
+
+                // Кнопка об информации проигрывания
+                QueueButtons.button.like
             ]
         }
     ];

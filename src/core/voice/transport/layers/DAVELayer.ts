@@ -58,11 +58,10 @@ export class DAVELayer extends BaseLayer<MLSSession> {
      * но сейчас он отключен. При неудаче выбрасывается исключение.
      */
     public packet = (frames: Buffer[]) => {
-        // Вызов метода encrypt сессии; возвращает массив зашифрованных пакетов или null.
-        let packets = this._client.encrypt(frames);
+        if (!this._client) return null;
 
-        if (!packets) throw Error("DAVE encryption failed");
-        return packets;
+        // Вызов метода encrypt сессии; возвращает массив зашифрованных пакетов или null.
+        return this._client.encrypt(frames);
     };
 
     /**

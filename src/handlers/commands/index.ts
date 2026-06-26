@@ -268,6 +268,10 @@ export class Commands extends handler<Command> {
         else client.rest.delete(Routes.applicationCommand(client.user.id, CommandID))
             .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed`))
             .catch(console.error);
+
+
+        client.rest.clearHandlerSweeper();
+        client.rest.clearHashSweeper();
     };
 
     /**

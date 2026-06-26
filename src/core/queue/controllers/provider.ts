@@ -1,5 +1,4 @@
 import { httpsClient, httpsStatusCode, Logger } from "#structures";
-import { RestAPIAgent } from "#handler/rest/index.js";
 import { Track } from "#core/queue/index.js";
 import { sdb } from "#worker/db";
 import { db } from "#app/db";
@@ -194,7 +193,7 @@ export class TrackResolvers {
             return track.link;
         }
 
-        const client = new httpsClient({ url: track.link, agent: track.proxy ? RestAPIAgent : null, sessionTimeout: TRACK_CHECK_WAIT, timeout: TRACK_CHECK_WAIT });
+        const client = new httpsClient({ url: track.link, agent: track.proxy ? sdb.proxy : null, sessionTimeout: TRACK_CHECK_WAIT, timeout: TRACK_CHECK_WAIT });
         const status = await client.toHead;
         const error = httpsStatusCode.parse(status);
 

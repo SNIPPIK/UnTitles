@@ -2,8 +2,8 @@ import { VoiceCloseCodes, VoiceOpcodes } from "discord-api-types/voice/v8";
 import { HeartbeatManager } from "../../structures/heartbeat.js";
 import { type WebSocketOpcodes } from "#core/voice/index.js";
 import { type Data, type MessageEvent, WebSocket } from "ws";
-import { RestAPIAgent } from "#handler/rest/index.js";
 import { TypedEmitter } from "#structures";
+import { sdb } from "#worker/db";
 import { env } from "#app/env";
 
 /**
@@ -132,7 +132,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this._endpoint = endpoint;
         this.ws = new WebSocket(`wss://${endpoint}?v=8`, {
             // Можно ли использовать прокси для подключения WS
-            agent: VoiceWebSocket.isProxy ? RestAPIAgent : null
+            agent: VoiceWebSocket.isProxy ? sdb.proxy : null
         });
 
         // Сообщение от websocket соединения

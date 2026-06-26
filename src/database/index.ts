@@ -97,12 +97,24 @@ class Database {
 }
 
 /**
- * @author SNIPPIK
- * @description Экспортируем базу данных глобально
- * @class Database
- * @public
+ * @description Глобальный экземпляр разделяемой базы данных (синглтон)
  */
-export let db: Database;
+let _db: Database | null = null;
+
+/**
+ * @description Экспортируемый объект разделяемой БД. Доступен только после инициализации.
+ * @throws {Error} при обращении до вызова initSharedDatabase()
+ */
+export const db = new Proxy(
+    {},
+    {
+        get(_, prop) {
+            if (!_db) throw Error("Database not ready");
+
+            return _db[prop as keyof Database];
+        }
+    }
+) as Database;
 
 /**
  * @author SNIPPIK
@@ -112,10 +124,10 @@ export let db: Database;
  * @public
  */
 export function initDatabase(client: DiscordClient) {
-    if (db) return;
+    if (_db) return;
 
     try {
-        db = new Database(client);
+        _db = new Database(client);
     } catch (err) {
         throw Error(`Fail init database: ${err}`);
     }

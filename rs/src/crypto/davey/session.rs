@@ -64,15 +64,11 @@ impl DaveSession {
   /// Используем явное сопоставление, чтобы избежать `unsafe transmute`
   /// и быть устойчивыми к возможным изменениям repr в `davey`.
   fn map_operation(v: u8) -> Result<davey::ProposalsOperationType> {
-    // Согласно спецификации Discord DAVE, типы операций MLS находятся в диапазоне 0..=10.
-    if v <= 10 {
-      return Ok(unsafe { std::mem::transmute(v) });
+    if v > 10 {
+      return Err(Error::from_reason(format!("Invalid operation: {v}")));
     }
 
-    Err(Error::from_reason(format!(
-      "Invalid DAVE ProposalsOperationType: {}. Expected value in range 0-10.",
-      v
-    )))
+    Ok(unsafe { std::mem::transmute(v) })
   }
 
   /// Общая логика инициализации.
@@ -220,10 +216,14 @@ impl DaveSession {
 
     // Парсим список идентификаторов, если он предоставлен
     let ids = recognized_user_ids
-        .map(|ids| {
-          ids.into_iter()
-              .map(|id| Self::parse_id(id, "recognized user id"))
-              .collect::<Result<Vec<_>>>()
+        .map(|ids| -> Result<Vec<u64>> {
+          let mut out = Vec::with_capacity(ids.len());
+
+          for id in ids {
+            out.push(Self::parse_id(id, "recognized user id")?);
+          }
+
+          Ok(out)
         })
         .transpose()?;
 
@@ -289,9 +289,16 @@ impl DaveSession {
   pub fn encrypt(&mut self, media_type: u8, codec: u8, packet: Buffer) -> Result<Buffer> {
     let mt = Self::map_media_type(media_type)?;
     let cd = Self::map_codec(codec)?;
-    let out = self.inner.encrypt(mt, cd, &packet).map_err(Self::map_err)?;
 
-    Ok(Buffer::from(out.as_ref()))
+    // ZERO-COPY: работаем через slice
+    let input: &[u8] = packet.as_ref();
+
+    let out = self.inner
+        .encrypt(mt, cd, input)
+        .map_err(Self::map_err)?;
+
+    // единственная аллокация тут — неизбежна (JS boundary)
+    Ok(Buffer::from(&*out))
   }
 
   /// Быстрое шифрование одного Opus-пакета (с заренне заговленным типом медиа и кодека).
@@ -332,23 +339,29 @@ impl DaveSession {
   /// Массив той же длины, где каждый элемент — либо зашифрованный `Buffer`, либо `null` (если шифрование не удалось).
   #[napi(js_name = "encryptOpusBatch")]
   pub fn encrypt_opus_batch(&mut self, packets: Vec<Buffer>) -> Vec<Option<Buffer>> {
-    let mut results = Vec::with_capacity(packets.len());
+    let mut results: Vec<Option<Buffer>> = Vec::with_capacity(packets.len());
 
     for packet in packets {
-      // Не шифруем Silent Frame
-      if packet.len() <= 3 {
+      let input = packet.as_ref();
+
+      // silent frame fast-path
+      if input.len() <= 3 {
         results.push(Some(packet));
         continue;
       }
 
-      if let Ok(out) = self
-          .inner
-          .encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet)
-      {
-        results.push(Some(Buffer::from(out.into_owned())));
-      } else {
-        println!("[DaveSession] encrypt failed");
-        results.push(None);
+      match self.inner.encrypt(
+        davey::MediaType::AUDIO,
+        davey::Codec::OPUS,
+        input
+      ) {
+        Ok(out) => {
+          results.push(Some(Buffer::from(&*out)));
+        }
+        Err(_) => {
+          // no println! — это убивает throughput
+          results.push(None);
+        }
       }
     }
 
@@ -370,7 +383,13 @@ impl DaveSession {
   pub fn decrypt(&mut self, user_id: String, media_type: u8, packet: Buffer) -> Result<Buffer> {
     let uid = Self::parse_id(user_id, "user id")?;
     let mt = Self::map_media_type(media_type)?;
-    let out = self.inner.decrypt(uid, mt, &packet).map_err(Self::map_err)?;
+
+    let input: &[u8] = packet.as_ref();
+
+    let out = self.inner
+        .decrypt(uid, mt, input)
+        .map_err(Self::map_err)?;
+
     Ok(Buffer::from(out))
   }
 
@@ -429,7 +448,7 @@ impl DaveSession {
 
   /// Удаление данных, включая слой davey
   pub fn cleanup(&mut self) {
-    let _ = self.inner.reset();
+    self.inner.reset().expect("Failed reset davey session");
   }
 }
 
@@ -439,6 +458,7 @@ impl DaveSession {
 
 impl Drop for DaveSession {
   fn drop(&mut self) {
-    self.cleanup();
+    // явно сбрасываем state
+    self.inner.reset().expect("Failed reset davey session");
   }
 }

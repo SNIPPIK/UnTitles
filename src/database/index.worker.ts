@@ -1,5 +1,7 @@
 import { AudioSaver, MetaSaver } from "./index.saver.js";
 import { isMainThread } from "node:worker_threads";
+import { SocksProxyAgent } from "socks-proxy-agent";
+import { HttpProxyAgent } from "http-proxy-agent";
 import { env } from "#app/env";
 
 /**
@@ -15,12 +17,16 @@ class SharedDatabase {
     /** Класс для кеширования аудио (доступен в главном потоке при включённом кеше) */
     public readonly audio_saver?: AudioSaver = null;
 
+    /** Прокси агент, доступен как для RestAPI так и для многих других систем */
+    public readonly proxy: SocksProxyAgent | HttpProxyAgent<string>;
+
     /**
      * @description Создаёт экземпляр разделяемого кеша. Поля инициализируются только если кеш включён.
      * @throws {Error} если попытка создать meta_saver в главном потоке (не разрешено)
      */
     public constructor() {
         const isCaching = this.isCacheEnabled();
+        this.proxy = this.createProxyAgent();
 
         // Если кеш отключён – поля остаются пустыми
         if (!isCaching) return;
@@ -35,11 +41,25 @@ class SharedDatabase {
     };
 
     /**
+     * @description Создание прокси агента для запросов
+     * @private
+     */
+    private createProxyAgent = () => {
+        const url = env.get("APIs.proxy", "");
+
+        if (typeof url !== "string" || url.length === 0) return null;
+        if (url.startsWith("socks")) return new SocksProxyAgent(url, { keepAlive: true, keepAliveMsecs: 20e3 });
+        if (url.startsWith("http")) return new HttpProxyAgent(url, { keepAlive: true, keepAliveMsecs: 20e3 });
+
+        return null;
+    }
+
+    /**
      * @description Проверяет, включено ли кеширование в конфигурации
      * @returns true, если кеш включён (строгое булево значение)
      * @private
      */
-    private isCacheEnabled(): boolean {
+    private isCacheEnabled = (): boolean => {
         const value = env.get("cache");
         if (typeof value === "boolean") return value;
         if (typeof value === "string") return value.toLowerCase() === "true";
@@ -56,15 +76,16 @@ let _sdb: SharedDatabase | null = null;
  * @description Экспортируемый объект разделяемой БД. Доступен только после инициализации.
  * @throws {Error} при обращении до вызова initSharedDatabase()
  */
-export const sdb = new Proxy({} as SharedDatabase, {
-    get(_, prop: keyof SharedDatabase) {
-        if (!_sdb) throw Error("SharedDatabase not initialized. Call initSharedDatabase() first.");
-        const value = _sdb[prop];
+export const sdb = new Proxy(
+    {},
+    {
+        get(_, prop) {
+            if (!_sdb) throw Error("Database not ready");
 
-        if (typeof value === "function") return (value as Function).bind(_sdb);
-        return value;
+            return _sdb[prop as keyof SharedDatabase];
+        }
     }
-});
+) as SharedDatabase;
 
 /**
  * @description Инициализирует глобальную разделяемую базу данных (кеш между потоками)

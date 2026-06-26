@@ -55,12 +55,26 @@ export class Environment {
 type EnvironmentOut<T> = T extends boolean ? T : T extends string ? T : T extends number ? string : never;
 
 /**
+ * @description Глобальный экземпляр разделяемой базы данных (синглтон)
+ */
+let _env: Environment | null = null;
+
+/**
  * @author SNIPPIK
  * @description Взаимодействуем с environment variables
  * @class Environment
  * @public
  */
-export var env: Environment;
+export const env = new Proxy(
+    {},
+    {
+        get(_, prop) {
+            if (!_env) throw Error("Environment not ready");
+
+            return _env[prop as keyof Environment];
+        }
+    }
+) as Environment;
 
 /**
  * @author SNIPPIK
@@ -68,11 +82,11 @@ export var env: Environment;
  * @returns void
  * @private
  */
-(() => {
-    if (env) return;
+(async () => {
+    if (_env) throw Error("Environment already initialized");
 
     try {
-        env = new Environment();
+        _env = new Environment();
     } catch (err) {
         throw Error(`Fail init environment: ${err}`);
     }

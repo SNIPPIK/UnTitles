@@ -1,6 +1,7 @@
-import { type APIExecuteParams, APIPlatformType, type APIRequestsKeys, type APIRequestsRaw, RestAPIAgent } from "./index.js";
+import { type APIExecuteParams, APIPlatformType, type APIRequestsKeys, type APIRequestsRaw } from "./index.js";
 import type { RestAPINames, RestOptions } from "./index.decorator.js";
 import type { RestClientSide } from "./index.client.js";
+import {sdb} from "#worker/db";
 
 /**
  * @author SNIPPIK
@@ -120,7 +121,7 @@ export namespace RestServerSide {
          * @protected
          */
         protected get agent() {
-            return this.proxy ? RestAPIAgent : null;
+            return this.proxy ? sdb.proxy : null;
         };
 
         /**

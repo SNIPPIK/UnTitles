@@ -1,14 +1,5 @@
-import { SocksProxyAgent } from "socks-proxy-agent";
-import { HttpProxyAgent } from "http-proxy-agent";
 import type { Track } from "#core/queue/index.js";
 import { env } from "#app/env";
-
-/**
- * @author SNIPPIK
- * @description Прокси агент, доступен только во 2 потоке
- * @private
- */
-export const RestAPIAgent = createProxyAgent();
 
 /**
  * @author SNIPPIK
@@ -101,22 +92,6 @@ export function OptionsRest<T>(options: T) {
         class extends target {
             options = options;
         }
-}
-
-
-/**
- * @author SNIPPIK
- * @description Создание прокси агента для запросов
- * @private
- */
-function createProxyAgent() {
-    const url = env.get("APIs.proxy", "");
-
-    if (typeof url !== "string" || url.length === 0) return null;
-    if (url.startsWith("socks")) return new SocksProxyAgent(url);
-    if (url.startsWith("http")) return new HttpProxyAgent(url);
-
-    return null;
 }
 
 /**
