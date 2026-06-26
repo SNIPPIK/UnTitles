@@ -130,7 +130,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
 
                     // --- Коррекция времени (компенсация микро-задержек процессора) ---
                     const now = this.time;
-                    const drift = Math.abs(now - this.insideTime);
+                    const drift = Math.abs(now - this.insideTime) + this.drift;
 
                     // Вычисляем, насколько кадров мы сдвинулись
                     const frames = drift > PLAYER_SEND_NATIVE ? drift + PLAYER_SEND_NATIVE : PLAYER_SEND_NATIVE;
@@ -158,9 +158,6 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             execute: (player) => {
                 const connection = player.voice.connection;
                 const metrics = this._getOrCreateMetrics(player);
-
-                // Защита от переполнения: если пакетов уже слишком много, ничего не отправляем
-                if (connection.udp.packets > PLAYER_SEND_LIMIT) return;
 
                 // Считаем базовое количество пакетов, которые нужно отправить за текущий шаг
                 let toSend = Math.ceil(this.options.duration / OPUS_FRAME_SIZE);

@@ -45,6 +45,15 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     };
 
     /**
+     * @description ВРеменная задержка между шагами
+     * @returns number
+     * @public
+     */
+    public get drift(): number {
+        return this._drift;
+    };
+
+    /**
      * @description Конструктор
      * @param options - конфигурация цикла
      * @throws {Error} если duration <= 0
@@ -130,7 +139,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         const delay = Math.max(-1, this.nextExecutionTime - this.time);
         this.clearTimer();
 
-        if (delay <= 3) {
+        if (delay <= 0) {
             // Мы уже отстаем, выполняем следующий шаг максимально быстро
             this.timer = setImmediate(this.step);
         } else {
@@ -147,9 +156,6 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         // Если очередь пуста – останавливаем цикл
         if (this.size === 0) return this.reset();
 
-        // Обновляем время следующего выполнения (устойчиво к дрейфу)
-        const now = this.time;
-
         try {
             // Выполнение полезной нагрузки (переопределяется в наследниках)
             this._stepCycle();
@@ -158,19 +164,16 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
             console.error("[CycleSystem] Unhandled error in _stepCycle:", error);
         }
 
+        // Обновляем время следующего выполнения (устойчиво к дрейфу)
+        const now = this.time;
+
         this.nextExecutionTime += this.options.duration;
         this._drift = Math.max(0, now - this.nextExecutionTime);
 
         // Если мы сильно отстали (например, из-за долгой обработки),
         // сбрасываем nextExecutionTime, чтобы избежать каскадного отставания
-        if (this.nextExecutionTime <= now) {
-            this.nextExecutionTime = now + this.options.duration;
-        }
-
+        if (this.nextExecutionTime <= now) this.nextExecutionTime = now + this.options.duration;
         this.lastDuration = this.options.duration;
-
-        // TODO DEBUG Drift Cycle System
-        console.log(this.options.duration, this._drift)
 
         // Планируем следующий шаг
         this.scheduleStep();
