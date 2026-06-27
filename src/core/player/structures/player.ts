@@ -186,15 +186,12 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public set cycle(isActive: boolean) {
-        // Проверяем читается ли текущий поток
-        if (!this._audio?.preload?.readable && this._audio?.current?.readable && this.status !== AudioPlayerState.playing) {
-            // Отправляем пустышку если такая возможность есть
-            if (this._voice.connection.ready) {
-                if (isActive) this._voice.connection.packet(SILENT_FRAME);
-                else setImmediate(() => {
-                    this._voice.connection.packet(SILENT_FRAME);
-                })
-            }
+        // Отправляем пустышку если такая возможность есть
+        if (this._voice.connection.ready) {
+            if (isActive) this._voice.connection.packet(SILENT_FRAME);
+            else setImmediate(() => {
+                this._voice.connection.packet(SILENT_FRAME);
+            });
         }
 
 
@@ -526,6 +523,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public cleanup = () => {
         this.emit("player/log", `[AudioPlayer/${this.id}] has cleanup`);
+        // Переводим плеер в режим ожидания
+        this._status = AudioPlayerState.idle;
 
         // Отключаем фильтры при очистке
         if (this._filters.size > 0) this._filters.clear();
@@ -542,9 +541,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
 
         // Устанавливаем время паузы (Для предотвращения рассинхрона Jitter)
         this._timer.timeout = Date.now();
-
-        // Переводим плеер в режим ожидания
-        this._status = AudioPlayerState.idle;
     };
 
     /**

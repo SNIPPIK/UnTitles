@@ -7,10 +7,7 @@ import { env } from "#app/env";
 
 
 //TODO
-// - Переделать цикл, возможна жесткая ошибка в расхождениях при долгом проигрывании, контроль дрифто скорее всего
-// - Переделать компенсатор в цикле плееров
-// - Исправить проблему с циклами в плеере при переключении плеера isCycleActive and isCycleDisable,
-//   в текущий момент используется временное решение проблемы. Предложение проверять надо ли добавлять пустой фрейм
+// - Исправить получение плейлистов в YouTube
 
 // Точка входа
 void main();
@@ -130,7 +127,7 @@ function init_process_events(client: DiscordClient): void {
 
     // Возможность завершить процесс корректно
     for (const event of ["SIGINT", "SIGTERM"]) {
-        process.on(event, () => {
+        process.once(event, () => {
             if (init_queue_destroyer(client)) return;
 
             Logger.log("WARN", `Received ${event}. Shutting down...`);
