@@ -292,6 +292,40 @@ impl RingBuffer {
         }
     }
 
+    pub fn pop_many(&self, out: &mut Vec<Vec<u8>>, limit: usize) {
+        let mut pos = self.tail.0.load(Ordering::Acquire);
+        let mut count = 0;
+
+        while count < limit {
+            let slot = &self.buffer[pos % self.capacity];
+            let seq = slot.seq.load(Ordering::Acquire);
+
+            let diff = seq as isize - (pos as isize + 1);
+
+            if diff != 0 {
+                // либо пусто, либо гонка — обновляем tail и выходим
+                self.tail.0.store(pos, Ordering::Relaxed);
+                break;
+            }
+
+            // пытаемся захватить слот БЕЗ compare_exchange
+            // (важно: мы уже "логически владелец" через seq check)
+            let value = unsafe {
+                ptr::read((*slot.data.get()).as_ptr())
+            };
+
+            // освобождаем слот
+            slot.seq.store(pos + self.capacity, Ordering::Release);
+
+            out.push(value);
+
+            pos += 1;
+            count += 1;
+        }
+
+        self.tail.0.store(pos, Ordering::Relaxed);
+    }
+
     // =========================================================================
     // Информационные методы (семантика корректна для MPMC)
     // =========================================================================

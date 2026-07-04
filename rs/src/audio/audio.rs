@@ -315,31 +315,41 @@ impl AudioEngine {
     /// Выдать `count` пакетов за раз (уменьшает количество вызовов через FFI).
     #[napi]
     pub fn get_packets(&self, count: u32) -> Vec<Buffer> {
+        if count == 0 {
+            return Vec::new();
+        }
+
         let (buffer_lock, buffer_cvar) = &*self.buffer;
 
-        let raw_packets = {
-            let buffer = buffer_lock.lock().unwrap();
-            let limit = count.min(buffer.len() as u32) as usize;
+        let mut raw_packets = {
+            let mut buffer = buffer_lock.lock().unwrap();
+
+            let limit = usize::min(count as usize, buffer.len());
+
             let mut extracted = Vec::with_capacity(limit);
 
-            for _ in 0..limit {
-                if let Some(packet) = buffer.pop() {
-                    extracted.push(packet);
-                } else {
-                    break;
-                }
-            }
+            // 🚀 ВАЖНО: один batch-call вместо N pop()
+            buffer.pop_many(&mut extracted, limit);
 
-            // Если мы вытащили пакеты и освободили место — будим поток загрузки из FFmpeg
-            if !extracted.is_empty() {
-                buffer_cvar.notify_all();
-            }
+            self.position
+                .fetch_add(extracted.len(), Ordering::Relaxed);
 
-            self.position.fetch_add(extracted.len() as usize, Ordering::Relaxed);
             extracted
         };
 
-        raw_packets.into_iter().map(Buffer::from).collect()
+        // notify вне lock (очень важно)
+        if !raw_packets.is_empty() {
+            buffer_cvar.notify_one();
+        }
+
+        // conversion stage отдельно (FFI boundary)
+        let mut packets = Vec::with_capacity(raw_packets.len());
+
+        for packet in raw_packets {
+            packets.push(Buffer::from(packet));
+        }
+
+        packets
     }
 
     /// Клонировать пакет по абсолютной позиции (не извлекая).

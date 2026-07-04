@@ -22,13 +22,6 @@ import { env } from "#app/env";
 // ========== КОНСТАНТЫ ==========
 
 /**
- * Время чистки мусора, через n произойдет чистка от мусора
- *
- * @const CLEAN_TIMEOUT
- */
-const CLEAN_TIMEOUT = 60e3 * 5;
-
-/**
  * Значение лимита по умолчанию (количество элементов, возвращаемых при поиске,
  * получении плейлиста, похожих треков и т.д.).
  * Используется, если переменная окружения не задана.
@@ -188,7 +181,7 @@ class RestServerLoader extends handler<RestServerSide.API> {
      */
     public initialize = async () => {
         await this.load(); // синхронный обход директории, заполнение this.files
-        for (const file of this.files) {
+        for (const file of this.files.array) {
             this.registry.registerPlatform(file);
         }
     };
@@ -206,158 +199,177 @@ class RestServerLoader extends handler<RestServerSide.API> {
  * - Отправки результатов (успех/ошибка) обратно в основной поток.
  */
 class RestWorkerHandler {
-    /**
-     * @param registry - Реестр платформ, используемый для поиска API и лимитов.
-     */
-    public constructor(private registry: RestRegistry) {
-        this.regulateCleaner();
+  /**
+   * @param registry - Реестр платформ, используемый для поиска API и лимитов.
+   */
+  public constructor(private registry: RestRegistry) {}
+
+  /**
+   * Формирует объект с данными о платформах, готовый для передачи в основной поток.
+   * Удаляет все функции (они не клонируются) и преобразует в простые объекты.
+   *
+   * @returns Сериализуемый объект, содержащий:
+   *   - `supported` — массив объектов платформ без функций.
+   *   - `authorization` — имена платформ с авторизацией.
+   *   - `audio` — имена платформ с поддержкой аудио.
+   *   - `related` — имена платформ с поддержкой related.
+   *   - `block` — пустой массив (заполняется в основном потоке при ошибках).
+   */
+  public getSerializablePlatforms(): RestServerSide.Data {
+    const fakeReq = this.registry.allowed.map((api) => ({
+      ...stripFunctions(api),
+      requests: (api.requests ?? []).map(stripFunctions),
+    }));
+
+    const { authorization, audio, related } = fakeReq.reduce(
+      (acc, api) => {
+        if (api.auth !== null) acc.authorization.push(api.name);
+        if (api.audio) acc.audio.push(api.name);
+        if (api.requests?.some((req) => req.name === "related"))
+          acc.related.push(api.name);
+        return acc;
+      },
+      {
+        authorization: [] as string[],
+        audio: [] as string[],
+        related: [] as string[]
+      },
+    );
+
+    return {
+      supported: fakeReq as any,
+      authorization: authorization as any,
+      audio: audio as any,
+      related: related as any,
+      block: []
     };
+  }
 
-    /**
-     * @description Чистильщик сборщика мусора
-     * @private
-     */
-    private regulateCleaner = () => {
-        setTimeout(async () => {
-            if (typeof global !== "undefined" && typeof global.gc === "function") {
-                global.gc();
-            }
+  /**
+   * Выполняет запрос к платформе с ограничением по времени.
+   *
+   * @param options - Параметры запроса:
+   *   - `platform` — имя платформы (например, "YOUTUBE").
+   *   - `payload` — строка (URL, поисковый запрос, ID).
+   *   - `options` — опциональные настройки (например, `{ audio: true }`).
+   *   - `requestId` — уникальный идентификатор для сопоставления ответа.
+   *   - `type` — тип запроса (search, track, related...).
+   * @returns Ничего не возвращает, результат отправляется через `parentPort`.
+   *
+   * @remarks
+   * Алгоритм:
+   * 1. Находит объект платформы в реестре.
+   * 2. Ищет подходящий колбэк (сначала точное совпадение `type`, затем "all").
+   * 3. Вызывает колбэк с payload и лимитом из реестра.
+   * 4. Оборачивает вызов тайм-аутом (REQUEST_TIMEOUT_MS).
+   * 5. При успехе — вызывает `sendSuccess`, при ошибке — `sendError`.
+   */
+  public async executeRequest(
+    options: RestServerSide.ServerOptions & { requestId: number },
+  ): Promise<void> {
+    const { platform, payload, options: reqOpts, requestId, type } = options;
 
-            setTimeout(this.regulateCleaner, CLEAN_TIMEOUT);
-        }, CLEAN_TIMEOUT);
-    };
+    try {
+      const restPlatform = this.registry.supported[platform];
 
-    /**
-     * Формирует объект с данными о платформах, готовый для передачи в основной поток.
-     * Удаляет все функции (они не клонируются) и преобразует в простые объекты.
-     *
-     * @returns Сериализуемый объект, содержащий:
-     *   - `supported` — массив объектов платформ без функций.
-     *   - `authorization` — имена платформ с авторизацией.
-     *   - `audio` — имена платформ с поддержкой аудио.
-     *   - `related` — имена платформ с поддержкой related.
-     *   - `block` — пустой массив (заполняется в основном потоке при ошибках).
-     */
-    public getSerializablePlatforms(): RestServerSide.Data {
-        // Берём только не заблокированные платформы
-        const fakeReq = this.registry.allowed.map(api => ({
-            ...stripFunctions(api),
-            requests: (api.requests ?? []).map(stripFunctions)
-        }));
-        return {
-            supported: fakeReq as any,
-            authorization: fakeReq.filter(api => api.auth !== null).map(api => api.name),
-            audio: fakeReq.filter(api => api.audio).map(api => api.name),
-            related: this.registry.relatedAllowed.map(api => api.name),
-            block: [] // блок-лист изначально пуст
-        };
-    };
+      // Если не найдена платформа
+      if (!restPlatform) {
+        this.sendError(requestId, Error(`Platform not found: ${platform}`));
+        return;
+      }
 
-    /**
-     * Выполняет запрос к платформе с ограничением по времени.
-     *
-     * @param options - Параметры запроса:
-     *   - `platform` — имя платформы (например, "YOUTUBE").
-     *   - `payload` — строка (URL, поисковый запрос, ID).
-     *   - `options` — опциональные настройки (например, `{ audio: true }`).
-     *   - `requestId` — уникальный идентификатор для сопоставления ответа.
-     *   - `type` — тип запроса (search, track, related...).
-     * @returns Ничего не возвращает, результат отправляется через `parentPort`.
-     *
-     * @remarks
-     * Алгоритм:
-     * 1. Находит объект платформы в реестре.
-     * 2. Ищет подходящий колбэк (сначала точное совпадение `type`, затем "all").
-     * 3. Вызывает колбэк с payload и лимитом из реестра.
-     * 4. Оборачивает вызов тайм-аутом (REQUEST_TIMEOUT_MS).
-     * 5. При успехе — вызывает `sendSuccess`, при ошибке — `sendError`.
-     */
-    public async executeRequest(options: RestServerSide.ServerOptions & { requestId: number }): Promise<void> {
-        const { platform, payload, options: reqOpts, requestId, type } = options;
+      // Ищем обработчик: сначала по точному имени типа, затем "all"
+      const callback = restPlatform.requests?.find(
+        (req) => req.name === type || req.name === "all",
+      );
+      if (!callback) {
+        this.sendError(
+          requestId,
+          Error(`Callback not found for platform: ${platform}, type: ${type}`),
+        );
+        return;
+      }
 
-        try {
-            const restPlatform = this.registry.supported[platform];
+      // Выполняем запрос с тайм-аутом
+      const result = await this.withTimeout(
+        callback.execute(payload, {
+          audio: reqOpts?.audio !== undefined ? reqOpts.audio : true,
+          limit:
+            this.registry.limits[callback.name as APIRequestsLimits] ??
+            DEFAULT_LIMIT,
+        }),
+        REQUEST_TIMEOUT_MS,
+        `Request timeout for ${platform}.${callback.name}`,
+      );
 
-            // Если не найдена платформа
-            if (!restPlatform) {
-                this.sendError(requestId, Error(`Platform not found: ${platform}`));
-                return;
-            }
+      // Если при запросе произошла ошибка
+      if (result instanceof Error) {
+        this.sendError(requestId, result);
+        return;
+      }
 
-            // Ищем обработчик: сначала по точному имени типа, затем "all"
-            const callback = restPlatform.requests?.find((req) => req.name === type || req.name === "all");
-            if (!callback) {
-                this.sendError(requestId, Error(`Callback not found for platform: ${platform}, type: ${type}`));
-                return;
-            }
+      this.sendSuccess(requestId, callback.name, result);
+    } catch (err) {
+      this.sendError(requestId, err as Error);
+    }
+  }
 
-            // Выполняем запрос с тайм-аутом
-            const result = await this.withTimeout(
-                callback.execute(payload, {
-                    audio: reqOpts?.audio !== undefined ? reqOpts.audio : true,
-                    limit: this.registry.limits[callback.name as APIRequestsLimits] ?? DEFAULT_LIMIT,
-                }),
-                REQUEST_TIMEOUT_MS,
-                `Request timeout for ${platform}.${callback.name}`
-            );
-
-            // Если при запросе произошла ошибка
-            if (result instanceof Error) {
-                this.sendError(requestId, result);
-                return;
-            }
-
-            this.sendSuccess(requestId, callback.name, result);
-        } catch (err) {
-            this.sendError(requestId, err as Error);
-        }
-    };
-
-    /**
-     * Оборачивает обещание в тайм-аут.
-     *
-     * @param promise - Исходный промис (запрос к API).
-     * @param ms - Максимальное время ожидания в миллисекундах.
-     * @param timeoutMessage - Сообщение об ошибке при тайм-ауте.
-     * @returns Промис, который всегда резолвится (не реджектится) — либо результатом, либо ошибкой.
-     *
-     * @remarks
-     * В текущей реализации исходный запрос не отменяется (нет AbortController), но это допустимо,
-     * так как воркер всё равно игнорирует результат после тайм-аута.
-     */
-    private withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T | Error> {
-        return new Promise((resolve) => {
-            const timer = setTimeout(() => resolve(Error(timeoutMessage)), ms);
-            promise
-                .then(res => { clearTimeout(timer); resolve(res); })
-                .catch(err => { clearTimeout(timer); resolve(err); });
+  /**
+   * Оборачивает обещание в тайм-аут.
+   *
+   * @param promise - Исходный промис (запрос к API).
+   * @param ms - Максимальное время ожидания в миллисекундах.
+   * @param timeoutMessage - Сообщение об ошибке при тайм-ауте.
+   * @returns Промис, который всегда резолвится (не реджектится) — либо результатом, либо ошибкой.
+   *
+   * @remarks
+   * В текущей реализации исходный запрос не отменяется (нет AbortController), но это допустимо,
+   * так как воркер всё равно игнорирует результат после тайм-аута.
+   */
+  private withTimeout<T>(
+    promise: Promise<T>,
+    ms: number,
+    timeoutMessage: string,
+  ): Promise<T | Error> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(Error(timeoutMessage)), ms);
+      promise
+        .then((res) => {
+          clearTimeout(timer);
+          resolve(res);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          resolve(err);
         });
-    };
+    });
+  }
 
-    /**
-     * Отправляет успешный результат в основной поток.
-     *
-     * @param requestId - Идентификатор запроса.
-     * @param type - Тип запроса (например, "search").
-     * @param result - Данные ответа (трек, массив треков и т.п.).
-     */
-    public sendSuccess(requestId: number, type: string, result: any): void {
-        parentPort?.postMessage({ requestId, status: "success", type, result });
-    };
+  /**
+   * Отправляет успешный результат в основной поток.
+   *
+   * @param requestId - Идентификатор запроса.
+   * @param type - Тип запроса (например, "search").
+   * @param result - Данные ответа (трек, массив треков и т.п.).
+   */
+  public sendSuccess(requestId: number, type: string, result: any): void {
+    parentPort?.postMessage({ requestId, status: "success", type, result });
+  }
 
-    /**
-     * Отправляет ошибку в основной поток, преобразуя её в сериализуемый объект.
-     *
-     * @param requestId - Идентификатор запроса.
-     * @param err - Объект ошибки (Error или любой другой).
-     */
-    public sendError(requestId: number | undefined, err: any): void {
-        const errorObj = err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { name: "UnknownError", message: String(err), stack: undefined };
+  /**
+   * Отправляет ошибку в основной поток, преобразуя её в сериализуемый объект.
+   *
+   * @param requestId - Идентификатор запроса.
+   * @param err - Объект ошибки (Error или любой другой).
+   */
+  public sendError(requestId: number | undefined, err: any): void {
+    const errorObj =
+      err instanceof Error
+        ? { name: err.name, message: err.message, stack: err.stack }
+        : { name: "UnknownError", message: String(err), stack: undefined };
 
-        parentPort?.postMessage({ requestId, status: "error", result: errorObj });
-    };
+    parentPort?.postMessage({ requestId, status: "error", result: errorObj });
+  }
 }
 
 // ========== ИНИЦИАЛИЗАЦИЯ ВОРКЕРА ==========

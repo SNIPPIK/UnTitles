@@ -143,10 +143,6 @@ class RestWorker<T extends APIRequestsKeys> {
             const worker = new SimpleWorker<RestServerSide.Data | any, RestServerSide.Result<T> & { requestId?: number }>(
                 __dirname + "/index.worker",
                 {
-                    execArgv: [
-                        "--experimental-require-module",
-                        "--enable-source-maps"
-                    ],
                     workerData: { rest: true },
                 },
                 false,
@@ -156,6 +152,7 @@ class RestWorker<T extends APIRequestsKeys> {
             // Подписываемся на постоянные сообщения (для обработки запросов)
             worker.on("message", (message) => {
                 const { requestId } = message;
+
                 if (requestId !== undefined) {
                     const request = this.pending.get(requestId);
                     if (request) {
@@ -307,6 +304,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
             this.pending.set(requestId, {
                 resolve: (message) => {
                     const { result, status } = message;
+
 
                     /**
                      * @description Слушаем статус ответа другого потока

@@ -77,7 +77,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                     let activePlayers = 0;
 
                     // Проходимся по всем плеерам в текущем цикле
-                    for (const p of this) {
+                    for (const p of this.array) {
                         // Если плеер не проходит фильтр (например, не играет) — пропускаем его
                         if (!this.options.filter(p)) continue;
 

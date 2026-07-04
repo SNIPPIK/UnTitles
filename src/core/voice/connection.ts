@@ -14,10 +14,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     private _status: ConnectionStatus = ConnectionStatus.disconnected;
 
     /** Менеджер голосового состояния */
-    private speaker: VoiceSpeakerManager | null = new VoiceSpeakerManager(this);
+    private speaker: VoiceSpeakerManager | null = null;
 
     /** Функции для общения с websocket клиента */
-    public adapter: VoiceAdapter | null = new VoiceAdapter();
+    public adapter: VoiceAdapter | null = null;
 
     /** Транспортный класс, соединяющий в себе весь функционал */
     public transport: Transport = null;
@@ -34,27 +34,21 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @description Записываем текущий статус подключения
      * @public
      */
-    public set status(status) {
-        // Производится попытка переподключения после уничтожения подключения
-        if (this._status === null && status === ConnectionStatus.reconnecting) {
-            return;
-        }
+    public set status(status: ConnectionStatus) {
+        if (this._status === null && status === ConnectionStatus.reconnecting) return;
 
-        // Подключаемся к голосовому каналу
-        if (status === ConnectionStatus.connecting) {
-            // Инициализируем подключение
-            if (this.adapter) {
-                // Подключаемся
-                this.adapter.send(this.configuration);
-                return;
-            }
-
-            // Если не удалось найти адаптер
-            throw Error("Adapter has not found");
-        }
-
+        const prev = this._status;
         this._status = status;
-    };
+
+        // side-effects отдельно
+        if (status === ConnectionStatus.connecting && this.adapter) {
+            queueMicrotask(() => {
+                this.adapter?.send(this.configuration);
+            });
+        }
+
+        this.emit("status", status, prev);
+    }
 
     /**
      * @description Подключение к Discord по Websocket
@@ -85,14 +79,13 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public disconnect = (): void => {
-        // Если нет адаптера
         if (!this.adapter) return;
 
-        this.status = ConnectionStatus.disconnected;
-        this.configuration.channel_id = null; // Удаляем id канала
+        this._status = ConnectionStatus.disconnected;
+        this.configuration.channel_id = null;
 
-        // Отправляем в discord сообщение об отключении бота
-        this.status = ConnectionStatus.connecting;
+        // ❌ убрали auto reconnect
+        //this.transport?.disconnect?.();
     };
 
     /**
@@ -118,6 +111,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      */
     public constructor(public configuration: VoiceConnectionConfiguration, adapterCreator: DiscordGatewayAdapterCreator) {
         super();
+        this.adapter = new VoiceAdapter();
         this.adapter.adapter = adapterCreator({
             /**
              * @description Регистрирует пакет `VOICE_SERVER_UPDATE` для голосового соединения. Это приведет к повторному подключению с использованием
@@ -125,14 +119,15 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
              * @param packet - Полученный пакет `VOICE_SERVER_UPDATE`
              */
             onVoiceServerUpdate: (packet) => {
-                this.adapter.packet.server = packet;
+                this.adapter!.packet.server = packet;
 
-                // Если есть точка подключения
-                if (packet.endpoint) {
-                    this.transport.connect(packet.endpoint);
-                    this.status = ConnectionStatus.connected;
-                    this.emit("info", `[Voice/Adapter]: receive on onVoiceServerUpdate`);
-                }
+                if (!packet.endpoint) return;
+
+                queueMicrotask(() => {
+                    this.transport?.connect(packet.endpoint);
+                    this._status = ConnectionStatus.connected; // bypass setter intentionally
+                    this.emit("info", `[Voice]: server update applied`);
+                });
             },
 
             /**
@@ -153,6 +148,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Создаем транспортный шлюз
         this.transport = new Transport(this.adapter);
+        this.speaker = new VoiceSpeakerManager(this);
 
         // Задаем статус подключения
         this.status = ConnectionStatus.connecting;
@@ -191,21 +187,18 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @protected
      */
     protected silent_destroy = () => {
-        if (this._status === ConnectionStatus.disconnected || !this.adapter) return;
-        this.status = ConnectionStatus.disconnected;
-        this.speaker.destroy();
+        if (this._status === ConnectionStatus.disconnected) return;
 
-        // Очищаем адаптер последним
-        this.adapter.destroy();
+        this._status = ConnectionStatus.disconnected;
 
-        // Уничтожаем транспортный канал
-        this.transport.destroy();
+        this.speaker?.destroy?.();
+        this.speaker = null;
+
+        this.transport?.destroy?.();
         this.transport = null;
 
-        // Nullify
+        this.adapter?.destroy?.();
         this.adapter = null;
-        this.speaker = null;
-        this._status = null;
     };
 
     /**

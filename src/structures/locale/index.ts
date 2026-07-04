@@ -56,23 +56,20 @@ export class locale {
      * @returns string
      * @public
      */
-    public static _ = (language: languages, locale: localeString, args?: any[]) => {
+    public static _ = (language: languages, locale: localeString, args: readonly unknown[] = []) => {
         const lang = this.universalLang(language);
-        let translate = locales[locale][lang] as string;
+        const entry = locales[locale];
 
-        // Если нет такой строки
-        if (!translate) {
-            // По умолчанию будет выведен указанный язык
-            translate = locales[locale][this.language];
-        }
+        // Безопасное получение текста
+        let template = entry?.[lang] ?? entry?.[this.language] ?? locale;
+        if (args.length === 0) return template;
 
-        // Если есть аргументы, меняем их через регулярку за один проход (почти)
-        if (args?.length) {
-            let i = 0;
-            translate = translate.replace(this.ARG_REGEX, () => args[i++]?.toString() ?? "{ARGUMENT}");
-        }
-
-        return translate;
+        // Прогон по тексту, если есть аргументы для передачи
+        let i = 0;
+        return template.replace(this.ARG_REGEX, () => {
+            const v = args[i++];
+            return v !== undefined && v !== null ? String(v) : "{ARGUMENT}";
+        });
     };
 
     /**

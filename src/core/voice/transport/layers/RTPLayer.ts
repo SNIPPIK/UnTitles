@@ -21,7 +21,7 @@ export class RTPLayer extends BaseLayer<iType<typeof VoiceRTPSocket>> {
     };
 
     /**
-     * @description Создание ключевого обьекта
+     * @description Создание ключевого объекта
      * @param ssrc
      * @param secret_key
      */

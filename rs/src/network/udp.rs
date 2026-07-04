@@ -12,6 +12,7 @@ use std::{
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH}
 };
+use crate::timers::scheduler::cycle_manager::TICK_INTERVAL_MS;
 
 /// Время до отправки keepalive пакета, для работы через NAT системы
 const KEEP_ALIVE_INTERVAL: u64 = 10000;
@@ -64,8 +65,11 @@ impl UdpBufferedInner {
     /// пакет возвращается в начало очереди (push_front) для повторной попытки позже,
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self, now: u64) {
+        let last_ms = self.last_send_ms.load(Ordering::Relaxed);
+        let count = ((now - last_ms) / TICK_INTERVAL_MS).max(3).min(1);
+
         // Пробуем отправить хотя бы один пакет за тик
-        for _ in 0..1 {  // небольшой burst limit, чтобы не виснуть в одном session'е
+        for _ in 0..count {  // небольшой burst limit, чтобы не виснуть в одном session'е
             let Some(packet) = self.buffer.pop() else {
                 break;
             };
@@ -98,6 +102,7 @@ impl UdpBufferedInner {
                     {
                         println!("UDP send error: {}", _e);
                     }
+                    break; // не пытаемся дальше в этом тике
                 }
             }
         }

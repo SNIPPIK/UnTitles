@@ -8,12 +8,12 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = { version = "3.9.4", default-features = true }
-napi-derive = "3.5.7"
+napi = { version = "3.10.2", default-features = true }
+napi-derive = "3.5.9"
 once_cell = "1.21.4"
-rand = "0.10.1"
-dashmap = "7.0.0-rc2"
-arc-swap = "1.9.1"
+rand = "0.10.2"
+dashmap = "6.2.1"
+arc-swap = "1.9.2"
 
 # For OGGParser
 bytes = "1.12.0"
@@ -22,7 +22,7 @@ memchr = "2.8.2"
 # For crypto
 davey = "0.1.4"
 aead = "0.6.1"
-aes-gcm = { version = "0.11.0-rc.4", features = ["aes"] }
+aes-gcm = { version = "0.11.0", features = ["aes"] }
 parking_lot = "0.12.5"
 
 # Профиль релиза (лучшая оптимизация)

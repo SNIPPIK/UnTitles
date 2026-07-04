@@ -1,108 +1,139 @@
 /**
- * @author SNIPPIK
- * @description Тихие методы удаления данных
- * @const SILENT_METHODS
- * @private
+ * Стандартные методы, вызываемые при удалении элемента из коллекции.
+ * Вызываются последовательно в указанном порядке.
+ *
+ * - `disconnect` — отключение от внешних ресурсов (сеть, БД).
+ * - `cleanup`    — освобождение внутренних ресурсов (таймеры, буферы).
+ * - `destroy`    — финальное уничтожение объекта.
  */
-const SILENT_METHODS = ["silent_destroy"];
+const DEFAULT_METHODS = ["disconnect", "cleanup", "destroy"] as const;
 
 /**
- * @author SNIPPIK
- * @description Стандартные методы удаления данных
- * @const DEFAULT_METHODS
- * @private
+ * Методы, вызываемые при "тихом" удалении (без побочных эффектов, таких как
+ * оповещение внешних систем или эмиссия событий).
  */
-const DEFAULT_METHODS = ["disconnect", "cleanup", "destroy"];
+const SILENT_METHODS = ["silent_destroy"] as const;
 
 /**
- * @author SNIPPIK
- * @description Коллекция
- * @abstract
- * @public
+ * Типизированная коллекция, хранящая объекты по ключу `T` (по умолчанию `string`).
+ *
+ * Обеспечивает:
+ * - **O(1)** доступ, вставку и удаление через внутренний `Map`.
+ * - Идемпотентную вставку: если ключ уже существует, возвращается существующий объект.
+ * - Безопасное удаление с автоматическим вызовом методов жизненного цикла (`disconnect`,
+ *   `cleanup`, `destroy`) или их "тихой" версии (`silent_destroy`).
+ * - Потокобезопасность **не** гарантируется — коллекция предназначена для
+ *   использования в однопоточном окружении (основной поток / один воркер).
+ *
+ * @typeParam K - Тип хранимых объектов.
+ * @typeParam T - Тип ключа (ID), по умолчанию `string`.
  */
 export class Collection<K, T = string> {
-    /** База Map для взаимодействия с объектами через идентификатор */
-    private _map = new Map<T, K>();
+    /**
+     * Внутреннее хранилище: ключ → объект.
+     * Напрямую не экспонируется; доступ только через методы класса.
+     */
+    private _map: Map<T, K> = new Map();
 
     /**
-     * @description Получаем объекты из MAP
-     * @public
+     * Возвращает массив всех хранимых объектов.
+     *
+     * Создаёт **новый** массив при каждом вызове (O(n)).
+     * Для горячих путей рекомендуется кешировать результат или использовать
+     * итератор `Map.values()`.
      */
-    public get array() {
-        return this._map.values();
+    public get array(): K[] {
+        return Array.from(this._map.values());
     };
 
-    /**
-     * @description Получаем кол-во объектов в списке
-     * @returns number
-     * @public
-     */
-    public get size() {
+    /** Количество элементов в коллекции. */
+    public get size(): number {
         return this._map.size;
     };
 
     /**
-     * @description Получаем объект из ID
-     * @param ID - ID объекта
-     * @returns K
-     * @public
+     * Возвращает объект по ключу или `undefined`, если ключ отсутствует.
+     * Сложность: **O(1)**.
      */
-    public get = (ID: T): K => {
+    public get(ID: T): K | undefined {
         return this._map.get(ID);
     };
 
     /**
-     * @description Добавляем объект в список
-     * @param ID - ID объекта
-     * @param value - Объект для добавления
-     * @param promise - Если надо сделать действие с объектом
-     * @returns K
-     * @public
+     * Добавляет объект в коллекцию.
+     *
+     * Если ключ `ID` уже существует, **новый объект игнорируется**, и метод
+     * возвращает существующий. Это предотвращает случайную перезапись и
+     * гарантирует, что объект с данным ID создаётся ровно один раз.
+     *
+     * @param ID    - Уникальный ключ объекта.
+     * @param value - Объект для сохранения.
+     * @param init  - Необязательный колбэк, вызываемый **только** при первой вставке
+     *                (до фактического добавления в `Map`). Удобен для инициализации
+     *                объекта (подписки, открытие соединений и т.п.).
+     *
+     * @returns Сохранённый объект (новый или ранее существовавший).
      */
-    public set = (ID: T, value: K, promise?: (item: K) => void): K => {
-        const item = this.get(ID);
+    public set(ID: T, value: K, init?: (item: K) => void): K {
+        const existing = this._map.get(ID);
 
-        // Если нет объекта, то добавляем его
-        if (!item) {
-            promise?.(value);
+        if (!existing) {
+            // Объект новый — инициализируем (если задан колбэк) и сохраняем.
+            init?.(value);
             this._map.set(ID, value);
             return value;
         }
 
-        // Выдаем объект
-        return item;
+        // Объект уже существует — возвращаем его, игнорируя переданный value.
+        return existing;
     };
 
     /**
-     * @description Удаляем элемент из списка, с выполнением функций "disconnect", "cleanup", "destroy"
-     * @param ID - ID Сервера
-     * @param silent - тихое удаление объекта
-     * @returns void
-     * @public
+     * Удаляет объект из коллекции, вызывая перед этим его методы жизненного цикла.
+     *
+     * Порядок вызова методов зависит от параметра `silent`:
+     * - **Обычный режим** (`silent = false`): `disconnect` → `cleanup` → `destroy`.
+     * - **Тихий режим** (`silent = true`): только `silent_destroy`.
+     *
+     * Методы вызываются только если они определены и являются функциями.
+     *
+     * @param ID     - Ключ удаляемого объекта.
+     * @param silent - Если `true`, используется сокращённый набор методов (`SILENT_METHODS`).
+     *
+     * @returns `true`, если объект был удалён, иначе `false` (ключа не было в коллекции).
      */
-    public remove = (ID: T, silent: boolean = false): void => {
+    public remove(ID: T, silent = false): boolean {
         const item = this._map.get(ID);
+        if (!item) return false;
 
-        // Если не найден объект
-        if (!item) return null;
+        // Выбираем набор методов в зависимости от режима.
+        const methods = silent ? SILENT_METHODS : DEFAULT_METHODS;
 
-        const cleanupMethods = silent ? SILENT_METHODS : DEFAULT_METHODS;
-        // Если объект имеет функции удаления от они будут выполнены до удаления
-        for (const key of cleanupMethods) {
-            const fn = (item as any)[key];
-            if (typeof fn === "function") fn.call(item);
+        for (let i = 0; i < methods.length; i++) {
+            const fn = (item as any)[methods[i]];
+            if (typeof fn === "function") {
+                fn.call(item);
+            }
         }
 
-        this._map.delete(ID);
+        return this._map.delete(ID);
     };
 
     /**
-     * @description Удаление всего из set/map
-     * @returns void
-     * @public
+     * Удаляет все элементы из коллекции **без вызова методов жизненного цикла**.
+     *
+     * Если требуется корректное завершение объектов, необходимо перед вызовом
+     * `clear()` пройтись по коллекции и вызвать `remove()` для каждого элемента.
      */
-    public clear = () => {
+    public clear(): void {
         this._map.clear();
-        this._map = null;
+    };
+
+    /**
+     * Проверяет, существует ли объект с указанным ключом.
+     * Сложность: **O(1)**.
+     */
+    public has(ID: T): boolean {
+        return this._map.has(ID);
     };
 }

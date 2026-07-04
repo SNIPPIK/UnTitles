@@ -49,7 +49,7 @@ export class ControllerFilters<T extends AudioFilter> extends SetArray<T> {
         const filters: string[] = [];
 
         // Добавляем пользовательские фильтры
-        for (const { filter, args, argument } of this) {
+        for (const { filter, args, argument } of this.array) {
             if (!filter || typeof filter !== "string") continue;
             const argString = args ? `${filter}${argument ?? ""}` : filter;
             filters.push(argString.trim());
@@ -66,7 +66,7 @@ export class ControllerFilters<T extends AudioFilter> extends SetArray<T> {
     public hasUnsupported = (filter: T): null | [string, string] => {
         // Делаем проверку на совместимость
         // Проверяем, не конфликтует ли новый фильтр с уже включёнными
-        for (const enabledFilter of this) {
+        for (const enabledFilter of this.array) {
             // Новый фильтр несовместим с уже включённым?
             if (filter.unsupported && filter.unsupported?.includes(enabledFilter.name)) return [filter.name, enabledFilter.name];
 

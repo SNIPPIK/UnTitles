@@ -68,7 +68,7 @@ pub struct OggOpusDemuxer {
     /// Идентификатор текущего логического потока (serial number).
     /// При смене serial сбрасывается `packet_carry`, так как пакеты
     /// разных потоков не могут смешиваться.
-    bitstream_serial: Option<i32>
+    bitstream_serial: Option<u32>
 }
 
 impl Default for OggOpusDemuxer {
@@ -88,7 +88,7 @@ impl OggOpusDemuxer {
     /// При необходимости буферы будут автоматически расширяться.
     pub fn new() -> Self {
         OggOpusDemuxer {
-            remainder: BytesMut::with_capacity(2 * 1024),
+            remainder: BytesMut::new(),
             packet_carry: Vec::with_capacity(1024),
             bitstream_serial: None
         }
@@ -173,11 +173,7 @@ impl OggOpusDemuxer {
             return Err(Error::from_reason("Ogg parser remainder overflow"));
         }
 
-        loop {
-            if self.remainder.len() < 27 {
-                break; // Не хватает даже на минимальный заголовок
-            }
-
+        while self.remainder.len() >= 27 {
             // Ищем сигнатуру "OggS"
             let pos = match memmem::find(&self.remainder, b"OggS") {
                 Some(pos) => pos,
@@ -195,21 +191,21 @@ impl OggOpusDemuxer {
             // Сдвигаем окно прямо к началу сигнатуры OggS
             if pos > 0 {
                 self.remainder.advance(pos);
+                debug_assert_eq!(&self.remainder[..4], b"OggS");
             }
 
-            // Теперь remainder гарантированно начинается с "OggS"
-            let segments_count = match self.remainder.get(26) {
-                Some(&v) => v as usize,
-                None => break,
-            };
-
-            let header_size = 27 + segments_count;
+            let header_size = 27 + self.remainder[26] as usize;
             if self.remainder.len() < header_size {
                 break; // Ждём следующего чанка для загрузки таблицы сегментов
             }
 
             let segment_table = &self.remainder[27..header_size];
-            let payload_size: usize = segment_table.iter().map(|&s| s as usize).sum();
+
+            let mut payload_size = 0usize;
+            for &segment in segment_table {
+                payload_size += segment as usize;
+            }
+
             let page_end = header_size + payload_size;
 
             if self.remainder.len() < page_end {
@@ -219,9 +215,9 @@ impl OggOpusDemuxer {
             // У нас есть полная страница
             let full_page = &self.remainder[..page_end];
 
-            // Обрабатываем. Если ошибка, пропускаем сигнатуру (4 байта), чтобы найти следующий OggS
+            // Обрабатываем. Если ошибка, пропускаем сигнатуру (1 байт), чтобы найти следующий OggS
             if Self::handle_page_core(full_page, &mut self.packet_carry, &mut self.bitstream_serial, &mut on_packet).is_err() {
-                self.remainder.advance(4);
+                self.remainder.advance(header_size.min(4));
                 continue;
             }
 
@@ -249,7 +245,7 @@ impl OggOpusDemuxer {
     ///   - Если segment_len < 255 → пакет завершён.
     ///   - Если segment_len == 255 → пакет продолжается на следующем сегменте / странице.
     /// - При каждом завершении пакета вызываем on_packet с детектированным типом.
-    fn handle_page_core<F>(page: &[u8], packet_carry: &mut Vec<u8>, bitstream_serial: &mut Option<i32>, on_packet: &mut F) -> Result<()>
+    fn handle_page_core<F>(page: &[u8], packet_carry: &mut Vec<u8>, bitstream_serial: &mut Option<u32>, on_packet: &mut F) -> Result<()>
     where F: FnMut(PacketType, &[u8]) -> Result<()> {
         if page.len() < 27 {
             return Err(Error::from_reason("Invalid OGG page"));
@@ -260,7 +256,7 @@ impl OggOpusDemuxer {
         let bos = (header_type & 0x02) != 0;
         let eos = (header_type & 0x04) != 0;
 
-        let serial = i32::from_le_bytes(page[14..18].try_into().map_err(|_| Error::from_reason("Invalid serial"))?);
+        let serial = u32::from_le_bytes(page[14..18].try_into().unwrap());
 
         // Смена потока
         if *bitstream_serial != Some(serial) {
@@ -289,9 +285,11 @@ impl OggOpusDemuxer {
             let end = offset + segment_len;
             let data = page.get(offset..end).ok_or_else(|| Error::from_reason("Segment out of bounds"))?;
 
-            packet_carry.extend_from_slice(data);
+            if segment_len != 0 {
+                packet_carry.extend_from_slice(data);
+            }
 
-            if packet_carry.len() > MAX_PACKET_SIZE {
+            if packet_carry.len() + segment_len > MAX_PACKET_SIZE {
                 packet_carry.clear();
                 return Err(Error::from_reason("Opus packet overflow"));
             }
@@ -404,24 +402,15 @@ impl OggOpusDemuxer {
                 PacketType::Frame
             }
             0b11 => {
-                // Код 0b11: поле count в следующем байте (младшие 6 бит) задаёт
-                // количество кадров минус 1 (например, 0 означает 1 кадр).
-                // Пакет должен содержать минимум 2 байта.
-                if len < 2 {
+                let ch = packet[1];
+
+                let _vbr = (ch & 0x80) != 0;
+                let _padding = (ch & 0x40) != 0;
+                let frame_count = ch & 0x3F;
+
+                if frame_count == 0 || frame_count > 48 {
                     return PacketType::Broken;
                 }
-                let frame_count = packet[1] & 0x7F;
-
-                // Mod RFC 6716;
-                // Это нестандартное расширение для Discord/PLC-потоков
-                if frame_count == 0 || frame_count > 120 {
-                    return PacketType::Broken;
-                }
-
-                let count = packet[1] & 0x3F;
-
-                // RFC 6716;
-                if count > 0 { return PacketType::Broken; }
 
                 PacketType::Frame
             }

@@ -41,7 +41,7 @@ export class Events extends handler<Event<SupportKeysOfEvents>> {
     public register = async (client: DiscordClient) => {
         if (this.size > 0) {
             // Отключаем только загруженные события
-            for (let item of this.files) {
+            for (let item of this.files.array) {
                 //@ts-ignore
                 client.off(item.name as any, item.run);
             }
@@ -53,7 +53,7 @@ export class Events extends handler<Event<SupportKeysOfEvents>> {
 
         try {
             // Проверяем ивенты
-            for (let item of this.files) {
+            for (let item of this.files.array) {
                 if (item?.type === "client") client[item.once ? "once" : "on"](item.name as any, item.run);
                 else this.emitter[item.once ? "once" : "on"](item.name as any, item.run);
             }

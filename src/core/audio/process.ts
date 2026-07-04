@@ -10,7 +10,7 @@ import path from "node:path";
  */
 export class Process {
     /** Процесс запущенный через spawn */
-    private _process: ChildProcessWithoutNullStreams;
+    private _process: ChildProcessWithoutNullStreams | null = null;
 
     /**
      * @description Получаем ChildProcessWithoutNullStreams
@@ -27,7 +27,7 @@ export class Process {
      * @public
      */
     public get stdout() {
-        return this?._process?.stdout ?? null;
+        return this._process?.stdout ?? null;
     };
 
     /**
@@ -67,7 +67,7 @@ export class Process {
         });
 
         // Добавляем события к процессу
-        for (let event of ["end", "error", "exit"]) {
+        for (let event of ["close", "error", "exit", "end"]) {
             if (this._process) this._process.once(event, this.destroy);
         }
     };
@@ -78,21 +78,26 @@ export class Process {
      * @private
      */
     public destroy = () => {
-        if (this._process) {
-            // Отключаем все точки данных и удаляем их
-            for (const std of [this._process.stdout, this._process.stderr, this._process.stdin]) {
-                std.removeAllListeners();
-                std.destroy();
-            }
-
-            // Отключаем события
-            this._process.removeAllListeners();
-            // Убиваем процесс
-            this._process.kill("SIGKILL");
-        }
+        const process = this._process;
+        if (!process) return;
 
         // Удаляем данные процесса
         this._process = null;
+
+        process.unref();
+
+        // Отключаем все точки данных и удаляем их
+        for (const std of [process.stdout, process.stderr, process.stdin]) {
+            if ("end" in std) std.end();
+            std.destroy();
+        }
+
+        // Отключаем события
+        process.removeAllListeners();
+
+        // Убиваем процесс
+        if (!process.killed)
+            process.kill("SIGTERM");
     };
 }
 

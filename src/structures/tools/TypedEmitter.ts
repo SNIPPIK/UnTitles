@@ -35,7 +35,9 @@ interface EventBucket {
      * @readonly
      * @public
      */
-    readonly type: "on" | "once"
+    readonly type: "on" | "once";
+
+    _removed?: boolean;
 }
 
 /**
@@ -70,7 +72,7 @@ export class TypedEmitter<L extends Record<string, any>> {
         }
 
         list.pop();
-    };
+    }
 
     /**
      * @description Внутренний метод добавления слушателя с учётом maxListeners и newListener
@@ -83,19 +85,19 @@ export class TypedEmitter<L extends Record<string, any>> {
         // Выполняем newListener до добавления (как в оригинальном EventEmitter)
         this.emit('newListener' as any, event, bucket.listener);
 
-        const arr = this._events.get(event) ?? [];
+        let arr = this._events.get(event);
+        if (!arr) {
+            arr = [];
+            this._events.set(event, arr);
+        }
+
         if (prepend) arr.unshift(bucket);
         else arr.push(bucket);
 
-        this._events.set(event, arr);
-
-        // Проверка на превышение maxListeners
-        const len = arr.length;
-        if (this._maxListeners > 0 && len > this._maxListeners && !this._warned) {
+        if (this._maxListeners > 0 && arr.length > this._maxListeners && !this._warned) {
             this._warned = true;
             console.warn(
-                `Possible TypedEmitter memory leak detected. ${len} ${event} listeners added. ` +
-                `Use emitter.setMaxListeners() to increase limit.`
+                `Possible TypedEmitter memory leak detected. ${arr.length} ${event} listeners added.`
             );
         }
     };
@@ -166,48 +168,57 @@ export class TypedEmitter<L extends Record<string, any>> {
     public emit<E extends keyof ListenerSignature<L>>(event: E, ...args: Parameters<ListenerSignature<L>[E]>): boolean;
     public emit<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, ...args: any[]): boolean;
     public emit(event: string, ...args: any[]): boolean {
-        // Специальная обработка события 'error'
-        if (event === 'error') {
-            const err = args[0] instanceof Error ? args[0] : Error(String(args[0]));
-            const hasErrorListeners = this.listenerCount('error') > 0;
-            if (!hasErrorListeners) {
-                throw err; // Неперехваченная ошибка (как в Node.js)
-            }
+        if (event === "error") {
+            const err = args[0] instanceof Error ? args[0] : new Error(String(args[0]));
+            if (this.listenerCount("error") === 0) throw err;
         }
 
-        const arr = this._events?.get(event);
+        const arr = this._events.get(event);
         if (!arr || arr.length === 0) return false;
 
-        // Копируем массив, чтобы изменения во время вызова не влияли на итерацию
-        const listeners = arr.slice();
+        let hasOnce = false;
 
-        for (const bucket of listeners) {
-            // Для once-слушателей удаляем из исходного массива (не из копии)
-            if (bucket.type === 'once') {
-                const originalArr = this._events?.get(event);
-                if (originalArr) {
-                    const idx = originalArr.findIndex(b => b.listener === bucket.listener);
-                    if (idx !== -1) {
-                        TypedEmitter.spliceOne(originalArr, idx);
-                        if (originalArr.length === 0) this._events?.delete(event);
-                    }
-                }
-            }
+        for (let i = 0; i < arr.length; i++) {
+            const bucket = arr[i];
 
             const result = bucket.listener(...args);
-            if (result && typeof result.then === "function") {
-                result.catch(err => {
-                    if (this.listenerCount('error') > 0) {
+
+            if (bucket.type === "once") {
+                bucket._removed = true;
+                hasOnce = true;
+            }
+
+            if (result && typeof (result as any).then === "function") {
+                (result as Promise<any>).catch(err => {
+                    if (this.listenerCount("error") > 0) {
                         //@ts-ignore
-                        this.emit('error', err);
+                        this.emit("error", err);
                     } else {
                         process.nextTick(() => { throw err; });
                     }
                 });
             }
         }
+
+        // cleanup once listeners (O(n), без findIndex)
+        if (hasOnce) {
+            let write = 0;
+
+            for (let read = 0; read < arr.length; read++) {
+                if (!arr[read]._removed) {
+                    arr[write++] = arr[read];
+                }
+            }
+
+            arr.length = write;
+
+            if (arr.length === 0) {
+                this._events.delete(event);
+            }
+        }
+
         return true;
-    };
+    }
 
     /**
      * @description Отписаться от события
@@ -219,31 +230,22 @@ export class TypedEmitter<L extends Record<string, any>> {
     public off<E extends keyof ListenerSignature<L>>(event: E, listener?: ListenerSignature<L>[E]): this;
     public off<S extends string>(event: Exclude<S, keyof ListenerSignature<L>>, listener?: DefaultListener): this;
     public off(event: string, listener?: DefaultListener): this {
-        if (!this._events) return this;
+        const arr = this._events.get(event);
+        if (!arr) return this;
 
-        // Если надо удалить событие без вызова функции
         if (!listener) {
             this._events.delete(event);
             return this;
         }
 
-        const arr = this._events.get(event);
-        if (!arr) return this;
-
-        let removed = false;
         for (let i = 0; i < arr.length; i++) {
             if (arr[i].listener === listener) {
                 TypedEmitter.spliceOne(arr, i);
-                removed = true;
                 break;
             }
         }
 
-        // Если есть тчо удалить
-        if (removed) {
-            this.emit('removeListener' as any, event, listener);
-            if (arr.length === 0) this._events.delete(event);
-        }
+        if (arr.length === 0) this._events.delete(event);
         return this;
     };
 
@@ -265,7 +267,13 @@ export class TypedEmitter<L extends Record<string, any>> {
     public listeners<E extends keyof L>(event: E): DefaultListener[];
     public listeners(event: string): DefaultListener[] {
         const arr = this._events.get(event);
-        return arr ? arr.map(b => b.listener) : [];
+        if (!arr) return [];
+
+        const out = new Array(arr.length);
+        for (let i = 0; i < arr.length; i++) {
+            out[i] = arr[i].listener;
+        }
+        return out;
     };
 
     /**
@@ -314,10 +322,7 @@ export class TypedEmitter<L extends Record<string, any>> {
     public removeAllListeners = (event?: string): this => {
         // Если есть имя события
         if (event) this._events.delete(event);
-        
-        // Если нет указания имени, то полное удаление
-        else this._events?.clear();
-        
+        else this._events.clear();
         return this;
     };
 
@@ -326,9 +331,8 @@ export class TypedEmitter<L extends Record<string, any>> {
      * @public
      */
     public destroy(): void {
-        this.removeAllListeners();
-        this._events = null;
+        this._events.clear();
+        this._warned = false;
         this._maxListeners = 10;
-        this._warned = null;
     };
 }

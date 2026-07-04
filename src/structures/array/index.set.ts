@@ -1,93 +1,146 @@
 /**
- * @author SNIPPIK
- * @description Реализация функция из Array в Set
- * @class SetArray
- * @extends Set
- * @public
+ * Гибридная коллекция, объединяющая свойства `Set<T>` и массива.
+ *
+ * Обеспечивает:
+ * - **O(1)** добавление, удаление и проверку наличия элемента.
+ * - **O(1)** получение элемента без поиска (возвращает сам элемент, если он есть).
+ * - Стабильный порядок итерации (в порядке добавления).
+ * - Доступ к внутреннему массиву только для чтения.
+ * - Безопасную итерацию через копию массива.
+ *
+ * Удаление реализовано через "swap-remove": последний элемент перемещается
+ * на место удаляемого, что не сохраняет порядок, но даёт O(1) сложность.
+ *
+ * @typeParam T - тип элементов коллекции.
  */
-export class SetArray<T> extends Set<T> {
-    /** Параметр со списком ссылок на объекты для использования функций Array */
-    private _array: Array<T> = new Array<T>();
+export class SetArray<T> {
+    /**
+     * Массив элементов. Порядок соответствует очерёдности добавления,
+     * но может нарушаться при удалении (swap-remove).
+     */
+    private _array: T[] = [];
 
     /**
-     * @description Выдаем коллекцию... Для дальнейшего использования
-     * @returns T[]
-     * @public
+     * Хеш-таблица: ключ — элемент, значение — его индекс в `_array`.
+     * Позволяет получать индекс за O(1), что критично для быстрого удаления.
      */
-    public get array(): T[] {
+    private _indexMap = new Map<T, number>();
+
+    /**
+     * Доступ к внутреннему массиву только для чтения.
+     * Модификация возможна только через методы класса.
+     */
+    public get array(): readonly T[] {
         return this._array;
     };
 
     /**
-     * @description Добавление задачи в базу
-     * @param task - Задача
-     * @public
+     * Добавляет элемент в коллекцию.
+     *
+     * Если элемент уже существует, метод игнорирует его и возвращает `this`.
+     * Сложность: **O(1)** амортизированное (за счёт `Map.set` и `Array.push`).
+     *
+     * @param item - добавляемый элемент.
+     * @returns `this` для цепочечных вызовов.
      */
-    public add(task: T) {
-        if (this.has(task)) this.delete(task);
+    public add(item: T): this {
+        if (this._indexMap.has(item)) return this;
 
-        // Стандартный метод добавления
-        this._array.push(task);
-        super.add(task);
+        const index = this._array.length;
+        this._array.push(item);
+        this._indexMap.set(item, index);
+
         return this;
     };
 
     /**
-     * @description Удаляет элемент из массива
-     * @param item - объект задачи или item с next
-     * @returns true если элемент найден и удалён, иначе false
-     * @public
+     * Проверяет, содержится ли элемент в коллекции.
+     * Сложность: **O(1)**.
      */
-    public delete(item: T) {
-        const index = this.array.indexOf(item);
+    public has(item: T): boolean {
+        return this._indexMap.has(item);
+    };
 
-        // Если есть данный объект в списке
-        if (index !== -1) {
-            this._array.splice(index, 1);
+    /**
+     * Удаляет элемент из коллекции.
+     *
+     * Использует "swap-remove": на место удаляемого элемента перемещается
+     * последний, после чего массив укорачивается на 1.
+     * Это **не сохраняет порядок** элементов, но даёт O(1) вместо O(n).
+     *
+     * @param item - удаляемый элемент.
+     * @returns `true`, если элемент был удалён, иначе `false`.
+     */
+    public delete(item: T): boolean {
+        const index = this._indexMap.get(item);
+        if (index === undefined) return false;
+
+        const lastIndex = this._array.length - 1;
+        const lastItem = this._array[lastIndex];
+
+        // Если удаляемый элемент не последний — меняем его с последним.
+        if (index !== lastIndex) {
+            this._array[index] = lastItem;
+            this._indexMap.set(lastItem, index);
         }
 
-        // Стандартный метод удаления
-        super.delete(item);
+        // Удаляем последний элемент и запись в мапе.
+        this._array.pop();
+        this._indexMap.delete(item);
+
         return true;
     };
 
     /**
-     * @description Получаем объект из списка
-     * @param item - оригинальный объект
-     * @public
+     * Если элемент присутствует в коллекции, возвращает его,
+     * иначе возвращает `null`.
+     *
+     * В отличие от `find`, не требует предиката и работает за O(1).
      */
-    public get(item: T) {
-        return this.has(item) ? item : null;
+    public get(item: T): T | null {
+        return this._indexMap.has(item) ? item : null;
     };
 
     /**
-     * @description Производим фильтрацию по функции
-     * @param predicate - Функция поиска
-     * @returns T[]
-     * @public
+     * Возвращает копию массива элементов.
+     *
+     * Безопасно для итерации с параллельным изменением коллекции,
+     * так как возвращается снимок на момент вызова.
      */
-    public filter = (predicate: (item: T) => boolean): T[] => {
-        return this.array.filter(predicate);
+    public values(): T[] {
+        return this._array.slice();
     };
 
     /**
-     * @description Производим поиск объекта по функции
-     * @param predicate - Функция поиска
-     * @returns T[]
-     * @public
+     * Фильтрует элементы коллекции через предикат.
+     *
+     * Не оптимизирован (O(n)), рекомендуется только для нечастых операций.
      */
-    public find = (predicate: (item: T) => boolean): T => {
-        return this.array.find(predicate);
+    public filter(fn: (item: T) => boolean): T[] {
+        return this._array.filter(fn);
     };
 
     /**
-     * @description Функция удаления данных из мульти класса
-     * @public
+     * Находит первый элемент, удовлетворяющий предикату.
+     *
+     * Не оптимизирован (O(n)), рекомендуется только для нечастых операций.
+     */
+    public find(fn: (item: T) => boolean): T | undefined {
+        return this._array.find(fn);
+    };
+
+    /**
+     * Полностью очищает коллекцию.
+     *
+     * Сложность O(1) за счёт `array.length = 0` и `Map.clear()`.
      */
     public clear(): void {
-        super.clear();
+        this._array.length = 0;
+        this._indexMap.clear();
+    };
 
-        // Удаления всех данных из списка
-        this._array.splice(0, this._array.length);
+    /** Количество элементов в коллекции. */
+    public get size(): number {
+        return this._array.length;
     };
 }

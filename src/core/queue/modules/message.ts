@@ -194,8 +194,8 @@ export class QueueButtons {
         {
             type: 1,
             components: [
-                // Кнопка очереди
-                QueueButtons.createButton({env: "queue", disabled: true}),
+                // Кнопка об информации проигрывания
+                QueueButtons.button.like,
 
                 // Кнопка текста песни
                 QueueButtons.button.lyrics,
@@ -204,10 +204,10 @@ export class QueueButtons {
                 QueueButtons.button.stop,
 
                 // Кнопка текущих фильтров
-                QueueButtons.createButton({env: "filters", disabled: true}),
-
-                // Кнопка об информации проигрывания
-                QueueButtons.button.like
+                QueueButtons.createButton({ env: "filters", disabled: true }),
+                
+                // Кнопка очереди
+                QueueButtons.createButton({env: "queue", disabled: true})
             ]
         }
     ];
@@ -222,22 +222,27 @@ export class QueueButtons {
     public constructor(ctx: QueueMessage<CommandInteraction>) {
         // Разово создаем селектор для повторного использования
         this._selector = {
-            "type": 1,
-            "components": [
-                {
-                    "type": 3,
-                    "custom_id": "filter_select",
-                    "placeholder": locale._(ctx.locale, "selector.filters"),
-                    "options": filters.filter((filter) => !filter.args).map((filter) => {
-                        return {
-                            label: filter.name.charAt(0).toUpperCase() + filter.name.slice(1).replace("_", " "),
-                            value: filter.name,
-                            emoji: filter.emoji,
-                            description: (filter.locale[ctx.locale] ?? filter.locale["en-US"]).split("]")[1]
-                        }
-                    })
+          type: 1,
+          components: [
+            {
+              type: 3,
+              custom_id: "filter_select",
+              placeholder: locale._(ctx.locale, "selector.filters"),
+              options: filters.reduce((acc, filter) => {
+                // Если нет аргументов
+                if (!filter.args) {
+                  acc.push({
+                    label: filter.name.charAt(0).toUpperCase() + filter.name.slice(1).replace("_", " "),
+                    value: filter.name,
+                    emoji: filter.emoji,
+                    description: (filter.locale[ctx.locale] ?? filter.locale["en-US"]).split("]")[1]
+                  });
                 }
-            ]
+
+                return acc;
+              }, [])
+            }
+          ]
         };
     };
 
@@ -290,7 +295,7 @@ export class QueueButtons {
         setButton(secondRow[3], { disabled: !hasFilters });
 
         // 📑 Queue
-        setButton(secondRow[0], { disabled: !isMultipleTracks });
+        setButton(secondRow[4], { disabled: !isMultipleTracks });
 
         return [this._selector, this._buttons[0], this._buttons[1]];
     };

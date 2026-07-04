@@ -389,7 +389,7 @@ export interface iDAVESession {
      *
      * Возвращает `ProposalsResult` с опциональными `commit` и `welcome`.
      */
-    processProposals(operationType: number, proposals: Buffer, recognizedUserIds?: Array<string> | undefined | null): ProposalsResult;
+    processProposals(operationType: number, proposals: Buffer, recognizedUserIds?: readonly string[] | undefined | null): ProposalsResult;
 
     /**
      * Обрабатывает подтверждение (Commit).
@@ -461,57 +461,6 @@ export interface SigningKeyPair {
     public: Buffer;
 }
 
-/**
- * Планировщик периодического вызова JavaScript-функции (callback)
- * с заданным интервалом. Реализован как нативный Node.js модуль (napi).
- *
- * Запускает фоновый поток, который через равные промежутки времени
- * вызывает переданный callback. Поток автоматически останавливается
- * при вызове `stop()` или при сборке мусора (деструктор).
- *
- * # Ограничения
- *
- * - Поток создаётся при каждом вызове `start()`. Для предотвращения
- *   множественных потоков следует вызывать `start()` однократно.
- *   Метод принимает `&mut self`, что гарантирует уникальный доступ
- *   к экземпляру, но после завершения `start()` объект можно
- *   использовать снова, что приведёт к созданию нового потока.
- * - Точность периодичности ограничена разрешением `thread::sleep`
- *   и загруженностью системного планировщика, однако алгоритм
- *   компенсирует отставание (см. реализацию `start`).
- */
-export interface Scheduler {
-    /** Создаёт новый планировщик с остановленным состоянием. */
-    constructor(): void;
-
-    /**
-     * Запускает фоновый поток, который будет вызывать `callback`
-     * с интервалом `duration_ms` миллисекунд.
-     *
-     * # Параметры
-     *
-     * - `duration_ms` — интервал в миллисекундах (> 0).
-     * - `callback` — JavaScript-функция без аргументов и возврата,
-     *   будет вызываться в основном потоке через механизм
-     *   `ThreadsafeFunction`.
-     *
-     * # Ошибки
-     *
-     * Возвращает `Err`, если не удалось преобразовать `callback`
-     * в потокобезопасную функцию.
-     */
-    start(durationMs: number, callback: () => void): void;
-
-    /**
-     * Останавливает фоновый поток.
-     *
-     * Устанавливает атомарный флаг `running` в `false`. Поток может
-     * завершиться не мгновенно, а после пробуждения от `sleep`
-     * (максимальная задержка — до 1 мс).
-     */
-    stop(): void;
-}
-
 /* ────────────────────────────────────────────────
    Экспорты реальных конструкторов и функций
 ───────────────────────────────────────────────── */
@@ -521,13 +470,11 @@ export interface Scheduler {
  * Содержит все конструкторы классов и вспомогательные функции.
  */
 export const {
-    Scheduler,
     VoiceRTPSocket,
     AudioEngine,
     UDPSocket,
     DAVESession
 } = Native as {
-    Scheduler:      NativeClass<Scheduler>
     DAVESession:    NativeClass<iDAVESession>;
     VoiceRTPSocket: NativeClass<iVoiceRTPSocket>;
     AudioEngine:    NativeClass<iAudioEngine>;

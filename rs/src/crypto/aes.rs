@@ -169,37 +169,43 @@ impl VoiceRTPSocket {
         }
 
         let total_len = RTP_HEADER_SIZE + frame_len + 16 + 4;
-        let mut packet = vec![0u8; total_len];
 
-        // Формируем заголовок RTP (атомарно обновляет sequence/timestamp).
+        // ===== FAST ALLOC (без vec![0; N]) =====
+        let mut packet = Vec::with_capacity(total_len);
+        unsafe { packet.set_len(total_len); }
+
+        // ===== RTP HEADER =====
         let header = self.build_header();
         packet[..RTP_HEADER_SIZE].copy_from_slice(&header);
 
+        // ===== PAYLOAD =====
         let payload_start = RTP_HEADER_SIZE;
-        packet[payload_start..payload_start + frame_len].copy_from_slice(frame.as_ref());
+        let payload_end = payload_start + frame_len;
 
-        // Генерируем nonce (12 байт, но используются только первые 4).
+        packet[payload_start..payload_end].copy_from_slice(frame.as_ref());
+
+        // ===== NONCE =====
         let nonce_bytes = self.generate_nonce();
         let nonce = Nonce::from_slice(&nonce_bytes);
 
-        // Шифруем "на месте" область полезной нагрузки.
+        // ===== ENCRYPT IN PLACE =====
         let tag = self
             .cipher
             .encrypt_in_place_detached(
                 nonce,
-                &header, // AAD — RTP-заголовок
-                &mut packet[payload_start..payload_start + frame_len],
+                &header,
+                &mut packet[payload_start..payload_end],
             )
             .map_err(|e| CryptoError::EncryptionFailed(format!("{:?}", e)))?;
 
-        let mut pos = payload_start + frame_len;
+        // ===== TAG =====
+        let tag_pos = payload_end;
+        packet[tag_pos..tag_pos + 16].copy_from_slice(tag.as_slice());
 
-        // Добавляем аутентификационный тег (16 байт).
-        packet[pos..pos + 16].copy_from_slice(tag.as_slice());
-        pos += 16;
-
-        // Добавляем младшие 4 байта nonce (как в Discord).
-        packet[pos..pos + 4].copy_from_slice(&nonce_bytes[..4]);
+        // ===== NONCE SHORT =====
+        let nonce_pos = tag_pos + 16;
+        packet[nonce_pos..nonce_pos + 4]
+            .copy_from_slice(&nonce_bytes[..4]);
 
         Ok(Buffer::from(packet))
     }

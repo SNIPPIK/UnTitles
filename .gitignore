@@ -6,3 +6,4 @@ build
 node_modules
 package-lock.json
 rs/target
+rs/package.json

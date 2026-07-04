@@ -83,88 +83,85 @@ abstract class Request {
      */
     public get request(): Promise<IncomingMessage | Error> {
         return new Promise((resolve) => {
-            const options = { ...this.data };
+            const baseOptions = { ...this.data };
 
-            /**
-             * Рекурсивная функция для выполнения запроса с обработкой редиректов.
-             * @param opts - Опции запроса (hostname, path, method, headers и т.д.)
-             * @param redirectCount - Текущее количество выполненных редиректов
-             */
-            const makeRequest = (opts: typeof options, redirectCount = 0) => {
-                // Строгий лимит редиректов (RFC)
+            const makeRequest = (opts: typeof baseOptions, redirectCount = 0) => {
                 if (redirectCount > 5) {
-                    return resolve(Error(`[httpsClient]: Too many redirects`));
+                    return resolve(new Error("[httpsClient]: Too many redirects"));
                 }
 
-                // Создаём запрос с использованием протокола (http/https)
+                const controller = new AbortController();
+                opts.signal = controller.signal;
+
                 const protocol = this.getProtocolRequest(opts.protocol);
 
                 const req = protocol(opts, (res) => {
-                    if (res.headers.location && res.statusCode && res.statusCode >= 300 && res.statusCode < 400) {
-                        const newUrl = res.headers.location;
-                        const newOptions = { ...opts };
+                    const location = res.headers.location;
 
+                    if (location && res.statusCode && res.statusCode >= 300 && res.statusCode < 400) {
                         try {
                             // Корректно обрабатываем относительные редиректы
                             const base = `${opts.protocol}//${opts.hostname}${opts.port ? `:${opts.port}` : ""}`;
-                            const parsedUrl = new URL(newUrl, base);
+                            const parsedUrl = new URL(location, base);
 
-                            newOptions.hostname = parsedUrl.hostname;
-                            newOptions.protocol = parsedUrl.protocol;
-                            newOptions.path = parsedUrl.pathname + parsedUrl.search;
-                            newOptions.port = parsedUrl.port || (parsedUrl.protocol === "https:" ? "443" : "80");
+                            const newOptions = {
+                                ...opts,
+                                hostname: parsedUrl.hostname,
+                                protocol: parsedUrl.protocol,
+                                path: parsedUrl.pathname + parsedUrl.search,
+                                port: parsedUrl.port || (parsedUrl.protocol === "https:" ? "443" : "80")
+                            };
 
                             this._redirect_url = parsedUrl.href;
-                        } catch (e) {
-                            return resolve(Error(`[httpsClient]: Invalid redirect URL: ${newUrl}`));
+
+                            res.resume();
+                            return makeRequest(newOptions, redirectCount + 1);
+                        } catch {
+                            return resolve(new Error(`[httpsClient]: Invalid redirect URL: ${location}`));
                         }
-
-                        // Потребляем поток старого ответа, чтобы избежать зависания сокетов
-                        res.resume();
-
-                        // Префиксный инкремент (++redirectCount или + 1)
-                        return makeRequest(newOptions, redirectCount + 1);
                     }
 
                     // Не редирект – возвращаем ответ
                     resolve(res);
                 });
 
-                // Если в опциях есть тело и метод не GET/HEAD, отправляем тело
+                // BODY SAFE WRITE
                 if (opts.body && opts.method !== "GET" && opts.method !== "HEAD") {
-                    const body = typeof opts.body === "string" ? Buffer.from(opts.body) : opts.body;
-                    req.setHeader("Content-Length", body.length);
-                    req.write(body);
+                    const bodyBuf = Buffer.isBuffer(opts.body)
+                        ? opts.body
+                        : Buffer.from(opts.body);
+
+                    req.setHeader("Content-Length", Buffer.byteLength(bodyBuf));
+                    req.write(bodyBuf);
                 }
 
                 // Обработка тайм-аута соединения (например, если сервер не отвечает)
                 req.once("timeout", () => {
+                    controller.abort();
                     req.destroy();
-                    resolve(
-                        Error(`[httpsClient]: Connection Timeout Exceeded ${opts.hostname}:${opts.port || 443}`)
-                    );
+                    resolve(new Error(`[httpsClient]: Timeout ${opts.hostname}:${opts.port || 443}`));
                 });
 
                 // Обработка ошибок сокета (ECONNRESET, ENOTFOUND и т.п.)
                 req.once("error", (err) => {
-                    if (err?.name?.match(/routines:ssl3_get_record:decryption/)) throw Error("Failed to connect to Proxy!");
+                    controller.abort();
 
-                    // Вместо throw возвращаем ошибку через Promise, предотвращая краш приложения
-                    if (err?.name?.match(/routines:ssl3_get_record:decryption/)) {
-                        return resolve(Error("[httpsClient]: Failed to connect to Proxy!"));
+                    if (err?.message?.includes("ssl3_get_record")) {
+                        return resolve(new Error("[httpsClient]: Failed proxy/SSL handshake"));
                     }
 
-                    resolve(Error(`[httpsClient]: Connection Error: ${err.message}`));
-
-                    req.destroy();
+                    resolve(new Error(`[httpsClient]: Error: ${err.message}`));
                 });
 
-                // Завершаем запрос (отправляем заголовки и тело, если не отправлено ранее)
                 req.end();
+
+                setTimeout(() => {
+                    controller.abort();
+                    req.destroy();
+                }, 5e3);
             };
 
-            // Начинаем запрос
-            makeRequest(options);
+            makeRequest(baseOptions);
         });
     };
 

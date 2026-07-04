@@ -139,6 +139,8 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 this._PlayerNextTrack().catch(() => {});
             }
         }
+
+        return;
     };
 
     /**
@@ -194,7 +196,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             });
         }
 
-
         // Подключаем плеер к циклу
         if (isActive) {
             // Если нет плеера в цикле
@@ -214,6 +215,15 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
             }
         }
+    };
+
+    /**
+     * @description В цикле сейчас плеер
+     * @return boolean
+     * @public
+     */
+    public get cycle() {
+        return db.queues.cycles.players.has(this);
     };
 
     /**
@@ -506,11 +516,13 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             if (queue) db.events.emitter.emit("message/playing", queue) // Отправляем сообщение, если можно
         }
 
-        // Передаем плеер в цикл
-        this.cycle = true;
+        // Передаем плеер в цикл если его там нет!
+        if (!this.cycle) {
+            this.cycle = true;
 
-        // Переводим плеер в состояние чтения аудио
-        this.status = AudioPlayerState.playing;
+            // Переводим плеер в состояние чтения аудио
+            this.status = AudioPlayerState.playing;
+        }
 
         // Меняем позицию если удачно
         this._tracks.position = index;

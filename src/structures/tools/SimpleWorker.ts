@@ -20,102 +20,166 @@ interface WorkerEvents<TOutput = any> {
 }
 
 /**
- * @author SNIPPIK
- * @description Улучшенный класс для работы с Worker Threads с автоматическим управлением жизненным циклом,
- *              типизированными событиями и поддержкой TypedEmitter.
- * @template TInput - Тип данных, отправляемых в воркер
- * @template TOutput - Тип данных, получаемых от воркера
- * @class SimpleWorker
- * @extends TypedEmitter<WorkerEvents<TOutput>>
- * @public
+ * Обёртка над Node.js Worker Threads с автоматическим управлением жизненным циклом,
+ * типизированными событиями и поддержкой `TypedEmitter`.
+ *
+ * Предоставляет простой API для запуска, отправки данных и остановки воркера,
+ * а также опциональный режим автоматического уничтожения после первого события.
+ *
+ * @typeParam TInput - Тип данных, отправляемых в воркер через `postMessage`.
+ * @typeParam TOutput - Тип данных, получаемых от воркера (событие `"message"`).
+ *
+ * @example
+ * ```ts
+ * const worker = new SimpleWorker<string, string>('./my-worker.ts');
+ * worker.on('message', (msg) => console.log(msg));
+ * worker.start('initial data');
+ * worker.send('another message');
+ * await worker.destroy();
+ * ```
  */
 export class SimpleWorker<TInput = any, TOutput = any> extends TypedEmitter<WorkerEvents<TOutput>> {
-    private logger: Console | { log: (level: string, ...args: any[]) => void };
-    private readonly autoDestroy: boolean;
+    /**
+     * Экземпляр воркера.
+     * `null`, если воркер ещё не запущен или уже уничтожен.
+     */
     private worker: Worker | null = null;
 
     /**
-     * @description Конструктор SimpleWorker
-     * @param file - Путь к файлу воркера (абсолютный или относительный)
-     * @param options - Опции для Worker (WorkerOptions)
-     * @param autoDestroy - Уничтожать воркер после первого полученного сообщения
-     * @param logger - Логгер для ошибок (по умолчанию console)
-     * @public
+     * Абсолютный путь к файлу воркера.
      */
-    public constructor(
-        private file: string,
+    private readonly workerPath: string;
+
+    /**
+     * Режим автоматического уничтожения после первого события
+     * (`"message"` или `"error"`).
+     */
+    private readonly autoDestroy: boolean;
+
+    /**
+     * @param file        - Путь к файлу воркера (абсолютный или относительный).
+     * @param options     - Стандартные опции `WorkerOptions` (передаются в конструктор `Worker`).
+     * @param autoDestroy - Если `true`, воркер автоматически уничтожается после первого
+     *                      события `"message"` или `"error"`.
+     * @param logger      - Объект с методом `log(level, ...args)` для логирования ошибок
+     *                      (по умолчанию `console`).
+     */
+    constructor(
+        file: string,
         private options: WorkerOptions = {},
-        autoDestroy = true,
-        logger: { log: (level: any, ...args: any[]) => void } = console
+        autoDestroy = false,
+        private logger: { log: (level: any, ...args: any[]) => void } = console
     ) {
         super();
+
+        // Приводим путь к абсолютному, если он ещё не абсолютный.
+        this.workerPath = path.isAbsolute(file)
+            ? file
+            : path.resolve(file);
+
         this.autoDestroy = autoDestroy;
-        this.logger = logger;
     };
 
     /**
-     * @description Запускает воркер и отправляет начальные данные (если указаны)
-     * @param initialData - Данные, которые будут отправлены в воркер сразу после запуска
-     * @returns Promise<void>
-     * @throws {Error} Если воркер уже запущен
-     * @public
+     * Запускает воркер и опционально отправляет начальные данные.
+     *
+     * Подписывается на события `"message"`, `"error"` и `"exit"`,
+     * пробрасывая их через `TypedEmitter`. При получении `"exit"` сбрасывает
+     * ссылку на воркер в `null`.
+     *
+     * В режиме `autoDestroy` после **первого** события `"message"` или `"error"`
+     * воркер будет автоматически уничтожен.
+     *
+     * @param initialData - Данные, отправляемые в воркер сразу после запуска.
+     *                      Если `undefined`, ничего не отправляется.
+     *
+     * @throws {Error} Если воркер уже запущен (повторный вызов запрещён).
      */
-    public async start(initialData?: TInput): Promise<void> {
-        if (this.worker) throw Error("Worker already started");
+    public start(initialData?: TInput): void {
+        if (this.worker) throw new Error("Worker already started");
 
-        const workerPath = path.isAbsolute(this.file) ? this.file : path.resolve(this.file);
-        this.worker = new Worker(workerPath, this.options);
+        const worker = new Worker(this.workerPath, this.options);
+        this.worker = worker;
 
-        // Обработчики событий (без автоматического удаления)
-        this.worker.on("message", (data: TOutput) => {
+        // ===== Проброс события "message" =====
+        worker.on("message", (data: TOutput) => {
             this.emit("message", data);
-            if (this.autoDestroy) this.destroy();
         });
 
-        // Обработчик ошибок
-        this.worker.on("error", (err) => {
-            //@ts-ignore
+        // ===== Проброс события "error" =====
+        worker.on("error", (err) => {
+            //@ts-ignore — тип события в Node.js может быть строже,
+            // но фактически это Error.
             this.emit("error", err);
-            if (this.autoDestroy) this.destroy();
         });
 
-        // Обработчик выхода процесса
-        this.worker.on("exit", (code) => {
+        // ===== Проброс события "exit" и очистка ссылки =====
+        worker.on("exit", (code) => {
             this.emit("exit", code);
-            if (this.autoDestroy) this.destroy();
+            this.worker = null;
         });
 
+        // Отправляем начальные данные, если они заданы.
         if (initialData !== undefined) {
-            this.send(initialData);
+            worker.postMessage(initialData);
+        }
+
+        // Режим автоматического уничтожения после первого события.
+        if (this.autoDestroy) {
+            const onceHandler = () => {
+                this.destroy();
+            };
+            worker.once("message", onceHandler);
+            worker.once("error", onceHandler);
         }
     };
 
     /**
-     * @description Отправляет данные в работающий воркер
-     * @param data - Данные для отправки
-     * @throws {Error} Если воркер не запущен
-     * @public
+     * Отправляет данные в запущенный воркер.
+     *
+     * @param data - Данные для отправки через `worker.postMessage`.
+     *
+     * @throws {Error} Если воркер не запущен.
      */
     public send(data: TInput): void {
-        if (!this.worker) throw Error("Worker not started");
-        this.worker.postMessage(data);
+        const worker = this.worker;
+        if (!worker) throw new Error("Worker not started");
+        worker.postMessage(data);
     };
 
     /**
-     * @description Принудительно завершает воркер и очищает ресурсы
-     * @returns Promise<void>
-     * @public
+     * Асинхронно завершает воркер.
+     *
+     * Удаляет всех слушателей событий и вызывает `worker.terminate()`.
+     * Ссылка на воркер обнуляется **синхронно**, чтобы предотвратить
+     * повторные попытки использования во время асинхронного завершения.
+     *
+     * Безопасно вызывать повторно: если воркер уже уничтожен,
+     * метод сразу возвращается.
+     *
+     * @returns Promise, который разрешается после вызова `worker.terminate()`.
      */
     public async destroy(): Promise<void> {
-        if (!this.worker) return;
-        this.worker.removeAllListeners();
+        const worker = this.worker;
+        if (!worker) return;
+
+        // Обнуляем ссылку синхронно, чтобы избежать повторного входа.
+        this.worker = null;
+
+        // Снимаем все подписки, чтобы не получить утекшие обработчики.
+        worker.removeAllListeners();
+
         try {
-            await this.worker.terminate();
+            await worker.terminate();
         } catch (err) {
             this.logger.log("ERROR", err);
-            throw err;
-        } finally {
-            this.worker = null;
         }
+    };
+
+    /**
+     * Возвращает `true`, если воркер запущен и не был уничтожен.
+     */
+    public isRunning(): boolean {
+        return this.worker !== null;
     };
 }

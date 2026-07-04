@@ -38,19 +38,15 @@
     "socks-proxy-agent": "^10.1.0",
     "ws": "^8.21.0"
   },
-  "optionalDependencies": {
-    "bufferutil": "^4.1.0",
-    "utf-8-validate": "^6.0.6"
-  },
   "devDependencies": {
     "@napi-rs/cli": "^3.7.2",
     "@types/node": "^26.0.1",
     "typescript": "^6.0.3"
   },
   "scripts": {
-    "start": "node ./build/src/index.js --ShardManager --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
-    "start:ts": "node ./src/index.ts --ShardManager --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
-    "start:bun": "bun ./src/index.ts --ShardManager --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
+    "start": "node ./build/src/index.js --ShardManager --optimize_for_size --expose-gc",
+    "start:ts": "node ./src/index.ts --ShardManager --optimize_for_size --expose-gc",
+    "start:bun": "bun ./src/index.ts --ShardManager --optimize_for_size --expose-gc",
     "build": "tsc",
     "build:native": "npm run build:copy && napi build --platform --release --cwd ./rs --esm --js index.mjs && npm run build:bindings",
     "build:native:dev": "npm run build:copy && napi build --platform --cwd ./rs --esm --js index.mjs && npm run build:bindings",

@@ -170,107 +170,90 @@ impl CycleManager {
     /// Использует `compare_exchange` для атомарной установки флага `running`,
     /// чтобы избежать гонок при одновременных вызовах из разных потоков.
     fn start_if_needed(&self) {
-        // Пытаемся переключить флаг false -> true.
-        // Если он уже был true, значит поток уже работает – выходим.
-        if self
-            .running
-            .compare_exchange(
-                false,
-                true,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            )
-            .is_err()
-        {
+        // ===== FAST GUARD (замена CAS на swap) =====
+        if self.running.swap(true, Ordering::AcqRel) {
             return;
         }
 
-        // Захватываем мьютекс для проверки/записи дескриптора потока.
         let mut handle_guard = self.handle.lock().unwrap();
-        // Двойная проверка: другой поток мог успеть создать поток, пока мы ждали мьютекс.
+
         if handle_guard.is_some() {
             self.running.store(true, Ordering::Release);
             return;
         }
 
-        // Клонируем Arс'и для передачи в замыкание потока.
         let sessions = Arc::clone(&self.sessions);
         let running = Arc::clone(&self.running);
+
+        const SPIN_MARGIN: Duration = Duration::from_micros(250);
+        const MIN_SLEEP: Duration = Duration::from_micros(600);
 
         let handle = thread::Builder::new()
             .name("udp-cycle".into())
             .spawn(move || {
-                // Базовый интервал между тактами (20 мс).
                 let interval = Duration::from_millis(TICK_INTERVAL_MS);
-                // Момент следующего «идеального» срабатывания.
                 let mut next_deadline = Instant::now() + interval;
-                // Порядковый номер такта (монотонно возрастает, используется только для отладки).
                 let mut tick: u64 = 0;
 
-                while running.load(Ordering::Relaxed) {
+                while running.load(Ordering::Acquire) {
                     #[cfg(debug_assertions)]
                     {
                         tick += 1;
                     }
 
-                    // Захватываем актуальный снапшот сессий (ArcSwap даёт полную копию без блокировок).
-                    let sessions = sessions.load_full();
-                    if !sessions.is_empty() {
+                    let snapshot = sessions.load_full();
+
+                    if !snapshot.is_empty() {
                         let now = now_ms();
-                        for session in sessions.values() {
+                        for session in snapshot.values() {
                             session.process(now);
                         }
                     }
-                    // Явно освобождаем снапшот, чтобы не держать ссылку дольше необходимого.
-                    drop(sessions);
 
-                    // ===== Контроль времени =====
+                    drop(snapshot);
+
+                    // ===== TIME CONTROL =====
                     let now = Instant::now();
 
                     if now < next_deadline {
-                        // Мы не опаздываем — нужно дождаться дедлайна.
                         let sleep_time = next_deadline - now;
 
-                        // Спим на всё оставшееся время, за вычетом 250 мкс.
-                        // Этот запас нужен, чтобы компенсировать неточность пробуждения
-                        // и успеть войти в активный цикл ожидания до точного дедлайна.
-                        // Минимальный порог в 600 мкс предохраняет от сна на слишком
-                        // короткое время (меньше минимальной гранулярности ОС).
-                        if sleep_time > Duration::from_micros(600) {
-                            thread::sleep(sleep_time - Duration::from_micros(250));
+                        if sleep_time > MIN_SLEEP {
+                            std::thread::sleep(sleep_time - SPIN_MARGIN);
                         }
 
-                        // Активный цикл ожидания (busy-wait) для точного попадания в дедлайн.
-                        // spin_loop — это подсказка процессору (на x86 аналог PAUSE),
-                        // снижающая энергопотребление и улучшающая производительность SMT.
+                        // ===== ADAPTIVE SPIN =====
+                        let mut spins = 0;
                         while Instant::now() < next_deadline {
-                            std::hint::spin_loop();
+                            if spins > 64 {
+                                std::thread::yield_now();
+                            } else {
+                                std::hint::spin_loop();
+                            }
+                            spins += 1;
                         }
                     } else {
-                        // Опаздываем — вычисляем, сколько тактов мы пропустили.
                         let lag = now.duration_since(next_deadline);
-                        let skipped = (lag.as_millis() as u64 / TICK_INTERVAL_MS) + 1;
 
-                        #[cfg(debug_assertions)] {
-                            // Логируем только при значительном отставании (>2 тактов).
+                        let lag_ms = lag.as_millis() as u64;
+                        let skipped = lag_ms / TICK_INTERVAL_MS + 1;
+
+                        #[cfg(debug_assertions)]
+                        {
                             if skipped > 2 {
                                 println!(
                                     "udp-cycle lag: skipped {} ticks, lag {}ms, total {} ticks",
                                     skipped,
-                                    lag.as_millis(),
+                                    lag_ms,
                                     tick
                                 );
                                 tick += skipped - 1;
                             }
                         }
 
-                        // Компенсируем отставание: сдвигаем дедлайн вперёд
-                        // на пропущенные интервалы. Это сохраняет «идеальное» расписание
-                        // без накопления фазового сдвига.
                         next_deadline += interval * skipped as u32;
                     }
 
-                    // Планируем следующий дедлайн.
                     next_deadline += interval;
                 }
             })
