@@ -322,10 +322,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         if (this.ws) {
             this.ws.removeAllListeners();
             this.ws.close();
-
-            if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
-                this.ws.terminate();
-            }
+            this.ws.terminate();
         }
 
         // Чистим данные о подключении
@@ -345,7 +342,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         super.destroy();
         this.sequence = null;
         this._endpoint = null;
-        this.queue = [];
+        this.queue = null;
 
         if (this._heartbeat) {
             this._heartbeat.destroy();

@@ -70,9 +70,9 @@ impl UdpBufferedInner {
 
         // Пробуем отправить хотя бы один пакет за тик
         for _ in 0..count {  // небольшой burst limit, чтобы не виснуть в одном session'е
-            let Some(packet) = self.buffer.pop() else {
-                break;
-            };
+            // Получаем аудио пакет для отправки
+            let Some(packet) = self.buffer.pop()
+            else { break; }; // Отменяем если нет данных в буфере
 
             match self.socket.send(&packet) {
                 Ok(_) => {
@@ -252,17 +252,15 @@ impl UdpBuffered {
 
             while active.load(Ordering::Relaxed) {
                 match socket.recv(&mut buf) {
-                    Ok(size) if size > 0 => {
-                        let js_buffer = Buffer::from(buf[..size].as_ref());
-                        tsfn.call(js_buffer, ThreadsafeFunctionCallMode::NonBlocking);
-                    }
                     // Если сокет временно недоступен (нет данных), немного спим.
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                         // Поток будет спать сам
                     }
                     // Любая другая ошибка (например, сокет закрыт) завершает цикл.
-                    Err(_) => {
-                        break;
+                    Err(_) => break,
+                    Ok(size) if size > 0 => {
+                        let js_buffer = Buffer::from(buf[..size].as_ref());
+                        tsfn.call(js_buffer, ThreadsafeFunctionCallMode::NonBlocking);
                     },
                     _ => {}
                 }
@@ -302,11 +300,13 @@ impl UdpBuffered {
     #[napi]
     pub fn destroy(&self) {
         if self.destroyed.swap(true, Ordering::Relaxed) { return; }
-
         self.listener_active.store(false, Ordering::Relaxed);
 
         // Отключаем режим прослушивания UDP потока
         self.stop_listening();
+
+        // Чистим данные в буфере
+        self.inner.buffer.clear();
 
         // Отключаем UDP сесиию от циклической системы
         remove_global_session(self.id);

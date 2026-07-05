@@ -17,7 +17,7 @@ import { DAVELayer } from "#core/voice/transport/layers/DAVELayer.js";
  * @const CLOSE_CODES
  * @private
  */
-const CLOSE_CODES: VoiceCloseCodes[] = [VoiceCloseCodes.SessionNoLongerValid];
+const CLOSE_CODES: VoiceCloseCodes[] = [ VoiceCloseCodes.SessionNoLongerValid ];
 
 /**
  * @author SNIPPIK
@@ -34,22 +34,22 @@ export class Transport extends TypedEmitter<TransportEvents> {
     };
 
     /** Слой UDP соединения, ключевой класс для отправки пакетов */
-    public _udp = new UDPLayer();
+    public _udp: UDPLayer | null = new UDPLayer();
 
     /** Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway */
-    public _ws = new VoiceWebSocket();
+    public _ws: VoiceWebSocket | null = new VoiceWebSocket();
 
     /** Слой RTP, ключевой класс для шифрования пакетов для отправки через UDP */
-    private _rtp = new RTPLayer();
+    private _rtp: RTPLayer | null = new RTPLayer();
 
     /** SSRC (синхронизационный источник), полученный от Discord. */
-    public ssrc: number;
+    public ssrc: number | null = null;
 
     /** Клиент Dave, для работы сквозного шифрования */
-    private _dave: DAVELayer;
+    private _dave: DAVELayer | null = null;
 
     /** Кол-во переподключений, требуется для безопасного отключения */
-    private reconnecting = 0;
+    private reconnecting: number = 0;
 
     /**
      * @description Готовность транспорта к безопасной передаче аудио-данных
@@ -61,7 +61,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
             this._dave?.ready &&
             this._rtp?.ready &&
             this._udp?.ready &&
-            this._state.code === TransportStateCode.Session
+            this._state.code === TransportStateCode.Session &&
+            !this.reconnecting
         );
     };
 

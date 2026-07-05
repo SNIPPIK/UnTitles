@@ -62,20 +62,16 @@ impl AutoBalancer {
         worker
     }
 
-    /// Удаляет пустые воркеры, оставляя минимум `MIN_WORKERS`.
+    /// Удаляет пустые воркеры.
     /// **Важно:** вызывается после каждого добавления/удаления. Если бы воркеров было много (тысячи),
     /// эта операция могла бы стать затратной, но при `MAX_PER_WORKER = 50` общее число воркеров обычно невелико.
     fn cleanup_empty_workers(&mut self) {
-        let mut current_len = self.workers.len();
-
         self.workers.retain(|w| {
-            if w.sessions.is_empty() {
-                current_len -= 1;
+            let empty = w.sessions.is_empty();
+            if empty {
                 w.manager.shutdown();
-                false
-            } else {
-                true
             }
+            !empty
         });
     }
 

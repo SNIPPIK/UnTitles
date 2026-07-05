@@ -264,9 +264,7 @@ class RestWorkerHandler {
    * 4. Оборачивает вызов тайм-аутом (REQUEST_TIMEOUT_MS).
    * 5. При успехе — вызывает `sendSuccess`, при ошибке — `sendError`.
    */
-  public async executeRequest(
-    options: RestServerSide.ServerOptions & { requestId: number },
-  ): Promise<void> {
+  public async executeRequest(options: RestServerSide.ServerOptions & { requestId: number }): Promise<void> {
     const { platform, payload, options: reqOpts, requestId, type } = options;
 
     try {
@@ -279,9 +277,7 @@ class RestWorkerHandler {
       }
 
       // Ищем обработчик: сначала по точному имени типа, затем "all"
-      const callback = restPlatform.requests?.find(
-        (req) => req.name === type || req.name === "all",
-      );
+      const callback = restPlatform.requests?.find((req) => req.name === type || req.name === "all");
       if (!callback) {
         this.sendError(
           requestId,
@@ -299,7 +295,7 @@ class RestWorkerHandler {
             DEFAULT_LIMIT,
         }),
         REQUEST_TIMEOUT_MS,
-        `Request timeout for ${platform}.${callback.name}`,
+        `Request timeout for ${platform}.${callback.name}`
       );
 
       // Если при запросе произошла ошибка

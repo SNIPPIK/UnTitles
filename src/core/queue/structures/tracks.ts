@@ -326,8 +326,6 @@ export class ControllerTracks<T extends Track> {
      * @public
      */
     public clear = () => {
-        this._current.length = 0;
-        this._original.length = 0;
         this._current = null;
         this._original = null;
         this._totalTime = null;

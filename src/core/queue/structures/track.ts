@@ -6,10 +6,9 @@ import { db } from "#app/db";
  * @author SNIPPIK
  * @description Базовый класс трека, для использования трека. Трек не привязан к чему либо!
  * @class Track
- * @extends TrackResolvers
  * @public
  */
-export class Track extends TrackResolvers {
+export class Track {
     /** Здесь хранятся данные времени трека */
     protected _duration: TrackDuration;
 
@@ -188,7 +187,7 @@ export class Track extends TrackResolvers {
      * @public
      */
     public get resource() {
-        return Track.providers.audio.resolve(this);
+        return TrackResolvers.providers.audio.resolve(this);
     };
 
     /**
@@ -196,7 +195,7 @@ export class Track extends TrackResolvers {
      * @public
      */
     public get lyrics() {
-        return Track.providers.lyrics.resolve(this);
+        return TrackResolvers.providers.lyrics.resolve(this);
     };
 
     /**
@@ -206,7 +205,6 @@ export class Track extends TrackResolvers {
      * @public
      */
     public constructor(protected _track: APIRequestData.Track, protected _api: RestServerSide.API) {
-        super();
         this.time = _track?.time as any;
         this.proxy = _api?.proxy ?? false;
 

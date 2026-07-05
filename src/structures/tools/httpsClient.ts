@@ -1,7 +1,6 @@
-import { createBrotliDecompress, createDeflate, createGunzip } from "node:zlib";
+import { createBrotliDecompress, createGunzip, createInflate } from "node:zlib";
 import { request as httpsRequest, RequestOptions } from "node:https";
 import { IncomingMessage, request as httpRequest } from "node:http";
-import { pipeline } from "node:stream";
 
 /**
  * @author SNIPPIK
@@ -290,37 +289,43 @@ export class httpsClient extends Request {
      * @public
      */
     public get toString(): Promise<string | Error> {
-        return new Promise((resolve) => {
-            this.request.then((res) => {
-                if (res instanceof Error) return resolve(res);
+        return new Promise(async (resolve) => {
+            const res = await this.request;
 
-                const encoding = res.headers["content-encoding"];
-                const streams: Array<any> = [res];
+            if (res instanceof Error)
+                return resolve(res);
 
-                // Настраиваем цепочку декомпрессии
-                if (encoding === "br") streams.push(createBrotliDecompress());
-                else if (encoding === "gzip") streams.push(createGunzip());
-                else if (encoding === "deflate") streams.push(createDeflate());
+            let stream: NodeJS.ReadableStream = res;
 
-                const chunks: Buffer[] = [];
+            switch (res.headers["content-encoding"]) {
+                case "br":
+                    stream = res.pipe(createBrotliDecompress());
+                    break;
 
-                // Используем безопасный pipeline для предотвращения утечек памяти при декомпрессии
-                pipeline(
-                    streams[0],
-                    ...(streams.slice(1) as []),
-                    (err) => {
-                        // Если получена ошибка
-                        if (err) return resolve(Error(`[httpsClient]: Decoding Error: ${err.message}`));
+                case "gzip":
+                    stream = res.pipe(createGunzip());
+                    break;
 
-                        const buffer = Buffer.concat(chunks);
-                        resolve(buffer.toString("utf-8"));
-                    }
-                );
+                case "deflate":
+                    stream = res.pipe(createInflate());
+                    break;
+            }
 
-                // Собираем бинарные фреймы (безопаснее, чем строковые, во избежание разрывов мульти байтовых UTF-8 символов)
-                const targetStream = streams[streams.length - 1];
-                targetStream.on("data", (chunk: Buffer) => chunks.push(chunk));
-            }).catch((err) => resolve(err));
+            let text = "";
+
+            stream.setEncoding("utf8");
+
+            stream.on("data", (chunk) => {
+                text += chunk;
+            });
+
+            stream.once("end", () => {
+                resolve(text);
+            });
+
+            stream.once("error", (err) => {
+                resolve(Error(err.message));
+            });
         });
     };
 

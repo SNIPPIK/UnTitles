@@ -35,19 +35,25 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public set status(status: ConnectionStatus) {
-        if (this._status === null && status === ConnectionStatus.reconnecting) return;
-
-        const prev = this._status;
-        this._status = status;
-
-        // side-effects отдельно
-        if (status === ConnectionStatus.connecting && this.adapter) {
-            queueMicrotask(() => {
-                this.adapter?.send(this.configuration);
-            });
+        // Производится попытка переподключения после уничтожения подключения
+        if (this._status === null && status === ConnectionStatus.reconnecting) {
+            return;
         }
 
-        this.emit("status", status, prev);
+        // Подключаемся к голосовому каналу
+        if (status === ConnectionStatus.connecting) {
+            // Инициализируем подключение
+            if (this.adapter) {
+                // Подключаемся
+                this.adapter.send(this.configuration);
+                return;
+            }
+
+            // Если не удалось найти адаптер
+            throw Error("Adapter has not found");
+        }
+
+        this._status = status;
     }
 
     /**
@@ -79,13 +85,14 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public disconnect = (): void => {
+        // Если нет адаптера
         if (!this.adapter) return;
 
-        this._status = ConnectionStatus.disconnected;
-        this.configuration.channel_id = null;
+        this.status = ConnectionStatus.disconnected;
+        this.configuration.channel_id = null; // Удаляем id канала
 
-        // ❌ убрали auto reconnect
-        //this.transport?.disconnect?.();
+        // Отправляем в discord сообщение об отключении бота
+        this.status = ConnectionStatus.connecting;
     };
 
     /**

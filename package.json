@@ -34,13 +34,13 @@
   "dependencies": {
     "discord-api-types": "^0.38.49",
     "http-proxy-agent": "^9.1.0",
-    "discord.js": "15.0.0-dev.1782477336-8ceabfc27",
+    "discord.js": "15.0.0-dev.1782606054-b9c59f784",
     "socks-proxy-agent": "^10.1.0",
     "ws": "^8.21.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.7.2",
-    "@types/node": "^26.0.1",
+    "@types/node": "^26.1.0",
     "typescript": "^6.0.3"
   },
   "scripts": {

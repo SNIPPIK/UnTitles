@@ -230,10 +230,6 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         this._played_frames = null;
         this._afade = null;
         this._timeout = null;
-
-        if (typeof global.gc === "function") {
-            global.gc();
-        }
     };
 }
 

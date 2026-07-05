@@ -92,7 +92,7 @@ class LyricsProvider<T extends Track> {
  * @private
  */
 export class TrackResolvers {
-    protected static providers = {
+    public static providers = {
         /**
          * @description Провайдеры для поддержания аудио и прочего
          * @public
@@ -101,7 +101,7 @@ export class TrackResolvers {
             const status = await sdb.audio_saver?.status(track);
 
             // Проверка кеша (мгновенно)
-            if (status?.status === "ended") return status.path;
+            if (status?.status === "ended") return status?.path;
 
             // Если ссылки нет — ищем через Rest/API
             if (!track.link) {
@@ -114,7 +114,7 @@ export class TrackResolvers {
                 for (let trk of songs) {
                     if (trk instanceof Error) continue;
 
-                    (trk as any).similarTrackPath = status.path;
+                    (trk as any).similarTrackPath = status?.path;
 
                     // Проверяем заголовок трека
                     const song = await this.head(trk);
@@ -133,7 +133,7 @@ export class TrackResolvers {
 
             // Проверяем HTTP HEAD (если это ссылка)
             if (track.link.startsWith("http")) {
-                (track as any).similarTrackPath = status.path;
+                (track as any).similarTrackPath = status?.path;
                 const song = await this.head(track);
 
                 // Если при проверке получена ошибка

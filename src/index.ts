@@ -10,6 +10,7 @@ import { env } from "#app/env";
 // - Исправить получение плейлистов в YouTube
 // - Исправить состояние гс при удалении очереди (не проходит подключение)
 // - Ошибка очереди в сообщении с очередью в плеере
+// - Добавить временную блокировку для voice при переподлючении (DAVE ломает передачу)
 
 // Точка входа
 void main();
@@ -92,12 +93,12 @@ async function execute_shard() {
     init_process_events(client);
 
     // Запускаем Garbage Collector
-    setImmediate(() => {
+    setInterval(() => {
         if (typeof global.gc === "function") {
             Logger.log("DEBUG", "[Node] running Garbage Collector - running main thread");
             global.gc();
         }
-    });
+    }, 30e3);
 }
 
 /**

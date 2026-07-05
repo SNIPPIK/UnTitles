@@ -315,24 +315,23 @@ impl AudioEngine {
     /// Выдать `count` пакетов за раз (уменьшает количество вызовов через FFI).
     #[napi]
     pub fn get_packets(&self, count: u32) -> Vec<Buffer> {
-        if count == 0 {
-            return Vec::new();
-        }
-
         let (buffer_lock, buffer_cvar) = &*self.buffer;
+        let counter = {
+            if count == 0 { 1 }
+            else { count }
+        };
 
-        let mut raw_packets = {
-            let mut buffer = buffer_lock.lock().unwrap();
-
-            let limit = usize::min(count as usize, buffer.len());
-
+        // Получение пакетов
+        let raw_packets = {
+            let buffer = buffer_lock.lock().unwrap();
+            let limit = usize::min(counter as usize, buffer.len());
             let mut extracted = Vec::with_capacity(limit);
 
-            // 🚀 ВАЖНО: один batch-call вместо N pop()
+            // Получаем кол-во пакетов вместо 1
             buffer.pop_many(&mut extracted, limit);
 
-            self.position
-                .fetch_add(extracted.len(), Ordering::Relaxed);
+            // Добавляем к позиции
+            self.position.fetch_add(extracted.len(), Ordering::Relaxed);
 
             extracted
         };
@@ -345,6 +344,7 @@ impl AudioEngine {
         // conversion stage отдельно (FFI boundary)
         let mut packets = Vec::with_capacity(raw_packets.len());
 
+        // Преобразуем пакеты в Buffer
         for packet in raw_packets {
             packets.push(Buffer::from(packet));
         }

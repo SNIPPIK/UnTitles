@@ -55,7 +55,7 @@
 
 > [!TIP]
 > I recommend enabling the caching system in `.env`. This will allow you to play tracks even if the platform is completely blocked.
-> However, the voice system is simply not allowed to lose audio packets, even under critical load!
+> However, the voice system is simply not permitted to lose audio packets, even in a critical situation; if UDP packets are blocked, they will be queued for retransmission!
 
 > [!WARNING]
 > If you use a proxy, keep in mind that `FFmpeg` does not support socks. For such tasks, there's [`STH`](https://github.com/SNIPPIK/SHS)  
@@ -182,10 +182,10 @@ for (let i = 0; i < 4; i++) {
                                           ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                    5. TRANSMISSION SCHEDULER (CycleManager + Balancer)              │
-│  [Rust] tokio runtime                                                               │
+│  [Rust] thread runtime                                                              │
 │  • Balancer groups up to 50 active connections per cycle                            │
 │  • CycleManager runs a loop with ~20 ms interval                                    │
-│  • Each cycle pulls ready Opus frames from AudioPlayer                              │
+│  • Each cycle pulls ready Opus frames from UDP Socket                               │
 └─────────────────────────────────────────────────────────────────────────────────────┘
                                           │
                                           ▼
@@ -221,7 +221,6 @@ for (let i = 0; i < 4; i++) {
 │                              7. RECEPTION AND STATISTICS                            │
 │  • Discord receives RTP packets, decodes Opus, plays back in the voice channel      │
 │  • WatKLOK collects WebRTC feedback: Delay, Packet Loss                             │
-│  • Logging of all stages with [RAM] and timestamps                                  │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 </details>

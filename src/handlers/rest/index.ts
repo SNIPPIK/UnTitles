@@ -151,15 +151,11 @@ class RestWorker<T extends APIRequestsKeys> {
 
             // Подписываемся на постоянные сообщения (для обработки запросов)
             worker.on("message", (message) => {
-                const { requestId } = message;
+                const request = this.pending.get(message.requestId);
+                if (!request) return;
 
-                if (requestId !== undefined) {
-                    const request = this.pending.get(requestId);
-                    if (request) {
-                        request.resolve(message);
-                        this.pending.delete(requestId);
-                    }
-                }
+                this.pending.delete(message.requestId);
+                request.resolve(message);
             });
 
             // Обработка ошибок — пересоздаём воркер
