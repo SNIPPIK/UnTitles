@@ -1,0 +1,60 @@
+import { ComponentCommand, type ComponentContext, Middlewares } from 'seyfert';
+import { MessageFlags } from 'seyfert/lib/types/index.js';
+import { Colors } from "#structures/discord/index.js";
+import { locale } from "#structures";
+import { db } from "#app/db";
+
+@Middlewares(["checkAnotherVoice", "userVoiceChannel"])
+export default class extends ComponentCommand {
+    componentType = 'Button' as const;
+
+    filter(ctx: ComponentContext<typeof this.componentType>) {
+        return ctx.customId === "resume_pause";
+    }
+
+    async run(ctx: ComponentContext<typeof this.componentType>) {
+        const queue = db.queues.get(ctx.guildId);
+
+        const track = queue.tracks.track;
+
+        // Если указан трек которого нет
+        if (!track) return null;
+
+        const {name, url} = track;
+
+        // Если плеер уже проигрывает трек
+        if (queue.player.status === "player/playing") {
+            // Приостанавливаем музыку если она играет
+            queue.player.pause();
+
+            // Сообщение о паузе
+            return ctx.write({
+                flags: MessageFlags.Ephemeral,
+                embeds: [
+                    {
+                        description: locale._(ctx.interaction.locale, "player.button.pause", [`[${name}](${url})`]),
+                        color: Colors.Green
+                    }
+                ]
+            });
+        }
+
+        // Если плеер на паузе
+        else if (queue.player.status === "player/pause") {
+            // Возобновляем проигрывание если это возможно
+            queue.player.resume();
+
+            // Сообщение о возобновлении
+            return ctx.write({
+                flags: MessageFlags.Ephemeral,
+                embeds: [
+                    {
+                        description: locale._(ctx.interaction.locale, "player.button.resume", [`[${name}](${url})`]),
+                        color: Colors.Green
+                    }
+                ]
+            });
+        }
+        return null;
+    };
+}

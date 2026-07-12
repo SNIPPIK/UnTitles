@@ -1,15 +1,12 @@
-import { DiscordClient, DJSVoice } from "#structures/discord/index.js";
+import { DiscordClient, SeyfertVoice } from "#structures/discord/index.js";
 import { ControllerQueues, type Queue } from "#core/queue/index.js";
 import { isMainThread } from "node:worker_threads";
 import { env } from "#app/env";
 
 // Database modules
-import { Middlewares } from "#handler/middlewares/index.js";
-import { Components } from "#handler/components/index.js";
-import { Commands } from "#handler/commands/index.js";
 import { RestObject } from "#handler/rest/index.js";
-import { Events } from "#handler/events/index.js";
 import { Voices } from "#core/voice/index.js";
+import { Commands } from "#handler/commands/index.js";
 
 /**
  * @author SNIPPIK
@@ -22,19 +19,10 @@ class Database {
     public readonly api: RestObject;
 
     /** Адаптер для общения с websocket'ом клиента */
-    public readonly adapter: DJSVoice;
-
-    /** Загружаем класс для хранения событий */
-    public readonly events: Events;
+    public readonly adapter: SeyfertVoice;
 
     /** Загружаем класс для хранения команд */
     public readonly commands: Commands;
-
-    /** Загружаем класс для хранения кнопок бота */
-    public readonly components: Components;
-
-    /** Загружаем класс для хранения ограничений и доп проверок бота и пользователей */
-    public readonly middlewares: Middlewares;
 
     /** Загружаем класс для хранения очередей, плееров, циклов */
     public readonly queues: ControllerQueues<Queue>;
@@ -60,16 +48,15 @@ class Database {
         if (!isMainThread) return;
 
         this.api = new RestObject();
-        this.queues = new ControllerQueues();
-        this.voice = new Voices();
-        this.commands = new Commands();
-        this.components = new Components();
-        this.events = new Events();
-        this.middlewares = new Middlewares();
 
         // Если реально клиент
         if (client instanceof DiscordClient) {
-            this.adapter = new DJSVoice(client);
+            this.queues = new ControllerQueues();
+            this.commands = new Commands();
+            this.voice = new Voices();
+
+            // Voice Adapter
+            this.adapter = new SeyfertVoice(client);
         }
 
         this.owner = {
@@ -99,22 +86,7 @@ class Database {
 /**
  * @description Глобальный экземпляр разделяемой базы данных (синглтон)
  */
-let _db: Database | null = null;
-
-/**
- * @description Экспортируемый объект разделяемой БД. Доступен только после инициализации.
- * @throws {Error} при обращении до вызова initSharedDatabase()
- */
-export const db = new Proxy(
-    {},
-    {
-        get(_, prop) {
-            if (!_db) throw Error("Database not ready");
-
-            return _db[prop as keyof Database];
-        }
-    }
-) as Database;
+export let db: Database | null = null;
 
 /**
  * @author SNIPPIK
@@ -124,10 +96,10 @@ export const db = new Proxy(
  * @public
  */
 export function initDatabase(client: DiscordClient) {
-    if (_db) return;
+    if (db) return;
 
     try {
-        _db = new Database(client);
+        db = new Database(client);
     } catch (err) {
         throw Error(`Fail init database: ${err}`);
     }

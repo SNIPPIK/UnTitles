@@ -70,22 +70,7 @@ class SharedDatabase {
 /**
  * @description Глобальный экземпляр разделяемой базы данных (синглтон)
  */
-let _sdb: SharedDatabase | null = null;
-
-/**
- * @description Экспортируемый объект разделяемой БД. Доступен только после инициализации.
- * @throws {Error} при обращении до вызова initSharedDatabase()
- */
-export const sdb = new Proxy(
-    {},
-    {
-        get(_, prop) {
-            if (!_sdb) throw Error("Database not ready");
-
-            return _sdb[prop as keyof SharedDatabase];
-        }
-    }
-) as SharedDatabase;
+export let sdb: SharedDatabase | null = null;
 
 /**
  * @description Инициализирует глобальную разделяемую базу данных (кеш между потоками)
@@ -93,10 +78,10 @@ export const sdb = new Proxy(
  * @public
  */
 export function initSharedDatabase(): void {
-    if (_sdb) throw Error("SharedDatabase already initialized");
+    if (sdb) throw Error("SharedDatabase already initialized");
 
     try {
-        _sdb = new SharedDatabase();
+        sdb = new SharedDatabase();
     } catch (err) {
         throw Error(`Failed to initialize shared database: ${err instanceof Error ? err.message : String(err)}`);
     }

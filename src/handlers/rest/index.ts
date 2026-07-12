@@ -144,6 +144,7 @@ class RestWorker<T extends APIRequestsKeys> {
                 __dirname + "/index.worker",
                 {
                     workerData: { rest: true },
+                    stderr: false
                 },
                 false,
                 Logger
@@ -235,7 +236,7 @@ class RestWorker<T extends APIRequestsKeys> {
         this.pending.clear();
         this.pending = null;
 
-        // Если поток уже есть в системе
+        // Если поток есть в системе
         if (this.worker) {
             await this.worker.destroy();
             this.worker = null;
@@ -328,7 +329,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
 
                         // Если была получена ошибка
                         case "error": {
-                            Logger.log("ERROR", result);
+                            Logger.log("ERROR", result as any);
 
                             // Если платформа не отвечает, то отключаем ее!
                             if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
@@ -336,7 +337,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
                                 this.platforms.block.push(platform.name);
                             }
 
-                            return resolve(result);
+                            return resolve(Error(result.name));
                         }
 
                         // Если получен неожиданный ответ

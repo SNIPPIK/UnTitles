@@ -1,7 +1,6 @@
 import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue/index.js";
 import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio/index.js";
-import { type AudioFilter, ControllerFilters } from "#core/player/index.js";
-import { AudioPlayerEvents } from "#handler/events/index.js";
+import { type AudioFilter, ControllerFilters, AudioPlayerEvents } from "#core/player/index.js";
 import { PlayerProgress } from "../controllers/progress.js";
 import type { VoiceConnection } from "#core/voice/index.js";
 import { PlayerAudio } from "../structures/audio.js";
@@ -261,7 +260,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             const position = skip?.position !== null ? skip?.position : current;
 
             // Выводим сообщение об ошибке
-            db.events.emitter.emit("message/error", queue, error, position);
+            queue.message.client.events.runCustom("message/error", queue, error, position);
 
             // Если надо пропустить трек
             if (skip.skip) {
@@ -513,7 +512,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Если трек включен в 1 раз
         if (seek === 0) {
             const queue = db.queues.get(this.id);
-            if (queue) db.events.emitter.emit("message/playing", queue) // Отправляем сообщение, если можно
+            if (queue) queue.message.client.events.runCustom("message/playing", queue) // Отправляем сообщение, если можно
         }
 
         // Передаем плеер в цикл если его там нет!

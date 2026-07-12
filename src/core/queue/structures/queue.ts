@@ -186,7 +186,7 @@ export class Queue {
      */
     public cleanup = () => {
         Logger.log("DEBUG", `[Queue/${this.message.guild_id}] has cleanup`);
-        if (db.queues.cycles.players.has(this._player)) db.events.emitter.emit("queue/cleanup", this);
+        if (db.queues.cycles.players.has(this._player)) this._message.client.events.runCustom("queue/cleanup", this);
 
         // Останавливаем плеер
         this._player.cleanup();
@@ -208,7 +208,7 @@ export class Queue {
      */
     public destroy = () => {
         Logger.log("LOG", `[Queue/${this.message.guild_id}] has destroyed`);
-        db.events.emitter.emit("queue/destroy", this);
+        this._message.client.events.runCustom("queue/destroy", this);
 
         this._message = null;
         this.timestamp = null;

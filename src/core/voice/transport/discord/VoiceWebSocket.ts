@@ -32,6 +32,14 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
     public sequence: number = -1;
 
     /**
+     * @description Готов ли WS для отправки пакетов
+     * @public
+     */
+    public get ready() {
+        return this.ws.readyState === this.ws.OPEN;
+    };
+
+    /**
      * @description Задержка WS ответа между UDP пакетами
      * @public
      */

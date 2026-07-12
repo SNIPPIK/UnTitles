@@ -1,51 +1,9 @@
+import { Logger as SLogger } from "seyfert";
 import * as process from "node:process";
 import { inspect } from "node:util";
 
-/**
- * @author SNIPPIK
- * @description База данных
- */
-const db = {
-    /**
-     * @description Цвета текста
-     * @protected
-     */
-    colors: {
-        "DEBUG": "\x1b[90m",
-        "WARN": "\x1b[33m",
-        "ERROR": "\x1b[31m",
-        "LOG": ""
-    },
 
-    /**
-     * @description Цвета фона
-     * @protected
-     */
-    status: {
-        "DEBUG": "\x1b[34md\x1b[0m",
-        "WARN": "\x1b[33mw\x1b[0m",
-        "ERROR": "\x1b[31me\x1b[0m",
-        "LOG": "\x1b[32mi\x1b[0m"
-    }
-};
-
-/**
- * @author SNIPPIK
- * @description Функция создания локального времени
- * @private
- */
-const createDate = () => {
-    const local_date = new Date();
-    const DMY = `${local_date.getDate()}.${(local_date.getMonth() + 1)}.${local_date.getFullYear()}`;
-    const time = (local_date.getHours() * 3600 + local_date.getMinutes() * 60 + local_date.getSeconds() + local_date.getMilliseconds() / 1e3).duration(true);
-    return `${DMY} ` + time;
-}
-
-/**
- * @description Время запуска процесса
- * @private
- */
-let _timestamp = null;
+type LoggerKeys = "DEBUG" | "WARN" | "ERROR" | "LOG";
 
 /**
  * @author SNIPPIK
@@ -54,6 +12,10 @@ let _timestamp = null;
  * @public
  */
 export class Logger {
+    private static _logger = new SLogger({
+        name: ""
+    });
+
     /**
      * @description Если включен режим отладки
      * @public
@@ -67,22 +29,10 @@ export class Logger {
      * @public
      * @static
      */
-    public static log = (status: keyof typeof db.status, text: string | Error): void => {
+    public static log = (status: LoggerKeys, text: string | Error): void => {
         queueMicrotask(() => {
-            const extStatus = db.status[status];
-
-            // Получаем память в мегабайтах с двумя знаками после запятой
-            const mem = process.memoryUsage();
-            const memUsedMB = ((mem.rss) / 1024 / 1024).toFixed(2);
-            const time = createDate();
-
-            // Если пришел текст
-            if (typeof text === "string") {
-                text = `${text}`.replace(/\[/, `\x1b[104m\x1b[30m|`).replace(/]/, "|\x1b[0m");
-            }
-
             // Если вместо текста пришла ошибка
-            else if (text instanceof Error) {
+            if (text instanceof Error) {
                 text = `\nCaught Exception\n` +
                     `┌ Name:    ${text.name}\n` +
                     `├ Message: ${text.message}\n` +
@@ -97,10 +47,12 @@ export class Logger {
             // Игнорируем debug сообщения
             if (status === "DEBUG" && !this.debug) return;
 
-            // Отправляем лог
-            process.stdout.write(`\x1b[35m[RAM ${memUsedMB} MB]\x1b[0m \x1b[90m${time}\x1b[0m |\x1b[0m ${extStatus} ` + `${db.colors[status]} - ${text}\n`);
-
-            if (!_timestamp) _timestamp = time;
+            switch (status) {
+                case "LOG": return this._logger.info(text);
+                case "WARN": return this._logger.warn(text);
+                case "DEBUG": return this._logger.debug(text);
+                case "ERROR": return this._logger.error(text);
+            }
         });
     };
 

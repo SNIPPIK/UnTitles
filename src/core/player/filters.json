@@ -17,7 +17,7 @@
       "name": "🌃"
     },
     "locale": { "en-US": "Increases speed by 25% and raises pitch.", "ru": "Ускоряет воспроизведение на 25% и повышает тональность." },
-    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl", "normalize", "hardstyle"],
+    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl", "normalize"],
     "filter": "asetrate=48000*1.25,aresample=128000",
     "args": false
   },
@@ -30,7 +30,7 @@
       "en-US": "Features a heavy, distorted kick drum with a rolling bassline, energetic synth leads, and a high BPM typically ranging from 150 to 160.",
       "ru": "Отличается тяжелой искаженной «бочкой» (kick) с раскатистой басовой линией, энергичными синтезаторными партиями и высоким темпом, обычно от 150 до 160 ударов в минуту."
     },
-    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl", "normalize", "nightcore", "bass", "subboost"],
+    "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl", "normalize", "bass", "subboost"],
     "filter": "asetrate=48000*1.05,aresample=48000,bass=g=15,equalizer=f=120:t=q:w=1:g=6,equalizer=f=5000:t=q:w=1:g=3",
     "args": false
   },

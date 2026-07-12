@@ -1,16 +1,9 @@
-import {
-    Command,
-    CommandCallback,
-    CommandIntegration,
-    Declare,
-    Middlewares,
-    Options,
-    Permissions
-} from "#handler/commands/index.js";
-import {ApplicationCommandOptionType, Colors} from "discord.js";
-import {RepeatType} from "#core/queue/index.js";
-import {locale} from "#structures";
-import {db} from "#app/db";
+import { Command, CommandContext, createStringOption, Declare, Locales, Middlewares, Options } from "seyfert";
+import { Colors } from "#structures/discord/index.js";
+import { MessageFlags } from "discord-api-types/v10";
+import { RepeatType } from "#core/queue/index.js";
+import { locale } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -20,82 +13,88 @@ import {db} from "#app/db";
  * @public
  */
 @Declare({
-    names: {
-        "en-US": "repeat",
-        "ru": "повтор"
-    },
-    descriptions: {
-        "en-US": "Switch the repeat type to any position!",
-        "ru": "Переключение типа повтора в любую позицию!"
-    },
-    integration_types: [CommandIntegration.Guild]
+    name: "repeat",
+    description: "Switch the repeat type to any position!",
+    integrationTypes: ["GuildInstall"],
+    botPermissions: ["SendMessages", "ViewChannel"]
 })
 @Options({
-    type: {
-        names: {
+    type: createStringOption({
+        required: true,
+        name_localizations: {
             "en-US": "type",
             "ru": "тип"
         },
-        descriptions: {
+        description: "Select a repeat type!",
+        description_localizations: {
             "en-US": "Select a repeat type!",
             "ru": "Выберите тип повтора!"
         },
-        type: ApplicationCommandOptionType.Number,
-        required: true,
         choices: [
             {
                 name: "song",
-                nameLocalizations: {
-                    "en-US": "song - Repeat one track",
-                    "ru": "трек - Повтор одного трека"
+                name_localizations: {
+                    "en-US": "song",
+                    "ru": "трек"
                 },
                 value: `${RepeatType.Song}`
             },
             {
                 name: "songs",
-                nameLocalizations: {
-                    "en-US": "songs - Repeat the entire queue",
-                    "ru": "треки - Повтор всей очереди"
+                name_localizations: {
+                    "en-US": "songs",
+                    "ru": "треки"
                 },
                 value: `${RepeatType.Songs}`
             },
             {
                 name: "autoplay",
-                nameLocalizations: {
-                    "en-US": "autoplay - Infinite Audio Stream [BETA]",
-                    "ru": "похожее - Бесконечный аудио поток [BETA]"
+                name_localizations: {
+                    "en-US": "autoplay",
+                    "ru": "похожее"
                 },
                 value: `${RepeatType.AutoPlay}`
             },
             {
                 name: "off",
-                nameLocalizations: {
-                    "en-US": "off - Disabling repeat",
-                    "ru": "выкл - Отключение повтора"
+                name_localizations: {
+                    "en-US": "off",
+                    "ru": "выкл"
                 },
                 value: `${RepeatType.None}`
-            },
+            }
         ]
-    }
+    })
 })
-@Middlewares(["cooldown", "queue", "voice", "another_voice", "player-not-playing", "player-wait-stream"])
-@Permissions({
-    client: ["SendMessages", "ViewChannel"]
+@Middlewares([
+    "userVoiceChannel",
+    "clientVoiceChannel",
+    "checkAnotherVoice"
+])
+@Locales({
+    name: [
+        ["ru", "повтор"],
+        ["en-US", "repeat"]
+    ],
+    description: [
+        ["ru", "Переключение типа повтора в любую позицию!"],
+        ["en-US", "Switch the repeat type to any position!"]
+    ]
 })
-class RepeatCommand extends Command {
-    async run({ctx, args}: CommandCallback) {
-        const queue = db.queues.get(ctx.guildId), loop = parseInt(args[0]) as RepeatType;
+export default class RepeatCommand extends Command {
+    async run(ctx: CommandContext) {
+        const queue = db.queues.get(ctx.guildId), loop = parseInt(ctx.options["type"]) as RepeatType;
 
         // Смотрим тип повтора
         switch (loop) {
             // Выключение повтора
             case RepeatType.None: {
                 queue.tracks.repeat = RepeatType.None;
-                return ctx.reply({
-                    flags: "Ephemeral",
+                return ctx.write({
+                    flags: MessageFlags.Ephemeral,
                     embeds: [
                         {
-                            description: locale._(ctx.locale, "player.button.repeat.off"),
+                            description: locale._(ctx.interaction.locale, "player.button.repeat.off"),
                             color: Colors.Green
                         }
                     ]
@@ -106,11 +105,11 @@ class RepeatCommand extends Command {
             case RepeatType.Song: {
                 queue.tracks.repeat = RepeatType.Song;
 
-                return ctx.reply({
-                    flags: "Ephemeral",
+                return ctx.write({
+                    flags: MessageFlags.Ephemeral,
                     embeds: [
                         {
-                            description: locale._(ctx.locale, "player.button.repeat.song"),
+                            description: locale._(ctx.interaction.locale, "player.button.repeat.song"),
                             color: Colors.Green
                         }
                     ]
@@ -121,11 +120,11 @@ class RepeatCommand extends Command {
             case RepeatType.Songs: {
                 queue.tracks.repeat = RepeatType.Songs;
 
-                return ctx.reply({
-                    flags: "Ephemeral",
+                return ctx.write({
+                    flags: MessageFlags.Ephemeral,
                     embeds: [
                         {
-                            description: locale._(ctx.locale, "player.button.repeat.songs"),
+                            description: locale._(ctx.interaction.locale, "player.button.repeat.songs"),
                             color: Colors.Green
                         }
                     ]
@@ -136,11 +135,11 @@ class RepeatCommand extends Command {
             case RepeatType.AutoPlay: {
                 queue.tracks.repeat = RepeatType.AutoPlay;
 
-                return ctx.reply({
-                    flags: "Ephemeral",
+                return ctx.write({
+                    flags: MessageFlags.Ephemeral,
                     embeds: [
                         {
-                            description: locale._(ctx.locale, "player.button.repeat.related"),
+                            description: locale._(ctx.interaction.locale, "player.button.repeat.related"),
                             color: Colors.Green
                         }
                     ]
@@ -152,9 +151,3 @@ class RepeatCommand extends Command {
         }
     }
 }
-
-/**
- * @export default
- * @description Не даем классам или объектам быть доступными везде в проекте
- */
-export default [RepeatCommand];

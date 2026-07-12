@@ -1,178 +1,174 @@
-import {
-    Command,
-    CommandCallback,
-    CommandIntegration,
-    Declare,
-    Middlewares,
-    Options,
-    Permissions,
-    SubCommand
-} from "#handler/commands/index.js";
-import {ApplicationCommandOptionType} from "discord-api-types/v10";
-import {Colors} from "#structures/discord/index.js";
-import {locale} from "#structures";
-import {db} from "#app/db";
+import { Command, type CommandContext, ComponentType, createNumberOption, Declare, Locales, Middlewares, Options, SubCommand } from 'seyfert';
+import { Colors } from '#structures/discord/index.js';
+import { MessageFlags } from "discord-api-types/v10";
+import { locale } from '#structures';
+import { db } from '#app/db';
 
 /**
- * @author SNIPPIK
- * @description Просмотр треков в очереди
- * @class QueueList
- * @extends SubCommand
+ * Подкоманда: список треков
  */
 @Declare({
-    names: {
-        "en-US": "list",
-        "ru": "список"
-    },
-    descriptions: {
-        "en-US": "View tracks in the current queue!",
-        "ru": "Просмотр треков в текущей очереди!"
-    }
+    name: 'list',
+    description: 'View tracks in the current queue!',
+    integrationTypes: ['GuildInstall'],
+    botPermissions: ['SendMessages', 'ViewChannel']
+})
+@Locales({
+    name: [['ru', 'список']],
+    description: [['ru', 'Просмотр треков в текущей очереди!']]
 })
 @Options({
-    type: {
-        names: {
-            "en-US": "value",
-            "ru": "число"
-        },
-        descriptions: {
-            "en-US": "Specify the track position to get +-10 tracks. When selected, the selected one will be shown",
-            "ru": "Укажите позицию трека для получения +-10 треков. При выборе будет показан выбранный"
-        },
-        type: ApplicationCommandOptionType.Number,
+    value: createNumberOption({
         required: true,
-        autocomplete: ({ ctx, args }) => {
-            const { tracks } = db.queues.get(ctx.guildId);
+        description: 'Specify the track position to get +-10 tracks. When selected, the selected one will be shown',
+        name_localizations: { ru: 'число' },
+        description_localizations: {
+            ru: 'Укажите позицию трека для получения +-10 треков. При выборе будет показан выбранный'
+        },
+        autocomplete: async (ctx) => {
+            const queue = db.queues.get(ctx.guildId);
+            const { tracks } = queue;
             const { position } = tracks;
 
-            const center = args[0] === "0" ? 1 : args[0] - 1;
+            // Определяем центральную позицию для отображения
+            let center: number;
+            const input = ctx.getInput();
+            if (input === '') {
+                center = position; // ничего не введено – показываем вокруг текущего трека
+            } else {
+                const num = Number(input);
+                center = input === '0' ? 1 : isNaN(num) ? position : num - 1;
+            }
+
+            // Получаем треки до и после центра
             const before = tracks.array(-10, center);
             const after = tracks.array(10, center);
 
-            return ctx.respond(
-                [...before, ...after].map((track, i) => {
-                    const value = center - before.length + i;
-                    const isCurrent = value === position;
-                    const Selected = center === value;
+            const choices = [...before, ...after].map((track, i) => {
+                const value = center - before.length + i;
+                const isCurrent = value === position;
+                const Selected = center === value;
 
-                    return {
-                        name: `${value + 1}. ${isCurrent && !Selected ? db.emoji.current : Selected && !isCurrent ? db.emoji.select : Selected && isCurrent ? db.emoji.select : `${db.emoji.queue}`} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
-                        value
-                    };
-                })
-            );
+                let emoji = '🎶';
+                if (isCurrent && !Selected) emoji = '▶️';
+                else if (Selected && !isCurrent) emoji = '➡️';
+                else if (Selected && isCurrent) emoji = '➡ 🎵️';
+
+                return {
+                    name: `${value + 1}. ${emoji} (${track.time.split}) | ${track.artist.title.slice(0, 35)} - ${track.name.slice(0, 75)}`,
+                    value
+                };
+            });
+
+            await ctx.respond(choices);
         }
-    }
+    })
 })
-class QueueList extends SubCommand {
-    async run({ctx, args}: CommandCallback<number>) {
+class QueueListCommand extends SubCommand {
+    async run(ctx: CommandContext) {
         const queue = db.queues.get(ctx.guildId);
-        const track = queue.tracks.get(args[0]);
+        const value = ctx.options["value"] as number;
 
-        // Если указан не существующий трек
-        if (!track) return ctx.reply(
-            {
+        const track = queue.tracks.get(value);
+        if (!track) {
+            return ctx.write({
                 embeds: [
                     {
-                        description: locale._(ctx.locale, "command.queue.track.notfound", [queue.tracks.total]),
+                        description: locale._(ctx.interaction.locale, 'command.queue.track.notfound', [queue.tracks.total]),
                         color: Colors.White
                     }
                 ],
-                flags: "Ephemeral"
-            }
-        );
+                flags: MessageFlags.Ephemeral
+            });
+        }
 
-        const { artist, url, name, image, api, ID, time, user, link } = track;
+        const { artist, url, name, image, api, ID, time, user } = track;
 
-        // Отправляем данные о выбранном треке
-        return ctx.reply({
-            embeds: [
+        return ctx.write({
+            components: [
                 {
-                    author: {
-                        url: artist.url,
-                        name: artist.title,
-                        icon_url: artist.image.url
-                    },
-                    thumbnail: image,
-                    description: `[${name}](${url})\n - ${ID}\n - ${time.split}` + (link && link.startsWith("http") ? `\n - 🗃: ❌` : link ? "\n - 🗃: ✅" : ""),
-                    color: api.color,
-
-                    footer: {
-                        text: `${user.username} | ${api.name} - ${api.url}`,
-                        icon_url: user.avatar
-                    }
+                    type: ComponentType.Container,
+                    "accent_color": api.color,
+                    components: [
+                        {
+                            "type": 9,
+                            "components": [
+                                {
+                                    "type": 10,
+                                    "content": `## ${db.emoji.disk} **[${artist.title}](${artist.url})**`
+                                },
+                                {
+                                    "type": 10,
+                                    "content": `### **[${name}](${url})**\n> ${ID}\n> ${time.split}`
+                                }
+                            ],
+                            "accessory": {
+                                "type": 11,
+                                "media": {
+                                    "url": image.url
+                                }
+                            }
+                        },
+                        {
+                            "type": 14, // Separator
+                            "divider": true,
+                            "spacing": 1
+                        },
+                        {
+                            "type": 10,
+                            "content": `-# ${user.username} ● ${time.split} | 🎵 ${api.name.toLowerCase()}`
+                        }
+                    ]
                 }
             ],
-            flags: "Ephemeral"
+            flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2
         });
-    };
+    }
 }
 
-
 /**
- * @author SNIPPIK
- * @description Удаление очереди
- * @class QueueDestroy
- * @extends SubCommand
+ * Подкоманда: удаление очереди
  */
 @Declare({
-    names: {
-        "en-US": "destroy",
-        "ru": "удаление"
-    },
-    descriptions: {
-        "en-US": "Queue deletion! No way to return tracks, player, queue!",
-        "ru": "Удаление очереди! Без возможности вернуть треки, плеер, очередь!"
-    }
+    name: 'destroy',
+    description: 'Queue deletion! No way to return tracks, player, queue!',
+    integrationTypes: ['GuildInstall'],
+    botPermissions: ['SendMessages', 'ViewChannel']
 })
-class QueueDestroy extends SubCommand {
-    async run({ctx}: CommandCallback) {
+@Locales({
+    name: [['ru', 'удаление']],
+    description: [['ru', 'Удаление очереди! Без возможности вернуть треки, плеер, очередь!']]
+})
+class QueueDestroyCommand extends SubCommand {
+    async run(ctx: CommandContext) {
         db.queues.remove(ctx.guildId);
         db.voice.remove(ctx.guildId);
 
-        // Отправляем данные о выбранном треке
-        return ctx.reply({
+        return ctx.write({
             embeds: [
                 {
-                    description: locale._(ctx.locale, "command.queue.destroy"),
+                    description: locale._(ctx.interaction.locale, 'command.queue.destroy'),
                     color: Colors.White
                 }
             ],
-            flags: "Ephemeral"
+            flags: MessageFlags.Ephemeral
         });
-    };
+    }
 }
 
-
 /**
- * @author SNIPPIK
- * @description Взаимодействие с очередью
- * @class QueueCommand
- * @extends Command
- * @public
+ * Родительская команда /queue
  */
 @Declare({
-    names: {
-        "en-US": "queue",
-        "ru": "очередь"
-    },
-    descriptions: {
-        "en-US": "Advanced control of music inclusion!",
-        "ru": "Расширенное управление включение музыки!"
-    },
-    integration_types: [CommandIntegration.Guild]
+    name: 'queue',
+    description: 'Advanced control of music inclusion!',
+    integrationTypes: ['GuildInstall'],
+    botPermissions: ['SendMessages', 'ViewChannel']
 })
-@Options([QueueList, QueueDestroy])
-@Middlewares(["cooldown", "voice", "another_voice", "queue"])
-@Permissions({
-    client: ["SendMessages", "ViewChannel"]
+@Locales({
+    name: [['ru', 'очередь']],
+    description: [['ru', 'Расширенное управление включение музыки!']]
 })
-class QueueCommand extends Command {
-    async run() {}
-}
-
-/**
- * @export default
- * @description Не даем классам или объектам быть доступными везде в проекте
- */
-export default [QueueCommand];
+@Options([QueueListCommand, QueueDestroyCommand])
+@Middlewares(["userVoiceChannel", "clientVoiceChannel", "checkAnotherVoice", "checkQueue"])
+export default class QueueCommand extends Command {}

@@ -1,72 +1,76 @@
-import { Command, CommandCallback, CommandContext, CommandIntegration, Declare, Middlewares } from "#handler/commands/index.js";
-import { ApplicationCommandType } from "discord-api-types/v10";
-import { MessageFlags, User } from "discord.js";
+import { Command, CommandContext, Declare, Middlewares, Locales } from "seyfert";
+import { ApplicationCommandType } from "seyfert/lib/types/index.js";
+import { MessageFlags } from "discord-api-types/v10";
 import { locale } from "#structures";
 import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
  * @description Просмотр аватара пользователя
- * @class AvatarCommand
- * @extends Assign
+ * @class AvatarContextCommand
+ * @extends Command
  * @public
  */
 @Declare({
-    names: {
-        "en-US": "Avatar",
-        "ru": "Аватар"
-    },
-    integration_types: [CommandIntegration.Guild, CommandIntegration.User],
-    contexts: [CommandContext.Guild, CommandContext.Bot, CommandContext.Private],
-    type: ApplicationCommandType.User
+    name: "Avatar",
+    type: ApplicationCommandType.User,
+    integrationTypes: ["GuildInstall", "UserInstall"],
+    botPermissions: ["SendMessages", "EmbedLinks"],
 })
-@Middlewares(["cooldown"])
-class AvatarContextCommand extends Command {
-    public run = ({ctx, args}: CommandCallback<User>) => {
-        const user = args[0];
-        const me = ctx.client.user;
-        const avatar = user.avatar ? user.avatarURL({size: 1024, forceStatic: false}) : db.images.no_image;
+@Middlewares(["checkCooldown"])
+@Locales({
+    name: [
+        ["ru", "Аватар"],
+        ["en-US", "Avatar"]
+    ],
+    description: [
+        ["ru", "Просмотр аватара пользователя"],
+        ["en-US", "View user's avatar"]
+    ]
+})
+export default class AvatarContextCommand extends Command {
+    async run(ctx: CommandContext) {
+        // В контекстной команде типа User целевой пользователь доступен через ctx.target
+        const user = ctx.interaction.data.resolved.users[0];
+        const me = ctx.client.me;
+        const avatar = user.avatar
+            ? user.avatarURL({ size: 1024, forceStatic: false })
+            : db.images.no_image;
 
-        // Отправляем сообщение в текстовый канал
-        return ctx.reply({
+        // Отправляем эфемерный ответ
+        await ctx.write({
+            embeds: [
+                {
+                    color: user.accentColor,
+                    description: `${locale._(ctx.interaction.locale, "user")} <@!${user.id}>`,
+                    timestamp: new Date().toISOString(),
+                    image: { url: avatar },
+                    footer: {
+                        text: me.username,
+                        icon_url: me.avatarURL({ size: 1024, forceStatic: false }),
+                    },
+                },
+            ],
             components: [
                 {
                     type: 1,
                     components: [
                         {
-                            "type": 2,
-                            "label": "User",
-                            "style": 5,
-                            "url": `https://discordapp.com/users/${user.id}`
+                            type: 2,
+                            label: "User",
+                            style: 5,
+                            url: `https://discordapp.com/users/${user.id}`,
                         },
                         {
-                            "type": 2,
-                            "label": "Image",
-                            "style": 5,
-                            "url": avatar
+                            type: 2,
+                            label: "Image",
+                            style: 5,
+                            url: avatar,
                         },
-                    ]
-                }
+                    ],
+                },
             ],
-            embeds: [
-                {
-                    color: user.accentColor,
-                    description: `${locale._(ctx.locale, "user")} <@!${user.id}>`,
-                    timestamp: new Date() as any,
-                    image: { url: avatar },
-                    footer: {
-                        text: `${me.username}`,
-                        icon_url: me.avatarURL({size: 1024, forceStatic: false})
-                    }
-                }
-            ],
-            flags: MessageFlags.Ephemeral
-        })
-    };
+            flags: MessageFlags.Ephemeral,
+        });
+    }
 }
-
-/**
- * @export default
- * @description Не даем классам или объектам быть доступными везде в проекте
- */
-export default [AvatarContextCommand];

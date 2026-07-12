@@ -65,44 +65,44 @@ impl UdpBufferedInner {
     /// пакет возвращается в начало очереди (push_front) для повторной попытки позже,
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self, now: u64) {
-        let last_ms = self.last_send_ms.load(Ordering::Relaxed);
-        let count = ((now - last_ms) / TICK_INTERVAL_MS).max(3).min(1);
+        // Получаем аудио пакет для отправки
+        let Some(packet) = self.buffer.pop()
+        else {
+            // Проверяем есть ли данные в буфере
+            #[cfg(debug_assertions)]
+            {
+                println!("UDP buffer is null");
+            }
 
-        // Пробуем отправить хотя бы один пакет за тик
-        for _ in 0..count {  // небольшой burst limit, чтобы не виснуть в одном session'е
-            // Получаем аудио пакет для отправки
-            let Some(packet) = self.buffer.pop()
-            else { break; }; // Отменяем если нет данных в буфере
+            return;
+        }; // Отменяем если нет данных в буфере
 
-            match self.socket.send(&packet) {
-                Ok(_) => {
-                    self.counter.store(0, Ordering::Relaxed);
-                    self.last_send_ms.store(now, Ordering::Relaxed);
-                    // пакет успешно ушёл — продолжаем, вдруг есть ещё
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    // Сокет временно перегружен — возвращаем пакет в начало очереди
-                    if let Err(_) = self.buffer.push_front(packet) {
-                        // Если даже push_front не удался — пакет потерян (очень редкий случай)
-                        self.send_drops.fetch_add(1, Ordering::Relaxed);
-
-                        #[cfg(debug_assertions)]
-                        {
-                            println!("UDP buffer full, packet dropped");
-                        }
-                    }
-                    break; // не пытаемся дальше в этом тике
-                }
-                Err(_e) => {
-                    // Другие ошибки (NetworkUnreachable, InvalidInput и т.д.)
+        match self.socket.send(&packet) {
+            Ok(_) => {
+                self.counter.store(0, Ordering::Relaxed);
+                self.last_send_ms.store(now, Ordering::Relaxed);
+                // пакет успешно ушёл — продолжаем
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                // Сокет временно перегружен — возвращаем пакет в начало очереди
+                if let Err(_) = self.buffer.push_front(packet) {
+                    // Если даже push_front не удался — пакет потерян (очень редкий случай)
                     self.send_drops.fetch_add(1, Ordering::Relaxed);
 
-                    // пакет потерян
                     #[cfg(debug_assertions)]
                     {
-                        println!("UDP send error: {}", _e);
+                        println!("UDP buffer full, packet dropped");
                     }
-                    break; // не пытаемся дальше в этом тике
+                }
+            }
+            Err(_e) => {
+                // Другие ошибки (NetworkUnreachable, InvalidInput и т.д.)
+                self.send_drops.fetch_add(1, Ordering::Relaxed);
+
+                // пакет потерян
+                #[cfg(debug_assertions)]
+                {
+                    println!("UDP send error: {}", _e);
                 }
             }
         }
@@ -131,7 +131,7 @@ impl UdpBufferedInner {
     }
 }
 
-/// Буферизованный UDP-сокет, доступный из JavaScript через N-API.
+/// Бактеризованный UDP-сокет, доступный из JavaScript через N-API.
 #[napi(js_name = "UDPSocket")]
 #[derive(Clone)]
 pub struct UdpBuffered {
@@ -308,7 +308,7 @@ impl UdpBuffered {
         // Чистим данные в буфере
         self.inner.buffer.clear();
 
-        // Отключаем UDP сесиию от циклической системы
+        // Отключаем UDP сессию от циклической системы
         remove_global_session(self.id);
     }
 

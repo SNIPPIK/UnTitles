@@ -1,54 +1,47 @@
-import type {
-    ChatInputCommandInteraction, AutocompleteInteraction, CacheType, ButtonInteraction, Message, SelectMenuInteraction,
-    MessageContextMenuCommandInteraction, PrimaryEntryPointCommandInteraction, UserContextMenuCommandInteraction
-} from "discord.js";
-import type { DiscordClient } from "#structures/discord/index.client.js";
+import { CommandContext, WebhookMessage, Message, AutocompleteInteraction } from "seyfert";
+import { middlewares } from "#handler/middlewares/index.js";
+import { AudioPlayerEvents } from "#core/player/index.js";
+import { QueueEvents } from "#core/queue/index.js";
+import { DiscordClient } from "./index.client.js";
+import { RestAPIEvents } from "#handler/rest/index.js";
 
-export * from "./index.sharder.js";
 export * from "./index.client.js";
 export * from "./index.voice.js";
 
 /**
- * @description Тип всех входящих данных для команд
- * @type AnyCommandInteraction
- * @public
- */
-export type AnyCommandInteraction = (CommandInteraction | MessageContextMenuCommandInteraction<CacheType> | PrimaryEntryPointCommandInteraction<CacheType> | UserContextMenuCommandInteraction<CacheType>) & {options?: {_subcommand?: string}};
-
-/**
- * @description Тип входящих данных для команд
+ * @author SNIPPIK
+ * @description Тип сообщения для команд
  * @type CommandInteraction
- * @public
  */
-export type CommandInteraction = (ChatInputCommandInteraction<CacheType>) & {options?: {_subcommand?: string}};
+export type CommandInteraction = CommandContext;
 
 /**
  * @description Тип входящих данных для дополнения к команде
  * @type CompeteInteraction
  * @public
  */
-export type CompeteInteraction = AutocompleteInteraction<CacheType>;
+export type CompeteInteraction = AutocompleteInteraction;
 
 /**
  * @description Тип входящих данных для кнопок
  * @type buttonInteraction
  * @public
  */
-export type buttonInteraction = ButtonInteraction<CacheType>;
+export type buttonInteraction = CommandContext;
 
 /**
  * @description Тип входящих данных для циклической системы
  * @type buttonInteraction
  * @public
  */
-export type SelectMenuInteract = SelectMenuInteraction;
+export type SelectMenuInteract = CommandContext;
 
 /**
  * @description Тип входящих данных для циклической системы
  * @type buttonInteraction
  * @public
  */
-export type CycleInteraction = Message<boolean>;
+export type CycleInteraction = (WebhookMessage | Message) & { editedTimestamp?: string };
 
 /**
  * @description Тип входящих данных для циклической системы
@@ -90,22 +83,14 @@ export enum Colors {
 }
 
 /**
- * @description Изменяем параметры discord.js
- * @module discord.js
+ * @author SNIPPIK
+ * @description Редактируем параметры seyfert
  */
-declare module "discord.js" {
-    //@ts-ignore
-    export interface ChatInputCommandInteraction {
-        member: GuildMember;
-    }
-
-    //@ts-ignore
-    export interface ButtonInteraction {
-        member: GuildMember;
-    }
-
-    //@ts-ignore
-    export interface GuildMemberManager {
+declare module "seyfert" {
+    interface SeyfertRegistry {
         client: DiscordClient;
+        middlewares: typeof middlewares;
     }
+
+    interface CustomEvents extends AudioPlayerEvents, QueueEvents, RestAPIEvents { }
 }

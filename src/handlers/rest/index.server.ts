@@ -267,5 +267,9 @@ type ResultError = {
     status: "error";
 
     /** Ответ */
-    result: Error;
+    result: {
+        name: string;
+        message?: string;
+        stack?: string;
+    };
 };

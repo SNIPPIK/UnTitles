@@ -58,6 +58,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
     public get ready(): boolean {
         // Используем опциональную цепочку, чтобы избежать TypeError, если транспорт уничтожен
         return !!(
+            this._ws?.ready &&
             this._dave?.ready &&
             this._rtp?.ready &&
             this._udp?.ready &&
@@ -95,17 +96,18 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 const d = state.payload;
                 this.ssrc = d.ssrc;
 
-                this._udp.create(d).then((discovery) => {
-                    this.emit("info", "[Transport/UDP]: Getting out");
+                this.emit("info", "[Transport/UDP]: Waiting discovery response");
 
+                this._udp.create(d).then((discovery) => {
+                    // Если при подключении произошла ошибка
                     if (discovery instanceof Error) {
                         this.emit("close", VoiceCloseCodes.ServerNotFound, discovery);
-                        this.emit("info", `[Transport/UDP]: Bad Discovery handshake`);
+                        this.emit("info", `[Transport/UDP]: Bad discovery handshake`);
                         this.destroy();
                         return;
                     }
 
-                    this.emit("info", `[Transport/UDP]: Good Discovery handshake | ${discovery.address}:${discovery.port}`);
+                    this.emit("info", `[Transport/UDP]: Good discovery handshake | ${discovery.address}:${discovery.port}`);
                     this._ws.packet = {
                         op: VoiceOpcodes.SelectProtocol,
                         d: {
@@ -205,7 +207,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @status Identify
          * @code 0
          */
-        this._ws.on("open", () => {
+        this._ws.once("open", () => {
             const { server, state } = this.adapter.packet;
 
             this.state = {
@@ -217,6 +219,31 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     token: server.token,
                     max_dave_protocol_version: MLSSession.max_version
                 }
+            };
+        });
+
+        /**
+         * @description Если websocket закрывается, пытаемся его поднять или перезапустить
+         * @status WS Close
+         * @code 1000-4022
+         */
+        this._ws.once("close", (code, reason = "Unknown") => {
+            // Сообщаем что хотим переподключится
+            this.emit("close", code, `[Transport/WS]: ${reason}`);
+
+            // Если достигли лимита попыток
+            if (this.reconnecting >= 3 || CLOSE_CODES.includes(code)) {
+                this.destroy();
+                return;
+            }
+
+            // Добавляем попытку
+            this.reconnecting++;
+
+            // Пробуем поднять соединение заново
+            this.state = {
+                code: TransportStateCode.OpeningWs,
+                payload: code
             };
         });
 
@@ -252,7 +279,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 payload: d
             }
 
-            this.emit("info", `[Transport/UDP]: has created`);
+            this.emit("info", `[Transport/UDP]: Start creating`);
         });
 
         /**
@@ -264,31 +291,6 @@ export class Transport extends TypedEmitter<TransportEvents> {
             this.state = {
                 code: TransportStateCode.Session,
                 payload: d
-            };
-        });
-
-        /**
-         * @description Если websocket закрывается, пытаемся его поднять или перезапустить
-         * @status WS Close
-         * @code 1000-4022
-         */
-        this._ws.on("close", (code, reason = "Unknown") => {
-            // Сообщаем что хотим переподключится
-            this.emit("close", code, `[Transport/WS]: ${reason}`);
-
-            // Если достигли лимита попыток
-            if (this.reconnecting >= 3 && this.reconnecting !== null || CLOSE_CODES.includes(code)) {
-                this.destroy();
-                return;
-            }
-
-            // Добавляем попытку
-            this.reconnecting++;
-
-            // Пробуем поднять соединение заново
-            this.state = {
-                code: TransportStateCode.OpeningWs,
-                payload: code
             };
         });
 

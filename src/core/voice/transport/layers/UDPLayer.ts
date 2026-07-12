@@ -55,7 +55,7 @@ export class UDPLayer extends BaseLayer<VoiceUDPSocket> {
     };
 
     /**
-     * @description Создание ключевого обьекта
+     * @description Создание ключевого объекта
      * @param d - Пакет Ready полученный от WS
      * @public
      */

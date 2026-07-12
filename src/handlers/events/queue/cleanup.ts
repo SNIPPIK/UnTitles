@@ -1,0 +1,63 @@
+import { Colors } from "#structures/discord/index.js";
+import { MessageFlags } from "discord-api-types/v10";
+import { createEvent } from "seyfert";
+import { locale } from "#structures";
+
+/**
+ * @author SNIPPIK
+ * @description Сообщение об ошибке
+ * @extends Event
+ * @event message/error
+ * @public
+ */
+export default createEvent({
+    data: {
+        name: "queue/cleanup"
+    },
+    async run(queue) {
+        const { tracks, player } = queue;
+
+        try {
+            const msg = await queue.message.send({
+                flags: MessageFlags.IsComponentsV2,
+                embeds: null,
+                components: [
+                    {
+                        "type": 17, // Container
+                        "accent_color": Colors.White,
+                        "components": [
+                            {
+                                "type": 9, // Block
+                                "components": [
+                                    {
+                                        "type": 10,
+                                        "content": locale._(queue.message.locale, "queue.cleanup")
+                                    },
+                                ],
+                                "accessory": {
+                                    "type": 11,
+                                    //"description": name, // Подсказка
+                                    "media": {
+                                        "url": queue.message.guild("cache").iconURL(),
+                                    }
+                                }
+                            },
+                            {
+                                "type": 14, // Separator
+                                "divider": true,
+                                "spacing": 1
+                            },
+                            {
+                                "type": 10, // Text
+                                "content": `> -# \`${player.audio.volumeIndicator}\` ${tracks.footer}`
+                            },
+                        ]
+                    }
+                ] as any
+            });
+            setTimeout(() => msg.delete?.().catch(() => null), 50e3);
+        } catch (err) {
+            console.log(err);
+        }
+    }
+})

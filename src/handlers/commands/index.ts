@@ -1,45 +1,18 @@
-import {
-    type ApplicationCommandOption, ApplicationCommandType, type Client,
-    GuildMember, Routes
-} from "discord.js";
-import {
-    AnyCommandInteraction,
-    buttonInteraction,
-    Colors,
-    CompeteInteraction,
-    DiscordClient,
-    SelectMenuInteract
-} from "#structures/discord/index.js";
-import {
-    AutocompleteCommandOption,
-    Choice,
-    ChoiceOption, CommandCallback,
-    CommandContext,
-    CommandIntegration, CommandOptionsType,
-    CommandPermissions
-} from "./index.decorator.js";
-import type { LocalizationMap, Permissions } from "discord-api-types/v10";
-import type { RegisteredMiddlewares } from "#handler/middlewares/index.js";
+import type { CompeteInteraction } from "#structures/discord/index.js";
 import filters from "#core/player/filters.json" with { type: 'json' };
+import type { LocalizationMap } from "discord-api-types/v10";
 import type { RestClientSide } from "#handler/rest/index.js";
 import type { AudioFilter } from "#core/player/index.js";
-import { locale, Logger } from "#structures";
-import { handler } from "#handler";
-import { env } from "#app/env";
+import { locale } from "#structures";
 import { db } from "#app/db";
-
-
-// Export decorator
-export * from "./index.decorator.js";
 
 /**
  * @author SNIPPIK
  * @description Класс для взаимодействия с командами
  * @class Commands
- * @extends handler
  * @public
  */
-export class Commands extends handler<Command> {
+export class Commands {
     /**
      * @description Создаем список фильтров для UI discord
      * @public
@@ -72,90 +45,6 @@ export class Commands extends handler<Command> {
         }
 
         return temples;
-    };
-
-    /**
-     * @description Команды для разработчика
-     * @return Command[]
-     * @public
-     */
-    public get owner() {
-        return this.files.filter(cmd => cmd.owner);
-    };
-
-    /**
-     * @description Команды доступные для всех
-     * @return Command[]
-     * @public
-     */
-    public get public() {
-        return this.files.filter(cmd => !cmd.owner);
-    };
-
-    /**
-     * @description Загружаем класс вместе с дочерним
-     * @constructor
-     * @public
-     */
-    public constructor() {
-        super("src/handlers/commands");
-    };
-
-    /**
-     * @description Вернется если произойдет любая ошибка при взаимодействии с ботом
-     * @param ctx
-     * @param error
-     * @public
-     */
-    public onInteractionFail = (ctx: AnyCommandInteraction | CompeteInteraction | buttonInteraction | SelectMenuInteract, error: Error | string) => {
-        Logger.log(
-            "ERROR",
-            `\nIntegration Reject | ${ctx.id}\n` +
-            `┌ Reason:  ${error instanceof Error ? error.message : String(error)}\n` +
-            `└ Stack:   ${error instanceof Error ? error.stack : "N/A"}`
-        );
-    };
-
-    /**
-     * @description Вернется если бот не владеет правами
-     * @param ctx
-     * @public
-     */
-    public onClientPermissionFail = (ctx: AnyCommandInteraction) => {
-        return ctx.reply(locale._(ctx.locale, "interaction.permission.user", [ctx.member]));
-    };
-
-    /**
-     * @description Вернется если пользователь не владеет правами
-     * @param ctx
-     * @public
-     */
-    public onUserPermissionFail = (ctx: AnyCommandInteraction) => {
-        const member = ctx.member;
-
-        // Если пользователь является пользователем сервера
-        if (member instanceof GuildMember) {
-            return member.send(locale._(ctx.locale, "interaction.permission.client", [member]));
-        }
-
-        return null;
-    };
-
-    /**
-     * @description Вернется если команды нет в системе
-     * @param ctx
-     * @public
-     */
-    public onCommandFail = (ctx: AnyCommandInteraction) => {
-        this.remove(ctx.client, ctx.commandGuildId, ctx.commandId);
-
-        return ctx.reply({
-            flags: "Ephemeral",
-            embeds: [{
-                description: locale._(ctx.locale, "interaction.command.fail"),
-                color: Colors.DarkRed
-            }]
-        });
     };
 
     /**
@@ -234,216 +123,20 @@ export class Commands extends handler<Command> {
             return null;
         }
     };
-
-    /**
-     * @description Ищем в array подходящий тип
-     * @param names - Имя или имена для поиска
-     * @public
-     */
-    public get = (names: string | string[]): Command | SubCommand => {
-        if (typeof names === "string") return this.map.get(names);
-
-        return this.files.find((cmd) => {
-            // Если указанное имя совпало с именем команды
-            if (typeof names === "string") return cmd.name === names;
-
-            // Проверяем имена если это список
-            return names.includes(cmd.name);
-        });
-    };
-
-    /**
-     * @description Удаление команды, полезно когда команда все еще есть в списке, но на деле ее нет
-     * @param client - Клиент
-     * @param guildID - ID сервера
-     * @param CommandID - ID Команды
-     */
-    public remove = (client: DiscordClient | Client, guildID: string, CommandID: string) => {
-        // Удаление приватной команды
-        if (guildID) client.rest.delete(Routes.applicationGuildCommand(client.user.id, guildID, CommandID))
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed in guild ${guildID}`))
-            .catch(console.error);
-
-        // Удаление глобальной команды
-        else client.rest.delete(Routes.applicationCommand(client.user.id, CommandID))
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${CommandID}] has removed`))
-            .catch(console.error);
-
-
-        client.rest.clearHandlerSweeper();
-        client.rest.clearHashSweeper();
-    };
-
-    /**
-     * @description Регистрируем команды в эко системе discord
-     * @public
-     */
-    public register = async (client: DiscordClient) => {
-        const guildID = env.get("owner.server"), guild = client.guilds.cache.get(guildID);
-        await this.load();
-
-        // Если команды не были загружены
-        if (!this.files.size) throw Error("Not loaded commands");
-
-        // Загрузка глобальных команд
-        client.application.commands.set(this.parseJsonData(this.public) as any)
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${this.public.length}] has load public commands`))
-            .catch(console.error);
-
-        // Загрузка приватных команд
-        if (guild) guild.commands.set(this.parseJsonData(this.owner) as any)
-            .then(() => Logger.log("DEBUG", `[App/Commands | ${this.owner.length}] has load guild commands`))
-            .catch(console.error);
-    };
-
-    /**
-     * @description Передаем только необходимые данные discord'у
-     * @param data - Все команды
-     * @private
-     */
-    private parseJsonData = (data: Command[]) => {
-        return data.map(cmd => cmd.toJSON());
-    };
 }
 
 /**
  * @author SNIPPIK
- * @description Стандартный прототип команды
- * @class BaseCommand
- * @abstract
+ * @description Интерфейс для выбора (choice) в опциях типа String, Integer, Number.
  * @public
  */
-export abstract class BaseCommand<T> {
-    /** Тип команды */
-    type?: T;
+export interface Choice {
+    /** Отображаемое имя выбора. */
+    name: string;
 
-    /** Название команды */
-    name?: string;
+    /** Значение, отправляемое при выборе. */
+    value: string;
 
-    /** Переводы названия команды на другие языки */
-    name_localizations?: LocalizationMap;
-
-    /** Описание команды */
-    description?: string;
-
-    /** Описание команды на других языках */
-    description_localizations?: LocalizationMap;
-
-    /** Права на использование команды */
-    default_member_permissions?: Permissions | null | undefined;
-
-    /** 18+ доступ */
-    nsfw?: boolean;
-
-    /** Контексты установки, в которых доступна команда, только для команд с глобальной областью действия. По умолчанию используются настроенные контексты вашего приложения */
-    readonly integration_types?: CommandIntegration[];
-
-    /** Контекст(ы) взаимодействия, в которых можно использовать команду, только для команд с глобальной областью действия. По умолчанию для новых команд включены все типы контекстов взаимодействия */
-    readonly contexts?: CommandContext[];
-
-    /**  Доп параметры они же аргументы для работы slashCommand */
-    readonly options?: ((AutocompleteCommandOption<any> & ChoiceOption) & ApplicationCommandOption)[];
-
-    /** Команду может использовать только разработчик */
-    readonly owner?: boolean;
-
-    /** Для работы с правами бота и пользователя */
-    readonly permissions: CommandPermissions;
-
-    /** Права для использования той или иной команды */
-    readonly middlewares?: RegisteredMiddlewares[];
-
-    /** Выполнение команды */
-    abstract run(options: CommandCallback<any>): any;
-
-    /**
-     * @description Отдаем данные в формате JSON и только необходимые
-     * @public
-     */
-    public toJSON() {
-        return {
-            name: this.name,
-            type: this.type,
-            nsfw: !!this.nsfw,
-            description: this.description,
-            name_localizations: this.name_localizations,
-            description_localizations: this.description_localizations,
-            default_member_permissions: this.default_member_permissions,
-            contexts: this.contexts,
-            integration_types: this.integration_types,
-        } as {
-            name: BaseCommand<T>['name'];
-            type: BaseCommand<T>['type'];
-            nsfw: BaseCommand<T>['nsfw'];
-            description: BaseCommand<T>['description'];
-            name_localizations: BaseCommand<T>['name_localizations'];
-            description_localizations: BaseCommand<T>['description_localizations'];
-            default_member_permissions: string;
-            contexts: BaseCommand<T>['contexts'];
-            integration_types: BaseCommand<T>['integration_types'];
-        };
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Глобальный прототип команды
- * @extends BaseCommand
- * @class Command
- * @abstract
- * @public
- */
-export abstract class Command extends BaseCommand<ApplicationCommandType> {
-    /** Стандартный тип для взаимодействия через slash */
-    type = ApplicationCommandType.ChatInput;
-
-    /**
-     * @description Отдаем данные в формате JSON и только необходимые
-     * @public
-     */
-    public toJSON = () => {
-        const options: ApplicationCommandOption[] = [];
-
-        for (const i of this.options ?? []) {
-            if (!(i instanceof SubCommand)) {
-                // Изменяем данные autocomplete на boolean
-                options.push({ ...i, autocomplete: "autocomplete" in i } as ApplicationCommandOption);
-                continue;
-            }
-
-            // Добавляем данные
-            options.push(i.toJSON() as any);
-        }
-
-        return {
-            ...super.toJSON(),
-            options
-        };
-    };
-}
-
-/**
- * @author SNIPPIK
- * @description Глобальный прототип под команды
- * @extends BaseCommand
- * @class Command
- * @abstract
- * @public
- */
-export abstract class SubCommand extends BaseCommand<CommandOptionsType> {
-    /** Тип под команды, для использования аргументов */
-    type = CommandOptionsType.Subcommand;
-
-    /**
-     * @description Отдаем данные в формате JSON и только необходимые
-     * @public
-     */
-    public toJSON = () => {
-        return {
-            ...super.toJSON(),
-
-            // Изменяем данные autocomplete на boolean
-            options: this.options?.map(x => ({ ...x, autocomplete: "autocomplete" in x }) as ApplicationCommandOption) ?? []
-        };
-    };
+    /** Локализованные имена выбора. */
+    nameLocalizations?: LocalizationMap;
 }
