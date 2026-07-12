@@ -2,7 +2,6 @@ import { Command, CommandContext, Declare, Middlewares, Locales } from "seyfert"
 import { ApplicationCommandType } from "seyfert/lib/types/index.js";
 import { MessageFlags } from "discord-api-types/v10";
 import { locale } from "#structures";
-import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -33,9 +32,7 @@ export default class AvatarContextCommand extends Command {
         // В контекстной команде типа User целевой пользователь доступен через ctx.target
         const user = ctx.interaction.data.resolved.users[0];
         const me = ctx.client.me;
-        const avatar = user.avatar
-            ? user.avatarURL({ size: 1024, forceStatic: false })
-            : db.images.no_image;
+        const avatar = user.avatarURL({ size: 1024, forceStatic: false });
 
         // Отправляем эфемерный ответ
         await ctx.write({

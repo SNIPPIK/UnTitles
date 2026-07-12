@@ -47,10 +47,9 @@ class Database {
         // Если запуск произведен в другим потоке
         if (!isMainThread) return;
 
-        this.api = new RestObject();
-
         // Если реально клиент
         if (client instanceof DiscordClient) {
+            this.api = new RestObject();
             this.queues = new ControllerQueues();
             this.commands = new Commands();
             this.voice = new Voices();

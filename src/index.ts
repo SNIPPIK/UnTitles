@@ -40,7 +40,7 @@ async function runShard(): Promise<void> {
         client.logger.info(`Loaded ${Logger.color(34, `${db.api.map.size} APIs`)}`);
 
         // Запуск Discord клиента с последующей пост-инициализацией
-        await client.start()
+        await client.start();
 
         // Загрузка команд после успешного подключения
         await client.uploadCommands({ cachePath: "./commands.json" }).catch((err) => {
@@ -84,7 +84,7 @@ function initProcessEvents(): void {
         );
     });
 
-    // Необработанное отклонение промиса
+    // Необработанное отклонение обещания
     process.on("unhandledRejection", (reason, promise) => {
         const error = reason instanceof Error ? reason : new Error(String(reason));
         Logger.log(
@@ -136,10 +136,6 @@ async function gracefulShutdown(): Promise<void> {
             await new Promise((resolve) => setTimeout(resolve, maxTimeout + 1000));
         }
     }
-
-    // Закрытие соединений с базами данных (если есть метод close)
-    //if (db.close) await db.close().catch((e) => Logger.error("DB close error", e));
-    //if (db.api?.close) await db.api.close().catch((e) => Logger.error("API close error", e));
 
     Logger.log("WARN", "Shutdown complete. Exiting.");
     process.exit(0);
