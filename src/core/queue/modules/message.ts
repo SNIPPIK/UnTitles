@@ -1,4 +1,4 @@
-import { StringSelectMenu, StringSelectOption, ActionRow, Button, Embed } from "seyfert";
+import { StringSelectMenu, StringSelectOption, ActionRow, Button, Embed, GuildStructure, AllChannels, VoiceStateStructure } from "seyfert";
 import filters from "#core/player/filters.json" with { type: 'json' };
 import { CommandInteraction } from "#structures/discord/index.js";
 import { MessageFlags } from "seyfert/lib/types/index.js";
@@ -15,6 +15,10 @@ import { db } from "#app/db";
  * @public
  */
 export class QueueMessage<T extends CommandInteraction> {
+    private readonly _guild: GuildStructure<"cached"> = null;
+    private readonly _channel: AllChannels = null;
+    private readonly _voice: VoiceStateStructure = null;
+
     /**
      * @description ID сервера, привязанный к сообщению
      * @public
@@ -54,7 +58,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public get guild() {
-        return this._original.guild;
+        return this._guild;
     };
 
     /**
@@ -63,7 +67,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public get channel() {
-        return this._original.channel;
+        return this._channel;
     };
 
     /**
@@ -72,7 +76,7 @@ export class QueueMessage<T extends CommandInteraction> {
      * @public
      */
     public get voice() {
-        return this._original.member.voice;
+        return this._voice;
     };
 
     /**
@@ -113,6 +117,9 @@ export class QueueMessage<T extends CommandInteraction> {
         this.voice_id = _original.member.voice("cache").channelId;
         this.channel_id = _original.channelId;
         this.guild_id = _original.guildId;
+        this._guild = _original.guild("cache");
+        this._channel = _original.channel("cache");
+        this._voice = _original.member.voice("cache");
     };
 
     /**
@@ -294,7 +301,7 @@ export class QueueButtons {
 
                                 // Преобразуем объект emoji в строку
                                 if (filter.emoji) {
-                                    const emojiString = filter.emoji.name
+                                    const emojiString = filter.emoji["id"] ? `${filter.emoji["animated"] ? '<a:' : '<:'}${filter.emoji.name}:${filter.emoji["id"]}>` : filter.emoji.name; // юникод-эмодзи
                                     option.setEmoji(emojiString);
                                 }
 

@@ -18,7 +18,7 @@ export default createEvent({
         const { tracks, player } = queue;
 
         try {
-            const msg = await queue.message.send({
+            const msg = await queue.message.send_single({
                 flags: MessageFlags.IsComponentsV2,
                 embeds: null,
                 components: [
@@ -38,7 +38,7 @@ export default createEvent({
                                     "type": 11,
                                     //"description": name, // Подсказка
                                     "media": {
-                                        "url": queue.message.guild("cache").iconURL(),
+                                        "url": queue.message.guild.iconURL(),
                                     }
                                 }
                             },
