@@ -32,10 +32,10 @@
     "binaryName": "watklok"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.48",
-    "discord.js": "15.0.0-dev.1777075897-40ce0791a",
-    "http-proxy-agent": "^9.0.0",
-    "socks-proxy-agent": "^10.0.0",
+    "discord-api-types": "^0.38.49",
+    "discord.js": "15.0.0-pr-11006.1765452229-e636950b2",
+    "http-proxy-agent": "^9.1.0",
+    "socks-proxy-agent": "^10.1.0",
     "ws": "^8.21.0"
   },
   "optionalDependencies": {
@@ -43,9 +43,9 @@
     "utf-8-validate": "^6.0.6"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.6.2",
-    "@types/node": "^25.9.1",
-    "typescript": "^6.0.3"
+    "@napi-rs/cli": "^3.7.3",
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
   },
   "scripts": {
     "start": "node ./build/src/index.js --ShardManager --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
