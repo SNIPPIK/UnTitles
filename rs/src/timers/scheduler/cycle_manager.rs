@@ -19,6 +19,9 @@ use std::{
 /// Задаёт частоту, с которой вызывается `process` для каждой сессии.
 pub const TICK_INTERVAL_MS: u64 = 20;
 
+const SPIN_MARGIN: Duration = Duration::from_micros(250);
+const MIN_SLEEP: Duration = Duration::from_micros(600);
+
 // ============================================================================
 // ДИСПЕТЧЕР ЦИКЛА
 // ============================================================================
@@ -164,35 +167,34 @@ impl CycleManager {
         self.wake_state.1.notify_one();
     }
 
-    /// Проверяет, не запущен ли уже воркер, и если нет – запускает его
+    /// Проверяет, не запущен ли уже воркер, и если нет — запускает его
     /// в отдельном потоке с именем `udp-cycle`.
-    ///
-    /// Использует `compare_exchange` для атомарной установки флага `running`,
-    /// чтобы избежать гонок при одновременных вызовах из разных потоков.
     fn start_if_needed(&self) {
-        // ===== FAST GUARD (замена CAS на swap) =====
-        if self.running.swap(true, Ordering::AcqRel) {
+        // Быстрая проверка без лишней записи в память.
+        if self
+            .running
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
             return;
         }
 
         let mut handle_guard = self.handle.lock().unwrap();
 
-        if handle_guard.is_some() {
-            self.running.store(true, Ordering::Release);
-            return;
-        }
+        debug_assert!(handle_guard.is_none());
 
         let sessions = Arc::clone(&self.sessions);
         let running = Arc::clone(&self.running);
 
-        const SPIN_MARGIN: Duration = Duration::from_micros(250);
-        const MIN_SLEEP: Duration = Duration::from_micros(600);
-
         let handle = thread::Builder::new()
             .name("udp-cycle".into())
             .spawn(move || {
+                const MAX_SKIP: u64 = 5;
+
                 let interval = Duration::from_millis(TICK_INTERVAL_MS);
                 let mut next_deadline = Instant::now() + interval;
+
+                #[cfg(debug_assertions)]
                 let mut tick: u64 = 0;
 
                 while running.load(Ordering::Acquire) {
@@ -201,60 +203,63 @@ impl CycleManager {
                         tick += 1;
                     }
 
-                    let snapshot = sessions.load_full();
+                    // ---------- PROCESS ----------
+                    let snapshot = sessions.load();
 
                     if !snapshot.is_empty() {
                         let now = now_ms();
+
                         for session in snapshot.values() {
                             session.process(now);
                         }
                     }
 
-                    drop(snapshot);
-
-                    // ===== TIME CONTROL =====
+                    // ---------- WAIT ----------
                     let now = Instant::now();
 
                     if now < next_deadline {
-                        let sleep_time = next_deadline - now;
+                        let sleep = next_deadline - now;
 
-                        if sleep_time > MIN_SLEEP {
-                            std::thread::sleep(sleep_time - SPIN_MARGIN);
+                        if sleep > MIN_SLEEP {
+                            thread::sleep(sleep - SPIN_MARGIN);
                         }
 
-                        // ===== ADAPTIVE SPIN =====
-                        let mut spins = 0;
-                        while Instant::now() < next_deadline {
-                            if spins > 64 {
-                                std::thread::yield_now();
+                        let mut spins = 0usize;
+
+                        loop {
+                            if Instant::now() >= next_deadline {
+                                break;
+                            }
+
+                            if spins < 128 {
+                                std::hint::spin_loop();
+                            } else if (spins & 63) == 0 {
+                                thread::yield_now();
                             } else {
                                 std::hint::spin_loop();
                             }
+
                             spins += 1;
                         }
+
+                        next_deadline += interval;
                     } else {
                         let lag = now.duration_since(next_deadline);
-
-                        let lag_ms = lag.as_millis() as u64;
-                        let skipped = lag_ms / TICK_INTERVAL_MS + 1;
+                        let skipped = (lag.as_millis() as u64 / TICK_INTERVAL_MS).min(MAX_SKIP);
 
                         #[cfg(debug_assertions)]
-                        {
-                            if skipped > 2 {
-                                println!(
-                                    "udp-cycle lag: skipped {} ticks, lag {}ms, total {} ticks",
-                                    skipped,
-                                    lag_ms,
-                                    tick
-                                );
-                                tick += skipped - 1;
-                            }
+                        if skipped > 0 {
+                            println!(
+                                "udp-cycle lag: skipped {} ticks ({} ms), total {} ticks",
+                                skipped,
+                                lag.as_millis(),
+                                tick
+                            );
                         }
 
-                        next_deadline += interval * skipped as u32;
+                        // Пересчитываем следующий дедлайн без накопления ошибки.
+                        next_deadline += interval * ((skipped + 1) as u32);
                     }
-
-                    next_deadline += interval;
                 }
             })
             .unwrap();
