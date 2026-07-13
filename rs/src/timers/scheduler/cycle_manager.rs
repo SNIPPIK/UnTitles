@@ -19,7 +19,7 @@ use std::{
 /// Задаёт частоту, с которой вызывается `process` для каждой сессии.
 pub const TICK_INTERVAL_MS: u64 = 20;
 
-const SPIN_MARGIN: Duration = Duration::from_micros(250);
+const SPIN_MARGIN: Duration = Duration::from_micros(200);
 const MIN_SLEEP: Duration = Duration::from_micros(600);
 
 // ============================================================================

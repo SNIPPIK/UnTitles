@@ -407,8 +407,9 @@ impl OggOpusDemuxer {
                 let _vbr = (ch & 0x80) != 0;
                 let _padding = (ch & 0x40) != 0;
                 let frame_count = ch & 0x3F;
+                let frame_counter = ch & 0x7F;
 
-                if frame_count == 0 || frame_count > 48 {
+                if frame_count == 0 || frame_count > 86 || frame_counter > 120 {
                     return PacketType::Broken;
                 }
 

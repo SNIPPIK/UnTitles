@@ -48,7 +48,7 @@ class BaseQueueController<T extends Queue> {
                     // Ставим на последнюю позицию
                     if (queue.tracks.size > 0) {
                         // Меняем позицию на последнюю
-                        queue.tracks.position = queue.tracks.total - 1;//queue.tracks.last_position + 1;
+                        queue.tracks.position = queue.tracks.last_position + 1;
                     }
 
                     // Если у плеера стоит пауза

@@ -198,7 +198,7 @@ impl RingBuffer {
 
     /// Добавляет элемент в **начало** очереди (push_front)
     /// Используется при неудачной отправке, чтобы вернуть пакет обратно
-    pub fn push_front(&self, value: Vec<u8>) -> Result<(), Vec<u8>> {
+    /*pub fn push_front(&self, value: Vec<u8>) -> Result<(), Vec<u8>> {
         let mut head = self.head.0.load(Ordering::Relaxed);
 
         loop {
@@ -231,7 +231,7 @@ impl RingBuffer {
                 return Err(value);
             }
         }
-    }
+    }*/
 
     // =========================================================================
     // Извлечение (pop)

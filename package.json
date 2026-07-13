@@ -44,9 +44,9 @@
     "typescript": "^6.0.3"
   },
   "scripts": {
-    "start": "node ./build/src/index.js --expose-gc --jitless --optimize_for_size",
-    "start:ts": "node ./src/index.ts --expose-gc --jitless --optimize_for_size",
-    "start:bun": "bun ./src/index.ts --expose-gc --jitless --optimize_for_size",
+    "start": "node ./build/src/index.js --expose-gc --optimize_for_size",
+    "start:ts": "node ./src/index.ts --expose-gc --optimize_for_size",
+    "start:bun": "bun ./src/index.ts --expose-gc --optimize_for_size",
 
     "build": "tsc",
     "build:native": "npm run build:copy && napi build --platform --release --cwd ./rs --esm --js index.mjs && npm run build:bindings",
