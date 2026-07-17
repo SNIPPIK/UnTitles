@@ -32,16 +32,16 @@
     "binaryName": "watklok"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.49",
+    "discord-api-types": "^0.38.50",
     "http-proxy-agent": "^9.1.0",
     "seyfert": "^5.0.0",
     "socks-proxy-agent": "^10.1.0",
-    "ws": "^8.21.0"
+    "ws": "^8.21.1"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.7.2",
+    "@napi-rs/cli": "^3.7.3",
     "@types/node": "^26.1.1",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "scripts": {
     "start": "node ./build/src/index.js --expose-gc --optimize_for_size",
