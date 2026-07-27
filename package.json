@@ -32,14 +32,14 @@
     "binaryName": "watklok"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.50",
+    "discord-api-types": "^0.38.51",
     "http-proxy-agent": "^9.1.0",
     "seyfert": "^5.0.0",
     "socks-proxy-agent": "^10.1.0",
     "ws": "^8.21.1"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.7.3",
+    "@napi-rs/cli": "^3.7.4",
     "@types/node": "^26.1.1",
     "typescript": "^7.0.2"
   },
