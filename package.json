@@ -32,22 +32,22 @@
     "binaryName": "watklok"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.50",
+    "@snazzah/davey": "^0.1.12",
+    "discord-api-types": "^0.38.52",
     "http-proxy-agent": "^9.1.0",
     "seyfert": "^5.0.0",
     "socks-proxy-agent": "^10.1.0",
     "ws": "^8.21.1"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.7.3",
-    "@types/node": "^26.1.1",
+    "@napi-rs/cli": "^3.8.1",
+    "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
   },
   "scripts": {
     "start": "node ./build/src/index.js --expose-gc --optimize_for_size",
     "start:ts": "node ./src/index.ts --expose-gc --optimize_for_size",
     "start:bun": "bun ./src/index.ts --expose-gc --optimize_for_size",
-
     "build": "tsc",
     "build:native": "npm run build:copy && napi build --platform --release --cwd ./rs --esm --js index.mjs && npm run build:bindings",
     "build:native:dev": "npm run build:copy && napi build --platform --cwd ./rs --esm --js index.mjs && npm run build:bindings",

@@ -131,16 +131,12 @@ export interface iAudioEngine {
     getPackets(count: number): Array<Buffer>;
 
     /**
-     * Получает пакет по индексу без удаления (прямой доступ).
-     * Индексация с 0.
-     */
-    getPacketAt(idx: number): Buffer | null;
-
-    /**
      * @description Полностью очищает буфер и сбрасывает позицию в 0.
      * @public
      */
     clear(): void;
+
+    destroy(): void
 }
 
 /**

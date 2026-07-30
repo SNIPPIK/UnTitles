@@ -66,7 +66,7 @@ impl UdpBufferedInner {
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self, now: u64) {
         let last_ms = self.last_send_ms.load(Ordering::Relaxed);
-        let count = ((now - last_ms) / TICK_INTERVAL_MS).max(3).min(1);
+        let count = ((now - last_ms) / TICK_INTERVAL_MS).clamp(1, 2);
 
         // Пробуем отправить хотя бы один пакет за тик
         for _ in 0..count {  // небольшой burst limit, чтобы не виснуть в одном session'е
@@ -80,19 +80,6 @@ impl UdpBufferedInner {
                     self.last_send_ms.store(now, Ordering::Relaxed);
                     // пакет успешно ушёл — продолжаем, вдруг есть ещё
                 }
-                /*Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    // Сокет временно перегружен — возвращаем пакет в начало очереди
-                    if let Err(_) = self.buffer.push_front(packet) {
-                        // Если даже push_front не удался — пакет потерян (очень редкий случай)
-                        self.send_drops.fetch_add(1, Ordering::Relaxed);
-
-                        #[cfg(debug_assertions)]
-                        {
-                            println!("UDP buffer full, packet dropped");
-                        }
-                    }
-                    break; // не пытаемся дальше в этом тике
-                }*/
                 Err(_e) => {
                     // Другие ошибки (NetworkUnreachable, InvalidInput и т.д.)
                     self.send_drops.fetch_add(1, Ordering::Relaxed);
@@ -212,8 +199,8 @@ impl UdpBuffered {
 
     /// Добавляет пакет в очередь на отправку. С проверкой мусора.
     #[napi]
-    pub fn push_packet(&self, packet: Buffer) {
-        self.try_push(packet.to_owned());
+    pub fn push_packet(&self, packet: Uint8Array) {
+        self.inner.push(packet.to_owned());
     }
 
     /// Добавляет несколько пакетов в очередь с проверкой мусора.
@@ -221,9 +208,9 @@ impl UdpBuffered {
     /// # Аргументы
     /// * `packets` - массив Buffer с данными для отправки.
     #[napi]
-    pub fn push_packets(&self, packets: Vec<Buffer>) {
+    pub fn push_packets(&self, packets: Vec<Uint8Array>) {
         for packet in packets {
-            self.try_push(packet.to_owned());
+            self.inner.push(packet.to_owned());
         }
     }
 
@@ -310,11 +297,6 @@ impl UdpBuffered {
 
         // Отключаем UDP сессию от циклической системы
         remove_global_session(self.id);
-    }
-
-    /// Пытается добавить байты во внутренний буфер для последующей отправки.
-    fn try_push(&self, bytes: Vec<u8>) {
-        self.inner.push(bytes);
     }
 
     /// Вычисляем когда надо отправить пакет или же надо догнать таймлайн

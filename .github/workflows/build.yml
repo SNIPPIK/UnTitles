@@ -1,7 +1,7 @@
 name: Build Rust Modules
 on:
   push:
-    branches: [ "main", "beta" ]
+    branches: [ "seyfert-main", "seyfert-beta" ]
     tags-ignore:
       - '**'
   pull_request:
@@ -54,7 +54,7 @@ jobs:
     runs-on: ${{ matrix.settings.host }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup node
         uses: actions/setup-node@v6

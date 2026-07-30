@@ -139,7 +139,11 @@ export class DiscordClient extends Client {
                     presences: true,
                     messages: true,
                     stageInstances: true,
-                    overwrites: true
+                    overwrites: true,
+                    //members: true,
+                    //guilds: true,
+                    //users: true,
+                    //channels: true
                 }
             }
         });

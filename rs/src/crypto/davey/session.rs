@@ -289,15 +289,12 @@ impl DaveSession {
   pub fn encrypt(&mut self, media_type: u8, codec: u8, packet: Buffer) -> Result<Buffer> {
     let mt = Self::map_media_type(media_type)?;
     let cd = Self::map_codec(codec)?;
-
-    // ZERO-COPY: работаем через slice
     let input: &[u8] = packet.as_ref();
 
     let out = self.inner
         .encrypt(mt, cd, input)
         .map_err(Self::map_err)?;
 
-    // единственная аллокация тут — неизбежна (JS boundary)
     Ok(Buffer::from(&*out))
   }
 
@@ -318,10 +315,7 @@ impl DaveSession {
       return Some(packet);
     }
 
-    match self
-        .inner
-        .encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet)
-    {
+    match self.inner.encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet) {
       Ok(out) => Some(Buffer::from(out.into_owned())),
       Err(_) => Some(packet),
     }
@@ -355,13 +349,8 @@ impl DaveSession {
         davey::Codec::OPUS,
         input
       ) {
-        Ok(out) => {
-          results.push(Some(Buffer::from(&*out)));
-        }
-        Err(_) => {
-          // no println! — это убивает throughput
-          results.push(None);
-        }
+        Ok(out) => results.push(Some(Buffer::from(out.into_owned()))),
+        Err(_) => results.push(None)
       }
     }
 
@@ -458,7 +447,6 @@ impl DaveSession {
 
 impl Drop for DaveSession {
   fn drop(&mut self) {
-    // явно сбрасываем state
-    self.inner.reset().expect("Failed reset davey session");
+    let _ = self.inner.reset();
   }
 }

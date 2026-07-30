@@ -40,7 +40,7 @@ export default class StatusCommand extends Command {
         const heapTotal     = toMB(mem.heapTotal);
         const external      = toMB(mem.external);
         const arrayBuffers  = toMB(mem.arrayBuffers);
-        const rust          = toMB(mem.rss - mem.heapTotal - mem.external - mem.arrayBuffers);
+        const rust          = toMB((mem.rss - mem.heapTotal - mem.external - mem.arrayBuffers - mem.heapUsed) / 2);
 
         // ── Формируем embed с секциями ──────────────────────────────
         const embed = {

@@ -185,9 +185,10 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
             const check = () => {
                 if (this.readable) {
                     this.emit("readable");
-                } else {
-                    this._timeout = setTimeout(check, 10);
+                    return;
                 }
+
+                this._timeout = setTimeout(check, 10);
             };
             setImmediate(check); // первая проверка почти мгновенно
         }
@@ -222,7 +223,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
         // Проверяем есть ли аудио
         if (this.engine) {
-            this.engine.clear();
+            this.engine.destroy();
             this.engine = null;
         }
 

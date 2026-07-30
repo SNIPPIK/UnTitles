@@ -5,7 +5,6 @@ use napi_derive::napi;
 use rand::RngExt;
 use rand::{rng};
 use std::fmt;
-use std::sync::Mutex;
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Nonce,
@@ -78,7 +77,7 @@ pub struct VoiceRTPSocket {
     sequence: AtomicU16,
     timestamp: AtomicU32,
     counter: AtomicU32,
-    cipher: Mutex<Aes256Gcm>
+    cipher: Aes256Gcm
 }
 
 #[napi]
@@ -101,15 +100,11 @@ impl VoiceRTPSocket {
 
         let mut key_array = [0u8; 32];
         key_array.copy_from_slice(key.as_ref());
-
-        // Инициализируем шифр. `new_from_slice` возвращает ошибку, если ключ не подходит.
-        let cipher = Aes256Gcm::new_from_slice(&key_array)
-            .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?;
-
         let mut rng = rng();
 
         Ok(VoiceRTPSocket {
-            cipher: Mutex::new(cipher),
+            cipher: Aes256Gcm::new_from_slice(&key_array)
+                .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?,
             options: EncryptorOptions { ssrc },
             sequence: AtomicU16::new(rng.random()),
             timestamp: AtomicU32::new(rng.random()),
@@ -138,32 +133,8 @@ impl VoiceRTPSocket {
     /// - Если шифрование провалилось (например, из-за неправильного nonce).
     /// - Если размер фрейма превышает допустимый (проверка отсутствует, но можно добавить).
     #[napi]
-    pub fn packet(&self, frame: Buffer) -> Result<Buffer> {
-        let header = self.build_header();
-        let nonce_bytes = self.generate_nonce();
-        let nonce = Nonce::from(nonce_bytes);
-
-        let payload = Payload {
-            msg: frame.as_ref(),
-            aad: &header
-        };
-
-        // Блокируем мьютекс только на время шифрования
-        let cipher = self.cipher.lock().map_err(|_| {
-            Error::new(Status::GenericFailure, "Mutex poison error".to_string())
-        })?;
-
-        let encrypted = cipher
-            .encrypt(&nonce, payload)
-            .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-
-        // Формируем итоговый пакет: заголовок + шифротекст/тег + tail nonce.
-        let mut out = Vec::with_capacity(RTP_HEADER_SIZE + encrypted.len() + 4);
-        out.extend_from_slice(&header);
-        out.extend_from_slice(&encrypted);
-        out.extend_from_slice(&nonce_bytes[0..4]);
-
-        Ok(Buffer::from(out))
+    pub fn packet(&self, frame: &[u8]) -> Result<Buffer> {
+        Ok(Buffer::from(self.create_packet_raw(frame)?))
     }
 
     /// Пакетное шифрование нескольких фреймов.
@@ -173,12 +144,13 @@ impl VoiceRTPSocket {
     /// Просто последовательно вызывает `packet` для каждого фрейма.
     /// Аллокация результата происходит один раз с предварительным резервированием ёмкости.
     #[napi]
-    pub fn packets(&self, frames: Vec<Buffer>) -> Result<Vec<Buffer>> {
+    pub fn packets(&self, frames: Vec<&[u8]>) -> Result<Vec<Buffer>> {
         let mut out = Vec::with_capacity(frames.len());
+
         for frame in frames {
-            let packet = self.packet(frame)?;
-            out.push(packet);
+            out.push(Buffer::from(self.create_packet_raw(frame)?));
         }
+
         Ok(out)
     }
 
@@ -187,10 +159,33 @@ impl VoiceRTPSocket {
     ///
     /// Счётчик увеличивается атомарно на единицу каждый раз (Acquire/Release гарантирует видимость).
     fn generate_nonce(&self) -> [u8; 12] {
-        let counter = self.counter.fetch_add(1, Ordering::SeqCst);
+        let counter = self.counter.fetch_add(1, Ordering::Relaxed);
         let mut nonce = [0u8; 12];
         nonce[0..4].copy_from_slice(&counter.to_be_bytes());
         nonce
+    }
+
+    // Убираем #[napi] — это будет чисто внутренний метод Rust
+    pub fn create_packet_raw(&self, frame: &[u8]) -> Result<Vec<u8>> {
+        let header = self.build_header();
+        let nonce_bytes = self.generate_nonce();
+        let nonce = Nonce::from(nonce_bytes);
+
+        let payload = Payload {
+            msg: frame,
+            aad: &header
+        };
+
+        let encrypted = self.cipher
+            .encrypt(&nonce, payload)
+            .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+
+        let mut out = Vec::with_capacity(RTP_HEADER_SIZE + encrypted.len() + 4);
+        out.extend_from_slice(&header);
+        out.extend_from_slice(&encrypted);
+        out.extend_from_slice(&nonce_bytes[0..4]);
+
+        Ok(out)
     }
 
     /// Строит стандартный RTP-заголовк (12 байт) в соответствии с RFC 3550.
@@ -201,7 +196,7 @@ impl VoiceRTPSocket {
     /// - Sequence number (16 бит, big-endian) – увеличивается атомарно.
     /// - Timestamp (32 бита, big-endian) – увеличивается на TIMESTAMP_INC.
     /// - SSRC (32 бита, big-endian) – фиксированный.
-    fn build_header(&self) -> Vec<u8> {
+    fn build_header(&self) -> [u8; RTP_HEADER_SIZE] {
         let mut header = [0u8; RTP_HEADER_SIZE];
 
         header[0] = 0x80;
@@ -215,7 +210,7 @@ impl VoiceRTPSocket {
 
         header[8..12].copy_from_slice(&self.options.ssrc.to_be_bytes());
 
-        header.to_vec()
+        header
     }
 
     /// Сбрасывает все внутренние счётчики в ноль.

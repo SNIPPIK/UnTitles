@@ -170,7 +170,7 @@ impl OggOpusDemuxer {
         if self.remainder.len() > MAX_REMAINDER_SIZE {
             self.remainder.clear();
             self.packet_carry.clear();
-            return Err(Error::from_reason("Ogg parser remainder overflow"));
+            return Ok(());
         }
 
         while self.remainder.len() >= 27 {
@@ -217,7 +217,9 @@ impl OggOpusDemuxer {
 
             // Обрабатываем. Если ошибка, пропускаем сигнатуру (1 байт), чтобы найти следующий OggS
             if Self::handle_page_core(full_page, &mut self.packet_carry, &mut self.bitstream_serial, &mut on_packet).is_err() {
-                self.remainder.advance(header_size.min(4));
+                // Пропускаем всю проблемную страницу и сбрасываем carry
+                self.packet_carry.clear();
+                self.remainder.advance(page_end);
                 continue;
             }
 
@@ -285,13 +287,13 @@ impl OggOpusDemuxer {
             let end = offset + segment_len;
             let data = page.get(offset..end).ok_or_else(|| Error::from_reason("Segment out of bounds"))?;
 
-            if segment_len != 0 {
-                packet_carry.extend_from_slice(data);
-            }
-
             if packet_carry.len() + segment_len > MAX_PACKET_SIZE {
                 packet_carry.clear();
                 return Err(Error::from_reason("Opus packet overflow"));
+            }
+
+            if segment_len != 0 {
+                packet_carry.extend_from_slice(data);
             }
 
             offset = end;

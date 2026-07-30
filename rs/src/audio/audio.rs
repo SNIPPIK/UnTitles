@@ -1,5 +1,6 @@
 use crate::audio::demuxers::ogg::{OggOpusDemuxer, PacketType};
 use crate::audio::ring_buffer::RingBuffer;
+use napi::{bindgen_prelude::Buffer}; // Добавляем Env в импорты
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::{
@@ -9,7 +10,7 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Condvar, Mutex,
     },
-    thread,
+    thread
 };
 
 // ============================================================================
@@ -159,7 +160,7 @@ impl AudioEngine {
 
             // Используем векторы повторно, чтобы не аллоцировать на каждой итерации.
             let mut frames = Vec::with_capacity(64);
-            let mut pending_push: Vec<bytes::Bytes> = Vec::with_capacity(128);
+            let mut pending_push: Vec<Vec<u8>> = Vec::with_capacity(128);
 
             // Внутри потока:
             loop {
@@ -202,7 +203,7 @@ impl AudioEngine {
                         // Добавляем реальные Opus фреймы (PacketType::Frame или Silent) в pending_push.
                         pending_push.extend(
                             frames.drain(..).filter_map(|(kind, data)| match kind {
-                                PacketType::Frame | PacketType::Silent => Some(data),
+                                PacketType::Frame | PacketType::Silent => Some(data.to_vec()),
                                 _ => None,
                             }),
                         );
@@ -223,7 +224,7 @@ impl AudioEngine {
                                     break;
                                 }
 
-                                let _ = buffer.push(packet.to_vec());
+                                let _ = buffer.push(packet);
                             }
                         }
                     }
@@ -286,6 +287,7 @@ impl AudioEngine {
     #[napi]
     pub fn destroy(&self) -> Result<()> {
         self.cleanup();
+        self.clear();
         Ok(())
     }
 
@@ -352,26 +354,22 @@ impl AudioEngine {
         packets
     }
 
-    /// Клонировать пакет по абсолютной позиции (не извлекая).
-    #[napi]
-    pub fn get_packet_at(&self, idx: u32) -> Option<Buffer> {
-        // Просто берем лок из кортежа
-        let raw_packet = self.buffer.0.lock().unwrap().get_clone_at(idx as usize);
-        raw_packet.map(Buffer::from)
-    }
-
     // =========================================================================
     // MANUAL PUSH
     // =========================================================================
 
     /// Массовое добавление пакетов.
     #[napi]
-    pub fn add_packets(&self, packets: Vec<Buffer>) {
+    pub fn add_packets(&self, packets: Vec<Uint8Array>) {
         let buffer = self.buffer.0.lock().unwrap();
+        let total_new = packets.len();
+
+        while buffer.len() + total_new > buffer.capacity() && !buffer.is_empty() {
+            buffer.pop();
+        }
 
         for packet in packets {
-            if buffer.is_full() { buffer.pop(); }
-            let _ = buffer.push(packet.to_vec());
+            buffer.push(packet.to_vec()).unwrap();
         }
     }
 
