@@ -23,7 +23,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected get time(): number {
-        return performance.now();
+        return process.uptime();
     };
 
     /**

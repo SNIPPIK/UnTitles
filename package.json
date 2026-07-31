@@ -32,7 +32,6 @@
     "binaryName": "watklok"
   },
   "dependencies": {
-    "@snazzah/davey": "^0.1.12",
     "discord-api-types": "^0.38.52",
     "http-proxy-agent": "^9.1.0",
     "seyfert": "^5.0.0",
@@ -40,14 +39,14 @@
     "ws": "^8.21.1"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.8.1",
+    "@napi-rs/cli": "^3.8.2",
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
   },
   "scripts": {
-    "start": "node ./build/src/index.js --expose-gc --optimize_for_size",
-    "start:ts": "node ./src/index.ts --expose-gc --optimize_for_size",
-    "start:bun": "bun ./src/index.ts --expose-gc --optimize_for_size",
+    "start": "node ./build/src/index.js --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
+    "start:ts": "node ./src/index.ts --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
+    "start:bun": "bun ./src/index.ts --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
     "build": "tsc",
     "build:native": "npm run build:copy && napi build --platform --release --cwd ./rs --esm --js index.mjs && npm run build:bindings",
     "build:native:dev": "npm run build:copy && napi build --platform --cwd ./rs --esm --js index.mjs && npm run build:bindings",

@@ -87,7 +87,7 @@ export class DiscordClient extends Client {
                     onMiddlewaresError: (ctx, error) => {
                         Logger.log(
                             "ERROR",
-                            `Components | Middleware Error\n` +
+                            `Component | Middleware Error\n` +
                             `┌ Reason:  ${ctx.customId}\n` +
                             `└ Stack:   ${error}`
                         );
@@ -96,7 +96,7 @@ export class DiscordClient extends Client {
                     onInternalError: (ctx, error) => {
                         Logger.log(
                             "ERROR",
-                            `Components | Internal Error\n` +
+                            `Component | Internal Error\n` +
                             `┌ Reason:  ${ctx.options}\n` +
                             `└ Stack:   ${error instanceof Error ? error.stack : error}`
                         );
@@ -105,7 +105,7 @@ export class DiscordClient extends Client {
                     onRunError: (ctx, error) => {
                         Logger.log(
                             "ERROR",
-                            `Components | Run Error\n` +
+                            `Component | Run Error\n` +
                             `┌ Reason:  ${ctx.customId}\n` +
                             `└ Stack:   ${error instanceof Error ? error.stack : error}`
                         );
