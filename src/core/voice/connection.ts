@@ -2,6 +2,7 @@ import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./transport/ada
 import { SpeakerType, VoiceSpeakerManager } from "#core/voice/structures/Speaker.js";
 import { Transport } from "#core/voice/transport/index.js";
 import { TypedEmitter, Logger } from "#structures";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
@@ -126,15 +127,12 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
              * @param packet - Полученный пакет `VOICE_SERVER_UPDATE`
              */
             onVoiceServerUpdate: (packet) => {
-                this.adapter!.packet.server = packet;
-
+                // Если ссылки для подключения нет
                 if (!packet.endpoint) return;
 
-                queueMicrotask(() => {
-                    this.transport?.connect(packet.endpoint);
-                    this._status = ConnectionStatus.connected; // bypass setter intentionally
-                    this.emit("info", `[Voice]: server update applied`);
-                });
+                this.adapter!.packet.server = packet;
+                this.transport?.connect(packet.endpoint);
+                this.emit("info", `[Voice]: server update applied`);
             },
 
             /**
@@ -165,17 +163,23 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
         });
 
-        // Слушаем шлюз
+        // Слушаем шлюз (открытие)
+        this.transport.on("open", () => {
+            this._status = ConnectionStatus.connected;
+        });
+
+        // Слушаем шлюз (информирование)
         this.transport.on("info", (err) => {
             Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
         });
 
-        // Слушаем если шлюз пытается выключиться по какой причине
+        // Слушаем шлюз (закрытие)
         this.transport.on("close", (code, reason) => {
+            this._status = ConnectionStatus.disconnected;
             Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${code}: ${reason}`);
         });
 
-        // Если транспортный слой будет уничтожен
+        // Слушаем шлюз (уничтожение)
         this.transport.once("destroyed", this.destroy);
     };
 
@@ -215,10 +219,13 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     public destroy = () => {
         if (this._status === ConnectionStatus.disconnected || !this.adapter) return;
         this.emit("info", `[Voice/Cleaner] has destroyed`);
-        this.emit("disconnect");
         this.disconnect();
-
         this.silent_destroy();
+
+        // Удаляем информацию о сессии из глобальной/импортируемой БД
+        if (this.adapter.packet?.state?.guild_id) {
+            db.voice.remove(this.adapter.packet.state.guild_id);
+        }
     };
 }
 
@@ -231,12 +238,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 interface VoiceConnectionEvents {
     /** Событие получения лога от голосового канала */
     readonly "info": (status: string | Error) => void;
-
-    /** Событие подключения к голосовому каналу */
-    readonly "connect": () => void;
-
-    /** Событие отключения от голосового канала */
-    readonly "disconnect": () => void;
 }
 
 

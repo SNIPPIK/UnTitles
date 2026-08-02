@@ -544,10 +544,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         this.cycle = false;
 
         // Удаляем текущий поток, поскольку он больше не нужен
-        // Пропускаем обработчики, чтобы избежать утечек памяти
-        if (this._audio.current) {
-            this._audio.current.removeAllListeners();
-        }
         this._audio.destroy();
 
         // Устанавливаем время паузы (Для предотвращения рассинхрона Jitter)

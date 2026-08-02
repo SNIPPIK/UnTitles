@@ -430,6 +430,9 @@ impl OggOpusDemuxer {
         self.remainder.clear();
         self.packet_carry.clear();
         self.bitstream_serial = None;
+
+        drop(std::mem::take(&mut self.packet_carry));
+        drop(std::mem::take(&mut self.remainder));
     }
 }
 

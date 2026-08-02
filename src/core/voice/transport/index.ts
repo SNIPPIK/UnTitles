@@ -3,7 +3,6 @@ import { VoiceWebSocket, WebSocketOpcodes } from "#core/voice/index.js";
 import { MLSSession } from "#core/voice/structures/MLSSession.js";
 import { VoiceAdapter } from "./adapter.js";
 import { TypedEmitter } from "#structures";
-import { db } from "#app/db";
 
 // Layers
 import { UDPLayer } from "#core/voice/transport/layers/UDPLayer.js";
@@ -17,7 +16,7 @@ import { DAVELayer } from "#core/voice/transport/layers/DAVELayer.js";
  * @const CLOSE_CODES
  * @private
  */
-const CLOSE_CODES: VoiceCloseCodes[] = [ VoiceCloseCodes.SessionNoLongerValid ];
+const CLOSE_CODES: VoiceCloseCodes[] = [ VoiceCloseCodes.SessionNoLongerValid, VoiceCloseCodes.Disconnected ];
 
 /**
  * @author SNIPPIK
@@ -107,6 +106,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                         return;
                     }
 
+                    this.emit("open"); // Успешное подключение
                     this.emit("info", `[Transport/UDP]: Good discovery handshake | ${discovery.address}:${discovery.port}`);
                     this._ws.packet = {
                         op: VoiceOpcodes.SelectProtocol,
@@ -228,8 +228,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @code 1000-4022
          */
         this._ws.once("close", (code, reason = "Unknown") => {
-            // Сообщаем что хотим переподключится
-            this.emit("close", code, `[Transport/WS]: ${reason}`);
+            // Если шлюх был закрыт принудительно не пытаемся его поднять повторно
+            if (this._state.code === TransportStateCode.Closed) return;
 
             // Если достигли лимита попыток
             if (this.reconnecting >= 3 || CLOSE_CODES.includes(code)) {
@@ -245,6 +245,9 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 code: TransportStateCode.OpeningWs,
                 payload: code
             };
+
+            // Сообщаем что хотим переподключится
+            this.emit("close", code, `[Transport/WS]: ${reason}`);
         });
 
         /**
@@ -332,18 +335,9 @@ export class Transport extends TypedEmitter<TransportEvents> {
     public destroy = () => {
         this.emit("destroyed", VoiceCloseCodes.CallTerminated);
         this._state.code = TransportStateCode.Closed;
+        super.destroy();
 
         setImmediate(() => {
-            // Безопасный вызов родительского destroy, если он существует в TypedEmitter
-            if (typeof super.destroy === "function") {
-                super.destroy();
-            }
-
-            // Удаляем информацию о сессии из глобальной/импортируемой БД
-            if (this.adapter.packet?.state?.guild_id) {
-                db.voice.remove(this.adapter.packet.state.guild_id);
-            }
-
             // Безопасный вызов деструкторов внутренних слоев
             this._ws?.destroy?.();
             this._udp?.destroy?.();
@@ -479,6 +473,9 @@ enum TransportStateCode {
  * @interface TransportEvents
  */
 interface TransportEvents {
+    /** Событие об открытии подключения к Discord **/
+    open: () => void;
+
     /** Событие с информацией от транспортного узла */
     info: (log: string) => void;
 

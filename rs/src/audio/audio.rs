@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::audio::demuxers::ogg::{OggOpusDemuxer, PacketType};
 use crate::audio::ring_buffer::RingBuffer;
 use napi::{bindgen_prelude::Buffer}; // Добавляем Env в импорты
@@ -153,7 +154,6 @@ impl AudioEngine {
         let buffer_ptr = Arc::clone(&self.buffer);
 
         let handle = thread::spawn(move || {
-            // Буферизованный ридер: буфер 64KB уменьшает количество syscall'ов.
             let mut reader = BufReader::with_capacity(65536, stdout);
             let mut parser = OggOpusDemuxer::new();
             let mut read_buf = [0u8; 16384];
@@ -165,27 +165,28 @@ impl AudioEngine {
             // Внутри потока:
             loop {
                 // Проверка внешнего флага остановки.
-                if !active.load(Ordering::Relaxed) { break; }
+                if !active.load(Ordering::Acquire) { break; }
 
                 // ===== Пользовательская пауза =====
                 {
                     let (lock, cvar) = &*pause_state;
                     let mut paused = lock.lock().unwrap();
-                    // Используем wait_timeout или проверяем активен ли поток после пробуждения
-                    while *paused && active.load(Ordering::SeqCst) {
-                        let result = cvar.wait_timeout(paused, std::time::Duration::from_millis(500)).unwrap();
-                        paused = result.0;
-                        // Если после пробуждения (или таймаута) поток стал неактивен — выходим
-                        if !active.load(Ordering::SeqCst) { return; }
+
+                    // Используем wait_timeout или проверяем активен ли поток, после пробуждения
+                    while *paused && active.load(Ordering::Acquire) {
+                        let (guard, _) = cvar
+                            .wait_timeout(paused, Duration::from_millis(50))
+                            .unwrap();
+
+                        paused = guard;
                     }
+
                 }
 
                 // ===== Чтение из FFmpeg =====
                 match reader.read(&mut read_buf) {
                     Ok(0) => {
-                        drop(parser);
-                        drop(frames);
-                        drop(pending_push);
+                        parser.cleanup();
                         break;
                     },
                     Ok(n) => {
@@ -215,23 +216,19 @@ impl AudioEngine {
 
                             for packet in pending_push.drain(..) {
                                 // Если буфер полон, поток засыпает на condvar, ожидая, пока JS заберет пакеты
-                                while buffer.is_full() && active.load(Ordering::SeqCst) {
+                                while buffer.is_full() && active.load(Ordering::Acquire) {
                                     buffer = buffer_cvar.wait(buffer).unwrap();
                                 }
 
                                 // Если во время ожидания поток попросили завершиться
-                                if !active.load(Ordering::SeqCst) {
-                                    break;
-                                }
+                                if !active.load(Ordering::Acquire) { break; }
 
                                 let _ = buffer.push(packet);
                             }
                         }
                     }
                     Err(_) => {
-                        drop(parser);
-                        drop(frames);
-                        drop(pending_push);
+                        parser.cleanup();
                         break;
                     },
                 }
@@ -281,6 +278,10 @@ impl AudioEngine {
         let mut handle_guard = self.reader_handle.lock().unwrap();
         if let Some(handle) = handle_guard.take() {
             let _ = handle.join();
+        }
+
+        if let Ok(buffer) = self.buffer.0.lock() {
+            buffer.clear();
         }
     }
 

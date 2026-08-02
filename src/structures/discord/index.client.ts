@@ -47,6 +47,8 @@ export class DiscordClient extends Client {
                     },
 
                     onRunError: (ctx, error) => {
+                        if (error instanceof Error && error.stack.match(/Interaction already replied/)) return;
+
                         Logger.log(
                             "ERROR",
                             `Command | Run Error\n` +
