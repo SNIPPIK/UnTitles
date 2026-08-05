@@ -158,8 +158,8 @@ export class TrackResolvers {
 
             const api = await Promise.race([
                 new httpsClient({
-                    url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(track.artist.title)}&track_name=${encodeURIComponent(this.name)}`,
-                    userAgent: "UnTitles 0.5.0, Music bot, github.com/SNIPPIK/UnTitles",
+                    url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(track.artist.title)}&track_name=${encodeURIComponent(track.name)}`,
+                    userAgent: true,
                     timeout: TRACK_CHECK_WAIT
                 }).toJson,
                 timeoutPromise
