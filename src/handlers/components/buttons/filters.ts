@@ -34,7 +34,7 @@ export default class extends ComponentCommand {
                 color: Colors.White,
                 author: {
                     name: `${locale._(ctx.interaction.locale, "filters")} - ${ctx.guild("cache").name}`,
-                    icon_url: queue.tracks.track.artist.image.url
+                    icon_url: queue.tracks.track.artist.image
                 },
                 thumbnail: {
                     url: ctx.guild("cache").iconURL()

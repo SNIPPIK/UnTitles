@@ -213,12 +213,14 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @protected
      */
     public destroy() {
-        // Удаляем все вызовы функций
-        super.destroy();
-        clearTimeout(this._timeout);
+        if (!this.engine) return;
 
         // Чистим все потоки от мусора
         this.emit("close", `[AudioResource] has destroyed`);
+
+        // Удаляем все вызовы функций
+        super.destroy();
+        clearTimeout(this._timeout);
 
         this.engine?.destroy?.();
         this.engine = null;

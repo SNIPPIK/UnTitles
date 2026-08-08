@@ -31,11 +31,11 @@ export default class extends ComponentCommand {
                     embeds: [
                         {
                             color: Colors.White,
-                            thumbnail: track.image,
+                            thumbnail: {url: track.image},
                             author: {
                                 name: track.name,
                                 url: track.url,
-                                icon_url: track.artist.image.url
+                                icon_url: track.artist.image
                             },
                             description: `\`\`\`css\n${item !== undefined ? item : locale._(ctx.interaction.locale, "player.button.lyrics.fail")}\n\`\`\``,
                             timestamp: new Date() as any
@@ -54,11 +54,11 @@ export default class extends ComponentCommand {
                     embeds: [
                         {
                             color: Colors.White,
-                            thumbnail: track.image,
+                            thumbnail: { url: track.image },
                             author: {
                                 name: track.name,
                                 url: track.url,
-                                icon_url: track.artist.image.url
+                                icon_url: track.artist.image
                             },
                             description: `\`\`\`css\n${locale._(ctx.interaction.locale, "player.button.lyrics.fail")}\n\`\`\``,
                             timestamp: new Date() as any

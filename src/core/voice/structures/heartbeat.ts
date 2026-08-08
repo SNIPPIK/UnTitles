@@ -4,7 +4,7 @@
  * @const timeout
  * @private
  */
-const HEART_TIMEOUT_ASK = 3e3;
+const HEARTBEAT_TIMEOUT = 3e3;
 
 /**
  * @author SNIPPIK
@@ -36,9 +36,7 @@ export class HeartbeatManager {
      * @public
      */
     public get latency() {
-        const latency = this.lastAckTime - this.lastSentTime;
-        if (latency <= 0) return 0;
-        return latency;
+        return Math.max(0, this.lastAckTime - this.lastSentTime);
     };
 
     /**
@@ -66,7 +64,9 @@ export class HeartbeatManager {
         this.stop(); // останавливаем старый таймер если есть
         if (intervalMs) this.intervalMs = intervalMs;
 
-        const timeout = () => {
+        const timeout = ()=> {
+            if (!this.intervalMs) return null;
+
             return setTimeout(() => {
                 this.lastSentTime = Date.now();
                 this.hooks?.send?.(this.lastSentTime); // отправляем heartbeat
@@ -90,8 +90,8 @@ export class HeartbeatManager {
 
         this.timeout = setTimeout(() => {
             this.misses++;
-            this.hooks.onTimeout(); // вызываем внешний обработчик
-        }, HEART_TIMEOUT_ASK); // небольшой запас, чтобы не ложно сработать
+            this.hooks?.onTimeout(); // вызываем внешний обработчик
+        }, HEARTBEAT_TIMEOUT); // небольшой запас, чтобы не ложно сработать
     };
 
     /**
@@ -100,6 +100,8 @@ export class HeartbeatManager {
      * @public
      */
     public ack = (): void => {
+        if (!this.lastSentTime) return;
+
         this.lastAckTime = Date.now();
         const latency = this.lastAckTime - this.lastSentTime;
 
@@ -121,6 +123,8 @@ export class HeartbeatManager {
         this.interval = undefined;
         this.timeout = undefined;
         this.misses = 0;
+        this.lastSentTime = 0;
+        this.lastAckTime = 0;
     };
 
     /**

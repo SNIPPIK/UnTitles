@@ -408,6 +408,9 @@ if (parentPort && workerData?.rest) {
                 } catch (err) {
                     workerHandler.sendError(message.requestId, err);
                 }
+
+                // Напоминаем сборщику, что бы не забывал чистить мусорный поток активнее
+                if (typeof global.gc === "function") global.gc();
             });
 
             // Глобальный перехват необработанных исключений

@@ -1,8 +1,12 @@
-use crate::timers::scheduler::cycle_manager::CycleManager;
-use crate::network::udp::UdpBuffered;
+use crate::{
+    structures::{
+        timers::scheduler::cycle_manager::CycleManager,
+        network::udp::UdpBuffered
+    }
+};
+use std::sync::{Arc, Mutex};
 use once_cell::sync::Lazy;
 use dashmap::DashMap;
-use std::sync::{Arc, Mutex};
 
 /// Максимальное количество UDP-сессий, обслуживаемых одним рабочим потоком (worker).
 /// При превышении этого лимита создаётся новый worker.

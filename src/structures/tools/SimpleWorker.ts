@@ -64,7 +64,7 @@ export class SimpleWorker<TInput = any, TOutput = any> extends TypedEmitter<Work
      * @param logger      - Объект с методом `log(level, ...args)` для логирования ошибок
      *                      (по умолчанию `console`).
      */
-    constructor(
+    public constructor(
         file: string,
         private options: WorkerOptions = {},
         autoDestroy = false,
@@ -174,12 +174,5 @@ export class SimpleWorker<TInput = any, TOutput = any> extends TypedEmitter<Work
         } catch (err) {
             this.logger.log("ERROR", err);
         }
-    };
-
-    /**
-     * Возвращает `true`, если воркер запущен и не был уничтожен.
-     */
-    public isRunning(): boolean {
-        return this.worker !== null;
     };
 }

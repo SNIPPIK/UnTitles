@@ -1,4 +1,4 @@
-use crate::crypto::davey::signing_key_pair::{
+use crate::structures::crypto::davey::signing_key_pair::{
   JsDecryptionStats, JsEncryptionStats, ProposalsResult, SigningKeyPair,
 };
 use napi::bindgen_prelude::{Buffer, Error, Result};
@@ -289,10 +289,9 @@ impl DaveSession {
   pub fn encrypt(&mut self, media_type: u8, codec: u8, packet: Buffer) -> Result<Buffer> {
     let mt = Self::map_media_type(media_type)?;
     let cd = Self::map_codec(codec)?;
-    let input: &[u8] = packet.as_ref();
 
     let out = self.inner
-        .encrypt(mt, cd, input)
+        .encrypt(mt, cd, packet.as_ref())
         .map_err(Self::map_err)?;
 
     Ok(Buffer::from(&*out))
@@ -316,8 +315,10 @@ impl DaveSession {
     }
 
     match self.inner.encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet) {
+      // Превращаем новый Vec<u8> в Buffer (забирая владение памятью без копирования)
       Ok(out) => Some(Buffer::from(out.into_owned())),
-      Err(_) => Some(packet),
+      // Возвращаем исходный буфер без лишних аллокаций
+      Err(_) => Some(packet)
     }
   }
 
@@ -332,25 +333,24 @@ impl DaveSession {
   /// # Возвращает
   /// Массив той же длины, где каждый элемент — либо зашифрованный `Buffer`, либо `null` (если шифрование не удалось).
   #[napi(js_name = "encryptOpusBatch")]
-  pub fn encrypt_opus_batch(&mut self, packets: Vec<Buffer>) -> Vec<Option<Buffer>> {
-    let mut results: Vec<Option<Buffer>> = Vec::with_capacity(packets.len());
+  pub fn encrypt_opus_batch(&mut self, packets: Vec<Buffer>) -> Vec<Buffer> {
+    let mut results: Vec<Buffer> = Vec::with_capacity(packets.len());
 
     for packet in packets {
-      let input = packet.as_ref();
-
-      // silent frame fast-path
-      if input.len() <= 3 {
-        results.push(Some(packet));
+      // В napi-rs Buffer реализует AsRef<[u8]>, поэтому .len() и операции сo срезами работают напрямую
+      if packet.len() <= 3 {
+        results.push(packet);
         continue;
       }
 
       match self.inner.encrypt(
         davey::MediaType::AUDIO,
         davey::Codec::OPUS,
-        input
+        packet.as_ref()
       ) {
-        Ok(out) => results.push(Some(Buffer::from(out.into_owned()))),
-        Err(_) => results.push(None)
+        // Превращаем изначальный Vec<u8> (out.into_owned()) напрямую в Buffer без лишнего копирования
+        Ok(out) => results.push(Buffer::from(out.into_owned())),
+        Err(_) => continue
       }
     }
 
@@ -372,11 +372,8 @@ impl DaveSession {
   pub fn decrypt(&mut self, user_id: String, media_type: u8, packet: Buffer) -> Result<Buffer> {
     let uid = Self::parse_id(user_id, "user id")?;
     let mt = Self::map_media_type(media_type)?;
-
-    let input: &[u8] = packet.as_ref();
-
     let out = self.inner
-        .decrypt(uid, mt, input)
+        .decrypt(uid, mt, &packet)
         .map_err(Self::map_err)?;
 
     Ok(Buffer::from(out))

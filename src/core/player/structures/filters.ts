@@ -48,11 +48,22 @@ export class ControllerFilters<T extends AudioFilter> extends SetArray<T> {
     private parseFilters = () => {
         const filters: string[] = [];
 
-        // Добавляем пользовательские фильтры
+        this.sort((a, b) => {
+            const pa = a.priority;
+            const pb = b.priority;
+            // undefined уходят в конец (можно заменить на 0, если нужно в начало)
+            const va = pa === undefined ? Infinity : pa;
+            const vb = pb === undefined ? Infinity : pb;
+            return va - vb;
+        });
+
         for (const { filter, args, argument } of this.array) {
-            if (!filter || typeof filter !== "string") continue;
-            const argString = args ? `${filter}${argument ?? ""}` : filter;
-            filters.push(argString.trim());
+            if (!filter) continue;
+            filters.push(
+                args
+                    ? `${filter}${argument ?? ''}`.trim()
+                    : filter.trim()
+            );
         }
 
         return filters.join(",");
@@ -96,6 +107,9 @@ export class ControllerFilters<T extends AudioFilter> extends SetArray<T> {
 export interface AudioFilter {
     /** Имя фильтра */
     readonly name: string;
+
+    /** Приоритет фильтра **/
+    readonly priority: 0 | 1;
 
     /** Имена переводов */
     readonly locale: LocalizationMap;

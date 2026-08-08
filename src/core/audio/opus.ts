@@ -4,7 +4,7 @@
  * @const SILENT_FRAME
  * @public
  */
-export const SILENT_FRAME = Buffer.from([0xF8, 0xFF, 0xFE]);
+export const SILENT_FRAME = [Buffer.from([0xF8, 0xFF, 0xFE])];
 
 /**
  * @author SNIPPIK

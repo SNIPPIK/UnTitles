@@ -137,6 +137,14 @@ export class QueueMessage<T extends CommandInteraction> {
     };
 
     /**
+     * @description
+     * @public
+     */
+    public destroy = () => {
+        this._original = null;
+    };
+
+    /**
      * @description Авто отправка сообщения
      * @param options - Параметры сообщения
      * @returns Promise<CycleInteraction>

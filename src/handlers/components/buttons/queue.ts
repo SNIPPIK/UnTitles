@@ -39,7 +39,7 @@ export default class extends ComponentCommand {
                         "accessory": {
                             "type": 11,
                             "media": {
-                                "url": track.image.url
+                                "url": track.image
                             }
                         }
                     },

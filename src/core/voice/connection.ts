@@ -188,7 +188,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @param frames - Аудио пакет OPUS
      * @public
      */
-    public packet = (frames: Buffer[] | Buffer) => {
+    public packet = (frames: Buffer[]) => {
         this.speaker.speaking = this.speaker.default;
         if (frames) this.transport.packet(frames);
     };

@@ -62,16 +62,6 @@
 > ⚠️ Some functions require proper environment configuration (FFmpeg, proxy, native modules)
 ---
 
-### ⚠️ Hardware Requirements | Data from Ryzen 7 5700x3D | 1 player
-- Total load for `1 layer + shard` (Voice + Player)
-- CPU: `~0.1%`
-- RAM: `80 MB`
-
-#### What causes a heavy load
-- `Scheduler` for 1 thread (50 UDP + RingBuffer) ~0.1% CPU
-- `OggOpusParser` for 1 conversion cycle ~0.5% CPU (1.2 sec)
----
-
 ## 🚀 Advantages (WatKLOK)
 - The most complex operations are handled by Rust via n-api, providing almost complete independence from Node.js limitations.
 - You can define the decoder mode (`voip`, `audio`, `lowdelay`), enable/disable `VBR`, enable/disable packet loss during the download phase, and also enable `FEC`.

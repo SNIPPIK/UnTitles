@@ -105,7 +105,7 @@ class QueueListCommand extends SubCommand {
                             "accessory": {
                                 "type": 11,
                                 "media": {
-                                    "url": image.url
+                                    "url": image
                                 }
                             }
                         },

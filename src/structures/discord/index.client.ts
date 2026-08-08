@@ -1,7 +1,6 @@
-import { Client, GatewayActivityUpdateData, LimitedCollection } from "seyfert";
+import {Client, GatewayActivityUpdateData, LimitedCollection, LimitedMemoryAdapter} from "seyfert";
 import { middlewares } from "#handler/middlewares/index.js";
 import { ActivityType } from "seyfert/lib/types/index.js";
-import { Logger } from "#structures";
 import { env } from "#app/env";
 import { db } from "#app/db";
 
@@ -30,95 +29,19 @@ export class DiscordClient extends Client {
              * @description Хуки для команд
              */
             commands: {
-                defaults: {
-                    onBeforeOptions: (ctx) => {
-                        Logger.log("DEBUG", `[${ctx.author.name}] run autocomplete ${ctx.fullCommandName}`);
-                    },
-                    onAfterRun: (ctx) => {
-                        Logger.log("DEBUG", `[${ctx.author.name}] run command ${ctx.fullCommandName}`);
-                    },
-                    onMiddlewaresError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Command | Middleware Error\n` +
-                            `┌ Reason:  ${ctx.fullCommandName}\n` +
-                            `└ Stack:   ${error}`
-                        );
-                    },
-
-                    onRunError: (ctx, error) => {
-                        if (error instanceof Error && error.stack.match(/Interaction already replied/)) return;
-
-                        Logger.log(
-                            "ERROR",
-                            `Command | Run Error\n` +
-                            `┌ Reason:  ${ctx.fullCommandName}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
-                    },
-
-                    onInternalError: (_, ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Command | Internal Error\n` +
-                            `┌ Reason:  ${ctx.name} - ${ctx.description}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
-                    },
-
-                    onOptionsError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Command | Options Error\n` +
-                            `┌ Reason:  ${ctx.options}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
-                    }
-                }
+                // Для команд через префикс
+                /*prefix: (msg) => {
+                    // here you can handle whatever prefixes you want depending on the message data.
+                    return ['!', '?', '.', `${msg.client.me.id}`];
+                },*/
+                deferReplyResponse: () => ({
+                    content: `${db.emoji.loading} **${this.me.username}** lost context`,
+                })
             },
-
-            /**
-             * @description Хуки для компонентов
-             */
-            components: {
-                defaults: {
-                    onAfterRun: (ctx) => {
-                      Logger.log("DEBUG", `[${ctx.author.name}] run component ${ctx.customId}`);
-                    },
-
-                    onMiddlewaresError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Component | Middleware Error\n` +
-                            `┌ Reason:  ${ctx.customId}\n` +
-                            `└ Stack:   ${error}`
-                        );
-                    },
-
-                    onInternalError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Component | Internal Error\n` +
-                            `┌ Reason:  ${ctx.options}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
-                    },
-
-                    onRunError: (ctx, error) => {
-                        Logger.log(
-                            "ERROR",
-                            `Component | Run Error\n` +
-                            `┌ Reason:  ${ctx.customId}\n` +
-                            `└ Stack:   ${error instanceof Error ? error.stack : error}`
-                        );
-                    }
-                }
-            },
-
             globalMiddlewares: ["checkCooldown"],
             allowedMentions: {
                 replied_user: false,
-                parse: ["roles"],
+                parse: ["roles"]
             }
         });
 
@@ -133,22 +56,28 @@ export class DiscordClient extends Client {
             },
 
             cache: {
+                adapter: new LimitedMemoryAdapter({
+                    presence: {
+                        expire: 1e3 * 60,
+                        limit: 5,
+                    },
+                    message: {
+                        expire: (1e3 * 60) * 2,
+                        limit: 10,
+                    }
+                }),
                 disabledCache: {
                     bans: true,
                     emojis: true,
                     stickers: true,
                     roles: true,
                     presences: true,
-                    messages: true,
                     stageInstances: true,
-                    overwrites: true,
-                    //members: true,
-                    //guilds: true,
-                    //users: true,
-                    //channels: true
                 }
             }
         });
+
+        if (this.cache.messages) this.cache.messages.filter = (message) => message.author.id === this.botId;
     };
 
     /**

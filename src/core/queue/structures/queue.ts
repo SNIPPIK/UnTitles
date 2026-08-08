@@ -127,7 +127,7 @@ export class Queue {
      * @returns ComponentV2
      * @public
      */
-    public get components() {
+    public get components(): any[] {
         // Если класс кнопок (компонентов был уничтожен)
         if (!this._buttons) {
             Logger.log("ERROR", "[Queue/MessageV2]: Fail init buttons class");
@@ -153,14 +153,14 @@ export class Queue {
                             },
                             {
                                 "type": 10,
-                                "content": `\`\`\`${name}\`\`\`[${("‾").repeat(name.length)}](${url})`
+                                "content": `\`\`\`${name}\`\`\`[${("‾").repeat(name.length > 64 ? 64 : name.length)}](${url})`
                             }
                         ],
                         "accessory": {
                             "type": 11,
                             //"description": name, // Подсказка
                             "media": {
-                                "url": image.url,
+                                "url": image,
                             }
                         }
                     },
@@ -210,6 +210,7 @@ export class Queue {
         Logger.log("LOG", `[Queue/${this.message.guild_id}] has destroyed`);
         this._message.client.events.runCustom("queue/destroy", this);
 
+        this._message.destroy();
         this._message = null;
         this.timestamp = null;
 

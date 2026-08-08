@@ -4,6 +4,22 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
+ * Регулярное выражение для очистки названий треков от часто встречающихся
+ *  "шумовых" суффиксов и спецсимволов, мешающих поиску дубликатов и
+ *  нормализации отображения.
+ */
+const REG_EXP_TITLE = /- Top|Lyrics Video|[\/()\[\]"]|[:;]/gi;
+
+/**
+ * @author SNIPPIK
+ * Регулярное выражение для очистки имён исполнителей от типовых
+ *  постфиксов и спецсимволов, аналогичное `REG_EXP_TITLE`, но
+ *  адаптированное под особенности YouTube Music/каналов.
+ */
+const REG_EXP_ARTIST = / - Topic|[\/()\[\]"]|[:;]/gi;
+
+/**
+ * @author SNIPPIK
  * @description Базовый класс трека, для использования трека. Трек не привязан к чему либо!
  * @class Track
  * @public
@@ -20,6 +36,9 @@ export class Track {
 
     /** Надо ли обходить ограничения через proxy */
     public proxy: boolean = false;
+
+    /** Ссылка на текст для предотвращения 2 вызова **/
+    private _resource_lyrics?: Promise<string | Error>;
 
     /**
      * @description Идентификатор трека
@@ -45,6 +64,10 @@ export class Track {
         return this._track.title;
     };
 
+    private set name(name) {
+        this._track.title = name.replace(REG_EXP_TITLE, "");
+    };
+
     /**
      * @description Получаем отредактированное название трека в формате time [author](author_url) - [title](track_url)
      * @public
@@ -62,12 +85,10 @@ export class Track {
      * @description Получаем превью трека
      * @public
      */
-    public get image() {
+    public get image(): string {
         // Если нет картинки
-        if (!this._track?.image) return { url: db.images.no_image };
-        return {
-            url: this._track.image
-        };
+        if (!this._track?.image) return db.images.no_image;
+        return this._track.image;
     };
 
     /**
@@ -75,12 +96,18 @@ export class Track {
      * @public
      */
     public get artist() {
-        return {
-            url: this._track.artist?.url,
-            title: this._track.artist?.title,
-            image: {
-                url: db.images.disk
-            }
+        return this._track.artist;
+    };
+
+    /**
+     * @description Задаем данные автора трека
+     * @public
+     */
+    private set artist(artist) {
+        this._track.artist = {
+            url: artist?.url,
+            title: artist.title.replace(REG_EXP_ARTIST, ""),
+            image: db.images.disk
         };
     };
 
@@ -109,7 +136,7 @@ export class Track {
         // Пользователь, который включил трек
         this._user = {
             username: username, id,
-            avatar: `https://cdn.discordapp.com/avatars/${id}/${avatar}.webp`
+            avatar: avatar ? `https://cdn.discordapp.com/avatars/${id}/${avatar}.webp` : null
         };
     };
 
@@ -160,7 +187,8 @@ export class Track {
         // Если что-то другое
         else {
             // Если время указано в формате 00:00
-            if (`${time?.total}`.match(/:/)) {
+            //@ts-ignore
+            if (typeof time?.total === "string" && time.total.includes(":")) {
                 this._duration = { split: time.total, total: (time.total as string).duration() };
                 return;
             }
@@ -195,7 +223,8 @@ export class Track {
      * @public
      */
     public get lyrics() {
-        return TrackResolvers.providers.lyrics.resolve(this);
+        return this._resource_lyrics ??=
+            TrackResolvers.providers.lyrics.resolve(this);
     };
 
     /**
@@ -208,9 +237,8 @@ export class Track {
         this.time = _track?.time as any;
         this.proxy = _api?.proxy ?? false;
 
-        // Удаляем мусорные названия из текста
-        if (_track.artist) _track.artist.title = `${_track.artist?.title}`.replace(/ - Topic|[\/()\[\]"]|[:;]/gi, "");
-        _track.title = `${_track.title}`.replace(/Lyrics Video|[\/()\[\]"]|[:;]/gi, "");
+        this.artist = _track.artist;
+        this.name = _track.title;
     };
 }
 

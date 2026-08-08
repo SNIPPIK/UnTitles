@@ -60,7 +60,10 @@ class Database {
 
         this.owner = {
             guildID: env.get("owner.server", ""),
-            ids: env.get("owner.list", "").split(",")
+            ids: env
+                .get("owner.list", "")
+                .split(",")
+                .filter(Boolean)
         };
 
         this.emoji = {
@@ -100,6 +103,12 @@ export function initDatabase(client: DiscordClient) {
     try {
         db = new Database(client);
     } catch (err) {
-        throw Error(`Fail init database: ${err}`);
+        throw new Error(
+            `Fail init database: ${
+                err instanceof Error
+                    ? err.message
+                    : String(err)
+            }`
+        );
     }
 }

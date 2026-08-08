@@ -1,5 +1,5 @@
 import { BaseLayer } from "#core/voice/transport/layers/BaseLayer.js";
-import { VoiceRTPSocket, iType} from "#native";
+import { VoiceRTPSocket, iType } from "#native";
 
 export class RTPLayer extends BaseLayer<iType<typeof VoiceRTPSocket>> {
     /**

@@ -9,7 +9,7 @@ import { TypedEmitter } from "#structures";
  * @version 1.3
  * @public
  */
-let MAX_DAVE_PROTOCOL: number = 1;
+const MAX_DAVE_PROTOCOL: number = 1;
 
 /**
  * @author SNIPPIK

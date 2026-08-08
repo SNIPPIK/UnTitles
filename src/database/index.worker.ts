@@ -34,7 +34,7 @@ class SharedDatabase {
         // audio_saver доступен только в главном потоке
         this.audio_saver = new AudioSaver();
 
-        // meta_saver доступен только в воркер-потоках
+        // meta_saver должен быть доступен только в воркер-потоках
         if (!isMainThread) {
             this.meta_saver = new MetaSaver();
         }

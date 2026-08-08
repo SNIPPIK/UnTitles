@@ -8,7 +8,7 @@ export default class extends ComponentCommand {
     componentType = 'Button' as const;
 
     filter(ctx: ComponentContext<typeof this.componentType>) {
-        return ctx.customId === "back";
+        return ctx.customId === "like";
     }
 
     async run(ctx: ComponentContext<typeof this.componentType>) {

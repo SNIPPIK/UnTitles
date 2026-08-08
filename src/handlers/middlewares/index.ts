@@ -133,7 +133,7 @@ const checkPlayerIsPlaying = createMiddleware<void>(async ({ context, stop, next
     const queue = db.queues.get(context.interaction.guildId);
 
     // Если музыку нельзя пропустить из-за плеера
-    if ((!queue || !queue?.player?.playing) && db.voice.get(context.interaction.guildId)) {
+    if (!queue?.player?.playing && db.voice.get(context.interaction.guildId)) {
         await context.write({
             flags: MessageFlags.Ephemeral,
             embeds: [
@@ -159,7 +159,7 @@ const checkPlayerWaitStream = createMiddleware<void>(async ({ context, stop, nex
     const queue = db.queues.get(context.interaction.guildId);
 
     // Если музыку нельзя пропустить из-за плеера
-    if (queue && queue.player.audio.preloaded) {
+    if (queue?.player.audio.preloaded) {
         await context.write({
             flags: MessageFlags.Ephemeral,
             embeds: [
@@ -199,7 +199,7 @@ const checkAnotherVoice = createMiddleware<void>(async ({ context, stop, next })
                 const connection = db.voice.get(context.interaction.guildId);
 
                 // Отключаемся от голосового канала
-                if (connection) connection.disconnect;
+                if (connection) connection.disconnect();
             }
 
             // Если есть музыкальная очередь

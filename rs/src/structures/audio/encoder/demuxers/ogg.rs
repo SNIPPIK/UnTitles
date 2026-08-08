@@ -1,5 +1,5 @@
+use napi::bindgen_prelude::{ Error, Result };
 use bytes::{Buf, BufMut, BytesMut};
-use napi::bindgen_prelude::*;
 use memchr::memmem;
 
 // ============================================================================
@@ -443,5 +443,14 @@ impl OggOpusDemuxer {
 impl Drop for OggOpusDemuxer {
     fn drop(&mut self) {
         self.cleanup();
+
+        #[cfg(debug_assertions)]
+        println!(
+            "OggOpusDemuxer drop | remainder={} cap={} | packet={} cap={}",
+            self.remainder.len(),
+            self.remainder.capacity(),
+            self.packet_carry.len(),
+            self.packet_carry.capacity(),
+        );
     }
 }

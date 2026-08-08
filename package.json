@@ -32,25 +32,31 @@
     "binaryName": "watklok"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.52",
+    "discord-api-types": "^0.38.53",
     "http-proxy-agent": "^9.1.0",
     "seyfert": "^5.0.0",
     "socks-proxy-agent": "^10.1.0",
-    "ws": "^8.21.2"
+    "ws": "^8.21.3"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^4.1.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.8.2",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "typescript": "^7.0.2"
   },
   "scripts": {
-    "start": "node ./build/src/index.js --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
-    "start:ts": "node ./src/index.ts --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
-    "start:bun": "bun ./src/index.ts --optimize_for_size --expose-gc --interval-stack-size --max-semi-space-size=10 --enable-source-maps",
+    "start": "node ./build/src/index.js --interval-stack-size",
+    "start:ts": "node ./src/index.ts --interval-stack-size",
+    "start:bun": "bun ./src/index.ts --interval-stack-size",
     "build": "tsc",
     "build:native": "npm run build:copy && napi build --platform --release --cwd ./rs --esm --js index.mjs && npm run build:bindings",
     "build:native:dev": "npm run build:copy && napi build --platform --cwd ./rs --esm --js index.mjs && npm run build:bindings",
     "build:copy": "node -e \"const fs=require('fs');fs.mkdirSync('rs',{recursive:true});fs.copyFileSync('package.json','rs/package.json')\"",
     "build:bindings": "node -e \"const fs = require('fs'); const src = 'rs'; const dest = 'build/native'; if (!fs.existsSync(dest)) fs.mkdirSync(dest, {recursive:true}); const f = fs.readdirSync(src).find(x => x.endsWith('.node')); if (f) { fs.renameSync(src + '/' + f, dest + '/' + f); ['index.d.ts', 'index.mjs'].forEach(x => { const p = src + '/' + x; if(fs.existsSync(p)) fs.renameSync(p, dest + '/' + x) }); console.log('Moved ' + f + ' from ' + src + ' to ' + dest); } else { console.log('Source dir: ' + src); console.error('No .node file found in ' + src); process.exit(1); }\""
+  },
+  "allowScripts": {
+    "bufferutil@4.1.0": true
   }
 }

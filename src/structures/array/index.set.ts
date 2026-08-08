@@ -130,12 +130,21 @@ export class SetArray<T> {
     };
 
     /**
+     * Фильтрует элементы коллекции через предикат.
+     *
+     * Не оптимизирован (O(n)), рекомендуется только для нечастых операций.
+     */
+    public sort(fn: (a: T, b: T) => number): T[] {
+        return this._array.sort(fn);
+    };
+
+    /**
      * Полностью очищает коллекцию.
      *
      * Сложность O(1) за счёт `array.length = 0` и `Map.clear()`.
      */
     public clear(): void {
-        this._array.length = 0;
+        this._array = [];
         this._indexMap.clear();
     };
 

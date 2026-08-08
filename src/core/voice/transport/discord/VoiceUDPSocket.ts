@@ -69,11 +69,10 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      *         внутренней очереди Rust) генерирует событие `error`.
      * @public
      */
-    public packet = (packet: Buffer[] | Buffer): void => {
+    public packet = (packet: Buffer[]): void => {
         try {
-            const list = Array.isArray(packet) ? packet : [packet];
-            if (list.length > 0 && this.socket) {
-                this.socket.pushPackets(list);
+            if (packet.length > 0 && this.socket) {
+                this.socket.pushPackets(packet);
             }
         } catch (error) {
             // Если не удалось отправить пакет или пакеты в rust слой
@@ -88,12 +87,8 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @returns Буфер, готовый к отправке через UDP-сокет.
      * @public
      */
-    public discovery = (ssrc: number): Buffer => {
-        const packet = Buffer.alloc(74, 0);
-        packet.writeUInt16BE(1, 0);   // тип 1 (discovery)
-        packet.writeUInt16BE(70, 2);  // длина 70 байт (всего 74)
-        packet.writeUInt32BE(ssrc, 4);
-        return packet;
+    public discovery = (ssrc: number): Buffer[] => {
+        return this.socket.discovery(ssrc);
     };
 
     /**
@@ -201,7 +196,7 @@ enum VoiceUDPSocketStatuses {
     connecting = "connecting",
 
     /** UDP соединение разорвано | сокет уничтожен, все ресурсы освобождены */
-    disconnected = "disconnected",
+    disconnected = "disconnected"
 }
 
 /**
@@ -231,7 +226,7 @@ export interface UDPSocketEvents {
  * @public
  */
 export interface handshake {
-    /** Адресс UDP подключения */
+    /** Адрес UDP подключения */
     address: string;
 
     /** Порт для подключения */

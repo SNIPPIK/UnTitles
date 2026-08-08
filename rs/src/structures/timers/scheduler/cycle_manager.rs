@@ -1,4 +1,5 @@
-use crate::network::udp::{now_ms, UdpBuffered};
+use crate::structures::network::udp::UdpBuffered;
+use crate::utils::duration::now_ms;
 use arc_swap::ArcSwap;
 use std::{
     collections::HashMap,
@@ -8,7 +9,7 @@ use std::{
         Arc, Condvar, Mutex,
     },
     thread::{self, JoinHandle},
-    time::{Duration, Instant},
+    time::{Duration, Instant}
 };
 
 // ============================================================================

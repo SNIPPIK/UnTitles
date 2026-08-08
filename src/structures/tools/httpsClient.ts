@@ -154,10 +154,14 @@ abstract class Request {
 
                 req.end();
 
-                setTimeout(() => {
+                const timeout = setTimeout(() => {
                     controller.abort();
                     req.destroy();
-                }, 5e3);
+                }, 5000);
+
+                req.once("close", () => {
+                    clearTimeout(timeout);
+                });
             };
 
             makeRequest(baseOptions);
@@ -349,7 +353,7 @@ export class httpsClient extends Request {
                 } catch {
                     return resolve(Error(`Invalid json response body at ${this.data.hostname}`));
                 }
-            }).catch((err) => resolve(err));
+            }).catch(err => resolve(err instanceof Error ? err : Error(String(err))));
         });
     };
 

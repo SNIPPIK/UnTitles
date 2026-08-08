@@ -2,7 +2,7 @@ use std::{
     cell::UnsafeCell,
     mem::MaybeUninit,
     ptr,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering}
 };
 
 // ============================================================================
@@ -109,6 +109,7 @@ impl RingBuffer {
     }
 
     /// Возвращает максимальную ёмкость буфера.
+    #[cfg(debug_assertions)]
     #[inline]
     pub fn capacity(&self) -> usize {
         self.capacity
@@ -294,6 +295,15 @@ impl RingBuffer {
 
 impl Drop for RingBuffer {
     fn drop(&mut self) {
+        #[cfg(debug_assertions)]
+        println!(
+            "RingBuffer drop len={} cap={} head={} tail={}",
+            self.len(),
+            self.capacity(),
+            self.head.0.load(Ordering::Relaxed),
+            self.tail.0.load(Ordering::Relaxed),
+        );
+
         // При удалении буфера необходимо корректно освободить все
         // оставшиеся элементы в слотах от tail до head.
         let head = self.head.0.load(Ordering::Relaxed);

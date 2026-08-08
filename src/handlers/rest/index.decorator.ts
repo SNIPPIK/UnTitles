@@ -205,7 +205,7 @@ export namespace APIRequestData {
         /**
          * @description База с картинками трека и автора
          */
-        image: string;
+        readonly image: string;
 
         /**
          * @description Данные о времени трека
@@ -260,7 +260,7 @@ export namespace APIRequestData {
         /**
          * @description Картинка автора плейлиста
          */
-        image: string;
+        readonly image: string;
 
         /**
          * @description Данные об авторе плейлиста
@@ -277,7 +277,7 @@ export namespace APIRequestData {
          * @description Ник/имя автора трека
          * @readonly
          */
-        title: string;
+        readonly title: string;
 
         /**
          * @description Ссылка на автора трека
@@ -288,7 +288,7 @@ export namespace APIRequestData {
         /**
          * @description Картинка артиста трека
          */
-        image?: string;
+        readonly image?: string;
     }
 }
 

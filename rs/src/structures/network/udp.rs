@@ -1,18 +1,25 @@
-use napi::threadsafe_function::ThreadsafeFunctionCallMode;
-use crate::timers::scheduler::balancer::{add_global_session, remove_global_session};
-use crate::audio::ring_buffer::RingBuffer;
-use napi::bindgen_prelude::*;
 use napi_derive::napi;
+use crate::structures::{
+    audio::ring_buffer::RingBuffer,
+    timers::scheduler::{
+        cycle_manager::TICK_INTERVAL_MS,
+        balancer::{add_global_session, remove_global_session}
+    }
+};
+use napi::{
+    bindgen_prelude::{Buffer, Function, Error, Result},
+    threadsafe_function::ThreadsafeFunctionCallMode
+};
 use std::{
+    io::ErrorKind,
     net::UdpSocket,
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
         Arc, Mutex,
     },
     thread,
-    time::{Duration, SystemTime, UNIX_EPOCH}
+    time::{ Duration }
 };
-use crate::timers::scheduler::cycle_manager::TICK_INTERVAL_MS;
 
 /// Время до отправки keepalive пакета, для работы через NAT системы
 const KEEP_ALIVE_INTERVAL: u64 = 10000;
@@ -66,7 +73,10 @@ impl UdpBufferedInner {
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self, now: u64) {
         let last_ms = self.last_send_ms.load(Ordering::Relaxed);
-        let count = ((now - last_ms) / TICK_INTERVAL_MS).clamp(1, 2);
+        let count = now
+            .saturating_sub(last_ms)
+            .div_euclid(TICK_INTERVAL_MS)
+            .clamp(1, 2);
 
         // Пробуем отправить хотя бы один пакет за тик
         for _ in 0..count {  // небольшой burst limit, чтобы не виснуть в одном session'е
@@ -157,7 +167,7 @@ impl UdpBuffered {
         socket.connect(&remote_addr)
             .map_err(|e| Error::from_reason(format!("Connect error: {}", e)))?;
 
-        socket.set_read_timeout(Some(Duration::from_millis(100)))
+        socket.set_read_timeout(Some(Duration::from_millis(20)))
             .map_err(|e| Error::from_reason(format!("Read timeout error: {}", e)))?;
 
         let inner = Arc::new(UdpBufferedInner {
@@ -199,8 +209,8 @@ impl UdpBuffered {
 
     /// Добавляет пакет в очередь на отправку. С проверкой мусора.
     #[napi]
-    pub fn push_packet(&self, packet: Uint8Array) {
-        self.inner.push(packet.to_owned());
+    pub fn push_packet(&self, packet: Buffer) {
+        self.inner.push(packet.to_vec());
     }
 
     /// Добавляет несколько пакетов в очередь с проверкой мусора.
@@ -208,10 +218,51 @@ impl UdpBuffered {
     /// # Аргументы
     /// * `packets` - массив Buffer с данными для отправки.
     #[napi]
-    pub fn push_packets(&self, packets: Vec<Uint8Array>) {
+    pub fn push_packets(&self, packets: Vec<Buffer>) {
         for packet in packets {
-            self.inner.push(packet.to_owned());
+            self.inner.push(packet.to_vec());
         }
+    }
+
+    /// Формирует discovery-пакет для голосового соединения Discord и возвращает его
+    /// в виде массива из одного элемента (`Buffer[]`).
+    ///
+    /// Discovery-пакет используется на начальном этапе установки голосового UDP-соединения
+    /// и имеет фиксированный размер 74 байта. Структура пакета:
+    ///
+    /// | Смещение | Размер (байт) | Описание                          |
+    /// |----------|---------------|-----------------------------------|
+    /// | 0..2     | 2             | Тип пакета (0x0001, big-endian)   |
+    /// | 2..4     | 2             | Длина пакета (0x0046 = 70, big-endian) |
+    /// | 4..8     | 4             | SSRC источника (big-endian)       |
+    /// | 8..74    | 66            | Заполнитель (нули)                |
+    ///
+    /// # Аргументы
+    /// - `ssrc` — 32-битный идентификатор источника синхронизации, уникальный для данного
+    ///   голосового потока.
+    ///
+    /// # Возвращаемое значение
+    /// `Vec<Buffer>` длины 1, содержащий сформированный discovery-пакет.
+    /// Возврат вектора (а не одиночного `Buffer`) обеспечивает единообразие API
+    /// с другими методами, возвращающими массивы пакетов (например, `packets`).
+    #[napi]
+    pub fn discovery(&self, ssrc: u32) -> Vec<Buffer> {
+        // Создаём буфер фиксированного размера (74 байта), заполненный нулями.
+        let mut packet = vec![0u8; 74];
+        
+        // Записываем тип пакета: 1 (2 байта, big-endian).
+        packet[0..2].copy_from_slice(&1u16.to_be_bytes());
+        
+        // Длина пакета: 70 (2 байта, big-endian).
+        packet[2..4].copy_from_slice(&70u16.to_be_bytes());
+        
+        // SSRC: 4 байта, big-endian.
+        packet[4..8].copy_from_slice(&ssrc.to_be_bytes());
+
+        // Возвращаем вектор, содержащий единственный Buffer.
+        let mut vec = Vec::with_capacity(1);
+        vec.push(Buffer::from(packet));
+        vec
     }
 
     /// Начинает прослушивание входящих пакетов в отдельном потоке.
@@ -240,13 +291,14 @@ impl UdpBuffered {
             while active.load(Ordering::Relaxed) {
                 match socket.recv(&mut buf) {
                     // Если сокет временно недоступен (нет данных), немного спим.
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        // Поток будет спать сам
+                    Err(ref e)
+                    if e.kind() == ErrorKind::WouldBlock || e.kind() == ErrorKind::TimedOut => {
+                        continue;
                     }
                     // Любая другая ошибка (например, сокет закрыт) завершает цикл.
                     Err(_) => break,
                     Ok(size) if size > 0 => {
-                        let js_buffer = Buffer::from(buf[..size].as_ref());
+                        let js_buffer = Buffer::from(buf[..size].to_vec());
                         tsfn.call(js_buffer, ThreadsafeFunctionCallMode::NonBlocking);
                     },
                     _ => {}
@@ -287,13 +339,14 @@ impl UdpBuffered {
     #[napi]
     pub fn destroy(&self) {
         if self.destroyed.swap(true, Ordering::Relaxed) { return; }
-        self.listener_active.store(false, Ordering::Relaxed);
 
         // Отключаем режим прослушивания UDP потока
         self.stop_listening();
 
         // Чистим данные в буфере
         self.inner.buffer.clear();
+
+        self.inner.send_drops.store(0, Ordering::Relaxed);
 
         // Отключаем UDP сессию от циклической системы
         remove_global_session(self.id);
@@ -319,13 +372,4 @@ impl Drop for UdpBuffered {
     fn drop(&mut self) {
         self.destroy();
     }
-}
-
-
-/// Вспомогательная функция для получения текущего времени в мс
-pub fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as u64
 }

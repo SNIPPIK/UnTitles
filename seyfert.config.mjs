@@ -5,7 +5,7 @@ import { config } from "seyfert";
  * @description Конфиг для библиотеки seyfert
  */
 export default config.bot({
-    debug: process.env["NODE_ENV"] === "development",
+    debug: false,//process.env["NODE_ENV"] === "development",
     token: process.env["token.discord"],
 
     locations: {
@@ -19,5 +19,8 @@ export default config.bot({
         "Guilds",
         "GuildMessages",
         "GuildVoiceStates"
+
+        // Для команд через префикс
+        //"MessageContent"
     ]
 });

@@ -130,7 +130,7 @@ class RestWorker<T extends APIRequestsKeys> {
      */
     public init = (): Promise<boolean> => {
         return new Promise(async (resolve) => {
-            // Если поток уже есть, уничтожаем старый
+            // Если поток запущен, уничтожаем старый
             if (this.worker) {
                 await this.worker.destroy();
                 this.worker = null;
@@ -182,7 +182,7 @@ class RestWorker<T extends APIRequestsKeys> {
             });
 
             // Запускаем воркер и отправляем начальные данные
-            await worker.start({ data: true });
+            worker.start({data: true});
 
             // Ждём первое сообщение (инициализация платформ)
             // Используем once, чтобы дождаться именно первого сообщения.

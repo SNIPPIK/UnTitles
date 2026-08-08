@@ -1,10 +1,13 @@
-use std::time::Duration;
-use crate::audio::demuxers::ogg::{OggOpusDemuxer, PacketType};
-use crate::audio::ring_buffer::RingBuffer;
-use napi::{bindgen_prelude::Buffer}; // Добавляем Env в импорты
+use crate::structures::audio::{
+    ring_buffer::RingBuffer,
+    encoder::{
+        demuxers::ogg::{OggOpusDemuxer, PacketType}
+    }
+};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::{
+    time::Duration,
     io::{BufReader, Read},
     process::{Child, Command, Stdio},
     sync::{
@@ -254,19 +257,6 @@ impl AudioEngine {
         // Сигнал потоку остановиться.
         self.reading_active.store(false, Ordering::Relaxed);
 
-        // Будим поток, если он на паузе
-        {
-            let (lock, cvar) = &*self.pause_state;
-            *lock.lock().unwrap() = false;
-            cvar.notify_all();
-        }
-
-        // Будим поток, если он заблокирован из-за переполнения буфера (автопаузы)
-        {
-            let (_, buffer_cvar) = &*self.buffer;
-            buffer_cvar.notify_all();
-        }
-
         if let Ok(mut guard) = self.child.lock() {
             if let Some(mut child) = guard.take() {
                 let _ = child.kill();
@@ -287,8 +277,8 @@ impl AudioEngine {
 
     #[napi]
     pub fn destroy(&self) -> Result<()> {
-        self.cleanup();
         self.clear();
+        self.cleanup();
         Ok(())
     }
 
@@ -361,16 +351,11 @@ impl AudioEngine {
 
     /// Массовое добавление пакетов.
     #[napi]
-    pub fn add_packets(&self, packets: Vec<Uint8Array>) {
+    pub fn add_packets(&self, packets: Vec<Vec<u8>>) {
         let buffer = self.buffer.0.lock().unwrap();
-        let total_new = packets.len();
-
-        while buffer.len() + total_new > buffer.capacity() && !buffer.is_empty() {
-            buffer.pop();
-        }
 
         for packet in packets {
-            buffer.push(packet.to_vec()).unwrap();
+            buffer.push(packet).unwrap();
         }
     }
 

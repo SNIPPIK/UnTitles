@@ -1,3 +1,5 @@
+import path from "node:path";
+
 /**
  * @author SNIPPIK
  * @description Взаимодействуем с environment variables
@@ -5,16 +7,23 @@
  * @public
  */
 export class Environment {
+    private readonly cache = new Map<string, unknown>();
+
     /**
      * @description Загружаем env файл в процесс
      * @public
      */
     public constructor() {
+        if (!("loadEnvFile" in process))
+            throw new Error("Node.js >=22 required");
+
         try {
-            process?.["loadEnvFile"]?.(".env");
+            if (typeof process.loadEnvFile === "function") {
+                process.loadEnvFile(".env");
+            }
         } catch (error) {
-            const path = __dirname.split(/\|\//);
-            throw Error(`[Environment] has not found .env file in directory ${path.splice(path.length, 1).join("/")}`);
+            const fullPath = path.dirname(__filename);
+            throw Error(`[Environment] has not found .env file in directory ${fullPath}`);
         }
     };
 
@@ -25,10 +34,15 @@ export class Environment {
      * @public
      */
     public get<T = string>(name: string, safe?: EnvironmentOut<T>): EnvironmentOut<T> {
+        const cached = this.cache.get(name);
+
+        if (cached !== undefined)
+            return cached as EnvironmentOut<T>;
+
         const env = process.env[name];
 
         // Если нет параметра в файле .env
-        if (!env) {
+        if (env === undefined) {
             // Если есть безопасный параметр, то передаем его вместо ошибки
             if (safe !== undefined) return safe;
 
@@ -37,11 +51,18 @@ export class Environment {
         }
 
         // Если параметр имеет правду
-        if (["on", "true"].includes(env)) return true as EnvironmentOut<T>;
+        if (["on", "true"].includes(env)) {
+            this.cache.set(name, true);
+            return true as EnvironmentOut<T>;
+        }
 
         // Если параметр имеет ложь
-        else if (["off", "false"].includes(env)) return false as EnvironmentOut<T>;
+        else if (["off", "false"].includes(env)) {
+            this.cache.set(name, false);
+            return false as EnvironmentOut<T>;
+        }
 
+        this.cache.set(name, env);
         // Если параметр имеет что-то другое
         return env as EnvironmentOut<T>;
     };
@@ -52,7 +73,7 @@ export class Environment {
  * @description Тип выходящего параметра env.get
  * @type EnvironmentOut
  */
-type EnvironmentOut<T> = T extends boolean ? T : T extends string ? T : T extends number ? string : never;
+type EnvironmentOut<T> = T;
 
 /**
  * @author SNIPPIK
@@ -60,18 +81,4 @@ type EnvironmentOut<T> = T extends boolean ? T : T extends string ? T : T extend
  * @class Environment
  * @public
  */
-export let env: Environment = null;
-
-/**
- * @author SNIPPIK
- * @description Инициализация .env файла
- * @returns void
- * @private
- */
-(async () => {
-    try {
-        env = new Environment();
-    } catch (err) {
-        throw Error(`Fail init environment: ${err}`);
-    }
-})();
+export const env = new Environment();

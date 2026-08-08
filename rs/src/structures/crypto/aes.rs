@@ -1,13 +1,17 @@
-use crate::timers::scheduler::cycle_manager::{TICK_INTERVAL_MS};
-use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
-use napi::bindgen_prelude::*;
+use crate::structures::timers::scheduler::cycle_manager::{ TICK_INTERVAL_MS };
+use napi::bindgen_prelude::{ Status, Buffer, Error, Result };
 use napi_derive::napi;
-use rand::RngExt;
-use rand::{rng};
-use std::fmt;
+use std::{
+    sync::atomic::{AtomicU16, AtomicU32, Ordering},
+    fmt
+};
 use aes_gcm::{
-    aead::{Aead, KeyInit, Payload},
-    Aes256Gcm, Nonce,
+    aead::{KeyInit, AeadInOut, inout::InOutBuf},
+    Aes256Gcm, Nonce
+};
+use rand::{
+    RngExt,
+    rng
 };
 
 /// Приращение временной метки RTP для одного пакета.
@@ -133,8 +137,8 @@ impl VoiceRTPSocket {
     /// - Если шифрование провалилось (например, из-за неправильного nonce).
     /// - Если размер фрейма превышает допустимый (проверка отсутствует, но можно добавить).
     #[napi]
-    pub fn packet(&self, frame: &[u8]) -> Result<Buffer> {
-        Ok(Buffer::from(self.create_packet_raw(frame)?))
+    pub fn packet(&self, frame: Buffer) -> Result<Buffer> {
+        Ok(self.create_packet_raw(frame)?)
     }
 
     /// Пакетное шифрование нескольких фреймов.
@@ -144,11 +148,11 @@ impl VoiceRTPSocket {
     /// Просто последовательно вызывает `packet` для каждого фрейма.
     /// Аллокация результата происходит один раз с предварительным резервированием ёмкости.
     #[napi]
-    pub fn packets(&self, frames: Vec<&[u8]>) -> Result<Vec<Buffer>> {
+    pub fn packets(&self, frames: Vec<Buffer>) -> Result<Vec<Buffer>> {
         let mut out = Vec::with_capacity(frames.len());
 
         for frame in frames {
-            out.push(Buffer::from(self.create_packet_raw(frame)?));
+            out.push(self.create_packet_raw(frame)?);
         }
 
         Ok(out)
@@ -165,27 +169,82 @@ impl VoiceRTPSocket {
         nonce
     }
 
-    // Убираем #[napi] — это будет чисто внутренний метод Rust
-    pub fn create_packet_raw(&self, frame: &[u8]) -> Result<Vec<u8>> {
+    /// Формирует зашифрованный RTP-пакет с полезной нагрузкой (Opus‑фреймом)
+    /// в соответствии с режимом `aead_aes256_gcm_rtpsize`, используемым в Discord Voice.
+    ///
+    /// Процесс:
+    /// 1. Генерируется 12-байтовый RTP-заголовок (версия, маркер, тип нагрузки,
+    ///    порядковый номер, временная метка, SSRC).
+    /// 2. Создаётся 12-байтовый nonce (первые 4 байта — текущий счётчик, остальные — нули).
+    /// 3. Выделяется буфер достаточного размера: [RTP-заголовок | Opus-данные].
+    /// 4. Шифрование выполняется **на месте** в этом буфере: Opus-фрейм заменяется
+    ///    текстом той же длины. Используется `Aes256Gcm::encrypt_inout_detached`,
+    ///    который принимает мутабельный буфер и возвращает аутентификационный тег (16 байт).
+    /// 5. К буферу дописываются тег GCM и младшие 4 байта nonce.
+    ///
+    /// # Структура итогового пакета
+    /// ```text
+    /// [ RTP Header 12 байт ][ Зашифрованный Opus (длина frame.len()) ][ GCM Tag 16 байт ][ Nonce suffix 4 байта ]
+    /// ```
+    ///
+    /// # Аргументы
+    /// - `frame` — Node.js `Buffer` с исходным Opus-пакетом (может быть пустым? **Нет**, в вызывающем
+    ///   коде есть проверка на `len > 0`).
+    ///
+    /// # Возвращаемое значение
+    /// - `Ok(Buffer)` — зашифрованный RTP-пакет, готовый к отправке по UDP.
+    /// - `Err(napi::Error)` — если произошла ошибка шифрования (например, из‑за неверного состояния
+    ///   шифра, переполнения nonce‑счётчика и т.п.).
+    ///
+    /// # Замечания по реализации
+    /// - Используется `InOutBuf` из `aead` v0.6 для работы с буфером «на месте».
+    /// - После шифрования исходные данные в `frame` не изменяются (копируются в `out`).
+    /// - Nonce‑счётчик автоматически инкрементируется при вызове `generate_nonce()`.
+    /// - Метод не добавляет RTP-расширения, маркерный бит всегда 0.
+    pub fn create_packet_raw(&self, frame: Buffer) -> Result<Buffer> {
+        // Формируем 12-байтовый RTP-заголовок (обновляет sequence/timestamp атомарно).
         let header = self.build_header();
+
+        // Получаем 12-байтовый nonce: первые 4 байта — счётчик, остальные 8 — нули.
         let nonce_bytes = self.generate_nonce();
         let nonce = Nonce::from(nonce_bytes);
 
-        let payload = Payload {
-            msg: frame,
-            aad: &header
-        };
+        // Выделяем память под весь пакет: заголовок + полезная нагрузка + тег (16) + nonce (4).
+        let mut out = Vec::with_capacity(RTP_HEADER_SIZE + frame.len() + 16 + 4);
 
-        let encrypted = self.cipher
-            .encrypt(&nonce, payload)
-            .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-
-        let mut out = Vec::with_capacity(RTP_HEADER_SIZE + encrypted.len() + 4);
+        // Копируем заголовок.
         out.extend_from_slice(&header);
-        out.extend_from_slice(&encrypted);
-        out.extend_from_slice(&nonce_bytes[0..4]);
 
-        Ok(out)
+        // Копируем исходный Opus-фрейм (payload). Шифрование заменит эти данные.
+        out.extend_from_slice(&frame);
+
+        // Смещение начала полезной нагрузки в буфере `out`.
+        let payload_offset = RTP_HEADER_SIZE;
+
+        // Создаём обёртку `InOutBuf` для шифрования на месте. Она позволяет
+        // `Aes256Gcm` записать текст прямо в этот же срез.
+        let buffer_to_encrypt = InOutBuf::from(&mut out[payload_offset..]);
+
+        // Шифруем на месте и получаем аутентификационный тег (16 байт).
+        // AAD (дополнительные аутентифицированные данные) — RTP-заголовок.
+        let tag = self
+            .cipher
+            .encrypt_inout_detached(
+                &nonce,
+                &header,            // AAD
+                buffer_to_encrypt,  // шифруемый/выходной буфер
+            )
+            .map_err(|e| napi::Error::from_reason(format!("Encryption failed: {}", e)))?;
+
+        // Добавляем тег GCM.
+        out.extend_from_slice(tag.as_slice());
+
+        // Добавляем младшие 4 байта nonce (суффикс, по которому получатель сможет
+        // вычислить полный nonce, имея счётчик).
+        out.extend_from_slice(&nonce_bytes[..4]);
+
+        // Передаём владение буфером `out` в JavaScript без копирования.
+        Ok(Buffer::from(out))
     }
 
     /// Строит стандартный RTP-заголовк (12 байт) в соответствии с RFC 3550.

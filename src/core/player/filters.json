@@ -23,6 +23,7 @@
   },
   {
     "name": "hardstyle",
+    "priority": 1,
     "emoji": {
       "name": "⚡"
     },
@@ -105,7 +106,7 @@
       "name": "1️⃣"
     },
     "locale": { "en-US": "Converts stereo to mono.", "ru": "Преобразует стерео в моно." },
-    "unsupported": ["8d","stereo_swap"],
+    "unsupported": ["8d", "stereo_swap"],
     "filter": "pan=mono|c0=.5*c0+.5*c1",
     "args": false
   },
@@ -115,7 +116,7 @@
       "name": "↔️"
     },
     "locale": { "en-US": "Swaps left and right channels.", "ru": "Меняет левый и правый каналы местами." },
-    "unsupported": ["mono","8d"],
+    "unsupported": ["mono", "8d"],
     "filter": "pan=stereo|c0=c1|c1=c0",
     "args": false
   },
@@ -171,7 +172,7 @@
       "name": "🌀"
     },
     "locale": { "en-US": "Creates rotating surround effect.", "ru": "Создаёт эффект вращающегося звука вокруг слушателя." },
-    "unsupported": ["mono","stereo_swap"],
+    "unsupported": ["mono", "stereo_swap"],
     "filter": "apulsator=hz=0.09",
     "args": false
   },

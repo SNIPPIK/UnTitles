@@ -173,9 +173,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @description Отправление аудио пакета в систему rust cycle
      * @public
      */
-    public packet = (frames: Buffer[] | Buffer) => {
-        const list = Array.isArray(frames) ? frames : [frames];
-        const encrypted = this._dave.packet(list);
+    public packet = (frames: Buffer[]) => {
+        const encrypted = this._dave.packet(frames);
         const rtp = this._rtp.packet(encrypted);
 
         // Отправляем все готовые пакеты разом
