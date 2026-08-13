@@ -1,7 +1,8 @@
 import { type APIExecuteParams, APIPlatformType, type APIRequestsKeys, type APIRequestsRaw } from "./index.js";
-import type { RestAPINames, RestOptions } from "./index.decorator.js";
+import type { RestOptions } from "./index.decorator.js";
+import type { RestAPINames } from "./index.abstract.js";
 import type { RestClientSide } from "./index.client.js";
-import {sdb} from "#worker/db";
+import { sdb } from "#worker/db";
 
 /**
  * @author SNIPPIK

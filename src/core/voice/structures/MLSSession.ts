@@ -17,7 +17,7 @@ const MAX_DAVE_PROTOCOL: number = 1;
  *              Если за это время не произошёл финальный коммит, переход аннулируется.
  * @const TRANSITION_EXPIRY
  */
-const TRANSITION_EXPIRY = 10;
+const TRANSITION_EXPIRY = 2;
 
 /**
  * @author SNIPPIK
@@ -25,7 +25,7 @@ const TRANSITION_EXPIRY = 10;
  *              Это позволяет плавно деградировать шифрование, не обрывая воспроизведение.
  * @const TRANSITION_EXPIRY_PENDING_DOWNGRADE
  */
-const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 24;
+const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 8;
 
 /**
  * Управляет сеансом группового протокола DAVE (MLS) для сквозного шифрования (E2EE)

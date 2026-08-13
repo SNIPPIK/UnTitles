@@ -57,6 +57,14 @@ export class DiscordClient extends Client {
 
             cache: {
                 adapter: new LimitedMemoryAdapter({
+                    member: {
+                        expire: (1e3 * 60) * 2,
+                        limit: 200,
+                    },
+                    user: {
+                        expire: (1e3 * 60) * 2,
+                        limit: 10,
+                    },
                     presence: {
                         expire: 1e3 * 60,
                         limit: 5,

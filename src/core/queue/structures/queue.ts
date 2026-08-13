@@ -186,7 +186,12 @@ export class Queue {
      */
     public cleanup = () => {
         Logger.log("DEBUG", `[Queue/${this.message.guild_id}] has cleanup`);
-        if (db.queues.cycles.players.has(this._player)) this._message.client.events.runCustom("queue/cleanup", this);
+
+        // Откладываем действие
+        setImmediate(() => {
+            // Проверяем плеер еще есть или нет
+            if (this._player?.id) this._message.client.events.runCustom("queue/cleanup", this);
+        })
 
         // Останавливаем плеер
         this._player.cleanup();

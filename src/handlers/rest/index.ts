@@ -1,10 +1,4 @@
-import {
-    APIPlatformType,
-    APIRequestData,
-    APIRequests,
-    APIRequestsKeys,
-    RestAPINames
-} from "#handler/rest/index.decorator.js";
+import { APIRequestData, APIRequests, APIRequestsKeys, RestAPINames, APIPlatformType, REST_STOP_WORDS } from "#handler/rest/index.abstract.js";
 import type { RestServerSide } from "./index.server.js";
 import { Logger, SimpleWorker } from "#structures";
 import { RestClientSide } from "./index.client.js";
@@ -13,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 
 // Export decorator
+export * from "./index.abstract.js";
 export * from "./index.decorator.js";
 export * from "./index.client.js";
 export * from "./index.server.js";
@@ -153,10 +148,11 @@ class RestWorker<T extends APIRequestsKeys> {
             // Подписываемся на постоянные сообщения (для обработки запросов)
             worker.on("message", (message) => {
                 const request = this.pending.get(message.requestId);
-                if (!request) return;
-
                 this.pending.delete(message.requestId);
-                request.resolve(message);
+
+                // Отклоняем если данные не имеют ID
+                if (!request) return;
+                return request.resolve(message);
             });
 
             // Обработка ошибок — пересоздаём воркер
@@ -529,91 +525,175 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
 }
 
 /**
- * @author SNIPPIK
- * @description Разделение слов в названии трека
- * @param text - Название
- * @const normalize
- * @private
+ * Нормализует текст для последующего сравнения или поиска.
+ *
+ * Процесс нормализации включает:
+ * 1. Приведение строки к форме NFKD (декомпозиция диакритических знаков).
+ * 2. Удаление всех диакритических знаков (категория `\p{M}`).
+ * 3. Удаление символа `█` (вероятно, используемого в плейсхолдерах или оформлении).
+ * 4. Перевод в нижний регистр.
+ * 5. Замена всех символов, не являющихся буквами (`\p{L}`), цифрами (`\p{N}`) или пробелами (`\s`),
+ *    на пробел.
+ * 6. Разбиение на слова по пробелам.
+ * 7. Фильтрация:
+ *    - Слова длиной ≤ 1 отбрасываются (артикли, одиночные буквы).
+ *    - Слова, входящие в множество стоп-слов (`REST_STOP_WORDS`), отбрасываются.
+ * 8. Объединение оставшихся слов обратно в строку через пробел.
+ *
+ * Итоговая строка содержит только значимые слова в нижнем регистре без лишних символов.
+ *
+ * @param text - Исходная строка (название трека, имя исполнителя и т.п.).
+ * @returns Нормализованная строка, готовая для сравнения.
  */
-const normalize = (text: string) => text
-    .normalize("NFKD")
-
-    // Удаление лишнего текста
-    .replaceAll(/█/gi, "")
-    .toLowerCase()
-
-    // Оставляем только буквы и цифры, заменяя остальное на пробелы
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .trim();
+const normalize = (text: string) =>
+    text
+        // Декомпозиция: буква + диакритический знак
+        .normalize("NFKD")
+        // Удаляем все combining marks (диакритику)
+        .replace(/\p{M}/gu, "")
+        // Удаляем специфический символ
+        .replace(/█/g, "")
+        // Единый регистр
+        .toLowerCase()
+        // Все, кроме букв/цифр/пробелов, заменяем пробелом
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+        // Разбиваем на слова (пробелы любой длины)
+        .split(/\s+/)
+        // Фильтр коротких и стоп-слов
+        .filter(word => word.length > 1 && !REST_STOP_WORDS.has(word))
+        // Обратно в строку
+        .join(" ");
 
 /**
- * @author SNIPPIK
- * @description Ищет треки из кучи мусорного текста
- * @param original - Оригинальное название
- * @param candidate - Название кандидата
- * @private
+ * Проверяет, существует ли в наборе слов кандидат, нечётко совпадающий с заданным словом.
+ *
+ * Алгоритм основан на расстоянии Левенштейна с ограничением в 1 ошибку.
+ * Для каждой пары (word, candidate):
+ * - Если разница длин больше 1 — кандидат пропускается.
+ * - Иначе выполняется посимвольное сравнение с разрешённой одной операцией (замена/вставка/удаление).
+ * - Счётчик `mistakes` увеличивается при каждом несовпадении.
+ * - После цикла добавляются оставшиеся символы (если строки разной длины).
+ * - Если итоговое количество ошибок ≤ 1, возвращается `true`.
+ *
+ * @param word  - Проверяемое слово (уже нормализованное).
+ * @param words - Итерируемый набор слов-кандидатов (обычно из целевой строки).
+ * @returns `true`, если найдено нечёткое совпадение с допустимым уровнем ошибок, иначе `false`.
  */
-/**
- * @author SNIPPIK
- * @description Ультимативный поиск с весовыми коэффициентами и нечетким сравнением
- */
-const getSmartMatch = (original: string, candidate: string) => {
-    const normOriginal = normalize(original);
-    const normCandidate = normalize(candidate);
+const fuzzyCheck = (word: string, words: Iterable<string>): boolean => {
+    for (const candidate of words) {
+        const lenDiff = Math.abs(candidate.length - word.length);
+        if (lenDiff > 1) continue; // Слишком разная длина — не может быть похожими при 1 ошибке
 
-    const queryWords = normOriginal.split(/\s+/).filter(word => word.length > 1);
-    if (queryWords.length === 0) return false;
+        let mistakes = 0;
+        let i = 0; // указатель для word
+        let j = 0; // указатель для candidate
 
-    // Убираем пробелы полностью для поиска "слипшихся" слов
-    const compressedCandidate = normCandidate.replace(/\s+/g, "");
+        while (i < word.length && j < candidate.length) {
+            if (word[i] === candidate[j]) {
+                i++;
+                j++;
+                continue;
+            }
 
-    let totalScore = 0;
+            // Несовпадение — фиксируем ошибку
+            if (++mistakes > 1) break;
 
-    for (const word of queryWords) {
-        // Точное вхождение слова (самый высокий приоритет)
-        if (normCandidate.includes(word)) {
-            totalScore += 1;
-            continue;
-        }
-
-        // Вхождение без учета пробелов (для японского и слитых тегов)
-        if (compressedCandidate.includes(word)) {
-            totalScore += 0.8;
-            continue;
-        }
-
-        // Нечеткое сравнение (Levenshtein Lite)
-        // Если слово длинное (4+ символа) и отличается всего на 1-2 буквы
-        if (word.length > 3) {
-            if (fuzzyCheck(word, normCandidate)) {
-                totalScore += 0.5;
+            // Обработка в зависимости от соотношения длин:
+            // Если word длиннее — считаем, что в candidate пропущен символ (вставка в candidate)
+            // Если candidate длиннее — символ пропущен в word (удаление из candidate)
+            // Если равны — замена: сдвигаем оба указателя
+            if (word.length > candidate.length) i++;
+            else if (candidate.length > word.length) j++;
+            else {
+                i++;
+                j++;
             }
         }
+
+        // Добавляем оставшиеся символы как ошибки (если длины не совпали)
+        mistakes += (word.length - i) + (candidate.length - j);
+
+        if (mistakes <= 1) return true;
     }
 
-    const finalScore = totalScore / queryWords.length;
-
-    // Порог вхождения: 0.8 обычно идеально для музыки
-    return finalScore >= 0.8;
+    return false;
 };
 
 /**
- * Упрощенный нечеткий поиск: ищет, есть ли в строке слово,
- * похожее на искомое с дистанцией в 1 символ.
+ * Выполняет интеллектуальное сравнение двух строк (например, названий треков)
+ * с учётом нормализации, весов слов и нечёткого сопоставления.
+ *
+ * Алгоритм:
+ * 1. Нормализует обе строки через `normalize()`.
+ * 2. Если одна из строк пуста после нормализации — возвращает `false`.
+ * 3. Если строки полностью совпадают — возвращает `true`.
+ * 4. Разбивает исходную строку (`source`) на слова, а целевую (`target`) преобразует в `Set`.
+ * 5. Вычисляет «сжатую» версию `target` без пробелов для проверки вхождений подстрок.
+ * 6. Для каждого слова из `source` вычисляет вес: `min(word.length / 6, 1)`.
+ *    Вес отражает значимость слова (более длинные слова имеют больший вклад).
+ * 7. Сравнивает слова:
+ *    - Точное совпадение со словом из `targetWords` → полный вес.
+ *    - Слово целиком входит в `compressed` → вес * 0.9 (например, склеенные слова).
+ *    - Длина слова ≥ 4 и нечёткое совпадение с каким-либо словом из `targetWords` → вес * 0.7.
+ *    - Иначе вклад 0.
+ * 8. Если `target` содержит всю `source` как подстроку (после нормализации) — добавляет бонус 1.
+ * 9. Итоговая оценка: `score / (maxScore + 1)`. Если она ≥ `threshold` (по умолчанию 0.8) — `true`.
+ *
+ * Такой подход устойчив к перестановке слов, опечаткам, лишним пробелам и незначительным отличиям.
+ *
+ * @param original  - Исходная строка (например, запрос или эталон).
+ * @param candidate - Строка-кандидат для сравнения.
+ * @param threshold - Порог схожести (0..1). Чем выше, тем строже сравнение.
+ * @returns `true`, если строки достаточно похожи, иначе `false`.
  */
-const fuzzyCheck = (word: string, target: string): boolean => {
-    if (target.length < word.length) return false;
+const getSmartMatch = (original: string, candidate: string, threshold = 0.8): boolean => {
+    const source = normalize(original);
+    const target = normalize(candidate);
 
-    // Для скорости можно использовать упрощенную проверку:
-    // Разбить таргет на слова и сравнить каждое по Левенштейну
-    const targetWords = target.split(/\s+/);
-    return targetWords.some(tWord => {
-        if (Math.abs(tWord.length - word.length) > 1) return false;
-        let mistakes = 0;
-        for (let i = 0; i < Math.min(word.length, tWord.length); i++) {
-            if (word[i] !== tWord[i]) mistakes++;
-            if (mistakes > 1) return false;
-        }
+    // Если после нормализации хотя бы одна строка пуста, сравнение невозможно
+    if (!source || !target)
+        return false;
+
+    // Полное совпадение — мгновенный успех
+    if (source === target)
         return true;
-    });
+
+    const sourceWords = source.split(/\s+/);
+    const targetWords = new Set(target.split(/\s+/));
+
+    // Убираем все пробелы для проверки вхождений подстрок (например, "love song" в "lovesong")
+    const compressed = target.replace(/\s+/g, "");
+
+    let score = 0;
+    let maxScore = 0;
+
+    for (const word of sourceWords) {
+        // Вес слова: чем длиннее, тем выше, но не более 1
+        const weight = Math.min(word.length / 6, 1);
+        maxScore += weight;
+
+        if (targetWords.has(word)) {
+            // Точное совпадение слова
+            score += weight;
+            continue;
+        }
+
+        if (compressed.includes(word)) {
+            // Слово является подстрокой сжатой целевой строки (возможно, слова склеены)
+            score += weight * 0.9;
+            continue;
+        }
+
+        // Для длинных слов (>=4) пробуем нечёткое сравнение с кандидатами
+        if (word.length >= 4 && fuzzyCheck(word, targetWords)) {
+            score += weight * 0.7;
+        }
+    }
+
+    // Бонус, если вся исходная строка является подстрокой целевой (например, "abc" в "xxabcxx")
+    if (target.includes(source))
+        score += 1;
+
+    // Нормируем: делим на максимально возможный балл + 1 (чтобы избежать деления на 0)
+    return score / (maxScore + 1) >= threshold;
 };

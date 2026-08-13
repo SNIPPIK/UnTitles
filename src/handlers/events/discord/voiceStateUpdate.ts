@@ -40,15 +40,16 @@ export default createEvent({
                 suppress: payload.suppress,
                 member: null
             });
+            return;
         }
 
         /**
          * Используем queueMicrotask, чтобы логика проверки не блокировала
          * основной поток обработки событий Gateway.
          */
-        queueMicrotask(async () => {
+        queueMicrotask(() => {
             // Получаем состояние бота на этом сервере
-            const botState = await client.cache.voiceStates?.get(client.me.id, guildId);
+            const botState = client.cache.voiceStates?.get(client.me.id, guildId);
 
             // Если бота нет в ГС — чистим таймеры и выходим
             if (!botState?.channelId) {
@@ -67,13 +68,13 @@ export default createEvent({
             }
 
             // Получаем ВСЕ стейты участников на сервере
-            const guildStates = await client.cache.voiceStates?.values(guildId) ?? [];
+            const guildStates = client.cache.voiceStates?.values(guildId) ?? [];
 
             // Считаем живых людей в канале с ботом
             let humanCount = 0;
             for (const vs of guildStates) {
                 if (vs.channelId === botState.channelId && vs.userId !== client.me.id) {
-                    const member = await client.cache.members?.get(vs.userId, guildId);
+                    const member = client.cache.members?.get(vs.userId, guildId);
                     if (member && !member.user?.bot) humanCount++;
                 }
             }
@@ -92,9 +93,7 @@ export default createEvent({
                     temple_db.delete(guildId);
 
                     // Возобновляем плеер, если он был на паузе
-                    if (queue.player?.status === "player/pause") {
-                        queue.player.resume();
-                    }
+                    if (queue.player?.status === "player/pause") queue.player.resume();
                 }
             } else {
                 // Пропускаем событие, если это сам бот заходит
@@ -103,26 +102,24 @@ export default createEvent({
 
                 // Если таймера нет — создаём
                 if (!temp) {
-                    if (queue.player?.status === "player/playing") {
-                        queue.player.pause();
-                    }
+                    // Если плеер сейчас играет трек
+                    if (queue.player?.status === "player/playing") queue.player.pause();
 
-                    const timer = setTimeout(async () => {
+                    const timer = setTimeout(() => {
                         // Финальная проверка перед удалением
-                        const finalStates = await client.cache.voiceStates?.values(guildId) ?? [];
-                        const finalBot = await client.cache.voiceStates?.get(client.me.id, guildId);
+                        const finalStates = client.cache.voiceStates?.values(guildId) ?? [];
+                        const finalBot = client.cache.voiceStates?.get(client.me.id, guildId);
 
                         const stillAlone = !finalStates.some(vs =>
                             vs.channelId === finalBot?.channelId &&
                             vs.userId !== client.me.id &&
-                            client.cache.members?.get(vs.userId, guildId).bot
+                            client.cache.members?.get(vs.userId, guildId)?.bot
                         );
 
                         if (stillAlone) {
                             db.queues.remove(guildId);
                             db.voice.remove(guildId);
                             temple_db.delete(guildId);
-                            // Можно: await client.voice.leave(guildId);
                         }
                     }, timeout * 1000);
 

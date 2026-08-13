@@ -68,7 +68,7 @@ export class locale {
         let i = 0;
         return template.replace(this.ARG_REGEX, () => {
             const v = args[i++];
-            return v !== undefined && v !== null ? String(v) : "{ARGUMENT}";
+            return v !== undefined && v !== null ? v : "{ARGUMENT}";
         });
     };
 

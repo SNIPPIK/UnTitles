@@ -83,9 +83,8 @@ export default createEvent({
                 };
 
                 const local_msg = await msg.edit({
-                    //flags: MessageFlags.IsComponentsV2,
                     components: [buildComponents() as any],
-                    //embeds: null
+                    embeds: null
                 });
 
                 if (local_msg) setTimeout(() => local_msg.delete?.().catch(() => null), 20e3);

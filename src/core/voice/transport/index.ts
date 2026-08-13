@@ -336,20 +336,18 @@ export class Transport extends TypedEmitter<TransportEvents> {
         this._state.code = TransportStateCode.Closed;
         super.destroy();
 
-        setImmediate(() => {
-            // Безопасный вызов деструкторов внутренних слоев
-            this._ws?.destroy?.();
-            this._udp?.destroy?.();
-            this._rtp?.destroy?.();
-            this._dave?.destroy?.();
+        // Безопасный вызов деструкторов внутренних слоев
+        this._ws?.destroy?.();
+        this._udp?.destroy?.();
+        this._rtp?.destroy?.();
+        this._dave?.destroy?.();
 
-            // Nullify для предотвращения утечек памяти
-            this._rtp = null;
-            this._ws = null;
-            this._udp = null;
-            this._dave = null;
-            this.reconnecting = null;
-        });
+        // Nullify для предотвращения утечек памяти
+        this._rtp = null;
+        this._ws = null;
+        this._udp = null;
+        this._dave = null;
+        this.reconnecting = null;
     };
 }
 

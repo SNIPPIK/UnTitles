@@ -218,10 +218,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         // Чистим все потоки от мусора
         this.emit("close", `[AudioResource] has destroyed`);
 
-        // Удаляем все вызовы функций
-        super.destroy();
-        clearTimeout(this._timeout);
-
+        this.engine?.clear();
         this.engine?.destroy?.();
         this.engine = null;
 
@@ -229,6 +226,14 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         this._played_frames = null;
         this._afade = null;
         this._timeout = null;
+
+        // Удаляем все вызовы функций
+        super.destroy();
+        clearTimeout(this._timeout);
+
+        if (typeof global.gc === "function") {
+            global.gc();
+        }
     };
 }
 

@@ -368,8 +368,22 @@ impl UdpBuffered {
 }
 
 /// При падении объекта автоматически вызывается destroy.
-impl Drop for UdpBuffered {
+impl Drop for UdpBufferedInner {
     fn drop(&mut self) {
-        self.destroy();
+        #[cfg(debug_assertions)]
+        {
+            use std::sync::atomic::Ordering;
+
+            println!("====================");
+            println!("UdpBufferedInner::drop");
+            println!("send_drops={}", self.send_drops.load(Ordering::Relaxed));
+            println!("last_send_ms={}", self.last_send_ms.load(Ordering::Relaxed));
+            println!("keep_alive_counter={}", self.counter.load(Ordering::Relaxed));
+            println!("buffer_len={}", self.buffer.len());
+            println!("buffer_cap={}", self.buffer.capacity());
+            println!("socket_strong={}", Arc::strong_count(&self.socket));
+            println!("UdpBufferedInner dropped");
+            println!("====================");
+        }
     }
 }

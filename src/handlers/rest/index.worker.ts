@@ -347,7 +347,7 @@ class RestWorkerHandler {
    * @param requestId - Идентификатор запроса.
    * @param err - Объект ошибки (Error или любой другой).
    */
-  public sendError(requestId: number | undefined, err: any): void {
+  public sendError(requestId: number, err: any): void {
     const errorObj =
       err instanceof Error
         ? { name: err.name, message: err.message, stack: err.stack }
@@ -412,12 +412,6 @@ if (parentPort && workerData?.rest) {
                 // Напоминаем сборщику, что бы не забывал чистить мусорный поток активнее
                 if (typeof global.gc === "function") global.gc();
             });
-
-            // Глобальный перехват необработанных исключений
-            process.on("unhandledRejection", (err) => {
-                workerHandler.sendError(undefined, err);
-            });
-
         } catch (initError) {
             // Если воркер упал на этапе инициализации — сообщаем основному потоку
             parentPort?.postMessage({

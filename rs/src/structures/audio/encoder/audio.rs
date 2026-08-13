@@ -56,10 +56,6 @@ pub struct AudioEngine {
 
 #[napi]
 impl AudioEngine {
-    // =========================================================================
-    // CONSTRUCTOR
-    // =========================================================================
-
     #[napi(constructor)]
     pub fn new(max_minutes: u32) -> Self {
         // Расчёт ёмкости буфера: 50 пакетов/сек * 60 сек * минуты.
@@ -77,10 +73,6 @@ impl AudioEngine {
             position: Arc::new(AtomicUsize::new(0))
         }
     }
-
-    // =========================================================================
-    // START
-    // =========================================================================
 
     #[napi]
     pub fn start(&self, mut args: Vec<String>, ffmpeg_path: String) -> Result<()> {
@@ -245,10 +237,6 @@ impl AudioEngine {
         Ok(())
     }
 
-    // =========================================================================
-    // DESTROY & CLEANUP
-    // =========================================================================
-
     fn cleanup(&self) {
         if self.destroyed.swap(true, Ordering::Relaxed) {
             return;
@@ -282,10 +270,6 @@ impl AudioEngine {
         Ok(())
     }
 
-    // =========================================================================
-    // BUFFER INFO
-    // =========================================================================
-
     #[napi(getter)]
     pub fn get_size(&self) -> u32 {
         self.buffer.0.lock().unwrap().len() as u32
@@ -300,10 +284,6 @@ impl AudioEngine {
     pub fn set_position(&self, pos: u32) {
         self.position.store(pos as usize, Ordering::Relaxed);
     }
-
-    // =========================================================================
-    // PACKETS GETTERS
-    // =========================================================================
 
     /// Выдать `count` пакетов за раз (уменьшает количество вызовов через FFI).
     #[napi]
@@ -345,10 +325,6 @@ impl AudioEngine {
         packets
     }
 
-    // =========================================================================
-    // MANUAL PUSH
-    // =========================================================================
-
     /// Массовое добавление пакетов.
     #[napi]
     pub fn add_packets(&self, packets: Vec<Vec<u8>>) {
@@ -358,10 +334,6 @@ impl AudioEngine {
             buffer.push(packet).unwrap();
         }
     }
-
-    // =========================================================================
-    // BUFFER CONTROL
-    // =========================================================================
 
     /// Проверка, есть ли место хотя бы для одного нового пакета.
     #[napi]
@@ -389,12 +361,39 @@ impl AudioEngine {
     }
 }
 
-// ============================================================================
-// DROP
-// ============================================================================
-
 impl Drop for AudioEngine {
     fn drop(&mut self) {
-        self.cleanup();
+        #[cfg(debug_assertions)]
+        {
+            println!("====================");
+            println!("AudioEngine::drop");
+            println!(
+                "reading_active={}",
+                self.reading_active.load(Ordering::Relaxed)
+            );
+            println!(
+                "destroyed={}",
+                self.destroyed.load(Ordering::Relaxed)
+            );
+            println!(
+                "position={}",
+                self.position.load(Ordering::Relaxed)
+            );
+
+            println!("child strong={}", Arc::strong_count(&self.child));
+            println!("reader strong={}", Arc::strong_count(&self.reader_handle));
+            println!("pause strong={}", Arc::strong_count(&self.pause_state));
+            println!("buffer strong={}", Arc::strong_count(&self.buffer));
+
+            {
+                let buffer = self.buffer.0.lock().unwrap();
+                println!("buffer len={}", buffer.len());
+                println!("buffer capacity={}", buffer.capacity());
+            }
+
+            println!("max_capacity={}", self.max_capacity);
+            println!("AudioEngine dropped");
+            println!("====================");
+        }
     }
 }

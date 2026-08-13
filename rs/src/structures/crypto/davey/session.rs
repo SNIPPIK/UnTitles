@@ -444,6 +444,12 @@ impl DaveSession {
 
 impl Drop for DaveSession {
   fn drop(&mut self) {
-    let _ = self.inner.reset();
+    #[cfg(debug_assertions)]
+    {
+      println!("DaveSession::drop");
+      if let Err(err) = self.inner.reset() {
+        eprintln!("DaveSession reset error: {err}");
+      }
+    }
   }
 }

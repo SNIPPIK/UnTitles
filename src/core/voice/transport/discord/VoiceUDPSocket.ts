@@ -157,6 +157,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
     private reset = () => {
         // Если есть UDP подключение
         if (this.socket) {
+            this.socket.stopListening();
             this.socket.destroy();
         }
 
@@ -175,11 +176,10 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      */
     public destroy = () => {
         super.destroy(); // Удаляем TypedEmitter
+        this.reset(); // Удаляем UDP
 
         if (this._status === VoiceUDPSocketStatuses.disconnected) return;
         this._status = VoiceUDPSocketStatuses.disconnected;
-        
-        this.reset(); // Удаляем UDP
     };
 }
 

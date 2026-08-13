@@ -1,5 +1,5 @@
-import { createEvent, WebhookMessage } from "seyfert";
 import { MessageFlags } from "seyfert/lib/types/index.js";
+import { createEvent, WebhookMessage } from "seyfert";
 import { locale } from "#structures";
 import { db } from "#app/db";
 

@@ -1,10 +1,7 @@
 use crate::structures::timers::scheduler::cycle_manager::{ TICK_INTERVAL_MS };
 use napi::bindgen_prelude::{ Status, Buffer, Error, Result };
 use napi_derive::napi;
-use std::{
-    sync::atomic::{AtomicU16, AtomicU32, Ordering},
-    fmt
-};
+use std::{sync::atomic::{AtomicU16, AtomicU32, Ordering}, fmt};
 use aes_gcm::{
     aead::{KeyInit, AeadInOut, inout::InOutBuf},
     Aes256Gcm, Nonce
@@ -279,5 +276,16 @@ impl VoiceRTPSocket {
         self.sequence.store(0, Ordering::SeqCst);
         self.timestamp.store(0, Ordering::SeqCst);
         self.counter.store(0, Ordering::SeqCst);
+    }
+}
+
+impl Drop for VoiceRTPSocket {
+    fn drop(&mut self) {
+        #[cfg(debug_assertions)]
+        println!(
+            "VoiceRTPSocket::drop | sequence={} timestamp={}",
+            self.sequence.load(std::sync::atomic::Ordering::Relaxed),
+            self.timestamp.load(std::sync::atomic::Ordering::Relaxed),
+        );
     }
 }

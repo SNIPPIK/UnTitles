@@ -298,7 +298,7 @@ export class ControllerTracks<T extends Track> {
      */
     public relatedTracks = async () => {
         try {
-            const tracks = await (db.api.fetchRelatedTracks(this.track) as Promise<T[] | Error>);
+            const tracks = await db.api.fetchRelatedTracks(this.track);
 
             // Если вместо треков, получена ошибка
             if (tracks instanceof Error) return tracks;
@@ -310,9 +310,9 @@ export class ControllerTracks<T extends Track> {
             else {
                 const user = this.track.user;
 
-                tracks.forEach((song) => {
-                    this.push(song, user);
-                });
+                // Добавляем треки в очередь
+                for (const track of tracks)
+                    this.push(track as T, user)
             }
             return true;
         } catch (err) {
