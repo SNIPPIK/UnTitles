@@ -374,17 +374,16 @@ class RestWorkerHandler {
  * @throws Ошибки, возникающие при инициализации, логируются, но не останавливают воркер.
  */
 if (parentPort && workerData?.rest) {
+    // Инициализируем общие ресурсы (база данных, кеш)
+    initSharedDatabase();
+
+    const registry = new RestRegistry();
+    const loader = new RestServerLoader(registry);
+
     (async () => {
         try {
-            // Инициализируем общие ресурсы (база данных, кеш)
-            initSharedDatabase();
-
-            const registry = new RestRegistry();
-            const loader = new RestServerLoader(registry);
-
             // Ждем ПОЛНОЙ загрузки всех платформ перед тем как начать слушать события
             await loader.initialize();
-
             const workerHandler = new RestWorkerHandler(registry);
 
             // Обработка сообщений от основного потока
