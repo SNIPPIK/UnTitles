@@ -542,54 +542,168 @@ class RestYouTubeAPI extends RestServerSide.API {
     };
 
     /**
-     * @description Получаем данные из страницы
-     * @param input - Страница
+     * Извлекает JSON-данные из HTML-страницы YouTube и проверяет их на доступность воспроизведения.
+     *
+     * Метод пытается найти два стандартных маркера, используемых YouTube для встраивания
+     * JSON-данных в HTML:
+     * 1. `"var ytInitialPlayerResponse = "` – основной ответ плеера, содержащий информацию о видео,
+     *    форматах, статусе воспроизведения и т.д.
+     * 2. `"var ytInitialData = "` – общие данные страницы (используются, например, для плейлистов,
+     *    рекомендаций).
+     *
+     * Если ни один из маркеров не найден или JSON не удалось распарсить, возвращается объект ошибки.
+     * В случае успеха дополнительно проверяется поле `playabilityStatus.status`:
+     * - Если статус отсутствует или равен `"OK"`, возвращается весь распарсенный JSON.
+     * - Иначе создаётся ошибка с сообщением, содержащим причину (`playabilityStatus.reason`)
+     *   или запасной текст `"Unknown playability status"`.
+     *
+     * @param input - Строка HTML-страницы, из которой нужно извлечь JSON.
+     *
+     * @returns Распарсенный JSON-объект (тип `json`) или экземпляр `Error`, если данные
+     *          не найдены, повреждены или видео недоступно для воспроизведения.
+     *
      * @protected
      */
     protected _extractResponse = (input: string): json | Error => {
-        if (typeof input !== "string") return locale.err("api.request.fail");
+        // Проверяем, что входные данные являются строкой. Если нет — возвращаем локализованную ошибку.
+        if (typeof input !== "string")
+            return locale.err("api.request.fail");
 
-        let endData: json = {};
+        // Пытаемся извлечь JSON с помощью одного из маркеров. Приоритет отдаётся
+        // `ytInitialPlayerResponse`, так как он содержит более специфичные данные.
+        const response =
+            this._extractJson(input, "var ytInitialPlayerResponse = ") ??
+            this._extractJson(input, "var ytInitialData = ");
 
-        // Попытка найти ytInitialData JSON
-        const initialDataMatch = input.match(/var ytInitialData = (.*?);<\/script>/);
-        if (initialDataMatch) {
-            try {
-                endData = JSON.parse(initialDataMatch[1]);
-            } catch {
-                // Игнорируем ошибку парсинга initialData
+        // Если JSON не был получен, возвращаем ошибку.
+        if (!response) return locale.err("api.request.fail");
+
+        // Проверяем статус воспроизведения.
+        const status = response.playabilityStatus?.status;
+
+        // Если статус задан и не равен "OK", значит видео недоступно.
+        if (status && status !== "OK") {
+            return Error(
+                locale._(
+                    locale.language,
+                    "api.request.fail.msg",
+                    [
+                        response.playabilityStatus?.reason ??
+                        "Unknown playability status"
+                    ]
+                )
+            );
+        }
+
+        // Возвращаем JSON.
+        return response;
+    };
+
+    /**
+     * Извлекает и парсит JSON-объект, следующий за указанным текстовым маркером в HTML-странице.
+     *
+     * Алгоритм:
+     * 1. Находит первое вхождение `marker`.
+     * 2. Пропускает пробельные символы после маркера.
+     * 3. Ожидает, что следующий символ — `{` (начало JSON-объекта). Если это не так, возвращает `null`.
+     * 4. Посимвольно сканирует строку, отслеживая вложенность фигурных скобок (`depth`),
+     *    учитывая строковые литералы (двойные и одинарные кавычки) и экранирование.
+     * 5. Когда глубина становится равной нулю (найден конец корневого объекта), пытается
+     *    распарсить подстроку от начала объекта до текущей позиции как JSON.
+     * 6. Если парсинг успешен — возвращает объект, иначе `null`.
+     *
+     * Метод устойчив к наличию вложенных объектов, строк с фигурными скобками и кавычками.
+     *
+     * @param input - Строка HTML-страницы.
+     * @param marker - Текстовый маркер, после которого ожидается JSON-объект.
+     *
+     * @returns JSON-объект или `null`, если маркер не найден или JSON повреждён.
+     *
+     * @private
+     */
+    private _extractJson(input: string, marker: string): json | null {
+        // Ищем стартовую позицию маркера.
+        const start = input.indexOf(marker);
+
+        // Если маркер не найден, возвращаем null.
+        if (start === -1)
+            return null;
+
+        // Указатель на позицию после маркера.
+        let i = start + marker.length;
+
+        // Пропускаем все пробельные символы (пробел, табуляция, перенос строки).
+        while (i < input.length && /\s/.test(input[i]))
+            i++;
+
+        // Ожидаем открывающую фигурную скобку. Если её нет, это не JSON.
+        if (input[i] !== "{")
+            return null;
+
+        // Переменные состояния парсера:
+        let depth = 0;          // Текущая глубина вложенности фигурных скобок
+        let quote = "";         // Текущий символ кавычки
+        let escape = false;     // Флаг экранированного символа внутри строки
+
+        // Запоминаем позицию начала объекта (для последующего slice).
+        const begin = i;
+
+        // Сканируем строку до конца.
+        for (; i < input.length; i++) {
+            const ch = input[i];
+
+            // Если предыдущий символ был обратной косой чертой, пропускаем текущий символ
+            // и сбрасываем флаг экранирования.
+            if (escape) {
+                escape = false;
+                continue;
+            }
+
+            // Если мы внутри строкового литерала.
+            if (quote) {
+                if (ch === "\\") {
+                    // Экранируем следующий символ.
+                    escape = true;
+                } else if (ch === quote) {
+                    // Закрывающая кавычка — выходим из строкового режима.
+                    quote = "";
+                }
+                // Внутри строки фигурные скобки не влияют на глубину.
+                continue;
+            }
+
+            // Если встретили открывающую кавычку — входим в строковый режим.
+            if (ch === '"' || ch === "'") {
+                quote = ch;
+                continue;
+            }
+
+            // Увеличиваем глубину при открывающей скобке.
+            if (ch === "{") {
+                depth++;
+                continue;
+            }
+
+            // Уменьшаем глубину при закрывающей скобке.
+            if (ch === "}") {
+                depth--;
+
+                // Если глубина стала нулевой, мы достигли конца корневого объекта.
+                if (depth === 0) {
+                    try {
+                        // Пытаемся распарсить подстроку от начала объекта до текущей позиции включительно.
+                        return JSON.parse(input.slice(begin, i + 1));
+                    } catch {
+                        // Если парсинг не удался (например, невалидный JSON), возвращаем null.
+                        return null;
+                    }
+                }
             }
         }
 
-        // Определяем, какой паттерн искать дальше: playerResponse или initialData
-        const startPattern = input.includes("var ytInitialPlayerResponse = ")
-            ? "var ytInitialPlayerResponse = "
-            : "var ytInitialData = ";
-
-        const startIndex = input.indexOf(startPattern);
-        const endIndex = input.indexOf("};", startIndex + startPattern.length);
-
-        // Если не нашли нужный участок с JSON — возвращаем ошибку
-        if (startIndex === -1 || endIndex === -1) return locale.err("api.request.fail");
-
-        try {
-            const jsonStr = input.substring(startIndex + startPattern.length, endIndex + 1);
-            const parsedData = JSON.parse(jsonStr);
-            // Объединяем данные, playerResponse имеет приоритет
-            endData = { ...endData, ...parsedData };
-        } catch {
-            return locale.err("api.request.fail");
-        }
-
-        // Проверяем статус playabilityStatus, если есть
-        const status = endData.playabilityStatus?.status;
-        if (status && status !== "OK") {
-            const reason = endData.playabilityStatus?.reason || "Not found status error";
-            return Error(locale._(locale.language, "api.request.fail.msg", [reason]));
-        }
-
-        return endData;
-    };
+        // Если цикл завершился, а глубина так и не стала нулевой — JSON неполный.
+        return null;
+    }
 }
 
 /**
