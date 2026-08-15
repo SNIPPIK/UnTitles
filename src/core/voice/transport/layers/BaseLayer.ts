@@ -22,6 +22,10 @@ export abstract class BaseLayer<T> {
      */
     protected _client: T;
 
+    public get client() {
+        return this._client;
+    };
+
     /**
      * @description Индикатор готовности слоя к работе.
      *              По умолчанию возвращает `false`. Наследники должны переопределить этот геттер,

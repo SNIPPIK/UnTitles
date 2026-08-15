@@ -7,7 +7,7 @@ import { TypedEmitter } from "#structures";
 // Layers
 import { UDPLayer } from "#core/voice/transport/layers/UDPLayer.js";
 import { RTPLayer } from "#core/voice/transport/layers/RTPLayer.js";
-import { DAVELayer } from "#core/voice/transport/layers/DAVELayer.js";
+import { DAVELayer, OPCODE_DAVE_MLS_WELCOME } from "#core/voice/transport/layers/DAVELayer.js";
 
 
 /**
@@ -16,46 +16,87 @@ import { DAVELayer } from "#core/voice/transport/layers/DAVELayer.js";
  * @const STOP_CODES
  * @private
  */
-const STOP_CODES: VoiceCloseCodes[] = [ VoiceCloseCodes.Disconnected ];
+const STOP_CODES: VoiceCloseCodes[] = [ VoiceCloseCodes.Disconnected, 1000 as any ];
 
 /**
- * @author SNIPPIK
- * @description Транспорт голосового соединения
- * @class Transport
- * @extends TypedEmitter
- * @public
+ * Транспорт голосового соединения Discord.
+ *
+ * Координирует работу трёх слоёв: WebSocket (сигнализация), UDP (передача медиа),
+ * RTP (шифрование) и опционально DAVE (сквозное шифрование).
+ * Управляет конечным автоматом состояний подключения и автоматическим
+ * восстановлением после обрывов.
+ *
+ * @extends TypedEmitter<TransportEvents>
  */
 export class Transport extends TypedEmitter<TransportEvents> {
-    /** Текущее состояние транспорта */
+    /**
+     * Текущее состояние транспорта.
+     * Содержит код состояния и связанные с ним данные (payload).
+     */
     private _state: TransportState = {
         code: TransportStateCode.Closed,
         payload: null
     };
 
-    /** Слой UDP соединения, ключевой класс для отправки пакетов */
+    /**
+     * Слой UDP-соединения для отправки голосовых пакетов.
+     * Может быть `null` после уничтожения транспорта.
+     */
     public _udp: UDPLayer | null = new UDPLayer();
 
-    /** Клиент WebSocket, ключевой класс для общения с Discord Voice Gateway */
+    /**
+     * Клиент WebSocket для общения с Discord Voice Gateway.
+     * Может быть `null` после уничтожения транспорта.
+     */
     public _ws: VoiceWebSocket | null = new VoiceWebSocket();
 
-    /** Слой RTP, ключевой класс для шифрования пакетов для отправки через UDP */
+    /**
+     * Слой RTP для шифрования исходящих пакетов.
+     * Создаётся заново при каждой успешной сессии.
+     */
     private _rtp: RTPLayer | null = new RTPLayer();
 
-    /** SSRC (синхронизационный источник), полученный от Discord. */
+    /**
+     * SSRC (синхронизационный источник), полученный от Discord.
+     * Используется при создании RTP-шифратора.
+     */
     public ssrc: number | null = null;
 
-    /** Клиент Dave, для работы сквозного шифрования */
+    /**
+     * Слой DAVE (MLS) для сквозного шифрования.
+     * Инициализируется только при поддержке со стороны сервера.
+     */
     private _dave: DAVELayer | null = null;
 
-    /** Кол-во переподключений, требуется для безопасного отключения */
+    /**
+     * Количество последовательных переподключений.
+     * Сбрасывается при успешном подключении.
+     */
     private reconnecting: number = 0;
 
     /**
-     * @description Готовность транспорта к безопасной передаче аудио-данных
-     * @public
+     * Флаг уничтожения транспорта. Блокирует повторные операции.
+     */
+    private destroyed = false;
+
+    /**
+     * Поколение попыток подключения UDP.
+     * Гарантирует, что устаревший ответ discovery не будет применён.
+     */
+    private generation = 0;
+
+    /**
+     * Готовность транспорта к безопасной передаче аудио.
+     *
+     * Условия:
+     * - транспорт не уничтожен;
+     * - состояние `Session`;
+     * - нет активных переподключений;
+     * - WebSocket, UDP и RTP готовы;
+     * - DAVE либо отсутствует, либо готов.
      */
     public get ready(): boolean {
-        // Используем опциональную цепочку, чтобы избежать TypeError, если транспорт уничтожен
+        // Полная проверка готовности
         return !!(
             this._ws?.ready &&
             this._dave?.ready &&
@@ -67,82 +108,48 @@ export class Transport extends TypedEmitter<TransportEvents> {
     };
 
     /**
-     * @description Текущее состояние транспортного канала
-     * @public
+     * Текущее состояние транспортного канала.
      */
     public get state() {
         return this._state;
     };
 
     /**
-     * @description Сеттер управляющий состоянием подключений
-     * @param state
-     * @public
+     * Устанавливает новое состояние и выполняет действия,
+     * соответствующие коду состояния (открытие WS, подготовка UDP и т.д.).
+     *
+     * @param state - Новое состояние с кодом и полезной нагрузкой.
      */
     public set state(state: TransportState) {
         this.emit("info", `[Transport]: ${this._state?.code} --> ${state?.code}`);
 
         this._state = state;
         switch (state.code) {
-            // Поднимаем WS
+            // Поднимаем WebSocket
             case TransportStateCode.OpeningWs: {
-                // Сохраняем прошлую последовательность до очистки старого сокета
-                //const last_seq = this._ws?.sequence ?? -1;
-
-                // Подключаемся по WS
+                // Подключаемся к голосовому шлюзу
                 this._ws.connect(this.adapter.packet.server.endpoint);
-
-                // Передаем сохраненную последовательность новому сокету
-                /*if (last_seq >= 0) {
-                    this._ws.sequence = last_seq;
-                    // Теперь это выполнится безопасно, так как слушатель "resumed" уже зарегистрирован выше
-                    this._ws.emit("resumed");
-                }*/
                 return;
             }
 
-            // Поднимаем UDP
+            // Поднимаем UDP после получения данных от шлюза
             case TransportStateCode.Ready: {
-                const d = state.payload;
-                this.ssrc = d.ssrc;
-
-                this.emit("info", "[Transport/UDP]: Waiting discovery response");
-
-                this._udp.create(d).then((discovery) => {
-                    // Если при подключении произошла ошибка
-                    if (discovery instanceof Error) {
-                        this.emit("close", VoiceCloseCodes.ServerNotFound, discovery);
-                        this.emit("info", `[Transport/UDP]: Bad discovery handshake`);
-                        this.destroy();
-                        return;
-                    }
-
-                    this.emit("open"); // Успешное подключение
-                    this.emit("info", `[Transport/UDP]: Good discovery handshake | ${discovery.address}:${discovery.port}`);
-                    this._ws.packet = {
-                        op: VoiceOpcodes.SelectProtocol,
-                        d: {
-                            protocol: "udp",
-                            data: {
-                                ...discovery,
-                                mode: "aead_aes256_gcm_rtpsize"
-                            }
-                        }
-                    };
+                this._prepareUDPConnection(state.payload).catch(() => {
+                    // Coming soon
                 });
                 return;
             }
 
-            // Получение данных о сессии
+            // Инициализируем шифрование после получения session description
             case TransportStateCode.Session: {
                 const d = state.payload;
 
-                // Инициализируем RTP (AES)
+                // Создаём AES-шифратор RTP
                 this._rtp.create(this.ssrc, d.secret_key);
                 this.emit("info", `[Transport/RTP]: has created`);
 
+                // Если доступен DAVE и версия протокола не нулевая — инициализируем MLS
                 if (this._dave && d.dave_protocol_version !== 0) {
-                    // Инициализируем DAVE (MLS)
                     this._dave.create(d.dave_protocol_version, this._ws);
                     this.emit("info", `[Transport/E2EE]: has created | ${d.dave_protocol_version}/${MLSSession.max_version}`);
                 }
@@ -150,7 +157,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 return;
             }
 
-            // Отправляем статус идентификации
+            // Отправляем Identify для регистрации голосового подключения
             case TransportStateCode.Identifying: {
                 this._ws.packet = {
                     op: VoiceOpcodes.Identify,
@@ -159,7 +166,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 return;
             }
 
-            // Отправляем код переподключения к прошлому соединению ws
+            // Отправляем Resume для восстановления предыдущей сессии
             case TransportStateCode.Resuming: {
                 this._ws.packet = {
                     op: VoiceOpcodes.Resume,
@@ -171,20 +178,20 @@ export class Transport extends TypedEmitter<TransportEvents> {
     };
 
     /**
-     * @description Создание класса прослойки
-     * @param adapter - Адаптер состояния
-     * @public
+     * Создаёт транспорт и подписывается на события WebSocket.
+     *
+     * @param adapter - Адаптер, содержащий данные сервера и текущего состояния клиента.
      */
     public constructor(private adapter: VoiceAdapter) {
         super();
         this._dave = new DAVELayer(this.adapter);
 
         /**
-         * @description Отправляем Identify данные, для регистрации голосового подключения
-         * @status Identify
-         * @code 0
+         * При открытии WS отправляем Identify.
          */
         this._ws.on("open", () => {
+            if (this.destroyed) return;
+
             const { server, state } = this.adapter.packet;
 
             this.state = {
@@ -200,45 +207,38 @@ export class Transport extends TypedEmitter<TransportEvents> {
         });
 
         /**
-         * @description Если websocket закрывается, пытаемся его поднять или перезапустить
-         * @status WS Close
-         * @code 1000-4022
+         * При закрытии WS пытаемся переподключиться или завершаем работу.
          */
         this._ws.on("close", (code, reason = "Unknown") => {
-            // Если будет получен код ожидания
-            if (STOP_CODES.includes(code)) return;
-
-            else {
-                this.reconnecting++;
-                this.emit("reconnect", code);
+            // Коды, при которых переподключение запрещено
+            // Три неудачные попытки — завершаем
+            if (STOP_CODES.includes(code)) {
+                return;
             }
 
+            if (this.destroyed) return;
+            this.reconnecting++;
 
-            // Если достигли лимита попыток
-            if (this.reconnecting > 3) {
+            if (this.reconnecting >= 3) {
                 this.destroy();
                 return;
             }
 
-            // Добавляем попытку
-            this.reconnecting++;
-
-            // Пробуем поднять соединение заново
+            this.emit("reconnect", code);
             this.state = {
                 code: TransportStateCode.OpeningWs,
                 payload: code
             };
 
-            // Сообщаем что хотим переподключится
             this.emit("close", code, `[Transport/WS]: ${reason}`);
         });
 
         /**
-         * @description Если websocket требует возобновления подключения
-         * @status Resume
-         * @code 7
+         * При сигнале resumed от шлюза отправляем Resume с текущим seq.
          */
         this._ws.on("resumed", () => {
+            if (this.destroyed) return;
+
             const { server, state } = this.adapter.packet;
 
             this.state = {
@@ -249,31 +249,32 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     token: server.token,
                     seq_ack: this._ws.sequence
                 }
-            }
+            };
         });
 
         /**
-         * @description Если голосовое подключение готово, подключаемся по UDP
-         * @status Ready
-         * @code 2
+         * При готовности голосового канала запускаем подготовку UDP.
          */
-        this._ws.on("ready", ({d}) => {
-            this.reconnecting = 0; // Делаем сброс попыток
+        this._ws.on("ready", ({ d }) => {
+            if (this.destroyed) return;
+
+            this.reconnecting = 0; // сброс счётчика попыток
+            this.ssrc = d.ssrc; // ← добавить
 
             this.state = {
                 code: TransportStateCode.Ready,
                 payload: d
-            }
+            };
 
             this.emit("info", `[Transport/UDP]: Start creating`);
         });
 
         /**
-         * @description Если голосовое подключение готово, и получены данные для шифрования пакетов
-         * @status SessionDescription
-         * @code 4
+         * При получении session description инициализируем шифрование.
          */
-        this._ws.on("sessionDescription", ({d}) => {
+        this._ws.on("sessionDescription", ({ d }) => {
+            if (this.destroyed) return;
+
             this.state = {
                 code: TransportStateCode.Session,
                 payload: d
@@ -281,28 +282,208 @@ export class Transport extends TypedEmitter<TransportEvents> {
         });
 
         /**
-         * @description Если websocket получил не предвиденную ошибку, то отключаемся
-         * @status WS Error
+         * При ошибке WS эмитим событие close без попытки переподключения.
          */
         this._ws.on("error", (err) => {
+            if (this.destroyed) return;
+
             this.emit("close", VoiceCloseCodes.BadRequest, `[Voice/WS-Error]: \n${err.stack}`);
         });
 
         /**
-         * @description Если подключились новые клиенты
-         * @event ClientConnect
+         * Обновление списка подключённых клиентов в адаптере.
          */
-        this._ws.on("Users", ({d}) => {
-            if ("user_id" in d) this.adapter.clients.delete(d.user_id);
-            else {
+        this._ws.on("Users", ({ d }) => {
+            if (this.destroyed) return;
+
+            if ("user_id" in d) {
+                // Пользователь отключился — удаляем из множества
+                this.adapter.clients.delete(d.user_id);
+            } else {
+                // Добавляем новых пользователей
                 for (const id of d.user_ids) this.adapter.clients.add(id);
+            }
+        });
+
+
+        /**
+         * Обработчик сообщений WebSocket с операциями DAVE (тип `"daveSession"`).
+         * Обрабатывает:
+         * - `DavePrepareTransition` – подготовка перехода (возвращает DaveTransitionReady)
+         * - `DaveExecuteTransition` – выполнение перехода
+         * - `DavePrepareEpoch` – подготовка новой эпохи
+         */
+        this._ws.on("daveSession", async ({ op, d }) => {
+            const client = this._dave.client;
+            if (client.destroyed) return;
+
+            switch (op) {
+                /**
+                 * @description Подготовка перехода (transition) на новую версию протокола DAVE.
+                 *              Сервер уведомляет о предстоящем переходе (смена ключей, версии шифрования).
+                 *              Вызывается `session.prepareTransition(d)`, которая возвращает `true`,
+                 *              если переход требует подтверждения от клиента.
+                 *              Если требуется – отправляем серверу `DaveTransitionReady` с `transition_id`,
+                 *              сигнализируя о готовности к переключению.
+                 */
+                case VoiceOpcodes.DavePrepareTransition: {
+                    const sendReady = client.prepareTransition(d);
+                    if (sendReady) {
+                        this._ws.packet = {
+                            op: VoiceOpcodes.DaveTransitionReady,
+                            d: { transition_id: d.transition_id },
+                        };
+                    } else client.reinit();
+                    return;
+                }
+
+                /**
+                 * @description Выполнение ранее подготовленного перехода.
+                 *              Сервер сообщает, что нужно активировать новое состояние (ключи, версию).
+                 *              Вызывается `session.executeTransition(d.transition_id)`,
+                 *              которая обновляет внутреннее состояние сессии.
+                 *              Ответа не требуется.
+                 */
+                case VoiceOpcodes.DaveExecuteTransition: {
+                    client.executeTransition(d.transition_id);
+                    return;
+                }
+
+                /**
+                 * @description Подготовка новой эпохи (epoch) в рамках MLS-группы.
+                 *              Эпоха — это версия ключей группы (инкрементируется при каждом изменении состава).
+                 *              Данные эпохи содержат новую версию протокола и другую метаинформацию.
+                 *              Сохраняем их через сеттер `session.prepareEpoch = d`.
+                 *              Подтверждение не требуется.
+                 */
+                case VoiceOpcodes.DavePrepareEpoch: {
+                    client.prepareEpoch = d;
+                    return;
+                }
+            }
+        });
+
+        /**
+         * Обработчик бинарных сообщений WebSocket (тип `"binary"`).
+         * Обрабатывает:
+         * - `DaveMlsExternalSender` – установка внешнего отправителя.
+         * - `DaveMlsProposals` – обработка предложений MLS (отправляет welcome/commit).
+         * - `DaveMlsAnnounceCommitTransition` – обработка коммита для перехода.
+         * - `DaveMlsWelcome` – обработка welcome-сообщения.
+         */
+        this._ws.on("binary", async ({ op, payload }) => {
+            const client = this._dave.client;
+            if (client.destroyed) return;
+
+            switch (op) {
+                /**
+                 * @description Установка внешнего отправителя (External Sender) для MLS-сессии.
+                 *              Внешний отправитель - это данные (сертификат и публичный ключ),
+                 *              которые позволяют сессии принимать коммиты от сервера Discord.
+                 *              Приходит от сервера один раз после инициализации.
+                 */
+                case VoiceOpcodes.DaveMlsExternalSender: {
+                    client.externalSender = payload;
+                    return;
+                }
+
+                /**
+                 * @description Обработка предложений (Proposals) MLS:
+                 *              добавление/удаление участников, обновление ключей и т.д.
+                 *              Сервер присылает зашифрованные proposals.
+                 *              Сессия их обрабатывает и возвращает commit + опционально welcome.
+                 *              Если есть результат, отправляем его обратно серверу с префиксом-опкодом.
+                 */
+                case VoiceOpcodes.DaveMlsProposals: {
+                    const proposal = client.processProposals(payload, this.adapter.clients.array);
+                    if (proposal) {
+                        this._ws.packet = Buffer.concat([OPCODE_DAVE_MLS_WELCOME, proposal]);
+                    }
+                    return;
+                }
+
+                /**
+                 * @description Обработка коммита (Commit) MLS, который сервер объявляет как часть перехода.
+                 *              Коммит фиксирует изменения группы (новые ключи, состав).
+                 *              После успешного применения коммита необходимо отправить серверу
+                 *              подтверждение `DaveTransitionReady` с идентификатором перехода.
+                 */
+                case VoiceOpcodes.DaveMlsAnnounceCommitTransition: {
+                    const { transition_id, success } = client.processCommit(payload);
+                    if (success && transition_id !== 0) {
+                        this._ws.packet = {
+                            op: VoiceOpcodes.DaveTransitionReady,
+                            d: { transition_id },
+                        };
+                    }
+                    return;
+                }
+
+                /**
+                 * @description Обработка welcome-сообщения (новый участник входит в группу).
+                 *              Welcome приходит от сервера, когда текущая сессия добавляется в группу.
+                 *              После успешной обработки нужно подтвердить готовность к переходу.
+                 */
+                case VoiceOpcodes.DaveMlsWelcome: {
+                    const { transition_id, success } = client.processWelcome(payload);
+                    if (success && transition_id !== 0) {
+                        this._ws.packet = {
+                            op: VoiceOpcodes.DaveTransitionReady,
+                            d: { transition_id },
+                        };
+                    }
+                    return;
+                }
             }
         });
     };
 
     /**
-     * @description Отправление аудио пакета в систему rust cycle
-     * @public
+     * Выполняет UDP-подключение: отправляет discovery, получает IP/порт,
+     * затем отправляет Select Protocol на WebSocket.
+     *
+     * @param data - Данные, полученные в состоянии Ready (адрес, порт, ssrc и т.д.).
+     */
+    private _prepareUDPConnection = async (data: TransportState_Ready["payload"]) => {
+        const generation = ++this.generation;
+
+        this.emit("info", "[Transport/UDP]: Waiting discovery response");
+
+        const discovery = await this._udp!.create(data);
+
+        // Транспорт мог быть уничтожен во время ожидания discovery
+        if (this.destroyed) return;
+
+        // Если за время ожидания начата новая попытка — игнорируем старый ответ
+        if (generation !== this.generation)
+            return;
+
+        // Ошибка при получении адреса — завершаем
+        if (discovery instanceof Error) {
+            this.emit("close", VoiceCloseCodes.ServerNotFound, discovery);
+            this.destroy();
+            return;
+        }
+
+        this.emit("open");
+
+        // Сообщаем шлюзу выбранный протокол и данные для UDP
+        this._ws!.packet = {
+            op: VoiceOpcodes.SelectProtocol,
+            d: {
+                protocol: "udp",
+                data: {
+                    ...discovery,
+                    mode: "aead_aes256_gcm_rtpsize"
+                }
+            }
+        };
+    };
+
+    /**
+     * Отправляет аудио-пакеты через всю цепочку: DAVE → RTP → UDP.
+     *
+     * @param frames - Массив Opus-пакетов для шифрования и отправки.
      */
     public packet = (frames: Buffer[]) => {
         this._udp.packet(
@@ -313,26 +494,33 @@ export class Transport extends TypedEmitter<TransportEvents> {
     };
 
     /**
-     * @description Уничтожаем голосовой транспорт
-     * @public
+     * Уничтожает транспорт: закрывает все слои, очищает состояние.
+     *
+     * Идемпотентный метод — повторный вызов не приводит к действиям.
      */
     public destroy = () => {
+        if (this.destroyed) return;
+
+        this.destroyed = true;
+
         this.emit("destroyed", VoiceCloseCodes.CallTerminated);
-        this._state.code = TransportStateCode.Closed;
+
+        this._state = {
+            code: TransportStateCode.Closed,
+            payload: null
+        };
+
         super.destroy();
 
-        // Безопасный вызов деструкторов внутренних слоев
-        this._ws?.destroy?.();
-        this._udp?.destroy?.();
-        this._rtp?.destroy?.();
-        this._dave?.destroy?.();
+        this._ws?.destroy();
+        this._udp?.destroy();
+        this._rtp?.destroy();
+        this._dave?.destroy();
 
-        // Nullify для предотвращения утечек памяти
-        this._rtp = null;
         this._ws = null;
         this._udp = null;
+        this._rtp = null;
         this._dave = null;
-        this.reconnecting = null;
     };
 }
 

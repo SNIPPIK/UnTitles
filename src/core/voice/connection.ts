@@ -1,6 +1,6 @@
 import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./transport/adapter.js";
 import { SpeakerType, VoiceSpeakerManager } from "#core/voice/structures/Speaker.js";
-import {Transport, TransportStateCode} from "#core/voice/transport/index.js";
+import { Transport, TransportStateCode } from "#core/voice/transport/index.js";
 import { TypedEmitter, Logger } from "#structures";
 import { db } from "#app/db";
 
@@ -175,6 +175,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          */
         this.transport.on("reconnect", (_) => {
             this.adapter.send(this.configuration);
+
+            // Переключаем спикер в состояние выключено
+            this.speaker.speaking = SpeakerType.disable;
         });
 
         /**
@@ -195,6 +198,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          * @description Транспортный шлюз закрывается
          */
         this.transport.on("close", (code, reason) => {
+            // Переключаем спикер в состояние выключено
+            this.speaker.speaking = SpeakerType.disable;
+
+            // Переключаем статус на отключен
             this._status = ConnectionStatus.disconnected;
             Logger.log("WARN",`[Voice/${this.configuration.guild_id}]: ${code}: ${reason}`);
         });

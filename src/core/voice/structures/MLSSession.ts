@@ -48,6 +48,7 @@ const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 24;
  * ```
  */
 export class MLSSession extends TypedEmitter<ClientMLSEvents> {
+    public destroyed = false;
     /**
      * Идентификатор последнего успешно выполненного перехода.
      * `undefined`, если переходов ещё не было.
@@ -283,6 +284,8 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      * Автоматически вызывается при изменении `prepareEpoch`.
      */
     public reinit = (): void => {
+        if (this.destroyed) return;
+
         if (this.version > 0) {
             if (this.session) {
                 this.session.reinit(this.version, this.user_id, this.channel_id);
@@ -442,6 +445,9 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      * - Обнуляет все поля объекта для помощи сборщику мусора.
      */
     public destroy = () => {
+        if (this.destroyed) return;
+        this.destroyed = true;
+
         this._isTransitioning = true;
 
         try {

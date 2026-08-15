@@ -74,11 +74,11 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         // Создаем менеджер жизни
         this._heartbeat = new HeartbeatManager({
             // Отправка heartbeat
-            send: (time, latency) => {
+            send: (time) => {
                 this.packet = {
                     op: VoiceOpcodes.Heartbeat,
                     d: {
-                        t: time - latency,
+                        t: time,
                         seq_ack: this.sequence
                     }
                 };
@@ -106,7 +106,9 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public connect = (endpoint: string, code?: VoiceCloseCodes): void => {
         // Если ws клиент уже есть
-        if (this.ws) this.reset();
+        if (this.ws) {
+            this.reset();
+        }
 
         // Создаем WS подключение
         this.ws = createRuntimeWebSocket(`wss://${endpoint}?v=8`);
@@ -316,9 +318,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
                 // Игнорируем любые ошибки закрытия – соединение будет отброшено
             }
         }
-
-        // Останавливаем heartbeat
-        this._heartbeat?.stop();
     };
 
     /**
@@ -332,10 +331,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.sequence = null;
         this.queue = null;
 
-        if (this._heartbeat) {
-            this._heartbeat.destroy();
-        }
-
+        if (this._heartbeat) this._heartbeat.destroy();
         this._heartbeat = null;
     };
 }

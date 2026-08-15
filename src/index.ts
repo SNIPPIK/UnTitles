@@ -69,11 +69,6 @@ function initProcessEvents(): void {
     // Необработанное синхронное исключение
     process.on("uncaughtException", (err, origin) => {
         // Игнорируем известные проблемы WebSocket (Discord.js)
-        if (isWebSocketError(err)) {
-            Logger.log("DEBUG", `Ignored WebSocket error: ${err.message}`);
-            return;
-        }
-
         Logger.log(
             "ERROR",
             `Uncaught Exception\n` +
@@ -104,18 +99,6 @@ function initProcessEvents(): void {
             return gracefulShutdown();
         });
     }
-}
-
-/**
- * @description Проверяет, является ли ошибка внутренней проблемой WebSocket Discord.js
- * @param err - Ошибка
- * @returns true если это известная ошибка WebSocket
- */
-function isWebSocketError(err: Error): boolean {
-    // Проверка по имени или сообщению, а не по хрупкому регулярному выражению
-    return err.name === "WebSocketError" ||
-        err.message?.includes("WebSocket") ||
-        err.stack?.includes("ws/lib/websocket") === true;
 }
 
 /**

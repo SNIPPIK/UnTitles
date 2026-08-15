@@ -11,7 +11,7 @@ import { VoiceWebSocket } from "#core/voice/index.js";
  * @const
  * @private
  */
-const OPCODE_DAVE_MLS_WELCOME = new Uint8Array([VoiceOpcodes.DaveMlsCommitWelcome]);
+export const OPCODE_DAVE_MLS_WELCOME = new Uint8Array([VoiceOpcodes.DaveMlsCommitWelcome]);
 
 /**
  * @author SNIPPIK
@@ -107,134 +107,9 @@ export class DAVELayer extends BaseLayer<MLSSession> {
             ws.packet = {
                 op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,
                 d: {
-                    transition_id: transitionId,
-                },
+                    transition_id: transitionId
+                }
             };
-        });
-
-        /**
-         * Обработчик сообщений WebSocket с операциями DAVE (тип `"daveSession"`).
-         * Обрабатывает:
-         * - `DavePrepareTransition` – подготовка перехода (возвращает DaveTransitionReady)
-         * - `DaveExecuteTransition` – выполнение перехода
-         * - `DavePrepareEpoch` – подготовка новой эпохи
-         */
-        ws.on("daveSession", async ({ op, d }) => {
-            switch (op) {
-                /**
-                 * @description Подготовка перехода (transition) на новую версию протокола DAVE.
-                 *              Сервер уведомляет о предстоящем переходе (смена ключей, версии шифрования).
-                 *              Вызывается `session.prepareTransition(d)`, которая возвращает `true`,
-                 *              если переход требует подтверждения от клиента.
-                 *              Если требуется – отправляем серверу `DaveTransitionReady` с `transition_id`,
-                 *              сигнализируя о готовности к переключению.
-                 */
-                case VoiceOpcodes.DavePrepareTransition: {
-                    const sendReady = session.prepareTransition(d);
-                    if (sendReady) {
-                        ws.packet = {
-                            op: VoiceOpcodes.DaveTransitionReady,
-                            d: { transition_id: d.transition_id },
-                        };
-                    } else session.reinit();
-                    return;
-                }
-
-                /**
-                 * @description Выполнение ранее подготовленного перехода.
-                 *              Сервер сообщает, что нужно активировать новое состояние (ключи, версию).
-                 *              Вызывается `session.executeTransition(d.transition_id)`,
-                 *              которая обновляет внутреннее состояние сессии.
-                 *              Ответа не требуется.
-                 */
-                case VoiceOpcodes.DaveExecuteTransition: {
-                    session.executeTransition(d.transition_id);
-                    return;
-                }
-
-                /**
-                 * @description Подготовка новой эпохи (epoch) в рамках MLS-группы.
-                 *              Эпоха — это версия ключей группы (инкрементируется при каждом изменении состава).
-                 *              Данные эпохи содержат новую версию протокола и другую метаинформацию.
-                 *              Сохраняем их через сеттер `session.prepareEpoch = d`.
-                 *              Подтверждение не требуется.
-                 */
-                case VoiceOpcodes.DavePrepareEpoch: {
-                    session.prepareEpoch = d;
-                    return;
-                }
-            }
-        });
-
-        /**
-         * Обработчик бинарных сообщений WebSocket (тип `"binary"`).
-         * Обрабатывает:
-         * - `DaveMlsExternalSender` – установка внешнего отправителя.
-         * - `DaveMlsProposals` – обработка предложений MLS (отправляет welcome/commit).
-         * - `DaveMlsAnnounceCommitTransition` – обработка коммита для перехода.
-         * - `DaveMlsWelcome` – обработка welcome-сообщения.
-         */
-        ws.on("binary", async ({ op, payload }) => {
-            switch (op) {
-                /**
-                 * @description Установка внешнего отправителя (External Sender) для MLS-сессии.
-                 *              Внешний отправитель - это данные (сертификат и публичный ключ),
-                 *              которые позволяют сессии принимать коммиты от сервера Discord.
-                 *              Приходит от сервера один раз после инициализации.
-                 */
-                case VoiceOpcodes.DaveMlsExternalSender: {
-                    session.externalSender = payload;
-                    return;
-                }
-
-                /**
-                 * @description Обработка предложений (Proposals) MLS:
-                 *              добавление/удаление участников, обновление ключей и т.д.
-                 *              Сервер присылает зашифрованные proposals.
-                 *              Сессия их обрабатывает и возвращает commit + опционально welcome.
-                 *              Если есть результат, отправляем его обратно серверу с префиксом-опкодом.
-                 */
-                case VoiceOpcodes.DaveMlsProposals: {
-                    const proposal = session.processProposals(payload, this.adapter.clients.array);
-                    if (proposal) {
-                        ws.packet = Buffer.concat([OPCODE_DAVE_MLS_WELCOME, proposal]);
-                    }
-                    return;
-                }
-
-                /**
-                 * @description Обработка коммита (Commit) MLS, который сервер объявляет как часть перехода.
-                 *              Коммит фиксирует изменения группы (новые ключи, состав).
-                 *              После успешного применения коммита необходимо отправить серверу
-                 *              подтверждение `DaveTransitionReady` с идентификатором перехода.
-                 */
-                case VoiceOpcodes.DaveMlsAnnounceCommitTransition: {
-                    const { transition_id, success } = session.processCommit(payload);
-                    if (success && transition_id !== 0) {
-                        ws.packet = {
-                            op: VoiceOpcodes.DaveTransitionReady,
-                            d: { transition_id },
-                        };
-                    }
-                    return;
-                }
-
-                /**
-                 * @description Обработка welcome-сообщения (новый участник входит в группу).
-                 *              Welcome приходит от сервера, когда текущая сессия добавляется в группу.
-                 *              После успешной обработки нужно подтвердить готовность к переходу.
-                 */
-                case VoiceOpcodes.DaveMlsWelcome: {
-                    const { transition_id, success } = session.processWelcome(payload);
-                    if (success && transition_id !== 0) {
-                        ws.packet = {
-                            op: VoiceOpcodes.DaveTransitionReady,
-                            d: { transition_id },
-                        };
-                    }
-                    return;
-                }
-            }
         });
 
         // Запускаем (пере)инициализацию сессии.
