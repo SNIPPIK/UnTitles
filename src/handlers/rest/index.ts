@@ -393,7 +393,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
      */
     private fetch = async (track: Track, array: RestServerSide.API[]): Promise<Track[] | Error> => {
         const { name, artist, api } = track;
-        const original_name = `${artist.title} ${name}`;
+        const original_name = `${name} ${artist.title}`;
         const original = normalize(original_name);
 
         // Формируем массив обещаний для каждой платформы (кроме исходной)
@@ -420,14 +420,21 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
 
                 // Фильтрация треков по длительности и совпадению слов
                 const findTrack = search.find((song) => {
-                    const candidate = normalize(`${song.artist.title} ${song.name}`);
-                    const timeDiff = Math.abs(track.time.total - song.time.total);
-                    const candidateArr = candidate.split(/\s+/).filter(Boolean);
-                    const matchCount = candidateArr.filter(word => original.includes(word)).length;
-                    const namer = getSmartMatch(original, candidate);
+                    const candidate = normalize(
+                        `${song.name} ${song.artist?.title ?? ""}`
+                    );
 
-                    return (timeDiff <= 5) && namer || (timeDiff <= 5) && (matchCount >= Math.floor(candidateArr.length * 0.75)) ||
-                        namer || song.name.toLowerCase().includes(track.name.toLowerCase());
+                    const timeDiff = Math.abs(
+                        track.time.total - song.time.total
+                    );
+
+                    return (
+                        getSmartMatch(original, candidate) ||
+                        (
+                            timeDiff <= 5 &&
+                            getSmartMatch(original, candidate, 0.6)
+                        )
+                    );
                 });
 
                 // Если отфильтровать треки не удалось
@@ -463,8 +470,8 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
             // Если нет ответов
             if (promises.length === 0) return Error(`[APIs/fetch] Fail to get audio link on alternative platforms!`);
             return promises;
-        } catch {
-            return Error(`[APIs/fetch] Fail to get audio link on alternative platforms!`);
+        } catch (err) {
+            return Error(`[APIs/fetch] Fail to get audio link on alternative platforms!\n${err}`);
         }
     };
 

@@ -103,18 +103,9 @@ export namespace RestClientSide {
                 type,
                 // Функция, выполняющая фактический запрос через глобальный RestObject
                 request: () => {
-                    this.destroy();
                     return db.api.request_worker<T>({ platform, payload, options, type });
                 }
             };
-        };
-
-        /**
-         * @description Функция для удаления Rest/API запроса
-         * @private
-         */
-        private destroy = () => {
-            this._api = null;
         };
     }
 }
