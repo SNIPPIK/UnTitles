@@ -13,10 +13,10 @@ import { DAVELayer } from "#core/voice/transport/layers/DAVELayer.js";
 /**
  * @author SNIPPIK
  * @description Коды закрытия, из-за этох кодов не выйдет переподключится
- * @const CLOSE_CODES
+ * @const STOP_CODES
  * @private
  */
-const CLOSE_CODES: VoiceCloseCodes[] = [ VoiceCloseCodes.SessionNoLongerValid, VoiceCloseCodes.Disconnected ];
+const STOP_CODES: VoiceCloseCodes[] = [ VoiceCloseCodes.Disconnected ];
 
 /**
  * @author SNIPPIK
@@ -86,7 +86,18 @@ export class Transport extends TypedEmitter<TransportEvents> {
         switch (state.code) {
             // Поднимаем WS
             case TransportStateCode.OpeningWs: {
-                this.connect(this.adapter.packet.server.endpoint);
+                // Сохраняем прошлую последовательность до очистки старого сокета
+                //const last_seq = this._ws?.sequence ?? -1;
+
+                // Подключаемся по WS
+                this._ws.connect(this.adapter.packet.server.endpoint);
+
+                // Передаем сохраненную последовательность новому сокету
+                /*if (last_seq >= 0) {
+                    this._ws.sequence = last_seq;
+                    // Теперь это выполнится безопасно, так как слушатель "resumed" уже зарегистрирован выше
+                    this._ws.emit("resumed");
+                }*/
                 return;
             }
 
@@ -167,46 +178,13 @@ export class Transport extends TypedEmitter<TransportEvents> {
     public constructor(private adapter: VoiceAdapter) {
         super();
         this._dave = new DAVELayer(this.adapter);
-    };
-
-    /**
-     * @description Отправление аудио пакета в систему rust cycle
-     * @public
-     */
-    public packet = (frames: Buffer[]) => {
-        const encrypted = this._dave.packet(frames);
-        const rtp = this._rtp.packet(encrypted);
-
-        // Отправляем все готовые пакеты разом
-        this._udp.packet(rtp);
-    };
-
-    /**
-     * @description Подключаемся к серверам discord
-     * @param endpoint - точка входа
-     * @private
-     */
-    public connect = (endpoint: string) => {
-        // Сохраняем прошлую последовательность до очистки старого сокета
-        const last_seq = this._ws?.sequence ?? -1;
-
-        if (this._ws) {
-            this._ws.removeAllListeners();
-            this._ws.destroy();
-            this._ws = null;
-        }
-
-        // Создаем новый экземпляр сокета
-        this._ws = new VoiceWebSocket();
-
-        // --- РЕГИСТРАЦИЯ СОБЫТИЙ (Строго ДО вызова методов отправки/подключения) ---
 
         /**
          * @description Отправляем Identify данные, для регистрации голосового подключения
          * @status Identify
          * @code 0
          */
-        this._ws.once("open", () => {
+        this._ws.on("open", () => {
             const { server, state } = this.adapter.packet;
 
             this.state = {
@@ -226,12 +204,18 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @status WS Close
          * @code 1000-4022
          */
-        this._ws.once("close", (code, reason = "Unknown") => {
-            // Если шлюх был закрыт принудительно не пытаемся его поднять повторно
-            if (this._state.code === TransportStateCode.Closed) return;
+        this._ws.on("close", (code, reason = "Unknown") => {
+            // Если будет получен код ожидания
+            if (STOP_CODES.includes(code)) return;
+
+            else {
+                this.reconnecting++;
+                this.emit("reconnect", code);
+            }
+
 
             // Если достигли лимита попыток
-            if (this.reconnecting >= 3 || CLOSE_CODES.includes(code)) {
+            if (this.reconnecting > 3) {
                 this.destroy();
                 return;
             }
@@ -301,7 +285,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * @status WS Error
          */
         this._ws.on("error", (err) => {
-            this.emit("close", VoiceCloseCodes.BadRequest, err);
+            this.emit("close", VoiceCloseCodes.BadRequest, `[Voice/WS-Error]: \n${err.stack}`);
         });
 
         /**
@@ -314,17 +298,18 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 for (const id of d.user_ids) this.adapter.clients.add(id);
             }
         });
+    };
 
-        // --- ЗАПУСК ПОДКЛЮЧЕНИЯ ---
-
-        // Передаем сохраненную последовательность новому сокету
-        if (last_seq >= 0) {
-            this._ws.sequence = last_seq;
-            // Теперь это выполнится безопасно, так как слушатель "resumed" уже зарегистрирован выше
-            this._ws.emit("resumed");
-        }
-
-        this._ws.connect(endpoint);
+    /**
+     * @description Отправление аудио пакета в систему rust cycle
+     * @public
+     */
+    public packet = (frames: Buffer[]) => {
+        this._udp.packet(
+            this._rtp.packet(
+                this._dave.packet(frames)
+            )
+        );
     };
 
     /**
@@ -444,7 +429,7 @@ type TransportState =
  * @description Все статусы подключения транспорта
  * @enum TransportStateCode
  */
-enum TransportStateCode {
+export enum TransportStateCode {
     /** Код поднятия WSS подключения */
     OpeningWs = "open_ws_connection",
 
@@ -470,6 +455,9 @@ enum TransportStateCode {
  * @interface TransportEvents
  */
 interface TransportEvents {
+    /** Событие переподключения WS и все компонентов */
+    reconnect: (code: VoiceCloseCodes) => void;
+
     /** Событие об открытии подключения к Discord **/
     open: () => void;
 

@@ -35,11 +35,7 @@
     "discord-api-types": "^0.38.53",
     "http-proxy-agent": "^9.1.0",
     "seyfert": "^5.0.0",
-    "socks-proxy-agent": "^10.1.0",
-    "ws": "^8.21.3"
-  },
-  "optionalDependencies": {
-    "bufferutil": "^4.1.0"
+    "socks-proxy-agent": "^10.1.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.8.6",
@@ -55,8 +51,5 @@
     "build:native:dev": "npm run build:copy && napi build --platform --cwd ./rs --esm --js index.mjs && npm run build:bindings",
     "build:copy": "node -e \"const fs=require('fs');fs.mkdirSync('rs',{recursive:true});fs.copyFileSync('package.json','rs/package.json')\"",
     "build:bindings": "node -e \"const fs = require('fs'); const src = 'rs'; const dest = 'build/native'; if (!fs.existsSync(dest)) fs.mkdirSync(dest, {recursive:true}); const f = fs.readdirSync(src).find(x => x.endsWith('.node')); if (f) { fs.renameSync(src + '/' + f, dest + '/' + f); ['index.d.ts', 'index.mjs'].forEach(x => { const p = src + '/' + x; if(fs.existsSync(p)) fs.renameSync(p, dest + '/' + x) }); console.log('Moved ' + f + ' from ' + src + ' to ' + dest); } else { console.log('Source dir: ' + src); console.error('No .node file found in ' + src); process.exit(1); }\""
-  },
-  "allowScripts": {
-    "bufferutil@4.1.0": true
   }
 }

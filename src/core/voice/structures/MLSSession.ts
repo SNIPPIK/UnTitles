@@ -17,7 +17,7 @@ const MAX_DAVE_PROTOCOL: number = 1;
  *              Если за это время не произошёл финальный коммит, переход аннулируется.
  * @const TRANSITION_EXPIRY
  */
-const TRANSITION_EXPIRY = 2;
+const TRANSITION_EXPIRY = 10;
 
 /**
  * @author SNIPPIK
@@ -25,7 +25,7 @@ const TRANSITION_EXPIRY = 2;
  *              Это позволяет плавно деградировать шифрование, не обрывая воспроизведение.
  * @const TRANSITION_EXPIRY_PENDING_DOWNGRADE
  */
-const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 8;
+const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 24;
 
 /**
  * Управляет сеансом группового протокола DAVE (MLS) для сквозного шифрования (E2EE)
@@ -66,6 +66,8 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      */
     private transitionTimers = new Map<number, NodeJS.Timeout>();
 
+    private _pendingExternalSender: Buffer | null = null;
+
     /**
      * Флаг, указывающий, что протокол был понижен с ненулевой версии до версии 0.
      * Используется для корректного восстановления при последующем повышении.
@@ -95,21 +97,21 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      */
     public static get max_version(): number {
         return MAX_DAVE_PROTOCOL;
-    }
+    };
 
     /**
      * Возвращает `true`, если в данный момент выполняется переход.
      */
     public get isTransitioning(): boolean {
         return this._isTransitioning;
-    }
+    };
 
     /**
      * Возвращает текущий статус сессии (зависит от реализации `DAVESession`).
      */
     public get status() {
         return this.session?.status;
-    }
+    };
 
     /**
      * Устанавливает внешнего отправителя для сессии.
@@ -118,8 +120,12 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      * @throws {Error} Если сессия не инициализирована.
      */
     public set externalSender(externalSender: Buffer) {
-        if (!this.session) throw Error("No session available");
-        this.session.setExternalSender(externalSender);
+        if (this.session) {
+            this.session.setExternalSender(externalSender);
+        } else {
+            // Сохраняем до создания сессии
+            this._pendingExternalSender = externalSender;
+        }
     }
 
     /**
@@ -138,7 +144,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
 
         this.version = data.protocol_version;
         this.reinit();
-    }
+    };
 
     /**
      * Обрабатывает сигнал о невалидном переходе от Discord.
@@ -156,7 +162,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
 
         this.clearTransitions();
         this.reinit();
-    }
+    };
 
     /**
      * @param version    - Начальная версия протокола.
@@ -169,7 +175,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
         public channel_id: string
     ) {
         super();
-    }
+    };
 
     /**
      * Обрабатывает предложения (Proposals) от других участников.
@@ -186,7 +192,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
         payload: Buffer,
         connectedClients: readonly string[]
     ): Buffer | null => {
-        if (!this.session) throw Error("No session available");
+        if (!this.session) return null;   // не бросаем ошибку
 
         const type = payload.readUInt8(0);
         const data = payload.subarray(1);
@@ -199,7 +205,6 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
 
         if (!result.commit) return null;
 
-        // Если есть приглашение (Welcome), конкатенируем с коммитом.
         return result.welcome
             ? Buffer.concat([result.commit, result.welcome])
             : result.commit;
@@ -214,9 +219,11 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      *          При ошибке вызывает `recoverFromInvalidTransition`.
      */
     public processCommit = (payload: Buffer) => {
-        if (!this.session) throw Error("No session available");
-
         const transition_id = payload.readUInt16BE(0);
+
+        if (!this.session) {
+            return { transition_id, success: false };
+        }
 
         try {
             this.session.processCommit(payload.subarray(2));
@@ -244,9 +251,11 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
      *          При ошибке вызывает `recoverFromInvalidTransition`.
      */
     public processWelcome = (payload: Buffer) => {
-        if (!this.session) throw Error("No session available");
-
         const transition_id = payload.readUInt16BE(0);
+
+        if (!this.session) {
+            return { transition_id, success: false };
+        }
 
         try {
             this.session.processWelcome(payload.subarray(2));
@@ -276,17 +285,19 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
     public reinit = (): void => {
         if (this.version > 0) {
             if (this.session) {
-                // Переиспользуем существующую сессию.
                 this.session.reinit(this.version, this.user_id, this.channel_id);
             } else {
-                // Создаём новую сессию.
                 this.session = new DAVESession(this.version, this.user_id, this.channel_id);
             }
 
-            // Оповещаем внешний код о новом ключевом пакете.
+            // Применяем отложенный externalSender, если он был получен ранее
+            if (this._pendingExternalSender) {
+                this.session.setExternalSender(this._pendingExternalSender);
+                this._pendingExternalSender = null;
+            }
+
             this.emit("key", this.session.getSerializedKeyPackage());
         } else if (this.session) {
-            // Версия 0: сброс и passthrough.
             this.session.reset();
             this.session.setPassthroughMode(true, TRANSITION_EXPIRY);
         }
@@ -421,7 +432,7 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
         }
 
         this.transitionTimers.clear();
-    }
+    };
 
     /**
      * Уничтожает сессию и освобождает все ресурсы.
@@ -440,21 +451,17 @@ export class MLSSession extends TypedEmitter<ClientMLSEvents> {
         }
 
         super.destroy();
-
         this.clearTransitions();
 
         this.session = null;
         this.reinitializing = false;
-
         this.user_id = null;
         this.channel_id = null;
-
         this.lastTransition_id = null;
-
         this.pendingTransitions = null;
         this.transitionTimers = null;
-
         this.downgraded = false;
+        this._pendingExternalSender = null;
     };
 }
 

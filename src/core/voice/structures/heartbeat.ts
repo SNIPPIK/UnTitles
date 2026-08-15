@@ -23,7 +23,7 @@ export class HeartbeatManager {
     private lastAckTime = 0;
 
     /** Последнее время отправки heartbeat */
-    private lastSentTime = 0;
+    private lastSentTime = Date.now();
 
     /** Количество пропущенных ACK */
     private misses = 0;
@@ -69,7 +69,7 @@ export class HeartbeatManager {
 
             return setTimeout(() => {
                 this.lastSentTime = Date.now();
-                this.hooks?.send?.(this.lastSentTime); // отправляем heartbeat
+                this.hooks?.send?.(this.lastSentTime, this.latency); // отправляем heartbeat
                 this.setTimeout(); // запускаем ожидание ack
                 return timeout();
             }, this.intervalMs);
@@ -100,8 +100,6 @@ export class HeartbeatManager {
      * @public
      */
     public ack = (): void => {
-        if (!this.lastSentTime) return;
-
         this.lastAckTime = Date.now();
         const latency = this.lastAckTime - this.lastSentTime;
 
@@ -151,7 +149,7 @@ export class HeartbeatManager {
  */
 type HeartbeatHooks = {
     /** Метод вызывается при необходимости отправки heartbeat-пакета */
-    readonly send?: (time: number) => void;
+    readonly send?: (time: number, latency?: number) => void;
 
     /** Метод вызывается, если не получен HEARTBEAT_ACK вовремя */
     readonly onTimeout: () => void;

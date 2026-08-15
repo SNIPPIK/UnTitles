@@ -1,10 +1,7 @@
 import { VoiceCloseCodes, VoiceOpcodes } from "discord-api-types/voice/v8";
 import { HeartbeatManager } from "../../structures/heartbeat.js";
 import { type WebSocketOpcodes } from "#core/voice/index.js";
-import { type Data, type MessageEvent, WebSocket } from "ws";
 import { TypedEmitter } from "#structures";
-import { sdb } from "#worker/db";
-import { env } from "#app/env";
 
 /**
  * @author SNIPPIK
@@ -14,11 +11,6 @@ import { env } from "#app/env";
  * @public
  */
 export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
-    private static isProxy = env.get<boolean>("proxy.ws", false);
-
-    /** Адрес для подключения по websocket */
-    private _endpoint: string;
-
     /** Менеджер жизни подключения */
     private _heartbeat: HeartbeatManager;
 
@@ -36,16 +28,8 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public get ready() {
-        return this.ws.readyState === this.ws.OPEN;
-    };
-
-    /**
-     * @description Задержка WS ответа между UDP пакетами
-     * @public
-     */
-    public get latency() {
-        if (!this._heartbeat) return 60;
-        return this._heartbeat?.latency;
+        const ws = this.ws;
+        return ws !== null && ws.readyState === WebSocket.OPEN;
     };
 
     /**
@@ -64,7 +48,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public set packet(payload: WebSocketOpcodes.extract | WebSocketOpcodes.dave_opcodes | Buffer) {
         // Если ws нет или он не готов — ставим в очередь
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        if (!this.ready) {
             if (payload instanceof Buffer) {
                 this.queue.push(payload);
             } else {
@@ -77,13 +61,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             if (payload instanceof Buffer) this.ws.send(payload);
             else this.ws.send(JSON.stringify(payload));
         } catch (err) {
-            // Если ws упал
-            if (`${err}`.match(/Cannot read properties of null/)) {
-                // Пробуем подключится заново
-                this.connect(this._endpoint, VoiceCloseCodes.UnknownOpcode);
-                return;
-            }
-
             this.emit("error", err instanceof Error ? err : Error(String(err)));
         }
     };
@@ -97,11 +74,11 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         // Создаем менеджер жизни
         this._heartbeat = new HeartbeatManager({
             // Отправка heartbeat
-            send: (time) => {
+            send: (time, latency) => {
                 this.packet = {
                     op: VoiceOpcodes.Heartbeat,
                     d: {
-                        t: time,
+                        t: time - latency,
                         seq_ack: this.sequence
                     }
                 };
@@ -129,19 +106,11 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      */
     public connect = (endpoint: string, code?: VoiceCloseCodes): void => {
         // Если ws клиент уже есть
-        if (this.ws) {
-            // Удаляем ws, поскольку он будет создан заново
-            this.reset();
-        }
+        if (this.ws) this.reset();
 
-        // Очищаем очередь перед новым подключением
-        this.queue = [];
-
-        this._endpoint = endpoint;
-        this.ws = new WebSocket(`wss://${endpoint}?v=8`, {
-            // Можно ли использовать прокси для подключения WS
-            agent: VoiceWebSocket.isProxy ? sdb.proxy : null
-        });
+        // Создаем WS подключение
+        this.ws = createRuntimeWebSocket(`wss://${endpoint}?v=8`);
+        this.ws.binaryType = 'arraybuffer'; // Указываем тип получаемых данных
 
         // Сообщение от websocket соединения
         this.ws.onmessage = this.onReceiveMessage;
@@ -192,7 +161,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @private
      */
     private flushQueue = (): void => {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        if (!this.ready || !this.queue) return;
 
         while (this.queue.length > 0) {
             const msg = this.queue.shift();
@@ -209,7 +178,7 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @param data - Raw данные из websocket
      * @private
      */
-    private readRawData = (data: Data) => {
+    private readRawData = (data: ArrayBuffer | string) => {
         // Если пришел буфер
         if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
             const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
@@ -260,12 +229,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
             // Проверка HeartbeatAck
             case VoiceOpcodes.HeartbeatAck: {
                 this._heartbeat.ack();
-                break;
-            }
-
-            // Проверка переподключения
-            case VoiceOpcodes.Resumed: {
-                this._heartbeat.start();
                 break;
             }
 
@@ -324,20 +287,38 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
      * @public
      */
     public reset = (): void => {
-        this.removeAllListeners();
+        // Очищаем очередь
+        this.queue = [];
 
-        // Если есть websocket клиент
-        if (this.ws) {
-            this.ws.removeAllListeners();
-            this.ws.close();
-            this.ws.terminate();
+        const ws = this.ws;
+        if (ws) {
+            // Снимаем обработчики, установленные через on... свойства
+            ws.onopen = null;
+            ws.onmessage = null;
+            ws.onclose = null;
+            ws.onerror = null;
+
+            // Безопасно завершаем соединение в зависимости от readyState
+            try {
+                const state = ws.readyState;
+
+                if (state === WebSocket.CONNECTING) {
+                    // Прерываем рукопожатие (без исключений)
+                    this.ws = null;
+                } else if (state === WebSocket.OPEN) {
+                    // Нормально закрываем соединение
+                    ws.close(1000, "reset");
+                }
+
+                // Для CLOSING и CLOSED ничего не делаем
+                this.ws = null;
+            } catch {
+                // Игнорируем любые ошибки закрытия – соединение будет отброшено
+            }
         }
 
-        // Чистим данные о подключении
-        this.ws = null;
-
-        // Если есть менеджер жизни ws
-        if (this._heartbeat) this._heartbeat.stop();
+        // Останавливаем heartbeat
+        this._heartbeat?.stop();
     };
 
     /**
@@ -349,7 +330,6 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.reset();
         super.destroy();
         this.sequence = null;
-        this._endpoint = null;
         this.queue = null;
 
         if (this._heartbeat) {
@@ -456,4 +436,19 @@ interface ClientWebSocketEvents {
      * ```
      */
     "resumed": () => void;
+}
+
+/**
+ * @description Получение нативного WS
+ * @param url
+ */
+function createRuntimeWebSocket(url: string) {
+    const Constructor = globalThis.WebSocket;
+
+    // Если не удалось получить нативный сокет
+    if (typeof Constructor !== 'function') {
+        throw new TypeError('This runtime does not provide a WebSocket implementation.');
+    }
+
+    return new Constructor(url);
 }

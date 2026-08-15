@@ -129,9 +129,14 @@ export class VoiceAdapter {
      * @public
      */
     public send = (config: VoiceConnectionConfiguration) => {
+        if (!this.adapter) return false;
+
         try {
             // Если удается отправить данные через адаптер
-            return this.adapter?.send({op: GatewayOpcodes.VoiceStateUpdate, d: config });
+            return this.adapter.send({
+                op: GatewayOpcodes.VoiceStateUpdate,
+                d: config
+            });
         } catch {
             // Если не удалось отправить данные через адаптер
             return false;

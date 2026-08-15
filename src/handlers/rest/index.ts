@@ -98,7 +98,7 @@ class RestWorker<T extends APIRequestsKeys> {
      * @description Общее кол-во методов запросов
      * @public
      */
-    public get methods() {
+    /*public get methods() {
         let reqs = 0;
 
         // Прогоняем платформы и собираем кол-во доступных запросов
@@ -107,7 +107,7 @@ class RestWorker<T extends APIRequestsKeys> {
         }
 
         return reqs;
-    };
+    };*/
 
     /**
      * @description Заблокирована ли платформа?
@@ -289,66 +289,99 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
      * @returns Promise<APIRequests[T] | Error>
      * @public
      */
-    public request_worker<T extends APIRequestsKeys>({platform, payload, options, type}: RestClientSide.ClientOptions): Promise<APIRequests<T>| Error> {
+    public request_worker<T extends APIRequestsKeys>(params: RestClientSide.ClientOptions): Promise<APIRequests<T>| Error> {
+        const {platform, payload, options, type} = params;
         return new Promise<APIRequests<T> | Error>((resolve) => {
             const requestId = this.generateUniqueId();
 
             // Регистрируем "ждущего"
             this.pending.set(requestId, {
-                resolve: (message) => {
-                    const { result, status } = message;
-
-
-                    /**
-                     * @description Слушаем статус ответа другого потока
-                     * @private
-                     */
-                    switch (status) {
-                        // Если получен успешный ответ
-                        case "success": {
-                            Logger.log("DEBUG", `[Rest/API |${type}| GET  - ${platform.name}]: ${payload}`);
-                            const parseTrack = (item: APIRequestData.Track) => new Track(item, platform);
-
-                            // Если пришел список треков
-                            if (Array.isArray(result)) {
-                                return resolve(result.map(parseTrack) as APIRequests<T>);
-                            }
-
-                            // Если пришел плейлист
-                            else if (typeof result === "object" && "items" in result) {
-                                return resolve({ ...result, items: result.items.map(parseTrack) } as APIRequests<T>);
-                            }
-
-                            // Если просто трек
-                            return resolve(parseTrack(result) as APIRequests<T>);
-                        }
-
-                        // Если была получена ошибка
-                        case "error": {
-                            Logger.log("ERROR", result as any);
-
-                            // Если платформа не отвечает, то отключаем ее!
-                            if (/Connection Timeout/.test(result.message) || /Fail getting client ID/.test(result.message)) {
-                                // Блочим платформу
-                                this.platforms.block.push(platform.name);
-                            }
-
-                            return resolve(Error(result.name));
-                        }
-
-                        // Если получен неожиданный ответ
-                        default: {
-                            Logger.log("WARN", `An unknown response was received from another thread!`);
-                            return resolve(Error(`Unknown response!!!`))
-                        }
-                    }
-                }
+                resolve: (message) => resolve(this.worker_resolve(message, params) as Error | APIRequests<T>)
             });
 
             // Отправляем запрос
             this.worker.send({ platform: platform.name, payload, options, requestId, type });
             Logger.log("DEBUG", `[Rest/API |${type}| SEND - ${platform.name}]: ${payload}`);
         });
+    };
+
+    /**
+     * Обработчик ответа от воркера (REST-клиента), вызываемый при получении результата
+     * выполнения запроса. Разбирает ответ в зависимости от статуса и преобразует данные
+     * в удобный для вызывающего кода вид.
+     *
+     * @param message - Сообщение от серверной части (воркера). Содержит:
+     *   - `result` — данные ответа (зависит от типа запроса).
+     *   - `status` — статус выполнения: `"success"`, `"error"` или неожиданный.
+     *   - `requestId?` — опциональный идентификатор запроса (не используется в текущей логике).
+     * @param param1 - Параметры клиентского запроса:
+     *   - `platform` — объект платформы (содержит имя, используемое для блокировки и логирования).
+     *   - `payload` — строка, переданная в запросе (например, URL или поисковый запрос).
+     *   - `type` — тип запроса (например, `"GET"`, `"POST"`), используется в логах.
+     *
+     * @returns Результат обработки:
+     *   - Для `"success"`: массив `Track[]`, объект с полем `items` (плейлист) или одиночный `Track`.
+     *   - Для `"error"`: объект `Error` со стеком ошибки.
+     *   - При неизвестном статусе: объект `Error` с сообщением `"Unknown response!!!"`.
+     *
+     * @private
+     * @remarks
+     * Метод вызывается автоматически при получении ответа от воркера. Он:
+     * 1. Логирует успешные запросы с уровнем `DEBUG`.
+     * 2. Преобразует "сырые" объекты треков в экземпляры класса `Track`.
+     * 3. Обрабатывает критические ошибки (таймауты, проблемы с клиентским ID) — добавляет платформу
+     *    в список заблокированных (`this.platforms.block`).
+     * 4. Логирует неожиданные статусы с уровнем `WARN`.
+     */
+    private worker_resolve = (message: RestServerSide.Result<APIRequestsKeys> & { requestId?: number }, { platform, payload, type }: RestClientSide.ClientOptions) => {
+        const { result, status } = message;
+
+        /**
+         * Обработка в зависимости от статуса ответа.
+         */
+        switch (status) {
+            // Успешный ответ
+            case "success": {
+                Logger.log("DEBUG", `[Rest/API |${type}| GET  - ${platform.name}]: ${payload}`);
+
+                // Функция-обёртка для преобразования данных трека в экземпляр Track.
+                const parseTrack = (item: APIRequestData.Track) => new Track(item, platform);
+
+                // Если ответ содержит массив треков — маппим каждый элемент.
+                if (Array.isArray(result)) {
+                    return result.map(parseTrack);
+                }
+                // Если ответ является объектом с полем `items` (плейлист) — обрабатываем вложенные треки.
+                else if (typeof result === "object" && "items" in result) {
+                    return { ...result, items: result.items.map(parseTrack) };
+                }
+                // Иначе считаем, что это одиночный трек.
+                return parseTrack(result);
+            }
+
+            // Ошибка при выполнении запроса
+            case "error": {
+                Logger.log("ERROR", result.stack);
+
+                // Если ошибка связана с тайм-аутом соединения или невозможностью получить client ID,
+                // блокируем платформу, чтобы предотвратить повторные неудачные запросы.
+                if (
+                    /Connection Timeout/.test(result.message) ||
+                    /Fail getting client ID/.test(result.message)
+                ) {
+                    this.platforms.block.push(platform.name);
+                }
+
+                // Возвращаем объект Error, чтобы вызывающий код мог обработать ошибку.
+                return Error(result.stack);
+            }
+
+            // Неожиданный статус
+            default: {
+                Logger.log("WARN", `An unknown response was received from another thread!`);
+                return Error(`Unknown response!!!`);
+            }
+        }
     };
 
     /**
@@ -661,7 +694,7 @@ const getSmartMatch = (original: string, candidate: string, threshold = 0.8): bo
     const sourceWords = source.split(/\s+/);
     const targetWords = new Set(target.split(/\s+/));
 
-    // Убираем все пробелы для проверки вхождений подстрок (например, "love song" в "lovesong")
+    // Убираем все пробелы для проверки вхождений подстрок
     const compressed = target.replace(/\s+/g, "");
 
     let score = 0;
@@ -690,7 +723,7 @@ const getSmartMatch = (original: string, candidate: string, threshold = 0.8): bo
         }
     }
 
-    // Бонус, если вся исходная строка является подстрокой целевой (например, "abc" в "xxabcxx")
+    // Бонус, если вся исходная строка является подстрокой целевой
     if (target.includes(source))
         score += 1;
 

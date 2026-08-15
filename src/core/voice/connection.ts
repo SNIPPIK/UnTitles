@@ -1,6 +1,6 @@
 import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./transport/adapter.js";
 import { SpeakerType, VoiceSpeakerManager } from "#core/voice/structures/Speaker.js";
-import { Transport } from "#core/voice/transport/index.js";
+import {Transport, TransportStateCode} from "#core/voice/transport/index.js";
 import { TypedEmitter, Logger } from "#structures";
 import { db } from "#app/db";
 
@@ -130,9 +130,14 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
                 // Если ссылки для подключения нет
                 if (!packet.endpoint) return;
 
-                this.adapter!.packet.server = packet;
-                this.transport?.connect(packet.endpoint);
                 this.emit("info", `[Voice]: server update applied`);
+                this.adapter.packet.server = packet;
+
+                // Отправляем статус
+                this.transport.state = {
+                    code: TransportStateCode.OpeningWs,
+                    payload: null
+                }
             },
 
             /**
@@ -141,8 +146,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
              * @param packet - Полученный пакет `VOICE_STATE_UPDATE`
              */
             onVoiceStateUpdate: (packet) => {
+                this.emit("info", `[Voice]: client update applied`);
                 this.adapter.packet.state = packet;
-                this.emit("info", `[Voice/Adapter]: receive on onVoiceStateUpdate`);
             },
 
             /**
@@ -158,28 +163,45 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         // Задаем статус подключения
         this.status = ConnectionStatus.connecting;
 
-        // Слушаем подключение
+        /**
+         * @description Слушаем данные VoiceConnection
+         */
         this.on("info", (err) => {
-            Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
+            Logger.log("WARN",`[Voice/${this.configuration.guild_id}]: ${err}`);
         });
 
-        // Слушаем шлюз (открытие)
+        /**
+         * @description Переподключаемся
+         */
+        this.transport.on("reconnect", (_) => {
+            this.adapter.send(this.configuration);
+        });
+
+        /**
+         * @description Транспортный шлюз открыт
+         */
         this.transport.on("open", () => {
             this._status = ConnectionStatus.connected;
         });
 
-        // Слушаем шлюз (информирование)
+        /**
+         * @description Транспортный шлюз информирует
+         */
         this.transport.on("info", (err) => {
-            Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${err}`);
+            Logger.log("WARN",`[Voice/${this.configuration.guild_id}]: ${err}`);
         });
 
-        // Слушаем шлюз (закрытие)
+        /**
+         * @description Транспортный шлюз закрывается
+         */
         this.transport.on("close", (code, reason) => {
             this._status = ConnectionStatus.disconnected;
-            Logger.log("WARN",`[Voice Layer/${this.configuration.guild_id}]: ${code}: ${reason}`);
+            Logger.log("WARN",`[Voice/${this.configuration.guild_id}]: ${code}: ${reason}`);
         });
 
-        // Слушаем шлюз (уничтожение)
+        /**
+         * @description Транспортный шлюз полностью закрывается
+         */
         this.transport.once("destroyed", this.destroy);
     };
 
