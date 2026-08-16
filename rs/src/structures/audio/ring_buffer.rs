@@ -249,7 +249,13 @@ impl RingBuffer {
     pub fn len(&self) -> usize {
         let head = self.head.0.load(Ordering::Acquire);
         let tail = self.tail.0.load(Ordering::Acquire);
-        head.saturating_sub(tail)
+        let cap = self.capacity;
+
+        if head >= tail {
+            head - tail
+        } else {
+            cap - tail + head
+        }
     }
 
     /// Возвращает `true`, если буфер пуст (на момент вызова).
