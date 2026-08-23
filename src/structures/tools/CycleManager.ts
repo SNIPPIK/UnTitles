@@ -8,49 +8,61 @@ import { SetArray } from "#structures/array/index.js";
  * @abstract
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Последняя зафиксированная длительность цикла (целевая) */
-    private lastDuration: number = 0;
-    private _drift = 0;
+    private lastDuration = 0;
 
-    /** Абсолютное время следующего запланированного выполнения (ms) */
-    private nextExecutionTime: number = 0;
+    /**
+     * Среднее отклонение запуска от ожидаемого времени.
+     */
+    private _jitter = 0;
 
-    /** Идентификатор активного таймера */
+    /**
+     * Среднее время выполнения цикла.
+     */
+    private _executionTime = 0;
+
+    /**
+     * Предполагаемое время следующего запуска.
+     */
+    private nextExecutionTime = 0;
+
+    /**
+     * Таймер Node.js.
+     */
     private timer: NodeJS.Timeout | NodeJS.Immediate | null = null;
 
     /**
-     * @description Текущее время в миллисекундах (высокая точность)
-     * @protected
+     * Монотонное время в миллисекундах.
      */
     protected get time(): number {
-        return process.uptime();
+        return performance.now();
     };
 
     /**
-     * @description Ожидаемое время следующего шага цикла
-     * @returns number (0 если цикл не активен)
-     * @public
+     * Предполагаемое время следующего запуска.
      */
     public get insideTime(): number {
         return this.nextExecutionTime;
     };
 
     /**
-     * @description Последний целевой интервал цикла
-     * @returns number
-     * @public
+     * Текущий интервал.
      */
     public get delay(): number {
         return this.lastDuration;
     };
 
     /**
-     * @description ВРеменная задержка между шагами
-     * @returns number
-     * @public
+     * Средний jitter Event Loop.
      */
     public get drift(): number {
-        return this._drift;
+        return this._jitter;
+    };
+
+    /**
+     * Среднее время выполнения одного прохода.
+     */
+    public get executionTime(): number {
+        return this._executionTime;
     };
 
     /**
@@ -58,11 +70,15 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @param options - конфигурация цикла
      * @throws {Error} если duration <= 0
      */
-    public constructor(public options: SyncCycleConfig<T> | AsyncCycleConfig<T>) {
+    public constructor(
+        public options: SyncCycleConfig<T> | AsyncCycleConfig<T>
+    ) {
         super();
+
         if (options.duration <= 0) {
             throw Error("Duration must be a positive number");
         }
+
         this.lastDuration = options.duration;
     };
 
@@ -72,21 +88,21 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @returns this
      */
     public add(item: T): this {
-        // Вызов кастомного обработчика добавления
-        if (this.options.custom?.push) {
-            this.options.custom.push(item);
+        this.options.custom?.push?.(item);
+
+        if (this.has(item)) {
+            this.delete(item);
         }
 
-        // Удаляем дубликат, если уже существует
-        if (this.has(item)) this.delete(item);
         super.add(item);
 
-        // Запуск цикла при первом добавленном элементе
         if (this.size === 1 && !this.nextExecutionTime) {
             const now = this.time;
-            this.nextExecutionTime = now + this.options.duration;
-            // Используем setImmediate для немедленного, но асинхронного старта
-            setImmediate(this.step);
+
+            this.nextExecutionTime =
+                now + this.options.duration;
+
+            this.timer = setImmediate(this.step);
         }
 
         return this;
@@ -98,15 +114,10 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @returns true если элемент был удалён, иначе false
      */
     public delete(item: T): boolean {
-        const existed = this.has(item);
-        if (!existed) return false;
+        if (!this.has(item)) return false;
+        this.options.custom?.remove?.(item);
 
-        if (this.options.custom?.remove) {
-            this.options.custom.remove(item);
-        }
-
-        super.delete(item);
-        return true;
+        return super.delete(item);
     };
 
     /**
@@ -114,9 +125,14 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public reset(): void {
         this.clearTimer();
-        this.clear();          // очистка SetArray
+        this.clear();
+
         this.nextExecutionTime = 0;
+
         this.lastDuration = 0;
+
+        this._jitter = 0;
+        this._executionTime = 0;
     };
 
     /**
@@ -124,10 +140,16 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected clearTimer(): void {
-        if (!this.timer) return;
+        if (!this.timer) {
+            return;
+        }
 
-        if ("hasRef" in this.timer) clearTimeout(this.timer as NodeJS.Timeout);
-        else clearImmediate(this.timer as NodeJS.Immediate);
+        if ("hasRef" in this.timer) {
+            clearTimeout(this.timer as NodeJS.Timeout);
+        } else {
+            clearImmediate(this.timer as NodeJS.Immediate);
+        }
+
         this.timer = null;
     };
 
@@ -136,15 +158,31 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @protected
      */
     protected scheduleStep(): void {
-        const delay = Math.max(-1, this.nextExecutionTime - this.time);
+        if (this.size === 0) {
+            this.reset();
+            return;
+        }
+
+        const now = this.time;
+
+        /**
+         * Здесь НЕ пытаемся обеспечить точность.
+         *
+         * Node.js timer — только приблизительная
+         * точка запуска producer-а.
+         */
+        const delay =
+            this.nextExecutionTime - now;
+
         this.clearTimer();
 
         if (delay <= 0) {
-            // Мы уже отстаем, выполняем следующий шаг максимально быстро
             this.timer = setImmediate(this.step);
         } else {
-            // Обычное планирование
-            this.timer = setTimeout(this.step, delay);
+            this.timer = setTimeout(
+                this.step,
+                delay
+            );
         }
     };
 
@@ -153,37 +191,75 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      * @private
      */
     private step = (): void => {
-        // Если очередь пуста – останавливаем цикл
-        if (this.size === 0) return this.reset();
+        this.timer = null;
 
-        // Обновляем время следующего выполнения (устойчиво к дрейфу)
-        const start = this.time;
-
-        try {
-            // Выполнение полезной нагрузки (переопределяется в наследниках)
-            this._stepCycle();
-        } catch (error) {
-            // Логируем критические ошибки, но не даём циклу упасть
-            console.error("[CycleSystem] Unhandled error in _stepCycle:", error);
+        if (this.size === 0) {
+            this.reset();
+            return;
         }
 
-        this._drift = Math.max(this._drift / 0.25, start - this.time);
-        const now = this.time;
+        const scheduled = this.nextExecutionTime;
+        const start = this.time;
 
-        // Если мы сильно отстали (например, из-за долгой обработки),
-        // сбрасываем nextExecutionTime, чтобы избежать каскадного отставания
-        if (this.nextExecutionTime <= now) this.nextExecutionTime = now + this.options.duration;
-        this.lastDuration = this.options.duration;
+        /**
+         * Реальное отклонение от предполагаемого времени.
+         */
+        const jitter = Math.max(
+            0,
+            start - scheduled
+        );
 
-        // Планируем следующий шаг
+        /**
+         * Сглаживаем статистику.
+         */
+        this._jitter =
+            this._jitter * 0.9 +
+            jitter * 0.1;
+
+        try {
+            this._stepCycle();
+        } catch (error) {
+            console.error(
+                "[CycleSystem] Unhandled error:",
+                error
+            );
+        }
+
+        const end = this.time;
+
+        /**
+         * Время обработки.
+         */
+        const executionTime = end - start;
+
+        this._executionTime =
+            this._executionTime * 0.9 +
+            executionTime * 0.1;
+
+        /**
+         * Следующая предполагаемая точка.
+         *
+         * Это именно prediction,
+         * а не жёсткий deadline.
+         */
+        this.nextExecutionTime =
+            scheduled + this.options.duration;
+
+        /**
+         * Если Node сильно отстал —
+         * не пытаемся догнать старое расписание.
+         */
+        if (this.nextExecutionTime <= end) {
+            this.nextExecutionTime =
+                end + this.options.duration;
+        }
+
+        this.lastDuration =
+            this.options.duration;
+
         this.scheduleStep();
     };
 
-    /**
-     * @description Абстрактный метод, выполняющий полезную работу на каждом шаге
-     * @protected
-     * @abstract
-     */
     protected abstract _stepCycle(): void;
 }
 

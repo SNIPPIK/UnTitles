@@ -15,7 +15,7 @@ export default class extends ComponentCommand {
         const queue = db.queues.get(ctx.guildId);
 
         // Если в очереди менее 2 треков
-        if (queue.tracks.size < 2) {
+        if (queue.tracks.total < 2) {
             return ctx.write({
                 embeds: [{
                     description: locale._(ctx.interaction.locale, "player.button.shuffle.fail"),

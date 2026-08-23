@@ -1,4 +1,4 @@
-import {Client, GatewayActivityUpdateData, LimitedCollection, LimitedMemoryAdapter} from "seyfert";
+import { Client, GatewayActivityUpdateData, LimitedCollection, LimitedMemoryAdapter } from "seyfert";
 import { middlewares } from "#handler/middlewares/index.js";
 import { ActivityType } from "seyfert/lib/types/index.js";
 import { env } from "#app/env";
@@ -25,9 +25,6 @@ export class DiscordClient extends Client {
      */
     public constructor() {
         super({
-            /**
-             * @description Хуки для команд
-             */
             commands: {
                 // Для команд через префикс
                 /*prefix: (msg) => {
@@ -57,14 +54,6 @@ export class DiscordClient extends Client {
 
             cache: {
                 adapter: new LimitedMemoryAdapter({
-                    member: {
-                        expire: (1e3 * 60) * 2,
-                        limit: 200,
-                    },
-                    user: {
-                        expire: (1e3 * 60) * 2,
-                        limit: 10,
-                    },
                     presence: {
                         expire: 1e3 * 60,
                         limit: 5,
@@ -156,8 +145,10 @@ export class DiscordClient extends Client {
             const envPresents = (JSON.parse(`[${env.get("client.presence.array")}]`) as GatewayActivityUpdateData[]).map((status) => {
                 const edited = status.name
                     .replace(/{shard}/g, `${this.gateway.size}`)
-                    .replace(/{queues}|{players}/g, `${db.queues.size}`)
-                    .replace(/{version}/g, `0.5.0 Seyfert`)
+                    .replace(/{queues}}/g, `${db.queues.size}`)
+                    .replace(/{players}/g, `${db.queues.cycles.players.size}`)
+                    .replace(/{messages}/g, `${db.queues.cycles.messages.size}`)
+                    .replace(/{version}/g, "0.5.0")
                     .replace(/{guilds}/g, `${guilds}`)
                     .replace(/{users}/g, `${users}`)
 

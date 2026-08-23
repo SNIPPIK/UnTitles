@@ -24,7 +24,7 @@ import { db } from "#app/db";
             "en-US": "Which platform does the request belong to?",
             "ru": "К какой платформе относится запрос?"
         },
-        choices: db.api.array.map((platform) => {
+        choices: db.api.array_prev.map((platform) => {
             return {
                 name: `${platform.name.toLowerCase()} | ${platform.url}`,
                 value: platform.name

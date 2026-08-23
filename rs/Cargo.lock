@@ -60,16 +60,16 @@ dependencies = [
 
 [[package]]
 name = "aes-gcm"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdf011db2e21ce0d575593d749db5554b47fed37aff429e4dc50bc91ac93a028"
+checksum = "7f2b8006a0c83f52b62ba44a97b58bf76fe2f70a329e588f67f89691d93d498f"
 dependencies = [
  "aead 0.6.1",
  "aes 0.9.1",
  "cipher 0.5.2",
  "ctr 0.10.1",
+ "ctutils",
  "ghash 0.6.0",
- "subtle",
 ]
 
 [[package]]
@@ -1222,9 +1222,9 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "napi"
-version = "3.12.1"
+version = "3.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "459197f1592f4c3dbbf9c1b13f5a4599a343e4ef66b96bc340e2a518b36a6662"
+checksum = "58c5f4d5375213fdb7be2655e152386e82f026f9a5ba36a75556e11359aafe09"
 dependencies = [
  "bitflags 2.11.0",
  "ctor",
@@ -1234,6 +1234,7 @@ dependencies = [
  "napi-sys",
  "nohash-hasher",
  "rustc-hash",
+ "tokio",
 ]
 
 [[package]]
@@ -1998,6 +1999,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio"
+version = "1.53.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed"
+dependencies = [
+ "pin-project-lite",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2207,7 +2217,7 @@ name = "watklok-native"
 version = "0.1.0"
 dependencies = [
  "aead 0.6.1",
- "aes-gcm 0.11.0",
+ "aes-gcm 0.11.1",
  "arc-swap",
  "bytes",
  "dashmap",

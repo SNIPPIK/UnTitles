@@ -268,7 +268,7 @@ export class ControllerTracks<T extends Track> {
     public shuffleTracks = (bol: boolean) => {
         // Если перетасовка выключена
         if (!this._shuffle) {
-            let currentIndex = this.size;
+            let currentIndex = this.total;
 
             // Записываем треки до перетасовки
             this._original = this._current.slice();

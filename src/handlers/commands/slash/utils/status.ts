@@ -40,7 +40,6 @@ export default class StatusCommand extends Command {
         const heapTotal     = toMB(mem.heapTotal);
         const external      = toMB(mem.external);
         const arrayBuffers  = toMB(mem.arrayBuffers);
-        const rust          = toMB((mem.rss - mem.heapTotal - mem.external - mem.arrayBuffers - mem.heapUsed) / 2);
 
         // ── Формируем embed с секциями ──────────────────────────────
         const embed = {
@@ -59,11 +58,10 @@ export default class StatusCommand extends Command {
                 {
                     name: "💾 Memory",
                     value: [
-                        `RSS: **${rss} MB**`,
+                        `RSS\`Rust: **${rss} MB**`,
                         `Heap: **${heapUsed} / ${heapTotal} MB**`,
                         `External: **${external} MB**`,
                         `ArrayBuffers: **${arrayBuffers} MB**`,
-                        `Native (Rust): **≈ ${rust} MB**`,
                     ].join('\n'),
                     inline: true,
                 },
@@ -71,7 +69,8 @@ export default class StatusCommand extends Command {
                     name: "🎵 Audio",
                     value: [
                         `Queues: **${db.queues.size}**`,
-                        `Players: **${db.queues.size}**`,
+                        `Players: **${db.queues.cycles.players.size}**`,
+                        `Messages: **${db.queues.cycles.messages.size}**`,
                         `Voice Sessions: **${db.voice.size}**`,
                     ].join('\n'),
                     inline: true,

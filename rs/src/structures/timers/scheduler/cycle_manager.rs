@@ -99,21 +99,11 @@ impl CycleManager {
     /// Если это первая сессия, запускает фоновый поток.
     /// Поток начнёт обходить сессии на следующем такте.
     pub fn add_session(&self, id: u32, session: Arc<UdpBuffered>) {
-        // Клонируем текущую карту и вставляем новую сессию.
         let mut map = self.sessions.load_full();
+
         Arc::make_mut(&mut map).insert(id, session);
-        // Атомарно заменяем старую карту новой.
         self.sessions.store(map);
-
-        // Убедимся, что воркер запущен (флаг running = true, создан поток).
         self.start_if_needed();
-
-        // Попытка немедленно разбудить воркер (на случай, если он спит).
-        // ВАЖНО: воркер не ожидает condvar, поэтому это уведомление
-        // не влияет на текущую реализацию, но оставлено как заготовка.
-        let (lock, cvar) = &*self.wake_state;
-        *lock.lock().unwrap() = true;
-        cvar.notify_one();
     }
 
     /// Удаляет сессию по идентификатору.
@@ -125,8 +115,6 @@ impl CycleManager {
         let mut map = self.sessions.load_full();
         Arc::make_mut(&mut map).remove(&id);
         self.sessions.store(map);
-        // Будим поток (не влияет, см. выше).
-        self.wake_thread();
     }
 
     /// Возвращает текущее количество активных сессий.
@@ -190,22 +178,15 @@ impl CycleManager {
         let handle = thread::Builder::new()
             .name("udp-cycle".into())
             .spawn(move || {
-                const MAX_SKIP: u64 = 5;
-
                 let interval = Duration::from_millis(TICK_INTERVAL_MS);
-                let mut next_deadline = Instant::now() + interval;
-
-                #[cfg(debug_assertions)]
-                let mut tick: u64 = 0;
+                let mut next_deadline = Instant::now();
 
                 while running.load(Ordering::Acquire) {
-                    #[cfg(debug_assertions)]
-                    {
-                        tick += 1;
-                    }
+                    // ================================================================
+                    // PROCESS
+                    // ================================================================
 
-                    // ---------- PROCESS ----------
-                    let snapshot = sessions.load();
+                    let snapshot = sessions.load_full();
 
                     if !snapshot.is_empty() {
                         let now = now_ms();
@@ -215,7 +196,12 @@ impl CycleManager {
                         }
                     }
 
-                    // ---------- WAIT ----------
+                    // ================================================================
+                    // SCHEDULE
+                    // ================================================================
+
+                    next_deadline += interval;
+
                     let now = Instant::now();
 
                     if now < next_deadline {
@@ -225,41 +211,11 @@ impl CycleManager {
                             thread::sleep(sleep - SPIN_MARGIN);
                         }
 
-                        let mut spins = 0usize;
-
-                        loop {
-                            if Instant::now() >= next_deadline {
-                                break;
-                            }
-
-                            if spins < 128 {
-                                std::hint::spin_loop();
-                            } else if (spins & 63) == 0 {
-                                thread::yield_now();
-                            } else {
-                                std::hint::spin_loop();
-                            }
-
-                            spins += 1;
+                        while Instant::now() < next_deadline {
+                            std::hint::spin_loop();
                         }
-
-                        next_deadline += interval;
                     } else {
-                        let lag = now.duration_since(next_deadline);
-                        let skipped = (lag.as_millis() as u64 / TICK_INTERVAL_MS).min(MAX_SKIP);
-
-                        #[cfg(debug_assertions)]
-                        if skipped > 0 {
-                            println!(
-                                "udp-cycle lag: skipped {} ticks ({} ms), total {} ticks",
-                                skipped,
-                                lag.as_millis(),
-                                tick
-                            );
-                        }
-
-                        // Пересчитываем следующий дедлайн без накопления ошибки.
-                        next_deadline += interval * ((skipped + 1) as u32);
+                        next_deadline = Instant::now() + interval;
                     }
                 }
             })

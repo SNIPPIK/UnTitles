@@ -7,7 +7,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = { version = "3.12.1", features = ["napi10"] }
+napi = { version = "3.12.2", features = ["napi10", "tokio_rt", "async"] }
 napi-derive = "3.6.3"
 once_cell = "1.21.4"
 rand = "0.10.2"
@@ -21,7 +21,7 @@ memchr = "2.8.3"
 # For crypto
 davey = "0.1.4"
 aead = "0.6.1"
-aes-gcm = { version = "0.11.0", features = ["aes"] }
+aes-gcm = { version = "0.11.1", features = ["aes"] }
 
 # Профиль релиза
 [profile.release]

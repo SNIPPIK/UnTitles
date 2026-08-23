@@ -46,8 +46,7 @@ export default class extends ComponentCommand {
                         value: item.locale[ctx.author.locale] ?? item.locale["en-US"],
                         inline: true
                     }
-                }),
-                timestamp: new Date().toString()
+                })
             }],
             flags: MessageFlags.Ephemeral
         });

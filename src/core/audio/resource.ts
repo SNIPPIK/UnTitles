@@ -230,10 +230,6 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         // Удаляем все вызовы функций
         super.destroy();
         clearTimeout(this._timeout);
-
-        if (typeof global.gc === "function") {
-            global.gc();
-        }
     };
 }
 

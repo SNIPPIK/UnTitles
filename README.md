@@ -119,7 +119,7 @@ for (let i = 0; i < 4; i++) {
 
 ---
 
-## 🎵 Audio Quality
+## 🎵 [`Audio Quality`](https://youtu.be/SwmPmEEDI58)
 - Everything depends on the limitations of Discord itself. There are no encoding restrictions; you can try feeding Discord even 512 KBit audio.
 - **Hot Audio Swap**: Instant seamless transitions between tracks.
 - **Audio Effects**: Smooth fade-in/fade-out for any actions (skip, seek, pause)
