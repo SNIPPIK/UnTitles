@@ -108,8 +108,7 @@ export class SimpleWorker<TInput = any, TOutput = any> extends TypedEmitter<Work
 
         // ===== Проброс события "error" =====
         worker.on("error", (err) => {
-            //@ts-ignore — тип события в Node.js может быть строже,
-            // но фактически это Error.
+            //@ts-ignore
             this.emit("error", err);
         });
 

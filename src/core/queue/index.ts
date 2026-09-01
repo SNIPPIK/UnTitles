@@ -45,10 +45,17 @@ class BaseQueueController<T extends Queue> {
                 setImmediate(async () => {
                     const player = queue.player;
 
-                    // Ставим на последнюю позицию
-                    if (queue.tracks.size > 0) {
-                        // Меняем позицию на последнюю
-                        queue.tracks.position = queue.tracks.last_position + 1;
+                    // Выбор типа позиции при включении заново
+                    switch (db.queues.options.retry) {
+                        case 1: {
+                            queue.tracks.position = queue.tracks.total - 1;
+                            break;
+                        }
+                        default: {
+                            // Начинаем с 1 трека
+                            queue.tracks.position = 0;
+                            break;
+                        }
                     }
 
                     // Если у плеера стоит пауза
@@ -154,7 +161,9 @@ export class ControllerQueues<T extends Queue> extends BaseQueueController<T> {
         optimization: parseInt(env.get("duration.optimization", "15")),
         volume: parseInt(env.get("audio.volume", "70")),
         swapFade: parseInt(env.get("audio.swap.fade", "5")),
-        fade: parseInt(env.get("audio.fade", "10"))
+        fade: parseInt(env.get("audio.fade", "10")),
+
+        retry: parseInt(env.get("retry.type", "1"))
     };
 }
 
@@ -162,6 +171,7 @@ export class ControllerQueues<T extends Queue> extends BaseQueueController<T> {
 import { CycleInteraction } from "#structures/discord/index.js";
 import { Track } from "#core/queue/structures/track.js";
 import { APIRequestData } from "#handler/rest/index.js";
+import { db } from "#app/db";
 
 /**
  * @author SNIPPIK

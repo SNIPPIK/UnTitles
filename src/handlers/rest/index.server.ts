@@ -19,6 +19,56 @@ export namespace RestServerSide {
     export type APIs = Record<RestAPINames, API>;
 
     /**
+     * @description Данные класса для работы с Rest/API
+     * @interface RestDatabase
+     * @public
+     */
+    export interface RestDatabase {
+        /**
+         * @description Все загруженные платформы
+         * @protected
+         */
+        supported: APIs;
+
+        /**
+         * @description Платформы с данных для авторизации
+         * @protected
+         */
+        authorization: RestAPINames[];
+
+        /**
+         * @description Платформы с возможности получить аудио
+         * @warn По-умолчанию запрос идет к track
+         * @protected
+         */
+        audio: RestAPINames[];
+
+        /**
+         * @description Платформы с возможностью получать похожие треки
+         * @protected
+         */
+        related: RestAPINames[];
+
+        /**
+         * @description Заблокированные платформы
+         * @protected
+         */
+        block: RestAPINames[];
+
+        /**
+         * @description Поддерживаемые платформы в array формате, для экономии памяти
+         * @private
+         */
+        array?: RestServerSide.API[];
+
+        /**
+         * @description Поддерживаемые платформы в array формате, для экономии памяти
+         * @private
+         */
+        array_tex?: RestServerSide.API[];
+    }
+
+    /**
      * @description Данные для валидного запроса параллельном процессу
      * @type ServerOptions
      * @public
@@ -29,24 +79,10 @@ export namespace RestServerSide {
 
         // Надо ли получить данные в ответ
         data?: boolean;
-    };
 
-    /**
-     * @description Рекурсивно проходит по всему объекту, оставляя только сериализуемые
-     * @type Serializable
-     * @public
-     */
-    export type Serializable<T> = T extends Function ? never : T extends object ? { [K in keyof T]: Serializable<T[K]> } : T;
-
-    /**
-     * @description Передаваемые данные из worker в основной поток
-     * @type Result
-     * @public
-     */
-    export type Result<T extends APIRequestsKeys> = {
         // Номер уникального запроса
         requestId: number;
-    } & (ResultSuccess<T> | ResultError);
+    };
 
     /**
      * @description Создаем класс для итоговой платформы для взаимодействия с APIs
@@ -87,6 +123,13 @@ export namespace RestServerSide {
         readonly auth?: boolean;
 
         /**
+         * @description Может ли платформа запрашивать повторное получение аудио
+         * @default false - разово
+         * @readonly
+         */
+        readonly retry?: boolean;
+
+        /**
          * @description Regexp для поиска платформы
          * @readonly
          */
@@ -96,7 +139,7 @@ export namespace RestServerSide {
          * @description Запросы к данных платформы
          * @readonly
          */
-        readonly requests: (RequestDef<"all"> | RequestDef<"track"> | RequestDef<"search"> | RequestDef<"artist"> | RequestDef<"related"> | RequestDef<"album"> | RequestDef<"playlist">)[];
+        readonly requests: (Request<"all"> | Request<"track"> | Request<"search"> | Request<"artist"> | Request<"related"> | Request<"album"> | Request<"playlist">)[];
 
         /**
          * @description Если надо использовать прокси при запросах
@@ -168,11 +211,18 @@ export namespace RestServerSide {
     }
 
     /**
-     * @description Доступные запросы для платформ
-     * @interface RequestDef
+     * @description Рекурсивно проходит по всему объекту, оставляя только сериализуемые
+     * @type Serializable
      * @public
      */
-    export interface RequestDef<T extends APIRequestsKeys> {
+    export type Serializable<T> = T extends Function ? never : T extends object ? { [K in keyof T]: Serializable<T[K]> } : T;
+
+    /**
+     * @description Доступные запросы для платформ
+     * @interface Request
+     * @public
+     */
+    interface Request<T extends APIRequestsKeys> {
         /** Имя запроса */
         name: T;
 
@@ -190,87 +240,4 @@ export namespace RestServerSide {
          */
         execute: (url: string, options: APIExecuteParams<T>) => Promise<APIRequestsRaw<T> | Error>;
     }
-
-    /**
-     * @description Данные класса для работы с Rest/API
-     * @interface Data
-     * @public
-     */
-    export interface Data {
-        /**
-         * @description Все загруженные платформы
-         * @protected
-         */
-        supported: APIs;
-
-        /**
-         * @description Платформы с данных для авторизации
-         * @protected
-         */
-        authorization: RestAPINames[];
-
-        /**
-         * @description Платформы с возможности получить аудио
-         * @warn По-умолчанию запрос идет к track
-         * @protected
-         */
-        audio: RestAPINames[];
-
-        /**
-         * @description Платформы с возможностью получать похожие треки
-         * @protected
-         */
-        related: RestAPINames[];
-
-        /**
-         * @description Заблокированные платформы
-         * @protected
-         */
-        block: RestAPINames[];
-
-        /**
-         * @description Поддерживаемые платформы в array формате, для экономии памяти
-         * @private
-         */
-        array?: RestServerSide.API[];
-
-        /**
-         * @description Поддерживаемые платформы в array формате, для экономии памяти
-         * @private
-         */
-        array_tex?: RestServerSide.API[];
-    }
 }
-
-/**
- * @description Если запрос обработан без ошибок
- * @type ResultSuccess
- * @private
- */
-type ResultSuccess<T extends APIRequestsKeys> = {
-    /** Статус запроса */
-    status: "success";
-
-    /** Тип ответа */
-    type: T;
-
-    /** Ответ */
-    result: APIRequestsRaw<T>;
-};
-
-/**
- * @description Если запрос обработан без ошибок
- * @type ResultError
- * @private
- */
-type ResultError = {
-    /** Статус запроса */
-    status: "error";
-
-    /** Ответ */
-    result: {
-        name: string;
-        message?: string;
-        stack?: string;
-    };
-};

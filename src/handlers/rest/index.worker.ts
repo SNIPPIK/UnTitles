@@ -1,20 +1,6 @@
-/**
- * @fileoverview Воркер для выполнения REST-запросов к музыкальным платформам (YouTube, Spotify и др.)
- *
- * Этот модуль запускается в отдельном потоке (worker_threads) и обрабатывает:
- * - Загрузку всех реализаций API платформ из директории `src/handlers/rest`.
- * - Хранение их конфигураций, лимитов и блок-листов.
- * - Выполнение запросов (поиск, получение треков, плейлистов, похожих треков) с тайм-аутами.
- * - Сериализацию данных для передачи в основной поток (удаление функций).
- *
- * Взаимодействие с основным потоком осуществляется через `parentPort`.
- *
- * @module RestWorker
- */
-
-import { parentPort, workerData } from "node:worker_threads";
 import type { APIRequestsLimits } from "#handler/rest/index.js";
 import type { RestServerSide } from "./index.server.js";
+import { parentPort } from "node:worker_threads";
 import { initSharedDatabase } from "#worker/db";
 import { handler } from "#handler";
 import { env } from "#app/env";
@@ -78,7 +64,7 @@ function stripFunctions<T extends object>(obj: T): RestServerSide.Serializable<T
  */
 class RestRegistry {
     /** Объект, где ключ — имя платформы (например, "YOUTUBE"), значение — конфиг API. */
-    public readonly supported: RestServerSide.APIs = {} as RestServerSide.APIs;
+    public readonly supported = {} as RestServerSide.APIs;
 
     /** Массив имён платформ, требующих авторизацию (auth !== null). */
     public readonly authorization: string[] = [];
@@ -208,7 +194,7 @@ class RestWorkerHandler {
    *   - `related` — имена платформ с поддержкой related.
    *   - `block` — пустой массив (заполняется в основном потоке при ошибках).
    */
-  public getSerializablePlatforms(): RestServerSide.Data {
+  public getSerializablePlatforms(): RestServerSide.RestDatabase {
     const fakeReq = this.registry.allowed.map((api) => ({
       ...stripFunctions(api),
       requests: (api.requests ?? []).map(stripFunctions),
@@ -373,7 +359,7 @@ class RestWorkerHandler {
  *
  * @throws Ошибки, возникающие при инициализации, логируются, но не останавливают воркер.
  */
-if (parentPort && workerData?.rest) {
+if (parentPort) {
     // Инициализируем общие ресурсы (база данных, кеш)
     initSharedDatabase();
 
@@ -387,7 +373,7 @@ if (parentPort && workerData?.rest) {
             const workerHandler = new RestWorkerHandler(registry);
 
             // Обработка сообщений от основного потока
-            parentPort.on("message", async (message: RestServerSide.ServerOptions & { requestId?: number, data?: boolean }) => {
+            parentPort.on("message", async (message: RestServerSide.ServerOptions) => {
                 try {
                     // Запрос на получение метаданных всех платформ при старте
                     if (message.data) {
@@ -405,7 +391,7 @@ if (parentPort && workerData?.rest) {
                     // Неизвестный формат сообщения
                     workerHandler.sendError(message.requestId, Error("Unsupported request type"));
                 } catch (err) {
-                    workerHandler.sendError(message.requestId, err);
+                    workerHandler.sendError(message?.requestId, err);
                 }
 
                 // Напоминаем сборщику, что бы не забывал чистить мусорный поток активнее

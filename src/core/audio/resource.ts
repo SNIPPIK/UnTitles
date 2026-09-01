@@ -17,25 +17,9 @@ const ENCODER_PARAMS = {
      * # Параметры
      * - voip - Способствует улучшению разборчивости речи, discord лучше работает с этим режимом
      * - audio - Поддерживайте верность вводимым данным (по умолчанию).
-     * - lowdelay - Ограничьтесь только режимами с наименьшей задержкой, отключив режимы, оптимизированные для передачи голоса.
+     * - lowdelay - Ускоряет кодировку данных, в таком режиме могут теряться аудио данные
      */
-    mode: "voip",
-
-    /**
-     * # Параметры
-     * - off - Используйте кодирование с постоянной скоростью передачи данных.
-     * - on - Используйте кодировку с переменной скоростью передачи данных (по умолчанию).
-     */
-    vbr: "off",
-
-    /** Потери при кодировании */
-    lost: {
-        /** Разрешаем терять n пакетов за 1 поток */
-        total: "0",
-
-        /** Можно ли сглаживать потери, заполнять пустотой. (Не рекомендуется включать) */
-        fec: "off"
-    }
+    mode: env.get("decoder.type", "audio")
 };
 
 /**
@@ -132,11 +116,8 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
             // Указываем формат аудио (ogg/opus)
             "-c:a", "libopus",
-            "-vbr", ENCODER_PARAMS.vbr,
             "-frame_duration", `${OPUS_FRAME_SIZE}`,
-            "-fec", ENCODER_PARAMS.lost.fec,
-            "-packet_loss", ENCODER_PARAMS.lost.total,
-            "-application", ENCODER_PARAMS.mode,
+            "-application", `${ENCODER_PARAMS.mode}`,
             "-f", "ogg",
             "pipe:1"
         ];

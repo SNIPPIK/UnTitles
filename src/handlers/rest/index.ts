@@ -1,4 +1,12 @@
-import { APIRequestData, APIRequests, APIRequestsKeys, RestAPINames, APIPlatformType, REST_STOP_WORDS } from "#handler/rest/index.abstract.js";
+import {
+    APIRequestData,
+    APIRequests,
+    APIRequestsKeys,
+    RestAPINames,
+    APIPlatformType,
+    REST_STOP_WORDS,
+    RestWorkerResult
+} from "#handler/rest/index.abstract.js";
 import type { RestServerSide } from "./index.server.js";
 import { Logger, SimpleWorker } from "#structures";
 import { RestClientSide } from "./index.client.js";
@@ -18,7 +26,7 @@ export * from "./index.server.js";
  * @class RestWorker
  * @private
  */
-class RestWorker<T extends APIRequestsKeys> {
+class RestWorker<T extends APIRequestsKeys = APIRequestsKeys> {
     /**  Второстепенный поток, динамически создается и удаляется когда не требуется */
     protected worker: SimpleWorker;
 
@@ -26,15 +34,15 @@ class RestWorker<T extends APIRequestsKeys> {
     protected lastID: number = 0;
 
     /** База с платформами */
-    protected platforms: RestServerSide.Data;
+    protected platforms: RestServerSide.RestDatabase;
 
     /** База с платформами в Map */
-    public map = new Map<string, RestServerSide.API>();
+    public map = new Map<string, RestServerSide.API<T>>();
 
     /** Map функций для возврата ответа от worker  */
-    protected pending = new Map<number, {
+    public pending = new Map<number, {
         // Функция ответа
-        resolve: (val: RestServerSide.Result<T> & { requestId?: number }) => void
+        resolve: (val: RestWorkerResult.Result<T> & { requestId?: number }) => void
     }>();
 
     /**
@@ -42,7 +50,7 @@ class RestWorker<T extends APIRequestsKeys> {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get array(): RestServerSide.API[] {
+    public get array(): RestServerSide.API<T>[] {
         if (!this.platforms.array) {
             this.platforms.array = Object.values(this.platforms.supported)
                 .sort((a, b) => a.name.localeCompare(b.name));
@@ -55,7 +63,7 @@ class RestWorker<T extends APIRequestsKeys> {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get array_auth(): RestServerSide.API[] {
+    public get array_auth(): RestServerSide.API<T>[] {
         return this.array_prev.filter(api => api.auth !== null);
     };
 
@@ -64,7 +72,7 @@ class RestWorker<T extends APIRequestsKeys> {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get array_audio(): RestServerSide.API[] {
+    public get array_audio(): RestServerSide.API<T>[] {
         return this.array_prev
             .filter(api => !this.platforms.block.includes(api.name) && this.platforms.audio.includes(api.name));
     };
@@ -74,7 +82,7 @@ class RestWorker<T extends APIRequestsKeys> {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get array_prev(): RestServerSide.API[] {
+    public get array_prev(): RestServerSide.API<T>[] {
         if (!this.platforms.array_tex) {
             this.platforms.array_tex = Object.values(this.platforms.supported)
                 .filter(api => api.type === APIPlatformType.primary && api.auth !== null)
@@ -89,25 +97,10 @@ class RestWorker<T extends APIRequestsKeys> {
      * @returns RestServerSide.API[]
      * @public
      */
-    public get array_related(): RestServerSide.API[] {
+    public get array_related(): RestServerSide.API<T>[] {
         return this.array_prev
             .filter(api => api.requests?.some(req => req.name === "related"));
     };
-
-    /**
-     * @description Общее кол-во методов запросов
-     * @public
-     */
-    /*public get methods() {
-        let reqs = 0;
-
-        // Прогоняем платформы и собираем кол-во доступных запросов
-        for (let i of this.array) {
-            reqs += i.requests.length;
-        }
-
-        return reqs;
-    };*/
 
     /**
      * @description Заблокирована ли платформа?
@@ -135,10 +128,9 @@ class RestWorker<T extends APIRequestsKeys> {
             const __dirname = dirname(__filename);
 
             // Создаём экземпляр SimpleWorker (нестатический)
-            const worker = new SimpleWorker<RestServerSide.Data | any, RestServerSide.Result<T> & { requestId?: number }>(
+            const worker = new SimpleWorker<RestServerSide.RestDatabase, RestWorkerResult.Result<T>>(
                 __dirname + "/index.worker",
                 {
-                    workerData: { rest: true },
                     stderr: false
                 },
                 false,
@@ -178,12 +170,13 @@ class RestWorker<T extends APIRequestsKeys> {
             });
 
             // Запускаем воркер и отправляем начальные данные
+            //@ts-ignore
             worker.start({data: true});
 
             // Ждём первое сообщение (инициализация платформ)
             // Используем once, чтобы дождаться именно первого сообщения.
             // Обрабатываем инициализацию
-            this.platforms = await new Promise<RestServerSide.Data>((resolveFirst) => {
+            this.platforms = await new Promise<RestServerSide.RestDatabase>((resolveFirst) => {
                 worker.once("message", (data) => resolveFirst(data as any));
             });
 
@@ -205,7 +198,7 @@ class RestWorker<T extends APIRequestsKeys> {
      * @description Получение случайной платформы
      * @protected
      */
-    protected get random(): RestServerSide.API | null {
+    protected get random(): RestServerSide.API<T> | null {
         const map = this.array_auth;
         if (map.length === 0) return null;
 
@@ -219,8 +212,8 @@ class RestWorker<T extends APIRequestsKeys> {
      * @protected
      */
     protected generateUniqueId = () => {
-        this.lastID = (this.lastID + 1) % 65536; // 2^16
-        return this.lastID;
+        if (this.lastID >= 2 ** 32) this.lastID = 0;
+        return this.lastID++;
     };
 
     /**
@@ -234,8 +227,9 @@ class RestWorker<T extends APIRequestsKeys> {
 
         // Если поток есть в системе
         if (this.worker) {
-            await this.worker.destroy();
-            this.worker = null;
+            this.worker.destroy().finally(() => {
+                this.worker = null;
+            });
         }
 
         this.platforms = null;
@@ -250,13 +244,13 @@ class RestWorker<T extends APIRequestsKeys> {
  * @extends RestWorker
  * @public
  */
-export class RestObject extends RestWorker<APIRequestsKeys> {
+export class RestObject<T extends APIRequestsKeys = APIRequestsKeys> extends RestWorker<T> {
     /**
      * @description Создание класса для взаимодействия с платформой
      * @returns RestClientSide.Request
      * @public
      */
-    public request = (name: RestServerSide.API["name"] | string): RestClientSide.Request => {
+    public request = (name: RestAPINames | string): RestClientSide.Request => {
         return new RestClientSide.Request(this.platform(name));
     };
 
@@ -266,7 +260,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
      * @returns RestServerSide.API
      * @private
      */
-    private platform = (name: RestServerSide.API["name"] | string): RestServerSide.API => {
+    private platform = (name: RestAPINames | string): RestServerSide.API<T> => {
         // Если не указана платформа
         if (!name) return this.random;
 
@@ -289,14 +283,14 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
      * @returns Promise<APIRequests[T] | Error>
      * @public
      */
-    public request_worker<T extends APIRequestsKeys>(params: RestClientSide.ClientOptions): Promise<APIRequests<T>| Error> {
+    public request_worker<K extends APIRequestsKeys>(params: RestClientSide.ClientOptions): Promise<APIRequests<K>| Error> {
         const {platform, payload, options, type} = params;
-        return new Promise<APIRequests<T> | Error>((resolve) => {
+        return new Promise<APIRequests<K> | Error>((resolve) => {
             const requestId = this.generateUniqueId();
 
             // Регистрируем "ждущего"
             this.pending.set(requestId, {
-                resolve: (message) => resolve(this.worker_resolve(message, params) as Error | APIRequests<T>)
+                resolve: (message) => resolve(this.worker_resolve(message, params) as Error | APIRequests<K>)
             });
 
             // Отправляем запрос
@@ -333,7 +327,7 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
      *    в список заблокированных (`this.platforms.block`).
      * 4. Логирует неожиданные статусы с уровнем `WARN`.
      */
-    private worker_resolve = (message: RestServerSide.Result<APIRequestsKeys> & { requestId?: number }, { platform, payload, type }: RestClientSide.ClientOptions) => {
+    private worker_resolve = (message: RestWorkerResult.Result<APIRequestsKeys> & { requestId?: number }, { platform, payload, type }: RestClientSide.ClientOptions) => {
         const { result, status } = message;
 
         /**
@@ -391,14 +385,14 @@ export class RestObject extends RestWorker<APIRequestsKeys> {
      * @returns Promise<Track | Error>
      * @private
      */
-    private fetch = async (track: Track, array: RestServerSide.API[]): Promise<Track[] | Error> => {
+    private fetch = async (track: Track, array: RestServerSide.API<T>[]): Promise<Track[] | Error> => {
         const { name, artist, api } = track;
         const original_name = `${name} ${artist.title}`;
         const original = normalize(original_name);
 
         // Формируем массив обещаний для каждой платформы (кроме исходной)
         const platformPromises = array
-            .filter(platform => platform.name !== api.name)
+            .filter(platform => !platform.retry ? platform.name !== api.name : true)
             .map(async (platform) => {
                 const platformAPI = this.request(platform.name);
 

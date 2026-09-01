@@ -21,8 +21,11 @@ export default createEvent({
 
         // Создаем сообщение
         const message = await queue.message.send_single({
+            components: null,
             embeds: [{
-                color: api.color, thumbnail: image, timestamp: new Date(),
+                color: api.color, thumbnail: {
+                    url: image
+                },
                 fields: [
                     {
                         name: locale._(queue.message.locale, "player.current.playing"),

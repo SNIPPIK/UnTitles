@@ -22,10 +22,15 @@ export const REST_STOP_WORDS = new Set([
  * @type RestAPINames
  * @public
  */
-export type RestAPINames = "RADIO" |
-    "YOUTUBE" | "SPOTIFY" | "SOUNDCLOUD" | "DEEZER" |
-    "VK" | "YANDEX" |
-    "APPLE_MUSIC";
+export type RestAPINames =
+    | "RADIO"
+    | "YOUTUBE"
+    | "SPOTIFY"
+    | "SOUNDCLOUD"
+    | "DEEZER"
+    | "VK"
+    | "YANDEX"
+    | "APPLE_MUSIC";
 
 /**
  * @author SNIPPIK
@@ -41,7 +46,14 @@ export type RestAPINames = "RADIO" |
  * @param artist - Популярные треки автора
  * @param related - Похожие треки
  */
-export type APIRequestsKeys = "all" | "track" | "playlist" | "album" | "search" | "artist" | "related";
+export type APIRequestsKeys =
+    | "all"
+    | "track"
+    | "search"
+    | "artist"
+    | "related"
+    | "album"
+    | "playlist";
 
 /**
  * @author SNIPPIK
@@ -49,12 +61,16 @@ export type APIRequestsKeys = "all" | "track" | "playlist" | "album" | "search" 
  * @type APIRequestsLimits
  * @public
  */
-export type APIRequestsLimits = "playlist" | "album" | "search" | "artist" | "related";
+export type APIRequestsLimits =
+    | "playlist"
+    | "album"
+    | "search"
+    | "artist"
+    | "related";
 
 /**
  * @description Helper: all possible requests across platforms
  * @type APIRequests
- * @helper
  * @public
  */
 export type APIRequests<T extends APIRequestsKeys, K = Track> =
@@ -67,7 +83,6 @@ export type APIRequests<T extends APIRequestsKeys, K = Track> =
 /**
  * @description Helper: all possible requests across platforms
  * @type APIRequestsRaw
- * @helper
  * @public
  */
 export type APIRequestsRaw<T extends APIRequestsKeys, K = APIRequestData.Track> =
@@ -81,11 +96,60 @@ export type APIRequestsRaw<T extends APIRequestsKeys, K = APIRequestData.Track> 
  * @author SNIPPIK
  * @description Тип параметров функции вызова для каждого запроса
  * @type APIExecuteParams
- * @helper
+ * @public
  */
 export type APIExecuteParams<T extends APIRequestsKeys> =
-    T extends "track" ? { audio: boolean } : T extends APIRequestsLimits ? { limit: number } : T extends "all" ? { audio: boolean, limit: number } :
+    T extends "track" ? { audio: boolean } :
+        T extends APIRequestsLimits ? { limit: number } :
+            T extends "all" ? { audio: boolean, limit: number } :
         never;
+
+/**
+ * @author SNIPPIK
+ * @description
+ * @namespace RestWorkerResult
+ * @public
+ */
+export namespace RestWorkerResult {
+    /**
+     * @description Передаваемые данные из worker в основной поток
+     * @type Result
+     * @public
+     */
+    export type Result<T extends APIRequestsKeys> = {
+        // Номер уникального запроса
+        requestId: number;
+    } & (Success<T> | Error);
+
+    /**
+     * @description Если запрос обработан без ошибок
+     * @type Success
+     * @private
+     */
+    interface Success<
+        T extends APIRequestsKeys
+    > {
+        status: "success";
+        requestId: number;
+        type: T;
+        result: APIRequestsRaw<T>;
+    }
+
+    /**
+     * @description Если запрос обработан без ошибок
+     * @type Error
+     * @private
+     */
+    interface Error {
+        status: "error";
+        requestId: number;
+        result: {
+            name: string;
+            message?: string;
+            stack?: string;
+        };
+    }
+}
 
 /**
  * @author SNIPPIK

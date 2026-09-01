@@ -46,7 +46,7 @@ export class SetArray<T> {
      */
     public get array(): readonly T[] {
         return this._array;
-    }
+    };
 
     /**
      * Добавляет элемент в коллекцию.
@@ -70,7 +70,7 @@ export class SetArray<T> {
         this._array.push(item);
         this._indexMap.set(item, index);
         return this;
-    }
+    };
 
     /**
      * Проверяет, содержится ли элемент в коллекции.
@@ -81,7 +81,7 @@ export class SetArray<T> {
      */
     public has(item: T): boolean {
         return this._indexMap.has(item);
-    }
+    };
 
     /**
      * Удаляет элемент из коллекции.
@@ -111,22 +111,7 @@ export class SetArray<T> {
         this._array.pop();
         this._indexMap.delete(item);
         return true;
-    }
-
-    /**
-     * Если элемент присутствует в коллекции, возвращает его, иначе `null`.
-     *
-     * В отличие от `find`, не требует предиката и работает за O(1).
-     * Использует однократный поиск по Map, вместо проверки `has` + повторного
-     * извлечения индекса.
-     *
-     * @param item - Искомый элемент.
-     * @returns Найденный элемент или `null`.
-     */
-    public get(item: T): T | null {
-        const idx = this._indexMap.get(item);
-        return idx !== undefined ? item : null;
-    }
+    };
 
     /**
      * Возвращает копию массива элементов.
@@ -139,7 +124,7 @@ export class SetArray<T> {
      */
     public values(): T[] {
         return this._array.slice();
-    }
+    };
 
     /**
      * Итератор по элементам коллекции **без копирования**.
@@ -160,7 +145,7 @@ export class SetArray<T> {
      */
     public [Symbol.iterator](): IterableIterator<T> {
         return this._array[Symbol.iterator]();
-    }
+    };
 
     /**
      * Фильтрует элементы коллекции через предикат.
@@ -172,7 +157,7 @@ export class SetArray<T> {
      */
     public filter(fn: (item: T) => boolean): T[] {
         return this._array.filter(fn);
-    }
+    };
 
     /**
      * Находит первый элемент, удовлетворяющий предикату.
@@ -184,7 +169,7 @@ export class SetArray<T> {
      */
     public find(fn: (item: T) => boolean): T | undefined {
         return this._array.find(fn);
-    }
+    };
 
     /**
      * Сортирует элементы коллекции на месте и возвращает ссылку на неё же.
@@ -199,13 +184,14 @@ export class SetArray<T> {
     public sort(fn: (a: T, b: T) => number): T[] {
         // Сортируем массив на месте.
         this._array.sort(fn);
+
         // Перестраиваем отображение элемент -> индекс.
         this._indexMap.clear();
         for (let i = 0; i < this._array.length; i++) {
             this._indexMap.set(this._array[i], i);
         }
         return this._array;
-    }
+    };
 
     /**
      * Полностью очищает коллекцию.
@@ -217,7 +203,7 @@ export class SetArray<T> {
     public clear(): void {
         this._array.length = 0;
         this._indexMap.clear();
-    }
+    };
 
     /**
      * Количество элементов в коллекции.
@@ -226,5 +212,5 @@ export class SetArray<T> {
      */
     public get size(): number {
         return this._array.length;
-    }
+    };
 }

@@ -121,14 +121,18 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * @param state - Новое состояние с кодом и полезной нагрузкой.
      */
     public set state(state: TransportState) {
-        this.emit("info", `[Transport]: ${this._state?.code} --> ${state?.code}`);
+        //this.emit("info", `[Transport]: ${this._state?.code} --> ${state?.code}`);
 
         this._state = state;
         switch (state.code) {
             // Поднимаем WebSocket
             case TransportStateCode.OpeningWs: {
-                // Подключаемся к голосовому шлюзу
-                this._ws.connect(this.adapter.packet.server.endpoint);
+                try {
+                    // Подключаемся к голосовому шлюзу
+                    this._ws.connect(this.adapter.packet.server.endpoint);
+                } catch (err) {
+                    this.emit("destroyed", VoiceCloseCodes.VoiceServerCrashed);
+                }
                 return;
             }
 

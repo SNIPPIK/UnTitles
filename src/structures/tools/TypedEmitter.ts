@@ -177,10 +177,8 @@ export class TypedEmitter<L extends Record<string, any>> {
         if (!arr || arr.length === 0) return false;
 
         let hasOnce = false;
-
         for (let i = 0; i < arr.length; i++) {
             const bucket = arr[i];
-
             const result = bucket.listener(...args);
 
             if (bucket.type === "once") {

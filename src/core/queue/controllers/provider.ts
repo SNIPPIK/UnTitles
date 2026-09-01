@@ -5,14 +5,6 @@ import { db } from "#app/db";
 
 /**
  * @author SNIPPIK
- * @description Время ожидания проверки трека
- * @const TRACK_CHECK_WAIT
- * @public
- */
-export const TRACK_CHECK_WAIT = 10e3;
-
-/**
- * @author SNIPPIK
  * @description Безопасное время для буферизации трека
  * @const TRACK_BUFFERED_TIME
  * @public
@@ -28,7 +20,7 @@ export const TRACK_BUFFERED_TIME = 500;
 class ResourceProvider<T extends Track> {
     public constructor(
         private readonly prepare: (track: T, attempt: number) => Promise<string | Error>,
-        private readonly options = { retries: 2, initialDelay: 70 }
+        private readonly options = { retries: 3, initialDelay: 70 }
     ) {};
 
     /**
@@ -160,7 +152,7 @@ export class TrackResolvers {
                 new httpsClient({
                     url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(track.artist.title)}&track_name=${encodeURIComponent(track.name)}`,
                     userAgent: true,
-                    timeout: TRACK_CHECK_WAIT
+                    timeout: 10e3
                 }).toJson,
                 timeoutPromise
             ]) as json | Error;
@@ -193,7 +185,7 @@ export class TrackResolvers {
             return track.link;
         }
 
-        const client = new httpsClient({ url: track.link, agent: track.proxy ? sdb.proxy : null, sessionTimeout: TRACK_CHECK_WAIT, timeout: TRACK_CHECK_WAIT });
+        const client = new httpsClient({ url: track.link, agent: track.proxy ? sdb.proxy : null });
         const status = await client.toHead;
         const error = httpsStatusCode.parse(status);
 
@@ -204,7 +196,7 @@ export class TrackResolvers {
         if (error) {
             Logger.log(
                 "ERROR",
-                `\nUnhandled Rejection Header Track\n` +
+                `\nSource aborted\n` +
                 `┌ Stack:    ${error}\n` +
                 `├ Redirect: ${client.redirect}\n` +
                 `└ URL:      ${track.link}`

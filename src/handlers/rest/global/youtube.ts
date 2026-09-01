@@ -118,7 +118,8 @@ const Clients = {
     filter: /https?:\/\/(?:youtu\.be|(?:(?:www|m|music|gaming)\.)?youtube\.com)/i,
     audio: true,
     auth: false,
-    color: 16711680
+    color: 16711680,
+    retry: true
 })
 @OptionsRest({
     AIzaKey: generateFakeApiKey()

@@ -42,6 +42,13 @@ export interface RestOptions {
     readonly auth?: boolean;
 
     /**
+     * @description Может ли платформа запрашивать повторное получение аудио
+     * @default false - разово
+     * @readonly
+     */
+    readonly retry?: boolean;
+
+    /**
      * @description Тип платформы, платформа может быть технической или же прямой
      * @default APIPlatformType
      * @readonly
@@ -79,6 +86,7 @@ export function DeclareRest(options: RestOptions) {
                         undefined;
 
             proxy = env.get(`${options.name.toLowerCase()}.proxy`, false);
+            retry = options.retry ?? false;
         }
 }
 

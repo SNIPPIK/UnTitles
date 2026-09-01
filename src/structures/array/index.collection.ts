@@ -41,7 +41,7 @@ export class Collection<K, T = string> {
      * `Map` гарантирует O(1) доступ, вставку и удаление, а также сохраняет
      * порядок вставки (что важно для итераторов).
      */
-    private readonly _map: Map<T, K> = new Map();
+    private readonly _map = new Map<T, K>();
 
     /**
      * Кэш массива всех значений коллекции.
@@ -75,6 +75,7 @@ export class Collection<K, T = string> {
             this._arrayCache = [...this._map.values()];
             this._arrayDirty = false;
         }
+        
         return this._arrayCache!;
     };
 
@@ -146,23 +147,22 @@ export class Collection<K, T = string> {
         const item = this._map.get(ID);
         if (item === undefined) return false;
 
+        this._map.delete(ID);
+        this._arrayDirty = true;
+
         // Выбираем набор методов жизненного цикла.
         const methods = silent ? SILENT_METHODS : DEFAULT_METHODS;
 
         // Последовательно вызываем каждый метод, если он существует.
         for (let i = 0; i < methods.length; i++) {
             const fn = (item as any)[methods[i]];
-            if (typeof fn === 'function') {
+
+            if (typeof fn === "function") {
                 fn.call(item);
             }
         }
 
-        // Удаляем из Map и сбрасываем кэш, если удаление успешно.
-        if (this._map.delete(ID)) {
-            this._arrayDirty = true;
-            return true;
-        }
-        return false;
+        return true;
     };
 
     /**
