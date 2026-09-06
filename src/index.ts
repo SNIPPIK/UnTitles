@@ -1,23 +1,13 @@
 import { DiscordClient } from "#structures/discord/index.js";
-import { initSharedDatabase } from "#worker/db";
-import { db, initDatabase } from "#app/db";
+import { initSharedDatabase } from "#db/worker";
+import { db, initDatabase } from "#db";
 import { Logger } from "#structures";
 
 // Точка входа с обработкой ошибок
-main().catch((error) => {
+void main().catch((error) => {
     Logger.log("ERROR", `Failed to start application: ${error.stack || error}`);
     process.exit(1);
 });
-
-/**
- * @author SNIPPIK
- * @description Запуск всего проекта в async режиме
- * @returns {Promise<void>}
- * @async
- */
-async function main(): Promise<void> {
-    await runShard();
-}
 
 /**
  * @author SNIPPIK
@@ -25,7 +15,7 @@ async function main(): Promise<void> {
  * @returns {Promise<void>}
  * @async
  */
-async function runShard(): Promise<void> {
+async function main(): Promise<void> {
     Logger.log("WARN", `[Core] has running ${Logger.color(36, "shard")}`);
 
     const client = new DiscordClient();
@@ -40,12 +30,7 @@ async function runShard(): Promise<void> {
         client.logger.info(`Loaded ${Logger.color(34, `${db.api.map.size} APIs`)}`);
 
         // Запуск Discord клиента с последующей пост-инициализацией
-        await client.start();
-
-        // Загрузка команд после успешного подключения
-        await client.uploadCommands({ cachePath: "./commands.json" }).catch((err) => {
-            client.logger.error(`Failed to upload commands: ${err.message}`);
-        });
+        await client.run();
 
         // Опциональный вызов GC (только при явном флаге или в dev-режиме)
         if (process.env.FORCE_GC === "true" && typeof global.gc === "function") {
