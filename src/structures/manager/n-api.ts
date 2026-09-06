@@ -5,13 +5,15 @@ let Native: any;
 
 try {
     //@ts-ignore
-    Native = (await import('../build/native/index.mjs'));
+    Native = (await import('../../../build/native/index.mjs'));
 } catch {
     try {
         //@ts-ignore
-        Native = (await import('../native/index.mjs'));
+        Native = (await import('../../../native/index.mjs'));
     } catch {
-        throw Error("Native layer has not found, need download or build rust module!");
+        throw Error("Native Rust build has not found!!!\n" +
+            " - Need download - https://github.com/SNIPPIK/UnTitles/actions/workflows/build.yml\n" +
+            " - Or build rust code your - npm run build:native");
     }
 }
 
@@ -131,12 +133,10 @@ export interface iAudioEngine {
     getPackets(count: number): Array<Buffer>;
 
     /**
-     * @description Полностью очищает буфер и сбрасывает позицию в 0.
-     * @public
+     * Уничтожает движок: останавливает поток чтения, убивает ffmpeg,
+     * очищает буфер. Идемпотентный.
      */
-    clear(): void;
-
-    destroy(): void
+    destroy(): void;
 }
 
 /**

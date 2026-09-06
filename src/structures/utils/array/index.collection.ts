@@ -58,6 +58,10 @@ export class Collection<K, T = string> {
      */
     private _arrayDirty = true;
 
+    public get entries() {
+        return this._map.entries();
+    };
+
     /**
      * Возвращает массив всех значений коллекции.
      *

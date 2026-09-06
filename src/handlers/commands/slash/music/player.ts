@@ -2,7 +2,7 @@ import { Command, CommandContext, createIntegerOption, Declare, Locales, Middlew
 import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "discord-api-types/v10";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @description Подкоманда для повторного запуска проигрывания
@@ -11,7 +11,8 @@ import { db } from "#app/db";
     name: "replay",
     description: "Restart queue!!! Necessary for re-enabling if playback has been completed!",
     integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"]
+    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Locales({
     name: [

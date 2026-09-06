@@ -1,11 +1,11 @@
-import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue/index.js";
-import { AudioResource, SILENT_FRAME, OPUS_FRAME_SIZE } from "#core/audio/index.js";
 import { type AudioFilter, ControllerFilters, AudioPlayerEvents } from "#core/player/index.js";
+import { ControllerTracks, ControllerVoice, RepeatType, Track } from "#core/queue/index.js";
+import { AudioResource, SILENT_FRAMES } from "#core/audio/index.js";
 import { PlayerProgress } from "../controllers/progress.js";
 import type { VoiceConnection } from "#core/voice/index.js";
 import { PlayerAudio } from "../structures/audio.js";
 import { Logger, TypedEmitter } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -21,7 +21,7 @@ const Progress = new PlayerProgress();
  * @description Безопасное время (мс) между отправкой аудио пакетов при возобновлении после паузы.
  * @remarks
  * Используется для защиты от переполнения jitter-буфера. При паузе плеер продолжает отправлять
- * SILENT_FRAME, но фактическое воспроизведение останавливается. Возобновление происходит только
+ * SILENT_FRAMES, но фактическое воспроизведение останавливается. Возобновление происходит только
  * после истечения этого интервала, чтобы избежать резкого наплыва пакетов.
  * @const
  * @private
@@ -59,10 +59,7 @@ const PLAYER_TIMEOUT_OFFSET = 3e3;
  * ```
  */
 export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
-    /** Количество пакетов, ожидающих отправки в UDP-буфере (для мониторинга загрузки) */
-    public _buffered: number | null = 1;
-
-    /** Текущее состояние плеера */
+    /** Текущее состояние плеера (idle, playing, paused и т.д.) */
     protected _status: AudioPlayerState | null = AudioPlayerState.idle;
 
     /** Менеджер тайм-аутов для безопасной паузы/возобновления */
@@ -165,14 +162,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     };
 
     /**
-     * @description Буфер плеера, кол-во времени пакетов в буфере udp подключения
-     * @public
-     */
-    public get latency() {
-        return this._buffered * OPUS_FRAME_SIZE;
-    };
-
-    /**
      * @description Проверяем играет ли плеер
      * @return boolean
      * @public
@@ -188,32 +177,32 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      */
     public set cycle(isActive: boolean) {
         // Отправляем пустышку если такая возможность есть
-        if (this._voice.connection.ready) {
-            if (isActive) this._voice.connection.packet(SILENT_FRAME);
-            else setImmediate(() => {
-                this._voice.connection.packet(SILENT_FRAME);
-            });
-        }
+        if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
 
-        // Подключаем плеер к циклу
-        if (isActive) {
-            // Если нет плеера в цикле
-            if (!db.queues.cycles.players.has(this)) {
-                // Добавляем плеер в цикл
-                db.queues.cycles.players.add(this);
-                this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
-            }
-        }
+        // Даем время на прогрев voice после пустого фрейма
+        setImmediate(() => {
+            if (!this.id) return;
 
-        // Отключаем плеер от цикла
-        else if (!isActive) {
-            // Если есть плеер в цикле
-            if (db.queues.cycles.players.has(this)) {
-                // Удаляем плеер из цикла
-                db.queues.cycles.players.delete(this);
-                this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
+            // Подключаем плеер к циклу
+            if (isActive) {
+                // Если нет плеера в цикле
+                if (!db.queues.cycles.players.has(this)) {
+                    // Добавляем плеер в цикл
+                    db.queues.cycles.players.add(this);
+                    this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
+                }
             }
-        }
+
+            // Отключаем плеер от цикла
+            else if (!isActive) {
+                // Если есть плеер в цикле
+                if (db.queues.cycles.players.has(this)) {
+                    // Удаляем плеер из цикла
+                    db.queues.cycles.players.delete(this);
+                    this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
+                }
+            }
+        });
     };
 
     /**
@@ -272,7 +261,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 }
 
                 // Если следующих треков нет
-                if (player.tracks.size === 1 && !player.playing) return queue.cleanup();
+                if (player.tracks.size === 1 && !player.playing) queue.cleanup();
                 player.tracks.remove(skip.position);
             }
         });

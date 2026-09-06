@@ -1,5 +1,5 @@
-import { TypedEmitter } from "#structures/tools/TypedEmitter.js";
 import { Worker, WorkerOptions } from "node:worker_threads";
+import { TypedEmitter } from "./TypedEmitter.js";
 import path from "node:path";
 
 /**

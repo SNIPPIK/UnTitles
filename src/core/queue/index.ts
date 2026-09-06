@@ -3,7 +3,7 @@ import { ControllerCycles } from "./controllers/cycle.js";
 import { Queue } from "#core/queue/structures/queue.js";
 import { QueueMessage } from "./modules/message.js";
 import { Collection, locale } from "#structures";
-import { env } from "#app/env";
+import { env } from "#db/env";
 
 export * from "./structures/tracks.js";
 export * from "./structures/voice.js";
@@ -40,13 +40,13 @@ class BaseQueueController<T extends Queue> {
 
         // Обновляем данные в очереди
         else {
-            // Если плеер не играет
+            // Если плеер не в цикле и не готовит трек
             if (!this.cycles.players.has(queue.player) && !queue.player.audio.preloaded) {
-                setImmediate(async () => {
+                setImmediate(() => {
                     const player = queue.player;
 
                     // Выбор типа позиции при включении заново
-                    switch (db.queues.options.retry) {
+                    switch (db.queues.options.replay) {
                         case 1: {
                             queue.tracks.position = queue.tracks.total - 1;
                             break;
@@ -62,13 +62,15 @@ class BaseQueueController<T extends Queue> {
                     if (player.status === "player/pause") player.resume();
 
                     // Запускаем функцию воспроизведения треков
-                    await player.play();
-                });
-            }
+                    void player.play().catch(error => {
+                        throw error;
+                    });
 
-            // Если текстовый канал изменился — обновляем привязку
-            if (queue.message.channel_id !== message.channelId) {
-                queue.message = new QueueMessage(message);
+                    // Если текстовый канал изменился — обновляем привязку
+                    if (queue.message.channel_id !== message.channelId) {
+                        queue.message = new QueueMessage(message);
+                    }
+                });
             }
         }
 
@@ -163,7 +165,7 @@ export class ControllerQueues<T extends Queue> extends BaseQueueController<T> {
         swapFade: parseInt(env.get("audio.swap.fade", "5")),
         fade: parseInt(env.get("audio.fade", "10")),
 
-        retry: parseInt(env.get("retry.type", "1"))
+        replay: parseInt(env.get("replay.type", "1"))
     };
 }
 
@@ -171,7 +173,7 @@ export class ControllerQueues<T extends Queue> extends BaseQueueController<T> {
 import { CycleInteraction } from "#structures/discord/index.js";
 import { Track } from "#core/queue/structures/track.js";
 import { APIRequestData } from "#handler/rest/index.js";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK

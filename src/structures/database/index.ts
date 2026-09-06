@@ -1,7 +1,7 @@
 import { DiscordClient, SeyfertVoice } from "#structures/discord/index.js";
 import { ControllerQueues, type Queue } from "#core/queue/index.js";
 import { isMainThread } from "node:worker_threads";
-import { env } from "#app/env";
+import { env } from "#db/env";
 
 // Database modules
 import { RestObject } from "#handler/rest/index.js";

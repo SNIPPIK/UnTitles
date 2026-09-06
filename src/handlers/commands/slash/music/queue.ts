@@ -2,7 +2,7 @@ import { Command, type CommandContext, ComponentType, createNumberOption, Declar
 import { Colors } from '#structures/discord/index.js';
 import { MessageFlags } from "discord-api-types/v10";
 import { locale } from '#structures';
-import { db } from '#app/db';
+import { db } from "#db";
 
 /**
  * Подкоманда: список треков
@@ -11,7 +11,8 @@ import { db } from '#app/db';
     name: 'list',
     description: 'View tracks in the current queue!',
     integrationTypes: ['GuildInstall'],
-    botPermissions: ['SendMessages', 'ViewChannel']
+    botPermissions: ['SendMessages', 'ViewChannel'],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Locales({
     name: [['ru', 'список']],
@@ -133,7 +134,8 @@ class QueueListCommand extends SubCommand {
     name: 'destroy',
     description: 'Queue deletion! No way to return tracks, player, queue!',
     integrationTypes: ['GuildInstall'],
-    botPermissions: ['SendMessages', 'ViewChannel']
+    botPermissions: ['SendMessages', 'ViewChannel'],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Locales({
     name: [['ru', 'удаление']],
@@ -163,7 +165,8 @@ class QueueDestroyCommand extends SubCommand {
     name: 'queue',
     description: 'Advanced control of music inclusion!',
     integrationTypes: ['GuildInstall'],
-    botPermissions: ['SendMessages', 'ViewChannel']
+    botPermissions: ['SendMessages', 'ViewChannel'],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Locales({
     name: [['ru', 'очередь']],

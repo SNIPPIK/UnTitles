@@ -2,7 +2,7 @@ import { AudioSaver, MetaSaver } from "./index.saver.js";
 import { isMainThread } from "node:worker_threads";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { HttpProxyAgent } from "http-proxy-agent";
-import { env } from "#app/env";
+import { env } from "#db/env";
 
 /**
  * @author SNIPPIK

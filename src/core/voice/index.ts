@@ -2,7 +2,7 @@ import type { DiscordGatewayAdapterCreator } from "#core/voice/transport/adapter
 import { VoiceConnection } from "#core/voice/connection.js";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
 import { Collection } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 // Voice Sockets
 export * from "./transport/discord/VoiceWebSocket.js";

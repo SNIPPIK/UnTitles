@@ -1,7 +1,7 @@
 import { Command, CommandContext, Declare, Middlewares, Locales } from "seyfert";
 import { ApplicationCommandType } from "seyfert/lib/types/index.js";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -14,6 +14,7 @@ import { db } from "#app/db";
     name: "the-play",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages", "Connect", "Speak"],
     type: ApplicationCommandType.Message
 })
 @Middlewares(["userVoiceChannel", "checkAnotherVoice"])

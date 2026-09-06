@@ -2,7 +2,7 @@ import { Colors } from "#structures/discord/index.js";
 import { Track } from "#core/queue/index.js";
 import { createEvent } from "seyfert";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK

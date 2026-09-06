@@ -4,7 +4,7 @@ import { MessageFlags } from "seyfert/lib/types/index.js";
 import { Colors } from "#structures/discord/index.js";
 import { createMiddleware } from "seyfert";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @description Проверяем на наличие в базе с cooldown
@@ -20,7 +20,7 @@ const checkCooldown = createMiddleware<void>(async ({ context, next, stop }) => 
 
     // Если не автор
     else if (!db.owner.ids.includes(context.author.id)) {
-        const cooldown = 3e3;
+        const cooldown = command.cooldown ?? 3e3;
         const timeNow = Date.now();
 
         const data = cooldowns.get(context.author.id);
@@ -39,6 +39,50 @@ const checkCooldown = createMiddleware<void>(async ({ context, next, stop }) => 
         }
 
         cooldowns.set(context.author.id, timeNow + cooldown, cooldown);
+    }
+
+    return next();
+});
+
+/**
+ * @description Предназначена ли команда только для разработчиков или для владельца гильдии.
+ */
+const checkVerifications = createMiddleware<void>(async ({ context, next, stop }) => {
+    const { author, command } = context;
+
+    // Проверка на статус разработчика
+    if (command.onlyDeveloper && !db.owner.ids.includes(author.id)) {
+        await context.editOrReply({
+            flags: MessageFlags.Ephemeral,
+            embeds: [
+                {
+                    description: locale._(context.interaction.locale, "middlewares.verification.owner.fail", [context.author]),
+                    color: EmbedColors.Red,
+                },
+            ]
+        });
+        return stop();
+    }
+
+    // Проверка на статус владельца сервера
+    if (command.onlyGuildOwner && context.inGuild()) {
+        const guild = await context.guild();
+        const owner = await guild.fetchOwner().catch(() => null);
+
+        if (!owner || owner.id !== author.id) {
+            await context.editOrReply({
+                flags: MessageFlags.Ephemeral,
+                embeds: [
+                    {
+                        description: locale._(context.interaction.locale, "middlewares.verification.owner.guild.fail", [context.author]),
+                        color: EmbedColors.Red,
+                    },
+                ]
+            });
+            return stop();
+        }
+
+        return next();
     }
 
     return next();
@@ -247,5 +291,5 @@ const checkAnotherVoice = createMiddleware<void>(async ({ context, stop, next })
  * @
  */
 export const middlewares = {
-    checkCooldown, checkQueue, userVoiceChannel, clientVoiceChannel, checkPlayerIsPlaying, checkPlayerWaitStream, checkAnotherVoice
+    checkVerifications, checkCooldown, checkQueue, userVoiceChannel, clientVoiceChannel, checkPlayerIsPlaying, checkPlayerWaitStream, checkAnotherVoice
 };

@@ -5,7 +5,7 @@ import { SpeakerType } from "#core/voice/structures/Speaker.js";
 import { VoiceConnection } from "#core/voice/index.js";
 import { AudioPlayer } from "#core/player/index.js";
 import { Logger } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -139,8 +139,7 @@ export class Queue {
 
         try {
             const { api, artist, name, image, user, url } = tracks.track;
-
-            return [{
+            const message = {
                 "type": 17, // Container
                 "accent_color": api.color,
                 "components": [
@@ -158,7 +157,7 @@ export class Queue {
                         ],
                         "accessory": {
                             "type": 11,
-                            //"description": name, // Подсказка
+                            "description": `Artbook - ${name}`, // Подсказка
                             "media": {
                                 "url": image,
                             }
@@ -170,7 +169,9 @@ export class Queue {
                     },
                     ...buttons
                 ]
-            }];
+            };
+
+            return [message];
         } catch (error) {
             Logger.log("ERROR", error as Error);
         }
@@ -231,6 +232,7 @@ export class Queue {
         this.tracks = null;
 
         // Удаляем подключение
+        this.voice.connection.disconnect();
         this.voice.connection.destroy();
         this.voice = null;
     };

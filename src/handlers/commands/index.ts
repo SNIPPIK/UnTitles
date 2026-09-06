@@ -4,7 +4,8 @@ import type { LocalizationMap } from "discord-api-types/v10";
 import type { RestClientSide } from "#handler/rest/index.js";
 import type { AudioFilter } from "#core/player/index.js";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
+import * as console from "node:console";
 
 /**
  * @author SNIPPIK

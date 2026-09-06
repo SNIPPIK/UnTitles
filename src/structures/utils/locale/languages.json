@@ -43,6 +43,11 @@
     "ru": "Необходимо указать число!"
   },
 
+  "autocomplete.number.incorrect": {
+    "en-US": "A title or URL is required",
+    "ru": "Указано не корректное число!"
+  },
+
   "autocomplete.fallback": {
     "en-US": "[WARNING]: Your request was rejected because the arguments did not match",
     "ru": "[ПРЕДУПРЕЖДЕНИЕ]: Ваш запрос был отклонен, поскольку аргументы не совпали"
@@ -130,6 +135,16 @@
   "middlewares.voice.new": {
     "en-US": "{ARGUMENT}\nThere is no one in that voice channel, I’m connecting!\n - A message about the current track will be created with the next track!",
     "ru": "{ARGUMENT}\nВ том голосовом канале никого нет, провожу подключение!\n - Сообщение о текущем треке будет создано со следующим треком!"
+  },
+
+  "middlewares.verification.owner.fail": {
+    "en-US": "This data is for the development team! You {ARGUMENT} are not on the list of developers!",
+    "ru": "Данная команда предназначена для разработчика! {ARGUMENT}, вы не включены в список разработчиков!"
+  },
+
+  "middlewares.verification.owner.guild.fail": {
+    "en-US": "This command is intended for the server owner! You {ARGUMENT} won't be able to use it on this server!",
+    "ru": "Данная команда предназначена для владельца сервера! У вас {ARGUMENT} не выйдет ее использовать на этом сервере!"
   },
 
 

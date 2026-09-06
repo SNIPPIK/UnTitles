@@ -1,6 +1,6 @@
 import type { APIRequestData } from "#handler/rest/index.js";
 import { Track } from "#core/queue/index.js";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK

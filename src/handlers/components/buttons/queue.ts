@@ -2,7 +2,7 @@ import { ComponentCommand, type ComponentContext } from "seyfert";
 import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "seyfert/lib/types/index.js";
 import { locale, Logger} from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 export default class extends ComponentCommand {
     componentType = 'Button' as const;

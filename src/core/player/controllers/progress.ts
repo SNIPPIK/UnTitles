@@ -1,6 +1,6 @@
 import type { RestAPINames } from "#handler/rest/index.abstract.js";
-import { env } from "#app/env";
-import { db } from "#app/db";
+import { env } from "#db/env";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK

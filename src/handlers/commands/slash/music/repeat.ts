@@ -3,7 +3,7 @@ import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "discord-api-types/v10";
 import { RepeatType } from "#core/queue/index.js";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -16,7 +16,8 @@ import { db } from "#app/db";
     name: "repeat",
     description: "Switch the repeat type to any position!",
     integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "ViewChannel"]
+    botPermissions: ["SendMessages", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Options({
     type: createStringOption({

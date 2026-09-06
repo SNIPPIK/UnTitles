@@ -2,7 +2,7 @@ import { type DiscordGatewayAdapterCreator, VoiceAdapter } from "./transport/ada
 import { SpeakerType, VoiceSpeakerManager } from "#core/voice/structures/Speaker.js";
 import { Transport, TransportStateCode } from "#core/voice/transport/index.js";
 import { TypedEmitter, Logger } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -14,6 +14,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     /** Текущий статус голосового подключения */
     private _status: ConnectionStatus = ConnectionStatus.disconnected;
 
+    /** Флаг полного уничтожения подключения */
+    private _destroyed = false;
+
     /** Менеджер голосового состояния */
     private speaker: VoiceSpeakerManager | null = null;
 
@@ -21,7 +24,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     public adapter: VoiceAdapter | null = null;
 
     /** Транспортный класс, соединяющий в себе весь функционал */
-    public transport: Transport = null;
+    public transport: Transport | null = null;
 
     /**
      * @description Получаем текущий статус голосового подключения
@@ -29,13 +32,24 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      */
     public get status() {
         return this._status;
-    };
+    }
+
+    /**
+     * @description Проверяет, уничтожено ли голосовое подключение
+     * @public
+     */
+    public get destroyed(): boolean {
+        return this._destroyed;
+    }
 
     /**
      * @description Записываем текущий статус подключения
      * @public
      */
     public set status(status: ConnectionStatus) {
+        // После уничтожения состояние больше не меняем
+        if (this._destroyed) return;
+
         // Производится попытка переподключения после уничтожения подключения
         if (this._status === null && status === ConnectionStatus.reconnecting) {
             return;
@@ -43,14 +57,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
 
         // Подключаемся к голосовому каналу
         if (status === ConnectionStatus.connecting) {
-            // Инициализируем подключение
             if (this.adapter) {
-                // Подключаемся
                 this.adapter.send(this.configuration);
                 return;
             }
 
-            // Если не удалось найти адаптер
             throw Error("Adapter has not found");
         }
 
@@ -62,7 +73,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public get ws() {
-        return this.transport._ws;
+        return this.transport?._ws ?? null;
     };
 
     /**
@@ -70,7 +81,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public get udp() {
-        return this.transport._udp;
+        return this.transport?._udp ?? null;
     };
 
     /**
@@ -78,7 +89,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public get ready(): boolean {
-        return this._status === ConnectionStatus.connected && this.transport.ready;
+        return (
+            !this._destroyed &&
+            this._status === ConnectionStatus.connected &&
+            !!this.transport?.ready
+        );
     };
 
     /**
@@ -86,13 +101,11 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public disconnect = (): void => {
-        // Если нет адаптера
-        if (!this.adapter) return;
+        if (this._destroyed || !this.adapter) return;
 
-        this.status = ConnectionStatus.disconnected;
-        this.configuration.channel_id = null; // Удаляем id канала
+        this._status = ConnectionStatus.disconnected;
+        this.configuration.channel_id = null;
 
-        // Отправляем в discord сообщение об отключении бота
         this.status = ConnectionStatus.connecting;
     };
 
@@ -102,10 +115,8 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public set channel(ID: string) {
-        // Если нет адаптера
-        if (!this.adapter) return;
+        if (this._destroyed || !this.adapter) return;
 
-        // Прописываем новый id канала
         this.configuration.channel_id = ID;
         this.status = ConnectionStatus.connecting;
     };
@@ -117,41 +128,40 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @constructor
      * @public
      */
-    public constructor(public configuration: VoiceConnectionConfiguration, adapterCreator: DiscordGatewayAdapterCreator) {
+    public constructor( public configuration: VoiceConnectionConfiguration, adapterCreator: DiscordGatewayAdapterCreator) {
         super();
+
         this.adapter = new VoiceAdapter();
         this.adapter.adapter = adapterCreator({
             /**
-             * @description Регистрирует пакет `VOICE_SERVER_UPDATE` для голосового соединения. Это приведет к повторному подключению с использованием
-             * новых данных, предоставленных в пакете.
-             * @param packet - Полученный пакет `VOICE_SERVER_UPDATE`
+             * @description Регистрирует пакет VOICE_SERVER_UPDATE
              */
             onVoiceServerUpdate: (packet) => {
-                // Если ссылки для подключения нет
+                if (this._destroyed) return;
                 if (!packet.endpoint) return;
 
                 this.emit("info", `[Voice]: server update applied`);
-                this.adapter.packet.server = packet;
 
-                // Отправляем статус
-                this.transport.state = {
+                this.adapter!.packet.server = packet;
+
+                this.transport!.state = {
                     code: TransportStateCode.OpeningWs,
                     payload: null
-                }
+                };
             },
 
             /**
-             * @description Регистрирует пакет `VOICE_STATE_UPDATE` для голосового соединения. Самое главное, он сохраняет идентификатор
-             * канала, к которому подключен клиент.
-             * @param packet - Полученный пакет `VOICE_STATE_UPDATE`
+             * @description Регистрирует пакет VOICE_STATE_UPDATE
              */
             onVoiceStateUpdate: (packet) => {
+                if (this._destroyed) return;
+
                 this.emit("info", `[Voice]: client update applied`);
-                this.adapter.packet.state = packet;
+                this.adapter!.packet.state = packet;
             },
 
             /**
-             * @description Регистрируем удаление данных из класса голосового подключения
+             * @description Регистрируем удаление данных
              */
             destroy: this.destroy
         });
@@ -167,16 +177,19 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          * @description Слушаем данные VoiceConnection
          */
         this.on("info", (err) => {
-            Logger.log("WARN",`[Voice/${this.configuration.guild_id}]: ${err}`);
+            Logger.log(
+                "WARN",
+                `[Voice/${this.configuration.guild_id}]: ${err}`
+            );
         });
 
         /**
          * @description Переподключаемся
          */
-        this.transport.on("reconnect", (_) => {
-            this.adapter.send(this.configuration);
+        this.transport.on("reconnect", () => {
+            if (this._destroyed) return;
 
-            // Переключаем спикер в состояние выключено
+            this.adapter?.send(this.configuration);
             this.speaker.speaking = SpeakerType.disable;
         });
 
@@ -184,6 +197,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          * @description Транспортный шлюз открыт
          */
         this.transport.on("open", () => {
+            if (this._destroyed) return;
             this._status = ConnectionStatus.connected;
         });
 
@@ -191,19 +205,27 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
          * @description Транспортный шлюз информирует
          */
         this.transport.on("info", (err) => {
-            Logger.log("WARN",`[Voice/${this.configuration.guild_id}]: ${err}`);
+            if (this._destroyed) return;
+
+            Logger.log(
+                "WARN",
+                `[Voice/${this.configuration.guild_id}]: ${err}`
+            );
         });
 
         /**
          * @description Транспортный шлюз закрывается
          */
         this.transport.on("close", (code, reason) => {
-            // Переключаем спикер в состояние выключено
-            this.speaker.speaking = SpeakerType.disable;
+            if (this._destroyed) return;
 
-            // Переключаем статус на отключен
+            this.speaker.speaking = SpeakerType.disable;
             this._status = ConnectionStatus.disconnected;
-            Logger.log("WARN",`[Voice/${this.configuration.guild_id}]: ${code}: ${reason}`);
+
+            Logger.log(
+                "WARN",
+                `[Voice/${this.configuration.guild_id}]: ${code}: ${reason}`
+            );
         });
 
         /**
@@ -218,27 +240,16 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public packet = (frames: Buffer[]) => {
+        if (this._destroyed || !this.transport || !this.speaker) {
+            return;
+        }
+
         this.speaker.speaking = this.speaker.default;
-        if (frames) this.transport.packet(frames);
-    };
 
-    /**
-     * @description Удаление голосового соединения без отключения от голосового канала
-     * @protected
-     */
-    protected silent_destroy = () => {
-        if (this._status === ConnectionStatus.disconnected) return;
-
-        this._status = ConnectionStatus.disconnected;
-
-        this.speaker?.destroy?.();
-        this.speaker = null;
-
-        this.transport?.destroy?.();
-        this.transport = null;
-
-        this.adapter?.destroy?.();
-        this.adapter = null;
+        // Если есть аудио пакеты
+        if (frames) {
+            this.transport.packet(frames);
+        }
     };
 
     /**
@@ -246,15 +257,68 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      * @public
      */
     public destroy = () => {
-        if (this._status === ConnectionStatus.disconnected || !this.adapter) return;
-        this.emit("info", `[Voice/Cleaner] has destroyed`);
-        this.disconnect();
-        this.silent_destroy();
+        // Destroy должен быть полностью идемпотентным
+        if (this._destroyed) return;
 
-        // Удаляем информацию о сессии из глобальной/импортируемой БД
-        if (this.adapter.packet?.state?.guild_id) {
-            db.voice.remove(this.adapter.packet.state.guild_id);
+        /*
+         * Сохраняем guildId до уничтожения adapter.
+         */
+        const guildId =
+            this.adapter?.packet?.state?.guild_id ??
+            this.configuration.guild_id;
+
+        // Сразу блокируем дальнейшие callbacks / reconnect
+        this._destroyed = true;
+        this._status = ConnectionStatus.disconnected;
+
+        this.emit("info", `[Voice/Cleaner] has destroyed`);
+
+        /*
+         * Удаляем соединение из глобальной БД.
+         */
+        if (guildId) {
+            db.voice.remove(guildId);
         }
+
+        /*
+         * Если adapter ещё существует — сообщаем Discord
+         * об отключении.
+         *
+         * Ошибка не должна препятствовать локальному cleanup.
+         */
+        if (this.adapter) {
+            this.configuration.channel_id = null;
+
+            try {
+                this.adapter.send(this.configuration);
+            } catch {
+                // Adapter уже мог быть закрыт.
+            }
+        }
+
+        /*
+         * Освобождаем speaker.
+         */
+        this.speaker?.destroy?.();
+        this.speaker = null;
+
+        /*
+         * Освобождаем transport.
+         */
+        this.transport?.destroy?.();
+        this.transport = null;
+
+        /*
+         * Освобождаем adapter.
+         */
+        this.adapter?.destroy?.();
+        this.adapter = null;
+
+        /*
+         * Больше VoiceConnection не должен удерживать
+         * зарегистрированные listeners.
+         */
+        super.destroy();
     };
 }
 

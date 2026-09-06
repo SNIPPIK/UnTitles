@@ -331,7 +331,8 @@ export class VoiceWebSocket extends TypedEmitter<ClientWebSocketEvents> {
         this.sequence = null;
         this.queue = null;
 
-        if (this._heartbeat) this._heartbeat.destroy();
+        this._heartbeat.stop();
+        this._heartbeat.destroy();
         this._heartbeat = null;
     };
 }

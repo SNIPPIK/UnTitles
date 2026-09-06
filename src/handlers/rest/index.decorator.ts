@@ -1,7 +1,7 @@
 import { RestAPINames, APIPlatformType } from "#handler/rest/index.abstract.js";
 import type { CommandInteraction } from "#structures/discord/index.js";
 import type { RestClientSide } from "#handler/rest/index.js";
-import { env } from "#app/env";
+import { env } from "#db/env";
 
 /**
  * @author SNIPPIK

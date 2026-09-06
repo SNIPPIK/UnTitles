@@ -2,7 +2,7 @@ import type { CycleInteraction, MessageComponent } from "#structures/discord/ind
 import { AudioPlayer, AudioPlayerState } from "#core/player/index.js";
 import { OPUS_FRAME_SIZE } from "#core/audio/index.js";
 import { Logger, TaskCycle } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -36,14 +36,6 @@ const PLAYER_SEND_POOL = Math.floor((PLAYER_SEND_NATIVE / OPUS_FRAME_SIZE) * 5);
 
 /**
  * @author SNIPPIK
- * @description Кол-во пакетов, которые могут быть в буфере UDP, если превысить лимит то, пакеты будут потеряны
- * @const PLAYER_SEND_LIMIT
- * @private
- */
-const PLAYER_SEND_LIMIT = PLAYER_SEND_POOL * 3;
-
-/**
- * @author SNIPPIK
  * @description Циклическая система плееров для плавной отправки аудиопакетов.
  * Адаптирует скорость работы цикла в зависимости от нагрузки Event Loop.
  *
@@ -52,12 +44,21 @@ const PLAYER_SEND_LIMIT = PLAYER_SEND_POOL * 3;
  * @private
  */
 class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
-    // Храним время последней корректировки цикла (для предотвращения слишком частых изменений)
-    private _lastAdjust = 0;
+    /**
+     * @description Данные для диагностики
+     * @protected
+     */
+    protected diagnostic(): string {
+        let udp = 0;
+        let audio = 0;
 
-    // Используем WeakMap для безопасного хранения состояний (метрик) каждого плеера.
-    // Это избавляет нас от необходимости принудительно писать данные в сам объект плеера через `any`.
-    private _playerMetrics = new WeakMap<T, { starving: boolean; buffered: number }>();
+        for (const player of this) {
+            udp += player.voice.connection.udp.packets;
+            audio += player.audio.current?.packets ?? 0;
+        }
+
+        return `udp=${udp} audio=${audio}`;
+    };
 
     /**
      * @description Инициализирует цикл обработки аудио-плееров
@@ -69,85 +70,6 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             // Базовое время до следующего прогона цикла
             duration: PLAYER_SEND_NATIVE,
 
-            // Кастомные функции для управления циклом
-            custom: {
-                step: () => {
-                    let anyStarving = false;
-                    let anyOverloaded = false;
-                    let activePlayers = 0;
-
-                    // Проходимся по всем плеерам в текущем цикле
-                    for (const p of this.array) {
-                        // Если плеер не проходит фильтр (например, не играет) — пропускаем его
-                        if (!this.options.filter(p)) continue;
-
-                        activePlayers++;
-
-                        // Получаем или создаем метрики для текущего плеера
-                        const metrics = this._getOrCreateMetrics(p);
-
-                        // Проверяем статус "голодания" (не хватает пакетов для отправки)
-                        if (metrics.starving) {
-                            anyStarving = true;
-                        }
-
-                        // Проверяем статус "перегрузки" (буфер UDP забит более чем на 180%)
-                        const packets = p.voice?.connection?.udp?.packets ?? 0;
-                        if (packets > PLAYER_SEND_LIMIT * 1.8) {
-                            anyOverloaded = true;
-                        }
-
-                        // Сбрасываем флаг голодания для следующего шага цикла
-                        metrics.starving = false;
-                    }
-
-                    // --- Адаптация скорости цикла ---
-                    // Если есть активные плееры, решаем, нужно ли нам ускорить или замедлить цикл
-                    if (activePlayers > 0) {
-                        if (anyStarving) {
-                            // Если кому-то не хватает пакетов, замедляем цикл (увеличиваем интервал),
-                            // чтобы дать системе время накопить аудиоданные.
-                            this.options.duration = Math.min(
-                                PLAYER_SEND_NATIVE * 2,
-                                this.options.duration + OPUS_FRAME_SIZE
-                            );
-                        } else if (anyOverloaded) {
-                            // Если буфер переполнен, ускоряем цикл (уменьшаем интервал),
-                            // чтобы быстрее разгрести очередь пакетов.
-                            this.options.duration = Math.max(
-                                PLAYER_SEND_NATIVE / 2,
-                                this.options.duration - OPUS_FRAME_SIZE
-                            );
-                        } else {
-                            // Если всё в порядке, плавно возвращаемся к стандартной скорости (базовому интервалу)
-                            if (this.options.duration > PLAYER_SEND_NATIVE) {
-                                this.options.duration = Math.max(PLAYER_SEND_NATIVE, this.options.duration - OPUS_FRAME_SIZE);
-                            } else if (this.options.duration < PLAYER_SEND_NATIVE) {
-                                this.options.duration = Math.min(PLAYER_SEND_NATIVE, this.options.duration + OPUS_FRAME_SIZE);
-                            }
-                        }
-                    }
-
-                    // --- Коррекция времени (компенсация микро-задержек процессора) ---
-                    const now = this.time;
-                    const drift = Math.abs(now - this.insideTime) + this.drift;
-
-                    // Вычисляем, насколько кадров мы сдвинулись
-                    const frames = drift > PLAYER_SEND_NATIVE ? drift + PLAYER_SEND_NATIVE : PLAYER_SEND_NATIVE;
-                    const quantized = Math.max(PLAYER_SEND_NATIVE, Math.ceil(frames / OPUS_FRAME_SIZE) * OPUS_FRAME_SIZE);
-
-                    // Применяем корректировку только раз в определенное время (Cooldown)
-                    if ((now - this._lastAdjust >= PLAYER_SEND_NATIVE) && (this.options.duration !== quantized)) {
-                        // Уменьшаем плавно, повышаем резко
-                        const step = this.options.duration > quantized ? -OPUS_FRAME_SIZE : OPUS_FRAME_SIZE;
-                        this.options.duration = Math.max(PLAYER_SEND_LIMIT, this.options.duration + step);
-
-                        // Устанавливаем задержку до следующей корректировки
-                        this._lastAdjust = now + PLAYER_SEND_NATIVE * 5;
-                    }
-                }
-            },
-
             // Оставляем в цикле только те плееры, которые сейчас проигрывают аудио и готовы к работе
             filter: (item) => item.playing && item.voice?.connection?.ready,
 
@@ -158,7 +80,6 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
              */
             execute: (player) => {
                 const connection = player.voice.connection;
-                const metrics = this._getOrCreateMetrics(player);
 
                 // Считаем базовое количество пакетов, которые нужно отправить за текущий шаг
                 let toSend = Math.ceil(this.options.duration / OPUS_FRAME_SIZE);
@@ -174,46 +95,22 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
 
                 const audio = player.audio.current;
 
-                // Сбрасываем метрику буферизации перед новой попыткой
-                metrics.buffered = 0;
-
                 // Берем пакеты из источника аудио и отправляем их в соединение
                 if (allowed > 0) {
                     const batch = audio.packetAt(allowed + 2); // Запрашиваем с небольшим запасом
                     if (batch && batch.length > 0) {
                         connection.packet(batch);
-                        metrics.buffered = batch.length; // Сохраняем информацию о том, сколько реально взяли
                     }
                 }
-
-                // --- Проверка на "голодание" источника ---
-                // Если мы хотели взять пакеты (allowed > 0), но источник ничего не дал (buffered === 0)
-                // ИЛИ если мы запросили много, а получили меньше половины — плеер не справляется (голодает).
-                metrics.starving = (allowed > 0 && metrics.buffered === 0) ||
-                    (allowed > 2 && metrics.buffered < allowed / 2);
 
                 // Если и в источнике, и в буфере UDP закончились пакеты — останавливаем плеер
                 if (audio.packets === 0 && connection.udp.packets === 0) {
                     player.status = AudioPlayerState.idle;
                     player.cycle = false;
-                    metrics.starving = false;
                 }
             }
         });
-    }
-
-    /**
-     * @description Вспомогательный метод для безопасного получения метрик плеера
-     * @private
-     */
-    private _getOrCreateMetrics(player: T) {
-        let metrics = this._playerMetrics.get(player);
-        if (!metrics) {
-            metrics = { starving: false, buffered: 0 };
-            this._playerMetrics.set(player, metrics);
-        }
-        return metrics;
-    }
+    };
 
     /**
      * @description Очистка цикла и принудительный запуск сборщика мусора (Garbage Collector)
@@ -224,7 +121,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
         super.reset();
 
         if (typeof global.gc === "function") {
-            Logger.log("DEBUG", "[Node] running Garbage Collector - running main thread");
+            Logger.log("DEBUG", "[Node] running Garbage Collector - AudioPlayers Cycle Drop");
             global.gc();
         }
     };
@@ -342,7 +239,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
              * - Если есть компоненты (кнопки) – вызывает `update`.
              * - Если компонентов нет – удаляет сообщение.
              */
-            execute: (message) => {
+            execute: (message) => queueMicrotask(() => {
                 const queue = db.queues.get(message.guildId);
 
                 // Нет очереди – сообщение больше не нужно
@@ -359,7 +256,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
                 }
 
                 return this.update(message, component);
-            }
+            })
         });
     };
 
@@ -379,7 +276,7 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
      */
     public update = (message: T, component: MessageComponent) => {
         try {
-            if (message.createdTimestamp) message.edit({ components: component, embeds: null }).catch(console.error);
+            if (message.createdTimestamp) message.edit({ components: component }).catch(() => {});
         } catch (error) {
             Logger.log("ERROR", `Failed to edit message in cycle\n${error instanceof Error ? error.stack : error}`);
 
@@ -438,4 +335,13 @@ class Messages<T extends CycleInteraction> extends TaskCycle<T> {
 
         return message;
     }
+
+    /**
+     * @description Очистка цикла
+     * @returns void
+     * @public
+     */
+    public reset = (): void => {
+        super.reset();
+    };
 }

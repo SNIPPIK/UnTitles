@@ -1,7 +1,8 @@
 import { Command, CommandContext, Declare, Middlewares, Locales } from "seyfert";
 import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "discord-api-types/v10";
-import { db } from "#app/db";
+import { sdb } from "#db/worker";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -72,6 +73,7 @@ export default class StatusCommand extends Command {
                     name: "🎵 Audio",
                     value: [
                         `Queues:         **${db.queues.size}**`,
+                        `QDownload:      **${sdb?.audio_saver?.size ?? 0}**`,
                         `Players:        **${db.queues.cycles.players.size}**`,
                         `Messages:       **${db.queues.cycles.messages.size}**`,
                         `Voice Sessions: **${db.voice.size}**`,

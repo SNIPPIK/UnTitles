@@ -1,30 +1,46 @@
 import { createEvent } from "seyfert";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
- * @description Временная база данных для таймеров автоматического выхода
+ * @description Таймеры автоматического выхода
  */
-const temple_db = new Map<string, NodeJS.Timeout>();
+const timers = new Map<string, NodeJS.Timeout>();
 
 /**
  * @author SNIPPIK
- * @description Время (в секундах) до отключения бота, если в канале никого нет
+ * @description Время ожидания перед отключением (сек.)
  */
-const timeout = 60;
+const TIMEOUT = 60;
+
+/**
+ * Отменить таймер выхода
+ */
+function clearLeaveTimer(guildId: string) {
+    const timer = timers.get(guildId);
+    if (!timer) return;
+
+    clearTimeout(timer);
+    timers.delete(guildId);
+}
 
 export default createEvent({
-    data: { name: "voiceStateUpdate" },
+    data: {
+        name: "voiceStateUpdate"
+    },
     run: ([newState, oldState], client) => {
-        // Seyfert предоставляет newState и oldState. Используем текущее состояние для логики.
         const payload = newState ?? oldState;
         if (!payload) return;
 
-        const { guildId, userId, channelId } = payload;
+        const { guildId, userId } = payload;
 
-        // Если это был бот
-        if (payload.userId === client.botId) {
-            // Обновляем адаптер базы данных (необходимо для работы голосового движка)
+        /**
+         * ==========================================================
+         * СОБЫТИЯ НАШЕГО БОТА
+         * ==========================================================
+         */
+        if (userId === client.botId) {
+            // Обновляем VoiceAdapter
             db.adapter.onVoiceStateUpdate({
                 session_id: payload.sessionId,
                 channel_id: payload.channelId,
@@ -40,92 +56,126 @@ export default createEvent({
                 suppress: payload.suppress,
                 member: null
             });
+
+            /**
+             * Если именно НАШ бот покинул голосовой канал —
+             * полностью удаляем очередь.
+             */
+            if (!payload.channelId) {
+                clearLeaveTimer(guildId);
+
+                db.queues.remove(guildId);
+                db.voice.remove(guildId);
+            }
+
             return;
         }
 
         /**
-         * Используем queueMicrotask, чтобы логика проверки не блокировала
-         * основной поток обработки событий Gateway.
+         * ==========================================================
+         * СОБЫТИЯ ВСЕХ ОСТАЛЬНЫХ ПОЛЬЗОВАТЕЛЕЙ
+         * ==========================================================
          */
         queueMicrotask(() => {
-            // Получаем состояние бота на этом сервере
-            const botState = client.cache.voiceStates?.get(client.me.id, guildId);
+            const queue = db.queues.get(guildId);
+            if (!queue) return;
 
-            // Если бота нет в ГС — чистим таймеры и выходим
-            if (!botState?.channelId) {
-                const temp = temple_db.get(guildId);
-                if (temp) {
-                    clearTimeout(temp);
-                    temple_db.delete(guildId);
-                }
+            /**
+             * Получаем текущее состояние нашего бота.
+             */
+            const botState = client.cache.voiceStates?.get(client.botId, guildId);
 
-                const queue = db.queues.get(guildId);
-                if (queue) {
-                    db.queues.remove(guildId);
-                    db.voice.remove(guildId);
+            /**
+             * Если бот уже не находится в голосовом канале —
+             * ничего делать не нужно.
+             */
+            if (!botState?.channelId) return;
+
+            /**
+             * Проверяем, есть ли хотя бы один человек
+             * в том же канале, где находится бот.
+             */
+            let hasHumans = false;
+
+            for (const state of client.cache.voiceStates?.values(guildId) ?? []) {
+                if (state.channelId !== botState.channelId)
+                    continue;
+
+                if (state.userId === client.botId)
+                    continue;
+
+                const member = client.cache.members?.get(state.userId, guildId);
+
+                if (member && !member.user?.bot) {
+                    hasHumans = true;
+                    break;
                 }
+            }
+
+            /**
+             * ======================================================
+             * В КАНАЛЕ ЕСТЬ ЛЮДИ
+             * ======================================================
+             */
+            if (hasHumans) {
+                clearLeaveTimer(guildId);
+
+                if (queue.player?.status === "player/pause")
+                    queue.player.resume();
+
                 return;
             }
 
-            // Получаем ВСЕ стейты участников на сервере
-            const guildStates = client.cache.voiceStates?.values(guildId) ?? [];
+            /**
+             * ======================================================
+             * В КАНАЛЕ НЕТ ЛЮДЕЙ
+             * ======================================================
+             */
 
-            // Считаем живых людей в канале с ботом
-            let humanCount = 0;
-            for (const vs of guildStates) {
-                if (vs.channelId === botState.channelId && vs.userId !== client.me.id) {
-                    const member = client.cache.members?.get(vs.userId, guildId);
-                    if (member && !member.user?.bot) humanCount++;
+            if (timers.has(guildId))
+                return;
+
+            if (queue.player?.status === "player/playing")
+                queue.player.pause();
+
+            const timer = setTimeout(() => {
+                timers.delete(guildId);
+
+                /**
+                 * Повторная проверка перед отключением.
+                 * За это время кто-то мог зайти.
+                 */
+                const currentBot = client.cache.voiceStates?.get(client.botId, guildId);
+
+                if (!currentBot?.channelId)
+                    return;
+
+                let hasHumans = false;
+
+                for (const state of client.cache.voiceStates?.values(guildId) ?? []) {
+                    if (state.channelId !== currentBot.channelId)
+                        continue;
+
+                    if (state.userId === client.botId)
+                        continue;
+
+                    const member = client.cache.members?.get(state.userId, guildId);
+
+                    if (member && !member.user?.bot) {
+                        hasHumans = true;
+                        break;
+                    }
                 }
-            }
 
-            const queue = db.queues.get(guildId);
-            const temp = temple_db.get(guildId);
+                if (hasHumans)
+                    return;
 
-            // Если нет очереди, просто выходим
-            if (!queue) return;
+                db.queues.remove(guildId);
+                db.voice.remove(guildId);
 
-            // ЛОГИКА ПАУЗЫ / ВЫХОДА
-            if (humanCount > 0) {
-                // Есть люди: отменяем таймер удаления
-                if (temp) {
-                    clearTimeout(temp);
-                    temple_db.delete(guildId);
+            }, TIMEOUT * 1000);
 
-                    // Возобновляем плеер, если он был на паузе
-                    if (queue.player?.status === "player/pause") queue.player.resume();
-                }
-            } else {
-                // Пропускаем событие, если это сам бот заходит
-                const isSelfJoin = userId === client.me.id && !!channelId;
-                if (isSelfJoin) return;
-
-                // Если таймера нет — создаём
-                if (!temp) {
-                    // Если плеер сейчас играет трек
-                    if (queue.player?.status === "player/playing") queue.player.pause();
-
-                    const timer = setTimeout(() => {
-                        // Финальная проверка перед удалением
-                        const finalStates = client.cache.voiceStates?.values(guildId) ?? [];
-                        const finalBot = client.cache.voiceStates?.get(client.me.id, guildId);
-
-                        const stillAlone = !finalStates.some(vs =>
-                            vs.channelId === finalBot?.channelId &&
-                            vs.userId !== client.me.id &&
-                            client.cache.members?.get(vs.userId, guildId)?.bot
-                        );
-
-                        if (stillAlone) {
-                            db.queues.remove(guildId);
-                            db.voice.remove(guildId);
-                            temple_db.delete(guildId);
-                        }
-                    }, timeout * 1000);
-
-                    temple_db.set(guildId, timer);
-                }
-            }
+            timers.set(guildId, timer);
         });
     }
 });

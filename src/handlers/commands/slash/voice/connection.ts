@@ -3,7 +3,7 @@ import { ChannelType } from "seyfert/lib/types/index.js";
 import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "discord-api-types/v10";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @description Подкоманда для подключения к голосовому каналу
@@ -12,7 +12,8 @@ import { db } from "#app/db";
     name: "join",
     description: "Connecting to voice channel!",
     integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"]
+    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    defaultMemberPermissions: ["Connect", "Speak", "ViewChannel", "SendMessages"],
 })
 @Middlewares(["userVoiceChannel", "clientVoiceChannel", "checkAnotherVoice"])
 @Options({
@@ -125,8 +126,7 @@ class VoiceLeaveCommand extends SubCommand {
         // Если есть очередь, то удаляем ее!
         if (queue) queue.cleanup();
 
-        // Отключаемся от голосового канала
-        if (!voiceConnection.disconnect) return null;
+        if (voiceConnection) voiceConnection.disconnect();
 
         return ctx.write({
             embeds: [

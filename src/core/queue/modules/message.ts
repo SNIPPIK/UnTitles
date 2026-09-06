@@ -5,8 +5,8 @@ import { MessageFlags } from "seyfert/lib/types/index.js";
 import type { AudioPlayer } from "#core/player/index.js";
 import { RepeatType } from "#core/queue/index.js";
 import { locale } from "#structures";
-import { env } from "#app/env";
-import { db } from "#app/db";
+import { env } from "#db/env";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK

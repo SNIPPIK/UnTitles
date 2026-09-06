@@ -22,24 +22,26 @@
     "#worker/*": "./build/src/workers/*",
     "#structures": "./build/src/structures/index.js",
     "#structures/*": "./build/src/structures/*",
-    "#app": "./build/src/index.js",
-    "#app/db": "./build/src/database/index.js",
-    "#app/env": "./build/src/environment.js",
-    "#worker/db": "./build/src/database/index.worker.js",
-    "#native": "./build/src/n-api.js"
+
+    "#db": "./build/src/structures/database/index.js",
+    "#db/app": "./build/src/index.js",
+    "#db/env": "./build/src/structures/manager/environment.js",
+    "#db/worker": "./build/src/structures/database/index.worker.js",
+
+    "#native": "./build/src/structures/manager/n-api.js"
   },
   "napi": {
     "binaryName": "watklok"
   },
   "dependencies": {
-    "discord-api-types": "^0.38.54",
+    "discord-api-types": "^0.38.55",
     "http-proxy-agent": "^9.1.0",
     "seyfert": "^5.0.0",
     "socks-proxy-agent": "^10.1.0"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.8.6",
-    "@types/node": "^26.4.0",
+    "@napi-rs/cli": "^3.9.0",
+    "@types/node": "^26.4.1",
     "typescript": "^7.0.2"
   },
   "scripts": {

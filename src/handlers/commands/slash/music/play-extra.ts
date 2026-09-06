@@ -1,7 +1,7 @@
 import { Locales, Command, SubCommand, createStringOption, Declare, Options, Middlewares, CommandContext } from "seyfert";
 import radio from "#core/player/stations.json" with { type: 'json' };
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @description Подкоманда для включения музыки через конкретную платформу
@@ -10,7 +10,8 @@ import { db } from "#app/db";
     name: "search",
     description: "Turn on music by link or title!",
     integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"]
+    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages", "Connect", "Speak"],
 })
 @Options({
     platform: createStringOption({
@@ -95,7 +96,8 @@ class PlaySearchCommand extends SubCommand {
     name: "wave",
     description: "Endless track playback mode!",
     integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"]
+    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages", "Connect", "Speak"],
 })
 @Options({
     platform: createStringOption({
@@ -181,7 +183,8 @@ class PlayRelatedCommand extends SubCommand {
     name: "radio",
     description: "Play radio",
     integrationTypes: ["GuildInstall"],
-    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"]
+    botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages", "Connect", "Speak"],
 })
 @Options({
     station: createStringOption({
@@ -254,6 +257,7 @@ class PlayRadio extends SubCommand {
     description: "Playing music!",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages", "Connect", "Speak"],
 })
 @Locales({
     name: [

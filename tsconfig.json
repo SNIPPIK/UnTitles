@@ -44,14 +44,13 @@
       "#structures/*": ["./src/structures/*"],
       "#structures": ["./src/structures/index"],
 
-      "#app": ["./src/index"],
-      "#app/db": ["./src/database/index"],
-      "#app/env": ["./src/environment"],
-
-      "#worker/db": ["./src/database/index.worker"],
+      "#db/": ["./src/structures/database/index"],
+      "#db/app": ["./src/index"],
+      "#db/env": ["./src/structures/manager/environment"],
+      "#db/worker": ["./src/structures/database/index.worker"],
 
       // Нативные модули написанные на Rust
-      "#native": ["./src/n-api"],
+      "#native": ["./src/structures/manager/n-api.ts"],
     }
   },
 

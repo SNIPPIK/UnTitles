@@ -1,7 +1,8 @@
 import { Command, type CommandContext, createNumberOption, Declare, Locales, Middlewares, Options, SubCommand } from "seyfert";
+import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "discord-api-types/v10";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @description Подкоманда для перехода позиции вперед
@@ -11,6 +12,7 @@ import { db } from "#app/db";
     description: "Skip tracks from the current to the specified track!",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"]
 })
 @Options({
     value: createNumberOption({
@@ -34,7 +36,7 @@ import { db } from "#app/db";
             const position = queue.tracks.position;
             const maxSuggestions = 5;
             const highlightIndex = 0;
-            const startIndex = Math.min(total - 1, position + (number - 1));
+            const startIndex = Math.min(total - 1, position + number);
 
             // Получаем треки
             const tracks = queue.tracks.array(maxSuggestions, startIndex);
@@ -72,12 +74,22 @@ import { db } from "#app/db";
 })
 class SkipNext extends SubCommand {
     async run(ctx: CommandContext<any>) {
-        const number: number = ctx.options.value;
+        const number = ctx.options.value;
         const {player, tracks} = db.queues.get(ctx.guildId);
         const track = tracks.get(number);
 
         // Если указан трек которого нет
-        if (!track) return null;
+        if (!track || number === "|NumberFail|") {
+            return ctx.write({
+                embeds: [
+                    {
+                        description: locale._(ctx.interaction.locale, "autocomplete.number.incorrect"),
+                        color: Colors.DarkRed
+                    }
+                ],
+                flags: MessageFlags.Ephemeral
+            });
+        }
 
         const {name, url, api} = track;
 
@@ -165,12 +177,22 @@ class SkipNext extends SubCommand {
 })
 class SkipBack extends SubCommand {
     async run(ctx: CommandContext<any>) {
-        const number: number = ctx.options.value;
+        const number = ctx.options.value;
         const {player, tracks} = db.queues.get(ctx.guildId);
         const track = tracks.get(number);
 
         // Если указан трек которого нет
-        if (!track) return null;
+        if (!track || number === "|NumberFail|") {
+            return ctx.write({
+                embeds: [
+                    {
+                        description: locale._(ctx.interaction.locale, "autocomplete.number.incorrect"),
+                        color: Colors.DarkRed
+                    }
+                ],
+                flags: MessageFlags.Ephemeral
+            });
+        }
 
         const {name, url, api} = track;
 
@@ -212,22 +234,27 @@ class SkipBack extends SubCommand {
         description: "You need to specify the track number!",
         required: true,
         autocomplete: (ctx) => {
-            const number = parseInt(ctx.getInput());
+            const input = parseInt(ctx.getInput());
             const queue = db.queues.get(ctx.guildId);
 
-            if (!queue || isNaN(number) || number <= 0) return null;
+            if (!queue || isNaN(input)) return null;
 
             const { total } = queue.tracks;
+            if (!total) return null;
+
             const max = 5;
-            const index = number - 1;
 
-            // Определяем начальную позицию и индекс подсветки
+            // Ограничиваем диапазон
+            const index = Math.min(Math.max(input - 1, 0), total - 1);
+
             let start = Math.max(0, index - Math.floor(max / 2));
-            if (index >= total) start = Math.max(0, total - max);
-            else if (start + max > total) start = Math.max(0, total - max);
 
-            const highlight = Math.max(0, index - start);
-            // Получаем массив треков
+            if (start + max > total) {
+                start = Math.max(0, total - max);
+            }
+
+            const highlight = index - start;
+
             const tracks = queue.tracks.array(max, start);
 
             // Если треков нет
@@ -238,16 +265,16 @@ class SkipBack extends SubCommand {
                         //@ts-ignore
                         value: "|NumberFail|"
                     }
-                ])
+                ]);
             }
 
             // Генерация результатов
-            const results = tracks.map((track, i) => ({
-                name: `${start + i + 1}. ${i === highlight ? db.emoji.select : db.emoji.queue} (${track.time.split}) ${track.name.slice(0, 75)}`,
-                value: start + i
-            }));
-
-            return ctx.respond(results);
+            return ctx.respond(
+                tracks.map((track, i) => ({
+                    name: `${start + i + 1}. ${i === highlight ? db.emoji.select : db.emoji.queue} (${track.time.split}) ${track.name.slice(0, 75)}`,
+                    value: 1 + start + i
+                }))
+            );
         }
     })
 })
@@ -263,22 +290,31 @@ class SkipBack extends SubCommand {
 })
 class SkipTo extends SubCommand {
     async run(ctx: CommandContext<any>) {
-        const number: number = ctx.options.value;
-        const {player, tracks} = db.queues.get(ctx.guildId);
-        const track = tracks.get(number);
+        const number = ctx.options.value;
+        const { player, tracks } = db.queues.get(ctx.guildId);
+        const track = tracks.get(number - 1);
 
         // Если указан трек которого нет
-        if (!track) return null;
+        if (!track || number === "|NumberFail|") {
+            return ctx.write({
+                embeds: [
+                    {
+                        description: locale._(ctx.interaction.locale, "autocomplete.number.incorrect"),
+                        color: Colors.DarkRed
+                    }
+                ],
+                flags: MessageFlags.Ephemeral
+            });
+        }
 
-        const {name, url, api} = track;
-
+        const { name, url, api } = track;
         // Переходим к позиции
-        player.play(0, 0, number).catch(console.error);
+        player.play(0, 0, number - 1).catch(console.error);
 
         return ctx.write({
             embeds: [
                 {
-                    description: locale._(ctx.interaction.locale, "command.skip.arg.track", [number + 1, `[${name}](${url})`]),
+                    description: locale._(ctx.interaction.locale, "command.skip.arg.track", [number, `[${name}](${url})`]),
                     color: api.color
                 }
             ],

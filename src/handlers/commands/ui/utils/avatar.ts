@@ -14,7 +14,7 @@ import { locale } from "#structures";
     name: "Avatar",
     type: ApplicationCommandType.User,
     integrationTypes: ["GuildInstall", "UserInstall"],
-    botPermissions: ["SendMessages", "EmbedLinks"],
+    botPermissions: ["SendMessages", "EmbedLinks"]
 })
 @Middlewares(["checkCooldown"])
 @Locales({

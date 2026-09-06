@@ -1,54 +1,6 @@
-import { CommandContext, WebhookMessage, Message, AutocompleteInteraction } from "seyfert";
-import { middlewares } from "#handler/middlewares/index.js";
-import { AudioPlayerEvents } from "#core/player/index.js";
-import { QueueEvents } from "#core/queue/index.js";
-import { DiscordClient } from "./index.client.js";
-import { RestAPIEvents } from "#handler/rest/index.js";
-
 export * from "./index.client.js";
 export * from "./index.voice.js";
-
-/**
- * @author SNIPPIK
- * @description Тип сообщения для команд
- * @type CommandInteraction
- */
-export type CommandInteraction = CommandContext;
-
-/**
- * @description Тип входящих данных для дополнения к команде
- * @type CompeteInteraction
- * @public
- */
-export type CompeteInteraction = AutocompleteInteraction;
-
-/**
- * @description Тип входящих данных для кнопок
- * @type buttonInteraction
- * @public
- */
-export type buttonInteraction = CommandContext;
-
-/**
- * @description Тип входящих данных для циклической системы
- * @type buttonInteraction
- * @public
- */
-export type SelectMenuInteract = CommandContext;
-
-/**
- * @description Тип входящих данных для циклической системы
- * @type buttonInteraction
- * @public
- */
-export type CycleInteraction = (WebhookMessage | Message) & { editedTimestamp?: string };
-
-/**
- * @description Тип входящих данных для циклической системы
- * @type MessageComponent
- * @public
- */
-export type MessageComponent = any;
+export * from "../types/Interaction.js";
 
 /**
  * @author SNIPPIK
@@ -80,17 +32,4 @@ export enum Colors {
     Navy = 3426654,
     DarkNavy = 2899536,
     Yellow = 16776960
-}
-
-/**
- * @author SNIPPIK
- * @description Редактируем параметры seyfert
- */
-declare module "seyfert" {
-    interface SeyfertRegistry {
-        client: DiscordClient;
-        middlewares: typeof middlewares;
-    }
-
-    interface CustomEvents extends AudioPlayerEvents, QueueEvents, RestAPIEvents { }
 }

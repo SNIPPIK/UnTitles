@@ -1,46 +1,24 @@
+use crossbeam_utils::CachePadded;
 use std::{
     cell::UnsafeCell,
     mem::MaybeUninit,
-    ptr,
-    sync::atomic::{AtomicUsize, Ordering}
+    sync::atomic::{AtomicUsize, Ordering},
 };
-
-// ============================================================================
-// Выравнивание под строку кэша
-// ============================================================================
-
-/// Обёртка, гарантирующая 64-байтное выравнивание поля.
-/// Предотвращает ложное разделение (false sharing) между ядрами процессора.
-#[repr(align(64))]
-struct CachePadded<T>(T);
 
 // ============================================================================
 // Слот кольцевого буфера
 // ============================================================================
 
-/// Отдельный слот буфера, хранящий полезную нагрузку и синхронизационный счётчик.
-///
-/// # Протокол
-/// Каждый слот имеет поле `seq`, которое сравнивается с глобальным индексом
-/// для определения состояния слота:
-/// - **seq == индекс** → слот свободен для записи.
-/// - **seq == индекс + 1** → слот содержит готовые данные для чтения.
-/// - Иначе — слот либо занят, либо находится в промежуточном состоянии.
-///
-/// После чтения `seq` устанавливается в `индекс + ёмкость`,
-/// возвращая слот в свободное состояние для следующего цикла.
+/// Отдельный слот буфера: содержит атомарный счётчик состояния и данные.
 struct Slot {
-    /// Порядковый номер, управляющий состоянием слота.
-    /// Используется для координации доступа без блокировок.
+    /// Порядковый номер слота, управляет его состоянием (свободен/занят/готов).
     seq: AtomicUsize,
 
-    /// Полезная нагрузка. Доступ синхронизируется через `seq`
-    /// согласно правилам Acquire/Release.
+    /// Хранилище данных; инициализируется/читается вручную через unsafe.
     data: UnsafeCell<MaybeUninit<Vec<u8>>>
 }
 
-// Данный тип безопасно передавать и делить между потоками,
-// так как весь доступ к `data` защищён атомарным протоколом.
+// Безопасно делить между потоками: весь доступ синхронизирован через seq.
 unsafe impl Send for Slot {}
 unsafe impl Sync for Slot {}
 
@@ -48,43 +26,23 @@ unsafe impl Sync for Slot {}
 // Кольцевой буфер
 // ============================================================================
 
-/// Многопоточный (MPMC) lock-free FIFO-буфер фиксированного размера.
-///
-/// Позволяет одному или нескольким производителям вставлять элементы,
-/// а одному или нескольким потребителям извлекать их. Никакие два потока
-/// не блокируют друг друга, за исключением кратковременных попыток
-/// атомарного CAS.
-///
-/// # Особенности
-/// - Фиксированная ёмкость, задаваемая при создании.
-/// - Гарантированно корректное освобождение ресурсов даже в случае
-///   частично заполненного буфера (через `Drop`).
-/// - `len()`, `is_empty()`, `is_full()` дают приблизительные значения
-///   и не линеаризуемы.
+/// Многопоточный (MPMC) lock-free FIFO буфер фиксированной ёмкости.
 pub struct RingBuffer {
-    /// Непрерывный массив слотов, индексируемый по модулю `capacity`.
+    /// Массив слотов.
     buffer: Box<[Slot]>,
-    /// Максимальное количество элементов, которое может одновременно
-    /// находиться в буфере.
+
+    /// Максимальное количество элементов.
     capacity: usize,
 
-    /// Голова — позиция следующей вставки (монотонно возрастает).
+    /// Голова — позиция следующей вставки (монотонно растёт).
     head: CachePadded<AtomicUsize>,
-    /// Хвост — позиция следующего извлечения (монотонно возрастает).
-    tail: CachePadded<AtomicUsize>,
+
+    /// Хвост — позиция следующего извлечения (монотонно растёт).
+    tail: CachePadded<AtomicUsize>
 }
 
-// RingBuffer владеет данными и синхронизирует доступ, поэтому
-// Send и Sync реализуются безопасно.
-unsafe impl Send for RingBuffer {}
-unsafe impl Sync for RingBuffer {}
-
 impl RingBuffer {
-    // ------------------------------------------------------------------------
-    // Конструктор
-    // ------------------------------------------------------------------------
-
-    /// Создаёт новый кольцевой буфер заданной ёмкости.
+    /// Создаёт кольцевой буфер заданной ёмкости.
     ///
     /// # Паника
     /// Паникует, если `capacity == 0`.
@@ -92,9 +50,10 @@ impl RingBuffer {
         assert!(capacity > 0, "capacity must be > 0");
 
         let mut slots = Vec::with_capacity(capacity);
+
         for i in 0..capacity {
             slots.push(Slot {
-                // Инициализируем seq индексом, означающим «слот свободен».
+                // Инициализируем seq индексом: слот свободен для записи.
                 seq: AtomicUsize::new(i),
                 data: UnsafeCell::new(MaybeUninit::uninit()),
             });
@@ -103,135 +62,129 @@ impl RingBuffer {
         Self {
             buffer: slots.into_boxed_slice(),
             capacity,
-            head: CachePadded(AtomicUsize::new(0)),
-            tail: CachePadded(AtomicUsize::new(0)),
+            head: CachePadded::new(AtomicUsize::new(0)),
+            tail: CachePadded::new(AtomicUsize::new(0)),
         }
     }
 
-    /// Возвращает максимальную ёмкость буфера.
-    #[cfg(debug_assertions)]
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.capacity
-    }
-
-    // ------------------------------------------------------------------------
-    // Вставка (push)
-    // ------------------------------------------------------------------------
-
     /// Пытается поместить `value` в буфер.
     ///
-    /// В случае успеха возвращает `Ok(())`, при заполненном буфере —
-    /// `Err(value)`, где `value` — исходное значение (не теряется).
-    ///
-    /// # Потокобезопасность
-    /// Может безопасно вызываться из нескольких потоков-производителей.
+    /// Возвращает `Ok(())` при успехе, `Err(value)` при заполненном буфере.
+    #[inline]
     pub fn push(&self, value: Vec<u8>) -> Result<(), Vec<u8>> {
         // Загружаем текущую позицию головы.
-        let mut pos = self.head.0.load(Ordering::Relaxed);
+        let mut pos = self.head.load(Ordering::Relaxed);
 
         loop {
-            // Индекс слота в массиве.
+            // Текущий слот по модулю ёмкости.
             let slot = &self.buffer[pos % self.capacity];
-            // Загружаем seq слотов с семантикой Acquire, чтобы увидеть
-            // все записи данных, сделанные предыдущим потоком.
+            // Acquire для seq: видим все записи от предыдущего потока.
             let seq = slot.seq.load(Ordering::Acquire);
 
-            // Разница между seq и pos. Поскольку счётчики монотонно растут,
-            // используем wrapping_sub для корректного сравнения при переполнениях.
+            // Разница seq и pos; wrapping_sub корректно обрабатывает переполнение.
             let diff = seq.wrapping_sub(pos) as isize;
 
             if diff == 0 {
-                // Слот свободен. Пытаемся атомарно зарезервировать позицию `pos`.
-                match self.head.0.compare_exchange_weak(
+                // Слот свободен: пробуем атомарно занять позицию `pos`.
+                match self.head.compare_exchange_weak(
                     pos,
                     pos.wrapping_add(1),
                     Ordering::Relaxed,
                     Ordering::Relaxed,
                 ) {
                     Ok(_) => {
-                        // Только один поток может оказаться здесь для данного `pos`.
-                        // Записываем данные в слот.
+                        // Успешно застолбили; записываем данные.
                         unsafe {
-                            ptr::write((*slot.data.get()).as_mut_ptr(), value);
+                            (*slot.data.get()).write(value);
                         }
-                        // Сообщаем потребителям, что слот заполнен.
-                        slot.seq.store(pos.wrapping_add(1), Ordering::Release);
+
+                        // Сообщаем потребителям, что слот готов (seq = pos + 1).
+                        slot.seq.store(
+                            pos.wrapping_add(1),
+                            Ordering::Release,
+                        );
+
                         return Ok(());
                     }
                     Err(actual) => {
-                        // CAS не удался — другой поток уже сдвинул голову.
-                        // Обновляем `pos` и пробуем снова.
+                        // CAS не удался: голова сдвинута другим потоком.
                         pos = actual;
                     }
                 }
             } else if diff < 0 {
-                // Буфер полон (seq отстаёт от pos). Возвращаем значение.
+                // Буфер полон: seq отстаёт от pos.
                 return Err(value);
             } else {
-                // Другой поток продвинул голову, но ещё не обновил seq.
-                // Перечитываем свежее значение головы.
-                pos = self.head.0.load(Ordering::Relaxed);
+                // Голова продвинута, но seq ещё не обновлён; перечитываем.
+                pos = self.head.load(Ordering::Relaxed);
             }
         }
     }
 
-    // ------------------------------------------------------------------------
-    // Извлечение (pop)
-    // ------------------------------------------------------------------------
-
-    /// Извлекает один элемент из буфера, если он доступен.
+    /// Извлекает один элемент из буфера, если он есть.
     ///
-    /// Возвращает `Some(value)`, если элемент был успешно извлечён,
-    /// или `None`, если буфер пуст.
+    /// Возвращает `Some(value)` или `None`, если буфер пуст.
+    #[inline]
     pub fn pop(&self) -> Option<Vec<u8>> {
-        let mut pos = self.tail.0.load(Ordering::Relaxed);
+        let mut pos = self.tail.load(Ordering::Relaxed);
 
         loop {
             let slot = &self.buffer[pos % self.capacity];
             let seq = slot.seq.load(Ordering::Acquire);
 
-            // Здесь сравниваем seq с pos + 1, потому что заполненный слот
-            // имеет seq == pos + 1 (после записи).
+            // Готовый слот имеет seq == pos + 1.
             let diff = seq.wrapping_sub(pos.wrapping_add(1)) as isize;
 
             if diff == 0 {
-                // Слот содержит данные. Пытаемся застолбить позицию.
-                match self.tail.0.compare_exchange_weak(
+                // Слот готов: пробуем занять позицию.
+                match self.tail.compare_exchange_weak(
                     pos,
                     pos.wrapping_add(1),
                     Ordering::Relaxed,
                     Ordering::Relaxed,
                 ) {
                     Ok(_) => {
-                        // Читаем данные (единственный поток-читатель для этого `pos`).
-                        let value = unsafe { ptr::read((*slot.data.get()).as_ptr()) };
+                        // Читаем данные (единственный читатель для этого pos).
+                        let value = unsafe {
+                            (*slot.data.get()).assume_init_read()
+                        };
+
                         // Возвращаем слот в свободное состояние для следующего цикла.
-                        // seq = pos + capacity гарантирует, что слот будет свободен,
-                        // когда голова достигнет pos + capacity.
+                        // seq = pos + capacity.
                         slot.seq.store(
                             pos.wrapping_add(self.capacity),
                             Ordering::Release,
                         );
+
                         return Some(value);
                     }
-                    Err(actual) => pos = actual,
+                    Err(actual) => {
+                        pos = actual;
+                    }
                 }
             } else if diff < 0 {
                 // Буфер пуст.
                 return None;
             } else {
-                // Хвост был сдвинут другим потоком, обновляем.
-                pos = self.tail.0.load(Ordering::Relaxed);
+                // Хвост сдвинут другим потоком.
+                pos = self.tail.load(Ordering::Relaxed);
             }
         }
     }
 
-    /// Извлекает до `limit` элементов и добавляет их в переданный вектор `out`.
-    ///
-    /// Метод эффективен: память резервируется заранее.
-    pub fn pop_many(&self, out: &mut Vec<Vec<u8>>, limit: usize) {
+    /// Извлекает до `limit` элементов и добавляет их в `out`.
+    #[inline]
+    pub fn pop_many(
+        &self,
+        out: &mut Vec<Vec<u8>>,
+        limit: usize,
+    ) {
+        if limit == 0 {
+            return;
+        }
+
         out.reserve(limit);
+
         for _ in 0..limit {
             match self.pop() {
                 Some(value) => out.push(value),
@@ -240,25 +193,16 @@ impl RingBuffer {
         }
     }
 
-    // ------------------------------------------------------------------------
-    // Информационные методы (приблизительные, не линеаризуемы)
-    // ------------------------------------------------------------------------
-
-    /// Текущее приблизительное количество элементов в буфере.
+    /// Текущее количество элементов (приблизительное).
     #[inline]
     pub fn len(&self) -> usize {
-        let head = self.head.0.load(Ordering::Acquire);
-        let tail = self.tail.0.load(Ordering::Acquire);
-        let cap = self.capacity;
+        let head = self.head.load(Ordering::Acquire);
+        let tail = self.tail.load(Ordering::Acquire);
 
-        if head >= tail {
-            head - tail
-        } else {
-            cap - tail + head
-        }
+        head.wrapping_sub(tail).min(self.capacity)
     }
 
-    /// Возвращает `true`, если буфер пуст (на момент вызова).
+    /// `true`, если буфер пуст.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
@@ -267,56 +211,63 @@ impl RingBuffer {
     /// Количество свободных слотов для записи.
     #[inline]
     pub fn capacity_remaining(&self) -> usize {
-        self.capacity.saturating_sub(self.len().min(self.capacity))
+        self.capacity.saturating_sub(self.len())
     }
 
-    /// Возвращает `true`, если буфер полностью заполнен.
+    /// `true`, если буфер заполнен полностью.
     #[inline]
     pub fn is_full(&self) -> bool {
-        self.capacity_remaining() == 0
+        self.len() >= self.capacity
     }
 
-    // ------------------------------------------------------------------------
-    // Очистка
-    // ------------------------------------------------------------------------
-
-    /// Безопасно осушает очередь, извлекая и уничтожая все элементы.
+    /// Очищает буфер.
     ///
-    /// После вызова буфер окажется в состоянии «пуст».
+    /// ВАЖНО:
+    /// Должен вызываться только после остановки всех producers и consumers.
     pub fn clear(&self) {
-        while self.pop().is_some() {}
+        let tail = self.tail.load(Ordering::Relaxed);
+        let head = self.head.load(Ordering::Relaxed);
 
-        self.head.0.store(0, Ordering::Relaxed);
-        self.tail.0.store(0, Ordering::Relaxed);
+        // Количество элементов в буфере.
+        let count = head.wrapping_sub(tail).min(self.capacity);
 
-        for (i, slot) in self.buffer.iter().enumerate() {
-            slot.seq.store(i, Ordering::Relaxed);
+        // Дропаем каждый инициализированный слот.
+        for offset in 0..count {
+            let pos = tail.wrapping_add(offset);
+            let slot = &self.buffer[pos % self.capacity];
+
+            unsafe {
+                // Приводим к Vec<u8> и дропаем.
+                slot.data.get().cast::<Vec<u8>>().drop_in_place();
+            }
+        }
+
+        // Сбрасываем голову и хвост в 0.
+        self.head.store(0, Ordering::Relaxed);
+        self.tail.store(0, Ordering::Relaxed);
+
+        // Сбрасываем seq всех слотов в исходное значение (индекс).
+        for (index, slot) in self.buffer.iter().enumerate() {
+            slot.seq.store(index, Ordering::Relaxed);
         }
     }
 }
 
 impl Drop for RingBuffer {
     fn drop(&mut self) {
-        #[cfg(debug_assertions)]
-        println!(
-            "RingBuffer drop len={} cap={} head={} tail={}",
-            self.len(),
-            self.capacity(),
-            self.head.0.load(Ordering::Relaxed),
-            self.tail.0.load(Ordering::Relaxed),
-        );
+        let tail = self.tail.load(Ordering::Relaxed);
+        let head = self.head.load(Ordering::Relaxed);
 
-        // При удалении буфера необходимо корректно освободить все
-        // оставшиеся элементы в слотах от tail до head.
-        let head = self.head.0.load(Ordering::Relaxed);
-        let tail = self.tail.0.load(Ordering::Relaxed);
+        // Количество элементов, которые нужно дропнуть.
+        let count = head.wrapping_sub(tail).min(self.capacity);
 
-        for pos in tail..head {
+        // Дропаем все инициализированные данные.
+        for offset in 0..count {
+            let pos = tail.wrapping_add(offset);
             let slot = &mut self.buffer[pos % self.capacity];
-            // Каждый слот в диапазоне [tail, head) гарантированно содержит
-            // инициализированное значение.
+
             unsafe {
-                ptr::drop_in_place((*slot.data.get()).as_mut_ptr());
+                slot.data.get_mut().assume_init_drop();
             }
         }
     }

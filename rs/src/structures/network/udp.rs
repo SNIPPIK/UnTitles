@@ -265,53 +265,77 @@ impl UdpBuffered {
         vec
     }
 
-    /// Начинает прослушивание входящих пакетов в отдельном потоке.
-    ///
-    /// # Аргументы
-    /// * `callback` - JS-функция, которая будет вызываться при получении каждого пакета.
-    ///   Функция получает один аргумент — Buffer с данными.
-    ///
-    /// Если прослушивание уже активно, метод ничего не делает.
-    /// Поток работает, пока не будет вызван `stop_listening` или уничтожен объект.
-    /// Для вызова из фонового потока используется ThreadsafeFunction.
+    /// Запускает фоновый поток для приёма входящих UDP-пакетов.
+    /// Каждый принятый пакет передаётся в JavaScript через `callback`.
+    /// Если прослушивание уже активно, вызов игнорируется.
     #[napi]
     pub fn start_listening(&self, callback: Function<Buffer, ()>) -> Result<()> {
+        // Устанавливаем флаг активности. Если он уже был true, значит поток уже работает — выходим.
         if self.listener_active.swap(true, Ordering::SeqCst) {
             return Ok(());
         }
 
+        // Создаём потокобезопасную функцию для вызова JS из фонового потока.
         let tsfn = callback.build_threadsafe_function().build()?;
+
+        // Клонируем сокет и флаг активности для передачи в поток.
         let socket = self.inner.socket.clone();
         let active = self.listener_active.clone();
 
-        // Основной рабочий поток
+        // Запускаем рабочий поток.
         let handle = thread::spawn(move || {
+            // Буфер для приёма одного пакета.
             let mut buf = [0u8; 2048];
 
-            while active.load(Ordering::Relaxed) {
+            // Основной цикл чтения, пока флаг активности установлен.
+            while active.load(Ordering::Acquire) {
                 match socket.recv(&mut buf) {
-                    // Если сокет временно недоступен (нет данных), немного спим.
-                    Err(ref e)
-                    if e.kind() == ErrorKind::WouldBlock || e.kind() == ErrorKind::TimedOut => {
-                        continue;
-                    }
-                    // Любая другая ошибка (например, сокет закрыт) завершает цикл.
-                    Err(_) => break,
+                    // Успешно получен пакет ненулевой длины.
                     Ok(size) if size > 0 => {
+                        // Повторная проверка флага после блокирующего чтения.
+                        if !active.load(Ordering::Acquire) {
+                            break;
+                        }
+
+                        // Копируем данные в Buffer (владеющий) для передачи в JS.
                         let js_buffer = Buffer::from(buf[..size].to_vec());
-                        tsfn.call(js_buffer, ThreadsafeFunctionCallMode::NonBlocking);
-                    },
+
+                        // Неблокирующе отправляем пакет в JS.
+                        let _ = tsfn.call(
+                            js_buffer,
+                            ThreadsafeFunctionCallMode::NonBlocking,
+                        );
+                    }
+
+                    // Ошибки "не готов" (неблокирующий сокет) — просто продолжаем цикл.
+                    Err(ref e)
+                    if e.kind() == ErrorKind::WouldBlock
+                        || e.kind() == ErrorKind::TimedOut =>
+                        {
+                            continue;
+                        }
+
+                    // Любая другая ошибка — завершаем поток.
+                    Err(_) => {
+                        break;
+                    }
+
+                    // Пустой пакет — игнорируем.
                     _ => {}
                 }
             }
 
+            // Явно освобождаем threadsafe-функцию.
             drop(tsfn);
         });
 
-        // Безопасное снятие блокировки с обработкой poisoning
+        // Сохраняем JoinHandle для последующего join при остановке.
         match self.listener_handle.lock() {
-            Ok(mut lock) => { *lock = Some(handle); }
+            Ok(mut lock) => {
+                *lock = Some(handle);
+            }
             Err(poisoned) => {
+                // Если мьютекс отравлен, всё равно сохраняем handle, используя into_inner.
                 let mut lock = poisoned.into_inner();
                 *lock = Some(handle);
             }
@@ -323,47 +347,104 @@ impl UdpBuffered {
     /// Останавливает прослушивание входящих пакетов и дожидается завершения потока.
     #[napi]
     pub fn stop_listening(&self) {
-        self.listener_active.store(false, Ordering::Relaxed);
+        // Сбрасываем флаг активности, чтобы поток вышел из цикла.
+        self.listener_active.store(false, Ordering::Release);
 
-        // Безопасное извлечение handle и ожидание завершения потока
+        // Забираем JoinHandle из мьютекса, обрабатывая возможное отравление.
         let handle = match self.listener_handle.lock() {
             Ok(mut lock) => lock.take(),
-            Err(poisoned) => poisoned.into_inner().take()
+            Err(poisoned) => {
+                poisoned.into_inner().take()
+            }
         };
 
-        if let Some(handle) = handle { let _ = handle.join(); }
+        // Если поток был запущен, ждём его завершения.
+        if let Some(handle) = handle {
+            let _ = handle.join();
+        }
     }
 
-    /// Полностью уничтожает сессию: останавливает прослушивание, очищает очередь,
-    /// удаляет себя из глобального балансировщика. Повторные вызовы игнорируются.
-    #[napi]
-    pub fn destroy(&self) {
-        if self.destroyed.swap(true, Ordering::Relaxed) { return; }
+    /// Полная очистка ресурсов UDP-сессии.
+    ///
+    /// Метод идемпотентен: повторный вызов не выполняет действий.
+    /// Останавливает прослушивание, очищает буфер, сбрасывает счётчик потерянных пакетов
+    /// и удаляет сессию из глобального реестра.
+    fn cleanup(&self) {
+        // Атомарно устанавливаем флаг destroyed в true.
+        // Если он уже был true, значит cleanup уже выполнялся — выходим.
+        if self.destroyed.swap(true, Ordering::AcqRel) {
+            return;
+        }
 
-        // Отключаем режим прослушивания UDP потока
+        // Останавливаем фоновый поток приёма пакетов (если он был запущен).
         self.stop_listening();
 
-        // Чистим данные в буфере
+        // Очищаем внутренний кольцевой буфер отправки.
         self.inner.buffer.clear();
 
+        // Сбрасываем счётчик отброшенных пакетов (для статистики).
         self.inner.send_drops.store(0, Ordering::Relaxed);
 
-        // Отключаем UDP сессию от циклической системы
+        // Удаляем сессию из глобального менеджера циклов (больше не будет обрабатываться).
         remove_global_session(self.id);
     }
 
-    /// Вычисляем когда надо отправить пакет или же надо догнать таймлайн
+    /// Уничтожает сессию, вызывая `cleanup`.
+    /// Метод доступен из JavaScript через N-API.
+    #[napi]
+    pub fn destroy(&self) {
+        self.cleanup();
+    }
+
+    /// Определяет, что нужно отправить: накопленные пакеты или keepalive-сигнал.
+    ///
+    /// Вызывается циклически из глобального менеджера с текущим временем в миллисекундах.
+    /// Если в очереди есть пакеты, отправляет их (внутренний `tick` также обновляет таймер keepalive).
+    /// Иначе проверяет, не пора ли отправить keepalive (если с последней отправки прошло
+    /// больше `KEEP_ALIVE_INTERVAL`).
     pub fn process(&self, now: u64) {
+        // Проверяем, есть ли пакеты, ожидающие отправки.
         if self.inner.has_pending_packets() {
-            // Если есть полезная нагрузка, отправляем её (сбросит таймер keepalive внутри)
+            // Отправляем накопленные пакеты (внутри также сбрасывается таймер keepalive).
             self.inner.tick(now);
         } else {
-            // Если полезной нагрузки нет, проверяем, пора ли слать keepalive
+            // Если пакетов нет, проверяем время последней отправки.
             let last_ms = self.inner.last_send_ms.load(Ordering::Relaxed);
+
+            // Если прошло достаточно времени, отправляем keepalive.
             if now.saturating_sub(last_ms) >= KEEP_ALIVE_INTERVAL {
                 self.inner.tick_alive(now);
             }
         }
+    }
+}
+
+/// Деструктор для `UdpBuffered`.
+///
+/// Выполняет корректную остановку фонового потока приёма пакетов
+/// и очистку буфера отправки. Гарантирует, что после уничтожения объекта
+/// не останется активных потоков, удерживающих ссылки на ресурсы.
+impl Drop for UdpBuffered {
+    fn drop(&mut self) {
+        // Останавливаем поток приёма: атомарно снимаем флаг активности.
+        // Поток, находящийся в блокирующем `recv`, проснётся и выйдет из цикла.
+        self.listener_active.store(false, Ordering::Release);
+
+        // Забираем JoinHandle из мьютекса, обрабатывая возможное отравление.
+        let handle = match self.listener_handle.lock() {
+            Ok(mut lock) => lock.take(),
+            Err(poisoned) => poisoned.into_inner().take(),
+        };
+
+        // Если поток был запущен, дожидаемся его завершения, чтобы
+        // избежать утечки ресурсов и гонок при освобождении памяти.
+        if let Some(handle) = handle {
+            let _ = handle.join();
+        }
+
+        // Очищаем внутренний кольцевой буфер отправки.
+        // Это освобождает накопленные, но ещё не отправленные пакеты.
+        self.inner.buffer.clear();
     }
 }
 
@@ -380,7 +461,7 @@ impl Drop for UdpBufferedInner {
             println!("last_send_ms={}", self.last_send_ms.load(Ordering::Relaxed));
             println!("keep_alive_counter={}", self.counter.load(Ordering::Relaxed));
             println!("buffer_len={}", self.buffer.len());
-            println!("buffer_cap={}", self.buffer.capacity());
+            //println!("buffer_cap={}", self.buffer.capacity());
             println!("socket_strong={}", Arc::strong_count(&self.socket));
             println!("UdpBufferedInner dropped");
             println!("====================");

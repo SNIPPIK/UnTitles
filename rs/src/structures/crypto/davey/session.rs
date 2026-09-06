@@ -107,6 +107,11 @@ impl DaveSession {
     })
   }
 
+  #[inline(always)]
+  fn is_silent(packet: &[u8]) -> bool {
+    matches!(packet, [0xF8, 0xFF, 0xFE])
+  }
+
   /// Переинициализирует существующую сессию новыми параметрами.
   ///
   /// Позволяет изменить пользователя, канал или версию протокола без создания нового объекта.
@@ -252,12 +257,8 @@ impl DaveSession {
   /// # Аргументы
   /// * `commit` - Буфер с commit-данными.
   #[napi]
-  pub fn process_commit(&mut self, commit: Buffer) -> Result<bool> {
-    self.inner.process_commit(&commit).map_err(|e| {
-      eprintln!("[DaveSession] MLS Commit Error: {}", e);
-      Self::map_err(e)
-    })?;
-    Ok(true)
+  pub fn process_commit(&mut self, commit: Buffer) {
+    let _ = self.inner.process_commit(&commit).map_err(Self::map_err);
   }
 
   /// Обрабатывает welcome-сообщение для вступления в группу.
@@ -294,7 +295,7 @@ impl DaveSession {
         .encrypt(mt, cd, packet.as_ref())
         .map_err(Self::map_err)?;
 
-    Ok(Buffer::from(&*out))
+    Ok(Buffer::from(out.as_ref()))
   }
 
   /// Быстрое шифрование одного Opus-пакета (с заренне заговленным типом медиа и кодека).
@@ -309,16 +310,24 @@ impl DaveSession {
   /// Зашифрованный пакет или `null`.
   #[napi(js_name = "encryptOpus")]
   pub fn encrypt_opus_fast(&mut self, packet: Buffer) -> Option<Buffer> {
-    // Не шифруем Silent Frame
-    if packet.len() <= 3 {
-      return Some(packet);
-    }
+    // Silent Frame не шифруем
+    if Self::is_silent(packet.as_ref()) { return Some(packet); }
 
-    match self.inner.encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, &packet) {
-      // Превращаем новый Vec<u8> в Buffer (забирая владение памятью без копирования)
-      Ok(out) => Some(Buffer::from(out.into_owned())),
-      // Возвращаем исходный буфер без лишних аллокаций
-      Err(_) => Some(packet)
+    match self.inner.encrypt(
+      davey::MediaType::AUDIO,
+      davey::Codec::OPUS,
+      packet.as_ref(),
+    ) {
+      Ok(out) => Some(Buffer::from(out.as_ref())),
+
+      Err(_) => self.inner
+          .encrypt(
+            davey::MediaType::AUDIO,
+            davey::Codec::OPUS,
+            packet.as_ref(),
+          )
+          .ok()
+          .map(|out| Buffer::from(out.as_ref())),
     }
   }
 
@@ -334,27 +343,30 @@ impl DaveSession {
   /// Массив той же длины, где каждый элемент — либо зашифрованный `Buffer`, либо `null` (если шифрование не удалось).
   #[napi(js_name = "encryptOpusBatch")]
   pub fn encrypt_opus_batch(&mut self, packets: Vec<Buffer>) -> Vec<Buffer> {
-    let mut results: Vec<Buffer> = Vec::with_capacity(packets.len());
+    packets
+        .into_iter()
+        .filter_map(|packet| {
+          // Silent Frame
+          if Self::is_silent(packet.as_ref()) { return Some(packet); }
 
-    for packet in packets {
-      // В napi-rs Buffer реализует AsRef<[u8]>, поэтому .len() и операции сo срезами работают напрямую
-      if packet.len() <= 3 {
-        results.push(packet);
-        continue;
-      }
+          match self.inner.encrypt(
+            davey::MediaType::AUDIO,
+            davey::Codec::OPUS,
+            packet.as_ref(),
+          ) {
+            Ok(out) => Some(Buffer::from(out.as_ref())),
 
-      match self.inner.encrypt(
-        davey::MediaType::AUDIO,
-        davey::Codec::OPUS,
-        packet.as_ref()
-      ) {
-        // Превращаем изначальный Vec<u8> (out.into_owned()) напрямую в Buffer без лишнего копирования
-        Ok(out) => results.push(Buffer::from(out.into_owned())),
-        Err(_) => continue
-      }
-    }
-
-    results
+            Err(_) => self.inner
+                .encrypt(
+                  davey::MediaType::AUDIO,
+                  davey::Codec::OPUS,
+                  packet.as_ref(),
+                )
+                .ok()
+                .map(|out| Buffer::from(out.as_ref())),
+          }
+        })
+        .collect()
   }
 
   /// Расшифровывает пакет, полученный от указанного пользователя.
@@ -376,7 +388,7 @@ impl DaveSession {
         .decrypt(uid, mt, &packet)
         .map_err(Self::map_err)?;
 
-    Ok(Buffer::from(out))
+    Ok(Buffer::from(out.as_ref()))
   }
 
   /// Расшифровывает пакет, полученный от указанного пользователя.
@@ -434,7 +446,7 @@ impl DaveSession {
 
   /// Удаление данных, включая слой davey
   pub fn cleanup(&mut self) {
-    self.inner.reset().expect("Failed reset davey session");
+    let _ = self.inner.reset().map_err(Self::map_err);
   }
 }
 
@@ -444,6 +456,8 @@ impl DaveSession {
 
 impl Drop for DaveSession {
   fn drop(&mut self) {
+    self.cleanup();
+
     #[cfg(debug_assertions)]
     {
       println!("DaveSession::drop");

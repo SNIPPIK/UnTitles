@@ -2,7 +2,7 @@ import { Middlewares, Locales, Command, type CommandContext, createStringOption,
 import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "discord-api-types/v10";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @description Главная команда, запускает переход времени в треке
@@ -12,6 +12,7 @@ import { db } from "#app/db";
     description: "Jump to a specific track time!",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"]
 })
 @Options({
     time: createStringOption({

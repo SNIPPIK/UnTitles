@@ -1,7 +1,7 @@
 import { httpsClient, httpsStatusCode, Logger } from "#structures";
 import { Track } from "#core/queue/index.js";
-import { sdb } from "#worker/db";
-import { db } from "#app/db";
+import { sdb } from "#db/worker";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -45,7 +45,7 @@ class ResourceProvider<T extends Track> {
             track.link = null; // Сбрасываем битую ссылку, чтобы prepare искал заново
 
             // Если это не последняя попытка — ждем (Exponential Backoff)
-            if (attempt < this.options.retries) {
+            if (attempt < this.options.retries - 1) {
                 const delay = this.options.initialDelay * Math.pow(2, attempt);
                 await this.sleep(delay);
             }
@@ -143,19 +143,14 @@ export class TrackResolvers {
          * @public
          */
         lyrics: new LyricsProvider(async (track) => {
-            // Если ответ не был получен от сервера
-            const timeoutPromise = new Promise((resolve) =>
-                setTimeout(() => resolve(Error("Timeout server request")), 10e3)
-            );
-
-            const api = await Promise.race([
-                new httpsClient({
-                    url: `https://lrclib.net/api/get?artist_name=${encodeURIComponent(track.artist.title)}&track_name=${encodeURIComponent(track.name)}`,
-                    userAgent: true,
-                    timeout: 10e3
-                }).toJson,
-                timeoutPromise
-            ]) as json | Error;
+            const api = await new httpsClient({
+                url:
+                    `https://lrclib.net/api/get` +
+                    `?artist_name=${encodeURIComponent(track.artist.title)}` +
+                    `&track_name=${encodeURIComponent(track.name)}`,
+                userAgent: true,
+                timeout: 10e3
+            }).toJson;
 
             // Если получаем вместо данных ошибку
             if (api instanceof Error) return api;

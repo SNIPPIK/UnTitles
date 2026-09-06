@@ -1,6 +1,6 @@
 import { Command, createStringOption, Declare, Options, Locales, Middlewares, CommandContext } from "seyfert";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @description Главная команда, включаем музыку
@@ -10,6 +10,7 @@ import { db } from "#app/db";
     description: "Turning on music, or searching for music!",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "Speak", "Connect", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages", "Connect", "Speak"],
 })
 @Options({
     query: createStringOption({

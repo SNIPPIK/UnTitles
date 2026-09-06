@@ -2,7 +2,7 @@ import { Command, type CommandContext, createNumberOption, Declare, Locales, Mid
 import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "discord-api-types/v10";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @description Главная команда, удаляет треки из очереди
@@ -12,6 +12,7 @@ import { db } from "#app/db";
     description: "Deleting a track from the queue, without the possibility of recovery!",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Options({
     value: createNumberOption({

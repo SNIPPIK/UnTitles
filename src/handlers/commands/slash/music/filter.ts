@@ -4,7 +4,7 @@ import type { AudioFilter } from "#core/player/index.js";
 import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "discord-api-types/v10";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @description Подкоманда для отключения фильтра
@@ -14,6 +14,7 @@ import { db } from "#app/db";
     description: "Disabled filters!",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Options({
     filter: createStringOption({
@@ -139,6 +140,7 @@ class FilterRemoveCommand extends SubCommand {
     description: "Added filter in queue!",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Options({
     filters: createStringOption({
@@ -281,6 +283,7 @@ class FilterPushCommand extends SubCommand {
     description: "Disable all filters!",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Locales({
     name: [
@@ -359,6 +362,7 @@ class FilterOffCommand extends SubCommand {
     description: "Manage audio filters",
     integrationTypes: ["GuildInstall"],
     botPermissions: ["SendMessages", "ViewChannel"],
+    defaultMemberPermissions: ["ViewChannel", "SendMessages"],
 })
 @Locales({
     name: [

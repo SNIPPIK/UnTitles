@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from "node:child_process";
-import { env } from "#app/env";
+import { env } from "#db/env";
 import path from "node:path";
 
 /**
@@ -80,24 +80,22 @@ export class Process {
     public destroy = () => {
         const process = this._process;
         if (!process) return;
-
-        // Удаляем данные процесса
         this._process = null;
 
-        process.unref();
-
-        // Отключаем все точки данных и удаляем их
-        for (const std of [process.stdout, process.stderr, process.stdin]) {
-            if ("end" in std) std.end();
-            std.destroy();
-        }
-
-        // Отключаем события
         process.removeAllListeners();
+        process.stdin.destroy();
+        process.stdout.destroy();
+        process.stderr.destroy();
 
-        // Убиваем процесс
-        if (!process.killed)
+        if (!process.killed) {
             process.kill("SIGTERM");
+
+            setTimeout(() => {
+                if (!process.killed) {
+                    process.kill("SIGKILL");
+                }
+            }, 1500).unref();
+        }
     };
 }
 

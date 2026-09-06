@@ -1,7 +1,5 @@
-import { TRACK_CHECK_WAIT } from "#core/queue/controllers/provider.js";
 import { AudioResource } from "#core/audio/index.js";
-import { Logger } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * Управляет жизненным циклом аудиопотоков в плеере: текущим воспроизведением,
@@ -23,23 +21,8 @@ import { db } from "#app/db";
  * ```
  */
 export class PlayerAudio<T extends AudioResource> {
-    /**
-     * Текущий активный (воспроизводимый) аудиопоток.
-     * `null`, если ничего не проигрывается.
-     */
-    private _audio: T | null = null;
-
-    /**
-     * Поток, находящийся в процессе пред загрузки (ожидает события `readable`).
-     * После успешной инициализации перемещается в `_audio`.
-     */
-    private _pre_audio: T | null = null;
-
-    /**
-     * Таймер контроля максимального времени ожидания готовности пред загружаемого потока.
-     * По истечении генерируется ошибка, и поток уничтожается.
-     */
-    private _timeout: NodeJS.Timeout | null = null;
+    /** Все созданные ресурсы */
+    private _streams: T[] = [];
 
     /**
      * Текущая громкость (целое число, диапазон 10..200).
@@ -52,12 +35,6 @@ export class PlayerAudio<T extends AudioResource> {
      * Пересчитывается только при изменении `_volume`.
      */
     private _volumeIndicator: string;
-
-    /**
-     * Кешированный признак наличия пред загруженного (но ещё не активного) потока.
-     * Позволяет быстро проверить состояние без разыменования `_pre_audio`.
-     */
-    private _preloaded = false;
 
     /**
      * Создаёт экземпляр менеджера аудио.
@@ -77,7 +54,6 @@ export class PlayerAudio<T extends AudioResource> {
      * @param volume - Новый уровень громкости (целое число).
      */
     public set volume(volume: number) {
-        // Простой clamp без тернарных операторов для производительности.
         this._volume = volume > 200 ? 200 : volume < 10 ? 10 : volume;
         this._updateVolumeIndicator();
     };
@@ -97,7 +73,8 @@ export class PlayerAudio<T extends AudioResource> {
 
     /** Активный аудиопоток или `null`, если ничего не воспроизводится. */
     public get current(): T | null {
-        return this._audio;
+        const length = this._streams?.length ?? 1;
+        return this._streams[length - 1] ?? null;
     };
 
     /**
@@ -105,63 +82,44 @@ export class PlayerAudio<T extends AudioResource> {
      * ожидающий готовности (события `readable`).
      */
     public get preloaded(): boolean {
-        return this._preloaded;
+        if (!this._streams?.length) return false;
+        return this._streams?.length > 1;
     };
 
     /**
-     * Начинает пред загрузку нового аудиопотока.
+     * Добавление нового ресурса.
      *
-     * Логика:
-     * 1. Если уже есть ожидающий поток (`_pre_audio`), он уничтожается, а его таймер сбрасывается.
-     * 2. Новый поток сохраняется в `_pre_audio`, взводится флаг `_preloaded`.
-     * 3. Запускается таймер на `TRACK_CHECK_WAIT` мс — если за это время поток не станет готовым,
-     *    генерируется ошибка, и поток уничтожается.
-     * 4. При возникновении ошибки в потоке (событие `error`) поток также уничтожается,
-     *    флаг сбрасывается.
-     * 5. Когда поток сигнализирует о готовности к чтению (`readable`), он становится активным:
-     *    текущий `_audio` уничтожается, новый переносится в `_audio`,
-     *    `_pre_audio` и таймер очищаются, флаг `_preloaded` сбрасывается.
-     *
-     * **Важно:** Метод предполагает, что поток ещё не готов на момент вызова.
-     * Если поток уже находится в состоянии `readable` **до** подписки, событие `readable`
-     * не будет сгенерировано повторно, и пред загрузка зависнет до тайм-аута.
-     * Потребитель должен гарантировать, что свежесозданный поток ещё не начал генерацию данных.
-     *
-     * @param stream - Новый аудиопоток для пред загрузки.
+     * Каждый ресурс живёт в массиве пока:
+     * - не станет активным
+     * - старый не будет уничтожен
      */
     public set preload(stream: T) {
-        // Отменяем предыдущую пред загрузку, если она ещё не завершилась.
-        if (this._pre_audio) {
-            clearTimeout(this._timeout!);
-            this._pre_audio.destroy();
+        if (this._streams.length >= 2) {
+            const old = this._streams.shift();
+            old?.destroy();
         }
 
-        this._pre_audio = stream;
-        this._preloaded = true;
+        this._streams.push(stream);
 
-        // Устанавливаем защитный тайм-аут.
-        this._timeout = setTimeout(() => {
-            stream.emit("error", new Error("Timeout: the stream has been exceeded!"));
-        }, TRACK_CHECK_WAIT);
+        stream.once("readable", () => {
+            const index = this._streams.indexOf(stream);
 
-        // При ошибке — очищаем всё, связанное с этим потоком.
-        stream.once("error", (error) => {
-            clearTimeout(this._timeout!);
-            stream.destroy();
-            this._pre_audio = null;
-            this._preloaded = false;
-            Logger.log("ERROR", error);
+            if (index === -1) return;
+
+            if (index > 0) {
+                const old = this._streams.shift();
+                old?.destroy();
+            }
         });
 
-        // Поток готов к чтению — активируем его.
-        stream.once("readable", () => {
-            clearTimeout(this._timeout!);
-            // Уничтожаем предыдущий активный поток, если он был.
-            this._audio?.destroy();
-            // Переключаем на новый.
-            this._audio = stream;
-            this._pre_audio = null;
-            this._preloaded = false;
+        stream.once("error", () => {
+            const index = this._streams.indexOf(stream);
+
+            if (index !== -1) {
+                this._streams.splice(index, 1);
+            }
+
+            stream.destroy();
         });
     };
 
@@ -173,17 +131,15 @@ export class PlayerAudio<T extends AudioResource> {
      * будут утеряны.
      */
     public destroy = () => {
-        this._audio?.destroy();
-        this._audio = null;
-
-        this._pre_audio?.destroy();
-        this._pre_audio = null;
-        this._preloaded = false;
-
-        if (this._timeout) {
-            clearTimeout(this._timeout);
-            this._timeout = null;
+        for (let stream of this._streams) {
+            try {
+                stream.destroy();
+                stream = null;
+            } catch {}
         }
+
+        this._streams.length = 0;
+        this._streams = [];
     };
 
     /**

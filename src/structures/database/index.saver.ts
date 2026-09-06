@@ -3,7 +3,7 @@ import { Logger, PromiseCycle } from "#structures";
 import { Process } from "#core/audio/process.js";
 import { Track } from "#core/queue/index.js";
 import afs from "node:fs/promises";
-import { env } from "#app/env";
+import { env } from "#db/env";
 import path from "node:path";
 import fs from "node:fs";
 

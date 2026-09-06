@@ -1,6 +1,6 @@
 import type { RestServerSide } from "./index.server.js";
 import type { APIRequestsKeys } from "./index.js";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK

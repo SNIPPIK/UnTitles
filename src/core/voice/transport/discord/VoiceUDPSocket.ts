@@ -175,8 +175,8 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      * @public
      */
     public destroy = () => {
-        super.destroy(); // Удаляем TypedEmitter
         this.reset(); // Удаляем UDP
+        super.destroy(); // Удаляем TypedEmitter
 
         if (this._status === VoiceUDPSocketStatuses.disconnected) return;
         this._status = VoiceUDPSocketStatuses.disconnected;

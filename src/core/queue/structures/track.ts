@@ -1,6 +1,6 @@
 import { TrackResolvers, TRACK_BUFFERED_TIME } from "#core/queue/controllers/provider.js";
 import { APIRequestData, RestServerSide } from "#handler/rest/index.js";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK

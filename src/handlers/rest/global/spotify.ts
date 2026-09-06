@@ -1,6 +1,6 @@
 import { DeclareRest, RestServerSide } from "#handler/rest/index.js";
 import { httpsClient, locale } from "#structures";
-import { sdb } from "#worker/db";
+import { sdb } from "#db/worker";
 
 /**
  * @author SNIPPIK
@@ -208,7 +208,7 @@ class RestSpotifyAPI extends RestServerSide.API {
                     // Если запрос выдал ошибку то
                     if (api instanceof Error) return api;
 
-                    return (api.trackList).map(this.track);
+                    return api.trackList.map((trk) => this.track(trk, api.visualIdentity.image));
                 } catch (e) {
                     return Error(`[APIs]: ${e}`);
                 }
@@ -248,20 +248,20 @@ class RestSpotifyAPI extends RestServerSide.API {
         return new httpsClient(
             {
                 url: `https://open.spotify.com/embed/${method}`,
+                userAgent: true,
                 agent: this.agent
             }
         ).toString.then((d) => {
             if (d instanceof Error) return locale.err("api.request.fail");
             const fragment = JSON.parse(d.split("type=\"application/json\">")[1].split("</sc")[0]);
-
             if (fragment.props.pageProps.statusCode) return locale.err("api.request.fail");
             return fragment.props.pageProps.state.data.entity;
         });
     };
 
     protected parseImages = (image: any[]) => {
-      const images = image.sort((a, b) => b.maxHeight - a.maxHeight);
-      return images[0].url;
+        const images = image?.sort((a, b) => b.maxHeight - a.maxHeight);
+        return images?.[0]?.url;
     };
 
     /**
@@ -272,14 +272,14 @@ class RestSpotifyAPI extends RestServerSide.API {
      */
     protected track = (track: json, images?: any[]) => {
         const track_images = images?.length > 0 ? images : track?.visualIdentity?.image;
-
+        const id = track.id ?? (track.uri as string).split(":").pop();
         return {
-            id: track.id ?? (track.uri as string).split(":").pop(),
+            id,
             title: track.title ?? track.name,
-            url: `https://open.spotify.com/track/${track.id}`,
+            url: `https://open.spotify.com/track/${id}`,
             artist: {
                 title: (track.artists ? track.artists[0].name : track.subtitle)?.split?.(",")?.[0],
-                url: track.artists ? `https://open.spotify.com/artist/${((track["artists"][0].uri) as string).split(":").pop()}` : `https://open.spotify.com/track/${track.id}`
+                url: track.artists ? `https://open.spotify.com/artist/${((track["artists"][0].uri) as string).split(":").pop()}` : `https://open.spotify.com/track/${id}`
             },
             time: { total: (track["duration"] / 1000).toFixed(0) },
             image: this.parseImages(track_images),

@@ -32,7 +32,7 @@
       "ru": "Отличается тяжелой искаженной «бочкой» (kick) с раскатистой басовой линией, энергичными синтезаторными партиями и высоким темпом, обычно от 150 до 160 ударов в минуту."
     },
     "unsupported": ["vaporwave", "demonic", "reverse", "phaser", "vinyl", "normalize", "bass", "subboost"],
-    "filter": "asetrate=48000*1.05,aresample=48000,bass=g=15,equalizer=f=120:t=q:w=1:g=6,equalizer=f=5000:t=q:w=1:g=3",
+    "filter": "asetrate=48000*1.05,aresample=48000,bass=g=8,equalizer=f=150:t=q:w=1:g=6,equalizer=f=5000:t=q:w=1:g=3",
     "args": false
   },
   {

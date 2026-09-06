@@ -514,12 +514,11 @@ export class Transport extends TypedEmitter<TransportEvents> {
             payload: null
         };
 
-        super.destroy();
-
         this._ws?.destroy();
         this._udp?.destroy();
         this._rtp?.destroy();
         this._dave?.destroy();
+        super.destroy();
 
         this._ws = null;
         this._udp = null;

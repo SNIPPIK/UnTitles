@@ -3,8 +3,8 @@ import { FFMPEG_PATH } from "#core/audio/process.js";
 import { AudioEngine, type iType } from "#native";
 import type { Track } from "#core/queue/index.js";
 import { TypedEmitter } from "#structures";
-import { env } from "#app/env";
-import { db } from "#app/db";
+import { env } from "#db/env";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -13,12 +13,6 @@ import { db } from "#app/db";
  * @private
  */
 const ENCODER_PARAMS = {
-    /**
-     * # Параметры
-     * - voip - Способствует улучшению разборчивости речи, discord лучше работает с этим режимом
-     * - audio - Поддерживайте верность вводимым данным (по умолчанию).
-     * - lowdelay - Ускоряет кодировку данных, в таком режиме могут теряться аудио данные
-     */
     mode: env.get("decoder.type", "audio")
 };
 
@@ -31,6 +25,9 @@ const ENCODER_PARAMS = {
  */
 export class AudioResource extends TypedEmitter<AudioResourceEvents> {
     protected engine: iType<typeof AudioEngine> = new AudioEngine(2);
+
+    /** Защита от повторного destroy */
+    protected _destroyed = false;
 
     /** Кол-во отданных пакетов */
     protected _played_frames = 0;
@@ -193,24 +190,43 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @description Удаляем ненужные данные
      * @protected
      */
+    /**
+     * Уничтожает ресурс: останавливает таймеры, освобождает нативный движок,
+     * удаляет ссылки на опции и счётчики, снимает все слушатели.
+     *
+     * Идемпотентен: повторный вызов после уничтожения не выполняет действий.
+     */
     public destroy() {
-        if (!this.engine) return;
+        // Защита от повторного вызова
+        if (this._destroyed) return;
+        this._destroyed = true;
 
-        // Чистим все потоки от мусора
-        this.emit("close", `[AudioResource] has destroyed`);
+        // Уведомляем слушателей о закрытии
+        this.emit(
+            "close",
+            `[AudioResource] has destroyed`
+        );
 
-        this.engine?.clear();
-        this.engine?.destroy?.();
-        this.engine = null;
+        // Останавливаем polling (если используется)
+        if (this._timeout) {
+            clearTimeout(this._timeout);
+            this._timeout = null;
+        }
 
+        // Забираем engine локально и сразу обнуляем ссылку
+        const engine = this.engine;
+
+        // Останавливаем нативные ресурсы: очистка буфера и destroy
+        engine.destroy();
+
+        // Убираем ссылки на большие данные
         this.options = null;
         this._played_frames = null;
         this._afade = null;
-        this._timeout = null;
+        this.engine = null;
 
-        // Удаляем все вызовы функций
+        // Удаляем всех слушателей (вызов родительского destroy)
         super.destroy();
-        clearTimeout(this._timeout);
     };
 }
 

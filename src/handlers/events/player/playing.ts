@@ -1,6 +1,6 @@
 import { MessageFlags } from "seyfert/lib/types/index.js";
 import { createEvent } from "seyfert";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -13,11 +13,15 @@ export default createEvent({
     data: { name: "message/playing" },
     async run(queue) {
         const message = await db.queues.cycles.messages.ensure(queue.message.guild_id, () => {
-            return queue.message.send_single({
-                embeds: null,
-                components: queue.components,
-                flags: MessageFlags.IsComponentsV2
-            });
+            try {
+                return queue.message.send_single({
+                    embeds: null,
+                    components: queue.components,
+                    flags: MessageFlags.IsComponentsV2
+                });
+            } catch {
+                return null;
+            }
         });
 
         // Меняем статус голосового канала

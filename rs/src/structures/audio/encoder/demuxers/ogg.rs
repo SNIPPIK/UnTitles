@@ -1,5 +1,5 @@
 use napi::bindgen_prelude::{ Error, Result };
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{ Buf, BufMut, BytesMut };
 use memchr::memmem;
 
 // ============================================================================
@@ -34,7 +34,7 @@ pub enum PacketType {
 }
 
 /// Выходной пакет: (тип, данные).
-pub type ParsedPacket = (PacketType, bytes::Bytes);
+pub type ParsedPacket = (PacketType, Vec<u8>);
 
 // ============================================================================
 // PARSER
@@ -78,283 +78,406 @@ impl Default for OggOpusDemuxer {
 }
 
 impl OggOpusDemuxer {
-    // =========================================================================
-    // CONSTRUCTOR
-    // =========================================================================
-
-    /// Создаёт новый экземпляр парсера с пустыми буферами.
-    ///
-    /// Начальная ёмкость `remainder` — 2 КБ, `packet_carry` — 1 КБ.
-    /// При необходимости буферы будут автоматически расширяться.
+    /// Создаёт новый демультиплексор с начальными буферами.
+    /// `remainder` — накопительный буфер для неполных Ogg-страниц,
+    /// `packet_carry` — перенос незавершённого Opus-пакета между страницами,
+    /// `bitstream_serial` — идентификатор текущего логического потока.
     pub fn new() -> Self {
-        OggOpusDemuxer {
-            remainder: BytesMut::new(),
-            packet_carry: Vec::with_capacity(1024),
-            bitstream_serial: None
+        Self {
+            remainder: BytesMut::with_capacity(2128),
+            packet_carry: Vec::with_capacity(512),
+            bitstream_serial: None,
         }
     }
 
-    // =========================================================================
-    // INFO
-    // =========================================================================
-
-    /// Возвращает суммарный объём данных, ожидающих обработки
-    /// (остаток во входном буфере + незавершённый пакет).
+    /// Суммарный объём данных, ожидающих обработки:
+    /// остаток во входном буфере + незавершённый пакет.
+    #[inline]
     pub fn pending_len(&self) -> usize {
         self.remainder.len() + self.packet_carry.len()
     }
 
-    // =========================================================================
-    // PUBLIC PARSE API
-    // =========================================================================
+    /// Возвращает текущие ёмкости внутренних буферов.
+    /// Используется для диагностики / мониторинга.
+    #[inline]
+    pub fn capacities(&self) -> (usize, usize) {
+        (
+            self.remainder.capacity(),
+            self.packet_carry.capacity(),
+        )
+    }
 
-    /// Подаёт очередной фрагмент данных и помещает готовые пакеты в `output`.
-    ///
-    /// Если `chunk` пуст, вызывается принудительная выдача последнего
-    /// накопленного пакета (`flush_internal`), что полезно при завершении потока.
-    ///
-    /// Каждый элемент `output` — кортеж `(PacketType, Bytes)`, где `Bytes`
-    /// содержит копию данных пакета.
-    pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<ParsedPacket>) -> Result<()> {
-        // Если входящий пакет пуст
-        if chunk.is_empty() { return self.flush_internal(output); }
+    /// Точка входа для разбора фрагмента данных.
+    /// Если `chunk` пуст — принудительно выталкивает последний незавершённый пакет.
+    /// Иначе запускает основной парсер с колбэком, копирующим данные в `output`.
+    pub fn parse_internal(
+        &mut self,
+        chunk: &[u8],
+        output: &mut Vec<ParsedPacket>,
+    ) -> Result<()> {
+        if chunk.is_empty() {
+            return self.flush_internal(output);
+        }
 
-        // Передаем на дальнейший разбор пакета
         self.parse_core(chunk, |packet_type, data| {
-            output.push((packet_type, bytes::Bytes::copy_from_slice(data)));
+            output.push((packet_type, data.to_vec()));
             Ok(())
         })
     }
 
-    // =========================================================================
-    // FLUSH
-    // =========================================================================
-
-    /// Выдаёт последний собранный, но ещё не завершённый пакет.
-    ///
-    /// Вызывается при получении пустого чанка (EOF). Если в `packet_carry`
-    /// есть данные, они интерпретируются как финальный пакет, для него
-    /// определяется тип и он добавляется в выходной вектор.
-    fn flush_internal(&mut self, output: &mut Vec<ParsedPacket>) -> Result<()> {
-        // Если есть в буфере еще данные о последних пакетах
-        if !self.packet_carry.is_empty() {
-            let packet = std::mem::take(&mut self.packet_carry);
-            let packet_type = Self::detect_packet_type(&packet);
-            // Превращаем старый Vec в Bytes без лишнего копирования содержимого
-            output.push((packet_type, bytes::Bytes::from(packet)));
-        }
-        Ok(())
-    }
-
-    // =========================================================================
-    // CORE PARSER
-    // =========================================================================
-
-    /// Основной цикл разбора: добавляет `chunk` в `remainder` и последовательно
-    /// выделяет полные Ogg-страницы, передавая их в `handle_page_core`.
-    ///
-    /// Для каждой страницы вызывается замыкание `on_packet`, получающее
-    /// тип пакета и ссылку на данные.
-    ///
-    /// Если страница обработана с ошибкой, парсер пропускает 4 байта (сигнатуру
-    /// "OggS") и продолжает поиск следующей страницы, что обеспечивает
-    /// устойчивость к повреждённым данным.
-    fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()>
-    where
-        F: FnMut(PacketType, &[u8]) -> Result<()>,
-    {
-        // put_slice работает гораздо умнее, чем extend_from_slice для Vec
-        self.remainder.put_slice(chunk);
-
-        // Защита от переполнения (бесконечный рост при битом стриме)
-        if self.remainder.len() > MAX_REMAINDER_SIZE {
-            self.remainder.clear();
-            self.packet_carry.clear();
+    /// Выдаёт последний собранный, но ещё не завершённый пакет (если есть).
+    /// Вызывается при завершении потока (EOF).
+    fn flush_internal(
+        &mut self,
+        output: &mut Vec<ParsedPacket>,
+    ) -> Result<()> {
+        if self.packet_carry.is_empty() {
             return Ok(());
         }
 
-        while self.remainder.len() >= 27 {
-            // Ищем сигнатуру "OggS"
+        // Забираем накопленные данные, оставляя пустой Vec.
+        let packet = std::mem::take(&mut self.packet_carry);
+        let packet_type = Self::detect_packet_type(&packet);
+
+        output.push((packet_type, packet));
+
+        Ok(())
+    }
+
+    /// Основной цикл разбора:
+    /// 1. Добавляет новые данные в `remainder`.
+    /// 2. Ищет сигнатуру "OggS".
+    /// 3. Проверяет заголовок страницы.
+    /// 4. Обрабатывает полные страницы через `handle_page_core`.
+    /// 5. Удаляет обработанные байты из `remainder`.
+    fn parse_core<F>(
+        &mut self,
+        chunk: &[u8],
+        mut on_packet: F,
+    ) -> Result<()>
+    where
+        F: FnMut(PacketType, &[u8]) -> Result<()>,
+    {
+        self.remainder.put_slice(chunk);
+
+        // Защита от неограниченного роста при повреждённом входе.
+        if self.remainder.len() > MAX_REMAINDER_SIZE {
+            self.reset_storage();
+            return Ok(());
+        }
+
+        while self.remainder.len() >= 4 {
+            // Ищем следующую сигнатуру "OggS".
             let pos = match memmem::find(&self.remainder, b"OggS") {
                 Some(pos) => pos,
                 None => {
-                    // Если OggS не найден, безопасно отбрасываем весь мусор,
-                    // оставляя только последние 3 байта (на случай, если "OggS" разорван между фреймами)
+                    // Сигнатура не найдена: оставляем хвост в 3 байта,
+                    // на случай если "OggS" разрезана пополам.
                     if self.remainder.len() > 3 {
-                        let discard_len = self.remainder.len() - 3;
-                        self.remainder.advance(discard_len);
+                        let keep = 3;
+                        let drop_len = self.remainder.len() - keep;
+                        self.remainder.advance(drop_len);
                     }
-                    return Ok(());
+                    break;
                 }
             };
 
-            // Сдвигаем окно прямо к началу сигнатуры OggS
+            // Отбрасываем мусор перед сигнатурой.
             if pos > 0 {
                 self.remainder.advance(pos);
-                debug_assert_eq!(&self.remainder[..4], b"OggS");
             }
 
-            let header_size = 27 + self.remainder[26] as usize;
-            if self.remainder.len() < header_size {
-                break; // Ждём следующего чанка для загрузки таблицы сегментов
+            // Недостаточно данных для заголовка Ogg-страницы.
+            if self.remainder.len() < 27 {
+                break;
             }
 
-            let segment_table = &self.remainder[27..header_size];
-
-            let mut payload_size = 0usize;
-            for &segment in segment_table {
-                payload_size += segment as usize;
-            }
-
-            let page_end = header_size + payload_size;
-
-            if self.remainder.len() < page_end {
-                break; // Ждём загрузки данных (payload)
-            }
-
-            // У нас есть полная страница
-            let full_page = &self.remainder[..page_end];
-
-            // Обрабатываем. Если ошибка, пропускаем сигнатуру (1 байт), чтобы найти следующий OggS
-            if Self::handle_page_core(full_page, &mut self.packet_carry, &mut self.bitstream_serial, &mut on_packet).is_err() {
-                // Пропускаем всю проблемную страницу и сбрасываем carry
-                self.packet_carry.clear();
-                self.remainder.advance(page_end);
+            // Дополнительная проверка capture pattern.
+            if &self.remainder[..4] != b"OggS" {
+                self.remainder.advance(1);
                 continue;
             }
 
-            // УСПЕХ: страница обработана. Просто "проглатываем" её из буфера за O(1)
-            self.remainder.advance(page_end);
+            // Версия Ogg: должна быть 0.
+            if self.remainder[4] != 0 {
+                self.remainder.advance(1);
+                continue;
+            }
+
+            let segments_count = self.remainder[26] as usize;
+            let header_size = 27 + segments_count;
+
+            // Ждём полную таблицу сегментов.
+            if self.remainder.len() < header_size {
+                break;
+            }
+
+            let segment_table = &self.remainder[27..header_size];
+            let payload_size = segment_table
+                .iter()
+                .map(|&s| s as usize)
+                .sum::<usize>();
+
+            // Защита от переполнения при вычислении конца страницы.
+            let page_end = match header_size.checked_add(payload_size) {
+                Some(end) => end,
+                None => {
+                    self.remainder.advance(4);
+                    continue;
+                }
+            };
+
+            // Ждём полный payload.
+            if self.remainder.len() < page_end {
+                break;
+            }
+
+            let full_page = &self.remainder[..page_end];
+
+            // Обработка страницы; при ошибке очищаем состояние переноса.
+            match Self::handle_page_core(
+                full_page,
+                &mut self.packet_carry,
+                &mut self.bitstream_serial,
+                &mut on_packet,
+            ) {
+                Ok(()) => {
+                    self.remainder.advance(page_end);
+                }
+                Err(_) => {
+                    self.packet_carry.clear();
+                    self.bitstream_serial = None;
+                    self.remainder.advance(page_end);
+                }
+            }
         }
 
         Ok(())
     }
 
-    // =========================================================================
-    // PAGE PARSER
-    // =========================================================================
-
-    /// Разбор одной полностью загруженной Ogg страницы.
-    /// Алгоритм:
-    /// - Читаем header_type (flags: continuation, BOS, EOS).
-    /// - Извлекаем serial.
-    /// - Если serial изменился → сброс carry.
-    /// - Если BOS или EOS → сброс carry (по спецификации Ogg: новый поток).
-    /// - Если страница НЕ является continuation (флаг 0x01 == 0) и при этом есть непустой carry —
-    ///   это означает, что предыдущий пакет оборвался без флага continuation, но данные остались —
-    ///   сбрасываем carry (нарушение, но мы защищаемся).
-    /// - Далее итерируем по сегментам:
-    ///   - Если segment_len < 255 → пакет завершён.
-    ///   - Если segment_len == 255 → пакет продолжается на следующем сегменте / странице.
-    /// - При каждом завершении пакета вызываем on_packet с детектированным типом.
-    fn handle_page_core<F>(page: &[u8], packet_carry: &mut Vec<u8>, bitstream_serial: &mut Option<u32>, on_packet: &mut F) -> Result<()>
-    where F: FnMut(PacketType, &[u8]) -> Result<()> {
+    /// Разбирает одну полностью загруженную Ogg-страницу.
+    ///
+    /// Проверяет:
+    /// - Ogg capture pattern;
+    /// - версию страницы;
+    /// - зарезервированные header flags;
+    /// - serial number;
+    /// - continuation state;
+    /// - BOS/EOS;
+    /// - lacing values;
+    /// - размер Opus packet.
+    ///
+    /// Незавершённые пакеты сохраняются в `packet_carry` и продолжаются
+    /// на следующей странице.
+    fn handle_page_core<F>(
+        page: &[u8],
+        packet_carry: &mut Vec<u8>,
+        bitstream_serial: &mut Option<u32>,
+        on_packet: &mut F,
+    ) -> Result<()>
+    where
+        F: FnMut(PacketType, &[u8]) -> Result<()>,
+    {
+        // Минимальный размер Ogg page header.
         if page.len() < 27 {
             return Err(Error::from_reason("Invalid OGG page"));
         }
 
+        // Capture pattern.
+        if &page[..4] != b"OggS" {
+            return Err(Error::from_reason("Invalid OGG capture pattern"));
+        }
+
+        // Ogg version.
+        if page[4] != 0 {
+            return Err(Error::from_reason("Unsupported OGG version"));
+        }
+
         let header_type = page[5];
+
+        // В Ogg используются только младшие 3 бита:
+        // 0x01 = continued, 0x02 = BOS, 0x04 = EOS.
+        // Остальные биты зарезервированы и должны быть нулевыми.
+        if header_type & 0xF8 != 0 {
+            return Err(Error::from_reason("Invalid OGG header flags"));
+        }
+
         let continued = (header_type & 0x01) != 0;
         let bos = (header_type & 0x02) != 0;
         let eos = (header_type & 0x04) != 0;
 
-        let serial = u32::from_le_bytes(page[14..18].try_into().unwrap());
+        // Serial number.
+        let serial = u32::from_le_bytes(
+            page[14..18]
+                .try_into()
+                .map_err(|_| Error::from_reason("Invalid OGG serial"))?,
+        );
 
-        // Смена потока
+        // Если это новый logical bitstream — старый незавершённый
+        // packet больше не имеет отношения к новому потоку.
         if *bitstream_serial != Some(serial) {
             packet_carry.clear();
             *bitstream_serial = Some(serial);
         }
 
-        // BOS/EOS: начало или конец логического потока — сбрасываем carry (должен был быть чистым, но на всякий случай)
-        if bos || eos {
-            packet_carry.clear();
-        }
-
         let segments_count = page[26] as usize;
-        let segment_table = &page[27..27 + segments_count];
-        let mut offset = 27 + segments_count;
+        let header_size = 27 + segments_count;
 
-        // Если эта страница не является продолжением (continued == false) и у нас есть битый фрейм из прошлых страниц,
-        // значит поток повреждён (прошлый пакет не был завершён, но новая страница его не продолжает).
-        // Согласно спецификации, такое не должно происходить, но для устойчивости очищаем carry.
-        if !continued && !packet_carry.is_empty() {
-            packet_carry.clear();
+        if page.len() < header_size {
+            return Err(Error::from_reason("Invalid OGG segment table"));
         }
+
+        let segment_table = &page[27..header_size];
+
+        // ---------------------------------------------------------------------
+        // BOS
+        // ---------------------------------------------------------------------
+
+        // BOS-страница не может быть continuation.
+        if bos && continued {
+            return Err(Error::from_reason(
+                "Invalid OGG BOS continuation",
+            ));
+        }
+
+        // Если приходит BOS с незавершённым packet — состояние потока
+        // уже повреждено.
+        if bos && !packet_carry.is_empty() {
+            packet_carry.clear();
+            return Err(Error::from_reason(
+                "OGG BOS with unfinished packet",
+            ));
+        }
+
+        // ---------------------------------------------------------------------
+        // CONTINUATION
+        // ---------------------------------------------------------------------
+
+        if continued {
+            // Если страница объявляет продолжение, у нас обязательно
+            // должен существовать packet, начатый предыдущей страницей.
+            if packet_carry.is_empty() {
+                return Err(Error::from_reason(
+                    "OGG continuation without previous packet",
+                ));
+            }
+        } else if !packet_carry.is_empty() {
+            // Предыдущая страница закончилась segment=255, то есть packet
+            // должен был продолжиться здесь, но continuation отсутствует.
+            packet_carry.clear();
+            return Err(Error::from_reason(
+                "OGG packet continuation mismatch",
+            ));
+        }
+
+        // ---------------------------------------------------------------------
+        // SEGMENTS
+        // ---------------------------------------------------------------------
+
+        let mut offset = header_size;
 
         for &segment_len in segment_table {
             let segment_len = segment_len as usize;
-            let end = offset + segment_len;
-            let data = page.get(offset..end).ok_or_else(|| Error::from_reason("Segment out of bounds"))?;
 
-            if packet_carry.len() + segment_len > MAX_PACKET_SIZE {
+            let end = offset
+                .checked_add(segment_len)
+                .ok_or_else(|| Error::from_reason("OGG segment overflow"))?;
+
+            if end > page.len() {
                 packet_carry.clear();
-                return Err(Error::from_reason("Opus packet overflow"));
+                return Err(Error::from_reason(
+                    "OGG segment out of bounds",
+                ));
+            }
+
+            // Проверяем размер ещё до расширения Vec.
+            let new_len = packet_carry
+                .len()
+                .checked_add(segment_len)
+                .ok_or_else(|| Error::from_reason("Opus packet overflow"))?;
+
+            if new_len > MAX_PACKET_SIZE {
+                packet_carry.clear();
+                return Err(Error::from_reason(
+                    "Opus packet exceeds maximum size",
+                ));
             }
 
             if segment_len != 0 {
-                packet_carry.extend_from_slice(data);
+                packet_carry.extend_from_slice(&page[offset..end]);
             }
 
             offset = end;
 
-            // Если сегмент не максимальной длины (255), то пакет закончен.
-            // Если segment_len == 255 — пакет продолжается.
+            // segment < 255 означает конец packet.
             if segment_len < 255 {
                 if !packet_carry.is_empty() {
-                    let packet_type = Self::detect_packet_type(&packet_carry);
-                    on_packet(packet_type, &packet_carry)?;
+                    let packet_type = Self::detect_packet_type(packet_carry);
+                    on_packet(packet_type, packet_carry.as_slice())?;
                     packet_carry.clear();
                 }
             }
         }
 
+        // Для Ogg page payload должен полностью соответствовать
+        // lacing table.
+        if offset != page.len() {
+            packet_carry.clear();
+            return Err(Error::from_reason(
+                "OGG page payload size mismatch",
+            ));
+        }
+
+        // ---------------------------------------------------------------------
+        // EOS
+        // ---------------------------------------------------------------------
+
+        // EOS с незавершённым packet означает обрезанный поток.
+        // Проверяем ПОСЛЕ обработки всех сегментов.
+        if eos && !packet_carry.is_empty() {
+            packet_carry.clear();
+            return Err(Error::from_reason(
+                "OGG EOS with unfinished packet",
+            ));
+        }
+
         Ok(())
     }
 
-    // =========================================================================
-    // PACKET DETECTION
-    // =========================================================================
+    /// Полный сброс внутренних буферов (создание новых пустых экземпляров).
+    #[inline]
+    fn reset_storage(&mut self) {
+        self.remainder = BytesMut::new();
+        self.packet_carry = Vec::new();
+        self.bitstream_serial = None;
+    }
 
-    /// Определяет тип полученного пакета на основе его содержимого и длины.
-    ///
-    /// Анализирует сигнатуры и структуру согласно RFC 6716 (Opus),
-    /// RFC 7845 (Opus в Ogg) и особенностям реализации Discord.
-    ///
-    /// Возможные возвращаемые значения:
-    /// - [`PacketType::End`] — одиночный байт `0xFF` (внутренний сигнал EOF).
-    /// - [`PacketType::OggPage`] — Ogg-страница (начинается с `b"OggS"`).
-    /// - [`PacketType::Head`] — Opus-заголовок идентификации (`b"OpusHead"`, длина ≥ 19).
-    /// - [`PacketType::Tags`] — Opus-заголовок комментариев (`b"OpusTags"`, длина ≥ 12).
-    /// - [`PacketType::Silent`] — PLC-пакеты тишины Discord (`0xF8FFFE` / `0xFCFFFE`).
-    /// - [`PacketType::Frame`] — валидный звуковой кадр Opus (проверен TOC).
-    /// - [`PacketType::Broken`] — пакет не соответствует ни одному известному формату.
+    /// Очищает все внутренние данные (вызывает reset_storage).
+    pub fn cleanup(&mut self) {
+        self.reset_storage();
+    }
+
+    /// Определяет тип пакета на основе его содержимого и длины.
     #[inline]
     pub fn detect_packet_type(packet: &[u8]) -> PacketType {
         let len = packet.len();
 
-        // Пустой пакет заведомо некорректен.
         if len == 0 {
             return PacketType::Broken;
         }
 
-        // Внутренний сигнал «конец потока» – ровно один байт 0xFF.
-        else if len == 1 && packet[0] == 0xFF {
+        // Одиночный байт 0xFF — внутренний маркер конца потока.
+        if len == 1 && packet[0] == 0xFF {
             return PacketType::End;
         }
 
-        // Ogg-страница: всегда начинается с магической последовательности "OggS".
-        // Минимальная длина Ogg-страницы – 28 байт, но здесь проверяем только сигнатуру,
-        // чтобы отличить от Opus-пакетов.
-        else if len >= 4 && packet.starts_with(b"OggS") {
+        // Ogg-страница.
+        if len >= 4 && packet.starts_with(b"OggS") {
             return PacketType::OggPage;
         }
 
-        // Opus identification header (OpusHead).
-        // Должен содержать как минимум 19 байт: "OpusHead" (8 байт), версия (1),
-        // количество каналов (1), pre-skip (2), sample rate (4), output gain (2),
-        // mapping family (1) – итого 19.
-        else if packet.starts_with(b"OpusHead") {
+        // Opus identification header.
+        if packet.starts_with(b"OpusHead") {
             return if len >= 19 {
                 PacketType::Head
             } else {
@@ -362,10 +485,8 @@ impl OggOpusDemuxer {
             };
         }
 
-        // Opus comment header (OpusTags).
-        // Минимальная длина 12 байт: "OpusTags" (8 байт), vendor string length (4) = 0,
-        // user comment list length (4) = 0, но фактически не может быть 0 – поэтому 12.
-        else if packet.starts_with(b"OpusTags") {
+        // Opus comment header.
+        if packet.starts_with(b"OpusTags") {
             return if len >= 12 {
                 PacketType::Tags
             } else {
@@ -373,66 +494,48 @@ impl OggOpusDemuxer {
             };
         }
 
-        // Специальные пакеты тишины, используемые в Discord и кодеках с PLC.
-        // Последовательности `0xF8 0xFF 0xFE` и `0xFC 0xFF 0xFE` соответствуют
-        // пакетам Silence/PLC (Packet Loss Concealment).
-        else if packet == [0xF8, 0xFF, 0xFE]
+        // Специальные пакеты тишины Discord (PLC).
+        if packet == [0xF8, 0xFF, 0xFE]
             || packet == [0xFC, 0xFF, 0xFE]
         {
             return PacketType::Silent;
         }
 
-        // Проверка Opus-пакета через байт TOC (Table Of Contents).
-        // Первый байт Opus-пакета всегда TOC.
+        // Байт TOC.
         let toc = packet[0];
 
-        // Старшие 5 бит – конфигурация (номер конфигурации Opus).
-        // Допустимые значения 0..31 (RFC 6716, раздел 3.1).
+        // Старшие 5 бит — конфигурация, должна быть ≤ 31.
         let config = toc >> 3;
         if config > 31 {
             return PacketType::Broken;
         }
 
-        // Два младших бита – количество кадров (frame count mode).
-        // 0b00 – 1 кадр, 0b01 – 2 равных кадра, 0b10 – 2 разных кадра, 0b11 – произвольное число.
-        let frame_code = toc & 0b11;
+        // Два младших бита — количество кадров.
+        match toc & 0b11 {
+            // Один или два кадра — валидный пакет.
+            0b00 | 0b01 | 0b10 => PacketType::Frame,
 
-        match frame_code {
-            0b00 | 0b01 | 0b10 => {
-                // Одиночный кадр или два кадра – всегда считаем валидным,
-                // так как дальнейшие проверки длины не требуются, (Opus-пакет не может быть короче 1 байта, что уже выполнено).
-                PacketType::Frame
-            }
+            // Произвольное количество кадров: требуется дополнительный байт.
             0b11 => {
+                if len < 2 {
+                    return PacketType::Broken;
+                }
+
                 let ch = packet[1];
-
-                let _vbr = (ch & 0x80) != 0;
-                let _padding = (ch & 0x40) != 0;
+                // Младшие 6 бит — количество кадров.
                 let frame_count = ch & 0x3F;
-                let frame_counter = ch & 0x7F;
 
-                if frame_count == 0 || frame_count > 86 || frame_counter > 120 {
+                // Нестандартное ограничение: 0 и >86 считаются невалидными.
+                if frame_count == 0 || frame_count > 86 {
                     return PacketType::Broken;
                 }
 
                 PacketType::Frame
             }
-            // Несуществующие комбинации 0b100..0b111 заведомо невозможны для 2-битного поля,
-            // но оставим рукав для компилятора.
-            4_u8..=u8::MAX => PacketType::Broken,
+
+            // Остальные комбинации невозможны для 2-битного поля.
+            _ => PacketType::Broken,
         }
-    }
-
-    /// Полностью очищает внутреннее состояние парсера.
-    ///
-    /// Полезно при переключении источника или после критической ошибки.
-    pub fn cleanup(&mut self) {
-        self.remainder.clear();
-        self.packet_carry.clear();
-        self.bitstream_serial = None;
-
-        drop(std::mem::take(&mut self.packet_carry));
-        drop(std::mem::take(&mut self.remainder));
     }
 }
 

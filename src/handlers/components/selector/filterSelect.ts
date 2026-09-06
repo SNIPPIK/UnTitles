@@ -4,7 +4,7 @@ import { MessageFlags } from "seyfert/lib/types/index.js";
 import { AudioFilter } from "#core/player/index.js";
 import { Colors } from "#structures/discord/index.js";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 @Middlewares(["checkAnotherVoice", "userVoiceChannel"])
 export default class extends ComponentCommand {

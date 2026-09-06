@@ -1,9 +1,9 @@
 import type { APIRequestsLimits } from "#handler/rest/index.js";
 import type { RestServerSide } from "./index.server.js";
 import { parentPort } from "node:worker_threads";
-import { initSharedDatabase } from "#worker/db";
+import { initSharedDatabase } from "#db/worker";
 import { handler } from "#handler";
-import { env } from "#app/env";
+import { env } from "#db/env";
 
 // ========== КОНСТАНТЫ ==========
 

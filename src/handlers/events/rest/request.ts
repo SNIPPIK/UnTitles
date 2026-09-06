@@ -1,7 +1,7 @@
 import { MessageFlags } from "seyfert/lib/types/index.js";
 import { createEvent, WebhookMessage } from "seyfert";
 import { locale } from "#structures";
-import { db } from "#app/db";
+import { db } from "#db";
 
 /**
  * @author SNIPPIK
@@ -12,17 +12,18 @@ import { db } from "#app/db";
  */
 export default createEvent({
     data: { name: 'rest/request' },
+
     run: async (platform, ctx, url) => {
-        // Если было получено ничего!
+        // Если URL не был получен
         if (url === undefined) {
             await ctx.client.events.runCustom(
                 "rest/error",
                 ctx,
                 locale._(ctx.interaction.locale, "api.request.fail")
             );
+
             return null;
         }
-
 
         // Получаем описание запроса от платформы
         const api = platform.request(url);
@@ -34,91 +35,125 @@ export default createEvent({
                 ctx,
                 locale._(ctx.interaction.locale, "api.platform.support")
             );
+
             return null;
         }
 
-        let msg: WebhookMessage = null, result: any = null;
+        let msg: WebhookMessage | null = null;
+
         try {
             /**
-             * @description Отправляем временное уведомление о начале запроса
-             * @protected
+             * Отправляем временное уведомление о начале запроса
              */
             msg = await ctx.followup({
                 flags: MessageFlags.IsComponentsV2,
+
                 components: [
                     {
                         type: 17,
                         accent_color: platform.color,
+
                         components: [
                             {
                                 type: 9,
+
                                 components: [
-                                    {type: 10, content: `### ${platform.platform}.${api.type}`},
                                     {
                                         type: 10,
-                                        content: `${locale._(ctx.interaction.locale, platform.audio ? "api.platform.request" : "api.platform.request.long", [db.emoji.loading, platform.platform])}`
+                                        content: `### ${platform.platform}.${api.type}`,
                                     },
-                                    {type: 10, content: `-# ${ctx.author.username}`},
+                                    {
+                                        type: 10,
+                                        content: locale._(
+                                            ctx.interaction.locale,
+                                            platform.audio
+                                                ? "api.platform.request"
+                                                : "api.platform.request.long",
+                                            [
+                                                db.emoji.loading,
+                                                platform.platform,
+                                            ]
+                                        ),
+                                    },
+                                    {
+                                        type: 10,
+                                        content: `-# ${ctx.author.username}`,
+                                    },
                                 ],
+
                                 accessory: {
                                     type: 11,
                                     media: {
-                                        url: ctx.author.avatarURL()
-                                    }
-                                }
-                            }
-                        ]
-                    }
+                                        url: ctx.author.avatarURL(),
+                                    },
+                                },
+                            },
+                        ],
+                    },
                 ],
             });
 
             // Вставляем оригинального автора
             msg.author = ctx.author;
         } catch (err) {
-            console.log(err)
+            console.log(err);
         }
 
         /**
-         * @description Выполнение REST-запроса с тайм-аутом
-         * @protected
+         * Выполняем REST-запрос
          */
-        result = await api.request();
-
-        // Выполняем в конце
-        setImmediate(async () => {
-            // Если очередь была создана
-            const queue = db.queues.get(ctx.guildId);
-
-            /**
-             * @description Отправляем сообщение о добавлении трека
-             * @protected
-             */
-            await ctx.client.events.runCustom("message/push",
-                msg,
-                queue,
-                !Array.isArray(result) ? result : result[0],
-            );
-        });
+        const result = await api.request();
 
         /**
-         * @description Если произошла ошибка, сообщаем о ней
-         * @protected
+         * Если произошла ошибка — сразу выходим.
+         *
+         * Важно: message/push ещё НЕ вызываем.
          */
-        if (result instanceof Error || result["message"]) {
+        if (result instanceof Error || result?.["message"]) {
             await ctx.client.events.runCustom(
                 "rest/error",
                 ctx,
-                `**${platform.platform}.${api.type}**\n**❯** **${result["message"] ?? result}**`
+                `**${platform.platform}.${api.type}**\n**❯** **${result?.["message"] ?? result}**`
             );
+
             return null;
         }
 
         /**
-         * @description Создаем очередь
-         * @protected
+         * Создаём очередь только после успешного REST-запроса.
          */
         const queue = db.queues.set(ctx);
-        queue.tracks.push(result, ctx.author); // Добавляем результат (трек / список / плейлист) в очередь
+
+        /**
+         * Добавляем результат в очередь.
+         */
+        const track = !Array.isArray(result)
+            ? result
+            : result[0];
+
+        queue.tracks.push(result, ctx.author);
+
+        /**
+         * Отправляем сообщение о добавлении трека.
+         *
+         * setImmediate здесь уже безопасен:
+         * result точно успешный,
+         * queue точно существует,
+         * track существует.
+         */
+        setImmediate(async () => {
+            try {
+                await ctx.client.events.runCustom(
+                    "message/push",
+                    msg,
+                    queue,
+                    track,
+                );
+            } catch (err) {
+                console.error(err);
+            }
+        });
+
         return null;
-    }
-})
+    },
+});

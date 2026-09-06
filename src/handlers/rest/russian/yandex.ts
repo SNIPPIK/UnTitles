@@ -1,7 +1,7 @@
 import { DeclareRest, OptionsRest, RestServerSide } from "#handler/rest/index.js";
 import { httpsClient, locale } from "#structures";
 import crypto from "node:crypto";
-import { sdb } from "#worker/db";
+import { sdb } from "#db/worker";
 
 /**
  * @author SNIPPIK
@@ -373,7 +373,7 @@ class RestYandexAPI extends RestServerSide.API {
                 // Если произошла ошибка при получении xml
                 if (xml instanceof Error) return locale.err("api.request.fail.msg", ["Fail parsing xml page"]);
 
-                const path = xml[1];
+                const path = xml[1] as string;
                 const sign = crypto.createHash("md5").update(this.options.keys[0] + path.slice(1) + xml[4]).digest("hex");
 
                 // Успех, возвращаем результат и прерываем цикл

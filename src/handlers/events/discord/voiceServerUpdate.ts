@@ -1,5 +1,5 @@
 import { createEvent } from 'seyfert';
-import { db } from "#app/db";
+import { db } from "#db";
 
 export default createEvent({
     data: { name: 'voiceServerUpdate' },
