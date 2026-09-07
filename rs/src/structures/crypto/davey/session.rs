@@ -107,11 +107,6 @@ impl DaveSession {
     })
   }
 
-  #[inline(always)]
-  fn is_silent(packet: &[u8]) -> bool {
-    matches!(packet, [0xF8, 0xFF, 0xFE])
-  }
-
   /// Переинициализирует существующую сессию новыми параметрами.
   ///
   /// Позволяет изменить пользователя, канал или версию протокола без создания нового объекта.
@@ -310,9 +305,6 @@ impl DaveSession {
   /// Зашифрованный пакет или `null`.
   #[napi(js_name = "encryptOpus")]
   pub fn encrypt_opus_fast(&mut self, packet: Buffer) -> Option<Buffer> {
-    // Silent Frame не шифруем
-    if Self::is_silent(packet.as_ref()) { return Some(packet); }
-
     match self.inner.encrypt(
       davey::MediaType::AUDIO,
       davey::Codec::OPUS,
@@ -346,9 +338,6 @@ impl DaveSession {
     packets
         .into_iter()
         .filter_map(|packet| {
-          // Silent Frame
-          if Self::is_silent(packet.as_ref()) { return Some(packet); }
-
           match self.inner.encrypt(
             davey::MediaType::AUDIO,
             davey::Codec::OPUS,
