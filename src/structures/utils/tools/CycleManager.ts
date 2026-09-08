@@ -228,7 +228,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
 
         // Если уже пора выполнять (задержка <= 0), используем setImmediate,
         // иначе setTimeout с рассчитанной задержкой.
-        if (delay <= 0) {
+        if (delay <= 1) {
             this.timer = setImmediate(this.step);
         } else {
             this.timer = setTimeout(this.step, delay);

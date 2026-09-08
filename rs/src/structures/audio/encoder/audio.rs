@@ -1,7 +1,7 @@
 use crate::structures::audio::{
     ring_buffer::RingBuffer,
     encoder::{
-        demuxers::ogg::{OggOpusDemuxer, PacketType}
+        demuxers::ogg::{ OggOpusDemuxer }
     }
 };
 use napi::bindgen_prelude::*;
@@ -321,9 +321,7 @@ impl AudioEngine {
                             // PUSH INTO RING BUFFER
                             // ==================================================
                             for (kind, packet) in frames.drain(..) {
-                                if !matches!(kind, PacketType::Frame | PacketType::Silent) {
-                                    continue;
-                                }
+                                if !kind.is_audio_frame() { continue; }
 
                                 while buffer.is_full() {
                                     if !active.load(Ordering::Acquire) || destroyed.load(Ordering::Acquire) { return; }

@@ -36,12 +36,12 @@
   "dependencies": {
     "discord-api-types": "^0.38.55",
     "http-proxy-agent": "^9.1.0",
-    "seyfert": "^5.0.0",
+    "seyfert": "^5.1.0",
     "socks-proxy-agent": "^10.1.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.9.0",
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.0",
     "typescript": "^7.0.2"
   },
   "scripts": {

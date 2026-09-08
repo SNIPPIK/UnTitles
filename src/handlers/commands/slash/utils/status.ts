@@ -36,7 +36,7 @@ export default class StatusCommand extends Command {
 
         // ── Данные о памяти ─────────────────────────────────────────
         const mem = process.memoryUsage();
-        const total         = toMB(mem.rss + Math.abs(mem.heapUsed - mem.heapTotal));
+        const total         = toMB(mem.rss + Math.abs(mem.heapUsed - mem.heapTotal) + mem.external + mem.arrayBuffers);
         const rss           = toMB(mem.rss);
         const heapUsed      = toMB(mem.heapUsed);
         const heapTotal     = toMB(mem.heapTotal);

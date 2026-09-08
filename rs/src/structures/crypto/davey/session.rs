@@ -46,17 +46,6 @@ impl DaveSession {
     }
   }
 
-  /// Преобразует номер кодека.
-  fn map_codec(v: u8) -> Result<davey::Codec> {
-    match v {
-      0 => Ok(davey::Codec::OPUS),
-      _ => Err(Error::from_reason(format!(
-        "Invalid codec: {}. Currently only 0 (Opus) is supported.",
-        v
-      ))),
-    }
-  }
-
   /// Преобразует номер операции proposals.
   ///
   /// # Безопасность
@@ -282,29 +271,7 @@ impl DaveSession {
   ///
   /// # Ошибки
   /// Если сессия не готова (`ready == false`), или передан неподдерживаемый тип/кодек.
-  pub fn encrypt(&mut self, media_type: u8, codec: u8, packet: Buffer) -> Result<Buffer> {
-    let mt = Self::map_media_type(media_type)?;
-    let cd = Self::map_codec(codec)?;
-
-    let out = self.inner
-        .encrypt(mt, cd, packet.as_ref())
-        .map_err(Self::map_err)?;
-
-    Ok(Buffer::from(out.as_ref()))
-  }
-
-  /// Быстрое шифрование одного Opus-пакета (с заренне заговленным типом медиа и кодека).
-  ///
-  /// В отличие от `encrypt`, этот метод не выбрасывает исключения при ошибке,
-  /// а возвращает `null`. Это удобно для потоковой обработки, где потеря одного пакета допустима.
-  ///
-  /// # Аргументы
-  /// * `packet` - Исходный Opus-фрейм.
-  ///
-  /// # Возвращает
-  /// Зашифрованный пакет или `null`.
-  #[napi(js_name = "encryptOpus")]
-  pub fn encrypt_opus_fast(&mut self, packet: Buffer) -> Option<Buffer> {
+  pub fn encrypt(&mut self, packet: Buffer) -> Option<Buffer> {
     match self.inner.encrypt(
       davey::MediaType::AUDIO,
       davey::Codec::OPUS,
@@ -323,6 +290,21 @@ impl DaveSession {
     }
   }
 
+  /// Быстрое шифрование одного Opus-пакета (с заренне заговленным типом медиа и кодека).
+  ///
+  /// В отличие от `encrypt`, этот метод не выбрасывает исключения при ошибке,
+  /// а возвращает `null`. Это удобно для потоковой обработки, где потеря одного пакета допустима.
+  ///
+  /// # Аргументы
+  /// * `packet` - Исходный Opus-фрейм.
+  ///
+  /// # Возвращает
+  /// Зашифрованный пакет или `null`.
+  #[napi(js_name = "encryptOpus")]
+  pub fn encrypt_opus_fast(&mut self, packet: Buffer) -> Option<Buffer> {
+    self.encrypt(packet)
+  }
+
   /// Шифрует пачку Opus-пакетов за один вызов,с зараниие заготовленним типом медиа и кодека
   ///
   /// Оптимизирует множество вызовов шифрования, уменьшая накладные расходы на пересылку между потоками.
@@ -337,24 +319,7 @@ impl DaveSession {
   pub fn encrypt_opus_batch(&mut self, packets: Vec<Buffer>) -> Vec<Buffer> {
     packets
         .into_iter()
-        .filter_map(|packet| {
-          match self.inner.encrypt(
-            davey::MediaType::AUDIO,
-            davey::Codec::OPUS,
-            packet.as_ref(),
-          ) {
-            Ok(out) => Some(Buffer::from(out.as_ref())),
-
-            Err(_) => self.inner
-                .encrypt(
-                  davey::MediaType::AUDIO,
-                  davey::Codec::OPUS,
-                  packet.as_ref(),
-                )
-                .ok()
-                .map(|out| Buffer::from(out.as_ref())),
-          }
-        })
+        .filter_map(|packet| self.encrypt(packet))
         .collect()
   }
 

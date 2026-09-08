@@ -176,9 +176,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public set cycle(isActive: boolean) {
-        // Отправляем пустышку если такая возможность есть
-        if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
-
         // Даем время на прогрев voice после пустого фрейма
         setImmediate(() => {
             if (!this.id) return;
@@ -187,6 +184,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             if (isActive) {
                 // Если нет плеера в цикле
                 if (!db.queues.cycles.players.has(this)) {
+                    // Отправляем пустышку если такая возможность есть
+                    if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
+
                     // Добавляем плеер в цикл
                     db.queues.cycles.players.add(this);
                     this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
@@ -199,6 +199,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
                 if (db.queues.cycles.players.has(this)) {
                     // Удаляем плеер из цикла
                     db.queues.cycles.players.delete(this);
+
+                    // Отправляем пустышку если такая возможность есть
+                    if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
                     this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
                 }
             }

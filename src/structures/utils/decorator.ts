@@ -1,53 +1,64 @@
 import type { BaseCommand } from "seyfert";
 
 /**
- * The type of the command options.
+ * Опции разработчика для команд Seyfert.
+ * Позволяют задать кулдаун, ограничения по использованию и пропуск регистрации.
  */
 export interface DeveloperOptions {
     /**
-     *
-     * The cooldown.
+     * Кулдаун команды (вероятно, в секундах).
      * @default 3
      */
     cooldown?: number;
 
     /**
-     *
-     * Only the bot developer can use the command.
-     * And sent the command to developer(s) guild(s).
+     * Команда доступна только разработчику бота.
+     * И отправляется в гильдии разработчика(ов).
      * @default false
      */
     onlyDeveloper?: boolean;
 
     /**
-     *
-     * Only the guild owner cam use the command.
+     * Команда доступна только владельцу гильдии.
      * @default false
      */
     onlyGuildOwner?: boolean;
 
     /**
-     * Skip registering the command.
+     * Пропустить регистрацию команды (не загружать в Discord API).
      * @default false
      */
     skipRegister?: boolean;
 }
 
 /**
- * Represents a constructor function.
+ * Тип, описывающий конструктор (класс), принимающий произвольные аргументы
+ * и возвращающий экземпляр типа T.
  */
 type Instantiable<T> = new (...arg: any[]) => T;
 
 /**
- * Decorator function type.
+ * Тип функции-декоратора: принимает цель (конструктор) и возвращает изменённый конструктор.
  */
 type Decorator<T> = (target: T) => T;
 
-export function DeveloperOptions<A extends Instantiable<any>>(options: A extends Instantiable<BaseCommand> ? DeveloperOptions : null): Decorator<A> {
+/**
+ * Фабрика декоратора для применения `DeveloperOptions` к классам команд.
+ *
+ * Если целевой класс не является наследником `BaseCommand`, параметр `options`
+ * должен быть `null` (защита от неправильного использования).
+ *
+ * @param options - объект с опциями разработчика или `null`.
+ * @returns Декоратор, который расширяет целевой класс и применяет опции через `Object.assign`.
+ */
+export function DeveloperOptions<A extends Instantiable<any>>(
+    options: A extends Instantiable<BaseCommand> ? DeveloperOptions : null
+): Decorator<A> {
     return (target: A) =>
         class extends target {
             constructor(...args: any[]) {
                 super(...args);
+                // Копируем все свойства из options в экземпляр команды.
                 Object.assign(this, options);
             }
         };

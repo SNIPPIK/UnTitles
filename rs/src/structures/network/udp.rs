@@ -2,7 +2,6 @@ use napi_derive::napi;
 use crate::structures::{
     audio::ring_buffer::RingBuffer,
     timers::scheduler::{
-        cycle_manager::TICK_INTERVAL_MS,
         balancer::{add_global_session, remove_global_session}
     }
 };
@@ -21,7 +20,7 @@ use std::{
     time::{ Duration }
 };
 
-/// Время до отправки keepalive пакета, для работы через NAT системы
+/// Время до отправки keepalive пакета, для работы поверх NAT систем
 const KEEP_ALIVE_INTERVAL: u64 = 10000;
 
 /// Внутренние данные UDP-сокета с буфером исходящих пакетов и статистикой.
@@ -72,34 +71,18 @@ impl UdpBufferedInner {
     /// пакет возвращается в начало очереди (push_front) для повторной попытки позже,
     /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
     pub fn tick(&self, now: u64) {
-        let last_ms = self.last_send_ms.load(Ordering::Relaxed);
-        let count = now
-            .saturating_sub(last_ms)
-            .div_euclid(TICK_INTERVAL_MS)
-            .clamp(1, 2);
-
-        // Пробуем отправить хотя бы один пакет за тик
-        for _ in 0..count {  // небольшой burst limit, чтобы не виснуть в одном session'е
-            // Получаем аудио пакет для отправки
-            let Some(packet) = self.buffer.pop()
-            else { break; }; // Отменяем если нет данных в буфере
-
+        if let Some(packet) = self.buffer.pop() {
             match self.socket.send(&packet) {
                 Ok(_) => {
                     self.counter.store(0, Ordering::Relaxed);
                     self.last_send_ms.store(now, Ordering::Relaxed);
-                    // пакет успешно ушёл — продолжаем, вдруг есть ещё
                 }
                 Err(_e) => {
-                    // Другие ошибки (NetworkUnreachable, InvalidInput и т.д.)
                     self.send_drops.fetch_add(1, Ordering::Relaxed);
-
-                    // пакет потерян
                     #[cfg(debug_assertions)]
                     {
                         println!("UDP send error: {}", _e);
                     }
-                    break; // не пытаемся дальше в этом тике
                 }
             }
         }
@@ -115,7 +98,7 @@ impl UdpBufferedInner {
             Ok(_) => {
                 self.last_send_ms.store(now, Ordering::Relaxed);
             }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {
                 // keepalive не критичен, можно просто пропустить
             }
             Err(_e) => {

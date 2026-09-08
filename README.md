@@ -1,10 +1,9 @@
-
 <div align="center">
-  <h1>🌟 WatKLOK — High-Performance Voice Engine for Discord</h1>
+<h1>🌟 WatKLOK — High-Performance Voice Engine for Discord</h1>
 
-<h4>Incredible bot with its own voice/audio engine, scalable architecture, multiple filters and support for 6 music platforms.</h4>
-<h4>Audio quality surpasses lavalink, don't believe me? Listen for yourself!</h4>
-<h4>The project is aimed at quality, not speed!!!</h4>
+<h4>Not just a music bot, but a full-featured voice engine for Discord built around a custom Rust core.</h4>
+<h4>Support for E2EE (Discord DAVE 🔐), native Opus processing, modular architecture, an extensible platform system, and audio filters.</h4>
+<h4>The project was created with one goal in mind — to achieve the highest possible playback quality within Discord's limitations.</h4>
 
   <p>
     English
@@ -38,78 +37,84 @@
 
 ---
 
-## 👥 Contributors
+## 👥 Authors
 
-- 👤 [`SNIPPIK`](https://github.com/SNIPPIK)
+The project is developed and maintained by a single author.
 
-📢 Report any bugs or omissions to [`Issues`](https://github.com/SNIPPIK/UnTitles/issues) or [`Discord`](https://discord.gg/qMf2Sv3)
+* 👤 **[SNIPPIK](https://github.com/SNIPPIK)**
 
-[![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
-[![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/qMf2Sv3)
+### 💬 Feedback
 
----
+If you find a bug, encounter unexpected behavior, or have an idea for an improvement — please open an **Issue** or join the **Discord server**.
+
+* 🐞 **Issues:** https://github.com/SNIPPIK/Untitles/issues
+* 💬 **Discord:** https://discord.gg/qMf2Sv3
+
+[![Invite](https://img.shields.io/badge/Add%20the%20bot-%235865F2.svg?style=for-the-badge\&logo=discord\&logoColor=white)](https://discord.com/oauth2/authorize?client_id=623170593268957214)
+[![Server](https://img.shields.io/badge/Support%20Server-%235865F2.svg?style=for-the-badge\&logo=discord\&logoColor=white)](https://discord.gg/qMf2Sv3)
+-------------------------------------------------------------------------------------------------------------------------------------------------------
 
 > [!IMPORTANT]
-> ⚠️ WatKLOK (UnTitles) is a complex technical project maintained exclusively by one author, `SNIPPIK`  
-> Please respect the authorship and license of the project.
+> **WatKLOK (UnTitles)** is a fully open-source project currently developed and maintained by a single person. Therefore, the release of fixes and new features depends on the author's available time.
 
-> [!TIP]
-> I recommend enabling the caching system in `.env`. This will allow you to play tracks even if the platform is completely blocked.
-> However, the voice system is simply not permitted to lose audio packets, even in a critical situation; if UDP packets are blocked, they will be queued for retransmission!
+> [!NOTE]
+> Some features require additional environment configuration to work correctly (for example, **FFmpeg**, **native modules**, **proxy**, and other dependencies).
 
 > [!WARNING]
-> If you use a proxy, keep in mind that `FFmpeg` does not support socks. For such tasks, there's [`STH`](https://github.com/SNIPPIK/SHS)  
-> ⚠️ Some functions require proper environment configuration (FFmpeg, proxy, native modules)
+> When using a proxy, keep in mind that **FFmpeg** does not support the **SOCKS** protocol. For such scenarios, using **[STH](https://github.com/SNIPPIK/SHS)** is recommended.
+
 ---
-
-## 🚀 Advantages (WatKLOK)
-- The most complex operations are handled by Rust via n-api, providing almost complete independence from Node.js limitations.
-- You can define the decoder mode (`voip`, `audio`, `lowdelay`), enable/disable `VBR`, enable/disable packet loss during the download phase, and also enable `FEC`.
-- There are strict delay limits to limit audio corruption, which can also be changed!
-
-<details>
-<summary>Click to open</summary>
 
 ## 🦀 Native Voice Engine (Rust Powered)
-- The core voice processing logic is moved to a native Rust module (src-rs), ensuring stability even with high event loop lag in Node.js.
-- **Voice Engine**: Full implementation of Voice Gateway V8. Stack: UDP + SRTP + Opus.
-- **Security**: Support for End-to-End Encryption (E2EE 🔐) via the Discord DAVE protocol.
-- **Timers**: Cyclic systems using a timer + auto-balancing.
-- Smart Streaming: No external Opus encoders required for streaming—it uses a proprietary Opus frame parsing method.
-- FFmpeg Integration: Used for flexible audio decoding and complex filtering.
+
+The core voice traffic processing logic is implemented as a native **Rust** module (`rs`). Critical operations run independently of the main Node.js event loop, allowing the voice engine to continue operating even under heavy main-thread load.
+
+* **Voice Engine** — custom implementation of Discord Voice processing: `UDP` + `SRTP` + `Opus`.
+* **Security** — support for **End-to-End Encryption (E2EE 🔐)** through the **Discord DAVE** protocol.
+* **Timing & Scheduler** — a native cyclic system with precise timing and automatic workload distribution across active voice sessions.
+* **Opus** — processing and transmission of Opus frames without requiring an external Opus encoder during the sending stage.
+* **FFmpeg Integration** — used for audio decoding, stream conversion, and applying complex audio filters. The order in which filters are applied may affect the final output.
 
 ---
 
-## 🌐 Platforms and Parsing
-- Support for YouTube, Spotify, VK, Yandex-Music, SoundCloud, Deezer, and Apple (only a draft).
-- Smart Fallback: If a track is unavailable on one platform, the system will automatically find it on another.
-- Related Tracks: Automatically selects and plays similar tracks for endless listening.
-- Worker Threads: All heavy-duty search and parsing operations are moved to separate worker threads to avoid blocking the bot's main thread. - **Extensibility**: Modular architecture via Dynamic Handler allows you to add a new platform in minutes.
+## 🌐 Platforms & Parsing
+
+The project supports **YouTube**, **Spotify**, **VK**, **Yandex Music**, **SoundCloud**, **Deezer**, and **Apple Music** *(in development)*.
+
+* **Smart Fallback** — if a track is unavailable on one platform, the system can automatically find an alternative source on another.
+* **Related Tracks** — automatically searches for and adds similar tracks to continue playback.
+* **Worker Threads** — resource-intensive search and parsing operations are executed in separate worker threads without blocking the main Node.js thread.
+* **Extensibility** — a modular architecture based on `Dynamic Handler` allows new platforms to be added without modifying the core player logic.
 
 ---
 
-## 🌍 Localization and Typing
-- **Languages**: Full support for Russian and English ([**language file**](src/structures/locale/languages.json)).
-- **DX (Developer Experience)**: The entire project is strongly typed (TypeScript + Rust ABI), comes with a bunch of interfaces and examples.
-- **Scalability**: Easily add any languages ​​supported by Discord.
+## 🌍 Localization & Typing
 
----
-</details>
+* **Localization** — full support for **Russian and English**. Localization files are located in [`languages.json`](src/structures/utils/locale/languages.json).
+* **DX (Developer Experience)** — the project is fully typed using **TypeScript**, with a typed interface for Rust communication through N-API.
+* **Extensibility** — the localization architecture allows new languages to be added without modifying command or interface logic.
 
-## 🎖️ Event Loop Blocking Resistance
-Even if the main Node.js thread is hard blocked, audio continues playing **without lag or distortion**.
+## 🎖️ Event Loop Blocking Resilience
+
+The voice engine runs inside a native Rust module and does not depend on the Node.js event loop for its critical processing and audio transmission cycle.
+
+Even under significant load or temporary blocking of the main Node.js thread, already-running playback continues to be processed by the native voice engine.
+
+This separates the **Node.js control logic** from the **critical audio pipeline**, minimizing the impact of event loop delays on playback stability.
+
 <details>
-<summary>Click to open</summary>
+<summary>Click to expand</summary>
 
 ```ts
 // 💣 Event Loop Blocking Test (x4)
 for (let i = 0; i < 4; i++) {
-    setInterval(() => {
-        const start = performance.now();
-        while (performance.now() - start < 100) {}
-    }, 100 + (i * 10));
+  setInterval(() => {
+    const start = performance.now();
+    while (performance.now() - start < 100) {}
+  }, 100 + (i * 10));
 }
 ```
+
 <p>
     <a href="">
       <img src=".github/images/ELLx4.png" alt="Title" />
@@ -120,153 +125,115 @@ for (let i = 0; i < 4; i++) {
 ---
 
 ## 🎵 [`Audio Quality`](https://youtu.be/SwmPmEEDI58)
-- Everything depends on the limitations of Discord itself. There are no encoding restrictions; you can try feeding Discord even 512 KBit audio.
-- **Hot Audio Swap**: Instant seamless transitions between tracks.
-- **Audio Effects**: Smooth fade-in/fade-out for any actions (skip, seek, pause)
-- **Filters: 16+** built-in **audio filters** with the ability to easily add your own via the JSON config [(filters.json)](src/core/player/filters.json)
-- **Sync**: Direct synchronization of the audio stream without distortion introduced by software filters.
+
+* **No artificial bitrate limitations** — the audio pipeline does not impose a bitrate limit on the source material. In theory, a stream with a bitrate higher than Discord's standard capabilities can be passed through, although the actual quality is ultimately limited by Discord itself and the audio codec in use.
+* **Hot Audio Swap** — instant and seamless switching between audio streams without noticeable gaps between tracks.
+* **Audio Effects** — smooth `fade-in` / `fade-out` transitions when switching tracks and performing `skip`, `seek`, and `pause` actions.
+* **Audio Filters** — more than 16 built-in audio filters with the ability to easily add custom filters through the JSON configuration file [`filters.json`](src/core/player/filters.json).
+* **Synchronization** — precise synchronization of the audio stream and its processing without additional artifacts caused by track switching or filter application.
 
 > [!WARNING]
-> Losses on the client side are impossible, if a loss occurs accidentally you will see it in the `current track` message  
-> If your internet is unstable, losses will occur in any case.  
-> It is impossible to completely eliminate `packet lost` due to the `UDP` protocol and other `discord` limitations.
-
-
-### Entire Audio Path
-<details>
-<summary>Click to open</summary>
-
-```txt
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              1. REQUEST INITIATION                                  │
-│  /play command → Platform API (YouTube, SoundCloud, Yandex...) → Fetch URL/ID       │
-│                                 (REST Layer)                                        │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                          2. RESOURCE RESOLUTION (ResourceProvider)                  │
-│  • AudioCache check (if already downloaded → instant return of .opus file path)     │
-│  • If not: db.api.fetchAudioLink() → obtain temporary URL from platform             │
-│  • HTTPS client (with Keep-Alive and redirects) → HEAD / GET stream                 │
-│  • If needed: save stream to AudioCache (background worker)                         │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                             3. DECODING AND PARSING                                 │
-│  [Rust] FFmpegProcess / native OggOpusParser (if source is already Opus)            │
-│  • Chunked reading (streaming)                                                      │
-│  • Extraction of raw Opus frames (OggParser::parse_internal)                        │
-│  • Stripping Ogg container → pure Opus bytes for each frame                         │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                         4. PLAYER PREPARATION (AudioPlayer)                         │
-│  • Track queue (Queue) → Track → AudioResource                                      │
-│  • If filters enabled (nightcore, bassboost) → applied ON Opus without PCM          │
-│  • Hot Audio Swap: instant source switching without breaking the connection         │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                    5. TRANSMISSION SCHEDULER (CycleManager + Balancer)              │
-│  [Rust] thread runtime                                                              │
-│  • Balancer groups up to 50 active connections per cycle                            │
-│  • CycleManager runs a loop with ~20 ms interval                                    │
-│  • Each cycle pulls ready Opus frames from UDP Socket                               │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              6. TRANSPORT LAYERS (Layers)                           │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
-│  │  RTPLayer                                                                   │    │
-│  │  • Adds RTP header (SSRC, timestamp, sequence number)                       │    │
-│  │  • Encrypts RTP packet with DAVELayer key (or static secret_key)            │    │
-│  │  • Forms final UDP datagram ready for sending                               │    │
-│  └─────────────────────────────────────────────────────────────────────────────┘    │
-│                                        │                                            │
-│                                        ▼                                            │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
-│  │ ┌─────────────────────────────────────────────────────────────────────────┐ │    │
-│  │ │ DAVELayer (if channel is E2EE)                                          │ │    │
-│  │ │ • Obtains keys from MLS session                                         │ │    │
-│  │ │ • Encrypts Opus frame (AES-GCM)                                         │ │    │
-│  │ │ • Fallback: up to 3 retries on encryption failure                       │ │    │
-│  │ └─────────────────────────────────────────────────────────────────────────┘ │    │
-│  │                                    │                                        │    │
-│  │                                    ▼                                        │    │
-│  │ ┌─────────────────────────────────────────────────────────────────────────┐ │    │
-│  │ │ UDPLayer                                                                │ │    │
-│  │ │ • Sends packet via UDP socket to Discord Voice Server                   │ │    │
-│  │ │ • Discovery Handshake (performed once per connection)                   │ │    │
-│  │ └─────────────────────────────────────────────────────────────────────────┘ │    │
-│  └─────────────────────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              7. RECEPTION AND STATISTICS                            │
-│  • Discord receives RTP packets, decodes Opus, plays back in the voice channel      │
-│  • WatKLOK collects WebRTC feedback: Delay, Packet Loss                             │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-```
-</details>
+> WatKLOK cannot guarantee that no packets will be lost after audio data is sent to Discord.
+>
+> Packet loss can occur anywhere along the network path between the bot, Discord servers, and the client. An unstable internet connection on the client side may result in dropouts or cause Opus to conceal lost frames.
+>
+> Packet loss cannot be completely eliminated due to the nature of UDP and Discord's network infrastructure. However, packet loss originating directly within the bot's audio pipeline should not be masked as a network issue — playback status is displayed in the current track message.
 
 ---
 
 ## 🎛 Interface
-- Interactive buttons: actions depend on the player's state
-- Progress bar support with timecodes
-- Responsive UI - no need to reuse commands
+
+* **Interactive Controls** — available buttons and actions automatically change depending on the current player state.
+* **Progress Bar** — displays the current track position and playback timestamps.
+* **Responsive Interface** — core actions are available directly from the player and do not require additional commands.
+* **Queue Management** — viewing, removing, and skipping tracks are available directly from the interface.
+* **Playback Control** — supports repeat modes, seeking, volume adjustment, and audio filters.
 
 #### 📚 Commands
-<details>
-<summary>Click to open</summary>
 
-|   Command | Autocomplete | Arguments                    | Description       |
-|----------:|:-------------|:-----------------------------|:------------------|
-| `/filter` | ✅            | (off, push, disable)         | Audio filters     |
-|   `/play` | ✅            | (query)                      | Playback          |
-| `/player` | ✅            | (api, replay, stop, related) | Advanced playback |
-| `/volume` | ✅            | value                        | Player Volume     |
-| `/remove` | ✅            | value                        | Delete Track      |
-|   `/seek` | ❌            | 00:00, int                   | Rewind Track      |
-|   `/skip` | ✅            | (back, to, next)             | Skip Tracks       |
-| `/repeat` | ✅            | type                         | Repeat Type       |
-|  `/queue` | ✅            | {destroy, list}              | Queue Management  |
-|  `/voice` | ✅            | (join, leave, tribune)       | Voice Channel     |
+<details>
+<summary>Click to expand</summary>
+
+| Command         | Autocomplete | Arguments                  | Description                            |
+| :-------------- | :----------: | :------------------------- | :------------------------------------- |
+| `/filter`       |       ✅      | `off`, `push`, `disable`   | Manage audio filters                   |
+| `/play`         |       ✅      | `query`                    | Play a track or search by query        |
+| `/play search`  |       ✅      | `platform`, `query`        | Search and play on a specific platform |
+| `/play radio`   |       ✅      | `query`                    | Play an internet radio station         |
+| `/play related` |       ✅      | `platform`, `query`        | Search for and play related tracks     |
+| `/player`       |       ✅      | `replay`, `stop`, `volume` | Advanced player controls               |
+| `/volume`       |       ✅      | `value`                    | Change player volume                   |
+| `/remove`       |       ✅      | `value`                    | Remove a track from the queue          |
+| `/seek`         |       ❌      | `00:00`, `int`             | Seek within the current track          |
+| `/skip`         |       ✅      | `back`, `to`, `next`       | Switch or skip tracks                  |
+| `/repeat`       |       ✅      | `type`                     | Configure repeat mode                  |
+| `/queue`        |       ✅      | `destroy`, `list`          | Manage the playback queue              |
+| `/voice`        |       ✅      | `join`, `leave`, `tribune` | Manage the voice channel               |
+| `/status`       |       ❌      | —                          | View bot status                        |
+| `/reload`       |       ❌      | —                          | Reload bot systems                     |
+
 </details>
 
 ---
 
-## 🚀 Launch
-- Node.js, FFmpeg, and Rust (optional) required
-- You don't need to build Rust components! Ready-made builds [here](https://github.com/SNIPPIK/UnTitles/actions/workflows/build.yml)
-> All parameters should already be defined in `.env.custom`, so take it and rename it to .env
+## 🚀 Getting Started
+
+### Requirements
+
+The following are required to run the project:
+
+* **Node.js**
+* **FFmpeg**
+* **Rust** — only if you need to build the native components yourself
+
+> Building the Rust components yourself is **not required**. Pre-built native binaries are available through [GitHub Actions](https://github.com/SNIPPIK/UnTitles/actions/workflows/build.yml).
+
+### Installation
+
 ```shell
-# Clone
+# Clone the repository
 git clone https://github.com/SNIPPIK/UnTitles
 cd UnTitles
 
 # Install dependencies
-npm i
+npm install
 
-# If you need to build Rust components
-# If you don't want to build, download the ready-made build and add everything to build/native
-npm run build:native
-
-# Build Typescript + run
-npm run build && npm run start
+# Configure the environment
+cp .env.custom .env
 ```
 
-# 📊 Project Diagram
-- In case you're curious about how the bot is built
+> All required parameters should already be present in `.env.custom`. Before starting the project, simply copy it to `.env` and provide your token. Other values can be changed if necessary.
 
-<details>
-<summary>Click to open</summary>
+### Building Native Components
 
-[<img align="center" alt="Diagram" width="" src=".github/images/src.png" />](.github/images/src.png)
-</details>
+If Rust is installed and you want to build the native components yourself:
+
+```shell
+npm run build:native
+```
+
+If you do not need to build the Rust components yourself, you can use the pre-built binaries from [GitHub Actions](https://github.com/SNIPPIK/UnTitles/actions/workflows/build.yml).
+
+The resulting native modules should be placed in:
+
+```text
+build/native
+```
+
+### Build & Run
+
+After installing the dependencies and preparing the native components:
+
+```shell
+# Build TypeScript
+npm run build
+
+# Start
+npm run start
+```
+
+Or with a single command:
+
+```shell
+npm run build && npm run start
+```

@@ -8,7 +8,7 @@ authors = ["SNIPPIK"]
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = { version = "3.12.2", features = ["napi10", "tokio_rt", "async", "compat-mode", "node_version_detect"] }
+napi = { version = "3.12.2", features = ["napi10", "tokio_rt", "async", "node_version_detect"] }
 napi-derive = "3.6.3"
 once_cell = "1.21.4"
 rand = "0.10.2"

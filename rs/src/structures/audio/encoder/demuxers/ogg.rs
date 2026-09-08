@@ -1,3 +1,4 @@
+
 use napi::bindgen_prelude::{ Error, Result };
 use bytes::{ Buf, BufMut, BytesMut };
 use memchr::memmem;
@@ -22,19 +23,37 @@ const MAX_PACKET_SIZE: usize = 4 * 1024 * 1024; // 4 МБ
 /// Для Discord - Frame, Silent. Поскольку остальные не требуются и будут откинуты, это уже потеря пакета.
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum PacketType {
-    Head,      // OpusHead (первые 8 байт "OpusHead", полный заголовок 19+)
-    Tags,      // OpusTags (комментарии)
-    Frame,     // обычный аудио фрейм
-    Silent,    // специальный маркер тишины (0x80 + data)
-    Broken,    // повреждённый/некорректный пакет
-    End,       // 0xFF — сигнал конца потока (не Ogg end-of-stream, а наш внутренний)
+    Head,       // OpusHead
+    Tags,       // OpusTags
 
-    // Ogg container
-    OggPage,
+    Frame,      // обычный Opus audio frame
+    Silent,     // специальный маркер тишины
+    PLC,        // packet loss concealment
+    VBR,        // VBR-related packet/frame
+
+    Broken,     // повреждённый/некорректный пакет
+    End,        // внутренний 0xFF
+
+    OggPage,    // Ogg container page
 }
 
 /// Выходной пакет: (тип, данные).
 pub type ParsedPacket = (PacketType, Vec<u8>);
+
+impl PacketType {
+    /// Проверяет, относится ли тип пакета к обрабатываемым аудио фреймам.
+    ///
+    /// Возвращает `true`, если пакет является одним из:
+    /// - `Frame` — обычный Opus-фрейм с одним или двумя кадрами;
+    /// - `Silent` — специальный пакет тишины;
+    /// - `VBR` — пакет с переменным битрейтом (используемый в некоторых реализациях).
+    ///
+    /// Такие пакеты должны передаваться в аудио-декодер или буфер,
+    /// в отличие от служебных (`Head`, `Tags`, `OggPage` и т.п.).
+    pub fn is_audio_frame(self) -> bool {
+        matches!(self, Self::Frame | Self::Silent | Self::VBR | Self::End)
+    }
+}
 
 // ============================================================================
 // PARSER
@@ -97,24 +116,10 @@ impl OggOpusDemuxer {
         self.remainder.len() + self.packet_carry.len()
     }
 
-    /// Возвращает текущие ёмкости внутренних буферов.
-    /// Используется для диагностики / мониторинга.
-    #[inline]
-    pub fn capacities(&self) -> (usize, usize) {
-        (
-            self.remainder.capacity(),
-            self.packet_carry.capacity(),
-        )
-    }
-
     /// Точка входа для разбора фрагмента данных.
     /// Если `chunk` пуст — принудительно выталкивает последний незавершённый пакет.
-    /// Иначе запускает основной парсер с колбэком, копирующим данные в `output`.
-    pub fn parse_internal(
-        &mut self,
-        chunk: &[u8],
-        output: &mut Vec<ParsedPacket>,
-    ) -> Result<()> {
+    /// Иначе запускает основной парсер с возвратом, копирующим данные в `output`.
+    pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<ParsedPacket>) -> Result<()> {
         if chunk.is_empty() {
             return self.flush_internal(output);
         }
@@ -127,10 +132,7 @@ impl OggOpusDemuxer {
 
     /// Выдаёт последний собранный, но ещё не завершённый пакет (если есть).
     /// Вызывается при завершении потока (EOF).
-    fn flush_internal(
-        &mut self,
-        output: &mut Vec<ParsedPacket>,
-    ) -> Result<()> {
+    fn flush_internal(&mut self, output: &mut Vec<ParsedPacket>) -> Result<()> {
         if self.packet_carry.is_empty() {
             return Ok(());
         }
@@ -150,12 +152,7 @@ impl OggOpusDemuxer {
     /// 3. Проверяет заголовок страницы.
     /// 4. Обрабатывает полные страницы через `handle_page_core`.
     /// 5. Удаляет обработанные байты из `remainder`.
-    fn parse_core<F>(
-        &mut self,
-        chunk: &[u8],
-        mut on_packet: F,
-    ) -> Result<()>
-    where
+    fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()> where
         F: FnMut(PacketType, &[u8]) -> Result<()>,
     {
         self.remainder.put_slice(chunk);
@@ -269,13 +266,7 @@ impl OggOpusDemuxer {
     ///
     /// Незавершённые пакеты сохраняются в `packet_carry` и продолжаются
     /// на следующей странице.
-    fn handle_page_core<F>(
-        page: &[u8],
-        packet_carry: &mut Vec<u8>,
-        bitstream_serial: &mut Option<u32>,
-        on_packet: &mut F,
-    ) -> Result<()>
-    where
+    fn handle_page_core<F>(page: &[u8], packet_carry: &mut Vec<u8>, bitstream_serial: &mut Option<u32>, on_packet: &mut F) -> Result<()> where
         F: FnMut(PacketType, &[u8]) -> Result<()>,
     {
         // Минимальный размер Ogg page header.
@@ -341,7 +332,6 @@ impl OggOpusDemuxer {
         }
 
         // Если приходит BOS с незавершённым packet — состояние потока
-        // уже повреждено.
         if bos && !packet_carry.is_empty() {
             packet_carry.clear();
             return Err(Error::from_reason(
@@ -458,6 +448,11 @@ impl OggOpusDemuxer {
     }
 
     /// Определяет тип пакета на основе его содержимого и длины.
+    ///
+    /// Поддерживает:
+    /// - RFC 6716 (Opus Audio Codec)
+    /// - Ogg контейнер
+    /// - Discord PLC (Packet Loss Concealment) маркеры
     #[inline]
     pub fn detect_packet_type(packet: &[u8]) -> PacketType {
         let len = packet.len();
@@ -466,17 +461,18 @@ impl OggOpusDemuxer {
             return PacketType::Broken;
         }
 
-        // Одиночный байт 0xFF — внутренний маркер конца потока.
+        // Одиночный байт 0xFF — внутренний маркер конца потока
         if len == 1 && packet[0] == 0xFF {
             return PacketType::End;
         }
 
-        // Ogg-страница.
+        // Ogg-страница
         if len >= 4 && packet.starts_with(b"OggS") {
             return PacketType::OggPage;
         }
 
-        // Opus identification header.
+        // Opus identification header (OpusHead)
+        // RFC 6716: минимум 19 байт
         if packet.starts_with(b"OpusHead") {
             return if len >= 19 {
                 PacketType::Head
@@ -485,7 +481,8 @@ impl OggOpusDemuxer {
             };
         }
 
-        // Opus comment header.
+        // Opus comment header (OpusTags)
+        // RFC 6716: минимум 12 байт
         if packet.starts_with(b"OpusTags") {
             return if len >= 12 {
                 PacketType::Tags
@@ -494,26 +491,32 @@ impl OggOpusDemuxer {
             };
         }
 
-        // Специальные пакеты тишины Discord (PLC).
-        if packet == [0xF8, 0xFF, 0xFE]
-            || packet == [0xFC, 0xFF, 0xFE]
-        {
-            return PacketType::Silent;
+        // Discord PLC маркеры
+        match packet {
+            [0xFC, 0xFF, 0xFE] => return PacketType::PLC,
+            [0xF8, 0xFF, 0xFE] => return PacketType::Silent,
+            _ => {}
         }
 
         // Байт TOC.
         let toc = packet[0];
 
-        // Старшие 5 бит — конфигурация, должна быть ≤ 31.
-        let config = toc >> 3;
-        if config > 31 {
-            return PacketType::Broken;
-        }
+        // Бит 5: stereo флаг (0 = mono, 1 = stereo)
+        let _stereo = (toc >> 2) & 1 != 0;
+
+        // Младшие 2 бита: код количества фреймов
+        let frame_code = toc & 0b11;
 
         // Два младших бита — количество кадров.
-        match toc & 0b11 {
-            // Один или два кадра — валидный пакет.
-            0b00 | 0b01 | 0b10 => PacketType::Frame,
+        match frame_code {
+            // Code 0: 1 фрейм
+            0b00 => PacketType::Frame,
+
+            // Code 1: 2 фрейма равного размера
+            0b01 => PacketType::Frame,
+
+            // Code 2: 2 фрейма разного размера (VBR)
+            0b10 => PacketType::VBR,
 
             // Произвольное количество кадров: требуется дополнительный байт.
             0b11 => {
@@ -525,8 +528,8 @@ impl OggOpusDemuxer {
                 // Младшие 6 бит — количество кадров.
                 let frame_count = ch & 0x3F;
 
-                // Нестандартное ограничение: 0 и >86 считаются невалидными.
-                if frame_count == 0 || frame_count > 86 {
+                // RFC 6716: максимум 48 кадров в стандарте
+                if frame_count == 0 || frame_count > 48 {
                     return PacketType::Broken;
                 }
 
