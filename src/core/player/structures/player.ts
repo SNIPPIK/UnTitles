@@ -184,9 +184,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
             if (isActive) {
                 // Если нет плеера в цикле
                 if (!db.queues.cycles.players.has(this)) {
-                    // Отправляем пустышку если такая возможность есть
-                    if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
-
                     // Добавляем плеер в цикл
                     db.queues.cycles.players.add(this);
                     this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
@@ -238,7 +235,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         super();
 
         // Используем arrow function чтобы не потерять контекст и обработать ошибку
-        setImmediate(() => this.play().catch(err => this.emit("player/error", this, err, { skip: true, position: this._tracks.position })));
+        setImmediate(() => this.play(0, 0).catch(err => this.emit("player/error", this, err, { skip: true, position: this._tracks.position })));
 
         /**
          * @description Событие получения ошибки плеера
@@ -285,7 +282,7 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @param position - Позиция нового трека
      * @public
      */
-    public play = async (seek: number = 0, timeout: number = 500, position: number = null): Promise<void> => {
+    public play = async (seek: number = 0, timeout: number = PLAYER_TIMEOUT_OFFSET, position: number = null): Promise<void> => {
         // Защита от одновременных вызовов
         if (this._playLock) return;
         this._playLock = true;

@@ -71,9 +71,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
      */
     public packet = (packet: Buffer[]): void => {
         try {
-            if (packet.length > 0 && this.socket) {
-                this.socket.pushPackets(packet);
-            }
+            this.socket.pushPackets(packet);
         } catch (error) {
             // Если не удалось отправить пакет или пакеты в rust слой
             this.emit("error", error as Error);

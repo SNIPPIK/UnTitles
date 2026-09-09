@@ -16,303 +16,485 @@ import { SetArray } from "../array/index.set.js";
  * @abstract
  */
 abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
-    /** Последняя фактическая длительность шага (в мс), используется для расчёта джиттера. */
-    private lastDuration = 0;
-
-    /** Текущее значение джиттера (отклонение фактического интервала от ожидаемого). */
-    private _jitter = 0;
-    /** Время, затраченное на выполнение последнего шага `_stepCycle`. */
-    private _executionTime = 0;
-
-    /** Максимальный зафиксированный джиттер за время работы (сбрасывается каждые 50 тиков). */
-    private _maxJitter = 0;
-    /** Максимальное время выполнения шага за время работы (сбрасывается каждые 50 тиков). */
-    private _maxExecutionTime = 0;
-
-    /**
-     * Реальная разница между фактическими моментами запуска соседних шагов.
-     */
-    //@ts-ignore
+    /** Фактический интервал между последними двумя запусками цикла. */
     private _realDelta = 0;
 
-    /** Временная метка последнего шага (в миллисекундах от старта). */
-    private _lastStep = 0;
+    /** EMA абсолютного отклонения фактического интервала от заданного duration. */
+    private _intervalJitter = 0;
 
-    /** Общее количество выполненных шагов (сбрасывается каждые 50 тиков). */
+    /** EMA абсолютного отклонения фактического старта от запланированного deadline. */
+    private _jitter = 0;
+
+    /** EMA времени выполнения последнего шага. */
+    private _executionTime = 0;
+
+    /** Максимальное отклонение старта от deadline за текущую выборку. */
+    private _maxJitter = 0;
+
+    /** Максимальное отклонение фактического интервала за текущую выборку. */
+    private _maxIntervalJitter = 0;
+
+    /** Максимальное время выполнения шага за текущую выборку. */
+    private _maxExecutionTime = 0;
+
+    /** Количество тиков в текущей статистической выборке. */
     private _ticks = 0;
 
-    /** Ожидаемое время следующего срабатывания (в миллисекундах от старта). */
+    /** Количество пропущенных интервалов в текущей выборке. */
+    private _skippedTicks = 0;
+
+    /** Общее количество пропущенных интервалов за время жизни системы. */
+    private _totalSkippedTicks = 0;
+
+    /** Время фактического запуска предыдущего шага. */
+    private _lastStep = 0;
+
+    /** Запланированное время следующего запуска. */
     private nextExecutionTime = 0;
 
-    /** Таймер (setTimeout или setImmediate), планирующий следующий шаг. */
+    /** Активный Node.js timer. */
     private timer: NodeJS.Timeout | NodeJS.Immediate | null = null;
 
+    /** Коэффициент EMA. */
+    private static readonly EMA_ALPHA = 0.1;
+
+    /** Количество тиков в статистической выборке. */
+    private static readonly STAT_TICKS = 50;
+
     /**
-     * Возвращает строку с дополнительными диагностическими данными.
-     * По умолчанию возвращает пустую строку; переопределяется в наследниках.
+     * Дополнительная диагностическая информация.
+     *
+     * Формат:
+     * cycle{...} timing{...} execution{...}
+     *
+     * Может быть переопределён в наследниках для добавления
+     * специфичных диагностических данных.
      *
      * @protected
      */
     protected diagnostic(): string {
-        return "";
+        const timing = [
+            `delta=${this._realDelta.toFixed(3)}ms`,
+            `drift=${this._jitter.toFixed(3)}ms`,
+            `max=${this._maxJitter.toFixed(3)}ms`,
+            `interval=${this._intervalJitter.toFixed(3)}ms`,
+            `maxInterval=${this._maxIntervalJitter.toFixed(3)}ms`,
+        ].join(", ");
+
+        const execution = [
+            `avg=${this._executionTime.toFixed(3)}ms`,
+            `max=${this._maxExecutionTime.toFixed(3)}ms`,
+        ].join(", ");
+
+        const cycle = [
+            `size=${this.size}`,
+            `ticks=${this._ticks}`,
+            `skipped=${this._skippedTicks}`,
+            `totalSkipped=${this._totalSkippedTicks}`,
+            `period=${this.options.duration.toFixed(3)}ms`,
+            `next=${this.nextExecutionTime.toFixed(3)}ms`,
+        ].join(", ");
+
+        return [
+            `cycle{${cycle}}`,
+            `timing{${timing}}`,
+            `execution{${execution}}`,
+        ].join(" | ");
     };
 
     /**
-     * Монотонное время в миллисекундах (performance.now()).
-     * Используется для всех временных расчётов.
-     *
-     * @protected
+     * Монотонное время в миллисекундах.
      */
     protected get time(): number {
         return performance.now();
-    };
+    }
 
     /**
-     * Предполагаемое время следующего запуска (в миллисекундах от старта).
-     * Устанавливается при планировании шага.
+     * Запланированное время следующего запуска.
      */
     public get insideTime(): number {
         return this.nextExecutionTime;
-    };
+    }
 
     /**
-     * Текущий интервал между шагами (мс), обычно равен `options.duration`.
+     * Настроенный период цикла.
      */
     public get delay(): number {
-        return this.lastDuration;
-    };
+        return this.options.duration;
+    }
 
     /**
-     * Средний джиттер Event Loop (отклонение фактического запуска от плана).
-     * Рассчитывается по формуле экспоненциального скользящего среднего.
+     * EMA отклонения фактического запуска от deadline.
+     *
+     * Положительное значение — запуск позже deadline.
+     * Отрицательное значение — запуск раньше deadline.
      */
     public get drift(): number {
         return this._jitter;
-    };
+    }
 
     /**
-     * Среднее время выполнения одного прохода `_stepCycle` (мс).
-     * Также сглаживается экспоненциально.
+     * Последний фактический интервал между запусками.
+     */
+    public get realDelta(): number {
+        return this._realDelta;
+    }
+
+    /**
+     * EMA абсолютного отклонения фактического интервала от duration.
+     */
+    public get intervalJitter(): number {
+        return this._intervalJitter;
+    }
+
+    /**
+     * EMA времени выполнения одного шага.
      */
     public get executionTime(): number {
         return this._executionTime;
-    };
+    }
 
     /**
-     * @description Конструктор.
-     * @param options - конфигурация цикла (содержит `duration` и необязательный `custom`).
-     * @throws {Error} если duration <= 0.
+     * Максимальное отклонение запуска от deadline
+     * в текущей статистической выборке.
      */
+    public get maxJitter(): number {
+        return this._maxJitter;
+    }
+
+    /**
+     * Максимальное отклонение фактического интервала
+     * от duration в текущей статистической выборке.
+     */
+    public get maxIntervalJitter(): number {
+        return this._maxIntervalJitter;
+    }
+
+    /**
+     * Максимальное время выполнения шага
+     * в текущей статистической выборке.
+     */
+    public get maxExecutionTime(): number {
+        return this._maxExecutionTime;
+    }
+
+    /**
+     * Количество пропущенных интервалов
+     * в текущей статистической выборке.
+     */
+    public get skippedTicks(): number {
+        return this._skippedTicks;
+    }
+
+    /**
+     * Общее количество пропущенных интервалов.
+     */
+    public get totalSkippedTicks(): number {
+        return this._totalSkippedTicks;
+    }
+
+    /**
+     * Количество тиков текущей статистической выборки.
+     */
+    public get ticks(): number {
+        return this._ticks;
+    }
+
+    /**
+     * Показывает, запущен ли цикл.
+     */
+    public get running(): boolean {
+        return this.timer !== null;
+    }
+
     public constructor(
         public options: SyncCycleConfig<T> | AsyncCycleConfig<T>
     ) {
         super();
 
-        // Проверяем, что интервал положительный.
         if (options.duration <= 0) {
-            throw Error("Duration must be a positive number");
+            throw new Error("Duration must be a positive number");
         }
-
-        // Инициализируем lastDuration значением из конфигурации.
-        this.lastDuration = options.duration;
-    };
+    }
 
     /**
-     * Добавляет элемент в очередь и запускает цикл при необходимости.
-     *
-     * Если элемент уже существует, он удаляется и добавляется заново
-     * (для сброса возможного состояния). При добавлении первого элемента
-     * цикл запускается немедленно через `setImmediate`.
-     *
-     * @param item - элемент для добавления.
-     * @returns this (для цепочечных вызовов).
+     * Добавляет элемент в цикл.
      */
     public add(item: T): this {
-        // Вызываем внешний хук добавления (если задан).
         this.options.custom?.push?.(item);
 
-        // Если элемент уже есть, удаляем его, чтобы обновить состояние.
-        if (this.has(item)) this.delete(item);
+        if (this.has(item)) {
+            this.delete(item);
+        }
 
-        // Добавляем в базовую коллекцию.
         super.add(item);
 
-        // Если это первый элемент и цикл ещё не запущен (nextExecutionTime == 0),
-        // инициализируем время следующего запуска и планируем первый шаг.
-        if (this.size === 1 && !this.nextExecutionTime) {
+        if (this.size === 1 && this.nextExecutionTime === 0) {
             const now = this.time;
+
             this.nextExecutionTime = now + this.options.duration;
-            // Используем setImmediate для немедленного запуска без задержки.
-            this.timer = setImmediate(this.step);
+
+            this.timer = setTimeout(
+                this.step,
+                this.options.duration
+            );
         }
 
         return this;
-    };
+    }
 
     /**
-     * Удаляет элемент из очереди.
-     *
-     * @param item - элемент для удаления.
-     * @returns true если элемент был удалён, иначе false.
+     * Удаляет элемент из цикла.
      */
     public delete(item: T): boolean {
-        // Если элемента нет, ничего не делаем.
-        if (!this.has(item)) return false;
+        if (!this.has(item)) {
+            return false;
+        }
 
-        // Вызываем внешний хук удаления (если задан).
         this.options.custom?.remove?.(item);
 
         return super.delete(item);
-    };
+    }
 
     /**
-     * Полная очистка очереди и остановка цикла.
-     * Сбрасывает все временные показатели и статистику.
+     * Полностью останавливает цикл и сбрасывает текущую статистику.
+     *
+     * Lifetime-счётчик пропущенных тиков сохраняется.
      */
     public reset(): void {
-        // Удаляем текущий таймер (если есть).
         this.clearTimer();
-        // Очищаем коллекцию.
         this.clear();
 
-        // Сбрасываем время следующего запуска.
         this.nextExecutionTime = 0;
-        // Сбрасываем интервал.
-        this.lastDuration = 0;
 
-        // Обнуляем статистику.
+        this._realDelta = 0;
+        this._intervalJitter = 0;
         this._jitter = 0;
         this._executionTime = 0;
-        this._realDelta = 0;
+
+        this._maxJitter = 0;
+        this._maxIntervalJitter = 0;
+        this._maxExecutionTime = 0;
+
+        this._ticks = 0;
+        this._skippedTicks = 0;
+
         this._lastStep = 0;
-    };
+    }
 
     /**
-     * Очищает активный таймер, если он существует.
-     * Определяет тип таймера по наличию метода `hasRef`.
-     *
-     * @protected
+     * Очищает активный timer.
      */
     protected clearTimer(): void {
-        // Если таймера нет, выходим.
-        if (!this.timer) return;
+        if (this.timer === null) {
+            return;
+        }
 
-        // Проверяем, является ли таймер Timeout (у него есть метод hasRef).
         if ("hasRef" in this.timer) {
             clearTimeout(this.timer as NodeJS.Timeout);
         } else {
-            // Иначе это Immediate.
             clearImmediate(this.timer as NodeJS.Immediate);
         }
 
         this.timer = null;
-    };
+    }
 
     /**
-     * Планирует следующий шаг цикла с учётом текущего времени.
-     * Если коллекция пуста, вызывает reset и прекращает цикл.
+     * Планирует следующий запуск цикла.
      *
-     * @protected
+     * Deadline рассчитывается относительно предыдущего deadline,
+     * а не относительно текущего времени. Это сохраняет стабильную
+     * временную сетку цикла.
      */
     protected scheduleStep(): void {
-        // Если нет элементов, останавливаем цикл.
-        if (this.size === 0) return this.reset();
+        if (this.size === 0) {
+            this.reset();
+            return;
+        }
 
         const now = this.time;
-
-        // Вычисляем задержку до запланированного момента.
         const delay = this.nextExecutionTime - now;
 
-        // Очищаем старый таймер перед установкой нового.
         this.clearTimer();
 
-        // Если уже пора выполнять (задержка <= 0), используем setImmediate,
-        // иначе setTimeout с рассчитанной задержкой.
-        if (delay <= 1) {
+        if (delay <= 0) {
             this.timer = setImmediate(this.step);
-        } else {
-            this.timer = setTimeout(this.step, delay);
+            return;
         }
-    };
+
+        this.timer = setTimeout(this.step, delay);
+    }
 
     /**
-     * Основной шаг цикла: выполняет `_stepCycle`, обновляет статистику
-     * и планирует следующий запуск.
-     *
-     * @private
+     * Основной шаг цикла.
      */
     private step = (): void => {
-        // Обнуляем ссылку на таймер (он уже сработал).
         this.timer = null;
 
-        // Если коллекция пуста, сбрасываем и выходим.
-        if (this.size === 0) return this.reset();
+        if (this.size === 0) {
+            this.reset();
+            return;
+        }
 
-        // Запоминаем запланированное время.
         const scheduled = this.nextExecutionTime;
-        // Фактическое время начала шага.
         const start = this.time;
 
-        // Вычисляем реальный интервал между двумя последовательными запусками.
+        /*
+         * -------------------------------------------------------------
+         * Timing diagnostics
+         * -------------------------------------------------------------
+         */
+
+        // Ошибка запуска относительно deadline.
+        const jitter = start - scheduled;
+
+        this._jitter =
+            this._jitter * (1 - DefaultCycleSystem.EMA_ALPHA) +
+            jitter * DefaultCycleSystem.EMA_ALPHA;
+
+        const absJitter = Math.abs(jitter);
+
+        if (absJitter > this._maxJitter) {
+            this._maxJitter = absJitter;
+        }
+
+        /*
+         * Фактический интервал между двумя последовательными
+         * запусками цикла.
+         */
         if (this._lastStep !== 0) {
             this._realDelta = start - this._lastStep;
+
+            const intervalJitter =
+                this._realDelta - this.options.duration;
+
+            const absIntervalJitter =
+                Math.abs(intervalJitter);
+
+            this._intervalJitter =
+                this._intervalJitter *
+                (1 - DefaultCycleSystem.EMA_ALPHA) +
+                absIntervalJitter *
+                DefaultCycleSystem.EMA_ALPHA;
+
+            if (absIntervalJitter > this._maxIntervalJitter) {
+                this._maxIntervalJitter = absIntervalJitter;
+            }
         }
+
         this._lastStep = start;
 
-        // Джиттер = насколько позже фактического момента мы запустились.
-        const jitter = Math.max(0, start - scheduled);
-        // Экспоненциальное скользящее среднее (EMA) с коэффициентом 0.1.
-        this._jitter = this._jitter * 0.9 + jitter * 0.1;
+        /*
+         * -------------------------------------------------------------
+         * Missed ticks
+         * -------------------------------------------------------------
+         */
 
-        // Обновляем максимум.
-        if (jitter > this._maxJitter) this._maxJitter = jitter;
+        if (jitter >= this.options.duration) {
+            const skipped = Math.floor(
+                jitter / this.options.duration
+            );
 
-        // Выполняем полезную работу шага.
+            this._skippedTicks += skipped;
+            this._totalSkippedTicks += skipped;
+        }
+
+        /*
+         * -------------------------------------------------------------
+         * Cycle work
+         * -------------------------------------------------------------
+         */
+
         try {
             this._stepCycle();
         } catch (error) {
-            // Логируем ошибку, не прерывая цикл.
             console.error(error);
         }
 
-        // Время окончания шага.
+        /*
+         * -------------------------------------------------------------
+         * Execution diagnostics
+         * -------------------------------------------------------------
+         */
+
         const end = this.time;
-        // Время выполнения `_stepCycle`.
-        const exec = end - start;
+        const executionTime = end - start;
 
-        // EMA времени выполнения.
-        this._executionTime = this._executionTime * 0.9 + exec * 0.1;
-        // Обновляем максимум.
-        if (exec > this._maxExecutionTime) this._maxExecutionTime = exec;
+        this._executionTime =
+            this._executionTime *
+            (1 - DefaultCycleSystem.EMA_ALPHA) +
+            executionTime *
+            DefaultCycleSystem.EMA_ALPHA;
 
-        // Вычисляем следующее запланированное время.
-        this.nextExecutionTime = scheduled + this.options.duration;
-        // Если мы уже опаздываем (например, шаг выполнялся слишком долго),
-        // пересинхронизируемся: следующий запуск будет не раньше, чем через duration от текущего конца.
+        if (executionTime > this._maxExecutionTime) {
+            this._maxExecutionTime = executionTime;
+        }
+
+        /*
+         * -------------------------------------------------------------
+         * Next deadline
+         * -------------------------------------------------------------
+         *
+         * ВАЖНО:
+         *
+         * Следующий deadline считается от ПРЕДЫДУЩЕГО deadline.
+         * Мы не делаем:
+         *
+         *     end + duration
+         *
+         * потому что это меняет фазу периодического цикла.
+         */
+
+        this.nextExecutionTime =
+            scheduled + this.options.duration;
+
+        /*
+         * Если выполнение шага заняло слишком много времени
+         * и следующий deadline уже прошёл, пропускаем просроченные
+         * интервалы, сохраняя исходную временную сетку.
+         */
         if (this.nextExecutionTime <= end) {
-            this.nextExecutionTime = end + this.options.duration;
+            const late = end - this.nextExecutionTime;
+
+            const skipped =
+                Math.floor(
+                    late / this.options.duration
+                ) + 1;
+
+            this.nextExecutionTime +=
+                skipped * this.options.duration;
+
+            this._skippedTicks += skipped;
+            this._totalSkippedTicks += skipped;
         }
 
-        // Сохраняем фактический интервал (равен запланированному).
-        this.lastDuration = this.options.duration;
+        /*
+         * -------------------------------------------------------------
+         * Statistics window
+         * -------------------------------------------------------------
+         */
 
-        // Каждые 50 тиков сбрасываем максимумы, чтобы они отражали недавнюю статистику.
-        if (++this._ticks > 50) {
+        this._ticks++;
+
+        if (this._ticks >= DefaultCycleSystem.STAT_TICKS) {
             this._ticks = 0;
-            this._maxExecutionTime = 0;
             this._maxJitter = 0;
+            this._maxIntervalJitter = 0;
+            this._maxExecutionTime = 0;
+            this._skippedTicks = 0;
         }
 
-        // Планируем следующий шаг.
+        /*
+         * -------------------------------------------------------------
+         * Next iteration
+         * -------------------------------------------------------------
+         */
+
         this.scheduleStep();
     };
 
     /**
-     * Абстрактный метод, реализующий полезную нагрузку одного шага.
-     * Должен быть определён в классе-наследнике.
-     *
-     * @protected
-     * @abstract
+     * Полезная нагрузка одного шага.
      */
     protected abstract _stepCycle(): void;
 }
@@ -338,11 +520,9 @@ export abstract class TaskCycle<T = unknown> extends DefaultCycleSystem<T> {
 
                 // Если результат – Promise, обрабатываем возможные ошибки асинхронно
                 if (result instanceof Promise) {
-                    queueMicrotask(() => {
-                        result.catch((err) => {
-                            console.error("[TaskCycle] Async execution error:", err);
-                            this.delete(item);
-                        });
+                    result.catch((err) => {
+                        console.error("[TaskCycle] Async execution error:", err);
+                        this.delete(item);
                     });
                 }
             } catch (error) {
@@ -372,20 +552,18 @@ export abstract class PromiseCycle<T = unknown> extends DefaultCycleSystem<T> {
      */
     protected async _stepCycle() {
         for await (const item of this.array) {
-            setImmediate(async () => {
-                if (await this.options.filter(item)) {
-                    Promise.resolve(this.options.execute(item))
-                        .then((keep) => {
-                            if (keep === false) {
-                                this.delete(item);
-                            }
-                        })
-                        .catch((err) => {
-                            console.error("[PromiseCycle] Promise execution error:", err);
+            if (await this.options.filter(item)) {
+                Promise.resolve(this.options.execute(item))
+                    .then((keep) => {
+                        if (keep === false) {
                             this.delete(item);
-                        });
-                }
-            })
+                        }
+                    })
+                    .catch((err) => {
+                        console.error("[PromiseCycle] Promise execution error:", err);
+                        this.delete(item);
+                    });
+            }
         }
 
         // Вызов пользовательского хука после шага

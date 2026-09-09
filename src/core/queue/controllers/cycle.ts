@@ -57,7 +57,11 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
             audio += player.audio.current?.packets ?? 0;
         }
 
-        return `udp=${udp} audio=${audio}`;
+        return [
+            super.diagnostic(),
+            `udp=${udp}`,
+            `audio=${audio}`,
+        ].join(" | ");
     };
 
     /**

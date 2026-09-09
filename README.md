@@ -1,11 +1,6 @@
 <div align="center">
-<h1>🌟 WatKLOK — High-Performance Voice Engine for Discord</h1>
-
-<h4>Not just a music bot, but a full-featured voice engine for Discord built around a custom Rust core.</h4>
-<h4>Support for E2EE (Discord DAVE 🔐), native Opus processing, modular architecture, an extensible platform system, and audio filters.</h4>
-<h4>The project was created with one goal in mind — to achieve the highest possible playback quality within Discord's limitations.</h4>
-
-  <p>
+<h1>WatKLOK</h1>
+ <p>
     English
     |
     <a href="./README_RU.md">

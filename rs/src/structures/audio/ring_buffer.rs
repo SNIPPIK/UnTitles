@@ -38,7 +38,10 @@ pub struct RingBuffer {
     head: CachePadded<AtomicUsize>,
 
     /// Хвост — позиция следующего извлечения (монотонно растёт).
-    tail: CachePadded<AtomicUsize>
+    tail: CachePadded<AtomicUsize>,
+
+    /// Автомоторный счетчик для точного подсчета пакетов в системе
+    count: AtomicUsize
 }
 
 impl RingBuffer {
@@ -64,6 +67,7 @@ impl RingBuffer {
             capacity,
             head: CachePadded::new(AtomicUsize::new(0)),
             tail: CachePadded::new(AtomicUsize::new(0)),
+            count: AtomicUsize::new(0),
         }
     }
 
@@ -104,6 +108,7 @@ impl RingBuffer {
                             Ordering::Release,
                         );
 
+                        self.count.fetch_add(1, Ordering::AcqRel);
                         return Ok(());
                     }
                     Err(actual) => {
@@ -156,6 +161,7 @@ impl RingBuffer {
                             Ordering::Release,
                         );
 
+                        self.count.fetch_sub(1, Ordering::AcqRel);
                         return Some(value);
                     }
                     Err(actual) => {
@@ -174,17 +180,10 @@ impl RingBuffer {
 
     /// Извлекает до `limit` элементов и добавляет их в `out`.
     #[inline]
-    pub fn pop_many(
-        &self,
-        out: &mut Vec<Vec<u8>>,
-        limit: usize,
-    ) {
-        if limit == 0 {
-            return;
-        }
+    pub fn pop_many(&self, out: &mut Vec<Vec<u8>>, limit: usize) {
+        if limit == 0 { return; }
 
         out.reserve(limit);
-
         for _ in 0..limit {
             match self.pop() {
                 Some(value) => out.push(value),
@@ -196,10 +195,7 @@ impl RingBuffer {
     /// Текущее количество элементов (приблизительное).
     #[inline]
     pub fn len(&self) -> usize {
-        let head = self.head.load(Ordering::Acquire);
-        let tail = self.tail.load(Ordering::Acquire);
-
-        head.wrapping_sub(tail).min(self.capacity)
+        self.count.load(Ordering::Acquire)
     }
 
     /// `true`, если буфер пуст.
