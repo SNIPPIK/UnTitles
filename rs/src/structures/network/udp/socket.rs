@@ -1,13 +1,10 @@
-use napi_derive::napi;
 use crate::structures::{
     audio::ring_buffer::RingBuffer,
+    crypto::aes::VoiceRTPSocket,
+    network::udp::inner_socket::SocketInner,
     timers::scheduler::{
-        balancer::{add_global_session, remove_global_session}
+        balancer::{ add_global_session, remove_global_session }
     }
-};
-use napi::{
-    bindgen_prelude::{Buffer, Function, Error, Result},
-    threadsafe_function::ThreadsafeFunctionCallMode
 };
 use std::{
     io::ErrorKind,
@@ -19,104 +16,18 @@ use std::{
     thread,
     time::{ Duration }
 };
-
-/// Время до отправки keepalive пакета, для работы поверх NAT систем
-const KEEP_ALIVE_INTERVAL: u64 = 10000;
-
-/// Внутренние данные UDP-сокета с буфером исходящих пакетов и статистикой.
-///
-/// Хранит сам сокет (в Arc для разделения между несколькими экземплярами UdpBuffered,
-/// которые могут быть клонированы для менеджера), очередь пакетов и счётчик сброшенных
-/// пакетов (drops). Все методы работают с блокировкой очереди, но стараются минимизировать
-/// время удержания блокировки.
-pub struct UdpBufferedInner {
-    /// Сокет UDP, обёрнутый в Arc для возможности разделения.
-    pub socket: Arc<UdpSocket>,
-
-    /// Очередь исходящих пакетов. Защищена мьютексом, так как используется из нескольких
-    /// потоков: основной поток добавляет пакеты через push, а цикл тиков (в CycleManager)
-    /// вызывает tick для отправки.
-    pub buffer: RingBuffer,
-
-    /// Счётчик количества пакетов, которые не были отправлены из-за переполнения буфера
-    /// или временной недоступности сокета (WouldBlock). Атомарный для потокобезопасности
-    /// без блокировок.
-    pub send_drops: AtomicUsize,
-
-    /// Последнее зафиксированное время отправки пакета
-    pub last_send_ms: AtomicU64,
-
-    /// Номер отправленного Keep-Alive пакета
-    pub counter: AtomicU32
-}
-
-impl UdpBufferedInner {
-    /// Добавляет пакет в очередь на отправку.
-    pub fn push(&self, data: Vec<u8>) {
-        if self.buffer.push(data).is_err() {
-            self.send_drops.fetch_add(1, Ordering::Relaxed);
-        }
-    }
-
-    /// Проверка, есть ли еще данные в кольцевом буфере и валиден ли сокет.
-    pub fn has_pending_packets(&self) -> bool {
-        !self.buffer.is_empty()
-    }
-
-    /// Попытка отправить один пакет из очереди.
-    ///
-    /// Вызывается из тика CycleManager. Пытается захватить блокировку очереди без ожидания
-    /// (try_lock), чтобы не блокировать цикл, если очередь занята другим потоком.
-    /// Если отправка завершается ошибкой WouldBlock (сокет временно недоступен),
-    /// пакет возвращается в начало очереди (push_front) для повторной попытки позже,
-    /// и счётчик drops увеличивается. Любая другая ошибка также приводит к возврату пакета.
-    pub fn tick(&self, now: u64) {
-        if let Some(packet) = self.buffer.pop() {
-            match self.socket.send(&packet) {
-                Ok(_) => {
-                    self.counter.store(0, Ordering::Relaxed);
-                    self.last_send_ms.store(now, Ordering::Relaxed);
-                }
-                Err(_e) => {
-                    self.send_drops.fetch_add(1, Ordering::Relaxed);
-                    #[cfg(debug_assertions)]
-                    {
-                        println!("UDP send error: {}", _e);
-                    }
-                }
-            }
-        }
-    }
-
-    /// Отправка keep-alive пакета для поддержания NAT.
-    pub fn tick_alive(&self, now: u64) {
-        let count = self.counter.fetch_add(1, Ordering::Relaxed);
-        let mut keep_alive_packet = [0u8; 8];
-        keep_alive_packet[0..4].copy_from_slice(&count.to_le_bytes());
-
-        match self.socket.send(&keep_alive_packet) {
-            Ok(_) => {
-                self.last_send_ms.store(now, Ordering::Relaxed);
-            }
-            Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                // keepalive не критичен, можно просто пропустить
-            }
-            Err(_e) => {
-                #[cfg(debug_assertions)]
-                {
-                    println!("Keepalive send failed: {}", _e);
-                }
-            }
-        }
-    }
-}
+use napi::{
+    bindgen_prelude::{Buffer, Function, Error, Result},
+    threadsafe_function::ThreadsafeFunctionCallMode
+};
+use napi_derive::napi;
 
 /// Бактеризованный UDP-сокет, доступный из JavaScript через N-API.
 #[napi(js_name = "UDPSocket")]
 #[derive(Clone)]
-pub struct UdpBuffered {
+pub struct SocketBuffered {
     /// Внутренние данные, разделяемые между клонами (например, для менеджера).
-    inner: Arc<UdpBufferedInner>,
+    inner: Arc<SocketInner>,
 
     /// Флаг активности потока, слушающего входящие пакеты.
     listener_active: Arc<AtomicBool>,
@@ -127,12 +38,12 @@ pub struct UdpBuffered {
     /// Флаг, указывающий, что объект был уничтожен (чтобы избежать повторного удаления).
     destroyed: Arc<AtomicBool>,
 
-    /// Уникальный идентификатор сессии, используемый для регистрации в глобальном балансировщике.
+    /// Уникальный идентификатор сессии, используемый для регистрации в глобальном балансировщике
     id: u32
 }
 
 #[napi]
-impl UdpBuffered {
+impl SocketBuffered {
     /// Создаёт новый UDP-сокет, подключается к указанному удалённому адресу и
     /// регистрируется в глобальном балансировщике.
     ///
@@ -153,18 +64,20 @@ impl UdpBuffered {
         socket.set_read_timeout(Some(Duration::from_millis(20)))
             .map_err(|e| Error::from_reason(format!("Read timeout error: {}", e)))?;
 
-        let inner = Arc::new(UdpBufferedInner {
+        let inner = Arc::new(SocketInner {
+            rtp: VoiceRTPSocket::new(),
             socket: Arc::new(socket),
             buffer: RingBuffer::new(2048),
             send_drops: AtomicUsize::new(0),
             last_send_ms: AtomicU64::new(0),
-            counter: AtomicU32::new(0)
+            keepalive_counter: AtomicU32::new(0),
+            consecutive_failures: AtomicU32::new(0),
         });
 
         // Генерируем случайный идентификатор для этой сессии.
         let id = rand::random::<u32>();
 
-        let udp = UdpBuffered {
+        let udp = SocketBuffered {
             inner,
             listener_active: Arc::new(AtomicBool::new(false)),
             listener_handle: Arc::new(Mutex::new(None)),
@@ -176,6 +89,23 @@ impl UdpBuffered {
         // Передаём клон, специально подготовленный для менеджера (без listener_handle).
         add_global_session(id, udp.clone());
         Ok(udp)
+    }
+
+    ///
+    pub fn tick(&self, now: u64) {
+        self.inner.auto_tick(now);
+    }
+
+    /// Инициализирует RTP-шифр с новым SSRC и ключом.
+    /// Безопасен для повторного вызова при подключении.
+    ///
+    /// # Аргументы
+    /// * `ssrc` — идентификатор источника синхронизации.
+    /// * `key` — 32-байтовый ключ AES-256-GCM.
+    #[napi(js_name = "initialize_rtp")]
+    pub fn initialize_rtp(&self, ssrc: u32, key: Vec<u8>) -> Result<()> {
+        self.inner.rtp.initialize(ssrc, key)
+            .map_err(|e| Error::from_reason(e.to_string()))
     }
 
     /// Текущее количество пакетов в очереди на отправку.
@@ -213,13 +143,6 @@ impl UdpBuffered {
     /// Discovery-пакет используется на начальном этапе установки голосового UDP-соединения
     /// и имеет фиксированный размер 74 байта. Структура пакета:
     ///
-    /// | Смещение | Размер (байт) | Описание                          |
-    /// |----------|---------------|-----------------------------------|
-    /// | 0..2     | 2             | Тип пакета (0x0001, big-endian)   |
-    /// | 2..4     | 2             | Длина пакета (0x0046 = 70, big-endian) |
-    /// | 4..8     | 4             | SSRC источника (big-endian)       |
-    /// | 8..74    | 66            | Заполнитель (нули)                |
-    ///
     /// # Аргументы
     /// - `ssrc` — 32-битный идентификатор источника синхронизации, уникальный для данного
     ///   голосового потока.
@@ -229,23 +152,21 @@ impl UdpBuffered {
     /// Возврат вектора (а не одиночного `Buffer`) обеспечивает единообразие API
     /// с другими методами, возвращающими массивы пакетов (например, `packets`).
     #[napi]
-    pub fn discovery(&self, ssrc: u32) -> Vec<Buffer> {
+    pub fn discovery(&self, ssrc: u32) {
         // Создаём буфер фиксированного размера (74 байта), заполненный нулями.
         let mut packet = vec![0u8; 74];
-        
+
         // Записываем тип пакета: 1 (2 байта, big-endian).
         packet[0..2].copy_from_slice(&1u16.to_be_bytes());
-        
+
         // Длина пакета: 70 (2 байта, big-endian).
         packet[2..4].copy_from_slice(&70u16.to_be_bytes());
-        
+
         // SSRC: 4 байта, big-endian.
         packet[4..8].copy_from_slice(&ssrc.to_be_bytes());
 
         // Возвращаем вектор, содержащий единственный Buffer.
-        let mut vec = Vec::with_capacity(1);
-        vec.push(Buffer::from(packet));
-        vec
+        self.inner.push(packet);
     }
 
     /// Запускает фоновый поток для приёма входящих UDP-пакетов.
@@ -259,7 +180,7 @@ impl UdpBuffered {
         }
 
         // Создаём потокобезопасную функцию для вызова JS из фонового потока.
-        let tsfn = callback.build_threadsafe_function().build()?;
+        let js_fn = callback.build_threadsafe_function().build()?;
 
         // Клонируем сокет и флаг активности для передачи в поток.
         let socket = self.inner.socket.clone();
@@ -283,8 +204,8 @@ impl UdpBuffered {
                         // Копируем данные в Buffer (владеющий) для передачи в JS.
                         let js_buffer = Buffer::from(buf[..size].to_vec());
 
-                        // Неблокирующе отправляем пакет в JS.
-                        let _ = tsfn.call(
+                        // Не блокируя отправляем пакет в JS.
+                        let _ = js_fn.call(
                             js_buffer,
                             ThreadsafeFunctionCallMode::NonBlocking,
                         );
@@ -309,7 +230,7 @@ impl UdpBuffered {
             }
 
             // Явно освобождаем threadsafe-функцию.
-            drop(tsfn);
+            drop(js_fn);
         });
 
         // Сохраняем JoinHandle для последующего join при остановке.
@@ -377,37 +298,17 @@ impl UdpBuffered {
     #[napi]
     pub fn destroy(&self) {
         self.cleanup();
-    }
-
-    /// Определяет, что нужно отправить: накопленные пакеты или keepalive-сигнал.
-    ///
-    /// Вызывается циклически из глобального менеджера с текущим временем в миллисекундах.
-    /// Если в очереди есть пакеты, отправляет их (внутренний `tick` также обновляет таймер keepalive).
-    /// Иначе проверяет, не пора ли отправить keepalive (если с последней отправки прошло
-    /// больше `KEEP_ALIVE_INTERVAL`).
-    pub fn process(&self, now: u64) {
-        // Проверяем, есть ли пакеты, ожидающие отправки.
-        if self.inner.has_pending_packets() {
-            // Отправляем накопленные пакеты (внутри также сбрасывается таймер keepalive).
-            self.inner.tick(now);
-        } else {
-            // Если пакетов нет, проверяем время последней отправки.
-            let last_ms = self.inner.last_send_ms.load(Ordering::Relaxed);
-
-            // Если прошло достаточно времени, отправляем keepalive.
-            if now.saturating_sub(last_ms) >= KEEP_ALIVE_INTERVAL {
-                self.inner.tick_alive(now);
-            }
-        }
+        self.inner.rtp.destroy();
     }
 }
+
 
 /// Деструктор для `UdpBuffered`.
 ///
 /// Выполняет корректную остановку фонового потока приёма пакетов
 /// и очистку буфера отправки. Гарантирует, что после уничтожения объекта
 /// не останется активных потоков, удерживающих ссылки на ресурсы.
-impl Drop for UdpBuffered {
+impl Drop for SocketBuffered {
     fn drop(&mut self) {
         // Останавливаем поток приёма: атомарно снимаем флаг активности.
         // Поток, находящийся в блокирующем `recv`, проснётся и выйдет из цикла.
@@ -428,26 +329,5 @@ impl Drop for UdpBuffered {
         // Очищаем внутренний кольцевой буфер отправки.
         // Это освобождает накопленные, но ещё не отправленные пакеты.
         self.inner.buffer.clear();
-    }
-}
-
-/// При падении объекта автоматически вызывается destroy.
-impl Drop for UdpBufferedInner {
-    fn drop(&mut self) {
-        #[cfg(debug_assertions)]
-        {
-            use std::sync::atomic::Ordering;
-
-            println!("====================");
-            println!("UdpBufferedInner::drop");
-            println!("send_drops={}", self.send_drops.load(Ordering::Relaxed));
-            println!("last_send_ms={}", self.last_send_ms.load(Ordering::Relaxed));
-            println!("keep_alive_counter={}", self.counter.load(Ordering::Relaxed));
-            println!("buffer_len={}", self.buffer.len());
-            //println!("buffer_cap={}", self.buffer.capacity());
-            println!("socket_strong={}", Arc::strong_count(&self.socket));
-            println!("UdpBufferedInner dropped");
-            println!("====================");
-        }
     }
 }

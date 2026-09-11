@@ -1,7 +1,11 @@
-use crate::structures::timers::scheduler::cycle_manager::{ TICK_INTERVAL_MS };
-use napi::bindgen_prelude::{ Status, Buffer, Error, Result };
-use napi_derive::napi;
-use std::{sync::atomic::{AtomicU16, AtomicU32, Ordering}, fmt};
+use crate::structures::timers::scheduler::cycle_manager::TICK_INTERVAL_MS;
+use std::{
+    sync::{
+        atomic::{AtomicU16, AtomicU32, Ordering},
+        RwLock,
+    },
+    fmt,
+};
 use aes_gcm::{
     aead::{KeyInit, AeadInOut, inout::InOutBuf},
     Aes256Gcm, Nonce
@@ -21,10 +25,13 @@ const GCM_TAG_SIZE: usize = 16;
 /// В Discord используются младшие 4 байта nonce, старшие 8 — нули.
 const NONCE_SUFFIX_SIZE: usize = 4;
 
+/// Допустимая длина ключа AES-256 (байт).
+const KEY_SIZE: usize = 32;
+
 /// Приращение временной метки RTP для одного пакета.
 /// Для Opus с частотой дискретизации 48 кГц и кадрами по 20 мс получаем 960 семплов.
 /// TICK_INTERVAL_MS — интервал цикла отправки (20 мс).
-const TIMESTAMP_INC: u64 = 48000 * TICK_INTERVAL_MS / 1000;
+const TIMESTAMP_INC: u32 = 48000 * TICK_INTERVAL_MS / 1000;
 
 // ============================================================================
 // Ошибки криптографических операций
@@ -39,51 +46,46 @@ pub enum CryptoError {
     /// Ошибка при шифровании (проблема с nonce, AAD или внутренняя ошибка AES-GCM).
     EncryptionFailed(String),
 
-    /// Размер фрейма превышает максимально допустимый (обычно MTU ~1200 байт).
-    FrameTooLarge(usize),
-
-    /// Некорректный RTP-пакет (например, слишком короткий заголовок).
-    InvalidPacket,
+    /// Сокет ещё не создан - (ssrc/key не заданы).
+    NotInitialized,
 }
 
-/// Реализация Display для преобразования ошибки в строку.
+/// Реализация `Display` для преобразования ошибки в строку.
 impl fmt::Display for CryptoError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CryptoError::InvalidKeyLength(len) => write!(f, "Invalid key length: {}", len),
             CryptoError::EncryptionFailed(msg) => write!(f, "Encryption failed: {}", msg),
-            CryptoError::FrameTooLarge(size) => write!(f, "Frame too large: {}", size),
-            CryptoError::InvalidPacket => write!(f, "Invalid RTP packet"),
+            CryptoError::NotInitialized => write!(f, "VoiceRTPSocket is not initialized"),
         }
     }
 }
 
-/// Реализация Error для совместимости со стандартным трейтом.
+/// Реализация `Error` для совместимости со стандартным трейтом.
 impl std::error::Error for CryptoError {}
-
-/// Преобразование нашей ошибки в формат N-API (для проброса в JavaScript).
-impl From<CryptoError> for Error {
-    fn from(e: CryptoError) -> Self {
-        Error::new(Status::GenericFailure, e.to_string())
-    }
-}
 
 // ============================================================================
 // Внутренние параметры шифрования
 // ============================================================================
 
-/// Внутренние параметры шифрования (пока только SSRC, в будущем можно расширить).
-#[derive(Clone)]
-struct EncryptorOptions {
+/// Внутреннее состояние шифра: появляется после `initialize`.
+struct EncryptorState {
+    /// 32-битный идентификатор источника синхронизации.
     ssrc: u32,
+
+    /// Экземпляр шифра AES-256-GCM.
+    cipher: Aes256Gcm,
 }
 
 // ============================================================================
 // VoiceRTPSocket
 // ============================================================================
 
-/// Объект RTP-сокета для голоса, доступный из JavaScript.
-/// Выполняет шифрование аудиофреймов (Opus) в соответствии с требованиями Discord.
+/// Объект RTP-сокета для голоса.
+/// Выполняет шифрование аудио фреймов (Opus) в соответствии с требованиями Discord.
+///
+/// Создаётся пустым через [`new`], `ssrc` и ключ задается позже через [`initialize`].
+/// Это позволяет поднять сокет до получения голосового ключа от Discord
 ///
 /// # Атомарные счётчики
 /// - `sequence` – 16-битный счётчик RTP-пакетов (оборачивается).
@@ -91,13 +93,11 @@ struct EncryptorOptions {
 /// - `counter` – 32-битный счётчик nonce (используется как первые 4 байта 12-байтового nonce).
 ///
 /// # Потокобезопасность
-/// Все публичные методы могут вызываться из разных потоков благодаря атомарным операциям.
-/// Однако `cipher` внутри не является `Sync`, поэтому экземпляр `VoiceRTPSocket` не должен
-/// использоваться из нескольких потоков одновременно (если только не обёрнут в Mutex).
-#[napi(js_name = "VoiceRTPSocket")]
+/// Все публичные методы принимают `&self`. Состояние шифра защищено `RwLock`.
+/// `initialize` и `destroy` берут write-lock, `packet`/`packets` — read-lock.
 pub struct VoiceRTPSocket {
-    /// Параметры (SSRC и др.).
-    options: EncryptorOptions,
+    /// Состояние шифра; `None`, пока не вызван `initialize`.
+    state: RwLock<Option<EncryptorState>>,
 
     /// Порядковый номер RTP-пакета (16 бит, автоматически оборачивается).
     sequence: AtomicU16,
@@ -107,106 +107,110 @@ pub struct VoiceRTPSocket {
 
     /// Счётчик nonce (32 бит, инкрементируется после каждого использования).
     counter: AtomicU32,
-
-    /// Экземпляр шифра AES-256-GCM.
-    cipher: Aes256Gcm,
 }
 
-/// N-API реализация VoiceRTPSocket.
-#[napi]
 impl VoiceRTPSocket {
-    /// Создаёт новый экземпляр VoiceRTPSocket.
+    /// Создаёт неинициализированный сокет.
+    ///
+    /// `ssrc` и ключ задаются отдельно через [`initialize`].
+    /// Счётчики sequence/timestamp/counter рандомизируются сразу —
+    /// по требованиям Discord они не должны начинаться с нуля.
+    ///
+    /// # Возвращаемое значение
+    /// Новый экземпляр `VoiceRTPSocket` в состоянии «не инициализирован».
+    pub fn new() -> Self {
+        // Инициализируем генератор случайных чисел для рандомизации счётчиков.
+        let mut rng = rng();
+
+        Self {
+            // Изначально состояние шифра отсутствует.
+            state: RwLock::new(None),
+            // Случайный начальный sequence, чтобы избежать предсказуемости.
+            sequence: AtomicU16::new(rng.random()),
+            // Случайный начальный timestamp.
+            timestamp: AtomicU32::new(rng.random()),
+            // Случайный начальный счётчик nonce.
+            counter: AtomicU32::new(rng.random()),
+        }
+    }
+
+    /// Инициализирует сокет.
     ///
     /// # Аргументы
     /// * `ssrc` — 32-битный идентификатор источника синхронизации.
-    /// * `key` — 32-байтный ключ AES-256-GCM (Buffer).
+    /// * `key` — 32-байтный ключ AES-256-GCM.
+    ///
+    /// # Возвращаемое значение
+    /// `Ok(())` при успешной инициализации.
     ///
     /// # Ошибки
-    /// Возвращает ошибку, если ключ не 32 байта или невалиден.
-    ///
-    /// Начальные значения sequence, timestamp и counter инициализируются
-    /// случайным образом для улучшения криптостойкости.
-    #[napi(constructor)]
-    pub fn new(ssrc: u32, key: Buffer) -> Result<Self> {
-        // Проверяем длину ключа.
-        if key.len() != 32 {
-            return Err(CryptoError::InvalidKeyLength(key.len()).into());
+    /// - `InvalidKeyLength` — ключ не 32 байта.
+    /// - `EncryptionFailed` — ключ невалиден (не прошёл проверку AES-GCM).
+    pub fn initialize(&self, ssrc: u32, key: Vec<u8>) -> Result<(), CryptoError> {
+        // Проверка длины ключа: для AES-256 требуется ровно 32 байта.
+        if key.len() != KEY_SIZE {
+            return Err(CryptoError::InvalidKeyLength(key.len()));
         }
 
-        // Копируем ключ из Buffer в массив фиксированной длины.
-        let mut key_array = [0u8; 32];
+        // Копируем ключ в массив фиксированной длины.
+        let mut key_array = [0u8; KEY_SIZE];
         key_array.copy_from_slice(key.as_ref());
 
-        // Получаем потоковый генератор случайных чисел.
+        // Создаём шифр из ключа. Ошибка возможна при некорректном ключе.
+        let cipher = Aes256Gcm::new_from_slice(&key_array)
+            .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?;
+
+        // Задаем все счётчики перед созданием нового состояния.
         let mut rng = rng();
+        self.sequence.store(rng.random(), Ordering::Relaxed);
+        self.timestamp.store(rng.random(), Ordering::Relaxed);
+        self.counter.store(rng.random(), Ordering::Relaxed);
 
-        Ok(Self {
-            // Создаём шифр из ключа; при ошибке возвращаем EncryptionFailed.
-            cipher: Aes256Gcm::new_from_slice(&key_array)
-                .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?,
+        // Заменяем состояние шифра под write-lock.
+        *self.state.write().expect("RTP state lock poisoned") =
+            Some(EncryptorState { ssrc, cipher });
 
-            options: EncryptorOptions { ssrc },
-
-            // Инициализируем счётчики случайными числами.
-            sequence: AtomicU16::new(rng.random()),
-            timestamp: AtomicU32::new(rng.random()),
-            counter: AtomicU32::new(rng.random()),
-        })
+        Ok(())
     }
 
-    /// Геттер режима шифрования (константа для Discord Voice).
-    #[napi(getter)]
+    /// Проверяет, готов ли сокет принимать фреймы.
     #[inline]
-    pub fn mode(&self) -> &'static str {
-        "aead_aes256_gcm_rtpsize"
+    pub fn is_initialized(&self) -> bool {
+        self.state.read().expect("RTP state lock poisoned").is_some()
     }
 
     /// Шифрует один Opus-фрейм и возвращает полный RTP-пакет.
     ///
     /// # Аргументы
-    /// * `frame` — Buffer с Opus-данными.
+    /// * `frame` — буфер с Opus-данными.
     ///
-    /// # Возвращает
-    /// Готовый зашифрованный RTP-пакет в виде Buffer.
-    #[napi]
+    /// # Возвращаемое значение
+    /// Готовый зашифрованный RTP-пакет.
+    ///
+    /// # Ошибки
+    /// Возвращает ошибку, если сокет не инициализирован или шифрование провалилось.
     #[inline]
-    pub fn packet(&self, frame: Buffer) -> Result<Buffer> {
+    pub fn packet(&self, frame: Vec<u8>) -> Result<Vec<u8>, CryptoError> {
         self.create_packet_raw(frame)
     }
 
-    /// Пакетное шифрование нескольких фреймов.
-    ///
-    /// # Аргументы
-    /// * `frames` — вектор буферов.
-    ///
-    /// # Возвращает
-    /// Вектор зашифрованных RTP-пакетов.
-    #[napi]
-    pub fn packets(&self, frames: Vec<Buffer>) -> Result<Vec<Buffer>> {
-        let mut output = Vec::with_capacity(frames.len());
-
-        for frame in frames {
-            output.push(self.create_packet_raw(frame)?);
-        }
-
-        Ok(output)
-    }
-
     /// Генерирует 12-байтовый nonce.
-    /// В Discord используются только первые 4 байта (счётчик), остальные 8 — нули.
     ///
-    /// # Возвращает
-    /// Массив `[u8; 12]`, где первые 4 байта — big-endian значение счётчика,
-    /// увеличенного на 1, остальные байты — нули.
+    /// В Discord используются только первые 4 байта (счётчик в big-endian),
+    /// остальные 8 — нули. Счётчик инкрементируется атомарно.
+    ///
+    /// # Возвращаемое значение
+    /// Массив из 12 байт.
     #[inline]
-    fn generate_nonce(&self) -> [u8; 12] {
+    fn generate_nonce(&self) -> [u8; RTP_HEADER_SIZE] {
         // Атомарно инкрементируем счётчик и получаем предыдущее значение.
-        let counter = self.counter.fetch_add(1, Ordering::Relaxed);
+        let counter = self.counter.fetch_add(1, Ordering::Acquire);
 
-        let mut nonce = [0u8; 12];
+        // Готовим массив из 12 байт, заполненный нулями.
+        let mut nonce = [0u8; RTP_HEADER_SIZE];
 
         // Копируем первые 4 байта счётчика в big-endian порядке.
-        nonce[..4].copy_from_slice(&counter.to_be_bytes());
+        nonce[..NONCE_SUFFIX_SIZE].copy_from_slice(&counter.to_be_bytes());
 
         nonce
     }
@@ -217,30 +221,30 @@ impl VoiceRTPSocket {
     /// `[ RTP header (12 байт) ][ зашифрованный payload ][ GCM tag (16 байт) ][ nonce suffix (4 байта) ]`
     ///
     /// # Аргументы
-    /// * `frame` — Buffer с Opus-данными.
+    /// * `frame` — незашифрованный Opus-фрейм.
     ///
-    /// # Возвращает
-    /// Buffer с зашифрованным пакетом.
+    /// # Возвращаемое значение
+    /// Готовый к отправке RTP-пакет.
+    ///
+    /// # Ошибки
+    /// - `NotInitialized` — сокет не инициализирован.
+    /// - `EncryptionFailed` — ошибка AES-GCM.
     #[inline]
-    fn create_packet_raw(&self, frame: Buffer) -> Result<Buffer> {
-        // Формируем RTP-заголовок (последовательно обновляет sequence и timestamp).
-        let header = self.build_header();
+    fn create_packet_raw(&self, frame: Vec<u8>) -> Result<Vec<u8>, CryptoError> {
+        // Держим read-lock на всё время шифрования.
+        let guard = self.state.read().expect("RTP state lock poisoned");
+        // Если состояние отсутствует — сокет не инициализирован.
+        let state = guard.as_ref().ok_or(CryptoError::NotInitialized)?;
 
-        // Генерируем nonce.
+        // Формируем RTP-заголовок (последовательно обновляет sequence и timestamp).
+        let header = self.build_header(state.ssrc);
+
+        // Генерируем nonce (инкрементирует counter).
         let nonce_bytes = self.generate_nonce();
         let nonce = Nonce::from(nonce_bytes);
-
-        /*
-         * RTP-пакет:
-         *
-         * [ 12 bytes header ]
-         * [ payload           ]
-         * [ 16 bytes GCM tag ]
-         * [ 4 bytes nonce ]
-         */
         let payload_len = frame.len();
 
-        // Выделяем память под весь пакет.
+        // Выделяем память под весь пакет заранее.
         let mut packet = Vec::with_capacity(
             RTP_HEADER_SIZE + payload_len + GCM_TAG_SIZE + NONCE_SUFFIX_SIZE,
         );
@@ -256,32 +260,43 @@ impl VoiceRTPSocket {
 
         // Шифруем payload in-place, используя nonce и AAD = RTP-заголовок.
         // Возвращает GCM-тег.
-        let tag = self
+        let tag = state
             .cipher
             .encrypt_inout_detached(
                 &nonce,
                 &header,
                 InOutBuf::from(payload),
             )
-            .map_err(|e| napi::Error::from_reason(format!("Encryption failed: {e}")))?;
+            .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
-        // Добавляем тег GCM.
+        // Добавляем тег GCM в конец пакета.
         packet.extend_from_slice(tag.as_slice());
 
         // Добавляем младшие 4 байта nonce в конец пакета.
         packet.extend_from_slice(&nonce_bytes[..NONCE_SUFFIX_SIZE]);
 
-        // Возвращаем как Buffer.
-        Ok(Buffer::from(packet))
+        Ok(packet)
     }
 
     /// Строит 12-байтовый RTP-заголовок.
     ///
-    /// # Возвращает
-    /// Массив `[u8; 12]` с установленными полями версии, payload type,
-    /// sequence, timestamp и SSRC.
+    /// Формат:
+    /// - байт 0 — `0x80` (Version=2);
+    /// - байт 1 — `0x78` (Payload type=120, Opus);
+    /// - байты 2..4 — sequence (big-endian);
+    /// - байты 4..8 — timestamp (big-endian);
+    /// - байты 8..12 — SSRC (big-endian).
+    ///
+    /// Атомарно увеличивает `sequence` на 1 и `timestamp` на `TIMESTAMP_INC`.
+    ///
+    /// # Аргументы
+    /// * `ssrc` — идентификатор источника синхронизации.
+    ///
+    /// # Возвращаемое значение
+    /// Массив из 12 байт — готовый RTP-заголовок.
     #[inline]
-    fn build_header(&self) -> [u8; RTP_HEADER_SIZE] {
+    fn build_header(&self, ssrc: u32) -> [u8; RTP_HEADER_SIZE] {
+        // Инициализируем заголовок нулями.
         let mut header = [0u8; RTP_HEADER_SIZE];
 
         // Байт 0: Version = 2 (0x80).
@@ -290,45 +305,64 @@ impl VoiceRTPSocket {
         // Байт 1: Payload type = 120 (0x78) для Opus.
         header[1] = 0x78;
 
-        // Атомарно получаем и увеличиваем sequence.
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        // Атомарно получаем текущий sequence и увеличиваем его на 1.
+        let sequence = self.sequence.fetch_add(1, Ordering::Acquire);
 
-        // Атомарно получаем и увеличиваем timestamp.
-        let timestamp = self.timestamp.fetch_add(TIMESTAMP_INC as u32, Ordering::Relaxed);
+        // Атомарно получаем текущий timestamp и увеличиваем его на TIMESTAMP_INC.
+        let timestamp = self.timestamp.fetch_add(TIMESTAMP_INC, Ordering::Acquire);
 
-        // Записываем sequence в big-endian.
+        // Записываем sequence в big-endian (2 байта).
         header[2..4].copy_from_slice(&sequence.to_be_bytes());
 
-        // Записываем timestamp в big-endian.
+        // Записываем timestamp в big-endian (4 байта).
         header[4..8].copy_from_slice(&timestamp.to_be_bytes());
 
-        // Записываем SSRC.
-        header[8..12].copy_from_slice(&self.options.ssrc.to_be_bytes());
+        // Записываем SSRC (4 байта).
+        header[8..RTP_HEADER_SIZE].copy_from_slice(&ssrc.to_be_bytes());
 
         header
     }
 
-    /// Сбрасывает все счётчики в ноль.
-    /// Может использоваться для переинициализации состояния.
-    #[napi]
+    /// Сбрасывает состояние шифра и все счётчики в ноль.
+    ///
+    /// После вызова требуется повторный `initialize`.
+    /// Безопасен для повторного вызова.
     #[inline]
-    pub fn destroy(&mut self) {
+    pub fn destroy(&self) {
+        // Обнуляем состояние шифра под write-lock.
+        *self.state.write().expect("RTP state lock poisoned") = None;
+
+        // Сбрасываем все счётчики.
         self.sequence.store(0, Ordering::Relaxed);
         self.timestamp.store(0, Ordering::Relaxed);
         self.counter.store(0, Ordering::Relaxed);
     }
 }
 
-/// Деструктор (только для отладочного вывода).
+/// `VoiceRTPSocket` можно создавать без аргументов.
+impl Default for VoiceRTPSocket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Деструктор: сбрасывает состояние шифра и счётчики.
+///
+/// В отладочной сборке выводит сообщение о вызове.
 impl Drop for VoiceRTPSocket {
     fn drop(&mut self) {
-        self.destroy();
-        
+        // На drop `RwLock` можно писать напрямую без `expect`.
+        if let Ok(mut guard) = self.state.write() {
+            *guard = None;
+        }
+
+        // Сбрасываем счётчики.
+        self.sequence.store(0, Ordering::Relaxed);
+        self.timestamp.store(0, Ordering::Relaxed);
+        self.counter.store(0, Ordering::Relaxed);
+
+        // Отладочный вывод.
         #[cfg(debug_assertions)]
-        println!(
-            "VoiceRTPSocket::drop | sequence={} timestamp={}",
-            self.sequence.load(std::sync::atomic::Ordering::Relaxed),
-            self.timestamp.load(std::sync::atomic::Ordering::Relaxed),
-        );
+        println!("VoiceRTPSocket::drop");
     }
 }

@@ -176,33 +176,27 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
      * @public
      */
     public set cycle(isActive: boolean) {
-        // Даем время на прогрев voice после пустого фрейма
-        setImmediate(() => {
-            if (!this.id) return;
+        if (!this.id) return;
 
-            // Подключаем плеер к циклу
-            if (isActive) {
-                // Если нет плеера в цикле
-                if (!db.queues.cycles.players.has(this)) {
-                    // Добавляем плеер в цикл
-                    db.queues.cycles.players.add(this);
-                    this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
-                }
+        // Подключаем плеер к циклу
+        if (isActive) {
+            // Если нет плеера в цикле
+            if (!db.queues.cycles.players.has(this)) {
+                // Добавляем плеер в цикл
+                db.queues.cycles.players.add(this);
+                this.emit("player/log", `[AudioPlayer/${this.id}] pushed in cycle`);
             }
+        }
 
-            // Отключаем плеер от цикла
-            else if (!isActive) {
-                // Если есть плеер в цикле
-                if (db.queues.cycles.players.has(this)) {
-                    // Удаляем плеер из цикла
-                    db.queues.cycles.players.delete(this);
-
-                    // Отправляем пустышку если такая возможность есть
-                    if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
-                    this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
-                }
+        // Отключаем плеер от цикла
+        else if (!isActive) {
+            // Если есть плеер в цикле
+            if (db.queues.cycles.players.has(this)) {
+                // Удаляем плеер из цикла
+                db.queues.cycles.players.delete(this);
+                this.emit("player/log", `[AudioPlayer/${this.id}] removed from cycle`);
             }
-        });
+        }
     };
 
     /**
@@ -387,6 +381,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Отключаем плеер от цикла
         this.cycle = false;
 
+        // Отправляем пустышку если такая возможность есть
+        if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
+
         // Логируем
         this.emit("player/log", `[AudioPlayer/${this.id}] paused`);
     };
@@ -433,6 +430,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public stop = (): Promise<void> | void => {
         if (this._status === AudioPlayerState.idle) return;
         this.status = AudioPlayerState.idle;
+
+        // Отправляем пустышку если такая возможность есть
+        if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
     };
 
     /**

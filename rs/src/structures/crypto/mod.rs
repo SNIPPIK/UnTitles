@@ -1,2 +1,2 @@
-mod aes;
+pub mod aes;
 mod davey;

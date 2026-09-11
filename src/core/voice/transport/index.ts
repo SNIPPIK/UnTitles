@@ -6,7 +6,6 @@ import { TypedEmitter } from "#structures";
 
 // Layers
 import { UDPLayer } from "#core/voice/transport/layers/UDPLayer.js";
-import { RTPLayer } from "#core/voice/transport/layers/RTPLayer.js";
 import { DAVELayer, OPCODE_DAVE_MLS_WELCOME } from "#core/voice/transport/layers/DAVELayer.js";
 
 
@@ -49,12 +48,6 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * Может быть `null` после уничтожения транспорта.
      */
     public _ws: VoiceWebSocket | null = new VoiceWebSocket();
-
-    /**
-     * Слой RTP для шифрования исходящих пакетов.
-     * Создаётся заново при каждой успешной сессии.
-     */
-    private _rtp: RTPLayer | null = new RTPLayer();
 
     /**
      * SSRC (синхронизационный источник), полученный от Discord.
@@ -100,7 +93,6 @@ export class Transport extends TypedEmitter<TransportEvents> {
         return !!(
             this._ws?.ready &&
             this._dave?.ready &&
-            this._rtp?.ready &&
             this._udp?.ready &&
             this._state.code === TransportStateCode.Session &&
             !this.reconnecting
@@ -147,10 +139,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
             // Инициализируем шифрование после получения session description
             case TransportStateCode.Session: {
                 const d = state.payload;
-
-                // Создаём AES-шифратор RTP
-                this._rtp.create(this.ssrc, d.secret_key);
                 this.emit("info", `[Transport/RTP]: has created`);
+                this._udp.client.initialize_rtp(this.ssrc, d.secret_key);
 
                 // Если доступен DAVE и версия протокола не нулевая — инициализируем MLS
                 if (this._dave && d.dave_protocol_version !== 0) {
@@ -491,9 +481,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      */
     public packet = (frames: Buffer[]) => {
         this._udp.packet(
-            this._rtp.packet(
-                this._dave.packet(frames)
-            )
+            this._dave.packet(frames)
         );
     };
 
@@ -516,13 +504,11 @@ export class Transport extends TypedEmitter<TransportEvents> {
 
         this._ws?.destroy();
         this._udp?.destroy();
-        this._rtp?.destroy();
         this._dave?.destroy();
         super.destroy();
 
         this._ws = null;
         this._udp = null;
-        this._rtp = null;
         this._dave = null;
     };
 }

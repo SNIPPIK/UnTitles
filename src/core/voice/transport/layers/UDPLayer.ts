@@ -72,13 +72,11 @@ export class UDPLayer extends BaseLayer<VoiceUDPSocket> {
         // Создаем обещание
         return new Promise(async (resolve) => {
             udp.connect(d); // Подключаемся
-
-            const discoveryPacket = udp.discovery(d.ssrc);
             let attempts = 0;
 
             const sendDiscovery = () => {
                 attempts++;
-                udp.packet(discoveryPacket);
+                udp.discovery(d.ssrc)
 
                 // Планируем следующую попытку, если не превышен лимит
                 if (attempts < MAX_RETRIES) {

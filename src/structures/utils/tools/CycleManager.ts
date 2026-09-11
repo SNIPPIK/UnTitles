@@ -56,7 +56,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
     private timer: NodeJS.Timeout | NodeJS.Immediate | null = null;
 
     /** Коэффициент EMA. */
-    private static readonly EMA_ALPHA = 0.1;
+    private static readonly EMA_ALPHA = 0.4;
 
     /** Количество тиков в статистической выборке. */
     private static readonly STAT_TICKS = 50;
@@ -107,21 +107,21 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     protected get time(): number {
         return performance.now();
-    }
+    };
 
     /**
      * Запланированное время следующего запуска.
      */
     public get insideTime(): number {
         return this.nextExecutionTime;
-    }
+    };
 
     /**
      * Настроенный период цикла.
      */
     public get delay(): number {
         return this.options.duration;
-    }
+    };
 
     /**
      * EMA отклонения фактического запуска от deadline.
@@ -131,28 +131,28 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public get drift(): number {
         return this._jitter;
-    }
+    };
 
     /**
      * Последний фактический интервал между запусками.
      */
     public get realDelta(): number {
         return this._realDelta;
-    }
+    };
 
     /**
      * EMA абсолютного отклонения фактического интервала от duration.
      */
     public get intervalJitter(): number {
         return this._intervalJitter;
-    }
+    };
 
     /**
      * EMA времени выполнения одного шага.
      */
     public get executionTime(): number {
         return this._executionTime;
-    }
+    };
 
     /**
      * Максимальное отклонение запуска от deadline
@@ -160,7 +160,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public get maxJitter(): number {
         return this._maxJitter;
-    }
+    };
 
     /**
      * Максимальное отклонение фактического интервала
@@ -168,7 +168,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public get maxIntervalJitter(): number {
         return this._maxIntervalJitter;
-    }
+    };
 
     /**
      * Максимальное время выполнения шага
@@ -176,7 +176,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public get maxExecutionTime(): number {
         return this._maxExecutionTime;
-    }
+    };
 
     /**
      * Количество пропущенных интервалов
@@ -184,28 +184,21 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
      */
     public get skippedTicks(): number {
         return this._skippedTicks;
-    }
+    };
 
     /**
      * Общее количество пропущенных интервалов.
      */
     public get totalSkippedTicks(): number {
         return this._totalSkippedTicks;
-    }
+    };
 
     /**
      * Количество тиков текущей статистической выборки.
      */
     public get ticks(): number {
         return this._ticks;
-    }
-
-    /**
-     * Показывает, запущен ли цикл.
-     */
-    public get running(): boolean {
-        return this.timer !== null;
-    }
+    };
 
     public constructor(
         public options: SyncCycleConfig<T> | AsyncCycleConfig<T>
@@ -215,7 +208,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         if (options.duration <= 0) {
             throw new Error("Duration must be a positive number");
         }
-    }
+    };
 
     /**
      * Добавляет элемент в цикл.
@@ -456,14 +449,9 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
         if (this.nextExecutionTime <= end) {
             const late = end - this.nextExecutionTime;
 
-            const skipped =
-                Math.floor(
-                    late / this.options.duration
-                ) + 1;
+            const skipped = Math.floor(late / this.options.duration) + 1;
 
-            this.nextExecutionTime +=
-                skipped * this.options.duration;
-
+            this.nextExecutionTime += skipped * this.options.duration;
             this._skippedTicks += skipped;
             this._totalSkippedTicks += skipped;
         }
@@ -481,7 +469,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
             this._maxJitter = 0;
             this._maxIntervalJitter = 0;
             this._maxExecutionTime = 0;
-            this._skippedTicks = 0;
+            //this._skippedTicks = 0;
         }
 
         /*
@@ -491,6 +479,7 @@ abstract class DefaultCycleSystem<T = unknown> extends SetArray<T> {
          */
 
         this.scheduleStep();
+        //console.log(this.diagnostic());
     };
 
     /**

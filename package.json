@@ -22,12 +22,10 @@
     "#worker/*": "./build/src/workers/*",
     "#structures": "./build/src/structures/index.js",
     "#structures/*": "./build/src/structures/*",
-
     "#db": "./build/src/structures/database/index.js",
     "#db/app": "./build/src/index.js",
     "#db/env": "./build/src/structures/manager/environment.js",
     "#db/worker": "./build/src/structures/database/index.worker.js",
-
     "#native": "./build/src/structures/manager/n-api.js"
   },
   "napi": {
@@ -40,8 +38,8 @@
     "socks-proxy-agent": "^10.1.0"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.9.0",
-    "@types/node": "^26.5.0",
+    "@napi-rs/cli": "^3.9.1",
+    "@types/node": "^22.20.2",
     "typescript": "^7.0.2"
   },
   "scripts": {

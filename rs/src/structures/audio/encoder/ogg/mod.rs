@@ -1,4 +1,6 @@
+pub mod packet_type;
 
+use crate::structures::audio::encoder::ogg::packet_type::{PacketType, ParsedPacket};
 use napi::bindgen_prelude::{ Error, Result };
 use bytes::{ Buf, BufMut, BytesMut };
 use memchr::memmem;
@@ -14,50 +16,6 @@ const MAX_REMAINDER_SIZE: usize = 64 * 1024; // 64 КБ
 /// Максимально допустимый размер одного Opus-пакета.
 /// Пакеты большего размера считаются ошибочными и отбрасываются.
 const MAX_PACKET_SIZE: usize = 4 * 1024 * 1024; // 4 МБ
-
-// ============================================================================
-// PACKET TYPES
-// ============================================================================
-
-/// Типы пакетов для OPUS, рекомендуется некоторые просто не пушить в исходное аудио
-/// Для Discord - Frame, Silent. Поскольку остальные не требуются и будут откинуты, это уже потеря пакета.
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum PacketType {
-    Head,       // OpusHead
-    Tags,       // OpusTags
-
-    Frame,      // обычный Opus audio frame
-    Silent,     // специальный маркер тишины
-    PLC,        // packet loss concealment
-    VBR,        // VBR-related packet/frame
-
-    Broken,     // повреждённый/некорректный пакет
-    End,        // внутренний 0xFF
-
-    OggPage,    // Ogg container page
-}
-
-/// Выходной пакет: (тип, данные).
-pub type ParsedPacket = (PacketType, Vec<u8>);
-
-impl PacketType {
-    /// Проверяет, относится ли тип пакета к обрабатываемым аудио фреймам.
-    ///
-    /// Возвращает `true`, если пакет является одним из:
-    /// - `Frame` — обычный Opus-фрейм с одним или двумя кадрами;
-    /// - `Silent` — специальный пакет тишины;
-    /// - `VBR` — пакет с переменным битрейтом (используемый в некоторых реализациях).
-    ///
-    /// Такие пакеты должны передаваться в аудио-декодер или буфер,
-    /// в отличие от служебных (`Head`, `Tags`, `OggPage` и т.п.).
-    pub fn is_audio_frame(self) -> bool {
-        matches!(self, Self::Frame | Self::Silent | Self::VBR | Self::PLC)
-    }
-}
-
-// ============================================================================
-// PARSER
-// ============================================================================
 
 /// Потоковый парсер Ogg-контейнера, извлекающий Opus-пакеты.
 ///
@@ -130,19 +88,37 @@ impl OggOpusDemuxer {
         })
     }
 
-    /// Выдаёт последний собранный, но ещё не завершённый пакет (если есть).
-    /// Вызывается при завершении потока (EOF).
+    /// Выдаёт последний незавершённый пакет при завершении потока (EOF).
+    ///
+    /// Вызывается, когда входной буфер пуст и нужно «дочистить» накопленные данные.
+    /// Пакеты короче 12 байт отбрасываются как подозрительные (не могут быть
+    /// валидным Opus-фреймом).
+    ///
+    /// # Аргументы
+    /// * `output` — вектор, в который помещается готовый пакет.
+    ///
+    /// # Возвращаемое значение
+    /// `Ok(())` в любом случае; ошибки парсинга здесь не генерируются.
     fn flush_internal(&mut self, output: &mut Vec<ParsedPacket>) -> Result<()> {
+        // Если незавершённых данных нет — нечего выдавать.
         if self.packet_carry.is_empty() {
+            return Ok(());
+        }
+
+        // Отбрасываем подозрительно короткие хвосты (< 12 байт):
+        // такие пакеты не могут быть валидными Opus-фреймами.
+        else if self.packet_carry.len() < 12 {
+            self.packet_carry.clear();
             return Ok(());
         }
 
         // Забираем накопленные данные, оставляя пустой Vec.
         let packet = std::mem::take(&mut self.packet_carry);
-        let packet_type = Self::detect_packet_type(&packet);
+        // Определяем тип последнего пакета.
+        let packet_type = PacketType::detect_packet_type(&packet);
 
+        // Публикуем пакет в выходной вектор.
         output.push((packet_type, packet));
-
         Ok(())
     }
 
@@ -402,7 +378,7 @@ impl OggOpusDemuxer {
             // segment < 255 означает конец packet.
             if segment_len < 255 {
                 if !packet_carry.is_empty() {
-                    let packet_type = Self::detect_packet_type(packet_carry);
+                    let packet_type = PacketType::detect_packet_type(packet_carry);
                     on_packet(packet_type, packet_carry.as_slice())?;
                     packet_carry.clear();
                 }
@@ -445,100 +421,6 @@ impl OggOpusDemuxer {
     /// Очищает все внутренние данные (вызывает reset_storage).
     pub fn cleanup(&mut self) {
         self.reset_storage();
-    }
-
-    /// Определяет тип пакета на основе его содержимого и длины.
-    ///
-    /// Поддерживает:
-    /// - RFC 6716 (Opus Audio Codec)
-    /// - Ogg контейнер
-    /// - Discord PLC (Packet Loss Concealment) маркеры
-    #[inline]
-    pub fn detect_packet_type(packet: &[u8]) -> PacketType {
-        let len = packet.len();
-
-        if len == 0 {
-            return PacketType::Broken;
-        }
-
-        // Одиночный байт 0xFF — внутренний маркер конца потока
-        if len == 1 && packet[0] == 0xFF {
-            return PacketType::End;
-        }
-
-        // Ogg-страница
-        if len >= 4 && packet.starts_with(b"OggS") {
-            return PacketType::OggPage;
-        }
-
-        // Opus identification header (OpusHead)
-        // RFC 6716: минимум 19 байт
-        if packet.starts_with(b"OpusHead") {
-            return if len >= 19 {
-                PacketType::Head
-            } else {
-                PacketType::Broken
-            };
-        }
-
-        // Opus comment header (OpusTags)
-        // RFC 6716: минимум 12 байт
-        if packet.starts_with(b"OpusTags") {
-            return if len >= 12 {
-                PacketType::Tags
-            } else {
-                PacketType::Broken
-            };
-        }
-
-        // Discord PLC маркеры
-        match packet {
-            [0xFC, 0xFF, 0xFE] => return PacketType::PLC,
-            [0xF8, 0xFF, 0xFE] => return PacketType::Silent,
-            _ => {}
-        }
-
-        // Байт TOC.
-        let toc = packet[0];
-
-        // Бит 5: stereo флаг (0 = mono, 1 = stereo)
-        let _stereo = (toc >> 2) & 1 != 0;
-
-        // Младшие 2 бита: код количества фреймов
-        let frame_code = toc & 0b11;
-
-        // Два младших бита — количество кадров.
-        match frame_code {
-            // Code 0: 1 фрейм
-            0b00 => PacketType::Frame,
-
-            // Code 1: 2 фрейма равного размера
-            0b01 => PacketType::Frame,
-
-            // Code 2: 2 фрейма разного размера (VBR)
-            0b10 => PacketType::VBR,
-
-            // Произвольное количество кадров: требуется дополнительный байт.
-            0b11 => {
-                if len < 2 {
-                    return PacketType::Broken;
-                }
-
-                let ch = packet[1];
-                // Младшие 6 бит — количество кадров.
-                let frame_count = ch & 0x3F;
-
-                // RFC 6716: максимум 48 кадров в стандарте
-                if frame_count == 0 || frame_count > 48 {
-                    return PacketType::Broken;
-                }
-
-                PacketType::Frame
-            }
-
-            // Остальные комбинации невозможны для 2-битного поля.
-            _ => PacketType::Broken,
-        }
     }
 }
 

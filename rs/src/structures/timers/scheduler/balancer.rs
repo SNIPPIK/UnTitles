@@ -1,7 +1,7 @@
 use crate::{
     structures::{
         timers::scheduler::cycle_manager::CycleManager,
-        network::udp::UdpBuffered
+        network::udp::socket::SocketBuffered
     }
 };
 use std::sync::{Arc, Mutex};
@@ -21,7 +21,7 @@ struct Worker {
     manager: CycleManager,
 
     /// Ссылки на udp сессии, для быстрого поиска и распределения между потоками
-    sessions: DashMap<u32, Arc<UdpBuffered>>
+    sessions: DashMap<u32, Arc<SocketBuffered>>
 }
 
 impl Worker {
@@ -83,7 +83,7 @@ impl AutoBalancer {
     /// Ищет первый воркер с числом сессий < MAX_PER_WORKER. Если такого нет, создаёт новый воркер.
     /// Затем вставляет сессию в выбранный воркер и добавляет её в `CycleManager` этого воркера.
     /// В конце удаляет пустые воркеры.
-    pub fn add_session(&mut self, id: u32, session: Arc<UdpBuffered>) {
+    pub fn add_session(&mut self, id: u32, session: Arc<SocketBuffered>) {
         // Ищем подходящий воркер.
         // Если воркеров много, можно хранить индекс последнего неполного воркера,
         // чтобы не итерироваться с самого начала каждый раз.
@@ -122,7 +122,7 @@ pub static GLOBAL_BALANCER: Lazy<Mutex<AutoBalancer>> = Lazy::new(|| {
 
 /// Добавляет сессию в глобальный балансировщик
 /// Обычно вызывается из конструктора `UdpBuffered`.
-pub fn add_global_session(id: u32, session: UdpBuffered) {
+pub fn add_global_session(id: u32, session: SocketBuffered) {
     GLOBAL_BALANCER.lock().unwrap().add_session(id, Arc::new(session));
 }
 

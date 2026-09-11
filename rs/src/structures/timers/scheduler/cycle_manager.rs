@@ -1,4 +1,4 @@
-use crate::structures::network::udp::UdpBuffered;
+use crate::structures::network::udp::socket::SocketBuffered;
 use crate::utils::duration::now_ms;
 use arc_swap::ArcSwap;
 use std::{
@@ -13,95 +13,137 @@ use std::{
 };
 
 /// Интервал между тиками цикла обработки UDP-пакетов (мс).
-pub const TICK_INTERVAL_MS: u64 = 20;
+pub const TICK_INTERVAL_MS: u32 = 20;
+
+const ALPHA_SHIFT: u32 = 4;
+const ADAPT_INTERVAL: u64 = 100;
+
+/// Количество измерений для калибровки гранулярности сна
+const SAMPLES: usize = 10;
+
+
 
 /// Интервал как `Duration` для вычислений.
-const TICK_INTERVAL: Duration = Duration::from_millis(TICK_INTERVAL_MS);
+const TICK_INTERVAL: Duration = Duration::from_millis(TICK_INTERVAL_MS as u64);
 
-// Желаемое среднее время активного ожидания (спина) в микросекундах
+/// Желаемое среднее время активного ожидания (спина) в микросекундах
 const TARGET_SPIN_TIME: Duration = Duration::from_micros(500);
-// Минимально допустимый запас перед дедлайном для перехода к спину
+
+/// Минимально допустимый запас перед дедлайном для перехода к спину
 const MIN_SPIN_MARGIN: Duration = Duration::from_micros(50);
-// Максимально допустимый запас перед дедлайном
+
+/// Максимально допустимый запас перед дедлайном
 const MAX_SPIN_MARGIN: Duration = Duration::from_millis(1);
 
-// Количество измерений для калибровки гранулярности сна
-const SAMPLES: usize = 10;
-// Запрашиваемый сон при калибровке (минимально заметная длительность)
-const REQUESTED_SLEEP: Duration = Duration::from_micros(100);
-// Верхняя граница измеренной гранулярности (защита от выбросов)
+/// Запрашиваемый сон при калибровке (минимально заметная длительность)
+const REQUESTED_SLEEP: Duration = Duration::from_micros(ADAPT_INTERVAL);
+
+/// Верхняя граница измеренной гранулярности (защита от выбросов)
 const MAX_GRANULARITY: Duration = Duration::from_millis(1);
 
-/// Вспомогательная структура для возврата из функции `wait_until`.
-/// Содержит информацию о результате ожидания.
+
+
+/// Результат ожидания scheduler'а.
+#[derive(Debug, Copy, Clone)]
 struct WaitOutcome {
-    /// Достигнут ли дедлайн (true) или ожидание прервано из-за остановки (false)
+    /// Достигнут ли запланированный deadline.
     reached_deadline: bool,
-    /// Фактическое время, проведённое в активном ожидании (спине)
+
+    /// Время, проведённое в активном spin.
     spin_time: Duration,
+
+    /// Насколько scheduler оказался за deadline
+    /// в момент перехода в precision phase.
+    sleep_overshoot: Duration
 }
 
 // ============================================================================
 // SchedulerState
 // ============================================================================
 
-/// Структура с метриками производительности цикла.
-/// Все поля — атомарные для безопасного доступа из разных потоков.
+/// Атомарное состояние и метрики scheduler'а.
+///
+/// Все временные значения хранятся в наносекундах.
+/// EMA-значения обновляются без блокировок.
 pub struct SchedulerState {
-    /// Количество выполненных тиков
+    // ========================================================================
+    // Cycle
+    // ========================================================================
+
+    /// Общее количество реально выполненных тиков.
     pub ticks: AtomicU64,
 
-    /// Количество пропущенных тиков (из-за отставания)
-    pub skipped_ticks: AtomicU64,
+    // ========================================================================
+    // Processing
+    // ========================================================================
 
-    /// Среднее время выполнения `process()` (EMA)
+    /// EMA времени обработки всех активных UDP-сессий.
     pub avg_process_ns: AtomicU64,
 
-    /// Максимальное время выполнения `process()`
+    /// Максимальное время обработки всех активных UDP-сессий.
     pub max_process_ns: AtomicU64,
 
-    /// Средняя ошибка сна (насколько проспали дольше запланированного)
-    pub avg_sleep_error_ns: AtomicU64,
+    // ========================================================================
+    // Scheduling
+    // ========================================================================
 
-    /// Максимальная ошибка сна
-    pub max_sleep_error_ns: AtomicU64,
-
-    /// Средний джиттер (отклонение от идеального расписания)
+    /// EMA абсолютного отклонения от запланированного deadline.
     pub avg_jitter_ns: AtomicU64,
 
-    /// Максимальный джиттер
+    /// Максимальное отклонение от deadline.
     pub max_jitter_ns: AtomicU64,
 
-    /// Текущий запас времени перед дедлайном для перехода к спину
+    // ========================================================================
+    // Sleep
+    // ========================================================================
+
+    /// EMA превышения времени системного ожидания
+    /// относительно момента перехода к precision phase.
+    pub avg_sleep_overshoot_ns: AtomicU64,
+
+    /// Максимальное превышение системного ожидания.
+    pub max_sleep_overshoot_ns: AtomicU64,
+
+    /// Измеренная базовая точность системного sleep.
+    pub sleep_granularity_ns: AtomicU64,
+
+    // ========================================================================
+    // Spin
+    // ========================================================================
+
+    /// Текущий запас времени перед deadline,
+    /// используемый для перехода в precision phase.
     pub spin_margin_ns: AtomicU64,
 
-    /// Среднее время, проведённое в активном ожидании (спине)
+    /// EMA времени активного ожидания.
     pub avg_spin_time_ns: AtomicU64,
-
-    /// Минимальная гранулярность сна ОС (средний overshoot при запросе очень короткого сна)
-    pub sleep_granularity_ns: AtomicU64,
 }
 
-/// Реализация `Default` для `SchedulerState`, задающая начальные значения метрик.
 impl Default for SchedulerState {
+    #[inline]
     fn default() -> Self {
         Self {
+            // Cycle
             ticks: AtomicU64::new(0),
-            skipped_ticks: AtomicU64::new(0),
 
+            // Processing
             avg_process_ns: AtomicU64::new(0),
             max_process_ns: AtomicU64::new(0),
 
-            avg_sleep_error_ns: AtomicU64::new(0),
-            max_sleep_error_ns: AtomicU64::new(0),
-
+            // Scheduling
             avg_jitter_ns: AtomicU64::new(0),
             max_jitter_ns: AtomicU64::new(0),
 
-            // Начальное значение spin margin — 250 микросекунд
-            spin_margin_ns: AtomicU64::new(250_000),
-            avg_spin_time_ns: AtomicU64::new(0),
+            // Sleep
+            avg_sleep_overshoot_ns: AtomicU64::new(0),
+            max_sleep_overshoot_ns: AtomicU64::new(0),
             sleep_granularity_ns: AtomicU64::new(0),
+
+            // Spin
+            spin_margin_ns: AtomicU64::new(
+                MIN_SPIN_MARGIN.as_nanos() as u64
+            ),
+            avg_spin_time_ns: AtomicU64::new(0),
         }
     }
 }
@@ -119,7 +161,7 @@ pub struct CycleManager {
     /// Активные UDP-сессии (ключ — идентификатор сессии, значение — обёрнутый UDP-буфер).
     ///
     /// `ArcSwap` даёт возможность получения непротиворечивого снимка карты.
-    sessions: Arc<ArcSwap<HashMap<u32, Arc<UdpBuffered>>>>,
+    sessions: Arc<ArcSwap<HashMap<u32, Arc<SocketBuffered>>>>,
 
     /// Флаг активности рабочего потока. `true` — поток должен работать.
     running: Arc<AtomicBool>,
@@ -154,7 +196,7 @@ impl CycleManager {
 
     /// Добавляет сессию в карту и запускает фоновый поток, если он ещё не запущен.
     /// После добавления пробуждает поток для немедленной обработки.
-    pub fn add_session(&self, id: u32, session: Arc<UdpBuffered>) {
+    pub fn add_session(&self, id: u32, session: Arc<SocketBuffered>) {
         // Обновляем карту сессий, вставляя новую сессию
         self.update_sessions(|map| {
             map.insert(id, session);
@@ -191,7 +233,7 @@ impl CycleManager {
     #[inline]
     fn update_sessions<F>(&self, update: F)
     where
-        F: FnOnce(&mut HashMap<u32, Arc<UdpBuffered>>),
+        F: FnOnce(&mut HashMap<u32, Arc<SocketBuffered>>),
     {
         // Загружаем текущую полную копию карты (Arc)
         let mut current = self.sessions.load_full();
@@ -307,316 +349,259 @@ impl Drop for CycleManager {
 }
 
 
-// ============================================================================
+// ---------------------------------------------------------------------------
 // Helpers
-// ============================================================================
+// ---------------------------------------------------------------------------
 
 /// Получает lock, игнорируя статус отравления (mutex poisoning).
-///
-/// Если другой поток спаниковал, держа мьютекс, мы всё равно получаем доступ.
-/// Это безопасно, так как состояние пересчитывается в каждом цикле.
-///
-/// # Аргументы
-/// * `mutex` — ссылка на мьютекс, который нужно заблокировать.
-///
-/// # Возвращаемое значение
-/// `MutexGuard`, гарантирующий доступ к данным за мьютексом.
 #[inline]
 fn acquire_lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    // Блокируем мьютекс; при отравлении извлекаем внутренние данные
     mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Обновляет атомарное значение через экспоненциальное скользящее среднее.
+/// Вариант с двойным EMA (быстрый + медленный) для более реактивного отклика.
 #[inline]
 fn update_ema(atomic: &AtomicU64, value: u64, shift: u32) {
     let old = atomic.load(Ordering::Relaxed);
-
     let next = if value >= old {
         old.saturating_add((value - old) >> shift)
     } else {
         old.saturating_sub((old - value) >> shift)
     };
-
     atomic.store(next, Ordering::Relaxed);
 }
 
-
-// ============================================================================
+// ---------------------------------------------------------------------------
 // Main cycle thread
-// ============================================================================
+// ---------------------------------------------------------------------------
 
-/// Основной цикл менеджера UDP-сессий с адаптивной калибровкой.
-///
-/// Периодически (с интервалом `TICK_INTERVAL`) вызывает метод `process`
-/// для каждой активной сессии. Завершается при сбросе флага `running`.
-/// Собирает метрики производительности и адаптирует параметры ожидания.
-///
-/// # Аргументы
-/// * `sessions` — общий снапшот активных сессий (ArcSwap).
-/// * `running` — флаг активности цикла.
-/// * `wake_state` — пара (мьютекс, condvar) для пробуждения извне.
-/// * `state` — общие метрики цикла.
-fn cycle_thread(sessions: Arc<ArcSwap<HashMap<u32, Arc<UdpBuffered>>>>, running: Arc<AtomicBool>, wake_state: Arc<(Mutex<bool>, Condvar)>, state: Arc<SchedulerState>) {
+fn cycle_thread(
+    sessions: Arc<ArcSwap<HashMap<u32, Arc<SocketBuffered>>>>,
+    running: Arc<AtomicBool>,
+    wake_state: Arc<(Mutex<bool>, Condvar)>,
+    state: Arc<SchedulerState>,
+) {
     let state_ref = state.as_ref();
     let mut next_deadline = Instant::now();
-    const ALPHA_SHIFT: u32 = 4;
 
+    // --------------------------  Initial calibration  -----------------------
     let granularity = measure_sleep_granularity();
     state_ref.sleep_granularity_ns.store(granularity.as_nanos() as u64, Ordering::Relaxed);
-    let initial_margin = granularity.saturating_mul(2).max(MIN_SPIN_MARGIN);
+
+    let initial_margin = granularity
+        .saturating_mul(2)
+        .max(MIN_SPIN_MARGIN)
+        .min(MAX_SPIN_MARGIN);
     state_ref.spin_margin_ns.store(initial_margin.as_nanos() as u64, Ordering::Relaxed);
 
+    // ---------------------------  Main loop  -------------------------------
     while running.load(Ordering::Acquire) {
         let tick_id = state_ref.ticks.fetch_add(1, Ordering::Relaxed) + 1;
         let tick_start = Instant::now();
 
-        // Обработка сессий
-        {
+        // -----------------------  Process sessions  -----------------------
+        let ticks = handle_deadline_slip(tick_start, &mut next_deadline, state_ref);
+
+        if ticks > 0 {
             let snapshot = sessions.load();
+
             if !snapshot.is_empty() {
-                let now = now_ms();
-                for session in snapshot.values() {
-                    session.process(now);
+                for _ in 0..ticks {
+                    let now = now_ms();
+
+                    for session in snapshot.values() {
+                        session.tick(now);
+                    }
                 }
             }
+
+            continue;
         }
 
-        let process_time = tick_start.elapsed();
-        let process_ns = process_time.as_nanos() as u64;
+        // -----------------------  Collect metrics  -----------------------
+        let process_ns = tick_start.elapsed().as_nanos() as u64;
         update_ema(&state_ref.avg_process_ns, process_ns, ALPHA_SHIFT);
         state_ref.max_process_ns.fetch_max(process_ns, Ordering::Relaxed);
 
+        // -----------------------  Stop check  ----------------------------
         if !running.load(Ordering::Acquire) {
             break;
         }
 
-        next_deadline += TICK_INTERVAL;
-        let now = Instant::now();
-        if handle_deadline_slip(now, &mut next_deadline, state_ref) {
-            continue;
-        }
-
+        // -----------------------  Wait until deadline  --------------------
         let spin_margin = Duration::from_nanos(state_ref.spin_margin_ns.load(Ordering::Relaxed));
         let outcome = wait_until(next_deadline, &running, &wake_state, spin_margin);
+
         if !outcome.reached_deadline {
             break;
         }
 
-        let actual_wake = Instant::now();
-        let oversleep = actual_wake.saturating_duration_since(next_deadline);
-        let oversleep_ns = oversleep.as_nanos() as u64;
-        update_ema(&state_ref.avg_sleep_error_ns, oversleep_ns, ALPHA_SHIFT);
-        state_ref.max_sleep_error_ns.fetch_max(oversleep_ns, Ordering::Relaxed);
+        // -----------------------  Sleep diagnostics  --------------------
+        let sleep_overshoot_ns = outcome.sleep_overshoot.as_nanos() as u64;
+        update_ema(&state_ref.avg_sleep_overshoot_ns, sleep_overshoot_ns, ALPHA_SHIFT);
+        state_ref.max_sleep_overshoot_ns.fetch_max(sleep_overshoot_ns, Ordering::Relaxed);
 
+        // -----------------------  Spin diagnostics  ---------------------
         let spin_ns = outcome.spin_time.as_nanos() as u64;
         update_ema(&state_ref.avg_spin_time_ns, spin_ns, ALPHA_SHIFT);
 
-        if tick_id % 100 == 0 {
+        // -----------------------  Adaptive calibration  -----------------
+        if tick_id % ADAPT_INTERVAL == 0 {
             let avg_spin = Duration::from_nanos(state_ref.avg_spin_time_ns.load(Ordering::Relaxed));
-            let avg_oversleep = Duration::from_nanos(state_ref.avg_sleep_error_ns.load(Ordering::Relaxed));
-            adapt_spin_margin(state_ref, avg_spin, avg_oversleep);
+            let avg_sleep_overshoot = Duration::from_nanos(state_ref.avg_sleep_overshoot_ns.load(Ordering::Relaxed));
+            adapt_spin_margin(state_ref, avg_spin, avg_sleep_overshoot);
         }
     }
 
-    // Поток завершён.
     running.store(false, Ordering::Release);
 }
 
-/// Корректирует `next_deadline` при отставании от графика.
-///
-/// Если текущее время больше или равно дедлайну, вычисляет, сколько тиков было пропущено,
-/// и сдвигает дедлайн вперёд на соответствующее число интервалов.
-/// Также обновляет метрики джиттера и пропущенных тиков.
-///
-/// # Аргументы
-/// * `now` — текущее время.
-/// * `next_deadline` — ссылка на дедлайн, который может быть изменён.
-/// * `state` — метрики цикла.
-///
-/// # Возвращаемое значение
-/// `true`, если дедлайн был сдвинут (т.е. мы отстали), `false`, если дедлайн ещё в будущем.
+// ---------------------------------------------------------------------------
+// Deadline slip handling (now also performs a quick “catch‑up” processing)
+// ---------------------------------------------------------------------------
+
 #[inline]
-fn handle_deadline_slip(now: Instant, next_deadline: &mut Instant, state: &SchedulerState) -> bool {
+fn handle_deadline_slip(
+    now: Instant,
+    next_deadline: &mut Instant,
+    state: &SchedulerState,
+) -> u32 {
     if now < *next_deadline {
-        return false;
+        return 0;
     }
 
     let late = now.duration_since(*next_deadline);
-    let late_ns = late.as_nanos() as u64;
 
-    state.max_jitter_ns
-        .fetch_max(late_ns, Ordering::Relaxed);
+    let jitter = late.as_nanos() as u64;
 
-    update_ema(
-        &state.avg_jitter_ns,
-        late_ns,
-        4,
-    );
+    update_ema(&state.avg_jitter_ns, jitter, ALPHA_SHIFT);
+    state.max_jitter_ns.fetch_max(jitter, Ordering::Relaxed);
 
-    let skipped = late.as_nanos() / TICK_INTERVAL.as_nanos();
+    // сколько тиков накопилось
+    let ticks = (late.as_nanos() / TICK_INTERVAL.as_nanos()) as u32 + 1;
 
-    if skipped != 0 {
-        state.skipped_ticks.fetch_add(
-            skipped as u64,
-            Ordering::Relaxed,
-        );
-    }
+    *next_deadline += TICK_INTERVAL * ticks;
 
-    let advance = skipped.saturating_add(1);
-
-    *next_deadline += TICK_INTERVAL * advance as u32;
-
-    true
+    ticks
 }
 
-/// Адаптирует величину spin margin на основе среднего времени спина и ошибки сна.
-///
-/// Цель — поддерживать среднее время спина близким к `TARGET_SPIN_TIME`,
-/// компенсируя систематические ошибки сна. Изменение ограничено пределами
-/// `MIN_SPIN_MARGIN` и `MAX_SPIN_MARGIN`.
-///
-/// # Аргументы
-/// * `state` — метрики цикла (для чтения и записи `spin_margin_ns`).
-/// * `avg_spin_time` — среднее время активного ожидания.
-/// * `avg_sleep_error` — средняя ошибка сна (oversleep).
-fn adapt_spin_margin(state: &SchedulerState, avg_spin_time: Duration, avg_sleep_error: Duration) {
-    let old_margin_ns =
-        state.spin_margin_ns.load(Ordering::Relaxed);
+// ---------------------------------------------------------------------------
+// Adaptive spin‑margin
+// ---------------------------------------------------------------------------
 
-    let old_margin = Duration::from_nanos(old_margin_ns);
+fn adapt_spin_margin(state: &SchedulerState, avg_spin_time: Duration, avg_sleep_overshoot: Duration) {
+    let old_margin = Duration::from_nanos(state.spin_margin_ns.load(Ordering::Relaxed));
+    let granularity = Duration::from_nanos(state.sleep_granularity_ns.load(Ordering::Relaxed));
 
-    let granularity = Duration::from_nanos(
-        state.sleep_granularity_ns.load(Ordering::Relaxed)
-    );
-
+    // Minimum margin respects OS granularity
     let min_margin = granularity
         .saturating_mul(2)
         .max(MIN_SPIN_MARGIN)
         .min(MAX_SPIN_MARGIN);
 
-    let mut margin = old_margin;
+    let mut target = old_margin;
 
-    // Компенсация систематического oversleep.
-    let sleep_correction = (avg_sleep_error / 2)
-        .min(old_margin / 4);
-
-    margin = margin.saturating_add(sleep_correction);
-
-    // Коррекция по фактическому времени spin.
-    if avg_spin_time > TARGET_SPIN_TIME * 2 {
-        let excess = avg_spin_time - TARGET_SPIN_TIME;
-        margin = margin.saturating_sub(excess / 2);
-    } else if avg_spin_time < TARGET_SPIN_TIME / 2 {
-        let deficit = TARGET_SPIN_TIME / 2 - avg_spin_time;
-        margin = margin.saturating_add(deficit / 2);
+    // ---------  Sleep‑error correction  ----------
+    if avg_sleep_overshoot > Duration::ZERO {
+        let correction = (avg_sleep_overshoot / 2).min(old_margin / 4);
+        target = target.saturating_add(correction);
     }
 
-    // Не позволяем регулятору прыгать больше чем на 10% за адаптацию.
-    let max_change = (old_margin / 10).max(Duration::from_nanos(1));
+    // ---------  Spin‑time correction  ----------
+    if avg_spin_time > TARGET_SPIN_TIME {
+        let excess = avg_spin_time - TARGET_SPIN_TIME;
+        target = target.saturating_sub(excess / 2);
+    } else if avg_spin_time < TARGET_SPIN_TIME / 2 {
+        let deficit = TARGET_SPIN_TIME / 2 - avg_spin_time;
+        target = target.saturating_add(deficit / 2);
+    }
 
-    let adjusted = if margin > old_margin {
-        old_margin + (margin - old_margin).min(max_change)
+    // ---------  Rate limiting  ----------
+    let max_change = (old_margin / 10).max(Duration::from_nanos(1));
+    let adjusted = if target > old_margin {
+        old_margin + (target - old_margin).min(max_change)
     } else {
-        old_margin - (old_margin - margin).min(max_change)
+        old_margin - (old_margin - target).min(max_change)
     };
 
-    let new_margin = adjusted.clamp(
-        min_margin,
-        MAX_SPIN_MARGIN,
-    );
-
-    state.spin_margin_ns.store(
-        new_margin.as_nanos() as u64,
-        Ordering::Relaxed,
-    );
+    // Clamp to allowed range
+    let new_margin = adjusted.clamp(min_margin, MAX_SPIN_MARGIN);
+    state.spin_margin_ns.store(new_margin.as_nanos() as u64, Ordering::Relaxed);
 }
 
+// ---------------------------------------------------------------------------
+// Wait logic (now keeps a single `Instant::now()` per loop iteration)
+// ---------------------------------------------------------------------------
 
-// ============================================================================
-// Wait logic
-// ============================================================================
-
-/// Ожидает наступления `deadline`, регулярно проверяя флаг `running` и сигналы пробуждения.
-///
-/// Использует гибридный подход: если до дедлайна больше `spin_margin`, спит с тайм-аутом
-/// и возможностью пробуждения по condvar; в последние микросекунды переходит на активный
-/// спин для точного попадания.
-///
-/// # Аргументы
-/// * `deadline` — момент времени, до которого нужно ожидать.
-/// * `running` — флаг активности.
-/// * `wake_state` — пара (мьютекс, condvar) для внешнего пробуждения.
-/// * `spin_margin` — запас времени перед дедлайном для начала спина.
-///
-/// # Возвращаемое значение
-/// Структура `WaitOutcome` с флагом достижения дедлайна и временем спина.
-fn wait_until(deadline: Instant, running: &AtomicBool, wake_state: &(Mutex<bool>, Condvar), spin_margin: Duration) -> WaitOutcome {
+#[inline]
+fn wait_until(
+    deadline: Instant,
+    running: &AtomicBool,
+    wake_state: &(Mutex<bool>, Condvar),
+    spin_margin: Duration,
+) -> WaitOutcome {
     loop {
+        // Early exit if the manager is stopped
         if !running.load(Ordering::Acquire) {
             return WaitOutcome {
                 reached_deadline: false,
                 spin_time: Duration::ZERO,
+                sleep_overshoot: Duration::ZERO,
             };
         }
 
         let now = Instant::now();
 
+        // Deadline reached → success
         if now >= deadline {
             return WaitOutcome {
                 reached_deadline: true,
                 spin_time: Duration::ZERO,
+                sleep_overshoot: Duration::ZERO,
             };
         }
 
-        let remaining = deadline - now;
+        let remaining = deadline.duration_since(now);
 
+        // -------------------  Sleep phase  -------------------
         if remaining > spin_margin {
+            // Sleep a little less than the remaining time, leaving `spin_margin`
+            // for the precision phase.
             let timeout = remaining - spin_margin;
-
-            wait_with_timeout(
-                &wake_state.0,
-                &wake_state.1,
-                timeout,
-            );
-
+            wait_with_timeout(&wake_state.0, &wake_state.1, timeout);
             continue;
         }
 
-        // Precision phase.
-        let spin_start = now;
+        // -------------------  Precision (spin) phase  -------------------
+        let spin_start = Instant::now();
+
+        // If the OS already overslept past the deadline, record it.
+        let sleep_overshoot = spin_start.saturating_duration_since(deadline);
 
         while Instant::now() < deadline {
             if !running.load(Ordering::Acquire) {
                 return WaitOutcome {
                     reached_deadline: false,
                     spin_time: spin_start.elapsed(),
+                    sleep_overshoot,
                 };
             }
-
             std::hint::spin_loop();
         }
 
         return WaitOutcome {
             reached_deadline: true,
             spin_time: spin_start.elapsed(),
+            sleep_overshoot,
         };
     }
 }
 
-/// Вспомогательная функция ожидания на condvar с тайм-аутом.
-///
-/// Если флаг пробуждения уже установлен, сразу сбрасывает его и возвращает `true`.
-/// Иначе ожидает не более `timeout`, после чего возвращает `false` (таймаут)
-/// или `true` (был сигнал).
-///
-/// # Аргументы
-/// * `lock` — мьютекс, связанный с флагом пробуждения.
-/// * `cvar` — условная переменная.
-/// * `timeout` — максимальное время ожидания.
-///
-/// # Возвращаемое значение
-/// `true`, если был получен сигнал пробуждения, `false` при тайм-ауте.
+// ---------------------------------------------------------------------------
+// Condvar with timeout (unchanged, but kept for completeness)
+// ---------------------------------------------------------------------------
+
 #[inline]
 fn wait_with_timeout(lock: &Mutex<bool>, cvar: &Condvar, timeout: Duration) -> bool {
     let mut wake = acquire_lock(lock);
@@ -633,32 +618,31 @@ fn wait_with_timeout(lock: &Mutex<bool>, cvar: &Condvar, timeout: Duration) -> b
     if was_woken {
         *wake = false;
     }
-
     was_woken
 }
 
-/// Измеряет гранулярность сна ОС путём серии коротких снов и вычисления среднего превышения.
-///
-/// Запрашивает сон на 100 микросекунд несколько раз, измеряет фактическое время и
-/// вычисляет среднюю величину превышения (`overshoot`). Эта величина используется
-/// как оценка минимальной точности таймеров ОС.
-///
-/// # Возвращаемое значение
-/// Среднее превышение запрошенного времени сна.
+// ---------------------------------------------------------------------------
+// Sleep‑granularity measurement (unchanged, but clarified)
+// ---------------------------------------------------------------------------
+
 fn measure_sleep_granularity() -> Duration {
     let mut overshoots = Vec::with_capacity(SAMPLES);
+
     for _ in 0..SAMPLES {
         let start = Instant::now();
         thread::sleep(REQUESTED_SLEEP);
         let elapsed = start.elapsed();
+
         if elapsed > REQUESTED_SLEEP {
             overshoots.push(elapsed - REQUESTED_SLEEP);
         }
     }
+
     if overshoots.is_empty() {
         return Duration::ZERO;
     }
+
     overshoots.sort_unstable();
-    let median = overshoots[overshoots.len() / 2];
-    median.min(MAX_GRANULARITY)
+    // Median overshoot, capped by a hard max.
+    overshoots[overshoots.len() / 2].min(MAX_GRANULARITY)
 }

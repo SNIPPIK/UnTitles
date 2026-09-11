@@ -1,4 +1,4 @@
-import {APIRequestData, DeclareRest, OptionsRest, RestServerSide} from "#handler/rest/index.js";
+import { APIRequestData, DeclareRest, OptionsRest, RestServerSide } from "#handler/rest/index.js";
 import { httpsClient, locale } from "#structures";
 import { sdb } from "#db/worker";
 
