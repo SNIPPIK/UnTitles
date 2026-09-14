@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.9.1",
-    "@types/node": "^22.20.2",
+    "@types/node": "^26.5.1",
     "typescript": "^7.0.2"
   },
   "scripts": {
