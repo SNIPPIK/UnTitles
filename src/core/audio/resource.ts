@@ -1,8 +1,8 @@
+import { FFMPEG_PATH, FFMPEG_PROXY } from "#core/audio/process.js";
+import { createProxyFFmpeg, TypedEmitter } from "#structures";
 import { OPUS_FRAME_SIZE } from "#core/audio/opus.js";
-import { FFMPEG_PATH } from "#core/audio/process.js";
 import { AudioEngine, type iType } from "#native";
 import type { Track } from "#core/queue/index.js";
-import { TypedEmitter } from "#structures";
 import { env } from "#db/env";
 import { db } from "#db";
 
@@ -35,6 +35,9 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
     /** Последнее заданное значение затухания */
     protected _afade = 0;
 
+    /** Модификатор скорости фильтров */
+    protected _afade_modificator = 1;
+
     /** Таймер для отслеживания данных от AudioEngine */
     protected _timeout: NodeJS.Timeout;
 
@@ -62,7 +65,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
     public get duration(): number {
         const currentPosition = this._played_frames
 
-        const time = currentPosition * OPUS_FRAME_SIZE;
+        const time = currentPosition * (OPUS_FRAME_SIZE * this._afade_modificator);
         return time / 1e3 + this.options.seek;
     };
 
@@ -80,29 +83,9 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         if (!track.isLive) args.unshift("-accurate_seek");
 
         // Если платформа не может играть нативно из сети
-        if (this.options.track.proxy && track.link.startsWith("http")) {
-            const proxy = env.get("APIs.proxy", null);
-
+        if (this.options.track.proxy && track.link.startsWith("http") && FFMPEG_PROXY) {
             // Если есть прокси
-            if (proxy) {
-                const isSocks = proxy.startsWith("socks");
-
-                // Если протокол socks
-                if (isSocks) {
-                    const path = proxy.split(":/")[1];
-
-                    // Если нашлись данные для входа
-                    if (path.match(/@/)) {
-                        args.unshift("-http_proxy", `http:/${proxy.split(":/")[1].split("@")[1]}`);
-                    }
-
-                    // Если данных для входа нет
-                    else args.unshift("-http_proxy", `http:/${proxy.split(":/")[1]}`);
-                }
-
-                // Если протокол http
-                else args.unshift("-http_proxy", `http:/${proxy.split(":/")[1]}`);
-            }
+            args.unshift("-http_proxy", createProxyFFmpeg(FFMPEG_PROXY));
         }
 
         return [
@@ -154,6 +137,17 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      */
     public constructor(public options: AudioResourceOptions) {
         super();
+        // Ищем модификатор скорости (asetrate, tempo)
+        let modificator: number = 1.0;
+
+        try {
+            // Иначе проверяем текущие фильтры
+            if (options.filters) modificator = Math.max(1.0, getSpeedMultiplier(options.filters));
+        } catch (error) {
+            this.emit("error", error as Error);
+        }
+
+        this._afade_modificator = modificator;
         this._afade = !this.options.swapped ? db.queues.options.fade : db.queues.options.swapFade;
 
         // Запускаем получение аудио
@@ -228,6 +222,81 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
         // Удаляем всех слушателей (вызов родительского destroy)
         super.destroy();
     };
+}
+
+/**
+ * @author SNIPPIK
+ * @description Регулярное выражение для захвата числового множителя из строки 'asetrate=48000*X'.
+ * @example "asetrate=48000*1.2" -> "1.2"
+ * @const ASSETRATE_MULTIPLIER_PATTERN
+ * @private
+ */
+const ASSETRATE_MULTIPLIER_PATTERN = /(?:^|,)asetrate=48000\*([\d.]+)/;
+
+/**
+ * @author SNIPPIK
+ * @description Регулярное выражение для захвата числового множителя из строки 'atempo=X'.
+ * @example "atempo=2" -> "2"
+ * @const ATEMPO_MULTIPLIER_PATTERN
+ * @private
+ */
+const ATEMPO_MULTIPLIER_PATTERN = /(?:^|,)atempo=([\d.]+)/;
+
+/**
+ * @author SNIPPIK
+ * @description Извлекает числовой множитель (rate) из фильтра asetrate.
+ * @param filtersString Строка фильтров FFmpeg.
+ * @returns Извлеченное значение как строка, или null.
+ * @function extractAsetrateMultiplier
+ * @private
+ */
+function extractAsetrateMultiplier(filtersString: string): string | null {
+    const match = filtersString.match(ASSETRATE_MULTIPLIER_PATTERN);
+    return match ? match[1] : null;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Извлекает числовой множитель (rate) из фильтра atempo.
+ * @param filtersString Строка фильтров FFmpeg.
+ * @returns Извлеченное значение как строка, или null.
+ * @function extractAtempoMultiplier
+ * @private
+ */
+function extractAtempoMultiplier(filtersString: string): string | null {
+    const match = filtersString.match(ATEMPO_MULTIPLIER_PATTERN);
+    return match ? match[1] : null;
+}
+
+/**
+ * @author SNIPPIK
+ * @description Центральная функция для получения множителя скорости (Speed Multiplier)
+ * из строки фильтров, проверяя сначала asetrate, затем atempo.
+ * @param filtersString Строка фильтров FFmpeg.
+ * @returns Числовой множитель скорости или 1.0, если не найден.
+ * @function getSpeedMultiplier
+ * @private
+ */
+function getSpeedMultiplier(filtersString: string): number {
+    if (!filtersString) return 1.0;
+
+    // Извлекаем множитель asetrate
+    const asetrateStr = extractAsetrateMultiplier(filtersString);
+
+    // Конвертируем в число. Если не найдено, используем 1.0 (нет изменения)
+    const asetrateMultiplier = asetrateStr ? parseFloat(asetrateStr) : 1.0;
+
+    // Извлекаем множитель atempo
+    const atempoStr = extractAtempoMultiplier(filtersString);
+
+    // Конвертируем в число. Если не найдено, используем 1.0 (нет изменения)
+    const atempoMultiplier = atempoStr ? parseFloat(atempoStr) : 1.0;
+
+    // Общий множитель - это произведение (умножение) двух эффектов.
+    const totalMultiplier = asetrateMultiplier * atempoMultiplier;
+
+    // Проверка на NaN и возврат результата.
+    return isNaN(totalMultiplier) ? 1.0 : totalMultiplier;
 }
 
 /**

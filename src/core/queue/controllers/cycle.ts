@@ -101,7 +101,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
 
                 // Берем пакеты из источника аудио и отправляем их в соединение
                 if (allowed > 0) {
-                    const batch = audio.packetAt(allowed + 2); // Запрашиваем с небольшим запасом
+                    const batch = audio.packetAt(audio.packets >= allowed ? allowed : audio.packets); // Запрашиваем с небольшим запасом
                     if (batch && batch.length > 0) {
                         connection.packet(batch);
                     }

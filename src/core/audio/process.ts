@@ -102,9 +102,16 @@ export class Process {
 /**
  * @author SNIPPIK
  * @description Путь до исполняемого файла ffmpeg
- * @private
+ * @public
  */
 export let FFMPEG_PATH = null;
+
+/**
+ * @author SNIPPIK
+ * @description Параметр прокси для FFMPEG
+ * @public
+ */
+export const FFMPEG_PROXY = env.get<string>("APIs.ffmpeg.proxy", env.get("APIs.proxy", null));
 
 /**
  * @author SNIPPIK
@@ -115,11 +122,11 @@ export let FFMPEG_PATH = null;
     const names = [`${cache}/ffmpeg`, cache, env.get("ffmpeg.path")].map((file) => path.resolve(file).replace(/\\/g,'/'));
 
     // Проверяем имена, если есть FFmpeg/avconv
-    for (const name of ["ffmpeg", ...names]) {
+    for (const name of [...names, path.resolve("build/native/ffmpeg"), "ffmpeg"]) {
         try {
             const result = spawnSync(name, ['-h'], { windowsHide: true });
             if (result.error) continue;
-            FFMPEG_PATH = name;
+            else FFMPEG_PATH = name;
             return;
         } catch {}
     }

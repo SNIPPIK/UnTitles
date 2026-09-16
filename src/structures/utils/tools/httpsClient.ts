@@ -33,7 +33,7 @@ abstract class Request {
     private static readonly MAX_REDIRECTS = 5;
 
     /** Тайм-аут запроса по умолчанию */
-    private static readonly REQUEST_TIMEOUT = 3e3;
+    private static readonly REQUEST_TIMEOUT = 2e3;
 
     /**
      * @description Данные для создания запроса
@@ -324,8 +324,7 @@ abstract class Request {
 
         const OS = [
             "X11; Linux x86_64",
-            "Windows NT 10.0; Win64; x64",
-            "X11; Linux i686"
+            "Windows NT 10.0; Win64; x64"
         ];
 
         const randomOS =

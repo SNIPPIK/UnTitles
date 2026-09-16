@@ -91,9 +91,16 @@ impl SocketBuffered {
         Ok(udp)
     }
 
+    /// Основной обработчик одного тика отправки UDP.
     ///
-    pub fn tick(&self, now: u64) {
-        self.inner.auto_tick(now);
+    /// Делегирует работу `auto_tick`, передавая текущее время и разрешённый
+    /// бюджет отправки (число пакетов, которые можно отправить в этом тике).
+    ///
+    /// # Аргументы
+    /// * `now` — текущее время в миллисекундах (используется для keepalive и статистики).
+    /// * `budget` — максимальное количество пакетов к отправке за тик.
+    pub fn tick(&self, now: u64, budget: u8) {
+        self.inner.auto_tick(now, budget);
     }
 
     /// Инициализирует RTP-шифр с новым SSRC и ключом.
@@ -102,8 +109,12 @@ impl SocketBuffered {
     /// # Аргументы
     /// * `ssrc` — идентификатор источника синхронизации.
     /// * `key` — 32-байтовый ключ AES-256-GCM.
+    ///
+    /// # Ошибки
+    /// Возвращает napi-ошибку при неверной длине ключа или ошибке AES-GCM.
     #[napi(js_name = "initialize_rtp")]
     pub fn initialize_rtp(&self, ssrc: u32, key: Vec<u8>) -> Result<()> {
+        // Прокидываем ошибку AES в napi-ошибку.
         self.inner.rtp.initialize(ssrc, key)
             .map_err(|e| Error::from_reason(e.to_string()))
     }
@@ -120,21 +131,41 @@ impl SocketBuffered {
         self.inner.send_drops.load(Ordering::Relaxed) as u32
     }
 
-    /// Добавляет пакет в очередь на отправку. С проверкой мусора.
+    /// Добавляет пакет в очередь на отправку.
+    ///
+    /// Пустой пакет будет отфильтрован внутренним `push`.
+    ///
+    /// # Аргументы
+    /// * `packet` — данные для отправки.
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        self.inner.push(packet.to_vec());
+        // to_owned() даёт Vec<u8> без заимствования из Buffer.
+        self.inner.push(packet.to_owned());
     }
 
     /// Добавляет несколько пакетов в очередь с проверкой мусора.
     ///
+    /// Пустые буферы отбрасываются до передачи в Rust-очередь,
+    /// чтобы не занимать слоты впустую.
+    ///
     /// # Аргументы
-    /// * `packets` - массив Buffer с данными для отправки.
+    /// * `packets` — массив Buffer с данными для отправки.
     #[napi]
     pub fn push_packets(&self, packets: Vec<Buffer>) {
-        for packet in packets {
-            self.inner.push(packet.to_vec());
-        }
+        // Фильтруем пустые буферы и конвертируем в Vec<u8> заранее.
+        let packets = packets
+            .into_iter()
+            .filter_map(|packet| {
+                if packet.is_empty() {
+                    None
+                } else {
+                    Some(packet.to_vec())
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Передаём подготовленный вектор массовой вставкой.
+        self.inner.push_many(packets);
     }
 
     /// Формирует discovery-пакет для голосового соединения Discord и возвращает его

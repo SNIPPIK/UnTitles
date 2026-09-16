@@ -32,7 +32,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      */
     public get status() {
         return this._status;
-    }
+    };
 
     /**
      * @description Проверяет, уничтожено ли голосовое подключение
@@ -40,7 +40,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
      */
     public get destroyed(): boolean {
         return this._destroyed;
-    }
+    };
 
     /**
      * @description Записываем текущий статус подключения
@@ -66,7 +66,7 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
         }
 
         this._status = status;
-    }
+    };
 
     /**
      * @description Подключение к Discord по Websocket
@@ -137,13 +137,10 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
              * @description Регистрирует пакет VOICE_SERVER_UPDATE
              */
             onVoiceServerUpdate: (packet) => {
-                if (this._destroyed) return;
-                if (!packet.endpoint) return;
-
+                if (this._destroyed || !packet.endpoint) return;
                 this.emit("info", `[Voice]: server update applied`);
 
                 this.adapter!.packet.server = packet;
-
                 this.transport!.state = {
                     code: TransportStateCode.OpeningWs,
                     payload: null
@@ -244,10 +241,9 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
             return;
         }
 
-        this.speaker.speaking = this.speaker.default;
-
         // Если есть аудио пакеты
         if (frames) {
+            this.speaker.speaking = this.speaker.default;
             this.transport.packet(frames);
         }
     };

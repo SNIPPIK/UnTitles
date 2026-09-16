@@ -1,6 +1,6 @@
 use crate::{
     structures::{
-        timers::scheduler::cycle_manager::CycleManager,
+        timers::scheduler::Scheduler,
         network::udp::socket::SocketBuffered
     }
 };
@@ -18,7 +18,7 @@ const MAX_PER_WORKER: usize = 50;
 /// Воркер теперь без Mutex
 struct Worker {
     /// Менеджер потов, хранящий в себе udp сессии
-    manager: CycleManager,
+    manager: Scheduler,
 
     /// Ссылки на udp сессии, для быстрого поиска и распределения между потоками
     sessions: DashMap<u32, Arc<SocketBuffered>>
@@ -26,7 +26,7 @@ struct Worker {
 
 impl Worker {
     fn new() -> Self {
-        let manager = CycleManager::new().expect("Failed to create timer");
+        let manager = Scheduler::new().expect("Failed to create timer");
         Worker {
             manager,
             sessions: DashMap::new()

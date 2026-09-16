@@ -72,11 +72,11 @@ export default class StatusCommand extends Command {
                 {
                     name: "🎵 Audio",
                     value: [
-                        `Queues:         **${db.queues.size}**`,
-                        `QDownload:      **${sdb?.audio_saver?.size ?? 0}**`,
-                        `Players:        **${db.queues.cycles.players.size}**`,
-                        `Messages:       **${db.queues.cycles.messages.size}**`,
-                        `Voice Sessions: **${db.voice.size}**`,
+                        `Queues:         **${db.queues.full_size}**`,
+                        `QDownload:      **${sdb?.audio_saver?.full_size ?? 0}**`,
+                        `Players:        **${db.queues.cycles.players.full_size}**`,
+                        `Messages:       **${db.queues.cycles.messages.full_size}**`,
+                        `Voice Sessions: **${db.voice.full_size}**`,
                     ].join('\n'),
                     inline: true,
                 },

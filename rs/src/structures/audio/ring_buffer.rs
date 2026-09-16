@@ -5,266 +5,429 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-// ============================================================================
-// Слот кольцевого буфера
-// ============================================================================
-
-/// Отдельный слот буфера: содержит атомарный счётчик состояния и данные.
-struct Slot {
-    /// Порядковый номер слота, управляет его состоянием (свободен/занят/готов).
-    seq: AtomicUsize,
-
-    /// Хранилище данных; инициализируется/читается вручную через unsafe.
-    data: UnsafeCell<MaybeUninit<Vec<u8>>>
-}
-
-// Безопасно делить между потоками: весь доступ синхронизирован через seq.
-unsafe impl Send for Slot {}
-unsafe impl Sync for Slot {}
-
-// ============================================================================
-// Кольцевой буфер
-// ============================================================================
-
-/// Многопоточный (MPMC) lock-free FIFO буфер фиксированной ёмкости.
+/// Многопоточный SPSC lock-free кольцевой буфер.
+///
+/// Архитектура:
+///
+/// Producer:
+///     head -> изменяется только producer
+///     tail -> только читается
+///
+/// Consumer:
+///     tail -> изменяется только consumer
+///     head -> только читается
+///
+/// Важно:
+/// - только ОДИН поток может вызывать `push` / `push_many`;
+/// - только ОДИН поток может вызывать `pop` / `pop_many`;
+/// - producer и consumer могут работать одновременно.
+///
+/// `head` и `tail` монотонно увеличиваются и используются только
+/// для вычисления позиции внутри кольца.
 pub struct RingBuffer {
-    /// Массив слотов.
-    buffer: Box<[Slot]>,
+    /// Хранилище элементов.
+    buffer: Box<[UnsafeCell<MaybeUninit<Vec<u8>>>]>,
 
-    /// Максимальное количество элементов.
+    /// Физическая ёмкость кольца.
     capacity: usize,
 
-    /// Голова — позиция следующей вставки (монотонно растёт).
+    /// Следующая позиция для записи.
+    ///
+    /// Изменяется только producer.
     head: CachePadded<AtomicUsize>,
 
-    /// Хвост — позиция следующего извлечения (монотонно растёт).
+    /// Следующая позиция для чтения.
+    ///
+    /// Изменяется только consumer.
     tail: CachePadded<AtomicUsize>,
-
-    /// Автомоторный счетчик для точного подсчета пакетов в системе
-    count: AtomicUsize
 }
 
+// SAFETY:
+// `buffer` содержит UnsafeCell, однако доступ к каждому элементу
+// синхронизирован через head/tail:
+//
+// Producer:
+//   - читает tail через Acquire;
+//   - пишет слот;
+//   - публикует head через Release.
+//
+// Consumer:
+//   - читает head через Acquire;
+//   - читает слот;
+//   - освобождает слот через Release.
+//
+// При соблюдении SPSC-контракта один слот никогда одновременно
+// не читается и не записывается.
+unsafe impl Send for RingBuffer {}
+unsafe impl Sync for RingBuffer {}
+
 impl RingBuffer {
-    /// Создаёт кольцевой буфер заданной ёмкости.
+    /// Создаёт пустой SPSC ring buffer.
     ///
-    /// # Паника
+    /// # Panics
+    ///
     /// Паникует, если `capacity == 0`.
     pub fn new(capacity: usize) -> Self {
         assert!(capacity > 0, "capacity must be > 0");
 
         let mut slots = Vec::with_capacity(capacity);
 
-        for i in 0..capacity {
-            slots.push(Slot {
-                // Инициализируем seq индексом: слот свободен для записи.
-                seq: AtomicUsize::new(i),
-                data: UnsafeCell::new(MaybeUninit::uninit()),
-            });
+        for _ in 0..capacity {
+            slots.push(UnsafeCell::new(MaybeUninit::uninit()));
         }
 
         Self {
             buffer: slots.into_boxed_slice(),
             capacity,
+
             head: CachePadded::new(AtomicUsize::new(0)),
             tail: CachePadded::new(AtomicUsize::new(0)),
-            count: AtomicUsize::new(0),
         }
     }
 
-    /// Пытается поместить `value` в буфер.
+    // ========================================================================
+    // Producer
+    // ========================================================================
+
+    /// Пытается добавить элемент.
     ///
-    /// Возвращает `Ok(())` при успехе, `Err(value)` при заполненном буфере.
+    /// `Ok(())` — элемент добавлен.
+    ///
+    /// `Err(value)` — буфер заполнен, исходный элемент возвращается.
+    ///
+    /// Не блокируется и не ждёт освобождения места.
     #[inline]
     pub fn push(&self, value: Vec<u8>) -> Result<(), Vec<u8>> {
-        // Загружаем текущую позицию головы.
-        let mut pos = self.head.load(Ordering::Relaxed);
+        // Producer владеет head, поэтому Relaxed достаточно.
+        let head = self.head.load(Ordering::Relaxed);
 
-        loop {
-            // Текущий слот по модулю ёмкости.
-            let slot = &self.buffer[pos % self.capacity];
-            // Acquire для seq: видим все записи от предыдущего потока.
-            let seq = slot.seq.load(Ordering::Acquire);
+        // Читаем актуальный tail consumer'а.
+        //
+        // Acquire гарантирует, что producer увидит освобождённые consumer'ом
+        // слоты до повторного использования.
+        let tail = self.tail.load(Ordering::Acquire);
 
-            // Разница seq и pos; wrapping_sub корректно обрабатывает переполнение.
-            let diff = seq.wrapping_sub(pos) as isize;
+        // Количество занятых элементов.
+        let used = head.wrapping_sub(tail);
 
-            if diff == 0 {
-                // Слот свободен: пробуем атомарно занять позицию `pos`.
-                match self.head.compare_exchange_weak(
-                    pos,
-                    pos.wrapping_add(1),
-                    Ordering::Relaxed,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => {
-                        // Успешно застолбили; записываем данные.
-                        unsafe {
-                            (*slot.data.get()).write(value);
-                        }
-
-                        // Сообщаем потребителям, что слот готов (seq = pos + 1).
-                        slot.seq.store(
-                            pos.wrapping_add(1),
-                            Ordering::Release,
-                        );
-
-                        self.count.fetch_add(1, Ordering::AcqRel);
-                        return Ok(());
-                    }
-                    Err(actual) => {
-                        // CAS не удался: голова сдвинута другим потоком.
-                        pos = actual;
-                    }
-                }
-            } else if diff < 0 {
-                // Буфер полон: seq отстаёт от pos.
-                return Err(value);
-            } else {
-                // Голова продвинута, но seq ещё не обновлён; перечитываем.
-                pos = self.head.load(Ordering::Relaxed);
-            }
+        // Буфер полностью заполнен.
+        if used >= self.capacity {
+            return Err(value);
         }
+
+        let index = head % self.capacity;
+
+        // Единственный producer владеет этим слотом.
+        unsafe {
+            (*self.buffer[index].get()).write(value);
+        }
+
+        // Публикуем новый head только ПОСЛЕ записи данных.
+        //
+        // Consumer с Acquire гарантированно увидит полностью записанный Vec.
+        self.head
+            .store(head.wrapping_add(1), Ordering::Release);
+
+        Ok(())
     }
 
-    /// Извлекает один элемент из буфера, если он есть.
+    /// Добавляет несколько элементов в очередь за один вызов.
     ///
-    /// Возвращает `Some(value)` или `None`, если буфер пуст.
+    /// Резервирует до `free` слотов за раз и записывает элементы напрямую,
+    /// без CAS на каждый пакет. Это эффективнее, чем серия одиночных `push`,
+    /// но подразумевает **единственного производителя** — параллельная запись
+    /// из нескольких потоков не защищена.
+    ///
+    /// # Стратегия
+    /// 1. Под `Relaxed`-чтением `head` и `Acquire`-чтением `tail` вычисляется
+    ///    количество свободных слотов `free`.
+    /// 2. Из входного итератора берётся не более `free` элементов.
+    /// 3. Каждый непустой элемент записывается в слот `(head + count) % capacity`.
+    /// 4. Один раз под `Release` публикуется обновлённый `head`.
+    ///
+    /// Пустые `Vec<u8>` пропускаются и не занимают слот.
+    ///
+    /// # Аргументы
+    /// * `values` — итератор по пакетам для добавления.
+    ///
+    /// # Возвращаемое значение
+    /// Количество **фактически добавленных** элементов (без учёта пустых).
+    /// Может быть меньше числа элементов в итераторе, если очередь заполнилась.
+    #[inline]
+    pub fn push_many<I>(&self, values: I) -> usize
+    where
+        I: IntoIterator<Item = Vec<u8>>,
+    {
+        // Текущие позиции головы и хвоста.
+        let head = self.head.load(Ordering::Relaxed);
+        let tail = self.tail.load(Ordering::Acquire);
+
+        // Число занятых слотов (wrapping-разность).
+        let used = head.wrapping_sub(tail);
+        // Свободные слоты (защита от переполнения через saturating_sub).
+        let free = self.capacity.saturating_sub(used);
+
+        // Если очередь заполнена — выходим.
+        if free == 0 {
+            return 0;
+        }
+
+        // Счётчик успешно добавленных пакетов.
+        let mut count = 0;
+
+        // Берём не более `free` элементов из итератора.
+        for value in values.into_iter().take(free) {
+            // Пустые пакеты не занимают слот.
+            if value.is_empty() {
+                continue;
+            }
+
+            // Индекс слота для текущего пакета.
+            let index = head.wrapping_add(count) % self.capacity;
+
+            // Пишем в слот без дополнительной синхронизации — слот гарантированно
+            // свободен, поскольку мы уже посчитали `free` и не превышаем его.
+            unsafe {
+                (*self.buffer[index].get()).write(value);
+            }
+
+            count += 1;
+        }
+
+        // Публикуем новое значение head один раз, если что-то записали.
+        if count != 0 {
+            self.head.store(
+                head.wrapping_add(count),
+                Ordering::Release,
+            );
+        }
+
+        count
+    }
+
+    // ========================================================================
+    // Consumer
+    // ========================================================================
+
+    /// Извлекает один элемент из очереди.
+    ///
+    /// Возвращает `None`, если на момент вызова очередь пуста.
+    /// `Some(Vec<u8>)` при успешном извлечении.
+    ///
+    /// # Потокобезопасность
+    /// Предполагается **единственный consumer**: загрузка `tail` идёт как `Relaxed`,
+    /// а обновление `tail` под `Release` не защищено CAS. При параллельном чтении
+    /// из нескольких потоков возможно дублирование извлечения одного и того же
+    /// элемента.
+    ///
+    /// # Порядок синхронизации
+    /// - `head` читается под `Acquire`, чтобы гарантированно увидеть данные,
+    ///   опубликованные producer'ом под `Release`.
+    /// - `tail` обновляется под `Release`, чтобы producer под `Acquire` увидел
+    ///   освобождение слота и мог его переиспользовать.
     #[inline]
     pub fn pop(&self) -> Option<Vec<u8>> {
-        let mut pos = self.tail.load(Ordering::Relaxed);
+        // Consumer владеет tail — можно читать под Relaxed.
+        let tail = self.tail.load(Ordering::Relaxed);
 
-        loop {
-            let slot = &self.buffer[pos % self.capacity];
-            let seq = slot.seq.load(Ordering::Acquire);
+        // Acquire гарантирует видимость данных после Release-записи head.
+        let head = self.head.load(Ordering::Acquire);
 
-            // Готовый слот имеет seq == pos + 1.
-            let diff = seq.wrapping_sub(pos.wrapping_add(1)) as isize;
+        // Очередь пуста.
+        if tail == head { return None; }
 
-            if diff == 0 {
-                // Слот готов: пробуем занять позицию.
-                match self.tail.compare_exchange_weak(
-                    pos,
-                    pos.wrapping_add(1),
-                    Ordering::Relaxed,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => {
-                        // Читаем данные (единственный читатель для этого pos).
-                        let value = unsafe {
-                            (*slot.data.get()).assume_init_read()
-                        };
+        // Индекс слота в массиве.
+        let index = tail % self.capacity;
 
-                        // Возвращаем слот в свободное состояние для следующего цикла.
-                        // seq = pos + capacity.
-                        slot.seq.store(
-                            pos.wrapping_add(self.capacity),
-                            Ordering::Release,
-                        );
+        // Consumer — единственный владелец этого элемента, конкурентов нет.
+        // Читаем значение из MaybeUninit, перенося владение наружу.
+        let value = unsafe {
+            (*self.buffer[index].get()).assume_init_read()
+        };
 
-                        self.count.fetch_sub(1, Ordering::AcqRel);
-                        return Some(value);
-                    }
-                    Err(actual) => {
-                        pos = actual;
-                    }
-                }
-            } else if diff < 0 {
-                // Буфер пуст.
-                return None;
-            } else {
-                // Хвост сдвинут другим потоком.
-                pos = self.tail.load(Ordering::Relaxed);
-            }
-        }
+        // Публикуем освобождение слота под Release:
+        // producer под Acquire увидит новый tail и сможет переиспользовать слот.
+        self.tail
+            .store(tail.wrapping_add(1), Ordering::Release);
+
+        Some(value)
     }
 
-    /// Извлекает до `limit` элементов и добавляет их в `out`.
+    /// Извлекает до `limit` элементов из очереди за один вызов.
+    ///
+    /// В отличие от одиночного `pop`, этот метод сначала снимает один снимок
+    /// `head` и вычисляет реальное число доступных элементов, после чего
+    /// читает их подряд без промежуточных атомарных операций.
+    ///
+    /// # Особенности
+    /// - не ждёт и не блокируется;
+    /// - если элементов меньше `limit`, возвращает только доступные;
+    /// - если очередь пуста, ничего не пишет в `out`;
+    /// - освобождение слотов публикуется одним `Release`-store, что дешевле
+    ///   серии одиночных `pop`.
+    ///
+    /// # Потокобезопасность
+    /// Предполагается **единственный consumer**. Параллельное извлечение из
+    /// нескольких потоков не защищено и может привести к дублированию.
+    ///
+    /// # Аргументы
+    /// * `out` — целевой вектор, куда помещаются извлечённые элементы.
+    /// * `limit` — максимальное число извлекаемых элементов.
     #[inline]
     pub fn pop_many(&self, out: &mut Vec<Vec<u8>>, limit: usize) {
+        // Нулевой лимит — нечего извлекать.
         if limit == 0 { return; }
 
-        out.reserve(limit);
-        for _ in 0..limit {
-            match self.pop() {
-                Some(value) => out.push(value),
-                None => break,
-            }
+        // Consumer владеет tail — можно читать под Relaxed.
+        let tail = self.tail.load(Ordering::Relaxed);
+
+        // Один snapshot головы под Acquire, чтобы увидеть все опубликованные данные.
+        let head = self.head.load(Ordering::Acquire);
+
+        // Сколько элементов реально доступно прямо сейчас.
+        // wrapping_sub защищает от гонки при переполнении счётчиков,
+        // min(capacity) ограничивает значение сверху.
+        let available = head
+            .wrapping_sub(tail)
+            .min(self.capacity);
+
+        // Никогда не читаем больше запрошенного.
+        let count = available.min(limit);
+
+        // Нечего извлекать.
+        if count == 0 { return; }
+
+        // Заранее резервируем место в выходном векторе.
+        out.reserve(count);
+
+        // Читаем `count` элементов подряд, начиная с текущего tail.
+        for offset in 0..count {
+            // Индекс очередного слота в массиве.
+            let index = tail
+                .wrapping_add(offset)
+                % self.capacity;
+
+            // Consumer — единственный владелец, конкуренции нет.
+            // Переносим владение из MaybeUninit наружу.
+            let value = unsafe {
+                (*self.buffer[index].get()).assume_init_read()
+            };
+
+            out.push(value);
         }
+
+        // Публикуем освобождение всех извлечённых слотов одним store.
+        // Producer под Acquire увидит новый tail и сможет переиспользовать диапазон.
+        self.tail.store(
+            tail.wrapping_add(count),
+            Ordering::Release,
+        );
     }
 
-    /// Текущее количество элементов (приблизительное).
+    // ========================================================================
+    // State
+    // ========================================================================
+
+    /// Возвращает текущее количество занятых слотов.
+    ///
+    /// Значение — мгновенный snapshot: при конкурентном доступе оно может
+    /// устареть сразу после возврата. Используется для метрик и грубых проверок.
     #[inline]
     pub fn len(&self) -> usize {
-        self.count.load(Ordering::Acquire)
+        // Acquire на обоих счётчиках — хотим видеть согласованное состояние
+        // публикаций и освобождений слотов.
+        let head = self.head.load(Ordering::Acquire);
+        let tail = self.tail.load(Ordering::Acquire);
+
+        // wrapping_sub защищает от переполнения счётчиков.
+        // min(capacity) ограничивает значение сверху при гонке.
+        head.wrapping_sub(tail).min(self.capacity)
     }
 
-    /// `true`, если буфер пуст.
+    /// Возвращает количество свободных слотов для записи.
+    ///
+    /// Используется producer'ом для оценки, сколько элементов можно
+    /// добавить без ожидания освобождения места.
+    #[inline]
+    pub fn free_slots(&self) -> usize {
+        // head читается под Relaxed — его пишет только producer.
+        let head = self.head.load(Ordering::Relaxed);
+        // tail читается под Acquire — важно увидеть освобождения consumer'а.
+        let tail = self.tail.load(Ordering::Acquire);
+
+        // Занятые слоты с защитой от переполнения и гонки.
+        let used = head.wrapping_sub(tail).min(self.capacity);
+
+        // Свободные слоты.
+        self.capacity - used
+    }
+
+    /// Проверяет, пуст ли буфер.
+    ///
+    /// Snapshot-проверка: результат может устареть сразу после возврата.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        // Оба счётчика под Acquire — нужна согласованная картина.
+        let head = self.head.load(Ordering::Acquire);
+        let tail = self.tail.load(Ordering::Acquire);
+
+        // Пусто, когда позиции головы и хвоста совпадают.
+        head == tail
     }
 
-    /// Количество свободных слотов для записи.
-    #[inline]
-    pub fn capacity_remaining(&self) -> usize {
-        self.capacity.saturating_sub(self.len())
-    }
-
-    /// `true`, если буфер заполнен полностью.
+    /// Проверяет, заполнен ли буфер полностью.
+    ///
+    /// Snapshot-проверка: если результат `true`, следующий `push` может
+    /// всё ещё пройти, если consumer успел освободить слот.
     #[inline]
     pub fn is_full(&self) -> bool {
-        self.len() >= self.capacity
+        // head — только под Relaxed (это поле producer'а).
+        let head = self.head.load(Ordering::Relaxed);
+        // tail под Acquire — важно увидеть освобождения от consumer'а.
+        let tail = self.tail.load(Ordering::Acquire);
+
+        // Разница не меньше ёмкости — все слоты заняты.
+        head.wrapping_sub(tail) >= self.capacity
     }
 
-    /// Очищает буфер.
+    // ========================================================================
+    // Maintenance
+    // ========================================================================
+
+    /// Полностью очищает буфер.
     ///
     /// ВАЖНО:
-    /// Должен вызываться только после остановки всех producers и consumers.
+    /// Должен вызываться только после остановки producer и consumer.
     pub fn clear(&self) {
         let tail = self.tail.load(Ordering::Relaxed);
         let head = self.head.load(Ordering::Relaxed);
 
-        // Количество элементов в буфере.
-        let count = head.wrapping_sub(tail).min(self.capacity);
+        let count = head
+            .wrapping_sub(tail)
+            .min(self.capacity);
 
-        // Дропаем каждый инициализированный слот.
+        // Дропаем только реально занятые слоты.
         for offset in 0..count {
-            let pos = tail.wrapping_add(offset);
-            let slot = &self.buffer[pos % self.capacity];
+            let index = tail
+                .wrapping_add(offset)
+                % self.capacity;
 
             unsafe {
-                // Приводим к Vec<u8> и дропаем.
-                slot.data.get().cast::<Vec<u8>>().drop_in_place();
+                (*self.buffer[index].get())
+                    .assume_init_drop();
             }
         }
 
-        // Сбрасываем голову и хвост в 0.
+        // После полной остановки потоков можно сбросить индексы.
         self.head.store(0, Ordering::Relaxed);
         self.tail.store(0, Ordering::Relaxed);
-
-        // Сбрасываем seq всех слотов в исходное значение (индекс).
-        for (index, slot) in self.buffer.iter().enumerate() {
-            slot.seq.store(index, Ordering::Relaxed);
-        }
     }
 }
 
 impl Drop for RingBuffer {
     fn drop(&mut self) {
-        let tail = self.tail.load(Ordering::Relaxed);
-        let head = self.head.load(Ordering::Relaxed);
-
-        // Количество элементов, которые нужно дропнуть.
-        let count = head.wrapping_sub(tail).min(self.capacity);
-
-        // Дропаем все инициализированные данные.
-        for offset in 0..count {
-            let pos = tail.wrapping_add(offset);
-            let slot = &mut self.buffer[pos % self.capacity];
-
-            unsafe {
-                slot.data.get_mut().assume_init_drop();
-            }
-        }
+        // Очищаем буфер: дропаем все элементы в диапазоне [tail, head)
+        // и сбрасываем счётчики в исходное состояние.
+        self.clear();
     }
 }

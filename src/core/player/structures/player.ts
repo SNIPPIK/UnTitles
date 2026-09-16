@@ -178,6 +178,9 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public set cycle(isActive: boolean) {
         if (!this.id) return;
 
+        // Отправляем пустышку если такая возможность есть
+        if (this._voice.connection.ready && !this.playing) this._voice.connection.packet(SILENT_FRAMES);
+
         // Подключаем плеер к циклу
         if (isActive) {
             // Если нет плеера в цикле
@@ -381,9 +384,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
         // Отключаем плеер от цикла
         this.cycle = false;
 
-        // Отправляем пустышку если такая возможность есть
-        if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
-
         // Логируем
         this.emit("player/log", `[AudioPlayer/${this.id}] paused`);
     };
@@ -430,9 +430,6 @@ export class AudioPlayer extends TypedEmitter<AudioPlayerEvents> {
     public stop = (): Promise<void> | void => {
         if (this._status === AudioPlayerState.idle) return;
         this.status = AudioPlayerState.idle;
-
-        // Отправляем пустышку если такая возможность есть
-        if (this._voice.connection.ready) this._voice.connection.packet(SILENT_FRAMES);
     };
 
     /**

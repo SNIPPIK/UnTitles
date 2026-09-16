@@ -286,6 +286,9 @@ class RestYouTubeAPI extends RestServerSide.API {
                         if (api instanceof Error) return api;
                     }
 
+                    // Если данные о треке не были получены
+                    if (!api["videoDetails"]) return locale.err( "api.request.fail.msg", ["No videoDetails is being received"]);
+
                     // Класс трека
                     const track = this.track(api["videoDetails"]);
 
@@ -308,7 +311,18 @@ class RestYouTubeAPI extends RestServerSide.API {
                         if (data["hlsManifestUrl"]) track.audio = data["dashManifestUrl"];
                         else {
                             // Если есть расшифровка ссылки видео
-                            if (data["formats"]) track.audio = data["formats"][0]["url"];
+                            if (data["formats"]) {
+                                const format = data["formats"][0];
+
+                                // Если ссылка на аудио не получена!
+                                if (!format) return locale.err( "api.request.fail.msg", ["No format data is being received"]);
+
+                                const url = format["url"];
+
+                                // Если ссылка на аудио не получена!
+                                if (!url ) return locale.err( "api.request.fail.msg", ["No audio data is being received"]);
+                                track.audio = url;
+                            }
                         }
                     }
 
@@ -567,8 +581,7 @@ class RestYouTubeAPI extends RestServerSide.API {
      */
     protected _extractResponse = (input: string): json | Error => {
         // Проверяем, что входные данные являются строкой. Если нет — возвращаем локализованную ошибку.
-        if (typeof input !== "string")
-            return locale.err("api.request.fail");
+        if (typeof input !== "string") return locale.err("api.request.fail");
 
         // Пытаемся извлечь JSON с помощью одного из маркеров. Приоритет отдаётся
         // `ytInitialPlayerResponse`, так как он содержит более специфичные данные.

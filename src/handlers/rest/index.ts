@@ -422,12 +422,13 @@ export class RestObject<T extends APIRequestsKeys = APIRequestsKeys> extends Res
                         track.time.total - song.time.total
                     );
 
+                    const name = getSmartMatch(original, candidate, 0.4);
+
                     return (
                         getSmartMatch(original, candidate) ||
-                        (
-                            timeDiff <= 5 &&
-                            getSmartMatch(original, candidate, 0.6)
-                        )
+                        (timeDiff <= 5 && name) ||
+                        (timeDiff <= 10 && name) ||
+                        (timeDiff <= 15 && name)
                     );
                 });
 

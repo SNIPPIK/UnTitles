@@ -1,4 +1,5 @@
 pub mod packet_type;
+mod opus_specification;
 
 use crate::structures::audio::encoder::ogg::packet_type::{PacketType, ParsedPacket};
 use napi::bindgen_prelude::{ Error, Result };
@@ -61,8 +62,8 @@ impl OggOpusDemuxer {
     /// `bitstream_serial` — идентификатор текущего логического потока.
     pub fn new() -> Self {
         Self {
-            remainder: BytesMut::with_capacity(2128),
-            packet_carry: Vec::with_capacity(512),
+            remainder: BytesMut::with_capacity(1024),
+            packet_carry: Vec::with_capacity(256),
             bitstream_serial: None,
         }
     }
@@ -78,48 +79,12 @@ impl OggOpusDemuxer {
     /// Если `chunk` пуст — принудительно выталкивает последний незавершённый пакет.
     /// Иначе запускает основной парсер с возвратом, копирующим данные в `output`.
     pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<ParsedPacket>) -> Result<()> {
-        if chunk.is_empty() {
-            return self.flush_internal(output);
-        }
+        if chunk.is_empty() { return Ok(()); }
 
         self.parse_core(chunk, |packet_type, data| {
             output.push((packet_type, data.to_vec()));
             Ok(())
         })
-    }
-
-    /// Выдаёт последний незавершённый пакет при завершении потока (EOF).
-    ///
-    /// Вызывается, когда входной буфер пуст и нужно «дочистить» накопленные данные.
-    /// Пакеты короче 12 байт отбрасываются как подозрительные (не могут быть
-    /// валидным Opus-фреймом).
-    ///
-    /// # Аргументы
-    /// * `output` — вектор, в который помещается готовый пакет.
-    ///
-    /// # Возвращаемое значение
-    /// `Ok(())` в любом случае; ошибки парсинга здесь не генерируются.
-    fn flush_internal(&mut self, output: &mut Vec<ParsedPacket>) -> Result<()> {
-        // Если незавершённых данных нет — нечего выдавать.
-        if self.packet_carry.is_empty() {
-            return Ok(());
-        }
-
-        // Отбрасываем подозрительно короткие хвосты (< 12 байт):
-        // такие пакеты не могут быть валидными Opus-фреймами.
-        else if self.packet_carry.len() < 12 {
-            self.packet_carry.clear();
-            return Ok(());
-        }
-
-        // Забираем накопленные данные, оставляя пустой Vec.
-        let packet = std::mem::take(&mut self.packet_carry);
-        // Определяем тип последнего пакета.
-        let packet_type = PacketType::detect_packet_type(&packet);
-
-        // Публикуем пакет в выходной вектор.
-        output.push((packet_type, packet));
-        Ok(())
     }
 
     /// Основной цикл разбора:

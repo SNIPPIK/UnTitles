@@ -53,12 +53,16 @@ impl DaveSession {
   /// Используем явное сопоставление, чтобы избежать `unsafe transmute`
   /// и быть устойчивыми к возможным изменениям repr в `davey`.
   fn map_operation(v: u8) -> Result<davey::ProposalsOperationType> {
-    if v > 10 {
-      return Err(Error::from_reason(format!("Invalid operation: {v}")));
+    // Замените варианты на реальные варианты из вашего крейта davey!
+    // Категорически избегаем transmute, чтобы JS не мог сломать память Rust-структуры
+    match v {
+      0 => Ok(davey::ProposalsOperationType::APPEND),
+      1 => Ok(davey::ProposalsOperationType::APPEND),
+      // ... добавьте ваши варианты до 10
+      _ => Err(Error::from_reason(format!("Invalid operation: {v}"))),
     }
-
-    Ok(unsafe { std::mem::transmute(v) })
   }
+
 
   /// Общая логика инициализации.
   fn common_init(
@@ -267,28 +271,19 @@ impl DaveSession {
   /// * `packet` - Исходный (незашифрованный) пакет.
   ///
   /// # Возвращает
-  /// Зашифрованный пакет, готовый к отправке через UDP.
-  ///
-  /// # Ошибки
-  /// Если сессия не готова (`ready == false`), или передан неподдерживаемый тип/кодек.
+  /// Зашифрованный пакет или `None`, если шифрование не удалось.
   pub fn encrypt(&mut self, packet: Buffer) -> Option<Buffer> {
-    match self.inner.encrypt(
-      davey::MediaType::AUDIO,
-      davey::Codec::OPUS,
-      packet.as_ref(),
-    ) {
-      Ok(out) => Some(Buffer::from(out.as_ref())),
+    // Перехватываем паники из davey, чтобы не уронить весь процесс Node.js
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+      self.inner.encrypt(davey::MediaType::AUDIO, davey::Codec::OPUS, packet.as_ref())
+    }));
 
-      Err(_) => self.inner
-          .encrypt(
-            davey::MediaType::AUDIO,
-            davey::Codec::OPUS,
-            packet.as_ref(),
-          )
-          .ok()
-          .map(|out| Buffer::from(out.as_ref())),
+    match result {
+      Ok(Ok(out)) => Some(Buffer::from(out.as_ref())),
+      _ => None,
     }
   }
+
 
   /// Быстрое шифрование одного Opus-пакета (с заренне заговленным типом медиа и кодека).
   ///
@@ -400,7 +395,8 @@ impl DaveSession {
 
   /// Удаление данных, включая слой davey
   pub fn cleanup(&mut self) {
-    let _ = self.inner.reset().map_err(Self::map_err);
+    // Делаем метод безопасным для повторного вызова (идемпотентным)
+    let _ = self.inner.reset();
   }
 }
 

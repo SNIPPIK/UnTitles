@@ -1,380 +1,574 @@
-use std::fmt;
+use crate::structures::audio::encoder::ogg::opus_specification::{
+    OpusPacketError, OpusPacketInfo, OpusToc,
+    MAX_OPUS_FRAMES, MAX_OPUS_FRAME_BYTES
+};
 
-/// Верхний предел количества фреймов в одном Opus-пакете (RFC 6716).
-const MAX_OPUS_FRAMES: usize = 48;
+/// Максимально допустимая длина length-поля (RFC 6716 §3.2.1).
+const MAX_LENGTH_FIELD_BYTES: usize = 3;
 
-/// Максимальный размер одного Opus-фрейма (RFC 6716).
-const MAX_OPUS_FRAME_BYTES: usize = 1275;
-
-/// Верхний предел размера Opus-пакета: 48 фреймов по 1275 байт + заголовки.
-/// Отсекает мусорные «пакеты» на входе.
-const MAX_OPUS_PACKET_BYTES: usize = MAX_OPUS_FRAMES * MAX_OPUS_FRAME_BYTES + 64;
-
-/// Типы пакетов для OPUS, рекомендуется некоторые просто не пушить в исходное аудио
-/// Для Discord - Frame, Silent. Поскольку остальные не требуются и будут откинуты, это уже потеря пакета.
+/// Типы пакетов для OPUS. Рекомендуется часть из них не отправлять в аудио-буфер.
+/// Для Discord актуальны `Frame` и `Silent`; остальные типы не требуются
+/// и будут отброшены (потеря пакета).
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum PacketType {
-    Head,       // OpusHead
-    Tags,       // OpusTags
+    /// Заголовок идентификации Opus (OpusHead).
+    Head,
+    /// Заголовок комментариев Opus (OpusTags).
+    Tags,
 
-    Frame,      // обычный Opus audio frame
-    Silent,     // специальный маркер тишины
-    PLC,        // packet loss concealment
-    VBR,        // VBR-related packet/frame
+    /// Обычный Opus-аудиофрейм.
+    Frame,
+    /// Специальный маркер тишины.
+    Silent,
+    /// Packet Loss Concealment — пакет восстановления потерь.
+    PLC,
+    /// Пакет/фрейм с переменным битрейтом (VBR).
+    VBR,
 
-    Broken,     // повреждённый/некорректный пакет
-    End,        // внутренний 0xFF
+    /// Повреждённый или некорректный пакет.
+    Broken,
+    /// Внутренний маркер конца потока (0xFF).
 
-    OggPage,    // Ogg container page
+    End,
+
+    /// Страница Ogg-контейнера.
+    OggPage
 }
 
-/// Выходной пакет: (тип, данные).
+/// Выходной пакет: кортеж из типа и данных.
 pub type ParsedPacket = (PacketType, Vec<u8>);
 
 impl PacketType {
     /// Проверяет, относится ли тип пакета к обрабатываемым аудио фреймам.
     ///
-    /// Возвращает `true`, если пакет является одним из:
-    /// - `Frame` — обычный Opus-фрейм с одним или двумя кадрами;
-    /// - `Silent` — специальный пакет тишины;
-    /// - `VBR` — пакет с переменным битрейтом (используемый в некоторых реализациях).
+    /// Возвращает `true` для одного из:
+    /// - `Frame` — обычный Opus-фрейм;
+    /// - `VBR` — фрейм с переменным битрейтом;
+    /// - `Silent` — пакет тишины;
+    /// - `PLC` — пакет восстановления потерь.
     ///
     /// Такие пакеты должны передаваться в аудио-декодер или буфер,
     /// в отличие от служебных (`Head`, `Tags`, `OggPage` и т.п.).
     pub fn is_audio_frame(self) -> bool {
-        matches!(self, Self::Frame | Self::Silent | Self::VBR)
+        matches!(self, Self::Frame | Self::VBR | Self::Silent | Self::PLC)
     }
 
-    /// Определяет тип пакета на основе его содержимого и длины.
+    /// Определяет тип пакета по его содержимому и длине.
     ///
     /// Поддерживает:
-    /// - RFC 6716 (Opus Audio Codec)
-    /// - Ogg контейнер
-    /// - Discord PLC (Packet Loss Concealment) маркеры
-    pub fn detect_packet_type(packet: &[u8]) -> PacketType {
-        let len = packet.len();
-
-        if len == 0 {
-            return PacketType::Broken;
-        }
-
-        // Одиночный байт 0xFF — внутренний маркер конца потока.
-        if len == 1 && packet[0] == 0xFF {
-            return PacketType::End;
-        }
-
-        // Ogg-страница.
-        if len >= 4 && packet.starts_with(b"OggS") {
-            return PacketType::OggPage;
-        }
-
-        // Opus identification header (OpusHead), RFC 6716: минимум 19 байт.
-        if packet.starts_with(b"OpusHead") {
-            return if len >= 19 {
-                PacketType::Head
-            } else {
-                PacketType::Broken
-            };
-        }
-
-        // Opus comment header (OpusTags), RFC 6716: минимум 12 байт.
-        if packet.starts_with(b"OpusTags") {
-            return if len >= 12 {
-                PacketType::Tags
-            } else {
-                PacketType::Broken
-            };
-        }
-
-        // Discord PLC маркеры.
-        match packet {
-            [0xFC, 0xFF, 0xFE] => return PacketType::PLC,
-            [0xF8, 0xFF, 0xFE] => return PacketType::Silent,
-            _ => {}
-        }
-
-        // Строгий структурный разбор Opus-пакета.
-        match parse_opus_packet(packet) {
-            Ok(info) => match info.toc.frame_code {
-                0b10 => PacketType::VBR,
-                _ => PacketType::Frame,
-            },
-            Err(_) => PacketType::Broken,
-        }
-    }
-}
-
-/// TOC-байт Opus-пакета: 5 бит config, 1 бит stereo, 2 бита frame code.
-///
-/// Соответствует первому байту каждого Opus-пакета (RFC 6716 §3.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct OpusToc {
-    /// Номер конфигурации (0..=31) — определяет режим кодека и длительность кадра.
-    pub config: u8,
-    /// Флаг стерео: `true` — стерео, `false` — моно.
-    pub stereo: bool,
-    /// Код количества кадров (0..=3) — определяет структуру пакета.
-    pub frame_code: u8,
-}
-
-impl OpusToc {
-    /// Разбирает TOC-байт на составляющие поля.
+    /// - RFC 6716 (Opus Audio Codec);
+    /// - Ogg-контейнер;
+    /// - Discord PLC (Packet Loss Concealment) маркеры.
     ///
     /// # Аргументы
-    /// * `byte` — первый байт Opus-пакета.
+    /// * `packet` — байтовый срез пакета.
     ///
     /// # Возвращаемое значение
-    /// Структура с извлечёнными полями config/stereo/frame_code.
-    #[inline]
-    pub fn parse(byte: u8) -> Self {
-        Self {
-            // Старшие 5 бит — config.
-            config: (byte >> 3) & 0x1F,
-            // Бит 2 — флаг стерео.
-            stereo: (byte >> 2) & 1 != 0,
-            // Младшие 2 бита — код количества кадров.
-            frame_code: byte & 0b11,
+    /// Вариант [`PacketType`], соответствующий распознанному формату.
+    pub fn detect_packet_type(packet: &[u8]) -> PacketType {
+        match packet {
+            // Пустой пакет — некорректен.
+            [] => PacketType::Broken,
+
+            // Внутренний маркер конца потока.
+            [0xFF] => PacketType::End,
+
+            // Discord PLC / silence маркеры.
+            [0xFC, 0xFF, 0xFE] => PacketType::PLC,
+            [0xF8, 0xFF, 0xFE] => PacketType::Silent,
+
+            // Страница Ogg-контейнера.
+            _ if packet.len() >= 4 && packet.starts_with(b"OggS") => {
+                PacketType::OggPage
+            }
+
+            // Заголовок идентификации Opus.
+            _ if packet.starts_with(b"OpusHead") => {
+                if packet.len() >= 19 {
+                    PacketType::Head
+                } else {
+                    PacketType::Broken
+                }
+            }
+
+            // Заголовок комментариев Opus.
+            _ if packet.starts_with(b"OpusTags") => {
+                if packet.len() >= 12 {
+                    PacketType::Tags
+                } else {
+                    PacketType::Broken
+                }
+            }
+
+            // Во всех остальных случаях пытаемся разобрать как Opus-пакет.
+            _ => match parse_opus_packet(packet) {
+                // Успешный разбор с флагом VBR.
+                Ok(info) if info.vbr => PacketType::VBR,
+                // Успешный разбор обычного фрейма.
+                Ok(_) => PacketType::Frame,
+                // Разбор не прошёл — считаем пакет повреждённым.
+                Err(_) => PacketType::Broken,
+            },
         }
     }
 }
 
-/// Структурная информация о корректном Opus-пакете.
-#[derive(Debug, Clone, Copy)]
-pub struct OpusPacketInfo {
-    /// Разобранный TOC-байт.
-    pub toc: OpusToc,
-    /// Итоговое число аудио кадров в пакете.
-    pub frame_count: usize,
-    /// Сколько байт занимает padding (срезается с конца payload).
-    pub padding_bytes: usize,
-    /// Сколько байт приходится на сами фреймы.
-    pub payload_bytes: usize,
-}
-
-/// Причина, по которой пакет не является валидным Opus-пакетом.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OpusPacketError {
-    /// Пустой пакет.
-    Empty,
-    /// Пакет превышает установленный предел.
-    TooLarge(usize),
-    /// Заголовок пакета обрезан.
-    TruncatedHeader,
-    /// Недопустимое количество кадров.
-    InvalidFrameCount(u8),
-    /// Поле длины обрезано.
-    TruncatedLengthField,
-    /// Padding превышает доступный объём данных.
-    PaddingExceedsPacket { padding: usize, available: usize },
-    /// Payload короче, чем требуется для указанного числа кадров.
-    PayloadTooShort { payload: usize, frames: usize },
-    /// Payload не делится на число кадров без остатка (для CBR).
-    PayloadNotDivisible { payload: usize, frames: usize },
-    /// Размер отдельного кадра превышает предел.
-    FrameTooLarge(usize),
-}
-
-/// Реализация `Display` для читаемого представления ошибок.
-impl fmt::Display for OpusPacketError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Empty => write!(f, "empty packet"),
-            Self::TooLarge(n) => write!(f, "packet {} exceeds limit", n),
-            Self::TruncatedHeader => write!(f, "truncated header"),
-            Self::InvalidFrameCount(n) => write!(f, "invalid frame count {}", n),
-            Self::TruncatedLengthField => write!(f, "truncated length field"),
-            Self::PaddingExceedsPacket { padding, available } => write!(
-                f, "padding {} exceeds available {}", padding, available
-            ),
-            Self::PayloadTooShort { payload, frames } => write!(
-                f, "payload {} too short for {} frames", payload, frames
-            ),
-            Self::PayloadNotDivisible { payload, frames } => write!(
-                f, "payload {} not divisible by {} frames", payload, frames
-            ),
-            Self::FrameTooLarge(n) => write!(
-                f, "frame {} exceeds {} bytes", n, MAX_OPUS_FRAME_BYTES
-            ),
-        }
-    }
-}
-
-/// Реализация `Error` для использования в `Result`.
-impl std::error::Error for OpusPacketError {}
-
-/// Читает длину в кодировке RFC 6716 §3.2.1.
+/// Читает length-поле Opus согласно RFC 6716 §3.2.1.
 ///
-/// Байт 255 означает «продолжение», любое значение < 255 — конец.
-/// Итоговая длина — сумма всех прочитанных байт.
+/// В packet framing Opus размер некоторых структур кодируется
+/// последовательностью байт. Значение `255` означает, что поле
+/// продолжается следующим байтом, а любое значение меньше `255`
+/// завершает поле.
 ///
-/// # Аргументы
-/// * `packet` — входные данные.
-/// * `offset` — текущая позиция, будет увеличена по мере чтения.
+/// Поэтому итоговое значение вычисляется как сумма всех прочитанных
+/// байт:
 ///
-/// # Возвращаемое значение
-/// `Ok(сумма)` при успешном чтении.
+/// ```text
+/// 255 + 255 + 100 = 610
+/// ```
 ///
-/// # Ошибки
-/// - `TruncatedLengthField` — данные закончились раньше конца поля.
-/// - `TooLarge` — переполнение при сложении.
+/// Ограничение `MAX_LENGTH_FIELD_BYTES` не является частью арифметики
+/// длины как таковой. Это защитная граница парсера, предотвращающая
+/// бесконечный или чрезмерно длинный malformed length field.
+///
+/// Функция намеренно работает непосредственно с исходным packet buffer
+/// и не создаёт временных структур или аллокаций.
+///
+/// # Arguments
+///
+/// * `packet` — полный входной Opus-пакет.
+/// * `offset` — текущая позиция чтения. При успешном чтении указатель
+///   перемещается за пределы обработанного length-поля.
+///
+/// # Returns
+///
+/// Возвращает суммарное значение length-поля.
+///
+/// # Errors
+///
+/// * [`OpusPacketError::TruncatedLengthField`] — пакет закончился
+///   до завершения length-поля.
+/// * [`OpusPacketError::TooLarge`] — произошло переполнение `usize`
+///   при накоплении длины.
+/// * [`OpusPacketError::InvalidLengthField`] — поле превысило
+///   установленное внутреннее ограничение по количеству байт.
 #[inline]
 fn read_length(packet: &[u8], offset: &mut usize) -> Result<usize, OpusPacketError> {
     let mut total = 0usize;
-    loop {
-        // Читаем очередной байт длины.
-        let b = *packet
+
+    // Ограничиваем количество байт, которое функция имеет право
+    // прочитать для одного length-поля.
+    //
+    // Это дополнительная защита от повреждённого или намеренно
+    // сформированного пакета с бесконечной последовательностью `255`.
+    for _ in 0..MAX_LENGTH_FIELD_BYTES {
+        // Получаем текущий байт.
+        //
+        // Использование `.get()` вместо прямого индексирования
+        // гарантирует отсутствие panic при обрезанном packet buffer.
+        let byte = *packet
             .get(*offset)
             .ok_or(OpusPacketError::TruncatedLengthField)?;
+
+        // Перемещаем позицию чтения сразу после потреблённого байта.
         *offset += 1;
 
-        // Прибавляем с проверкой переполнения.
+        // Length кодируется суммой последовательных значений.
+        //
+        // checked_add() нужен не столько для обычного Opus-пакета,
+        // сколько как дополнительная гарантия безопасности при работе
+        // с потенциально повреждённым или искусственно сформированным
+        // входом.
         total = total
-            .checked_add(b as usize)
+            .checked_add(byte as usize)
             .ok_or(OpusPacketError::TooLarge(usize::MAX))?;
 
-        // Любое значение < 255 завершает поле.
-        if b != 255 {
+        // Значение меньше 255 завершает length-поле.
+        //
+        // Значение 255 означает "продолжение", поэтому цикл должен
+        // перейти к чтению следующего байта.
+        if byte != 255 {
             return Ok(total);
         }
     }
+
+    // Все разрешённые байты были `255`, но завершающего байта
+    // так и не встретилось.
+    Err(OpusPacketError::InvalidLengthField)
 }
 
-/// Строгий разбор структуры Opus-пакета по RFC 6716 §3.2.
+/// Выполняет строгий структурный разбор Opus-пакета
+/// согласно RFC 6716 §3.2.
 ///
-/// Проверяет:
-/// * наличие TOC-байта;
-/// * корректность кода фреймов (0..=3) и, для code 3, счётчика 1..=48;
-/// * корректность length-полей padding'а и VBR-длин;
-/// * что padding и фреймы не выходят за границы пакета;
-/// * что payload достаточно для объявленного числа фреймов;
-/// * для CBR — что payload делится на число фреймов без остатка;
-/// * верхние пределы размера пакета и фрейма.
+/// Функция занимается исключительно packet framing:
 ///
-/// # Аргументы
-/// * `packet` — байтовый срез Opus-пакета (начиная с TOC-байта).
+/// ```text
+/// raw Opus bytes
+///       │
+///       ▼
+///      TOC
+///       │
+///       ├── frame code
+///       ├── frame count
+///       ├── VBR / CBR
+///       └── padding
+///              │
+///              ▼
+///       frame boundaries
+///              │
+///              ▼
+///       OpusPacketInfo
+/// ```
 ///
-/// # Возвращаемое значение
-/// `OpusPacketInfo` со структурной информацией о пакете.
+/// Декодирование Opus здесь не выполняется.
 ///
-/// # Ошибки
-/// Возвращает `OpusPacketError` при любом несоответствии RFC.
+/// Аналогично функция не занимается RTP, UDP, Discord Voice,
+/// FFmpeg или PCM. Это позволяет использовать parser независимо
+/// от транспортного слоя.
+///
+/// Проверяются:
+///
+/// * наличие TOC;
+/// * допустимость frame code;
+/// * количество кадров;
+/// * наличие и размер padding;
+/// * VBR length fields;
+/// * границы frame payload;
+/// * размер каждого кадра;
+/// * CBR/VBR packet structure;
+/// * итоговая согласованность размера пакета.
+///
+/// Функция не выполняет heap allocation и не копирует содержимое
+/// входного packet.
+///
+/// # Arguments
+///
+/// * `packet` — полный Opus packet без RTP-заголовка.
+///
+/// # Returns
+///
+/// Возвращает [`OpusPacketInfo`] с уже разобранной структурой
+/// packet framing.
+///
+/// # Errors
+///
+/// Возвращает [`OpusPacketError`] при любом нарушении структуры
+/// пакета или внутренних ограничений parser-а.
+#[inline]
 pub fn parse_opus_packet(packet: &[u8]) -> Result<OpusPacketInfo, OpusPacketError> {
-    // Пустой пакет — заведомо невалиден.
-    if packet.is_empty() {
-        return Err(OpusPacketError::Empty);
-    }
-    // Проверка верхнего предела размера пакета.
-    if packet.len() > MAX_OPUS_PACKET_BYTES {
-        return Err(OpusPacketError::TooLarge(packet.len()));
+    let packet_len = packet.len();
+
+    // Выполняем самые дешёвые проверки до любого структурного разбора.
+    //
+    // Пустой packet не содержит даже TOC.
+    //
+    // Слишком большой packet сразу отбрасывается как выходящий
+    // за внутреннюю границу parser-а.
+    match packet_len {
+        0 => return Err(OpusPacketError::Empty),
+        sz if sz > MAX_OPUS_FRAME_BYTES => {
+            return Err(OpusPacketError::TooLarge(sz));
+        }
+        _ => {}
     }
 
-    // Разбираем TOC-байт.
+    // Первый байт любого Opus packet — TOC.
+    //
+    // Здесь он уже гарантированно существует, поскольку выше
+    // проверено packet_len != 0.
     let toc = OpusToc::parse(packet[0]);
-    // Смещение в пакете: сразу после TOC.
-    let mut offset = 1usize;
 
-    // Разбираем код фреймов.
+    // Позиция следующего непрочитанного байта.
+    //
+    // После TOC она начинается с offset = 1.
+    let mut offset = 1;
+
+    // Из frame code определяем:
+    //
+    // * количество кадров;
+    // * используется ли VBR;
+    // * присутствует ли padding.
+    //
+    // Это центральная точка packet framing: дальнейший разбор
+    // полностью зависит от полученной структуры.
     let (frame_count, vbr, has_padding) = match toc.frame_code {
-        // Code 0: один кадр.
-        0b00 => (1usize, false, false),
-        // Code 1: два кадра CBR.
-        0b01 => (2usize, false, false),
-        // Code 2: два кадра VBR.
-        0b10 => (2usize, true, false),
-        // Code 3: произвольное число кадров, читаем доп. байт.
-        0b11 => {
-            let ch = *packet.get(offset).ok_or(OpusPacketError::TruncatedHeader)?;
+        // Один frame, размер определяется оставшимся payload.
+        00 => (1, false, false),
+
+        // Два frame с одинаковым размером.
+        01 => (2, false, false),
+
+        // Два frame с индивидуальными размерами.
+        10 => (2, true, false),
+
+        // Специальная структура:
+        //
+        // следующий байт содержит:
+        //
+        // bit 7 — VBR
+        // bit 6 — padding
+        // bit 5..0 — количество frames
+        11 => {
+            // Для чтения frame-count byte должен существовать
+            // хотя бы ещё один байт после TOC.
+            if offset >= packet_len {
+                return Err(OpusPacketError::TruncatedHeader);
+            }
+
+            let ch = packet[offset];
             offset += 1;
 
-            // Флаг VBR — старший бит.
-            let vbr = (ch & 0x80) != 0;
-            // Флаг наличия padding'а — бит 6.
-            let has_padding = (ch & 0x40) != 0;
-            // Количество кадров — младшие 6 бит.
-            let m = (ch & 0x3F) as usize;
+            // Младшие 6 бит содержат количество кадров.
+            let frame_count = (ch & 0x7F) as usize;
 
-            // По RFC 6716 допустимо от 1 до 48 кадров.
-            if m == 0 || m > MAX_OPUS_FRAMES {
-                return Err(OpusPacketError::InvalidFrameCount(m as u8));
+            // Zero frames недопустимы, а parser дополнительно
+            // ограничивает количество кадров внутренним максимумом.
+            if frame_count == 0 || frame_count > MAX_OPUS_FRAMES {
+                return Err(OpusPacketError::InvalidFrameCount(
+                    frame_count as u8
+                ));
             }
-            (m, vbr, has_padding)
+
+            // Bit 7: VBR flag.
+            //
+            // true означает, что размеры frames будут явно
+            // указаны в packet.
+            //
+            // false означает CBR-раскладку.
+            //
+            // Bit 6: padding flag.
+            //
+            // При его наличии после frame payload находится
+            // дополнительный padding, размер которого кодируется
+            // отдельным length-полем.
+            (
+                frame_count,
+                (ch & 0x80) != 0,
+                (ch & 0x40) != 0,
+            )
         }
-        // Невозможная ветка (frame_code имеет только 2 бита).
-        _ => unreachable!(),
+
+        // frame_code занимает ровно два бита, поэтому других
+        // значений существовать не может.
+        _ => (3, false, false)
     };
 
-    // Padding: длина в "length of length" кодировке.
+    // Если packet содержит padding, сначала считываем его размер.
+    //
+    // Padding располагается в конце packet и не является частью
+    // аудио frames, поэтому его необходимо исключить из payload
+    // до расчёта frame sizes.
     let padding_bytes = if has_padding {
         read_length(packet, &mut offset)?
     } else {
         0
     };
 
-    // VBR: M-1 явных длин (длина последнего фрейма — остаток).
-    let mut declared_sum = 0usize;
-    if vbr && frame_count > 1 {
-        for _ in 0..(frame_count - 1) {
-            let len = read_length(packet, &mut offset)?;
-            declared_sum = declared_sum
-                .checked_add(len)
-                .ok_or(OpusPacketError::TooLarge(usize::MAX))?;
-        }
-    }
-
-    // Заголовок не должен вылезти за пределы пакета.
-    if offset > packet.len() {
+    // После чтения служебных полей offset не должен выйти
+    // за границу packet.
+    //
+    // Также padding должен физически помещаться в оставшийся
+    // packet buffer.
+    if offset > packet_len
+        || padding_bytes > packet_len - offset
+    {
         return Err(OpusPacketError::TruncatedHeader);
     }
-    // Доступный объём данных после заголовка.
-    let available = packet.len() - offset;
 
-    // Проверяем, что padding не превышает доступные данные.
-    if padding_bytes > available {
-        return Err(OpusPacketError::PaddingExceedsPacket {
-            padding: padding_bytes,
-            available,
+    // Всё, что осталось между текущей позицией и padding,
+    // является непосредственно frame payload.
+    //
+    // Важно: padding уже исключён и не участвует в расчёте
+    // размеров Opus frames.
+    let payload_bytes =
+        packet_len - offset - padding_bytes;
+
+    // Даже один frame должен содержать данные.
+    //
+    // Отдельно от этого CBR/VBR parser проверит конкретный
+    // допустимый размер frame.
+    if payload_bytes == 0 {
+        return Err(OpusPacketError::PayloadTooShort {
+            payload: 0,
+            frames: frame_count,
         });
     }
 
-    // Реальный объём payload без padding'а.
-    let payload_bytes = available - padding_bytes;
-
-    // VBR: после явных длин должен остаться хотя бы 1 байт на последний кадр.
-    if vbr && frame_count > 1 {
-        if declared_sum >= payload_bytes {
-            return Err(OpusPacketError::PayloadTooShort {
-                payload: payload_bytes,
-                frames: frame_count,
-            });
-        }
+    // Теперь разбираем непосредственно frame payload.
+    //
+    // VBR требует чтения length fields для frames.
+    //
+    // CBR не содержит отдельных length fields:
+    // размер определяется делением общего payload на количество frames.
+    if vbr {
+        parse_vbr_frames(
+            packet,
+            &mut offset,
+            frame_count,
+            payload_bytes,
+        )?;
+    } else {
+        parse_cbr_frames(frame_count, payload_bytes)?;
     }
 
-    // CBR: payload должен делиться на число кадров без остатка.
-    if !vbr {
-        if payload_bytes < frame_count {
-            return Err(OpusPacketError::PayloadTooShort {
-                payload: payload_bytes,
-                frames: frame_count,
-            });
-        }
-        if payload_bytes % frame_count != 0 {
-            return Err(OpusPacketError::PayloadNotDivisible {
-                payload: payload_bytes,
-                frames: frame_count,
-            });
-        }
+    // Финальная проверка согласованности.
+    //
+    // Здесь offset уже указывает на границу frame metadata/payload,
+    // поэтому к нему добавляются:
+    //
+    // * фактический frame payload;
+    // * padding.
+    //
+    // Результат должен точно совпасть с размером исходного packet.
+    let expected_packet_size = offset
+        .checked_add(payload_bytes)
+        .and_then(|size| size.checked_add(padding_bytes))
+        .ok_or(OpusPacketError::TooLarge(usize::MAX))?;
+
+    if expected_packet_size != packet_len {
+        return Err(OpusPacketError::PacketSizeMismatch {
+            expected: expected_packet_size,
+            actual: packet_len,
+        });
     }
 
-    // Размер среднего фрейма не должен превышать 1275 байт.
-    let per_frame_max = payload_bytes / frame_count.max(1);
-    if per_frame_max > MAX_OPUS_FRAME_BYTES {
-        return Err(OpusPacketError::FrameTooLarge(per_frame_max));
-    }
-
+    // Все структурные проверки пройдены.
+    //
+    // Возвращаем компактное описание packet-а без копирования
+    // исходных bytes.
     Ok(OpusPacketInfo {
-        toc,
+        /*toc,
         frame_count,
         padding_bytes,
-        payload_bytes,
+        payload_bytes,*/
+        vbr,
     })
+}
+
+/// Разбирает размеры кадров VBR-пакета.
+///
+/// В VBR packet размеры первых `N - 1` кадров записаны
+/// непосредственно перед frame payload в виде length fields.
+///
+/// Размер последнего кадра отдельно не хранится:
+///
+/// ```text
+/// last_frame = payload_size - sum(previous_frames)
+/// ```
+///
+/// Это позволяет избежать отдельного length field для последнего
+/// кадра и одновременно даёт возможность проверить, что все
+/// объявленные размеры действительно помещаются в packet.
+///
+/// Функция не извлекает сами frames и не копирует их данные.
+/// Она только проверяет корректность их границ.
+///
+/// # Arguments
+///
+/// * `packet` — исходный Opus packet.
+/// * `offset` — текущая позиция чтения metadata.
+/// * `frame_count` — количество frames.
+/// * `payload_bytes` — общий размер frame payload после исключения
+///   padding.
+#[inline]
+fn parse_vbr_frames(packet: &[u8], offset: &mut usize, frame_count: usize, payload_bytes: usize) -> Result<(), OpusPacketError> {
+    // Накапливаем размеры всех frames, кроме последнего.
+    //
+    // Последний frame вычисляется как остаток payload.
+    let mut declared_sum = 0usize;
+
+    // Последний frame не имеет собственного length field.
+    let last_idx = frame_count - 1;
+
+    // Читаем length field только для первых N - 1 frames.
+    for _ in 0..last_idx {
+        let frame_size = read_length(packet, offset)?;
+
+        // Нулевой frame не содержит аудиоданных.
+        //
+        // Также запрещаем frame, превышающий максимально допустимый
+        // размер одного Opus frame.
+        if frame_size == 0
+            || frame_size > MAX_OPUS_FRAME_BYTES
+        {
+            return Err(OpusPacketError::InvalidFrameSize(frame_size));
+        }
+
+        // Суммируем уже объявленные frame sizes.
+        //
+        // checked_add() гарантирует отсутствие integer overflow
+        // даже при повреждённом input.
+        declared_sum = declared_sum
+            .checked_add(frame_size)
+            .ok_or(OpusPacketError::TooLarge(usize::MAX))?;
+    }
+
+    // Размер последнего frame не записан явно.
+    //
+    // Он определяется как оставшаяся часть payload после
+    // всех предыдущих frames.
+    let last_frame_size = payload_bytes
+        .checked_sub(declared_sum)
+        .ok_or(OpusPacketError::PayloadMismatch {
+            expected: declared_sum,
+            actual: payload_bytes,
+        })?;
+
+    // Проверяем последний frame теми же ограничениями.
+    //
+    // Если declared_sum оказался больше payload, checked_sub()
+    // уже вернул ошибку выше.
+    if last_frame_size == 0
+        || last_frame_size > MAX_OPUS_FRAME_BYTES
+    {
+        return Err(OpusPacketError::InvalidFrameSize(
+            last_frame_size,
+        ));
+    }
+
+    Ok(())
+}
+
+/// Проверяет размеры кадров CBR-пакета.
+///
+/// В CBR каждый frame имеет одинаковый размер, поэтому отдельные
+/// length fields отсутствуют.
+///
+/// Размер одного frame вычисляется напрямую:
+///
+/// ```text
+/// frame_size = payload_bytes / frame_count
+/// ```
+///
+/// Для корректного CBR packet-а payload обязан делиться на количество
+/// frames без остатка.
+///
+/// Функция не изменяет packet и не извлекает аудиоданные.
+#[inline]
+fn parse_cbr_frames(frame_count: usize, payload_bytes: usize) -> Result<(), OpusPacketError> {
+    // Все frames должны иметь одинаковый размер.
+    //
+    // Если деление даёт остаток, packet физически невозможно
+    // разбить на одинаковые frames.
+    if payload_bytes % frame_count != 0 {
+        return Err(OpusPacketError::PayloadNotDivisible {
+            payload: payload_bytes,
+            frames: frame_count,
+        });
+    }
+
+    // Теперь деление гарантированно даёт целое значение.
+    let frame_size = payload_bytes / frame_count;
+
+    // Проверяем нижнюю и верхнюю границы одного frame.
+    //
+    // Нулевой размер невозможен, а превышение
+    // MAX_OPUS_FRAME_BYTES нарушает ограничение формата.
+    if frame_size == 0
+        || frame_size > MAX_OPUS_FRAME_BYTES
+    {
+        return Err(OpusPacketError::InvalidFrameSize(frame_size));
+    }
+
+    Ok(())
 }

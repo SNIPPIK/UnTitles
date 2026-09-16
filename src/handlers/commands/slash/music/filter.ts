@@ -301,7 +301,6 @@ class FilterOffCommand extends SubCommand {
         const queue = db.queues.get(ctx.guildId);
         const player = queue.player;
 
-
         // Если нет включенных фильтров
         if (player.filters.size === 0) {
             return ctx.write({
@@ -314,6 +313,9 @@ class FilterOffCommand extends SubCommand {
                 flags: MessageFlags.Ephemeral
             });
         }
+
+        // Удаляем фильтры
+        player.filters.clear();
 
         // Если можно выключить фильтр или фильтры сейчас
         if (player.audio.current.duration < player.tracks.track.time.total - db.queues.options.optimization) {
@@ -346,9 +348,6 @@ class FilterOffCommand extends SubCommand {
                 flags: MessageFlags.Ephemeral
             });
         }
-
-        // Удаляем фильтры
-        player.filters.clear();
         return null;
     };
 }

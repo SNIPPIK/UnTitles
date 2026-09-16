@@ -122,7 +122,7 @@ export default createEvent({
         /**
          * Создаём очередь только после успешного REST-запроса.
          */
-        const queue = db.queues.set(ctx);
+        const queue = db.queues.create(ctx);
 
         /**
          * Добавляем результат в очередь.

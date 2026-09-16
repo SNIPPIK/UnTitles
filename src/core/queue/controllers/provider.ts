@@ -5,7 +5,7 @@ import { db } from "#db";
 
 /**
  * @author SNIPPIK
- * @description Безопасное время для буферизации трека
+ * @description Безопасное время для буферизации трека (сек).
  * @const TRACK_BUFFERED_TIME
  * @public
  */
@@ -13,64 +13,134 @@ export const TRACK_BUFFERED_TIME = 500;
 
 /**
  * @author SNIPPIK
- * @description Резолвер ресурсов с поддержкой экспоненциальной паузы
- * @class ResourceResolver
+ * @description Ошибка временного характера: timeout, 5xx, обрыв соединения.
+ * Не означает, что ссылка битая — её нужно просто повторить без сброса.
+ * @class TransientError
+ * @private
+ */
+class TransientError extends Error {
+    public constructor(message: string) {
+        super(message);
+        // Имя нужно, чтобы отличать TransientError от прочих Error через instanceof.
+        this.name = "TransientError";
+    }
+}
+
+/**
+ * @author SNIPPIK
+ * @description Резолвер ресурсов с поддержкой экспоненциальной паузы между попытками.
+ *
+ * При ошибке резолвер различает два случая:
+ * - TransientError — временный сбой, ссылка сохраняется и повторяется та же попытка;
+ * - прочие ошибки — ссылка сбрасывается, следующая попытка запросит её заново
+ *   через `prepare(track, attempt, refreshLink = true)`.
+ *
+ * @class ResourceProvider
  * @private
  */
 class ResourceProvider<T extends Track> {
     public constructor(
-        private readonly prepare: (track: T, attempt: number) => Promise<string | Error>,
+        /**
+         * Функция подготовки/получения ссылки на ресурс.
+         *
+         * @param track       — трек, для которого ищется ссылка.
+         * @param attempt     — номер текущей попытки (начиная с 0).
+         * @param hadLink     — при `true` требуется повтор ссылки у платформы
+         *                      (после настоящей ошибки HEAD); при `false` можно
+         *                      использовать существующую ссылку.
+         */
+        private readonly prepare: (track: T, attempt: number, hadLink: boolean) => Promise<string | Error>,
         private readonly options = { retries: 3, initialDelay: 70 }
     ) {};
 
     /**
-     * @description Пытается разрешить путь к ресурсу, плавно увеличивая паузы при ошибках
-     * @public
+     * @description Пытается разрешить путь к ресурсу, экспоненциально увеличивая паузу между попытками.
+     *
+     * # Аргументы
+     * * `track` — трек, для которого нужно получить рабочий URL.
+     *
+     * # Возвращаемое значение
+     * Строка с URL при успехе; объект `Error` при исчерпании попыток.
+     *
+     * # Побочные эффекты
+     * Устанавливает `track.link` на успешный URL.
+     * При ошибках обнуляет `track.link`, чтобы форсировать повтор.
      */
     public async resolve(track: T): Promise<string | Error> {
         let lastError: Error | string = "Unknown error";
+        // true — на следующей попытке prepare должен обновить ссылку через API,
+        // а не гонять полный поиск по платформам.
+        let refreshLink = false;
 
         for (let attempt = 0; attempt < this.options.retries; attempt++) {
-            // Пытаемся подготовить ресурс
-            const result = await this.prepare(track, attempt);
+            // Пытаемся получить ссылку через prepare.
+            const result = await this.prepare(track, attempt, refreshLink);
 
-            // Если успех — сразу отдаем результат
+            // Успех: сохраняем ссылку в трек и возвращаем.
             if (typeof result === "string") {
                 track.link = result;
                 return result;
             }
 
-            // Если ошибка — логируем и готовимся к следующей попытке
+            // Запоминаем ошибку на случай исчерпания попыток.
             lastError = result;
-            track.link = null; // Сбрасываем битую ссылку, чтобы prepare искал заново
 
-            // Если это не последняя попытка — ждем (Exponential Backoff)
+            if (result instanceof TransientError) {
+                // Временный сбой — не трогаем ссылку, повторим ту же попытку.
+                refreshLink = false;
+            } else {
+                // Настоящая ошибка: помечаем, что в следующий раз надо повторить,
+                // и сбрасываем битую ссылку.
+                refreshLink = !!track.link;
+                track.link = null;
+            }
+
+            // Пауза с экспоненциальным ростом перед следующей попыткой.
             if (attempt < this.options.retries - 1) {
                 const delay = this.options.initialDelay * Math.pow(2, attempt);
                 await this.sleep(delay);
             }
         }
 
-        return lastError instanceof Error ? lastError : Error(`[ResourceResolver]: Max retries reached. Last error: ${lastError}`);
+        // Возвращаем ошибку: сам объект Error или обёртку над строкой.
+        return lastError instanceof Error
+            ? lastError
+            : Error(`[ResourceResolver]: Max retries reached. Last error: ${lastError}`);
     };
 
+    /// Асинхронная пауза указанной длительности (мс).
     private sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
  * @author SNIPPIK
- * @description Резолвер текстов треков
+ * @description Резолвер текстов треков.
+ *
+ * В отличие от `ResourceProvider`, тексты обычно получаются за одну попытку,
+ * поэтому повторов и пауз здесь нет.
+ *
  * @class LyricsProvider
  * @private
  */
 class LyricsProvider<T extends Track> {
     public constructor(
+        /**
+         * Функция получения текста для трека.
+         *
+         * @param track — трек, для которого запрашиваются слова.
+         * @returns Строка с текстом, `undefined`, если текста нет, или `Error` при сбое.
+         */
         private readonly prepare: (track: T) => Promise<string | Error>,
     ) {};
 
     /**
-     * @description Пытается разрешить путь к ресурсу, плавно увеличивая паузы при ошибках
-     * @public
+     * @description Единственная попытка получить текст песни.
+     *
+     * # Аргументы
+     * * `track` — целевой трек.
+     *
+     * # Возвращаемое значение
+     * Текст, `undefined` при отсутствии, или `Error` при сетевой/серверной ошибке.
      */
     public async resolve(track: T): Promise<string | Error> {
         return this.prepare(track);
@@ -79,70 +149,82 @@ class LyricsProvider<T extends Track> {
 
 /**
  * @author SNIPPIK
- * @description
+ * @description Набор провайдеров для разрешения ресурсов, связанных с треком:
+ * аудиопоток (URL) и текст песни.
+ *
+ * `audio` — устойчивый провайдер с ретраями и корректировкой ссылки.
+ * `lyrics` — одноразовый провайдер текста.
+ *
  * @class TrackResolvers
  * @private
  */
 export class TrackResolvers {
     public static providers = {
         /**
-         * @description Провайдеры для поддержания аудио и прочего
+         * @description Провайдер аудио: проверяет кэш, при необходимости
+         * запрашивает ссылку у платформы и валидирует её через HEAD.
          * @public
          */
-        audio: new ResourceProvider(async (track, attempt) => {
+        audio: new ResourceProvider(async (track, attempt, refreshLink) => {
+            // Проверяем кэш сохранённого аудио.
             const status = await sdb.audio_saver?.status(track);
-
-            // Проверка кеша (мгновенно)
             if (status?.status === "ended") return status?.path;
 
-            // Если ссылки нет — ищем через Rest/API
+            // Если ссылки нет — нужно её получить.
             if (!track.link) {
-                const songs = await db.api.fetchAudioLink(track, attempt < 1);
+                // refreshLink — пришли сюда после НАСТОЯЩЕЙ ошибки HEAD →
+                // нужен только повтор ссылки у исходной платформы.
+                // Attempt < 1 — самая первая попытка, тоже пробуем родную платформу.
+                const hasReply = refreshLink || attempt < 1;
+                const songs = await db.api.fetchAudioLink(track, hasReply);
 
-                // Если была получена ошибка вместо треков
                 if (songs instanceof Error) return songs;
 
-                // Проверяем полученные треки
+                // Перебираем кандидатов, берём первый валидный.
                 for (let trk of songs) {
                     if (trk instanceof Error) continue;
 
+                    // Прокидываем путь для будущего симлинка.
                     (trk as any).similarTrackPath = status?.path;
 
-                    // Проверяем заголовок трека
+                    // Проверяем доступность через HEAD.
                     const song = await this.head(trk);
-
-                    // Если получена ошибка, то отбрасываем трек
                     if (song instanceof Error) continue;
 
+                    // Переносим прокси и ссылку в исходный трек.
                     track.proxy = trk.api.proxy;
                     track.link = trk.link;
                     return song;
                 }
 
-                // Если ничего не нашлось
+                // Ни один кандидат не подошёл.
                 return Error("Resource has not found");
             }
 
-            // Проверяем HTTP HEAD (если это ссылка)
-            if (track.link.startsWith("http")) {
+            // Ссылка уже есть и это HTTP-URL — валидируем через HEAD.
+            if (track.link?.startsWith?.("http")) {
                 (track as any).similarTrackPath = status?.path;
                 const song = await this.head(track);
 
-                // Если при проверке получена ошибка
+                // Если это TransientError — резолвер повторит ту же ссылку,
+                // если настоящая ошибка — сбросит и пойдёт за новой.
                 if (song instanceof Error) return song;
 
                 track.link = song;
                 return song;
             }
 
+            // Локальный путь или иная не-HTTP ссылка — возвращаем как есть.
             return track.link;
         }),
 
         /**
-         * @description Провайдер для получения текстов
+         * @description Провайдер текста песни: запрос к lrclib.net по имени
+         * исполнителя и названию трека.
          * @public
          */
         lyrics: new LyricsProvider(async (track) => {
+            // Запрос к публичному API текстов.
             const api = await new httpsClient({
                 url:
                     `https://lrclib.net/api/get` +
@@ -152,42 +234,65 @@ export class TrackResolvers {
                 timeout: 10e3
             }).toJson;
 
-            // Если получаем вместо данных ошибку
+            // Если получаем вместо данных ошибку — пробрасываем её.
             if (api instanceof Error) return api;
 
-            // Если нет текста песни
+            // Если текст не найден.
             else if (api.statusCode === 404) return undefined;
 
-            // Сохраняем текст песни
+            // Сохраняем текст в поле трека для последующего доступа.
             track["_lyrics"] = api?.syncedLyrics || api?.plainLyrics;
 
-            // Выдаем впервые текст песни
+            // Отдаём вызывающему тексту.
             return api?.syncedLyrics || api?.plainLyrics;
         })
     };
 
     /**
-     * @description Запрос head заголовка от аудио ресурса
-     * @param track
+     * @description Проверяет доступность аудио по URL через HEAD-запрос,
+     * обрабатывает редиректы и при необходимости ставит трек в очередь на сохранение.
+     *
+     * # Аргументы
+     * * `track` — трек со ссылкой и (опционально) прокси.
+     *
+     * # Возвращаемое значение
+     * Актуальный URL при успехе; `Error` при настоящей ошибке или
+     * `TransientError` при временном сбое.
+     *
+     * # Побочные эффекты
+     * - обновляет `track.link` при редиректе;
+     * - создаёт ссылку при локальной ссылке;
+     * - добавляет трек в очередь сохранения, если `sdb.audio_saver` доступен.
+     *
      * @private
      * @static
      */
     private static head = async (track: Track): Promise<string | Error> => {
-        // Если вдруг попадет не ссылка
+        // Если вдруг попадет не ссылка — работаем как с локальным файлом.
         if (!track.link?.startsWith("http")) {
-            // Делаем линковку
+            // Делаем линковку.
             if (sdb.audio_saver) await sdb.audio_saver.symlink(track);
             return track.link;
         }
 
+        // Создаём клиент HEAD-запроса; при наличии прокси — через агент.
         const client = new httpsClient({ url: track.link, agent: track.proxy ? sdb.proxy : null });
         const status = await client.toHead;
+
+        // Клиент не получил ответа
+        if (!status.statusCode) {
+            const err = new TransientError(`HEAD transient failure: status=${status}, url=${track.link}`);
+            Logger.log("WARN", err.message);
+            return err;
+        }
+
+        // Преобразуем статус в понятную ошибку (или null).
         const error = httpsStatusCode.parse(status);
 
-        // Если было перенаправление запроса
+        // Если было перенаправление запроса — сохраняем актуальную ссылку.
         if (client.redirect) track.link = client.redirect;
 
-        // Резолвер поймает это, обнулит ссылку и вызовет prepare снова
+        // Резолвер поймает это, обнулит ссылку и вызовет prepare снова.
         if (error) {
             Logger.log(
                 "ERROR",
@@ -200,7 +305,7 @@ export class TrackResolvers {
             return error;
         }
 
-        // Если можно сохранять аудио
+        // Ссылка валидна: можно ставить трек в очередь сохранения.
         if (sdb.audio_saver) sdb.audio_saver.add(track);
         return track.link;
     };

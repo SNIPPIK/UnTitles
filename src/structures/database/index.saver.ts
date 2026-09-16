@@ -1,6 +1,6 @@
+import { createProxyFFmpeg, Logger, PromiseCycle } from "#structures";
+import { FFMPEG_PROXY, Process } from "#core/audio/process.js";
 import type { APIRequestData } from "#handler/rest/index.js";
-import { Logger, PromiseCycle } from "#structures";
-import { Process } from "#core/audio/process.js";
 import { Track } from "#core/queue/index.js";
 import afs from "node:fs/promises";
 import { env } from "#db/env";
@@ -82,7 +82,7 @@ export class MetaSaver<T extends APIRequestData.Track | APIRequestData.List> {
  * @extends PromiseCycle<Track>
  * @public
  */
-export class AudioSaver extends PromiseCycle<Track> {
+export class AudioSaver<T extends Track = Track> extends PromiseCycle<T> {
     /** Путь до директории с кешированными данными */
     public _dirname = path.resolve(env.get("cache.dir"));
 
@@ -125,7 +125,7 @@ export class AudioSaver extends PromiseCycle<Track> {
     /**
      * Опускаем приоритет задачи в самый низ очереди Event Loop
      */
-    private lowPriorityExecute = async(track: Track): Promise<boolean> => this.download(track);
+    private lowPriorityExecute = async(track: T): Promise<boolean> => this.download(track);
 
     /**
      * Загружает аудиофайл, соответствующий треку, с использованием ffmpeg.
@@ -153,13 +153,15 @@ export class AudioSaver extends PromiseCycle<Track> {
      * @returns `Promise<boolean>` — `true`, если удалённый файл успешно загружен и перемещён,
      *          или `false` для локальных файлов / при любой ошибке.
      */
-    private download = async (track: Track): Promise<boolean> => {
+    private download = async (track: T): Promise<boolean> => {
         // Получаем целевой путь сохранения и временный путь для загрузки.
         const { path: targetFile } = await this.status(track);
         const tmp = targetFile + ".tmp";
 
+        if (!track.link) return false;
+
         const similarPath = (track as any).similarTrackPath;
-        const isLocalFile = track.link.startsWith("/") || track.link.includes(":\\");
+        const isLocalFile = track.link?.startsWith("/") || track.link?.includes(":\\");
 
         // --- Попытка линковки (второй проход или локальный файл) ---
         // Этот вызов может создать симлинк, если трек уже существует локально.
@@ -169,7 +171,12 @@ export class AudioSaver extends PromiseCycle<Track> {
         if (!isLocalFile) {
             // Аргументы ffmpeg: входной URL, формат opus, выходной временный файл.
             const args = ["-i", track.link, "-f", "opus", tmp];
-            this.applyProxy(args, track); // Добавляет прокси-аргументы, если необходимо.
+
+            // Если платформа не может играть нативно из сети
+            if (track.proxy && track.link.startsWith("http") && FFMPEG_PROXY) {
+                // Если есть прокси
+                args.unshift("-http_proxy", createProxyFFmpeg(FFMPEG_PROXY));
+            }
 
             // Оборачиваем процесс ffmpeg в промис с контролем таймаута.
             return new Promise((resolve) => {
@@ -281,16 +288,15 @@ export class AudioSaver extends PromiseCycle<Track> {
      * console.log(track.similarTrackPath); // null
      * ```
      */
-    public symlink = async (track: Track): Promise<boolean> => {
+    public symlink = async (track: T): Promise<boolean> => {
         const linkPath = (track as any).similarTrackPath;
+        const target = track.link;
 
         // Если путь для ссылки не задан — выходим.
-        if (!linkPath) return false;
+        if (!linkPath || !target) return false;
 
         // Принимаем только абсолютные пути, чтобы избежать неоднозначности.
-        if (!(track.link.startsWith("/") || track.link.includes(":\\"))) return false;
-
-        const target = track.link;
+        if (!(target?.startsWith("/") || target?.includes(":\\"))) return false;
 
         // Нет смысла создавать ссылку, указывающую на саму себя.
         if (linkPath === target) return false;
@@ -373,7 +379,7 @@ export class AudioSaver extends PromiseCycle<Track> {
      * }
      * ```
      */
-    public status = async (track: Track | string) => {
+    public status = async (track: T | string) => {
         const basePath = typeof track === "string"
             ? `${this._dirname}/Audio/${track}`
             : `${this._dirname}/Audio/${track.api.url}/${track.ID}`;
@@ -391,36 +397,5 @@ export class AudioSaver extends PromiseCycle<Track> {
         } catch {}
 
         return { status: "not-ended", path: file };
-    };
-
-    /**
-     * Добавляет к аргументам ffmpeg параметры HTTP-прокси, если трек этого требует.
-     *
-     * Прокси применяется только при одновременном выполнении условий:
-     * 1. У трека установлен флаг `proxy` (например, `track.proxy === true`).
-     * 2. Ссылка трека начинается с `http` (игнорируются локальные файлы).
-     * 3. В переменной окружения `APIs.proxy` задан адрес прокси-сервера.
-     *
-     * Адрес извлекается из строки вида `"http://user:pass@host:port"` путём отсечения протокола,
-     * после чего добавляется в начало массива аргументов:
-     * `"-http_proxy"`, `"http://host:port"`.
-     *
-     * Изменяет массив `args` **на месте**.
-     *
-     * @param args  - Текущий массив аргументов для `Process(ffmpeg)`. Будет модифицирован.
-     * @param track - Объект трека, содержащий `link` и флаг `proxy`.
-     *
-     * @private
-     */
-    private applyProxy(args: string[], track: Track) {
-        if (!track.proxy || !track.link.startsWith("http")) return;
-
-        const proxy = env.get("APIs.proxy");
-        if (!proxy) return;
-
-        args.unshift(
-            "-http_proxy",
-            `http:/${proxy.split(":/")[1]}`
-        );
     };
 }

@@ -38,14 +38,15 @@
     "socks-proxy-agent": "^10.1.0"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.9.1",
-    "@types/node": "^22.20.2",
+    "@napi-rs/cli": "^3.10.3",
+    "@types/node": "^26.6.1",
     "typescript": "^7.0.2"
   },
   "scripts": {
-    "start": "node    --expose-gc --enable-source-maps --max-old-space-size=4096 ./build/src/index.js",
-    "start:ts": "node --expose-gc --enable-source-maps --max-old-space-size=4096 ./src/index.ts",
+    "start": "node    --expose-gc ./build/src/index.js",
+    "start:ts": "node --expose-gc ./src/index.ts",
     "start:bun": "bun ./src/index.ts",
+    "start:shs": "build/native/sthp -p 9100 -s 192.168.1.1:9100",
     "build": "tsc",
     "build:native": "npm run build:copy && napi build --platform --release --cwd ./rs --esm --js index.mjs && npm run build:bindings",
     "build:native:dev": "npm run build:copy && napi build --platform --cwd ./rs --esm --js index.mjs && npm run build:bindings",

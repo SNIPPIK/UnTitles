@@ -24,7 +24,7 @@ const DISCOVERY_SIZE: usize = 74;
 
 /// Готовые не-RTP пакеты, которые не шифруются и не оборачиваются в RTP.
 /// Всё остальное считается Opus-фреймом и идёт через `VoiceRTPSocket`.
-const RAW_BYPASS_SIZES: &[usize] = &[KEEPALIVE_SIZE, DISCOVERY_SIZE];
+const RAW_BYPASS_SIZES: &[usize] = &[DISCOVERY_SIZE];
 
 /// Проверяет, должен ли фрейм отправляться сырым, без RTP-шифрования.
 ///
@@ -74,15 +74,55 @@ pub struct SocketInner {
 
 impl SocketInner {
     /// Добавляет пакет в очередь на отправку.
+    ///
+    /// # Аргументы
+    /// * `data` — байтовые данные пакета.
+    ///
+    /// # Поведение
+    /// Пустые данные игнорируются. При переполнении буфера в отладочной сборке
+    /// выводится сообщение об ошибке.
     pub fn push(&self, data: Vec<u8>) {
-        if self.buffer.push(data).is_err() {
-            self.send_drops.fetch_add(1, Ordering::Relaxed);
-        }
+        let _ = self.buffer.push(data);
     }
 
-    /// Проверка, есть ли еще данные в кольцевом буфере и валиден ли сокет.
+    /// Добавляет массив пакетов в очередь на отправку.
+    ///
+    /// # Аргументы
+    /// * `packets` — вектор байтовых пакетов для добавления.
+    pub fn push_many(&self, packets: Vec<Vec<u8>>) {
+        // Делегируем массовое добавление во внутренний буфер.
+        self.buffer.push_many(packets);
+    }
+
+    /// Проверка, есть ли ещё данные в кольцевом буфере.
+    ///
+    /// Возвращает `true`, если очередь содержит хотя бы один пакет,
+    /// ожидающий отправки.
     pub fn has_pending_packets(&self) -> bool {
         !self.buffer.is_empty()
+    }
+
+    /// Определяет, что нужно отправить: пакет из очереди или keepalive-сигнал.
+    ///
+    /// Вызывается циклически из глобального менеджера с текущим временем в миллисекундах.
+    /// Если в очереди есть пакеты, отправляет их (внутренний `tick` также обновляет таймер keepalive).
+    /// Иначе проверяет, не пора ли отправить keepalive (если с последней отправки прошло
+    /// больше `KEEP_ALIVE_INTERVAL`).
+    pub fn auto_tick(&self, now: u64, budget: u8) {
+
+        // Проверяем, есть ли пакеты, ожидающие отправки.
+        if self.has_pending_packets() {
+            // Отправляем накопленные пакеты (внутри также сбрасывается таймер keepalive).
+            self.tick(now, budget);
+        } else {
+            // Если пакетов нет, проверяем время последней отправки.
+            let last_ms = self.last_send_ms.load(Ordering::Relaxed);
+
+            // Если прошло достаточно времени, отправляем keepalive.
+            if now.saturating_sub(last_ms) >= KEEP_ALIVE_INTERVAL {
+                self.tick_alive(now);
+            }
+        }
     }
 
     /// Попытка отправить один пакет из очереди.
@@ -97,50 +137,100 @@ impl SocketInner {
     /// Discovery (74 байта) уходит сырым — без RTP и без шифрования,
     /// счётчики RTP при этом не двигаются.
     /// Всё остальное считается Opus-фреймом и шифруется в RTP.
-    pub fn tick(&self, now: u64) {
+    #[inline]
+    fn tick(&self, now: u64, budget: u8) {
         // До инициализации RTP отправляем только discovery:
         // Opus-фреймы ждут ключа, discovery — нет.
-        let Some(frame) = self.buffer.pop() else {
-            return;
-        };
+        //
+        // budget определяет максимальное количество элементов,
+        // которое scheduler разрешил обработать за этот цикл.
+        //
+        // ВАЖНО:
+        // budget != гарантированное количество отправленных пакетов.
+        //
+        // Это только верхняя граница:
+        //
+        //     budget = 3
+        //     queue = 1 packet
+        //
+        //     -> отправим только 1.
+        //
+        // Поэтому scheduler не заставляет UDP отправлять несуществующие
+        // или ещё не готовые данные.
+        for _ in 0..budget {
+            let Some(frame) = self.buffer.pop() else {
+                return;
+            };
 
-        let bypass = is_raw_bypass(frame.len());
-        if !bypass && !self.rtp.is_initialized() {
-            // Opus-фрейм, но ключа ещё нет — возвращаем в очередь и ждём.
-            // Через ArrayQueue push/pop вернуть в начало нельзя, поэтому
-            // просто кладём обратно и выходим; на следующем тике попробуем снова.
-            let _ = self.buffer.push(frame);
-            return;
-        }
+            let bypass = is_raw_bypass(frame.len());
+            if !bypass && !self.rtp.is_initialized() {
+                // Opus-фрейм, но RTP ещё не готов.
+                //
+                // ArrayQueue не поддерживает возврат элемента в начало,
+                // поэтому возвращаем его обратно в очередь и прекращаем
+                // обработку текущего budget.
+                //
+                // Не пытаемся брать следующие элементы:
+                // порядок Opus-пакетов должен сохраняться.
+                let _ = self.buffer.push(frame);
+                return;
+            }
 
-        let packet = if bypass {
-            // Discovery (74) или keepalive (8) — уходят как есть.
-            // На практике keepalive приходит через tick_alive, но если
-            // он случайно попал в очередь — не ошибёмся.
-            frame
-        } else {
-            match self.rtp.packet(frame) {
-                Ok(p) => p,
+            let packet = if bypass {
+                // Discovery (74) или keepalive (8) отправляются как есть.
+                //
+                // Keepalive обычно проходит через tick_alive(), но
+                // дополнительная проверка здесь делает очередь безопаснее.
+                frame
+            } else {
+                match self.rtp.packet(frame) {
+                    Ok(packet) => packet,
+
+                    Err(_e) => {
+                        self.send_drops
+                            .fetch_add(1, Ordering::Relaxed);
+
+                        self.consecutive_failures
+                            .fetch_add(1, Ordering::Relaxed);
+
+                        #[cfg(debug_assertions)]
+                        println!("RTP encrypt error: {}", _e);
+
+                        // Не продолжаем burst после ошибки RTP.
+                        //
+                        // Причина: если RTP-контекст сломан, бессмысленно
+                        // пытаться прогонять следующие Opus-пакеты через
+                        // тот же неисправный state.
+                        return;
+                    }
+                }
+            };
+
+            match self.socket.send(&packet) {
+                Ok(_) => {
+                    self.consecutive_failures
+                        .store(0, Ordering::Relaxed);
+
+                    self.last_send_ms
+                        .store(now, Ordering::Relaxed);
+                }
+
                 Err(_e) => {
-                    self.send_drops.fetch_add(1, Ordering::Relaxed);
-                    self.consecutive_failures.fetch_add(1, Ordering::Relaxed);
+                    self.send_drops
+                        .fetch_add(1, Ordering::Relaxed);
+
+                    self.consecutive_failures
+                        .fetch_add(1, Ordering::Relaxed);
+
                     #[cfg(debug_assertions)]
-                    println!("RTP encrypt error: {}", _e);
+                    println!("UDP send error: {}", _e);
+
+                    // Не продолжаем burst после WouldBlock / ошибки socket.
+                    //
+                    // Иначе один неудачный send может превратиться
+                    // в несколько бесполезных попыток подряд.
                     return;
                 }
-            }
-        };
-
-        match self.socket.send(&packet) {
-            Ok(_) => {
-                self.consecutive_failures.store(0, Ordering::Relaxed);
-                self.last_send_ms.store(now, Ordering::Relaxed);
-            }
-            Err(_e) => {
-                self.send_drops.fetch_add(1, Ordering::Relaxed);
-                self.consecutive_failures.fetch_add(1, Ordering::Relaxed);
-                #[cfg(debug_assertions)]
-                println!("UDP send error: {}", _e);
             }
         }
     }
@@ -150,7 +240,7 @@ impl SocketInner {
     /// Keepalive — это НЕ RTP: 8 сырых байт, без шифрования, без заголовка,
     /// без счётчиков `sequence`/`timestamp`/`counter` внутри `VoiceRTPSocket`.
     /// Работает даже до `initialize`.
-    pub fn tick_alive(&self, now: u64) {
+    fn tick_alive(&self, now: u64) {
         let count = self.keepalive_counter.fetch_add(1, Ordering::Relaxed);
         let mut pkt = [0u8; KEEPALIVE_SIZE];
         pkt[0..4].copy_from_slice(&count.to_le_bytes()); // LE, как ждёт Discord
@@ -165,28 +255,6 @@ impl SocketInner {
             Err(_e) => {
                 #[cfg(debug_assertions)]
                 println!("Keepalive send failed: {}", _e);
-            }
-        }
-    }
-
-    /// Определяет, что нужно отправить: пакет из очереди или keepalive-сигнал.
-    ///
-    /// Вызывается циклически из глобального менеджера с текущим временем в миллисекундах.
-    /// Если в очереди есть пакеты, отправляет их (внутренний `tick` также обновляет таймер keepalive).
-    /// Иначе проверяет, не пора ли отправить keepalive (если с последней отправки прошло
-    /// больше `KEEP_ALIVE_INTERVAL`).
-    pub fn auto_tick(&self, now: u64) {
-        // Проверяем, есть ли пакеты, ожидающие отправки.
-        if self.has_pending_packets() {
-            // Отправляем накопленные пакеты (внутри также сбрасывается таймер keepalive).
-            self.tick(now);
-        } else {
-            // Если пакетов нет, проверяем время последней отправки.
-            let last_ms = self.last_send_ms.load(Ordering::Relaxed);
-
-            // Если прошло достаточно времени, отправляем keepalive.
-            if now.saturating_sub(last_ms) >= KEEP_ALIVE_INTERVAL {
-                self.tick_alive(now);
             }
         }
     }
@@ -205,7 +273,7 @@ impl Drop for SocketInner {
             println!("last_send_ms={}", self.last_send_ms.load(Ordering::Relaxed));
             println!("keep_alive_counter={}", self.keepalive_counter.load(Ordering::Relaxed));
             println!("buffer_len={}", self.buffer.len());
-            //println!("buffer_cap={}", self.buffer.capacity());
+            println!("buffer_cap={}", self.buffer.free_slots());
             println!("socket_strong={}", Arc::strong_count(&self.socket));
             println!("UdpBufferedInner dropped");
             println!("====================");

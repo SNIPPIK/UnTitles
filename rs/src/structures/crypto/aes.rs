@@ -1,4 +1,4 @@
-use crate::structures::timers::scheduler::cycle_manager::TICK_INTERVAL_MS;
+use crate::structures::timers::scheduler::TICK_INTERVAL_MS;
 use std::{
     sync::{
         atomic::{AtomicU16, AtomicU32, Ordering},
@@ -16,21 +16,33 @@ use rand::{
 };
 
 /// Размер RTP-заголовка без расширений (байт).
+/// Базовая часть: version/P/X/CC (1) + M/PT (1) + sequence (2) + timestamp (4) + SSRC (4).
 const RTP_HEADER_SIZE: usize = 12;
 
 /// Размер тега аутентификации AES-GCM (байт).
+/// Добавляется к каждому зашифрованному пакету и проверяется при расшифровке.
 const GCM_TAG_SIZE: usize = 16;
 
-/// Размер добавляемого суффикса nonce в конце пакета (байт).
-/// В Discord используются младшие 4 байта nonce, старшие 8 — нули.
+/// Минимальный размер суффикса nonce, добавляемого в конец пакета (байт).
+/// Используется в вариантах протокола с укороченным nonce (2 байта).
+const NONCE_SUFFIX_SIZE_MIN: usize = 2;
+
+/// Базовый размер суффикса nonce, добавляемого в конец пакета (байт).
+/// В Discord передаются младшие 4 байта nonce, старшие 8 остаются нулями.
 const NONCE_SUFFIX_SIZE: usize = 4;
 
+/// Максимальный размер суффикса nonce, добавляемого в конец пакета (байт).
+/// Вариант протокола с полным 8-байтовым суффиксом.
+const NONCE_SUFFIX_SIZE_MAX: usize = 8;
+
 /// Допустимая длина ключа AES-256 (байт).
+/// Для режима AES-256-GCM требуется ровно 32 байта.
 const KEY_SIZE: usize = 32;
 
 /// Приращение временной метки RTP для одного пакета.
+///
 /// Для Opus с частотой дискретизации 48 кГц и кадрами по 20 мс получаем 960 семплов.
-/// TICK_INTERVAL_MS — интервал цикла отправки (20 мс).
+/// `TICK_INTERVAL_MS` — интервал цикла отправки (20 мс).
 const TIMESTAMP_INC: u32 = 48000 * TICK_INTERVAL_MS / 1000;
 
 // ============================================================================
@@ -125,10 +137,13 @@ impl VoiceRTPSocket {
         Self {
             // Изначально состояние шифра отсутствует.
             state: RwLock::new(None),
+
             // Случайный начальный sequence, чтобы избежать предсказуемости.
             sequence: AtomicU16::new(rng.random()),
+
             // Случайный начальный timestamp.
             timestamp: AtomicU32::new(rng.random()),
+
             // Случайный начальный счётчик nonce.
             counter: AtomicU32::new(rng.random()),
         }
@@ -312,13 +327,13 @@ impl VoiceRTPSocket {
         let timestamp = self.timestamp.fetch_add(TIMESTAMP_INC, Ordering::Acquire);
 
         // Записываем sequence в big-endian (2 байта).
-        header[2..4].copy_from_slice(&sequence.to_be_bytes());
+        header[NONCE_SUFFIX_SIZE_MIN .. NONCE_SUFFIX_SIZE].copy_from_slice(&sequence.to_be_bytes());
 
         // Записываем timestamp в big-endian (4 байта).
-        header[4..8].copy_from_slice(&timestamp.to_be_bytes());
+        header[NONCE_SUFFIX_SIZE .. NONCE_SUFFIX_SIZE_MAX].copy_from_slice(&timestamp.to_be_bytes());
 
         // Записываем SSRC (4 байта).
-        header[8..RTP_HEADER_SIZE].copy_from_slice(&ssrc.to_be_bytes());
+        header[NONCE_SUFFIX_SIZE_MAX .. RTP_HEADER_SIZE].copy_from_slice(&ssrc.to_be_bytes());
 
         header
     }

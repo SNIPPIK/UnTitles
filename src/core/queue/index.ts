@@ -1,9 +1,13 @@
 import { Colors, CommandInteraction } from "#structures/discord/index.js";
+import { CycleInteraction } from "#structures/discord/index.js";
 import { ControllerCycles } from "./controllers/cycle.js";
+import { Track } from "#core/queue/structures/track.js";
+import { APIRequestData } from "#handler/rest/index.js";
 import { Queue } from "#core/queue/structures/queue.js";
 import { QueueMessage } from "./modules/message.js";
 import { Collection, locale } from "#structures";
 import { env } from "#db/env";
+import { db } from "#db";
 
 export * from "./structures/tracks.js";
 export * from "./structures/voice.js";
@@ -16,26 +20,23 @@ export * from "./structures/queue.js";
  * @class BaseQueueController
  * @private
  */
-class BaseQueueController<T extends Queue> {
-    /** Хранилище очередей */
-    private queue: Collection<T> = new Collection();
-
+class BaseQueueController<T extends Queue = Queue> extends Collection<T> {
     /** Хранилище циклов для работы музыки */
     public cycles = new ControllerCycles();
 
     /**
-     * @description Создание очереди, можно создать очередь, не забываем что это просто объект которому надо указать как работать
+     * @description Создание очереди.
      * @public
      */
-    public set = (message: CommandInteraction) => {
-        let queue = this.queue.get(message.guildId);
+    public create = (message: CommandInteraction) => {
+        let queue = this.get(message.guildId);
 
         // Если нет очереди
         if (!queue) {
             queue = new Queue(message) as T;
 
-            // Добавляем очередь в список очередей
-            this.queue.set(message.guildId, queue);
+            // Добавляем очередь непосредственно в Collection
+            this.set(message.guildId, queue);
         }
 
         // Обновляем данные в очереди
@@ -45,28 +46,26 @@ class BaseQueueController<T extends Queue> {
                 setImmediate(() => {
                     const player = queue.player;
 
-                    // Выбор типа позиции при включении заново
                     switch (db.queues.options.replay) {
                         case 1: {
                             queue.tracks.position = queue.tracks.total - 1;
                             break;
                         }
+
                         default: {
-                            // Начинаем с 1 трека
                             queue.tracks.position = 0;
                             break;
                         }
                     }
 
-                    // Если у плеера стоит пауза
-                    if (player.status === "player/pause") player.resume();
+                    if (player.status === "player/pause") {
+                        player.resume();
+                    }
 
-                    // Запускаем функцию воспроизведения треков
                     void player.play().catch(error => {
                         throw error;
                     });
 
-                    // Если текстовый канал изменился — обновляем привязку
                     if (queue.message.channel_id !== message.channelId) {
                         queue.message = new QueueMessage(message);
                     }
@@ -78,51 +77,25 @@ class BaseQueueController<T extends Queue> {
     };
 
     /**
-     * @description Получение очереди по уник id
-     * @param ID - Уник id
-     * @public
-     */
-    public get = (ID: string) => {
-        return this.queue.get(ID);
-    };
-
-    /**
-     * @description Кол-во очередей в текущем потоке
-     * @public
-     */
-    public get size() {
-        return this.queue.size;
-    };
-
-    /**
-     * @description Удаление очереди, удаление со всеми составными без остатка
-     * @public
-     */
-    public remove = (ID: string, silent = false) => {
-        this.queue.remove(ID, silent);
-    };
-
-    /**
-     * @description Выключение системы очереди, можно отложить выключение музыки на время максимального трека
+     * @description Выключение системы очереди.
      * @public
      */
     public shutdown = () => {
         let timeout = 0;
 
-        // На все сервера отправляем сообщение о перезапуске
-        for (const queue of this.queue.array) {
-            // Если аудио не играет
-            if (!queue.player.playing || !queue.player.audio?.current) continue;
+        for (const queue of this.array) {
+            if (!queue.player.playing || !queue.player.audio?.current) {
+                continue;
+            }
 
-            // Если плеер запущен
             if (this.cycles.players.has(queue.player)) {
                 const remaining = queue.player.audio.current.packets * 20;
 
-                // Если время ожидания меньше чем в очереди
-                if (timeout < remaining) timeout = remaining;
+                if (timeout < remaining) {
+                    timeout = remaining;
+                }
             }
 
-            // Уведомляем пользователей об окончании, для каждого сервера
             queue.message.send({
                 withResponse: false,
                 embeds: [
@@ -134,14 +107,14 @@ class BaseQueueController<T extends Queue> {
                 ]
             }).then((msg) => {
                 setTimeout(() => {
-                    if (!!msg.delete) msg.delete().catch(() => null);
+                    if (msg.delete) {
+                        msg.delete().catch(() => null);
+                    }
                 }, timeout ?? 1e3);
             });
 
-            // Отключаем события плеера
             queue.player.removeAllListeners();
 
-            // Тихо удаляем очередь
             this.remove(queue.message.guild_id, true);
         }
 
@@ -154,7 +127,6 @@ class BaseQueueController<T extends Queue> {
  * @description Загружаем класс для хранения очередей, плееров, циклов
  * @description Здесь хранятся все очереди для серверов, для 1 сервера - 1 очередь и плеер
  * @class ControllerQueues
- * @extends Collection
  * @public
  */
 export class ControllerQueues<T extends Queue> extends BaseQueueController<T> {
@@ -168,12 +140,6 @@ export class ControllerQueues<T extends Queue> extends BaseQueueController<T> {
         replay: parseInt(env.get("replay.type", "1"))
     };
 }
-
-
-import { CycleInteraction } from "#structures/discord/index.js";
-import { Track } from "#core/queue/structures/track.js";
-import { APIRequestData } from "#handler/rest/index.js";
-import { db } from "#db";
 
 /**
  * @author SNIPPIK

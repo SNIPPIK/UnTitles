@@ -24,6 +24,42 @@ function clearLeaveTimer(guildId: string) {
     timers.delete(guildId);
 }
 
+/**
+ * Проверяет, есть ли в канале бота хотя бы один живой (не-бот) пользователь.
+ *
+ * ВАЖНО: дополнительно учитывает `freshState` — состояние из текущего события.
+ * Кеш seyfert может обновляться ПОСЛЕ диспатча `voiceStateUpdate`, поэтому
+ * зашедший человек в `client.cache.voiceStates` может ещё отсутствовать.
+ * Без этого бот ложно решает «людей нет» и ставит плеер на паузу.
+ *
+ * @param freshState Состояние пользователя из события (newState), либо null.
+ */
+function isBotChannelOccupiedByHuman(client: any, guildId: string, botChannelId: string, freshState: any | null): boolean {
+    // 1. Мгновенная проверка: если из события видно, что пользователь
+    //    сейчас в канале бота и это не бот — он там есть, независимо от кеша.
+    if (
+        freshState &&
+        freshState.userId !== client.botId &&
+        freshState.channelId === botChannelId
+    ) {
+        const member = client.cache.members?.get(freshState.userId, guildId);
+        // Если member ещё не в кеше — считаем человеком (безопасный дефолт:
+        // лучше не поставить на паузу, чем поставить при живом человеке).
+        if (!member || !member.user?.bot) return true;
+    }
+
+    // 2. Полный проход по кешу.
+    for (const state of client.cache.voiceStates?.values(guildId) ?? []) {
+        if (state.channelId !== botChannelId) continue;
+        if (state.userId === client.botId) continue;
+
+        const member = client.cache.members?.get(state.userId, guildId);
+        if (member && !member.user?.bot) return true;
+    }
+
+    return false;
+}
+
 export default createEvent({
     data: {
         name: "voiceStateUpdate"
@@ -40,7 +76,6 @@ export default createEvent({
          * ==========================================================
          */
         if (userId === client.botId) {
-            // Обновляем VoiceAdapter
             db.adapter.onVoiceStateUpdate({
                 session_id: payload.sessionId,
                 channel_id: payload.channelId,
@@ -57,10 +92,7 @@ export default createEvent({
                 member: null
             });
 
-            /**
-             * Если именно НАШ бот покинул голосовой канал —
-             * полностью удаляем очередь.
-             */
+            // Наш бот покинул канал — сносим очередь целиком.
             if (!payload.channelId) {
                 clearLeaveTimer(guildId);
 
@@ -80,37 +112,20 @@ export default createEvent({
             const queue = db.queues.get(guildId);
             if (!queue) return;
 
-            /**
-             * Получаем текущее состояние нашего бота.
-             */
+            // Где сейчас наш бот.
             const botState = client.cache.voiceStates?.get(client.botId, guildId);
-
-            /**
-             * Если бот уже не находится в голосовом канале —
-             * ничего делать не нужно.
-             */
             if (!botState?.channelId) return;
 
-            /**
-             * Проверяем, есть ли хотя бы один человек
-             * в том же канале, где находится бот.
-             */
-            let hasHumans = false;
+            // newState — актуальное состояние пользователя из события.
+            // Передаём его в проверку, чтобы не зависеть от гонки с кешем.
+            const freshState = newState ?? null;
 
-            for (const state of client.cache.voiceStates?.values(guildId) ?? []) {
-                if (state.channelId !== botState.channelId)
-                    continue;
-
-                if (state.userId === client.botId)
-                    continue;
-
-                const member = client.cache.members?.get(state.userId, guildId);
-
-                if (member && !member.user?.bot) {
-                    hasHumans = true;
-                    break;
-                }
-            }
+            const hasHumans = isBotChannelOccupiedByHuman(
+                client,
+                guildId,
+                botState.channelId,
+                freshState
+            );
 
             /**
              * ======================================================
@@ -120,8 +135,9 @@ export default createEvent({
             if (hasHumans) {
                 clearLeaveTimer(guildId);
 
-                if (queue.player?.status === "player/pause")
+                if (queue.player?.status === "player/pause") {
                     queue.player.resume();
+                }
 
                 return;
             }
@@ -131,48 +147,34 @@ export default createEvent({
              * В КАНАЛЕ НЕТ ЛЮДЕЙ
              * ======================================================
              */
+            if (timers.has(guildId)) return;
 
-            if (timers.has(guildId))
-                return;
-
-            if (queue.player?.status === "player/playing")
+            if (queue.player?.status === "player/playing") {
                 queue.player.pause();
+            }
 
             const timer = setTimeout(() => {
                 timers.delete(guildId);
 
-                /**
-                 * Повторная проверка перед отключением.
-                 * За это время кто-то мог зайти.
-                 */
+                // Повторная проверка — за минуту кто-то мог зайти.
                 const currentBot = client.cache.voiceStates?.get(client.botId, guildId);
+                if (!currentBot?.channelId) return;
 
-                if (!currentBot?.channelId)
+                // Здесь `freshState` не нужен: с момента установки таймера
+                // прошло 60 секунд, кеш гарантированно актуален.
+                if (
+                    isBotChannelOccupiedByHuman(
+                        client,
+                        guildId,
+                        currentBot.channelId,
+                        null
+                    )
+                ) {
                     return;
-
-                let hasHumans = false;
-
-                for (const state of client.cache.voiceStates?.values(guildId) ?? []) {
-                    if (state.channelId !== currentBot.channelId)
-                        continue;
-
-                    if (state.userId === client.botId)
-                        continue;
-
-                    const member = client.cache.members?.get(state.userId, guildId);
-
-                    if (member && !member.user?.bot) {
-                        hasHumans = true;
-                        break;
-                    }
                 }
-
-                if (hasHumans)
-                    return;
 
                 db.queues.remove(guildId);
                 db.voice.remove(guildId);
-
             }, TIMEOUT * 1000);
 
             timers.set(guildId, timer);
