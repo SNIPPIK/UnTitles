@@ -76,7 +76,7 @@ export class UDPLayer extends BaseLayer<VoiceUDPSocket> {
 
             const sendDiscovery = () => {
                 attempts++;
-                udp.discovery(d.ssrc)
+                udp.discovery(d.ssrc);
 
                 // Планируем следующую попытку, если не превышен лимит
                 if (attempts < MAX_RETRIES) {

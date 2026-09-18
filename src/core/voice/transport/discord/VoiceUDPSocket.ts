@@ -151,7 +151,7 @@ export class VoiceUDPSocket extends TypedEmitter<UDPSocketEvents> {
             // Проверяем, что адрес является корректным IPv4.
             if (!isIPv4(address)) {
                 // Если адрес невалиден — эмитим ошибку.
-                this.emit("discovery", Error("Not found IPv4 address"));
+                this.emit("error", Error("Not found IPv4 address"));
             } else {
                 // Устанавливаем статус «соединение установлено».
                 this._status = VoiceUDPSocketStatuses.connected;

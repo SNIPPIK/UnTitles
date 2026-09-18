@@ -379,8 +379,9 @@ impl OggOpusDemuxer {
     #[inline]
     fn reset_storage(&mut self) {
         self.remainder = BytesMut::new();
-        self.packet_carry = Vec::new();
         self.bitstream_serial = None;
+        self.packet_carry.clear();
+        self.packet_carry.shrink_to_fit();
     }
 
     /// Очищает все внутренние данные (вызывает reset_storage).

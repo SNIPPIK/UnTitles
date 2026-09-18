@@ -442,15 +442,13 @@ export class Transport extends TypedEmitter<TransportEvents> {
         const generation = ++this.generation;
 
         this.emit("info", "[Transport/UDP]: Waiting discovery response");
-
         const discovery = await this._udp!.create(data);
 
         // Транспорт мог быть уничтожен во время ожидания discovery
         if (this.destroyed) return;
 
         // Если за время ожидания начата новая попытка — игнорируем старый ответ
-        if (generation !== this.generation)
-            return;
+        if (generation !== this.generation) return;
 
         // Ошибка при получении адреса — завершаем
         if (discovery instanceof Error) {

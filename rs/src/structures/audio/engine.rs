@@ -282,6 +282,10 @@ impl AudioEngine {
 
                 // Поток завершается — сбрасываем флаг активности.
                 active.store(false, Ordering::Release);
+
+                parser.cleanup();
+                frames.clear();
+                frames.shrink_to_fit();
             })
             .map_err(|e| {
                 // Если не удалось создать поток — убиваем ffmpeg и сбрасываем флаги.
@@ -518,11 +522,12 @@ impl AudioEngine {
 
         // Очищаем буфер.
         {
-            let buffer = match self.buffer.0.lock() {
+            let mut buffer = match self.buffer.0.lock() {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
             buffer.clear();
+            buffer.shrink_to_fit();
         }
     }
 }

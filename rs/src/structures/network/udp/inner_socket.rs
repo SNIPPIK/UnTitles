@@ -172,7 +172,7 @@ impl SocketInner {
                 //
                 // Не пытаемся брать следующие элементы:
                 // порядок Opus-пакетов должен сохраняться.
-                let _ = self.buffer.push(frame);
+                let _ = self.buffer.push_up(frame);
                 return;
             }
 
@@ -183,7 +183,7 @@ impl SocketInner {
                 // дополнительная проверка здесь делает очередь безопаснее.
                 frame
             } else {
-                match self.rtp.packet(frame) {
+                match self.rtp.packet(&frame) {
                     Ok(packet) => packet,
 
                     Err(_e) => {

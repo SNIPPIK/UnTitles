@@ -131,6 +131,52 @@ impl RingBuffer {
         Ok(())
     }
 
+    /// Пытается добавить элемент в начало буфера.
+    ///
+    /// `Ok(())` — элемент добавлен первым.
+    /// `Err(value)` — буфер заполнен, исходный элемент возвращается.
+    ///
+    /// Не блокируется и не ждёт освобождения места.
+    ///
+    /// Важно: метод должен вызываться только producer'ом.
+    #[inline]
+    pub fn push_up(&self, value: Vec<u8>) -> Result<(), Vec<u8>> {
+        // Текущая позиция producer'а.
+        let head = self.head.load(Ordering::Relaxed);
+
+        // Текущая позиция consumer'а.
+        let tail = self.tail.load(Ordering::Acquire);
+
+        // Проверяем заполненность.
+        let used = head.wrapping_sub(tail);
+
+        if used >= self.capacity {
+            return Err(value);
+        }
+
+        // Новый элемент должен оказаться перед текущим первым элементом.
+        //
+        // Например:
+        // tail = 5
+        // head = 8
+        //
+        // Логические элементы находятся в позициях:
+        // 5, 6, 7
+        //
+        // После push_up новый tail будет 4.
+        let new_tail = tail.wrapping_sub(1);
+        let index = new_tail % self.capacity;
+
+        unsafe {
+            (*self.buffer[index].get()).write(value);
+        }
+
+        // Публикуем новый tail после записи.
+        self.tail.store(new_tail, Ordering::Release);
+
+        Ok(())
+    }
+
     /// Добавляет несколько элементов в очередь за один вызов.
     ///
     /// Резервирует до `free` слотов за раз и записывает элементы напрямую,
@@ -322,6 +368,54 @@ impl RingBuffer {
             tail.wrapping_add(count),
             Ordering::Release,
         );
+    }
+
+    /// Освобождает все элементы и сжимает хранилище до `new_capacity` слотов.
+    ///
+    /// # ВАЖНО
+    /// Требует `&mut self`, то есть должен вызываться только когда producer
+    /// и consumer гарантированно остановлены (как и `clear()`). В этот момент
+    /// во всём процессе нет других ссылок на буфер, поэтому переаллокация
+    /// backing-массива безопасна.
+    ///
+    /// # Panics
+    /// Паникует, если `new_capacity == 0`.
+    pub fn shrink_to(&mut self, new_capacity: usize) {
+        // Сначала дропаем живые элементы (освобождаем их кучи).
+        self.clear();
+
+        // Уже меньше или равно — нечего сжимать.
+        if new_capacity >= self.capacity {
+            return;
+        }
+
+        // Готовим новый, меньший backing-массив.
+        let mut slots = Vec::with_capacity(new_capacity);
+        for _ in 0..new_capacity {
+            slots.push(UnsafeCell::new(MaybeUninit::uninit()));
+        }
+
+        // Заменяем старый Box — старая память возвращается аллокатору сразу.
+        // Старые слоты уничтожаются как MaybeUninit — деструктор не вызывается,
+        // что корректно, так как clear() уже дропнул всё живое.
+        self.buffer = slots.into_boxed_slice();
+        self.capacity = new_capacity;
+
+        // После clear() счётчики уже 0, но оставим явно для читаемости.
+        self.head.store(0, Ordering::Relaxed);
+        self.tail.store(0, Ordering::Relaxed);
+    }
+
+    /// Сжимает хранилище до минимально возможного размера (1 слот),
+    /// возвращая куче всю backing-память.
+    ///
+    /// Семантика как у `Vec::shrink_to_fit`: длина после `clear()` = 0,
+    /// поэтому остаётся один слот — минимально рабочее состояние.
+    ///
+    /// # ВАЖНО
+    /// Требует `&mut self` — только для остановленного буфера.
+    pub fn shrink_to_fit(&mut self) {
+        self.shrink_to(1);
     }
 
     // ========================================================================

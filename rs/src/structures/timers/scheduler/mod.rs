@@ -34,7 +34,7 @@ const SAMPLES: usize = 10;
 const TICK_INTERVAL: Duration = Duration::from_millis(TICK_INTERVAL_MS as u64);
 
 /// Целевое среднее время активного ожидания (спина).
-const TARGET_SPIN_TIME: Duration = Duration::from_micros(500);
+const TARGET_SPIN_TIME: Duration = Duration::from_micros(1000);
 
 /// Минимально допустимый запас перед дедлайном для перехода к спину.
 const MIN_SPIN_MARGIN: Duration = Duration::from_micros(50);

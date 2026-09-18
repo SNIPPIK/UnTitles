@@ -304,7 +304,7 @@ impl SocketBuffered {
     /// Метод идемпотентен: повторный вызов не выполняет действий.
     /// Останавливает прослушивание, очищает буфер, сбрасывает счётчик потерянных пакетов
     /// и удаляет сессию из глобального реестра.
-    fn cleanup(&self) {
+    fn cleanup(&mut self) {
         // Атомарно устанавливаем флаг destroyed в true.
         // Если он уже был true, значит cleanup уже выполнялся — выходим.
         if self.destroyed.swap(true, Ordering::AcqRel) {
@@ -315,7 +315,10 @@ impl SocketBuffered {
         self.stop_listening();
 
         // Очищаем внутренний кольцевой буфер отправки.
-        self.inner.buffer.clear();
+        if let Some(inner) = Arc::get_mut(&mut self.inner) {
+            inner.buffer.clear();
+            inner.buffer.shrink_to_fit();
+        }
 
         // Сбрасываем счётчик отброшенных пакетов (для статистики).
         self.inner.send_drops.store(0, Ordering::Relaxed);
@@ -327,7 +330,7 @@ impl SocketBuffered {
     /// Уничтожает сессию, вызывая `cleanup`.
     /// Метод доступен из JavaScript через N-API.
     #[napi]
-    pub fn destroy(&self) {
+    pub fn destroy(&mut self) {
         self.cleanup();
         self.inner.rtp.destroy();
     }

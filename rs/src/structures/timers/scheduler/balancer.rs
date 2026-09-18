@@ -1,133 +1,214 @@
 use crate::{
     structures::{
-        timers::scheduler::Scheduler,
-        network::udp::socket::SocketBuffered
-    }
+        network::udp::socket::SocketBuffered,
+        timers::scheduler::Scheduler
+    },
 };
-use std::sync::{Arc, Mutex};
-use once_cell::sync::Lazy;
-use dashmap::DashMap;
 
-/// Максимальное количество UDP-сессий, обслуживаемых одним рабочим потоком (worker).
-/// При превышении этого лимита создаётся новый worker.
-/// Выбрано 50, потому что:
-/// - Каждая сессия требует вызова `tick()` ~раз в 20 мс (50 Гц). 50 сессий дают 2500 вызовов/сек — комфортная нагрузка.
-/// - При большем количестве возрастает задержка обработки (jitter) из-за последовательного обхода.
+use once_cell::sync::Lazy;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
+
+/// Максимальное количество UDP-сессий, обслуживаемых одним рабочим потоком.
+/// При превышении создаётся новый воркер с собственным планировщиком.
 const MAX_PER_WORKER: usize = 50;
 
-/// Воркер теперь без Mutex
+/// Воркер с собственным `Scheduler` и набором UDP-сессий.
+///
+/// Каждый воркер обслуживает не более `MAX_PER_WORKER` сессий,
+/// вызывая их `tick()` через собственный цикл планировщика.
 struct Worker {
-    /// Менеджер потов, хранящий в себе udp сессии
+    /// Планировщик, обслуживающий сессии воркера.
     manager: Scheduler,
 
-    /// Ссылки на udp сессии, для быстрого поиска и распределения между потоками
-    sessions: DashMap<u32, Arc<SocketBuffered>>
+    /// Сессии, принадлежащие этому воркеру (по идентификатору).
+    sessions: HashMap<u32, Arc<SocketBuffered>>
 }
 
 impl Worker {
+    /// Создаёт нового воркера с пустым набором сессий и новым планировщиком.
+    ///
+    /// # Паника
+    /// Паникует, если не удалось создать `Scheduler` (проблемы с ОС/потоком).
     fn new() -> Self {
-        let manager = Scheduler::new().expect("Failed to create timer");
-        Worker {
-            manager,
-            sessions: DashMap::new()
+        Self {
+            manager: Scheduler::new().expect("Failed to create timer"),
+            sessions: HashMap::new()
         }
+    }
+
+    /// Проверяет, что воркер не содержит ни одной сессии.
+    fn is_empty(&self) -> bool {
+        self.sessions.is_empty()
+    }
+
+    /// Возвращает количество сессий, привязанных к воркеру.
+    fn session_count(&self) -> usize {
+        self.sessions.len()
     }
 }
 
-/// Балансировщик нагрузки, распределяющий сессии между несколькими `Worker`.
-/// Каждый worker имеет свой независимый цикл `tick()`.
-/// Балансировщик старается равномерно заполнять воркеры, но не перераспределяет сессии после добавления.
-/// При добавлении сессии ищется первый воркер, у которого число сессий меньше `MAX_PER_WORKER`.
-/// При удалении сессии воркер может стать пустым, и тогда он будет удалён (кроме `MIN_WORKERS`).
+/// Балансировщик нагрузки между несколькими `Worker`.
+///
+/// Распределяет сессии по воркерам, создавая новые при переполнении
+/// (`MAX_PER_WORKER`). Периодически удаляет пустые воркеры, чтобы не
+/// держать лишние потоки/циклы.
+///
+/// **Потокобезопасность**: все методы вызываются под внешним `Mutex`
+/// глобального балансировщика, поэтому сам `AutoBalancer` не содержит
+/// внутренних примитивов синхронизации.
 pub struct AutoBalancer {
-    // Вектор воркеров защищён собственным мьютексом (или блокировкой AutoBalancer)
-    workers: Vec<Arc<Worker>>,
+    /// Список воркеров. Индексы могут меняться из-за `swap_remove`
+    /// при очистке пустых воркеров.
+    workers: Vec<Worker>,
 
-    // Быстрый поиск воркера по session_id
-    session_map: DashMap<u32, Arc<Worker>>
+    /// Быстрый поиск индекса воркера по `session_id`.
+    /// Обновляется при перемещении воркеров в `cleanup_empty_workers`.
+    session_map: HashMap<u32, usize>
 }
 
 impl AutoBalancer {
+    /// Создаёт балансировщик с одним воркером по умолчанию.
     pub fn new() -> Self {
-        let mut balancer = AutoBalancer {
+        let mut balancer = Self {
             workers: Vec::new(),
-            session_map: DashMap::new()
+            session_map: HashMap::new(),
         };
 
+        // Гарантируем, что в балансировщике всегда есть хотя бы один воркер.
         balancer.create_worker();
         balancer
     }
 
-    /// Создаёт нового воркера с собственным `CycleManager` (интервал 20 мс = 50 тиков/сек).
-    /// Возвращает `Arc<Mutex<Worker>>` для безопасного доступа из нескольких потоков балансировщика.
-    fn create_worker(&mut self) -> Arc<Worker> {
-        let worker = Arc::new(Worker::new());
-        self.workers.push(worker.clone());
-        worker
+    /// Создаёт нового воркера и возвращает его индекс в `workers`.
+    ///
+    /// # Возвращаемое значение
+    /// Индекс только что созданного воркера.
+    fn create_worker(&mut self) -> usize {
+        // Индекс нового воркера совпадает с текущей длиной массива.
+        let index = self.workers.len();
+        self.workers.push(Worker::new());
+        index
     }
 
-    /// Удаляет пустые воркеры.
-    /// **Важно:** вызывается после каждого добавления/удаления. Если бы воркеров было много (тысячи),
-    /// эта операция могла бы стать затратной, но при `MAX_PER_WORKER = 50` общее число воркеров обычно невелико.
+    /// Удаляет пустые воркеры из списка.
+    ///
+    /// Использует `swap_remove`, поэтому при удалении воркера
+    /// последний элемент массива перемещается на его место. Это
+    /// требует обновления индексов в `session_map`.
     fn cleanup_empty_workers(&mut self) {
-        self.workers.retain(|w| {
-            let empty = w.sessions.is_empty();
-            if empty {
-                w.manager.shutdown();
+        let mut index = 0;
+
+        while index < self.workers.len() {
+            // Если воркер не пуст — просто переходим к следующему.
+            if !self.workers[index].is_empty() {
+                index += 1;
+                continue;
             }
-            !empty
-        });
+
+            // Останавливаем цикл и потоки воркера.
+            self.workers[index].manager.shutdown();
+
+            // swap_remove: последний элемент перемещается на `index`.
+            self.workers.swap_remove(index);
+
+            // После swap_remove последний воркер мог переехать на `index`.
+            // Обновляем все записи session_map, которые указывали на
+            // старый индекс перемещённого воркера.
+            if index < self.workers.len() {
+                for worker_id in self.session_map.values_mut() {
+                    if *worker_id == self.workers.len() {
+                        *worker_id = index;
+                    }
+                }
+            }
+            // Не увеличиваем `index`: на его место пришёл другой воркер,
+            // который тоже нужно проверить.
+        }
     }
 
-    /// Добавляет сессию в балансировщике.
-    /// Ищет первый воркер с числом сессий < MAX_PER_WORKER. Если такого нет, создаёт новый воркер.
-    /// Затем вставляет сессию в выбранный воркер и добавляет её в `CycleManager` этого воркера.
-    /// В конце удаляет пустые воркеры.
+    /// Добавляет сессию в наименее загруженный воркер.
+    ///
+    /// Если все воркеры заполнены (`MAX_PER_WORKER`), создаётся новый.
+    ///
+    /// # Аргументы
+    /// * `id` — идентификатор сессии.
+    /// * `session` — обёртка UDP-сессии, разделяемая между воркером и планировщиком.
     pub fn add_session(&mut self, id: u32, session: Arc<SocketBuffered>) {
-        // Ищем подходящий воркер.
-        // Если воркеров много, можно хранить индекс последнего неполного воркера,
-        // чтобы не итерироваться с самого начала каждый раз.
-        let target_worker = self.workers
+        // Ищем воркер со свободным местом. Если такого нет — создаём нового.
+        let worker_index = self
+            .workers
             .iter()
-            .find(|w| w.sessions.len() < MAX_PER_WORKER)
-            .cloned()
+            .position(|worker| worker.session_count() < MAX_PER_WORKER)
             .unwrap_or_else(|| self.create_worker());
 
-        target_worker.sessions.insert(id, session.clone());
-        target_worker.manager.add_session(id, session);
-        self.session_map.insert(id, target_worker);
+        let worker = &mut self.workers[worker_index];
 
-        // cleanup_empty_workers() здесь НЕ нужен. Мы только что добавили сессию,
-        // количество пустых воркеров не могло увеличиться.
+        // Клонируем Arc: одна ссылка в карте воркера, другая — в планировщике.
+        worker.sessions.insert(id, session.clone());
+        worker.manager.add_session(id, session);
+
+        // Регистрируем сессию в глобальной карте для быстрого поиска.
+        self.session_map.insert(id, worker_index);
     }
 
     /// Удаляет сессию из балансировщика.
-    /// Ищет воркер, содержащий данную сессию, удаляет её оттуда и из `CycleManager` этого воркера.
-    /// После удаления запускает очистку пустых воркеров.
+    ///
+    /// Если после удаления воркер становится пустым — он уничтожается.
+    ///
+    /// # Аргументы
+    /// * `id` — идентификатор удаляемой сессии.
     pub fn remove_session(&mut self, id: u32) {
-        // Быстрый поиск воркера через индекс (O(1))
-        if let Some((_, worker)) = self.session_map.remove(&id) {
+        // Забираем индекс воркера; если сессии нет — ничего не делаем.
+        let Some(worker_index) = self.session_map.remove(&id) else {
+            return;
+        };
+
+        // Убираем сессию из карты воркера и останавливаем её в планировщике.
+        if let Some(worker) = self.workers.get_mut(worker_index) {
             worker.sessions.remove(&id);
             worker.manager.remove_session(id);
-            self.cleanup_empty_workers();
         }
+
+        // Прибираем воркеры, которые стали пустыми.
+        self.cleanup_empty_workers();
     }
 }
 
-/// Глобальный синглтон балансировщика, защищённый мьютексом.
-/// Все операции добавления/удаления сессий проходят через него.
-pub static GLOBAL_BALANCER: Lazy<Mutex<AutoBalancer>> = Lazy::new(|| {
-    Mutex::new(AutoBalancer::new())
-});
+/// Глобальный балансировщик.
+///
+/// Инициализируется лениво при первом обращении (`Lazy`), так как создание
+/// `AutoBalancer` требует запуска минимум одного воркера. Все обращения —
+/// через `Mutex`, поскольку балансировщик мутабельный и общий для потоков.
+pub static GLOBAL_BALANCER: Lazy<Mutex<AutoBalancer>> =
+    Lazy::new(|| Mutex::new(AutoBalancer::new()));
 
-/// Добавляет сессию в глобальный балансировщик
-/// Обычно вызывается из конструктора `UdpBuffered`.
+/// Добавляет сессию в глобальный балансировщик.
+///
+/// Оборачивает сессию в `Arc` и делегирует добавление в `AutoBalancer`.
+/// Игнорирует отравление мьютекса (balancer должен продолжать работать).
+///
+/// # Аргументы
+/// * `id` — идентификатор сессии.
+/// * `session` — объект UDP-сессии (обёртка сокета с буфером).
 pub fn add_global_session(id: u32, session: SocketBuffered) {
-    GLOBAL_BALANCER.lock().unwrap().add_session(id, Arc::new(session));
+    GLOBAL_BALANCER
+        .lock()
+        .unwrap()
+        .add_session(id, Arc::new(session));
 }
 
 /// Удаляет сессию из глобального балансировщика.
-/// Обычно вызывается из метода `destroy` у `UdpBuffered`.
+///
+/// Игнорирует отравление мьютекса.
+///
+/// # Аргументы
+/// * `id` — идентификатор удаляемой сессии.
 pub fn remove_global_session(id: u32) {
-    GLOBAL_BALANCER.lock().unwrap().remove_session(id);
+    GLOBAL_BALANCER
+        .lock()
+        .unwrap()
+        .remove_session(id);
 }

@@ -16,28 +16,50 @@ use rand::{
 };
 
 /// Размер RTP-заголовка без расширений (байт).
-/// Базовая часть: version/P/X/CC (1) + M/PT (1) + sequence (2) + timestamp (4) + SSRC (4).
+///
+/// Базовая часть: version/P/X/CC (1 байт) + M/PT (1 байт) +
+/// sequence (2 байта) + timestamp (4 байта) + SSRC (4 байта) = 12.
 const RTP_HEADER_SIZE: usize = 12;
 
 /// Размер тега аутентификации AES-GCM (байт).
+///
 /// Добавляется к каждому зашифрованному пакету и проверяется при расшифровке.
 const GCM_TAG_SIZE: usize = 16;
 
-/// Минимальный размер суффикса nonce, добавляемого в конец пакета (байт).
-/// Используется в вариантах протокола с укороченным nonce (2 байта).
-const NONCE_SUFFIX_SIZE_MIN: usize = 2;
-
-/// Базовый размер суффикса nonce, добавляемого в конец пакета (байт).
-/// В Discord передаются младшие 4 байта nonce, старшие 8 остаются нулями.
-const NONCE_SUFFIX_SIZE: usize = 4;
-
-/// Максимальный размер суффикса nonce, добавляемого в конец пакета (байт).
-/// Вариант протокола с полным 8-байтовым суффиксом.
-const NONCE_SUFFIX_SIZE_MAX: usize = 8;
-
 /// Допустимая длина ключа AES-256 (байт).
+///
 /// Для режима AES-256-GCM требуется ровно 32 байта.
 const KEY_SIZE: usize = 32;
+
+/// Смещение поля sequence в RTP-заголовке.
+const RTP_SEQUENCE_OFFSET: usize = 2;
+
+/// Смещение поля timestamp в RTP-заголовке.
+const RTP_TIMESTAMP_OFFSET: usize = 4;
+
+/// Смещение поля SSRC в RTP-заголовке.
+const RTP_SSRC_OFFSET: usize = 8;
+
+/// Полный размер nonce для AES-GCM (байт).
+///
+/// AES-GCM всегда использует 12-байтовый nonce.
+const NONCE_SIZE: usize = 12;
+
+/// Размер значащей части nonce (байт).
+///
+/// В Discord используется счётчик в первых 4 байтах nonce,
+/// остальные 8 байт остаются нулями.
+const NONCE_COUNTER_SIZE: usize = 4;
+
+/// Значение первого байта RTP-заголовка: Version = 2.
+///
+/// `0x80` = `10` в старших двух битах (версия 2) + нулевые P/X/CC.
+const RTP_VERSION: u8 = 0x80;
+
+/// Payload Type для Opus в RTP.
+///
+/// Значение 120 — динамический тип нагрузки, используемый Discord Voice.
+const RTP_PAYLOAD_TYPE_OPUS: u8 = 120;
 
 /// Приращение временной метки RTP для одного пакета.
 ///
@@ -75,7 +97,6 @@ impl fmt::Display for CryptoError {
 
 /// Реализация `Error` для совместимости со стандартным трейтом.
 impl std::error::Error for CryptoError {}
-
 // ============================================================================
 // Внутренние параметры шифрования
 // ============================================================================
@@ -122,118 +143,142 @@ pub struct VoiceRTPSocket {
 }
 
 impl VoiceRTPSocket {
-    /// Создаёт неинициализированный сокет.
+    /// Создаёт неинициализированный RTP-сокет.
     ///
-    /// `ssrc` и ключ задаются отдельно через [`initialize`].
-    /// Счётчики sequence/timestamp/counter рандомизируются сразу —
-    /// по требованиям Discord они не должны начинаться с нуля.
+    /// SSRC и ключ шифрования задаются отдельно через [`initialize`].
+    /// Начальные значения sequence, timestamp и nonce counter
+    /// рандомизируются для избежания предсказуемого старта сессии.
     ///
     /// # Возвращаемое значение
-    /// Новый экземпляр `VoiceRTPSocket` в состоянии «не инициализирован».
+    /// Новый `VoiceRTPSocket` в состоянии «не инициализирован».
     pub fn new() -> Self {
-        // Инициализируем генератор случайных чисел для рандомизации счётчиков.
+        // Генератор случайных чисел для начальных значений счётчиков.
         let mut rng = rng();
 
         Self {
-            // Изначально состояние шифра отсутствует.
+            // Состояние шифрования отсутствует до вызова initialize().
             state: RwLock::new(None),
 
-            // Случайный начальный sequence, чтобы избежать предсказуемости.
+            // Случайное начальное значение RTP sequence (16 бит).
             sequence: AtomicU16::new(rng.random()),
 
-            // Случайный начальный timestamp.
+            // Случайное начальное значение RTP timestamp (32 бита).
             timestamp: AtomicU32::new(rng.random()),
 
-            // Случайный начальный счётчик nonce.
-            counter: AtomicU32::new(rng.random()),
+            // Случайное начальное значение nonce counter (32 бита).
+            counter: AtomicU32::new(rng.random())
         }
     }
 
-    /// Инициализирует сокет.
+    /// Инициализирует RTP-сокет.
     ///
     /// # Аргументы
     /// * `ssrc` — 32-битный идентификатор источника синхронизации.
     /// * `key` — 32-байтный ключ AES-256-GCM.
     ///
+    /// При каждой инициализации RTP-счётчики получают новые
+    /// случайные начальные значения — это защищает от повторного
+    /// использования nonce при реконнекте.
+    ///
     /// # Возвращаемое значение
     /// `Ok(())` при успешной инициализации.
     ///
     /// # Ошибки
-    /// - `InvalidKeyLength` — ключ не 32 байта.
-    /// - `EncryptionFailed` — ключ невалиден (не прошёл проверку AES-GCM).
+    /// * `InvalidKeyLength` — ключ имеет неверную длину.
+    /// * `EncryptionFailed` — не удалось создать AES-GCM cipher.
     pub fn initialize(&self, ssrc: u32, key: Vec<u8>) -> Result<(), CryptoError> {
-        // Проверка длины ключа: для AES-256 требуется ровно 32 байта.
+        // Проверяем длину ключа — AES-256 требует ровно 32 байта.
         if key.len() != KEY_SIZE {
             return Err(CryptoError::InvalidKeyLength(key.len()));
         }
 
         // Копируем ключ в массив фиксированной длины.
         let mut key_array = [0u8; KEY_SIZE];
-        key_array.copy_from_slice(key.as_ref());
+        key_array.copy_from_slice(&key);
 
-        // Создаём шифр из ключа. Ошибка возможна при некорректном ключе.
+        // Создаём шифр AES-256-GCM из ключа.
         let cipher = Aes256Gcm::new_from_slice(&key_array)
-            .map_err(|_| CryptoError::EncryptionFailed("invalid key".into()))?;
+            .map_err(|_| {
+                CryptoError::EncryptionFailed("invalid AES-256 key".into())
+            })?;
 
-        // Задаем все счётчики перед созданием нового состояния.
+        // Готовим генератор случайных чисел для сброса счётчиков.
         let mut rng = rng();
+
+        // Счётчики не участвуют в синхронизации памяти между потоками,
+        // достаточно Relaxed.
         self.sequence.store(rng.random(), Ordering::Relaxed);
         self.timestamp.store(rng.random(), Ordering::Relaxed);
         self.counter.store(rng.random(), Ordering::Relaxed);
 
-        // Заменяем состояние шифра под write-lock.
+        // Публикуем новое состояние только после успешного
+        // создания cipher и сброса всех счётчиков.
         *self.state.write().expect("RTP state lock poisoned") =
             Some(EncryptorState { ssrc, cipher });
 
         Ok(())
     }
 
-    /// Проверяет, готов ли сокет принимать фреймы.
+    /// Проверяет, инициализирован ли RTP-сокет.
+    ///
+    /// # Возвращаемое значение
+    /// `true`, если `initialize` уже был вызван и состояние шифра присутствует.
     #[inline]
     pub fn is_initialized(&self) -> bool {
-        self.state.read().expect("RTP state lock poisoned").is_some()
+        // Читаем состояние под read-lock, обрабатывая отравление мьютекса.
+        self.state
+            .read()
+            .expect("RTP state lock poisoned")
+            .is_some()
     }
 
     /// Шифрует один Opus-фрейм и возвращает полный RTP-пакет.
     ///
+    /// Формат результата:
+    ///
+    /// ```text
+    /// [RTP header][encrypted payload][GCM tag][nonce suffix]
+    /// ```
+    ///
     /// # Аргументы
-    /// * `frame` — буфер с Opus-данными.
+    /// * `frame` — байтовый срез с Opus-данными.
     ///
     /// # Возвращаемое значение
-    /// Готовый зашифрованный RTP-пакет.
+    /// `Vec<u8>` с готовым RTP-пакетом.
     ///
     /// # Ошибки
-    /// Возвращает ошибку, если сокет не инициализирован или шифрование провалилось.
+    /// * `NotInitialized` — сокет ещё не инициализирован.
+    /// * `EncryptionFailed` — ошибка AES-GCM.
     #[inline]
-    pub fn packet(&self, frame: Vec<u8>) -> Result<Vec<u8>, CryptoError> {
+    pub fn packet(&self, frame: &[u8]) -> Result<Vec<u8>, CryptoError> {
+        // Вся логика — в create_packet_raw.
         self.create_packet_raw(frame)
     }
 
-    /// Генерирует 12-байтовый nonce.
+    /// Генерирует 12-байтовый nonce для AES-GCM.
     ///
-    /// В Discord используются только первые 4 байта (счётчик в big-endian),
-    /// остальные 8 — нули. Счётчик инкрементируется атомарно.
+    /// Используется 32-битный счётчик в big-endian формате,
+    /// остальные байты nonce заполняются нулями.
     ///
     /// # Возвращаемое значение
-    /// Массив из 12 байт.
+    /// Массив из `NONCE_SIZE` байт.
     #[inline]
-    fn generate_nonce(&self) -> [u8; RTP_HEADER_SIZE] {
-        // Атомарно инкрементируем счётчик и получаем предыдущее значение.
-        let counter = self.counter.fetch_add(1, Ordering::Acquire);
+    fn generate_nonce(&self) -> [u8; NONCE_SIZE] {
+        // Relaxed достаточно: счётчик нужен только для получения
+        // уникального значения nonce, а не для публикации памяти.
+        let counter = self.counter.fetch_add(1, Ordering::Relaxed);
 
         // Готовим массив из 12 байт, заполненный нулями.
-        let mut nonce = [0u8; RTP_HEADER_SIZE];
+        let mut nonce = [0u8; NONCE_SIZE];
 
-        // Копируем первые 4 байта счётчика в big-endian порядке.
-        nonce[..NONCE_SUFFIX_SIZE].copy_from_slice(&counter.to_be_bytes());
+        // Копируем первые 4 байта счётчика в big-endian.
+        nonce[..NONCE_COUNTER_SIZE]
+            .copy_from_slice(&counter.to_be_bytes());
 
         nonce
     }
 
-    /// Формирует полный зашифрованный RTP-пакет.
-    ///
-    /// # Структура пакета
-    /// `[ RTP header (12 байт) ][ зашифрованный payload ][ GCM tag (16 байт) ][ nonce suffix (4 байта) ]`
+    /// Формирует и шифрует полный RTP-пакет.
     ///
     /// # Аргументы
     /// * `frame` — незашифрованный Opus-фрейм.
@@ -242,39 +287,42 @@ impl VoiceRTPSocket {
     /// Готовый к отправке RTP-пакет.
     ///
     /// # Ошибки
-    /// - `NotInitialized` — сокет не инициализирован.
-    /// - `EncryptionFailed` — ошибка AES-GCM.
+    /// * `NotInitialized` — сокет не инициализирован.
+    /// * `EncryptionFailed` — ошибка AES-GCM.
     #[inline]
-    fn create_packet_raw(&self, frame: Vec<u8>) -> Result<Vec<u8>, CryptoError> {
+    fn create_packet_raw(&self, frame: &[u8]) -> Result<Vec<u8>, CryptoError> {
         // Держим read-lock на всё время шифрования.
         let guard = self.state.read().expect("RTP state lock poisoned");
-        // Если состояние отсутствует — сокет не инициализирован.
-        let state = guard.as_ref().ok_or(CryptoError::NotInitialized)?;
 
-        // Формируем RTP-заголовок (последовательно обновляет sequence и timestamp).
+        // Если состояние отсутствует — сокет не инициализирован.
+        let state = guard
+            .as_ref()
+            .ok_or(CryptoError::NotInitialized)?;
+
+        // Формируем RTP-заголовок (обновляет sequence и timestamp).
         let header = self.build_header(state.ssrc);
 
         // Генерируем nonce (инкрементирует counter).
         let nonce_bytes = self.generate_nonce();
         let nonce = Nonce::from(nonce_bytes);
-        let payload_len = frame.len();
 
         // Выделяем память под весь пакет заранее.
         let mut packet = Vec::with_capacity(
-            RTP_HEADER_SIZE + payload_len + GCM_TAG_SIZE + NONCE_SUFFIX_SIZE,
+            RTP_HEADER_SIZE
+                + frame.len()
+                + GCM_TAG_SIZE
+                + NONCE_COUNTER_SIZE,
         );
 
-        // Добавляем заголовок.
+        // RTP header остаётся открытым и используется как AAD.
         packet.extend_from_slice(&header);
 
-        // Добавляем незашифрованный payload (позже будет зашифрован in-place).
-        packet.extend_from_slice(&frame);
+        // Добавляем исходный Opus payload.
+        packet.extend_from_slice(frame);
 
-        // Получаем мутабельный срез payload для шифрования.
+        // Шифруем payload непосредственно внутри итогового буфера.
         let payload = &mut packet[RTP_HEADER_SIZE..];
 
-        // Шифруем payload in-place, используя nonce и AAD = RTP-заголовок.
-        // Возвращает GCM-тег.
         let tag = state
             .cipher
             .encrypt_inout_detached(
@@ -282,27 +330,33 @@ impl VoiceRTPSocket {
                 &header,
                 InOutBuf::from(payload),
             )
-            .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+            .map_err(|error| {
+                CryptoError::EncryptionFailed(error.to_string())
+            })?;
 
-        // Добавляем тег GCM в конец пакета.
+        // GCM authentication tag.
         packet.extend_from_slice(tag.as_slice());
 
-        // Добавляем младшие 4 байта nonce в конец пакета.
-        packet.extend_from_slice(&nonce_bytes[..NONCE_SUFFIX_SIZE]);
+        // Discord voice packet mode использует 4-байтовый
+        // nonce suffix в конце пакета.
+        packet.extend_from_slice(
+            &nonce_bytes[..NONCE_COUNTER_SIZE],
+        );
 
         Ok(packet)
     }
 
-    /// Строит 12-байтовый RTP-заголовок.
+    /// Формирует 12-байтовый RTP-заголовок.
     ///
     /// Формат:
-    /// - байт 0 — `0x80` (Version=2);
-    /// - байт 1 — `0x78` (Payload type=120, Opus);
-    /// - байты 2..4 — sequence (big-endian);
-    /// - байты 4..8 — timestamp (big-endian);
-    /// - байты 8..12 — SSRC (big-endian).
     ///
-    /// Атомарно увеличивает `sequence` на 1 и `timestamp` на `TIMESTAMP_INC`.
+    /// ```text
+    /// [0]      Version = 2
+    /// [1]      Payload Type = 120
+    /// [2..4]  Sequence
+    /// [4..8]  Timestamp
+    /// [8..12] SSRC
+    /// ```
     ///
     /// # Аргументы
     /// * `ssrc` — идентификатор источника синхронизации.
@@ -314,40 +368,44 @@ impl VoiceRTPSocket {
         // Инициализируем заголовок нулями.
         let mut header = [0u8; RTP_HEADER_SIZE];
 
-        // Байт 0: Version = 2 (0x80).
-        header[0] = 0x80;
+        // Байт 0: Version = 2.
+        header[0] = RTP_VERSION;
+        // Байт 1: Payload Type = 120 (Opus).
+        header[1] = RTP_PAYLOAD_TYPE_OPUS;
 
-        // Байт 1: Payload type = 120 (0x78) для Opus.
-        header[1] = 0x78;
+        // Атомарно получаем sequence и увеличиваем на 1.
+        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
 
-        // Атомарно получаем текущий sequence и увеличиваем его на 1.
-        let sequence = self.sequence.fetch_add(1, Ordering::Acquire);
-
-        // Атомарно получаем текущий timestamp и увеличиваем его на TIMESTAMP_INC.
-        let timestamp = self.timestamp.fetch_add(TIMESTAMP_INC, Ordering::Acquire);
+        // Атомарно получаем timestamp и увеличиваем на TIMESTAMP_INC.
+        let timestamp = self
+            .timestamp
+            .fetch_add(TIMESTAMP_INC, Ordering::Relaxed);
 
         // Записываем sequence в big-endian (2 байта).
-        header[NONCE_SUFFIX_SIZE_MIN .. NONCE_SUFFIX_SIZE].copy_from_slice(&sequence.to_be_bytes());
+        header[RTP_SEQUENCE_OFFSET..RTP_SEQUENCE_OFFSET + 2]
+            .copy_from_slice(&sequence.to_be_bytes());
 
         // Записываем timestamp в big-endian (4 байта).
-        header[NONCE_SUFFIX_SIZE .. NONCE_SUFFIX_SIZE_MAX].copy_from_slice(&timestamp.to_be_bytes());
+        header[RTP_TIMESTAMP_OFFSET..RTP_TIMESTAMP_OFFSET + 4]
+            .copy_from_slice(&timestamp.to_be_bytes());
 
         // Записываем SSRC (4 байта).
-        header[NONCE_SUFFIX_SIZE_MAX .. RTP_HEADER_SIZE].copy_from_slice(&ssrc.to_be_bytes());
+        header[RTP_SSRC_OFFSET..RTP_SSRC_OFFSET + 4]
+            .copy_from_slice(&ssrc.to_be_bytes());
 
         header
     }
 
-    /// Сбрасывает состояние шифра и все счётчики в ноль.
+    /// Сбрасывает состояние шифрования и счётчики.
     ///
-    /// После вызова требуется повторный `initialize`.
-    /// Безопасен для повторного вызова.
+    /// После вызова требуется повторный [`initialize`].
+    /// Повторный вызов безопасен.
     #[inline]
     pub fn destroy(&self) {
         // Обнуляем состояние шифра под write-lock.
         *self.state.write().expect("RTP state lock poisoned") = None;
 
-        // Сбрасываем все счётчики.
+        // Сбрасываем все счётчики в ноль.
         self.sequence.store(0, Ordering::Relaxed);
         self.timestamp.store(0, Ordering::Relaxed);
         self.counter.store(0, Ordering::Relaxed);

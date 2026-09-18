@@ -16,8 +16,8 @@ const MAX_SEND_BURST: u8 = 3;
 /// 20 ms      → normal
 /// 20–30 ms   → burst 2
 /// >30 ms     → burst 3
-const BURST_THRESHOLD_1: Duration = Duration::from_millis(2);
-const BURST_THRESHOLD_2: Duration = Duration::from_millis(15);
+const BURST_THRESHOLD_1: Duration = Duration::from_millis(1);
+const BURST_THRESHOLD_2: Duration = Duration::from_millis(5);
 
 /// -------------------------------------------------------------------------
 /// SendBudget
