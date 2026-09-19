@@ -1,4 +1,4 @@
-use crate::structures::timers::scheduler::TICK_INTERVAL_MS;
+use crate::structures::timers::scheduler::constants::TICK_INTERVAL_MS;
 use std::{
     sync::{
         atomic::{AtomicU16, AtomicU32, Ordering},
@@ -65,7 +65,7 @@ const RTP_PAYLOAD_TYPE_OPUS: u8 = 120;
 ///
 /// Для Opus с частотой дискретизации 48 кГц и кадрами по 20 мс получаем 960 семплов.
 /// `TICK_INTERVAL_MS` — интервал цикла отправки (20 мс).
-const TIMESTAMP_INC: u32 = 48000 * TICK_INTERVAL_MS / 1000;
+const TIMESTAMP_INC: u32 = 48000 * (TICK_INTERVAL_MS as u32) / 1000;
 
 // ============================================================================
 // Ошибки криптографических операций

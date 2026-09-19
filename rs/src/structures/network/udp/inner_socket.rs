@@ -99,7 +99,7 @@ impl SocketInner {
     /// Возвращает `true`, если очередь содержит хотя бы один пакет,
     /// ожидающий отправки.
     pub fn has_pending_packets(&self) -> bool {
-        !self.buffer.is_empty()
+        !self.buffer.is_empty() || self.buffer.len() > 0
     }
 
     /// Определяет, что нужно отправить: пакет из очереди или keepalive-сигнал.
@@ -159,7 +159,7 @@ impl SocketInner {
         // или ещё не готовые данные.
         for _ in 0..budget {
             let Some(frame) = self.buffer.pop() else {
-                return;
+                break;
             };
 
             let bypass = is_raw_bypass(frame.len());
@@ -176,7 +176,7 @@ impl SocketInner {
                 return;
             }
 
-            let packet = if bypass {
+            let mut packet = if bypass {
                 // Discovery (74) или keepalive (8) отправляются как есть.
                 //
                 // Keepalive обычно проходит через tick_alive(), но
@@ -208,6 +208,7 @@ impl SocketInner {
 
             match self.socket.send(&packet) {
                 Ok(_) => {
+                    packet.shrink_to_fit();
                     self.consecutive_failures
                         .store(0, Ordering::Relaxed);
 
@@ -216,6 +217,7 @@ impl SocketInner {
                 }
 
                 Err(_e) => {
+                    packet.shrink_to_fit();
                     self.send_drops
                         .fetch_add(1, Ordering::Relaxed);
 

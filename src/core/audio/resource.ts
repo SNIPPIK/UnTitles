@@ -93,13 +93,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
 
             // Аудио фильтры
             "-af", this.filters,
-
-            // Указываем формат аудио (ogg/opus)
-            "-c:a", "libopus",
-            "-frame_duration", `${OPUS_FRAME_SIZE}`,
             "-application", `${ENCODER_PARAMS.mode}`,
-            "-f", "ogg",
-            "pipe:1"
         ];
     };
 
