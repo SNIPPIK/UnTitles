@@ -5,7 +5,7 @@ use crate::structures::audio::encoder::ogg::packet_type::{PacketType, ParsedPack
 use napi::bindgen_prelude::{ Error, Result };
 use bytes::{ Buf, BufMut, BytesMut };
 use memchr::memmem;
-
+use crate::structures::audio::opus::SILENT_FRAME;
 // ============================================================================
 // LIMITS
 // ============================================================================
@@ -344,7 +344,12 @@ impl OggOpusDemuxer {
             if segment_len < 255 {
                 if !packet_carry.is_empty() {
                     let packet_type = PacketType::detect_packet_type(packet_carry);
-                    on_packet(packet_type, packet_carry.as_slice())?;
+                    
+                    if packet_type == PacketType::PLC {
+                        on_packet(PacketType::Silent, &SILENT_FRAME.to_vec())?;
+                    } else {
+                        on_packet(packet_type, packet_carry.as_slice())?;
+                    }
                     packet_carry.clear();
                 }
             }

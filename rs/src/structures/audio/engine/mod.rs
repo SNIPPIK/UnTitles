@@ -18,17 +18,11 @@ use napi_derive::napi;
 use std::{
     process::Child,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize},
         Arc, Condvar, Mutex,
     },
     thread::JoinHandle,
 };
-
-/// Счётчик живых экземпляров AudioEngine (только в отладочных сборках).
-///
-/// Позволяет отслеживать утечки объектов в тестах и при отладке.
-#[cfg(debug_assertions)]
-pub(crate) static AUDIO_ENGINE_ALIVE: AtomicUsize = AtomicUsize::new(0);
 
 /// Движок аудио-буфера, связанный с процессом ffmpeg и потоком чтения.
 ///
@@ -83,10 +77,6 @@ impl AudioEngine {
     pub fn new(max_minutes: u32) -> Self {
         // 50 пакетов/сек * 60 сек * минуты, минимум 1500.
         let capacity = (50u32 * 60 * max_minutes).max(1500) as usize;
-
-        // Отладочный счётчик живых экземпляров.
-        #[cfg(debug_assertions)]
-        AUDIO_ENGINE_ALIVE.fetch_add(1, Ordering::Relaxed);
 
         Self {
             // Процесс ffmpeg ещё не запущен.

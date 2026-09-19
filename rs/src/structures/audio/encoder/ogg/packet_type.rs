@@ -50,7 +50,7 @@ impl PacketType {
     /// Такие пакеты должны передаваться в аудио-декодер или буфер,
     /// в отличие от служебных (`Head`, `Tags`, `OggPage` и т.п.).
     pub fn is_audio_frame(self) -> bool {
-        matches!(self, Self::Frame | Self::VBR | Self::Silent)
+        matches!(self, Self::Frame | Self::VBR | Self::Silent | Self::PLC)
     }
 
     /// Определяет тип пакета по его содержимому и длине.

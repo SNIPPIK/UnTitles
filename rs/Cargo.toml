@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 napi = { version = "3.12.6", features = ["napi10", "async", "node_version_detect"] }
 napi-derive = "3.6.7"
+mimalloc = "0.1.52"
 once_cell = "1.21.4"
 arc-swap = "1.9.2"
 
@@ -25,7 +26,6 @@ davey = "0.1.4"
 rand = "0.10.2"
 aead = { version = "0.6.1", default-features = false }
 aes-gcm = { version = "0.11.1", features = ["aes"] }
-state = "0.6.0"
 
 # Профиль релиза
 [profile.release]
