@@ -2,7 +2,7 @@ pub mod packet_type;
 mod opus_specification;
 
 use crate::structures::audio::encoder::ogg::packet_type::{PacketType, ParsedPacket};
-use napi::bindgen_prelude::{ Error, Result };
+use std::io::{Error, ErrorKind, Result};
 use bytes::{ Buf, BufMut, BytesMut };
 use memchr::memmem;
 use crate::structures::audio::opus::SILENT_FRAME;
@@ -212,17 +212,17 @@ impl OggOpusDemuxer {
     {
         // Минимальный размер Ogg page header.
         if page.len() < 27 {
-            return Err(Error::from_reason("Invalid OGG page"));
+            return Err(Error::new(ErrorKind::InvalidData, "Invalid OGG page"));
         }
 
         // Capture pattern.
         if &page[..4] != b"OggS" {
-            return Err(Error::from_reason("Invalid OGG capture pattern"));
+            return Err(Error::new(ErrorKind::InvalidData, "Invalid OGG capture pattern"));
         }
 
         // Ogg version.
         if page[4] != 0 {
-            return Err(Error::from_reason("Unsupported OGG version"));
+            return Err(Error::new(ErrorKind::InvalidData, "Unsupported OGG version"));
         }
 
         let header_type = page[5];
@@ -231,7 +231,7 @@ impl OggOpusDemuxer {
         // 0x01 = continued, 0x02 = BOS, 0x04 = EOS.
         // Остальные биты зарезервированы и должны быть нулевыми.
         if header_type & 0xF8 != 0 {
-            return Err(Error::from_reason("Invalid OGG header flags"));
+            return Err(Error::new(ErrorKind::InvalidData, "Invalid OGG header flags"));
         }
 
         let continued = (header_type & 0x01) != 0;
@@ -242,7 +242,7 @@ impl OggOpusDemuxer {
         let serial = u32::from_le_bytes(
             page[14..18]
                 .try_into()
-                .map_err(|_| Error::from_reason("Invalid OGG serial"))?,
+                .map_err(|_| Error::new(ErrorKind::InvalidData, "Invalid OGG serial"))?,
         );
 
         // Если это новый logical bitstream — старый незавершённый
@@ -256,7 +256,7 @@ impl OggOpusDemuxer {
         let header_size = 27 + segments_count;
 
         if page.len() < header_size {
-            return Err(Error::from_reason("Invalid OGG segment table"));
+            return Err(Error::new(ErrorKind::InvalidData, "Invalid OGG segment table"));
         }
 
         let segment_table = &page[27..header_size];
@@ -267,7 +267,8 @@ impl OggOpusDemuxer {
 
         // BOS-страница не может быть continuation.
         if bos && continued {
-            return Err(Error::from_reason(
+            return Err(Error::new(
+                ErrorKind::InvalidData,
                 "Invalid OGG BOS continuation",
             ));
         }
@@ -275,7 +276,8 @@ impl OggOpusDemuxer {
         // Если приходит BOS с незавершённым packet — состояние потока
         if bos && !packet_carry.is_empty() {
             packet_carry.clear();
-            return Err(Error::from_reason(
+            return Err(Error::new(
+                ErrorKind::InvalidData,
                 "OGG BOS with unfinished packet",
             ));
         }
@@ -288,7 +290,8 @@ impl OggOpusDemuxer {
             // Если страница объявляет продолжение, у нас обязательно
             // должен существовать packet, начатый предыдущей страницей.
             if packet_carry.is_empty() {
-                return Err(Error::from_reason(
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
                     "OGG continuation without previous packet",
                 ));
             }
@@ -296,7 +299,8 @@ impl OggOpusDemuxer {
             // Предыдущая страница закончилась segment=255, то есть packet
             // должен был продолжиться здесь, но continuation отсутствует.
             packet_carry.clear();
-            return Err(Error::from_reason(
+            return Err(Error::new(
+                ErrorKind::InvalidData,
                 "OGG packet continuation mismatch",
             ));
         }
@@ -312,11 +316,12 @@ impl OggOpusDemuxer {
 
             let end = offset
                 .checked_add(segment_len)
-                .ok_or_else(|| Error::from_reason("OGG segment overflow"))?;
+                .ok_or_else(|| Error::new(ErrorKind::InvalidData, "OGG segment overflow"))?;
 
             if end > page.len() {
                 packet_carry.clear();
-                return Err(Error::from_reason(
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
                     "OGG segment out of bounds",
                 ));
             }
@@ -325,11 +330,12 @@ impl OggOpusDemuxer {
             let new_len = packet_carry
                 .len()
                 .checked_add(segment_len)
-                .ok_or_else(|| Error::from_reason("Opus packet overflow"))?;
+                .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Opus packet overflow"))?;
 
             if new_len > MAX_PACKET_SIZE {
                 packet_carry.clear();
-                return Err(Error::from_reason(
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
                     "Opus packet exceeds maximum size",
                 ));
             }
@@ -344,13 +350,24 @@ impl OggOpusDemuxer {
             if segment_len < 255 {
                 if !packet_carry.is_empty() {
                     let packet_type = PacketType::detect_packet_type(packet_carry);
-                    
-                    if packet_type == PacketType::PLC {
-                        on_packet(PacketType::Silent, &SILENT_FRAME.to_vec())?;
-                    } else {
-                        on_packet(packet_type, packet_carry.as_slice())?;
+
+                    // Более деликатно разбираем типы пакета
+                    match packet_type {
+                        PacketType::PLC => {
+                            packet_carry.clear();
+                            on_packet(PacketType::Silent, &SILENT_FRAME.to_vec())?;
+                        }
+
+                        // Не передаем VBR пакет, склеиваем его со следующим
+                        PacketType::VBR => {
+                            continue;
+                        }
+
+                        _ => {
+                            on_packet(packet_type, packet_carry.as_slice())?;
+                            packet_carry.clear();
+                        }
                     }
-                    packet_carry.clear();
                 }
             }
         }
@@ -359,7 +376,8 @@ impl OggOpusDemuxer {
         // lacing table.
         if offset != page.len() {
             packet_carry.clear();
-            return Err(Error::from_reason(
+            return Err(Error::new(
+                ErrorKind::InvalidData,
                 "OGG page payload size mismatch",
             ));
         }
@@ -372,7 +390,8 @@ impl OggOpusDemuxer {
         // Проверяем ПОСЛЕ обработки всех сегментов.
         if eos && !packet_carry.is_empty() {
             packet_carry.clear();
-            return Err(Error::from_reason(
+            return Err(Error::new(
+                ErrorKind::InvalidData,
                 "OGG EOS with unfinished packet",
             ));
         }
@@ -401,7 +420,7 @@ impl OggOpusDemuxer {
 
 impl Drop for OggOpusDemuxer {
     fn drop(&mut self) {
-        self.cleanup();
+        self.reset_storage();
 
         #[cfg(debug_assertions)]
         println!(
