@@ -1,5 +1,6 @@
 import { Command, CommandContext, Declare, Middlewares, Locales } from "seyfert";
 import { ApplicationCommandType } from "seyfert/lib/types/index.js";
+import { Colors } from "#structures/discord/index.js";
 import { MessageFlags } from "discord-api-types/v10";
 import { locale } from "#structures";
 
@@ -30,18 +31,17 @@ import { locale } from "#structures";
 export default class AvatarContextCommand extends Command {
     async run(ctx: CommandContext) {
         // В контекстной команде типа User целевой пользователь доступен через ctx.target
-        const user = ctx.interaction.data.resolved.users[0];
+        const user = Object.values(ctx.interaction.data.resolved.users)[0];
         const me = ctx.client.me;
-        const avatar = user.avatarURL({ size: 1024, forceStatic: false });
 
         // Отправляем эфемерный ответ
         await ctx.write({
             embeds: [
                 {
-                    color: user.accentColor,
+                    color: user?.accentColor ?? Colors.Navy,
                     description: `${locale._(ctx.interaction.locale, "user")} <@!${user.id}>`,
                     timestamp: new Date().toISOString(),
-                    image: { url: avatar },
+                    image: { url: `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=1024` },
                     footer: {
                         text: me.username,
                         icon_url: me.avatarURL({ size: 1024, forceStatic: false }),
@@ -62,7 +62,7 @@ export default class AvatarContextCommand extends Command {
                             type: 2,
                             label: "Image",
                             style: 5,
-                            url: avatar,
+                            url: `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=1024`,
                         },
                     ],
                 },

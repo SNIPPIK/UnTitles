@@ -344,6 +344,8 @@ impl SocketBuffered {
 /// не останется активных потоков, удерживающих ссылки на ресурсы.
 impl Drop for SocketBuffered {
     fn drop(&mut self) {
+        self.cleanup();
+
         // Останавливаем поток приёма: атомарно снимаем флаг активности.
         // Поток, находящийся в блокирующем `recv`, проснётся и выйдет из цикла.
         self.listener_active.store(false, Ordering::Release);
