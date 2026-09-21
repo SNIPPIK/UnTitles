@@ -15,6 +15,12 @@ pub enum PacketType {
     Head,
     /// Заголовок комментариев Opus (OpusTags).
     Tags,
+    /// Повреждённый или некорректный пакет.
+    Broken,
+    /// Внутренний маркер конца потока (0xFF).
+    End,
+    /// Страница Ogg-контейнера.
+    OggPage,
 
     /// Обычный Opus-аудиофрейм.
     Frame,
@@ -24,15 +30,8 @@ pub enum PacketType {
     PLC,
     /// Пакет/фрейм с переменным битрейтом (VBR).
     VBR,
-
-    /// Повреждённый или некорректный пакет.
-    Broken,
-    /// Внутренний маркер конца потока (0xFF).
-
-    End,
-
-    /// Страница Ogg-контейнера.
-    OggPage
+    /// Пакет/фрейм с переменным битрейтом (VBR), совмещенный с пустым фреймом для плавного перехода
+    SVBR
 }
 
 /// Выходной пакет: кортеж из типа и данных.
@@ -50,7 +49,7 @@ impl PacketType {
     /// Такие пакеты должны передаваться в аудио-декодер или буфер,
     /// в отличие от служебных (`Head`, `Tags`, `OggPage` и т.п.).
     pub fn is_audio_frame(self) -> bool {
-        matches!(self, Self::Frame | Self::VBR | Self::Silent | Self::PLC)
+        matches!(self, Self::Frame | Self::SVBR | Self::VBR | Self::Silent | Self::PLC)
     }
 
     /// Определяет тип пакета по его содержимому и длине.
@@ -84,7 +83,7 @@ impl PacketType {
 
             // Заголовок идентификации Opus.
             _ if packet.starts_with(b"OpusHead") => {
-                if packet.len() >= 19 {
+                if packet.len() >= 8 {
                     PacketType::Head
                 } else {
                     PacketType::Broken
@@ -93,7 +92,7 @@ impl PacketType {
 
             // Заголовок комментариев Opus.
             _ if packet.starts_with(b"OpusTags") => {
-                if packet.len() >= 12 {
+                if packet.len() >= 8 {
                     PacketType::Tags
                 } else {
                     PacketType::Broken

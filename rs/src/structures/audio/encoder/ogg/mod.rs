@@ -1,11 +1,13 @@
 pub mod packet_type;
 mod opus_specification;
 
-use crate::structures::audio::encoder::ogg::packet_type::{PacketType, ParsedPacket};
+use crate::structures::audio::{
+    encoder::ogg::packet_type::{PacketType, ParsedPacket},
+    opus::SILENT_FRAME
+};
 use std::io::{Error, ErrorKind, Result};
 use bytes::{ Buf, BufMut, BytesMut };
 use memchr::memmem;
-use crate::structures::audio::opus::SILENT_FRAME;
 // ============================================================================
 // LIMITS
 // ============================================================================
@@ -340,7 +342,7 @@ impl OggOpusDemuxer {
                 ));
             }
 
-            if segment_len != 0 {
+            else if segment_len != 0 {
                 packet_carry.extend_from_slice(&page[offset..end]);
             }
 
@@ -354,13 +356,16 @@ impl OggOpusDemuxer {
                     // Более деликатно разбираем типы пакета
                     match packet_type {
                         PacketType::PLC => {
-                            packet_carry.clear();
+                            packet_carry.clear(); // Удаляем мусорный PLC
                             on_packet(PacketType::Silent, &SILENT_FRAME.to_vec())?;
                         }
 
                         // Не передаем VBR пакет, склеиваем его со следующим
                         PacketType::VBR => {
-                            continue;
+                            // Вставляем SILENT_FRAME в начало, остаток (старый carry) идёт следом
+                            packet_carry.splice(0..0, SILENT_FRAME.iter().copied());
+                            on_packet(PacketType::SVBR, packet_carry.as_slice())?;
+                            packet_carry.clear(); // Удаляем после отправки
                         }
 
                         _ => {
@@ -402,7 +407,7 @@ impl OggOpusDemuxer {
     /// Полный сброс внутренних буферов (создание новых пустых экземпляров).
     #[inline]
     fn reset_storage(&mut self) {
-        self.remainder = BytesMut::new();
+        self.remainder.clear();
         self.bitstream_serial = None;
         self.packet_carry.clear();
         self.packet_carry.shrink_to_fit();
