@@ -5,7 +5,6 @@ import { Collection } from "#structures";
 import { db } from "#db";
 
 // Voice Sockets
-export * from "./transport/discord/VoiceWebSocket.js";
 export * from "./transport/discord/VoiceUDPSocket.js";
 export * from "./connection.js";
 

@@ -1,491 +1,538 @@
 import type { VoiceDavePrepareEpochData, VoiceDavePrepareTransitionData } from "discord-api-types/voice/v8";
-import { DAVESession, iType } from "#native";
+import { iType, MLSSession as NativeMLSSession } from "#native";
 import { TypedEmitter } from "#structures";
 
-/**
- * @author SNIPPIK
- * @description Текущая максимальная версия протокола DAVE, поддерживаемая этой реализацией.
- *              Используется для согласования версий с сервером Discord.
- * @version 1.3
- * @public
- */
-const MAX_DAVE_PROTOCOL: number = 1;
+/// Максимальная поддерживаемая версия протокола DAVE.
+const MAX_DAVE_PROTOCOL = 1;
 
-/**
- * @author SNIPPIK
- * @description Количество секунд, в течение которых предыдущая транзакция (переход) считается действительной.
- *              Если за это время не произошёл финальный коммит, переход аннулируется.
- * @const TRANSITION_EXPIRY
- */
+/// Время (сек), в течение которого разрешён passthrough-режим при переходе.
 const TRANSITION_EXPIRY = 10;
 
-/**
- * @author SNIPPIK
- * @description Дополнительное время (в секундах), дающееся на выполнение перехода при понижении версии протокола.
- *              Это позволяет плавно деградировать шифрование, не обрывая воспроизведение.
- * @const TRANSITION_EXPIRY_PENDING_DOWNGRADE
- */
-const TRANSITION_EXPIRY_PENDING_DOWNGRADE = 24;
+/// Результат обработки перехода от нативного слоя.
+interface NativeTransitionResult {
+    transition_id: number;
+    success: boolean;
+    invalidated: boolean;
+}
 
-/**
- * Управляет сеансом группового протокола DAVE (MLS) для сквозного шифрования (E2EE)
- * голосовых каналов Discord.
- *
- * Обеспечивает:
- * - Инициализацию и пере инициализацию сессии при смене версии протокола.
- * - Обработку предложений (Proposals), коммитов (Commit) и приглашений (Welcome).
- * - Управление переходами между версиями протокола с таймаутами.
- * - Шифрование и шифрование аудио пакетов (Opus) с использованием DAVE.
- * - Корректную обработку ошибок с возможностью восстановления.
- *
- * @extends TypedEmitter<ClientMLSEvents>
- *
- * @example
- * ```ts
- * const session = new MLSSession(1, "user123", "channel456");
- * session.on("key", (keyPackage) => { ... });
- * session.reinit();
- * ```
- */
+/// Обёртка над нативной MLS-сессией (DAVE).
+///
+/// Управляет жизненным циклом E2EE для голосового канала: инициализация,
+/// обмен ключами, переходы между версиями протокола, обработка proposals/
+/// commit/welcome, шифрование исходящих Opus-пакетов.
+///
+/// Нативная сессия создаётся лениво при первом обращении к `session`
+/// или при вызове методов, которым требуется активное состояние.
 export class MLSSession extends TypedEmitter<ClientMLSEvents> {
-    public destroyed = false;
-    /**
-     * Идентификатор последнего успешно выполненного перехода.
-     * `undefined`, если переходов ещё не было.
-     */
-    public lastTransition_id?: number;
-
-    /**
-     * Ожидающие переходы: ключ — `transition_id`, значение — целевая версия протокола.
-     * Переход считается завершённым только после вызова `executeTransition`.
-     */
-    private pendingTransitions = new Map<number, number>();
-
-    /**
-     * Таймеры для ожидающих переходов.
-     * Если переход не завершён в течение 5 секунд, он автоматически удаляется.
-     */
-    private transitionTimers = new Map<number, NodeJS.Timeout>();
-
-    private _pendingExternalSender: Buffer | null = null;
-
-    /**
-     * Флаг, указывающий, что протокол был понижен с ненулевой версии до версии 0.
-     * Используется для корректного восстановления при последующем повышении.
-     */
-    private downgraded = false;
-
-    /**
-     * Флаг, указывающий, что сессия находится в процессе инициализации
-     * (после ошибки перехода). Пока `true`, входящие `prepareEpoch` игнорируются.
-     */
-    public reinitializing = false;
-
-    /**
-     * Экземпляр нижележащей DAVE-сессии.
-     * Может быть `null` после вызова `destroy()`.
-     */
-    public session: iType<typeof DAVESession>;
-
-    /**
-     * Флаг, указывающий, что в данный момент выполняется переход между версиями.
-     * Блокирует повторные вызовы `executeTransition` и шифрование.
-     */
-    private _isTransitioning = false;
-
-    /**
-     * Максимальная поддерживаемая версия протокола DAVE.
-     */
-    public static get max_version(): number {
-        return MAX_DAVE_PROTOCOL;
-    };
-
-    /**
-     * Возвращает `true`, если в данный момент выполняется переход.
-     */
-    public get isTransitioning(): boolean {
-        return this._isTransitioning;
-    };
-
-    /**
-     * Возвращает текущий статус сессии (зависит от реализации `DAVESession`).
-     */
-    public get status() {
-        return this.session?.status;
-    };
-
-    /**
-     * Устанавливает внешнего отправителя для сессии.
-     * Используется при работе с делегированным шифрованием.
-     *
-     * @throws {Error} Если сессия не инициализирована.
-     */
-    public set externalSender(externalSender: Buffer) {
-        if (this.session) {
-            this.session.setExternalSender(externalSender);
-        } else {
-            // Сохраняем до создания сессии
-            this._pendingExternalSender = externalSender;
-        }
+    /// `true`, если сессия уничтожена — либо на уровне обёртки,
+    /// либо на уровне нативного объекта.
+    public get destroyed(): boolean {
+        return this._destroyed
+            || (this.session?.destroyed ?? false);
     }
 
-    /**
-     * Обрабатывает данные подготовки эпохи от Discord.
-     *
-     * Если `epoch === 1`, обновляет версию протокола и запускает инициализацию.
-     * Повторные вызовы с `epoch !== 1` или во время `reinitializing` игнорируются.
-     *
-     * @throws {Error} Косвенно, через `reinit()`.
-     */
-    public set prepareEpoch(data: VoiceDavePrepareEpochData) {
-        if (this.reinitializing) return;
+    /// Идентификатор последнего успешно выполненного перехода.
+    public get lastTransition_id(): number | undefined {
+        return this.session?.lastTransitionId;
+    }
 
-        // Только первая эпоха вызывает инициализацию.
-        if (data.epoch !== 1) return;
+    /// `true`, если сессия переинициализируется после ошибки перехода.
+    public get reinitializing(): boolean {
+        return this.session?.reinitializing
+            ?? this._reinitializing;
+    }
 
-        this.version = data.protocol_version;
-        this.reinit();
-    };
+    /// `true`, если в данный момент выполняется смена версии протокола.
+    public get isTransitioning(): boolean {
+        return this.session?.isTransitioning ?? false;
+    }
 
-    /**
-     * Обрабатывает сигнал о невалидном переходе от Discord.
-     *
-     * Устанавливает флаг `reinitializing`, вызов событие `invalidateTransition`,
-     * очищает все ожидающие переходы и запускает инициализацию.
-     *
-     * @param id - Идентификатор невалидного перехода.
-     */
-    public set recoverFromInvalidTransition(id: number) {
-        if (this.reinitializing) return;
+    /// Текущий внутренний статус MLS-сессии.
+    public get status(): number | undefined {
+        return this.session?.status;
+    }
 
-        this.reinitializing = true;
-        this.emit("invalidateTransition", id);
+    /// `true`, если нативная сессия готова к шифрованию.
+    public get ready(): boolean {
+        return this.session?.ready ?? false;
+    }
 
-        this.clearTransitions();
-        this.reinit();
-    };
+    /// Максимальная поддерживаемая версия DAVE.
+    public static get max_version(): number {
+        return MAX_DAVE_PROTOCOL;
+    }
 
-    /**
-     * @param version    - Начальная версия протокола.
-     * @param user_id    - Идентификатор текущего пользователя.
-     * @param channel_id - Идентификатор голосового канала.
-     */
+    /// Флаг уничтожения на уровне обёртки (не нативного объекта).
+    private _destroyed = false;
+
+    /// Флаг переинициализации до момента создания нативной сессии.
+    private _reinitializing = false;
+
+    /// Внешний отправитель, сохранённый до появления нативной сессии.
+    private _pendingExternalSender: Buffer | null = null;
+
+    /// Нативная MLS-сессия. Создаётся лениво.
+    public session: iType<typeof NativeMLSSession> = null;
+
+    /// @param version    — начальная версия протокола DAVE.
+    /// @param user_id    — идентификатор текущего пользователя.
+    /// @param channel_id — идентификатор голосового канала.
     constructor(
         private version: number,
         public user_id: string,
-        public channel_id: string
+        public channel_id: string,
     ) {
         super();
-    };
+    }
 
-    /**
-     * Обрабатывает предложения (Proposals) от других участников.
-     *
-     * @param payload          - Буфер, содержащий тип предложения (1 байт) и данные.
-     * @param connectedClients - Список подключённых клиентов (участников).
-     *
-     * @returns Буфер с коммитом (и опционально приглашением), если требуется;
-     *          `null`, если коммит не требуется.
-     *
-     * @throws {Error} Если сессия не инициализирована.
-     */
-    public processProposals = (
-        payload: Buffer,
-        connectedClients: readonly string[]
-    ): Buffer | null => {
-        if (!this.session) return null;   // не бросаем ошибку
+    // ---------------------------------------------------------------------
+    // External sender
+    // ---------------------------------------------------------------------
 
-        const type = payload.readUInt8(0);
-        const data = payload.subarray(1);
+    /// Устанавливает внешнего отправителя.
+    ///
+    /// Если нативная сессия уже создана — передаёт значение напрямую,
+    /// иначе сохраняет и применит при создании.
+    public set externalSender(
+        externalSender: Buffer,
+    ) {
+        if (this.session) {
+            this.session.externalSender =
+                externalSender;
+        } else {
+            this._pendingExternalSender =
+                externalSender;
+        }
+    }
 
-        const result = this.session.processProposals(
-            type as 0 | 1,
-            data,
-            connectedClients
+    // ---------------------------------------------------------------------
+    // Epoch
+    // ---------------------------------------------------------------------
+
+    /// Обрабатывает данные подготовки новой эпохи.
+    ///
+    /// Игнорируется во время переинициализации и для эпох кроме 1.
+    /// Обновляет версию протокола, при необходимости создаёт сессию
+    /// и эмитит событие `key`, если получен новый key-package.
+    public set prepareEpoch(
+        data: VoiceDavePrepareEpochData,
+    ) {
+        if (this.reinitializing) {
+            return;
+        }
+
+        // Только первая эпоха вызывает инициализацию.
+        if (data.epoch !== 1) {
+            return;
+        }
+
+        this.version = data.protocol_version;
+
+        if (!this.session) {
+            this.createSession();
+        }
+
+        const key =
+            this.session!.prepareEpoch(
+                data.epoch,
+                data.protocol_version,
+            );
+
+        // Оповещаем внешний код о новом key-package.
+        if (key) {
+            this.emit("key", key);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Invalid transition recovery
+    // ---------------------------------------------------------------------
+
+    /// Запускает восстановление после невалидного перехода.
+    ///
+    /// Устанавливает флаг переинициализации, эмитит `invalidateTransition`
+    /// и делегирует нативный вызов. Игнорируется во время переинициализации.
+    public set recoverFromInvalidTransition(
+        id: number,
+    ) {
+        if (this.reinitializing) {
+            return;
+        }
+
+        this._reinitializing = true;
+
+        if (!this.session) {
+            this.createSession();
+        }
+
+        this.emit(
+            "invalidateTransition",
+            id,
         );
 
-        if (!result.commit) return null;
+        const key =
+            this.session!.recoverFromInvalidTransition(
+                id,
+            );
 
+        // Оповещаем внешний код о новом key-package.
+        if (key) {
+            this.emit("key", key);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Proposals
+    // ---------------------------------------------------------------------
+
+    /// Обрабатывает proposals от другого участника.
+    ///
+    /// Первый байт payload — тип операции, остальное — данные.
+    /// Возвращает commit (и welcome, если применимо) или `null`,
+    /// если нативная сессия не создана или commit не требуется.
+    public processProposals = (
+        payload: Buffer,
+        connectedClients: readonly string[],
+    ): Buffer | null => {
+        if (!this.session) {
+            return null;
+        }
+
+        // Минимум — 1 байт под тип операции.
+        if (payload.length < 1) {
+            return null;
+        }
+
+        // Тип операции.
+        const type =
+            payload.readUInt8(0);
+
+        // Данные предложений.
+        const data =
+            payload.subarray(1);
+
+        const result =
+            this.session.processProposals(
+                type,
+                data,
+                [...connectedClients],
+            );
+
+        // Если коммит не требуется — ничего не возвращаем.
+        if (!result.commit) {
+            return null;
+        }
+
+        // Склеиваем commit и welcome, если welcome присутствует.
         return result.welcome
-            ? Buffer.concat([result.commit, result.welcome])
+            ? Buffer.concat([
+                result.commit,
+                result.welcome,
+            ])
             : result.commit;
     };
 
-    /**
-     * Обрабатывает коммит (Commit) от другого участника.
-     *
-     * @param payload - Буфер, содержащий `transition_id` (2 байта) и данные коммита.
-     *
-     * @returns Объект с `transition_id` и флагом `success`.
-     *          При ошибке вызывает `recoverFromInvalidTransition`.
-     */
-    public processCommit = (payload: Buffer) => {
-        const transition_id = payload.readUInt16BE(0);
+    // ---------------------------------------------------------------------
+    // Commit
+    // ---------------------------------------------------------------------
 
+    /// Обрабатывает commit от другого участника.
+    ///
+    /// При отсутствии сессии возвращает `success: false` с извлечённым
+    /// transition_id (если payload достаточно длинный).
+    /// При `invalidated` эмитит событие `invalidateTransition`.
+    public processCommit = (
+        payload: Buffer,
+    ) => {
         if (!this.session) {
-            return { transition_id, success: false };
+            // transition_id хранится в первых 2 байтах payload.
+            const transition_id =
+                payload.length >= 2
+                    ? payload.readUInt16BE(0)
+                    : 0;
+
+            return {
+                transition_id,
+                success: false,
+            };
         }
 
-        try {
-            this.session.processCommit(payload.subarray(2));
+        const result =
+            this.session.processCommit(
+                payload,
+            ) as NativeTransitionResult;
 
-            if (transition_id !== 0) {
-                this.pendingTransitions.set(transition_id, this.version);
-            } else {
-                this.reinitializing = false;
-                this.lastTransition_id = transition_id;
-            }
-
-            return { transition_id, success: true };
-        } catch (e) {
-            this.recoverFromInvalidTransition = transition_id;
-            return { transition_id, success: false };
+        // Нативная сессия сообщила, что переход невалиден.
+        if (result.invalidated) {
+            this.emit(
+                "invalidateTransition",
+                result.transition_id,
+            );
         }
+
+        return {
+            transition_id:
+            result.transition_id,
+            success:
+            result.success,
+        };
     };
 
-    /**
-     * Обрабатывает приглашение (Welcome) для присоединения к группе.
-     *
-     * @param payload - Буфер, содержащий `transition_id` (2 байта) и данные приглашения.
-     *
-     * @returns Объект с `transition_id` и флагом `success`.
-     *          При ошибке вызывает `recoverFromInvalidTransition`.
-     */
-    public processWelcome = (payload: Buffer) => {
-        const transition_id = payload.readUInt16BE(0);
+    // ---------------------------------------------------------------------
+    // Welcome
+    // ---------------------------------------------------------------------
 
+    /// Обрабатывает welcome от другого участника.
+    ///
+    /// Аналогичен `processCommit`, но для присоединения к группе.
+    public processWelcome = (
+        payload: Buffer,
+    ) => {
         if (!this.session) {
-            return { transition_id, success: false };
+            const transition_id =
+                payload.length >= 2
+                    ? payload.readUInt16BE(0)
+                    : 0;
+
+            return {
+                transition_id,
+                success: false,
+            };
         }
 
-        try {
-            this.session.processWelcome(payload.subarray(2));
+        const result =
+            this.session.processWelcome(
+                payload,
+            ) as NativeTransitionResult;
 
-            if (transition_id !== 0) {
-                this.pendingTransitions.set(transition_id, this.version);
-            } else {
-                this.reinitializing = false;
-                this.lastTransition_id = transition_id;
-            }
-
-            return { transition_id, success: true };
-        } catch (e) {
-            this.recoverFromInvalidTransition = transition_id;
-            return { transition_id, success: false };
+        if (result.invalidated) {
+            this.emit(
+                "invalidateTransition",
+                result.transition_id,
+            );
         }
+
+        return {
+            transition_id:
+            result.transition_id,
+            success:
+            result.success,
+        };
     };
 
-    /**
-     * (Пере)инициализирует сессию с текущей версией протокола.
-     *
-     * - Если версия > 0: создаёт или инициализирует `DAVESession`.
-     * - Если версия === 0: сбрасывает сессию и включает режим passthrough.
-     *
-     * Автоматически вызывается при изменении `prepareEpoch`.
-     */
+    // ---------------------------------------------------------------------
+    // Reinit
+    // ---------------------------------------------------------------------
+
+    /// Переинициализирует сессию с текущей версией протокола.
+    ///
+    /// Применяет отложенный external sender (если был сохранён),
+    /// эмитит новый `key`. Для версии 0 включает passthrough-режим.
     public reinit = (): void => {
-        if (this.destroyed) return;
+        // Уничтоженную сессию не переинициализируем.
+        if (this._destroyed) {
+            return;
+        }
 
-        if (this.version > 0) {
-            if (this.session) {
-                this.session.reinit(this.version, this.user_id, this.channel_id);
-            } else {
-                this.session = new DAVESession(this.version, this.user_id, this.channel_id);
-            }
+        if (!this.session) {
+            this.createSession();
+        }
 
-            // Применяем отложенный externalSender, если он был получен ранее
-            if (this._pendingExternalSender) {
-                this.session.setExternalSender(this._pendingExternalSender);
-                this._pendingExternalSender = null;
-            }
+        // Запускаем нативный reinit, получаем возможный key-package.
+        const result =
+            this.session!.reinit()
 
-            this.emit("key", this.session.getSerializedKeyPackage());
-        } else if (this.session) {
-            this.session.reset();
-            this.session.setPassthroughMode(true, TRANSITION_EXPIRY);
+        // Применяем отложенный external sender, если он был.
+        if (this._pendingExternalSender) {
+            this.session!.externalSender =
+                this._pendingExternalSender;
+
+            this._pendingExternalSender = null;
+        }
+
+        // Оповещаем о новом key-package.
+        if (result) {
+            this.emit("key", result);
+        }
+
+        // Для нулевой версии включаем passthrough с ограничением по времени.
+        if (this.version === 0) {
+            this.session!.setPassthroughMode(
+                true,
+                TRANSITION_EXPIRY,
+            );
         }
     };
 
-    /**
-     * Подготавливает переход на новую версию протокола.
-     *
-     * - Регистрирует ожидающий переход с таймаутом в 5 секунд.
-     * - Для `transition_id === 0` немедленно выполняет переход.
-     * - Для `protocol_version === 0` включает режим passthrough.
-     *
-     * @param data - Данные перехода (`transition_id`, `protocol_version`).
-     *
-     * @returns `true`, если переход требует последующего вызова `executeTransition`;
-     *          `false` для `transition_id === 0` (немедленное выполнение).
-     */
-    public prepareTransition = (data: VoiceDavePrepareTransitionData): boolean => {
-        const { transition_id, protocol_version } = data;
+    // ---------------------------------------------------------------------
+    // Transitions
+    // ---------------------------------------------------------------------
 
-        this.pendingTransitions.set(transition_id, protocol_version);
-
-        // Сбрасываем предыдущий таймер, если переход с таким ID уже ожидался.
-        if (this.transitionTimers.has(transition_id)) {
-            clearTimeout(this.transitionTimers.get(transition_id)!);
+    /// Подготавливает переход на другую версию протокола.
+    ///
+    /// Возвращает `true`, если переход требует последующего
+    /// `executeTransition`.
+    public prepareTransition = (
+        data: VoiceDavePrepareTransitionData,
+    ): boolean => {
+        if (!this.session) {
+            this.createSession();
         }
 
-        // Устанавливаем таймер автоочистки ожидающего перехода (5 секунд).
-        const timer = setTimeout(() => {
-            if (this.pendingTransitions.has(transition_id)) {
-                this.pendingTransitions.delete(transition_id);
-            }
-            this.transitionTimers.delete(transition_id);
-        }, 5000);
-
-        this.transitionTimers.set(transition_id, timer);
-
-        // transition_id === 0 означает немедленный переход.
-        if (transition_id === 0) {
-            this.executeTransition(0);
-        }
-
-        // Включение passthrough при переходе на нулевую версию.
-        if (protocol_version === 0) {
-            this.session?.setPassthroughMode(true, TRANSITION_EXPIRY_PENDING_DOWNGRADE);
-        }
-
-        return transition_id !== 0;
+        return this.session!.prepareTransition(
+            data.transition_id,
+            data.protocol_version,
+        );
     };
 
-    /**
-     * Выполняет отложенный переход на новую версию протокола.
-     *
-     * - Защищён от повторного входа (reentry) флагом `_isTransitioning`.
-     * - Обновляет `version`, обрабатывает даунгрейд и восстановление.
-     * - Очищает таймер и удаляет переход из `pendingTransitions`.
-     *
-     * @param transition_id - Идентификатор перехода для выполнения.
-     *
-     * @returns `true`, если переход выполнен успешно;
-     *          `false`, если переход не найден или уже выполняется.
-     */
-    public executeTransition = (transition_id: number): boolean => {
-        if (this._isTransitioning) return false;
-
-        const version = this.pendingTransitions.get(transition_id);
-        if (version === undefined) return false;
-
-        this._isTransitioning = true;
-
-        const oldVersion = this.version;
-        this.version = version;
-
-        // Фиксируем даунгрейд.
-        if (oldVersion !== 0 && this.version === 0) {
-            this.downgraded = true;
+    /// Выполняет ранее подготовленный переход.
+    ///
+    /// Возвращает `false`, если сессия отсутствует или переход неизвестен.
+    public executeTransition = (
+        transition_id: number,
+    ): boolean => {
+        if (!this.session) {
+            return false;
         }
 
-        // При восстановлении после даунгрейда включаем passthrough.
-        if (this.downgraded && this.version > 0) {
-            this.session?.setPassthroughMode(true, TRANSITION_EXPIRY);
-            this.downgraded = false;
-        }
-
-        this.lastTransition_id = transition_id;
-
-        // Очищаем состояние перехода.
-        this.pendingTransitions.delete(transition_id);
-
-        if (this.transitionTimers.has(transition_id)) {
-            clearTimeout(this.transitionTimers.get(transition_id)!);
-            this.transitionTimers.delete(transition_id);
-        }
-
-        this._isTransitioning = false;
-        return true;
+        return this.session.executeTransition(
+            transition_id,
+        );
     };
 
-    /**
-     * Шифрует массив Opus-пакетов.
-     *
-     * Шифрование **не** выполняется, если:
-     * - Версия протокола === 0 (passthrough).
-     * - Сессия не готова (`session.ready === false`).
-     * - Выполняется переход (`_isTransitioning === true`).
-     * - Сессия инициализируется (`reinitializing === true`).
-     *
-     * @param packets - Массив буферов с Opus-данными.
-     *
-     * @returns Массив зашифрованных пакетов или `null`, если шифрование невозможно.
-     */
-    public encrypt = (packets: Buffer[]) => {
-        if (
-            this.version === 0 ||
-            !this.session?.ready ||
-            this._isTransitioning ||
-            this.reinitializing
-        ) return null;
+    // ---------------------------------------------------------------------
+    // Encrypt
+    // ---------------------------------------------------------------------
 
-        return this.session.encryptOpusBatch(packets);
-    };
-
-    /**
-     * Очищает все ожидающие переходы и их таймеры.
-     * Вызывается при инициализации после ошибки.
-     */
-    private clearTransitions() {
-        this.pendingTransitions.clear();
-
-        for (const t of this.transitionTimers.values()) {
-            clearTimeout(t);
+    /// Шифрует массив Opus-пакетов.
+    ///
+    /// Возвращает `null`, если шифрование невозможно:
+    /// - версия протокола 0 (passthrough);
+    /// - сессия не готова;
+    /// - идёт переход;
+    /// - идёт переинициализация.
+    public encrypt = (
+        packets: Buffer[],
+    ): Buffer[] | null => {
+        // Passthrough-режим: без шифрования.
+        if (this.version === 0) {
+            return null;
         }
 
-        this.transitionTimers.clear();
+        // Сессия не готова к работе.
+        if (!this.session?.ready) {
+            return null;
+        }
+
+        // Не шифруем во время переходов/переинициализации —
+        // состояние ключей нестабильно.
+        if (this.session.isTransitioning) {
+            return null;
+        }
+
+        if (this.session.reinitializing) {
+            return null;
+        }
+
+        return this.session.encrypt(
+            packets,
+        );
     };
 
-    /**
-     * Уничтожает сессию и освобождает все ресурсы.
-     *
-     * - Сбрасывает нижележащую DAVE-сессию.
-     * - Вызывает `super.destroy()` для очистки слушателей `TypedEmitter`.
-     * - Обнуляет все поля объекта для помощи сборщику мусора.
-     */
+    // ---------------------------------------------------------------------
+    // Reset
+    // ---------------------------------------------------------------------
+
+    /// Сбрасывает состояние нативной сессии без её уничтожения.
+    public reset(): void {
+        this.session?.reset();
+    }
+
+    // ---------------------------------------------------------------------
+    // Destroy
+    // ---------------------------------------------------------------------
+
+    /// Полностью уничтожает обёртку и нативную сессию.
+    ///
+    /// Идемпотентен. Ошибки уничтожения нативного слоя эмитятся
+    /// как событие `error`, чтобы не прерывать очистку остальных полей.
     public destroy = () => {
-        if (this.destroyed) return;
-        this.destroyed = true;
+        // Защита от повторного вызова.
+        if (this._destroyed) {
+            return;
+        }
 
-        this._isTransitioning = true;
+        this._destroyed = true;
 
         try {
-            this.session?.reset();
-        } catch (e) {
-            this.emit("error", Error(`[Critical destroy error]\n${e}`));
+            this.session?.destroy();
+        } catch (error) {
+            // Ошибку уничтожения пробрасываем наружу событием.
+            this.emit(
+                "error",
+                Error(
+                    `[Critical destroy error]\n${error}`,
+                ),
+            );
         }
 
+        // Убираем слушателей базового эмиттера.
         super.destroy();
-        this.clearTransitions();
 
+        // Обнуляем все ссылки для помощи GC.
         this.session = null;
-        this.reinitializing = false;
-        this.user_id = null;
-        this.channel_id = null;
-        this.lastTransition_id = null;
-        this.pendingTransitions = null;
-        this.transitionTimers = null;
-        this.downgraded = false;
+
+        this._reinitializing = false;
         this._pendingExternalSender = null;
+
+        this.user_id = null as any;
+        this.channel_id = null as any;
     };
+
+    // ---------------------------------------------------------------------
+    // Native creation
+    // ---------------------------------------------------------------------
+
+    /// Лениво создаёт нативную MLS-сессию.
+    ///
+    /// Если был сохранён external sender — применяет его сразу после создания.
+    private createSession(): void {
+        // Сессия уже существует — ничего не делаем.
+        if (this.session) {
+            return;
+        }
+
+        // Создаём нативную сессию с текущими параметрами.
+        this.session =
+            new NativeMLSSession(
+                this.version,
+                this.user_id,
+                this.channel_id,
+            );
+
+        // Применяем отложенный external sender, если он есть.
+        if (this._pendingExternalSender) {
+            this.session.externalSender =
+                this._pendingExternalSender;
+
+            this._pendingExternalSender = null;
+        }
+    }
 }
 
-/**
- * @author SNIPPIK
- * @description События, которые может генерировать MLSSession.
- * @interface ClientMLSEvents
- */
+/// События, эмитируемые MLS-сессией.
 export interface ClientMLSEvents {
-    /** Возникает при критической ошибке (например, невалидный коммит). */
+    /// Ошибка критического характера (например, при уничтожении).
     "error": (error: Error) => void;
 
-    /** Отладочные сообщения (полезно для логирования переходов, инициализации). */
+    /// Отладочное сообщение.
     "debug": (message: string) => void;
 
-    /** Генерируется, когда доступен новый KeyPackage (отправляется серверу или другим участникам). */
+    /// Новый key-package, который нужно передать другим участникам.
     "key": (message: Buffer) => void;
 
-    /** Вызывается, когда переход признан недействительным и требуется повторная инициализация. */
-    "invalidateTransition": (transitionId: number) => void;
+    /// Текущий переход признан невалидным; требуется переинициализация.
+    "invalidateTransition": (
+        transitionId: number,
+    ) => void;
 }

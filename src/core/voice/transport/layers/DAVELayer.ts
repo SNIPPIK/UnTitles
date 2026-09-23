@@ -2,7 +2,7 @@ import { BaseLayer } from "#core/voice/transport/layers/BaseLayer.js";
 import { MLSSession } from "#core/voice/structures/MLSSession.js";
 import { VoiceAdapter } from "#core/voice/transport/adapter.js";
 import { VoiceOpcodes } from "discord-api-types/voice/v8";
-import { VoiceWebSocket } from "#core/voice/index.js";
+import {iType, VoiceWebSocket} from "#native";
 
 /**
  * @author SNIPPIK
@@ -79,7 +79,7 @@ export class DAVELayer extends BaseLayer<MLSSession> {
      * - `"daveSession"` – обработка сообщений WebSocket с операциями DAVE.
      * - `"binary"` – обработка бинарных сообщений (external sender, proposals, commit, welcome).
      */
-    public create = (version: number, ws: VoiceWebSocket) => {
+    public create = (version: number, ws: iType<typeof VoiceWebSocket>) => {
         const { user_id, channel_id } = this.adapter.packet.state;
 
         // Если уже есть активная сессия, уничтожаем её перед созданием новой.
@@ -104,12 +104,12 @@ export class DAVELayer extends BaseLayer<MLSSession> {
          * Отправляет серверу сообщение с идентификатором перехода.
          */
         session.on("invalidateTransition", async (transitionId) => {
-            ws.packet = {
+            ws.packet = JSON.stringify({
                 op: VoiceOpcodes.DaveMlsInvalidCommitWelcome,
                 d: {
                     transition_id: transitionId
                 }
-            };
+            });
         });
 
         // Запускаем (пере)инициализацию сессии.

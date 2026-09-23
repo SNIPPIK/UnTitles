@@ -273,155 +273,264 @@ export interface iUDPSocket {
  *
  * @see https://github.com/discord/dave
  */
-export interface iDAVESession {
-    /** Возвращает текущую версию протокола, установленную в сессии. */
-    get protocolVersion(): number;
+export interface iMLSSession {
+    /**
+     * Создаёт обёртку без нативной сессии.
+     *
+     * # Аргументы
+     * * `version` — начальная версия протокола.
+     * * `user_id` — идентификатор пользователя.
+     * * `channel_id` — идентификатор канала.
+     */
+    constructor(version: number, userId: string, channelId: string): void;
 
     /**
-     * Возвращает `true`, если сессия готова к шифрованию/дешифрованию
-     * (завершён обмен ключами).
+     * `true`, если сессия уничтожена.
+     *
+     * Устанавливается в `destroy()` и остаётся `true` до конца жизни объекта.
+     */
+    get destroyed(): boolean;
+
+    /**
+     * `true`, если сессия повторно инициализируется.
+     *
+     * Устанавливается при `recoverFromInvalidTransition` или первой ошибке
+     * обработки commit/welcome. Сбрасывается после успешного завершения
+     * перехода с `transition_id == 0`.
+     */
+    get reinitializing(): boolean;
+
+    /**
+     * `true`, если в данный момент выполняется переход.
+     *
+     * Используется как защита от повторного входа в `execute_transition`
+     * и от параллельного шифрования во время смены версии протокола.
+     */
+    get isTransitioning(): boolean;
+
+    /**
+     * Идентификатор последнего успешно выполненного перехода.
+     *
+     * `None`, если переходов ещё не было или сессия была уничтожена.
+     */
+    get lastTransitionId(): number | null;
+
+    /**
+     * `true`, если нативная сессия готова к шифрованию.
+     *
+     * `false`, если нативная сессия ещё не создана или не завершила обмен ключами.
      */
     get ready(): boolean;
 
     /**
-     * Возвращает статус сессии в виде числа (0..255).
+     * Внутренний статус нативной сессии.
      *
-     * Конкретные значения определяются внутренним перечислением `davey::Status`.
+     * `None`, если нативная сессия ещё не создана. Значения соответствуют
+     * внутреннему перечислению `davey::Status`.
      */
-    get status(): number;
+    get status(): number | null;
 
     /**
-     * Создаёт новую сессию DAVE.
+     * Версия протокола активной нативной сессии.
      *
-     * Параметры:
-     * - `protocol_version` — ненулевая версия протокола.
-     * - `user_id` — строковый идентификатор пользователя (конвертируется в u64).
-     * - `channel_id` — строковый идентификатор канала (конвертируется в u64).
-     * - `key_pair` — опциональная подписывающая ключевая пара.
-     *
-     * Возвращает ошибку, если идентификаторы не парсятся или версия протокола равна 0.
+     * Возвращает 0, если нативная сессия ещё не создана. Не путать
+     * с полем `self.version`, которое хранит запрошенную версию и может
+     * отличаться от фактической версии нативной сессии.
      */
-    constructor(protocolVersion: number, userId: string, channelId: string, keyPair?: SigningKeyPair | undefined | null): void;
+    get protocolVersion(): number;
 
     /**
-     * Переинициализирует сессию с новыми параметрами.
+     * Устанавливает внешнего отправителя.
      *
-     * Аналогичен конструктору, но применяется к уже существующему объекту,
-     * сбрасывая внутреннее состояние и устанавливая новые значения.
-     *
-     * Параметры такие же, как у `new`.
+     * Если нативная сессия уже создана — передаёт значение напрямую,
+     * иначе откладывает до момента инициализации.
      */
-    reinit(protocolVersion: number, userId: string, channelId: string, keyPair?: SigningKeyPair | undefined | null): void;
+    set externalSender(data: Buffer);
 
     /**
-     * Полностью сбрасывает внутреннее состояние сессии.
+     * Обрабатывает данные подготовки эпохи.
      *
-     * После вызова сессия теряет все ключи и настройки, её можно заново инициализировать.
+     * Реагирует только на эпоху 1; остальные случаи игнорируются.
+     * Обновляет версию протокола и запускает `reinit`.
+     *
+     * # Аргументы
+     * * `epoch` — номер эпохи.
+     * * `protocol_version` — версия протокола для этой эпохи.
+     *
+     * # Возвращаемое значение
+     * Новый key-package, если он был создан.
      */
+    prepareEpoch(epoch: number, protocolVersion: number): Buffer | null;
+
+    /**
+     * Запускает восстановление после невалидного перехода.
+     *
+     * Устанавливает флаг `reinitializing`, очищает ожидающие переходы
+     * и выполняет `reinit_internal`.
+     *
+     * # Аргументы
+     * * `transition_id` — идентификатор невалидного перехода.
+     *
+     * # Возвращаемое значение
+     * Новый key-package, если он был создан.
+     */
+    recoverFromInvalidTransition(transitionId: number): Buffer | null;
+
+    /**
+     * Повторна инициализирует нативную сессию с текущей версией протокола.
+     *
+     * # Возвращаемое значение
+     * Новый key-package, если он был создан.
+     */
+    reinit(): Buffer | null;
+
+    /** Сбрасывает состояние нативной сессии без её уничтожения. */
     reset(): void;
 
     /**
-     * Генерирует и возвращает сериализованный ключевой пакет (KeyPackage)
-     * для отправки другим участникам.
+     * Полностью уничтожает сессию и освобождает ресурсы.
+     * Идемпотентен: повторный вызов не выполняет действий.
      */
-    getSerializedKeyPackage(): Buffer;
+    destroy(): void;
 
     /**
-     * Устанавливает внешний отправляющий ключ (External Sender).
+     * Включает или выключает passthrough-режим.
      *
-     * Принимает буфер с сериализованными данными внешнего отправителя.
-     */
-    setExternalSender(data: Buffer): void;
-
-    /**
-     * Включает или выключает сквозной (passthrough) режим.
+     * В passthrough медиа-пакеты передаются без шифрования/расшифровки.
      *
-     * В сквозном режиме медиаданные передаются без шифрования/дешифрования.
-     * `expiry` — опциональное время истечения режима в секундах.
+     * # Аргументы
+     * * `enabled` — `true` для включения.
+     * * `expiry` — время жизни режима в секундах (опционально).
      */
     setPassthroughMode(enabled: boolean, expiry?: number | undefined | null): void;
 
     /**
-     * Обрабатывает предложения (Proposals) от других участников.
+     * Возвращает сериализованный key-package.
      *
-     * Параметры:
-     * - `operation_type` — тип операции (u8, должно быть ≤ 10).
-     * - `proposals` — буфер с сериализованными предложениями.
-     * - `recognized_user_ids` — опциональный список строковых идентификаторов
-     *   пользователей, чьи ключи уже известны.
-     *
-     * Возвращает `ProposalsResult` с опциональными `commit` и `welcome`.
+     * # Ошибки
+     * Возвращает ошибку, если нативная сессия ещё не создана.
      */
-    processProposals(operationType: number, proposals: Buffer, recognizedUserIds?: readonly string[] | undefined | null): ProposalsResult;
+    getSerializedKeyPackage(): Buffer;
 
     /**
-     * Обрабатывает подтверждение (Commit).
+     * Обрабатывает proposals от другого участника.
      *
-     * Возвращает `true` при успешной обработке.
+     * # Аргументы
+     * * `operation_type` — тип операции (0 или 1).
+     * * `proposals` — сериализованные предложения.
+     * * `recognized_user_ids` — известные идентификаторы пользователей.
+     *
+     * # Возвращаемое значение
+     * `ProposalsResult` с commit и welcome (если есть).
      */
-    processCommit(commit: Buffer): boolean;
-
-    /** Обрабатывает приветственное сообщение (Welcome). */
-    processWelcome(welcome: Buffer): void;
-
-    /**
-     * Оптимизированное шифрование Opus-пакета.
-     *
-     * Если пакет короткий (≤ 3 байта) или шифрование не удалось,
-     * возвращает оригинальный пакет без изменений.
-     *
-     * Возвращает `Option<Buffer>`: `Some(зашифрованный или оригинальный пакет)`,
-     * `None` только при невозможности шифрования (не используется в текущей реализации,
-     * всегда `Some`).
-     */
-    encryptOpus(packet: Buffer): Buffer | null;
+    processProposals(operationType: number, proposals: Buffer, recognizedUserIds?: Array<string> | undefined | null): ProposalsResult;
 
     /**
-     * Пакетное шифрование Opus-пакетов.
+     * Обрабатывает commit от другого участника.
      *
-     * Принимает вектор буферов, возвращает вектор результатов той же длины.
-     * Каждый элемент: `Some(зашифрованный или оригинальный пакет)`, либо `None`,
-     * если шифрование не удалось (для пакетов длиной > 3, где произошла ошибка).
+     * Первые два байта payload — `transition_id`.
+     *
+     * # Аргументы
+     * * `payload` — сериализованные данные commit.
+     *
+     * # Возвращаемое значение
+     * `TransitionResult` с `transition_id`, флагом успеха и признаком
+     * невалидности (для инициирования повторной инициализации).
      */
-    encryptOpusBatch(packets: Array<Buffer>): Array<Buffer | undefined | null>;
+    processCommit(payload: Buffer): TransitionResult;
 
     /**
-     * Упрощённый метод дешифрования Opus-пакетов (только аудио).
+     * Обрабатывает welcome от другого участника.
      *
-     * Принимает `user_id` и зашифрованный буфер, возвращает расшифрованный Opus-пакет.
+     * Логика аналогична `process_commit`, но применяется к данным
+     * приветственного сообщения.
+     *
+     * # Аргументы
+     * * `payload` — сериализованные данные welcome.
      */
-    decryptOpus(userId: string, packet: Buffer): Buffer;
+    processWelcome(payload: Buffer): TransitionResult;
 
     /**
-     * Очищает внутреннее состояние сессии (вызывает `reset`).
+     * Регистрирует ожидаемый переход.
      *
-     * Используется в деструкторе и может вызываться вручную.
+     * Для `transition_id == 0` переход выполняется немедленно. Для
+     * `protocol_version == 0` включается passthrough с увеличенным сроком
+     * (ожидание подтверждения понижения).
+     *
+     * # Аргументы
+     * * `transition_id` — идентификатор перехода.
+     * * `protocol_version` — целевая версия протокола.
+     *
+     * # Возвращаемое значение
+     * `true`, если переход требует вызова `execute_transition`.
      */
-    cleanup(): void;
+    prepareTransition(transitionId: number, protocolVersion: number): boolean;
+
+    /**
+     * Выполняет ранее зарегистрированный переход.
+     *
+     * # Аргументы
+     * * `transition_id` — идентификатор перехода.
+     *
+     * # Возвращаемое значение
+     * `true`, если переход выполнен; `false`, если запись отсутствует
+     * или уже выполняется другой переход.
+     */
+    executeTransition(transitionId: number): boolean;
+
+    /**
+     * Шифрует массив Opus-пакетов.
+     *
+     * Возвращает `None`, если шифрование невозможно: версия 0, идёт
+     * переход, идёт повторная инициализация, сессия не готова, либо один из
+     * пакетов не удалось зашифровать (batch считается неуспешным целиком).
+     *
+     * # Аргументы
+     * * `packets` — исходные Opus-пакеты.
+     *
+     * # Возвращаемое значение
+     * Вектор зашифрованных пакетов или `None`.
+     */
+    encrypt(packets: Array<Buffer>): Array<Buffer> | null;
 }
 
-/**
- * Результат обработки proposals.
- * Содержит commit, который необходимо применить, и опциональный welcome для новых участников.
- */
+/** Результат обработки proposals: commit и опциональный welcome. */
 export interface ProposalsResult {
-    /** Commit-данные (всегда присутствуют при успешной обработке). */
+    /** Данные commit. */
     commit?: Buffer;
 
-    /** Welcome-данные (требуются, если в группу добавляются новые участники). */
+    /** Данные welcome (только при добавлении новых участников). */
     welcome?: Buffer;
 }
 
-/**
- * Пара ключей подписи (асимметричная криптография).
- * Используется для аутентификации участников группы.
- */
-export interface SigningKeyPair {
-    /** Приватный ключ (должен храниться в секрете). */
-    private: Buffer;
+/** Результат обработки commit/welcome. */
+export interface TransitionResult {
+    /** Идентификатор перехода. */
+    transition_id: number;
 
-    /** Публичный ключ (распространяется открыто). */
-    public: Buffer;
+    /** `true`, если обработка завершилась успешно. */
+    success: boolean;
+
+    /** `true`, если переход признан невалидным и требует повторной инициализации. */
+    invalidated: boolean;
+}
+
+
+
+export interface iVoiceWebSocket {
+    constructor(): void
+    get ready(): boolean
+    get status(): number
+    get sequence(): number
+    /** Подписка на событие. `payload` — строка JSON, `binary` — Buffer. */
+    on(event: string, callback: Function): void
+    /** Первый вариант — Buffer (binary), второй — строка JSON. */
+    set packet(payload: Buffer | string)
+    connect(endpoint: string, code?: number | undefined | null): void
+    reset(): void
+    destroy(): void
+    /** Псевдоним для `send_packet`. */
+    setPacket(payload: Buffer | string): void
 }
 
 /* ────────────────────────────────────────────────
@@ -435,9 +544,11 @@ export interface SigningKeyPair {
 export const {
     AudioEngine,
     UDPSocket,
-    DAVESession
+    MLSSession,
+    VoiceWebSocket
 } = Native as {
-    DAVESession:    NativeClass<iDAVESession>;
+    VoiceWebSocket: NativeClass<iVoiceWebSocket>
+    MLSSession:    NativeClass<iMLSSession>;
     AudioEngine:    NativeClass<iAudioEngine>;
     UDPSocket:      NativeClass<iUDPSocket>;
 };

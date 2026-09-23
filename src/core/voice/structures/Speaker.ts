@@ -62,7 +62,7 @@ export class VoiceSpeakerManager {
         this._type = speaking;
 
         // Обновляем статус голоса
-        this.voice.ws.packet = {
+        this.voice.ws.packet = JSON.stringify({
             op: VoiceOpcodes.Speaking,
             d: {
                 speaking: speaking,
@@ -70,7 +70,7 @@ export class VoiceSpeakerManager {
                 ssrc: this.voice.transport.ssrc
             },
             seq: this.voice.ws.sequence
-        };
+        });
     };
 
     /**

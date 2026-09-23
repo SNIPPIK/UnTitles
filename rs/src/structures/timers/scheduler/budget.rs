@@ -16,24 +16,14 @@ const MAX_SEND_BURST: u8 = 3;
 /// 20 ms      → normal
 /// 20–30 ms   → burst 2
 /// >30 ms     → burst 3
-const BURST_THRESHOLD_1: Duration = Duration::from_millis(1);
-const BURST_THRESHOLD_2: Duration = Duration::from_millis(5);
+const BURST_THRESHOLD_1: Duration = Duration::from_millis(3);
+const BURST_THRESHOLD_2: Duration = Duration::from_millis(10);
 
 /// -------------------------------------------------------------------------
 /// SendBudget
 /// -------------------------------------------------------------------------
 ///
 /// Планировщик отвечает только за timing.
-///
-/// Он НЕ знает:
-/// - какой именно Opus-пакет сейчас играет;
-/// - сколько реально готовых пакетов в буфере;
-/// - как устроен RTP;
-/// - как работает UDP.
-///
-/// Он лишь сообщает нижнему уровню:
-///
-///     "у нас есть timing debt, разрешён дополнительный budget".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SendBudget {
     /// Обычный режим — один пакет за тик.

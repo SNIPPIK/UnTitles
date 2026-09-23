@@ -1,4 +1,4 @@
-mod audio;
-mod crypto;
-mod timers;
-mod network;
+pub mod audio;
+pub mod crypto;
+pub mod timers;
+pub mod network;

@@ -279,13 +279,6 @@ export class TrackResolvers {
         const client = new httpsClient({ url: track.link, agent: track.proxy ? sdb.proxy : null });
         const status = await client.toHead;
 
-        // Клиент не получил ответа
-        if (!status.statusCode) {
-            const err = new TransientError(`HEAD transient failure: status=${status}, url=${track.link}`);
-            Logger.log("WARN", err.message);
-            return err;
-        }
-
         // Преобразуем статус в понятную ошибку (или null).
         const error = httpsStatusCode.parse(status);
 

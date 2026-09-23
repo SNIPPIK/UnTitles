@@ -125,9 +125,30 @@ struct EncryptorState {
 /// - `timestamp` – 32-битная метка времени, увеличивается на `TIMESTAMP_INC` для каждого пакета.
 /// - `counter` – 32-битный счётчик nonce (используется как первые 4 байта 12-байтового nonce).
 ///
+/// # ЗАМЕЧАНИЕ ПО БЕЗОПАСНОСТИ NONCE
+///
+/// Случайный старт `counter` в [`initialize`] безопасен **только в том
+/// случае**, если Discord выдаёт НОВЫЙ ключ при каждом вызове `initialize`
+/// (например, при переподключении/resume). Если это предположение
+/// когда-либо нарушится — т.е. `initialize` будет вызван повторно с тем же
+/// ключом, — два сеанса независимо, со случайных точек, будут
+/// инкрементировать один и тот же 32-битный nonce-счётчик по одному и тому
+/// же пространству значений. По "парадоксу дней рождения" заметная
+/// вероятность коллизии появляется уже на десятках-сотнях тысяч пакетов за
+/// сеанс, а коллизия nonce при AES-GCM с одним и тем же ключом полностью
+/// ломает и конфиденциальность, и аутентификацию для столкнувшихся
+/// пакетов. Если гарантия "новый ключ на каждый initialize" не закреплена
+/// протоколом — счётчик нужно не рандомизировать заново, а хранить и
+/// увеличивать монотонно на весь срок жизни ключа.
+///
 /// # Потокобезопасность
 /// Все публичные методы принимают `&self`. Состояние шифра защищено `RwLock`.
-/// `initialize` и `destroy` берут write-lock, `packet`/`packets` — read-lock.
+/// `initialize` и `destroy` берут write-lock и держат его на всё время
+/// изменения счётчиков — это важно: если сброс/установка счётчиков
+/// происходит не под тем же write-lock, что и запись `state`, конкурентные
+/// вызовы `initialize`/`destroy` могут переплестись и оставить свежий
+/// шифр с чужими (например, обнулёнными) счётчиками. `packet`/`packets`
+/// берут read-lock.
 pub struct VoiceRTPSocket {
     /// Состояние шифра; `None`, пока не вызван `initialize`.
     state: RwLock<Option<EncryptorState>>,
@@ -178,7 +199,8 @@ impl VoiceRTPSocket {
     ///
     /// При каждой инициализации RTP-счётчики получают новые
     /// случайные начальные значения — это защищает от повторного
-    /// использования nonce при реконнекте.
+    /// использования nonce при реконнекте (см. замечание по безопасности
+    /// nonce в доккомментарии структуры).
     ///
     /// # Возвращаемое значение
     /// `Ok(())` при успешной инициализации.
@@ -186,7 +208,7 @@ impl VoiceRTPSocket {
     /// # Ошибки
     /// * `InvalidKeyLength` — ключ имеет неверную длину.
     /// * `EncryptionFailed` — не удалось создать AES-GCM cipher.
-    pub fn initialize(&self, ssrc: u32, key: Vec<u8>) -> Result<(), CryptoError> {
+    pub fn initialize(&self, ssrc: u32, mut key: Vec<u8>) -> Result<(), CryptoError> {
         // Проверяем длину ключа — AES-256 требует ровно 32 байта.
         if key.len() != KEY_SIZE {
             return Err(CryptoError::InvalidKeyLength(key.len()));
@@ -202,19 +224,32 @@ impl VoiceRTPSocket {
                 CryptoError::EncryptionFailed("invalid AES-256 key".into())
             })?;
 
+        // Обнуляем ключевой материал в памяти сразу после того, как он
+        // скопирован в cipher — простая защита без зависимости от crate
+        // `zeroize`
+        for byte in key_array.iter_mut() {
+            *byte = 0;
+        }
+        for byte in key.iter_mut() {
+            *byte = 0;
+        }
+
         // Готовим генератор случайных чисел для сброса счётчиков.
         let mut rng = rng();
 
-        // Счётчики не участвуют в синхронизации памяти между потоками,
-        // достаточно Relaxed.
+        // Держим write-lock на всё время: сброс счётчиков и публикация
+        // нового состояния должны быть атомарны относительно destroy().
+        let mut guard = self.state.write().expect("RTP state lock poisoned");
+
+        // Счётчики не участвуют в синхронизации памяти между потоками
+        // помимо того, что уже обеспечивает write-lock; достаточно Relaxed.
         self.sequence.store(rng.random(), Ordering::Relaxed);
         self.timestamp.store(rng.random(), Ordering::Relaxed);
         self.counter.store(rng.random(), Ordering::Relaxed);
 
-        // Публикуем новое состояние только после успешного
-        // создания cipher и сброса всех счётчиков.
-        *self.state.write().expect("RTP state lock poisoned") =
-            Some(EncryptorState { ssrc, cipher });
+        // Публикуем новое состояние, не отпуская write-lock — это и даёт
+        // атомарность относительно destroy().
+        *guard = Some(EncryptorState { ssrc, cipher });
 
         Ok(())
     }
@@ -402,10 +437,9 @@ impl VoiceRTPSocket {
     /// Повторный вызов безопасен.
     #[inline]
     pub fn destroy(&self) {
-        // Обнуляем состояние шифра под write-lock.
-        *self.state.write().expect("RTP state lock poisoned") = None;
+        let mut guard = self.state.write().expect("RTP state lock poisoned");
+        *guard = None;
 
-        // Сбрасываем все счётчики в ноль.
         self.sequence.store(0, Ordering::Relaxed);
         self.timestamp.store(0, Ordering::Relaxed);
         self.counter.store(0, Ordering::Relaxed);
@@ -424,7 +458,6 @@ impl Default for VoiceRTPSocket {
 /// В отладочной сборке выводит сообщение о вызове.
 impl Drop for VoiceRTPSocket {
     fn drop(&mut self) {
-        // На drop `RwLock` можно писать напрямую без `expect`.
         if let Ok(mut guard) = self.state.write() {
             *guard = None;
         }

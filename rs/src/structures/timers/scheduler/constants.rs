@@ -28,7 +28,7 @@ pub const MIN_SPIN_MARGIN: Duration = Duration::from_micros(100);
 
 /// Максимальный запас перед дедлайном для перехода в спин.
 /// Выше этого значения спин начинает заметно нагружать CPU.
-pub const MAX_SPIN_MARGIN: Duration = Duration::from_millis(2);
+pub const MAX_SPIN_MARGIN: Duration = Duration::from_micros(700);
 
 /// Запрашиваемая длительность сна при калибровке гранулярности ОС.
 pub const REQUESTED_SLEEP: Duration = Duration::from_millis(1);

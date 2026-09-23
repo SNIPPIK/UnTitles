@@ -1,5 +1,3 @@
-//! Операции над кольцевым буфером и позицией чтения.
-
 use super::AudioEngine;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -13,171 +11,257 @@ impl AudioEngine {
 
     /// Возвращает текущее количество пакетов в буфере.
     ///
-    /// Значение — мгновенный снимок: при конкурентной записи/чтении может
-    /// устареть сразу после возврата. Полезно для метрик и грубых проверок.
+    /// Значение — мгновенный снимок: при конкурентной записи/чтении
+    /// оно может устареть сразу после возврата.
     #[napi(getter)]
     pub fn get_size(&self) -> u32 {
-        // При отравлении мьютекса возвращаем 0 — это безопаснее,
-        // чем паниковать в JS-биндинге.
-        self.buffer.0.lock().map(|b| b.len() as u32).unwrap_or(0)
+        self.buffer
+            .0
+            .lock()
+            .map(|buffer| buffer.len().min(u32::MAX as usize) as u32)
+            .unwrap_or(0)
     }
 
     // ============================================================
     // POSITION
     // ============================================================
 
-    /// Возвращает текущую позицию чтения (число извлечённых пакетов).
+    /// Возвращает текущую позицию чтения.
+    ///
+    /// Позиция увеличивается на фактическое количество извлечённых
+    /// аудио-пакетов.
     #[napi(getter)]
     pub fn get_position(&self) -> u32 {
-        self.position.load(Ordering::Acquire) as u32
+        self.position
+            .load(Ordering::Acquire)
+            .min(u32::MAX as usize) as u32
     }
 
     /// Устанавливает позицию чтения вручную.
-    ///
-    /// Полезно для перемотки, сброса счётчика или синхронизации состояния
-    /// с внешней системой.
-    ///
-    /// # Аргументы
-    /// * `pos` — новое значение позиции.
     #[napi(setter)]
     pub fn set_position(&self, pos: u32) {
-        self.position.store(pos as usize, Ordering::Release);
+        self.position.store(
+            pos as usize,
+            Ordering::Release,
+        );
     }
 
-    /// Извлекает до `count` пакетов из буфера за один вызов N-API.
+    // ============================================================
+    // GET PACKETS
+    // ============================================================
+
+    /// Извлекает до `count` пакетов из буфера.
     ///
-    /// Если `count == 0`, извлекается один пакет. Возвращает вектор
-    /// `Buffer` (длина может быть меньше запрошенной). Позиция чтения
-    /// увеличивается на фактическое число извлечённых пакетов. При
-    /// извлечении будит поток чтения, если он ждал свободного места.
+    /// Если `count == 0`, извлекается один пакет.
     ///
-    /// # Аргументы
-    /// * `count` — максимальное количество пакетов для извлечения.
+    /// Если доступно меньше пакетов, возвращается фактически доступное
+    /// количество.
     ///
-    /// # Возвращаемое значение
-    /// Вектор `Buffer`. Пустой вектор означает, что буфер пуст или движок
-    /// уже уничтожен.
+    /// После успешного извлечения reader уведомляется о появившемся
+    /// свободном месте.
     #[napi]
     pub fn get_packets(&self, count: u32) -> Vec<Buffer> {
-        // Не работаем с уничтоженным движком.
+        // Быстрый путь.
         if self.destroyed.load(Ordering::Acquire) {
             return Vec::new();
         }
 
-        // При count == 0 извлекаем ровно один пакет.
-        let count = if count == 0 { 1 } else { count } as usize;
+        let count = (count as usize).max(1);
 
         let (buffer_lock, buffer_cvar) = &*self.buffer;
 
-        // Извлекаем пакеты под блокировкой.
         let raw_packets = {
             let buffer = match buffer_lock.lock() {
-                Ok(b) => b,
+                Ok(buffer) => buffer,
                 Err(_) => return Vec::new(),
             };
 
-            // Ограничиваем запрос фактически доступным количеством.
-            let limit = count.min(buffer.len());
-            if limit == 0 {
+            // Важно проверить destroyed ещё раз ПОСЛЕ получения mutex.
+            //
+            // Иначе возможна гонка:
+            //
+            // get_packets() -> destroyed == false
+            // destroy()    -> destroyed = true
+            // get_packets() -> получает mutex и читает уже уничтожаемый buffer
+            //
+            // Сам mutex не даст use-after-free, но семантически операция
+            // уже не должна выполняться.
+            if self.destroyed.load(Ordering::Acquire) {
                 return Vec::new();
             }
 
+            let available = buffer.len();
+
+            if available == 0 {
+                return Vec::new();
+            }
+
+            let limit = count.min(available);
             let mut extracted = Vec::with_capacity(limit);
+
             buffer.pop_many(&mut extracted, limit);
 
-            // Обновляем позицию на фактическое число извлечённых пакетов.
-            if !extracted.is_empty() {
-                self.position.fetch_add(extracted.len(), Ordering::Release);
-            }
+            if extracted.is_empty() { return Vec::new(); }
+
+            // Позиция соответствует фактически извлечённым пакетам.
+            //
+            // Не используем обычный fetch_add: теоретическое переполнение
+            // usize не должно превращать позицию обратно в маленькое число.
+            let increment = extracted.len();
+
+            let _ = self.position.try_update(
+                Ordering::Release,
+                Ordering::Relaxed,
+                |current| current.checked_add(increment),
+            );
 
             extracted
         };
 
-        // Уведомляем reader о появлении свободного места — вне блокировки,
-        // чтобы не будить поток, пока мьютекс ещё удерживается.
-        if !raw_packets.is_empty() {
-            buffer_cvar.notify_one();
-        }
+        // Mutex уже освобождён.
+        buffer_cvar.notify_one();
 
-        // Преобразуем Vec<u8> в Buffer для передачи через FFI.
-        raw_packets.into_iter().map(Buffer::from).collect()
+        raw_packets
+            .into_iter()
+            .map(Buffer::from)
+            .collect()
     }
+
+    // ============================================================
+    // ADD PACKETS
+    // ============================================================
 
     /// Добавляет пакеты в буфер из JavaScript.
     ///
-    /// При заполнении буфера прекращает добавление, не бросая ошибку.
-    /// После добавления уведомляет ожидающего читателя.
+    /// Добавление прекращается при заполнении буфера.
+    /// Ошибка переполнения не превращается в panic.
     ///
-    /// # Аргументы
-    /// * `packets` — массив данных для добавления.
+    /// Reader уведомляется только если хотя бы один пакет действительно
+    /// был добавлен.
     #[napi]
     pub fn add_packets(&self, packets: Vec<Vec<u8>>) {
+        // Быстрый путь.
         if self.destroyed.load(Ordering::Acquire) {
             return;
         }
 
         let (buffer_lock, buffer_cvar) = &*self.buffer;
-        let buffer = match buffer_lock.lock() {
-            Ok(b) => b,
-            Err(_) => return,
-        };
+        let mut added_any = false;
 
-        for packet in packets {
-            // Прекращаем добавление при заполнении буфера.
-            if buffer.is_full() {
-                break;
-            }
-            // Ошибка push (переполнение) — тоже стоп, без паники.
-            if buffer.push(packet).is_err() {
+        {
+            let buffer = match buffer_lock.lock() {
+                Ok(buffer) => buffer,
+                Err(_) => return,
+            };
+
+            // Повторная проверка под mutex.
+            if self.destroyed.load(Ordering::Acquire) {
                 return;
+            }
+
+            for packet in packets {
+                if buffer.is_full() { break; }
+
+                match buffer.push(packet) {
+                    Ok(()) => {
+                        added_any = true;
+                    }
+
+                    Err(_) => {
+                        // Не меняем active и не считаем это fatal error:
+                        // публичный API специально работает как best-effort.
+                        break;
+                    }
+                }
             }
         }
 
-        // Уведомляем возможного ожидающего reader'а о появлении данных.
-        buffer_cvar.notify_one();
+        // Не держим buffer mutex во время notify.
+        if added_any {
+            buffer_cvar.notify_one();
+        }
     }
 
-    /// Проверяет, есть ли в буфере место хотя бы под один новый пакет.
-    ///
-    /// # Возвращаемое значение
-    /// `true`, если текущий размер буфера меньше `max_capacity`.
-    /// `false`, если буфер заполнен или движок уничтожен.
+    // ============================================================
+    // CAN ACCEPT
+    // ============================================================
+
+    /// Проверяет, есть ли в буфере место хотя бы под один пакет.
     #[napi]
     pub fn can_accept(&self) -> bool {
         if self.destroyed.load(Ordering::Acquire) {
             return false;
         }
-        self.buffer
-            .0
-            .lock()
-            .map(|b| b.len() < self.max_capacity)
-            .unwrap_or(false)
+
+        let buffer = match self.buffer.0.lock() {
+            Ok(buffer) => buffer,
+            Err(_) => return false,
+        };
+
+        // Повторная проверка после захвата mutex.
+        if self.destroyed.load(Ordering::Acquire) {
+            return false;
+        }
+
+        !buffer.is_full()
     }
 
-    /// Проверяет, что заполненность буфера ниже указанного процента от `max_capacity`.
+    // ============================================================
+    // CAN ACCEPT THRESHOLD
+    // ============================================================
+
+    /// Проверяет, что заполненность буфера строго ниже указанного
+    /// процента от `max_capacity`.
     ///
-    /// Используется для управления backpressure из JavaScript: пока порог
-    /// не превышен, можно продолжать подавать данные.
-    ///
-    /// # Аргументы
-    /// * `threshold_percent` — пороговый процент заполненности (0..=100).
-    ///   Значения больше 100 обрезаются до 100.
-    ///
-    /// # Возвращаемое значение
-    /// `true`, если текущая заполненность ниже порога; иначе `false`.
+    /// `threshold_percent` автоматически ограничивается диапазоном
+    /// `0..=100`.
     #[napi]
     pub fn can_accept_threshold(&self, threshold_percent: u32) -> bool {
         if self.destroyed.load(Ordering::Acquire) {
             return false;
         }
 
-        // Ограничиваем процент до 100, чтобы избежать порога выше ёмкости.
-        let threshold = (self.max_capacity * threshold_percent.min(100) as usize) / 100;
+        let buffer = match self.buffer.0.lock() {
+            Ok(buffer) => buffer,
+            Err(_) => return false,
+        };
 
-        self.buffer
-            .0
-            .lock()
-            .map(|b| b.len() < threshold)
-            .unwrap_or(false)
+        if self.destroyed.load(Ordering::Acquire) {
+            return false;
+        }
+
+        let percent = threshold_percent.min(100);
+
+        // Не вычисляем:
+        //
+        // max_capacity * percent
+        //
+        // напрямую, чтобы не иметь потенциального overflow usize.
+        //
+        // Сравнение:
+        //
+        //   len / max_capacity < percent / 100
+        //
+        // выполняем через произведение с меньшим числом:
+        //
+        //   len * 100 < max_capacity * percent
+        //
+        // Здесь тоже возможен overflow, поэтому используем div_ceil-подобную
+        // границу через количество допустимых элементов.
+        let capacity = self.max_capacity;
+
+        if capacity == 0 {
+            return false;
+        }
+
+        // Количество элементов, которое должно оставаться недостигнутым:
+        //
+        // percent == 100 -> допустимы все значения ниже capacity
+        // percent == 50  -> len < половины capacity
+        let threshold = capacity
+            .saturating_mul(percent as usize)
+            / 100;
+
+        buffer.len() < threshold
     }
 }

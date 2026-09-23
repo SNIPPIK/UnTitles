@@ -1,12 +1,13 @@
 import { VoiceCloseCodes, VoiceOpcodes } from "discord-api-types/voice/v8";
-import { VoiceWebSocket, WebSocketOpcodes } from "#core/voice/index.js";
 import { MLSSession } from "#core/voice/structures/MLSSession.js";
+import { WebSocketOpcodes } from "#core/voice/index.js";
 import { VoiceAdapter } from "./adapter.js";
 import { TypedEmitter } from "#structures";
 
 // Layers
 import { UDPLayer } from "#core/voice/transport/layers/UDPLayer.js";
 import { DAVELayer, OPCODE_DAVE_MLS_WELCOME } from "#core/voice/transport/layers/DAVELayer.js";
+import { iType, VoiceWebSocket } from "#native";
 
 
 /**
@@ -47,7 +48,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
      * Клиент WebSocket для общения с Discord Voice Gateway.
      * Может быть `null` после уничтожения транспорта.
      */
-    public _ws: VoiceWebSocket | null = new VoiceWebSocket();
+    public _ws: iType<typeof VoiceWebSocket> | null = new VoiceWebSocket();
 
     /**
      * SSRC (синхронизационный источник), полученный от Discord.
@@ -153,19 +154,19 @@ export class Transport extends TypedEmitter<TransportEvents> {
 
             // Отправляем Identify для регистрации голосового подключения
             case TransportStateCode.Identifying: {
-                this._ws.packet = {
+                this._ws.packet = JSON.stringify({
                     op: VoiceOpcodes.Identify,
                     d: state.payload
-                };
+                });
                 return;
             }
 
             // Отправляем Resume для восстановления предыдущей сессии
             case TransportStateCode.Resuming: {
-                this._ws.packet = {
+                this._ws.packet = JSON.stringify({
                     op: VoiceOpcodes.Resume,
                     d: state.payload
-                };
+                });
                 return;
             }
         }
@@ -249,7 +250,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
         /**
          * При готовности голосового канала запускаем подготовку UDP.
          */
-        this._ws.on("ready", ({ d }) => {
+        this._ws.on("ready", (payload) => {
+            const d = payload[0].d;
             if (this.destroyed) return;
 
             this.reconnecting = 0; // сброс счётчика попыток
@@ -266,7 +268,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
         /**
          * При получении session description инициализируем шифрование.
          */
-        this._ws.on("sessionDescription", ({ d }) => {
+        this._ws.on("sessionDescription", (payload) => {
+            const d = payload[0].d;
             if (this.destroyed) return;
 
             this.state = {
@@ -287,7 +290,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
         /**
          * Обновление списка подключённых клиентов в адаптере.
          */
-        this._ws.on("Users", ({ d }) => {
+        this._ws.on("Users", (payload) => {
+            const d = payload[0].d;
             if (this.destroyed) return;
 
             if ("user_id" in d) {
@@ -307,7 +311,9 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * - `DaveExecuteTransition` – выполнение перехода
          * - `DavePrepareEpoch` – подготовка новой эпохи
          */
-        this._ws.on("daveSession", async ({ op, d }) => {
+        this._ws.on("daveSession", async (payload) => {
+            const { op, d } = payload[0];
+
             const client = this._dave.client;
             if (client.destroyed) return;
 
@@ -323,10 +329,10 @@ export class Transport extends TypedEmitter<TransportEvents> {
                 case VoiceOpcodes.DavePrepareTransition: {
                     const sendReady = client.prepareTransition(d);
                     if (sendReady) {
-                        this._ws.packet = {
+                        this._ws.packet = JSON.stringify({
                             op: VoiceOpcodes.DaveTransitionReady,
                             d: { transition_id: d.transition_id },
-                        };
+                        });
                     } else client.reinit();
                     return;
                 }
@@ -365,7 +371,8 @@ export class Transport extends TypedEmitter<TransportEvents> {
          * - `DaveMlsAnnounceCommitTransition` – обработка коммита для перехода.
          * - `DaveMlsWelcome` – обработка welcome-сообщения.
          */
-        this._ws.on("binary", async ({ op, payload }) => {
+        this._ws.on("binary", async (payload1) => {
+            const { op, payload } = payload1[0];
             const client = this._dave.client;
             if (client.destroyed) return;
 
@@ -377,7 +384,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                  *              Приходит от сервера один раз после инициализации.
                  */
                 case VoiceOpcodes.DaveMlsExternalSender: {
-                    client.externalSender = payload;
+                    client.externalSender = Buffer.from(payload);
                     return;
                 }
 
@@ -389,7 +396,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                  *              Если есть результат, отправляем его обратно серверу с префиксом-опкодом.
                  */
                 case VoiceOpcodes.DaveMlsProposals: {
-                    const proposal = client.processProposals(payload, this.adapter.clients.array);
+                    const proposal = client.processProposals(Buffer.from(payload), this.adapter.clients.array);
                     if (proposal) {
                         this._ws.packet = Buffer.concat([OPCODE_DAVE_MLS_WELCOME, proposal]);
                     }
@@ -403,12 +410,12 @@ export class Transport extends TypedEmitter<TransportEvents> {
                  *              подтверждение `DaveTransitionReady` с идентификатором перехода.
                  */
                 case VoiceOpcodes.DaveMlsAnnounceCommitTransition: {
-                    const { transition_id, success } = client.processCommit(payload);
+                    const { transition_id, success } = client.processCommit(Buffer.from(payload));
                     if (success && transition_id !== 0) {
-                        this._ws.packet = {
+                        this._ws.packet = JSON.stringify({
                             op: VoiceOpcodes.DaveTransitionReady,
                             d: { transition_id },
-                        };
+                        });
                     }
                     return;
                 }
@@ -419,12 +426,12 @@ export class Transport extends TypedEmitter<TransportEvents> {
                  *              После успешной обработки нужно подтвердить готовность к переходу.
                  */
                 case VoiceOpcodes.DaveMlsWelcome: {
-                    const { transition_id, success } = client.processWelcome(payload);
+                    const { transition_id, success } = client.processWelcome(Buffer.from(payload));
                     if (success && transition_id !== 0) {
-                        this._ws.packet = {
+                        this._ws.packet = JSON.stringify({
                             op: VoiceOpcodes.DaveTransitionReady,
                             d: { transition_id },
-                        };
+                        });
                     }
                     return;
                 }
@@ -460,7 +467,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
         this.emit("open");
 
         // Сообщаем шлюзу выбранный протокол и данные для UDP
-        this._ws!.packet = {
+        this._ws!.packet = JSON.stringify({
             op: VoiceOpcodes.SelectProtocol,
             d: {
                 protocol: "udp",
@@ -469,7 +476,7 @@ export class Transport extends TypedEmitter<TransportEvents> {
                     mode: "aead_aes256_gcm_rtpsize"
                 }
             }
-        };
+        });
     };
 
     /**

@@ -42,6 +42,29 @@ async function main(): Promise<void> {
         throw error; // Пробрасываем для обработки в main
     }
 
+    // 💣 Event Loop Blocking Test (x4)
+    /*for (let i = 0; i < 4; i++) {
+        setInterval(() => {
+            const start = performance.now();
+            while (performance.now() - start < 100) {}
+        }, 100 + (i * 10));
+    }*/
+
+    /*if (Logger.debug) setInterval(() => {
+        if (typeof global.gc === "function") global.gc();
+        const m = process.memoryUsage();
+
+        console.log(
+            "WARN",
+            [
+                `RSS: ${(m.rss / 1024 / 1024).toFixed(2)} MB`,
+                `Heap: ${(m.heapUsed / 1024 / 1024).toFixed(2)} / ${(m.heapTotal / 1024 / 1024).toFixed(2)} MB`,
+                `External: ${(m.external / 1024 / 1024).toFixed(2)} MB`,
+                `ArrayBuffers: ${(m.arrayBuffers / 1024 / 1024).toFixed(2)} MB`,
+            ].join(" | ")
+        );
+    }, 10_000);*/
+
     // Отслеживание событий процесса (сигналы, ошибки)
     initProcessEvents();
 }

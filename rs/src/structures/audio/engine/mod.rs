@@ -59,6 +59,12 @@ pub struct AudioEngine {
 
     /// Позиция чтения (количество извлечённых пакетов).
     pub(crate) position: Arc<AtomicUsize>,
+
+    /// Сериализует процесс уничтожения.
+    ///
+    /// Нужен для того, чтобы конкурентные вызовы `destroy()`
+    /// не возвращались до фактического завершения первого destroy.
+    destroy_lock: Mutex<()>,
 }
 
 #[napi]
@@ -102,6 +108,8 @@ impl AudioEngine {
 
             // Позиция чтения начинается с нуля.
             position: Arc::new(AtomicUsize::new(0)),
+
+            destroy_lock: Mutex::new(()),
         }
     }
 }
