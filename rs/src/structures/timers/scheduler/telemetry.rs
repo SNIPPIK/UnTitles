@@ -32,9 +32,6 @@ pub struct SchedulerTelemetry {
     /// Общее количество выполненных тиков.
     pub ticks: AtomicU64,
 
-    /// Число тиков, в которых был активирован burst-режим отправки.
-    pub emergency_bursts: AtomicU64,
-
     /// Суммарное количество дополнительных слотов, добавленных burst-режимом.
     pub extra_frames_budgeted: AtomicU64,
 }
@@ -62,7 +59,6 @@ impl Default for SchedulerTelemetry {
 
             // Счётчики.
             ticks: AtomicU64::new(0),
-            emergency_bursts: AtomicU64::new(0),
             extra_frames_budgeted: AtomicU64::new(0),
         }
     }

@@ -46,7 +46,7 @@ export class AudioResource extends TypedEmitter<AudioResourceEvents> {
      * @public
      */
     public get readable(): boolean {
-        return this.engine?.size > 0;
+        return this.engine?.readable;
     };
 
     /**

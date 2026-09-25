@@ -12,7 +12,7 @@ import { iType, VoiceWebSocket } from "#native";
 
 /**
  * @author SNIPPIK
- * @description Коды закрытия, из-за этох кодов не выйдет переподключится
+ * @description Коды закрытия, из-за этих кодов не выйдет переподключится
  * @const STOP_CODES
  * @private
  */

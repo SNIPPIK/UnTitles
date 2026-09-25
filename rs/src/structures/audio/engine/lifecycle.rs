@@ -26,7 +26,7 @@ impl AudioEngine {
     /// 2. Атомарно переводит движок в состояние destroyed.
     /// 3. Останавливает reader.
     /// 4. Будит reader на condvar.
-    /// 5. Забирает ffmpeg и завершает его.
+    /// 5. Забирает FFmpeg и завершает его.
     /// 6. Дожидается reader thread.
     /// 7. Очищает и освобождает audio buffer.
     pub fn force_destroy(&self) {
@@ -67,7 +67,7 @@ impl AudioEngine {
         //   - на pause condvar;
         //   - на buffer condvar.
         //
-        // Не имеет смысла ждать ffmpeg, прежде чем разбудить thread:
+        // Не имеет смысла ждать FFmpeg, прежде чем разбудить thread:
         // reader уже получил reading_active = false и должен завершиться.
         // ------------------------------------------------------------------
         self.pause_state.1.notify_all();
@@ -90,7 +90,7 @@ impl AudioEngine {
         };
 
         if let Some(mut process) = process {
-            // Если ffmpeg ещё жив — завершаем его.
+            // Если FFmpeg ещё жив — завершаем его.
             //
             // Ошибка kill здесь не является фатальной:
             // процесс мог завершиться между try_wait() и kill().
@@ -130,18 +130,13 @@ impl AudioEngine {
         // Можно безопасно очищать его.
         // ------------------------------------------------------------------
         {
-            let mut buffer = self
+            let buffer = self
                 .buffer
                 .0
                 .lock()
                 .unwrap_or_else(|p| p.into_inner());
 
             buffer.clear();
-
-            // Здесь shrink_to_fit уместен:
-            // движок уже уничтожается и повторное использование capacity
-            // больше не требуется.
-            buffer.shrink_to_fit();
         }
     }
 }
@@ -149,11 +144,6 @@ impl AudioEngine {
 /// Гарантированное освобождение ресурсов при удалении объекта.
 impl Drop for AudioEngine {
     fn drop(&mut self) {
-        // force_destroy идемпотентен.
-        //
-        // В destroy_lock уже может быть проведён предыдущий destroy,
-        // поэтому повторный cleanup просто завершится после проверки
-        // destroyed.
         self.force_destroy();
     }
 }

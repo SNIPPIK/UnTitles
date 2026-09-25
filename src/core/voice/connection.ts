@@ -35,14 +35,6 @@ export class VoiceConnection extends TypedEmitter<VoiceConnectionEvents> {
     };
 
     /**
-     * @description Проверяет, уничтожено ли голосовое подключение
-     * @public
-     */
-    public get destroyed(): boolean {
-        return this._destroyed;
-    };
-
-    /**
      * @description Записываем текущий статус подключения
      * @public
      */

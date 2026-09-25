@@ -39,12 +39,7 @@ impl PrecisionTimer {
     /// # Возвращаемое значение
     /// `WaitOutcome` с признаком достижения дедлайна, суммарным временем спина
     /// и величиной промаха сна за дедлайн.
-    pub fn wait_until(
-        deadline: Instant,
-        running: &AtomicBool,
-        wake_state: &(Mutex<bool>, Condvar),
-        telemetry: &SchedulerTelemetry,
-    ) -> WaitOutcome {
+    pub fn wait_until(deadline: Instant, running: &AtomicBool, wake_state: &(Mutex<bool>, Condvar), telemetry: &SchedulerTelemetry) -> WaitOutcome {
         // Накопители метрик по итерациям.
         let mut spin_time = Duration::ZERO;
         let mut sleep_overshoot = Duration::ZERO;
@@ -72,7 +67,7 @@ impl PrecisionTimer {
 
             let remaining = deadline.duration_since(now);
 
-            // 1. Глубокий сон (OS Sleep)
+            // Глубокий сон (OS Sleep)
             // Если до дедлайна ещё далеко — спим, оставляя запас под yield и спин.
             if remaining > yield_threshold {
                 let timeout = remaining - yield_threshold;
@@ -87,7 +82,7 @@ impl PrecisionTimer {
                 continue;
             }
 
-            // 2. Кооперативная уступка (Yield)
+            // Кооперативная уступка (Yield)
             // Осталось меньше двух spin_margin, но больше одного.
             // Отдаём CPU другим потокам, снижая энергопотребление и нагрузку.
             if remaining > spin_margin {
@@ -95,7 +90,7 @@ impl PrecisionTimer {
                 continue;
             }
 
-            // 3. Активный спин (Spin-lock)
+            // Активный спин (Spin-lock)
             // Последние микросекунды — крутимся для максимальной точности.
             let spin_start = Instant::now();
             while Instant::now() < deadline {
@@ -104,6 +99,7 @@ impl PrecisionTimer {
                     spin_time += spin_start.elapsed();
                     return WaitOutcome { reached_deadline: false, spin_time, sleep_overshoot };
                 }
+
                 // Подсказка процессору (PAUSE/relax) — снижает потребление.
                 std::hint::spin_loop();
             }
@@ -112,7 +108,7 @@ impl PrecisionTimer {
         }
     }
 
-    /// Ожидает на condvar с таймаутом, обрабатывая флаг пробуждения.
+    /// Ожидает на condvar с тайм-аутом, обрабатывая флаг пробуждения.
     ///
     /// Если флаг `wake` уже установлен — возвращается немедленно,
     /// сбрасывая его. Отравление мьютекса игнорируется.
@@ -131,7 +127,7 @@ impl PrecisionTimer {
             return;
         }
 
-        // Ждём с таймаутом. Результат (сигнал/таймаут) не важен —
+        // Ждём с тайм-аутом. Результат (сигнал/таймаут) не важен —
         // на следующей итерации цикла всё равно пересчитается состояние.
         let _ = cvar.wait_timeout(wake, timeout);
     }
@@ -144,7 +140,7 @@ impl PrecisionTimer {
     /// - если спин слишком длинный — уменьшаем запас;
     /// - если спин слишком короткий — увеличиваем;
     /// - изменение за шаг ограничено 10 % от текущего значения (антиосцилляция);
-    /// - итог клампится с учётом измеренной гранулярности ОС.
+    /// - итог с учётом измеренной гранулярности ОС.
     ///
     /// # Аргументы
     /// * `state` — метрики планировщика (читает/записывает `spin_margin_ns`).
@@ -182,7 +178,7 @@ impl PrecisionTimer {
         let adjusted = if target > old_margin {
             old_margin + diff.min(max_change)
         } else {
-            old_margin - (old_margin.saturating_sub(target)).min(max_change)
+            old_margin - old_margin.saturating_sub(target).min(max_change)
         };
 
         // Публикуем новое значение в допустимых границах.

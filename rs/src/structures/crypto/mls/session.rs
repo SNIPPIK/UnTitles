@@ -59,7 +59,7 @@ pub struct MlsSession {
     pending_transitions: HashMap<u16, PendingTransition>,
 
     /// External sender, отложенный до создания нативной сессии.
-    pending_external_sender: Option<Vec<u8>>,
+    pending_external_sender: Option<Vec<u8>>
 }
 
 #[napi]
@@ -87,7 +87,7 @@ impl MlsSession {
 
             last_transition_id: None,
             pending_transitions: HashMap::new(),
-            pending_external_sender: None,
+            pending_external_sender: None
         }
     }
 

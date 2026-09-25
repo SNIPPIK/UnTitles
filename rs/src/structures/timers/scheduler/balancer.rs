@@ -54,7 +54,7 @@ impl Worker {
     }
 }
 
-/// Балансировщик нагрузки между worker'ами.
+/// Балансировщик нагрузки между worker.
 ///
 /// Все методы `&mut self` предполагают внешнюю синхронизацию.
 pub struct AutoBalancer {
@@ -194,7 +194,7 @@ impl AutoBalancer {
             return;
         };
 
-        // Если структура уже рассинхронизирована, не паникуем.
+        // Если структура уже не синхронизирована, не паникуем.
         let Some(worker) = self.workers.get_mut(worker_index) else {
             return;
         };
@@ -216,7 +216,7 @@ impl AutoBalancer {
 pub static GLOBAL_BALANCER: Lazy<Mutex<AutoBalancer>> =
     Lazy::new(|| Mutex::new(AutoBalancer::new()));
 
-/// Добавляет сессию в глобальный балансировщик.
+/// Добавляет сессию в балансировщике.
 pub fn add_global_session(
     id: u32,
     session: SocketBuffered,

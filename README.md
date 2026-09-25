@@ -64,7 +64,7 @@ If you find a bug, encounter unexpected behavior, or have an idea for an improve
 
 The core voice traffic processing logic is implemented as a native **Rust** module (`rs`). Critical operations run independently of the main Node.js event loop, allowing the voice engine to continue operating even under heavy main-thread load.
 
-* **Voice Engine** — custom implementation of Discord Voice processing: `UDP` + `SRTP` + `Opus`.
+* **Voice Engine** — custom implementation of Discord Voice processing: `WS` + `UDP` + `SRTP` + `Opus`.
 * **Security** — support for **End-to-End Encryption (E2EE 🔐)** through the **Discord DAVE** protocol.
 * **Timing & Scheduler** — a native cyclic system with precise timing and automatic workload distribution across active voice sessions.
 * **Opus** — processing and transmission of Opus frames without requiring an external Opus encoder during the sending stage.
@@ -144,28 +144,28 @@ for (let i = 0; i < 4; i++) {
 * **Queue Management** — viewing, removing, and skipping tracks are available directly from the interface.
 * **Playback Control** — supports repeat modes, seeking, volume adjustment, and audio filters.
 
-#### 📚 Commands
+### 📚 Commands
 
 <details>
 <summary>Click to expand</summary>
 
 | Command         | Autocomplete | Arguments                  | Description                            |
-| :-------------- | :----------: | :------------------------- | :------------------------------------- |
-| `/filter`       |       ✅      | `off`, `push`, `disable`   | Manage audio filters                   |
-| `/play`         |       ✅      | `query`                    | Play a track or search by query        |
-| `/play search`  |       ✅      | `platform`, `query`        | Search and play on a specific platform |
-| `/play radio`   |       ✅      | `query`                    | Play an internet radio station         |
-| `/play related` |       ✅      | `platform`, `query`        | Search for and play related tracks     |
-| `/player`       |       ✅      | `replay`, `stop`, `volume` | Advanced player controls               |
-| `/volume`       |       ✅      | `value`                    | Change player volume                   |
-| `/remove`       |       ✅      | `value`                    | Remove a track from the queue          |
-| `/seek`         |       ❌      | `00:00`, `int`             | Seek within the current track          |
-| `/skip`         |       ✅      | `back`, `to`, `next`       | Switch or skip tracks                  |
-| `/repeat`       |       ✅      | `type`                     | Configure repeat mode                  |
-| `/queue`        |       ✅      | `destroy`, `list`          | Manage the playback queue              |
-| `/voice`        |       ✅      | `join`, `leave`, `tribune` | Manage the voice channel               |
-| `/status`       |       ❌      | —                          | View bot status                        |
-| `/reload`       |       ❌      | —                          | Reload bot systems                     |
+|:----------------|:------------:|:---------------------------|:---------------------------------------|
+| `/filter`       |      ✅       | `off`, `push`, `disable`   | Manage audio filters                   |
+| `/play`         |      ✅       | `query`                    | Play a track or search by query        |
+| `/play search`  |      ✅       | `platform`, `query`        | Search and play on a specific platform |
+| `/play radio`   |      ✅       | `query`                    | Play an internet radio station         |
+| `/play related` |      ✅       | `platform`, `query`        | Search for and play related tracks     |
+| `/player`       |      ✅       | `replay`, `stop`, `volume` | Advanced player controls               |
+| `/volume`       |      ✅       | `value`                    | Change player volume                   |
+| `/remove`       |      ✅       | `value`                    | Remove a track from the queue          |
+| `/seek`         |      ❌       | `00:00`, `int`             | Seek within the current track          |
+| `/skip`         |      ✅       | `back`, `to`, `next`       | Switch or skip tracks                  |
+| `/repeat`       |      ✅       | `type`                     | Configure repeat mode                  |
+| `/queue`        |      ✅       | `destroy`, `list`          | Manage the playback queue              |
+| `/voice`        |      ✅       | `join`, `leave`, `tribune` | Manage the voice channel               |
+| `/status`       |      ❌       | —                          | View bot status                        |
+| `/reload`       |      ❌       | —                          | Reload bot systems                     |
 
 </details>
 

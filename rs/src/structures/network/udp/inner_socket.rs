@@ -7,7 +7,7 @@ use std::{
     net::UdpSocket,
     sync::{
         atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering},
-        Arc,
+        Arc
     }
 };
 
@@ -69,29 +69,55 @@ pub struct SocketInner {
     pub keepalive_counter: AtomicU32,
 
     /// Подряд идущие неудачи в `tick` (backoff/reconnect).
-    pub consecutive_failures: AtomicU32
+    pub consecutive_failures: AtomicU32,
+
+    /// Количество пакетов, которые уже извлечены из RingBuffer,
+    /// но ещё не завершили socket.send().
+    ///
+    /// Нужен для корректной синхронизации с JS:
+    /// RingBuffer может стать пустым раньше, чем последний пакет
+    /// реально завершит отправку через UDP.
+    pub in_flight: AtomicUsize,
 }
 
 impl SocketInner {
-    /// Добавляет пакет в очередь на отправку.
+    /// Добавляет один пакет в очередь.
     ///
-    /// # Аргументы
-    /// * `data` — байтовые данные пакета.
-    ///
-    /// # Поведение
-    /// Пустые данные игнорируются. При переполнении буфера в отладочной сборке
-    /// выводится сообщение об ошибке.
-    pub fn push(&self, data: Vec<u8>) {
-        let _ = self.buffer.push(data);
+    /// Это неблокирующий путь, используемый N-API.
+    /// При полном буфере исходный пакет не теряется внутри RingBuffer:
+    /// `push()` возвращает его обратно, после чего мы явно считаем drop.
+    #[inline]
+    pub fn push(&self, packet: Vec<u8>) {
+        match self.buffer.push(packet) {
+            Ok(()) => {}
+
+            Err(_packet) => {
+                self.send_drops.fetch_add(1, Ordering::Relaxed);
+            }
+        }
     }
 
-    /// Добавляет массив пакетов в очередь на отправку.
+    /// Добавляет batch пакетов.
     ///
-    /// # Аргументы
-    /// * `packets` — вектор байтовых пакетов для добавления.
+    /// Также неблокирующий путь.
+    ///
+    /// Если очередь заполнена не полностью, добавляется максимально возможное
+    /// количество пакетов, а непринятый хвост считается drop.
+    #[inline]
     pub fn push_many(&self, packets: Vec<Vec<u8>>) {
-        // Делегируем массовое добавление во внутренний буфер.
-        self.buffer.push_many(packets);
+        if packets.is_empty() {
+            return;
+        }
+
+        let expected = packets.len();
+        let pushed = self.buffer.push_many(packets);
+
+        if pushed < expected {
+            self.send_drops.fetch_add(
+                expected - pushed,
+                Ordering::Relaxed,
+            );
+        }
     }
 
     /// Проверка, есть ли ещё данные в кольцевом буфере.
@@ -142,7 +168,7 @@ impl SocketInner {
         // До инициализации RTP отправляем только discovery:
         // Opus-фреймы ждут ключа, discovery — нет.
         //
-        // budget определяет максимальное количество элементов,
+        // Budget определяет максимальное количество элементов,
         // которое scheduler разрешил обработать за этот цикл.
         //
         // ВАЖНО:
@@ -158,29 +184,29 @@ impl SocketInner {
         // Поэтому scheduler не заставляет UDP отправлять несуществующие
         // или ещё не готовые данные.
         for _ in 0..budget {
+            // Резервируем пакет ДО pop().
+            //
+            // Это важно: между удалением пакета из RingBuffer
+            // и socket.send() JS всё ещё должен видеть пакет как pending.
+            self.in_flight.fetch_add(1, Ordering::Relaxed);
+
             let Some(frame) = self.buffer.pop() else {
+                // Пакета реально не оказалось.
+                self.in_flight.fetch_sub(1, Ordering::Release);
                 break;
             };
 
             let bypass = is_raw_bypass(frame.len());
+
             if !bypass && !self.rtp.is_initialized() {
-                // Opus-фрейм, но RTP ещё не готов.
-                //
-                // ArrayQueue не поддерживает возврат элемента в начало,
-                // поэтому возвращаем его обратно в очередь и прекращаем
-                // обработку текущего budget.
-                //
-                // Не пытаемся брать следующие элементы:
-                // порядок Opus-пакетов должен сохраняться.
+                // RTP ещё не готов — возвращаем пакет обратно.
                 let _ = self.buffer.push_up(frame);
+
+                self.in_flight.fetch_sub(1, Ordering::Release);
                 return;
             }
 
             let mut packet = if bypass {
-                // Discovery (74) или keepalive (8) отправляются как есть.
-                //
-                // Keepalive обычно проходит через tick_alive(), но
-                // дополнительная проверка здесь делает очередь безопаснее.
                 frame
             } else {
                 match self.rtp.packet(&frame) {
@@ -196,11 +222,7 @@ impl SocketInner {
                         #[cfg(debug_assertions)]
                         println!("RTP encrypt error: {}", _e);
 
-                        // Не продолжаем burst после ошибки RTP.
-                        //
-                        // Причина: если RTP-контекст сломан, бессмысленно
-                        // пытаться прогонять следующие Opus-пакеты через
-                        // тот же неисправный state.
+                        self.in_flight.fetch_sub(1, Ordering::Release);
                         return;
                     }
                 }
@@ -209,6 +231,7 @@ impl SocketInner {
             match self.socket.send(&packet) {
                 Ok(_) => {
                     packet.shrink_to_fit();
+
                     self.consecutive_failures
                         .store(0, Ordering::Relaxed);
 
@@ -218,6 +241,7 @@ impl SocketInner {
 
                 Err(_e) => {
                     packet.shrink_to_fit();
+
                     self.send_drops
                         .fetch_add(1, Ordering::Relaxed);
 
@@ -227,13 +251,13 @@ impl SocketInner {
                     #[cfg(debug_assertions)]
                     println!("UDP send error: {}", _e);
 
-                    // Не продолжаем burst после WouldBlock / ошибки socket.
-                    //
-                    // Иначе один неудачный send может превратиться
-                    // в несколько бесполезных попыток подряд.
+                    self.in_flight.fetch_sub(1, Ordering::Release);
                     return;
                 }
             }
+
+            // Пакет действительно закончил socket.send().
+            self.in_flight.fetch_sub(1, Ordering::Release);
         }
     }
 

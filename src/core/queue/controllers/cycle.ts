@@ -108,7 +108,7 @@ class AudioPlayers<T extends AudioPlayer> extends TaskCycle<T> {
                 }
 
                 // Если и в источнике, и в буфере UDP закончились пакеты — останавливаем плеер
-                if (audio.packets === 0 && connection.udp.packets === 0) {
+                if (!audio.readable && audio.packets === 0 && connection.udp.packets === 0) {
                     player.status = AudioPlayerState.idle;
                     player.cycle = false;
                 }

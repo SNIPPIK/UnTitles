@@ -54,7 +54,7 @@ impl Scheduler {
             running: Arc::new(AtomicBool::new(false)),
             wake_state: Arc::new((Mutex::new(false), Condvar::new())),
             handle: Mutex::new(None),
-            telemetry: Arc::new(SchedulerTelemetry::default()),
+            telemetry: Arc::new(SchedulerTelemetry::default())
         })
     }
 
@@ -67,8 +67,10 @@ impl Scheduler {
     pub fn add_session(&self, id: u32, session: Arc<crate::structures::network::udp::socket::SocketBuffered>) {
         // Добавляем в реестр.
         self.registry.add(id, session);
+
         // Гарантируем, что воркер запущен.
         self.start_if_needed();
+
         // Будим его, чтобы не ждать следующего тика.
         self.wake_thread();
     }
@@ -181,12 +183,7 @@ impl Drop for Scheduler {
 /// * `running` — флаг активности воркера.
 /// * `wake_state` — состояние для досрочного пробуждения.
 /// * `telemetry` — метрики планировщика.
-fn cycle_thread(
-    registry: Arc<SessionRegistry>,
-    running: Arc<AtomicBool>,
-    wake_state: Arc<(Mutex<bool>, Condvar)>,
-    telemetry: Arc<SchedulerTelemetry>
-) {
+fn cycle_thread(registry: Arc<SessionRegistry>, running: Arc<AtomicBool>, wake_state: Arc<(Mutex<bool>, Condvar)>, telemetry: Arc<SchedulerTelemetry>) {
     // Медианный overshoot коротких снов даёт оценку минимального шага.
     let granularity = measure_sleep_granularity();
     telemetry.sleep_granularity_ns.store(granularity.as_nanos() as u64, Ordering::Relaxed);
@@ -226,13 +223,6 @@ fn cycle_thread(
         if !snapshot.is_empty() {
             // Определяем бюджет отправки по величине опоздания.
             let budget = SendBudget::calculate_send_budget(late);
-
-            // Учитываем burst-режим в метриках.
-            if budget.is_burst() {
-                telemetry.emergency_bursts.fetch_add(1, Ordering::Relaxed);
-                let extra = budget.packets().saturating_sub(1);
-                telemetry.extra_frames_budgeted.fetch_add(extra as u64, Ordering::Relaxed);
-            }
 
             // Один timestamp на все сессии — обход снимка быстрый.
             let timestamp = now_ms();

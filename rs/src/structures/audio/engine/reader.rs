@@ -1,4 +1,4 @@
-//! Тело фонового потока чтения stdout ffmpeg.
+//! Тело фонового потока чтения stdout FFmpeg.
 //!
 //! Функция полностью самодостаточна: не хранит ссылок на `AudioEngine`,
 //! получает только `Arc`-и на общие состояния. Это позволяет тестировать
@@ -10,7 +10,7 @@ use crate::structures::audio::{
     ring_buffer::RingBuffer,
 };
 use std::{
-    io::{BufReader, Read},
+    io::{BufRead, BufReader},
     process::ChildStdout,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -18,223 +18,289 @@ use std::{
     },
 };
 
-/// Читает stdout ffmpeg, демультиплексирует Ogg/Opus и складывает аудио-пакеты
-/// в кольцевой буфер.
+/// Проверяет, нужно ли остановить reader.
+#[inline(always)]
+fn should_stop(active: &AtomicBool, destroyed: &AtomicBool) -> bool {
+    !active.load(Ordering::Acquire) || destroyed.load(Ordering::Acquire)
+}
+
+/// RAII-уведомление consumer'а.
 ///
-/// Завершается, когда:
-/// * `active` сброшен;
-/// * `destroyed` выставлен;
-/// * ffmpeg закрыл stdout (EOF);
-/// * произошла ошибка чтения или парсинга;
-/// * парсер переполнен;
-/// * произошла ошибка записи в кольцевой буфер.
-pub(crate) fn reader_loop(
-    stdout: ChildStdout,
-    active: Arc<AtomicBool>,
-    destroyed: Arc<AtomicBool>,
-    pause_state: Arc<(Mutex<bool>, Condvar)>,
-    buffer_state: Arc<(Mutex<RingBuffer>, Condvar)>,
-) {
-    // Буферизованное чтение stdout сглаживает мелкие чтения от ОС.
+/// Если текущая пачка реально добавила хотя бы один пакет,
+/// при любом выходе из блока будет выполнен `notify_one()`.
+struct NotifyOnDrop<'a> {
+    cvar: &'a Condvar,
+    should_notify: bool,
+}
+
+impl<'a> Drop for NotifyOnDrop<'a> {
+    #[inline]
+    fn drop(&mut self) {
+        if self.should_notify {
+            self.cvar.notify_one();
+        }
+    }
+}
+
+/// Читает stdout FFmpeg, мультиплексирует Ogg/Opus
+/// и помещает аудио-пакеты в RingBuffer.
+///
+/// Завершается при:
+/// - остановке `active`;
+/// - `destroyed`;
+/// - EOF stdout;
+/// - ошибке чтения;
+/// - ошибке парсинга;
+/// - переполнении parser;
+/// - poison Mutex/Condvar;
+/// - невозможности записать пакет.
+pub(crate) fn reader_loop(stdout: ChildStdout, active: Arc<AtomicBool>, destroyed: Arc<AtomicBool>, pause_state: Arc<(Mutex<bool>, Condvar)>, buffer_state: Arc<(Mutex<RingBuffer>, Condvar)>) {
+    // ------------------------------------------------------------------------
+    // Инициализация
+    // ------------------------------------------------------------------------
+
+    // Буферизуем stdout FFmpeg.
+    //
+    // fill_buf() позволяет отдавать parser'у уже имеющийся внутренний буфер
+    // напрямую, без промежуточного копирования в отдельный read_buf.
     let mut reader = BufReader::with_capacity(65536, stdout);
 
-    // Демультиплексор Ogg/Opus.
+    // Потоковый Ogg/Opus demuxer.
     let mut parser = OggOpusDemuxer::new();
 
-    // Один read() из stdout.
-    let mut read_buf = [0u8; 16384];
-
-    // Переиспользуемый буфер распарсенных пакетов.
+    // Повторно используемый контейнер пакетов
     let mut frames = Vec::with_capacity(128);
 
     'reader: loop {
-        // ------------------------------------------------------------------
-        // Проверка остановки.
-        // ------------------------------------------------------------------
-        if !active.load(Ordering::Acquire)
-            || destroyed.load(Ordering::Acquire)
-        {
+        // ====================================================================
+        // Проверка остановки
+        // ====================================================================
+
+        if should_stop(&active, &destroyed) {
             break;
         }
 
-        // ------------------------------------------------------------------
-        // Обработка паузы.
-        // ------------------------------------------------------------------
+        // ====================================================================
+        // Пользовательская пауза
+        // ====================================================================
+
         {
             let (lock, cvar) = &*pause_state;
 
             let mut paused = match lock.lock() {
                 Ok(guard) => guard,
-                Err(_) => {
-                    // Mutex poisoned — завершаем reader через общий cleanup.
-                    break 'reader;
-                }
+                Err(_) => break,
             };
 
-            while *paused
-                && active.load(Ordering::Acquire)
-                && !destroyed.load(Ordering::Acquire)
-            {
+            while *paused && !should_stop(&active, &destroyed) {
                 paused = match cvar.wait(paused) {
                     Ok(guard) => guard,
-                    Err(_) => {
-                        // Не делаем return:
-                        // нужен общий путь завершения ниже.
-                        break 'reader;
-                    }
+                    Err(_) => break 'reader,
                 };
             }
         }
 
-        // ------------------------------------------------------------------
-        // После паузы состояние могло измениться.
-        // ------------------------------------------------------------------
-        if !active.load(Ordering::Acquire)
-            || destroyed.load(Ordering::Acquire)
-        {
+        // Состояние могло измениться во время ожидания.
+        if should_stop(&active, &destroyed) {
             break;
         }
 
-        // ------------------------------------------------------------------
-        // На каждой итерации frames должен быть пустым.
-        // ------------------------------------------------------------------
+        // ====================================================================
+        // Подготовка output
+        // ====================================================================
+
         debug_assert!(
             frames.is_empty(),
-            "reader_loop: frames buffer must be empty before parse"
+            "reader_loop: frames must be empty before parsing"
         );
 
-        // На всякий случай очищаем его и в release-сборках.
         frames.clear();
 
-        // ------------------------------------------------------------------
-        // Читаем следующий chunk из ffmpeg.
-        // ------------------------------------------------------------------
-        match reader.read(&mut read_buf) {
-            Ok(0) => {
-                // EOF: ffmpeg закрыл stdout.
+        // ====================================================================
+        // Чтение FFmpeg
+        // ====================================================================
+
+        let eof = match reader.fill_buf() {
+            Ok(available) if available.is_empty() => {
+                // FFmpeg закрыл stdout.
                 //
-                // Всё, что было полностью распарсено до EOF, уже находится
-                // в ring buffer. Незавершённый Ogg page/packet отбрасываем.
-                break;
+                // НЕ выходим сразу.
+                //
+                // У OggOpusDemuxer есть flush-path через пустой chunk:
+                //
+                //     parser.parse_internal(&[], &mut frames)
+                //
+                // Он должен получить шанс выдать последний packet_carry.
+                true
             }
 
-            Ok(n) => {
-                // ----------------------------------------------------------
-                // Парсим chunk.
-                // ----------------------------------------------------------
-                if parser
-                    .parse_internal(&read_buf[..n], &mut frames)
-                    .is_err()
-                {
-                    break;
-                }
+            Ok(available) => {
+                let len = available.len();
 
-                // ----------------------------------------------------------
-                // Лимит проверяем ПОСЛЕ parse_internal().
+                // Парсим данные напрямую из внутреннего буфера BufReader.
                 //
-                // До parse_internal() parser.pending_len() мог быть маленьким,
-                // а текущий chunk уже мог существенно увеличить remainder
-                // или packet_carry.
-                // ----------------------------------------------------------
-                if parser.pending_len() > MAX_PARSER_PENDING {
-                    break;
+                // Если parser успел выдать готовые packets до обнаружения
+                // проблемы в хвосте, они останутся в `frames` и ниже будут
+                // обработаны.
+                let parse_result =
+                    parser.parse_internal(available, &mut frames);
+
+                // В любом случае consumed bytes больше не должны оставаться
+                // в BufReader.
+                reader.consume(len);
+
+                if parse_result.is_err() {
+                    // Уже готовые packets всё равно отправим в RingBuffer
+                    // ниже, после чего reader завершится.
+                    //
+                    // Это лучше, чем уничтожать frames вместе с parser.
+                    true
+                } else {
+                    false
                 }
-
-                // Если parser ничего не выдал — сразу следующий read().
-                if frames.is_empty() {
-                    continue;
-                }
-
-                // ----------------------------------------------------------
-                // Загружаем полученные audio packets в RingBuffer.
-                // ----------------------------------------------------------
-                let (buffer_lock, buffer_cvar) = &*buffer_state;
-
-                let mut buffer = match buffer_lock.lock() {
-                    Ok(guard) => guard,
-                    Err(_) => {
-                        break 'reader;
-                    }
-                };
-
-                let mut pushed_any = false;
-
-                for (kind, packet) in frames.drain(..) {
-                    // Служебные Ogg/Opus packets не отправляем в audio queue.
-                    if !kind.is_audio_frame() {
-                        continue;
-                    }
-
-                    // ------------------------------------------------------
-                    // Ждём свободного места.
-                    // ------------------------------------------------------
-                    while buffer.is_full() {
-                        if !active.load(Ordering::Acquire)
-                            || destroyed.load(Ordering::Acquire)
-                        {
-                            break 'reader;
-                        }
-
-                        buffer = match buffer_cvar.wait(buffer) {
-                            Ok(guard) => guard,
-                            Err(_) => {
-                                break 'reader;
-                            }
-                        };
-                    }
-
-                    // Состояние могло измениться во время ожидания.
-                    if !active.load(Ordering::Acquire)
-                        || destroyed.load(Ordering::Acquire)
-                    {
-                        break 'reader;
-                    }
-
-                    // ------------------------------------------------------
-                    // Добавляем пакет.
-                    // ------------------------------------------------------
-                    if buffer.push(packet).is_err() {
-                        // Reader больше не может гарантировать корректное
-                        // производство данных.
-                        active.store(false, Ordering::Release);
-                        break 'reader;
-                    }
-
-                    pushed_any = true;
-                }
-
-                // ----------------------------------------------------------
-                // Будим consumer только если реально что-то добавили.
-                //
-                // Один notify после пачки дешевле, чем notify на каждый
-                // audio packet.
-                // ----------------------------------------------------------
-                if pushed_any {
-                    buffer_cvar.notify_one();
-                }
-
-                // frames очищается автоматически drain(..), но явно оставляем
-                // пустым для гарантии перед следующей итерацией.
-                frames.clear();
             }
 
             Err(_) => {
-                // Ошибка чтения stdout ffmpeg.
-                break;
+                // Ошибка чтения stdout.
+                //
+                // Уже накопленные `frames` ниже будут обработаны.
+                true
             }
+        };
+
+        // ====================================================================
+        // EOF / read error / parser error
+        // ====================================================================
+        //
+        // Если EOF, здесь делаем flush.
+        //
+        // Если была ошибка parser/read, flush делать уже не нужно:
+        // мы не хотим интерпретировать потенциально повреждённый хвост
+        // как полноценный Opus packet.
+        //
+        // Поэтому для EOF отдельно вызываем flush.
+        // ====================================================================
+
+        if eof {
+            // Если stdout действительно закончился нормально,
+            // flush оставшегося packet_carry обязателен.
+            //
+            // Если внутри parser есть последний незавершённый Ogg/Opus packet,
+            // именно здесь он получает шанс попасть в `frames`.
+            if parser.pending_len() != 0 {
+                let _ = parser.parse_internal(&[], &mut frames);
+            }
+        }
+
+        // ====================================================================
+        // Передача готовых packets в RingBuffer
+        // ====================================================================
+
+        if !frames.is_empty() {
+            let (buffer_lock, buffer_cvar) = &*buffer_state;
+
+            let mut buffer = match buffer_lock.lock() {
+                Ok(guard) => guard,
+                Err(_) => break 'reader,
+            };
+
+            // Один notify после batch.
+            //
+            // Даже если ниже произойдёт ранний break,
+            // Drop notifier разбудит consumer, если хотя бы один
+            // packet уже был добавлен.
+            let mut notifier = NotifyOnDrop {
+                cvar: buffer_cvar,
+                should_notify: false,
+            };
+
+            for (kind, packet) in frames.drain(..) {
+                // В audio queue идут только типы, являющиеся аудио.
+                //
+                // Здесь используется существующий semantic helper
+                // `is_audio_frame()`.
+                if !kind.is_audio_frame() {
+                    continue;
+                }
+
+                // ------------------------------------------------------------
+                // Backpressure
+                // ------------------------------------------------------------
+
+                while buffer.is_full() {
+                    if should_stop(&active, &destroyed) {
+                        break 'reader;
+                    }
+
+                    buffer = match buffer_cvar.wait(buffer) {
+                        Ok(guard) => guard,
+                        Err(_) => break 'reader,
+                    };
+                }
+
+                // Пока ждали свободный слот, поток мог быть остановлен.
+                if should_stop(&active, &destroyed) {
+                    break 'reader;
+                }
+
+                // ------------------------------------------------------------
+                // Push
+                // ------------------------------------------------------------
+
+                match buffer.push(packet) {
+                    Ok(()) => {
+                        // Есть что сообщить consumer'у.
+                        notifier.should_notify = true;
+                    }
+
+                    Err(_packet) => {
+                        // Теоретически сюда не должны попасть:
+                        // выше уже проверен `is_full()` и producer единственный.
+                        //
+                        // Но сохраняем защиту от любой рассинхронизации.
+                        active.store(false, Ordering::Release);
+                        break 'reader;
+                    }
+                }
+            }
+
+            drop(notifier);
+        }
+
+        // ====================================================================
+        // EOF
+        // ====================================================================
+
+        if eof {
+            break;
+        }
+
+        // ====================================================================
+        // Проверка parser limits
+        // ====================================================================
+        //
+        // Важно делать её ПОСЛЕ обработки уже готовых frames.
+        //
+        // Если текущий chunk одновременно:
+        //   - выдал валидные audio packets;
+        //   - увеличил remainder/packet_carry;
+        //
+        // готовые packets не должны теряться только из-за последующего
+        // превышения parser limit.
+        // ====================================================================
+
+        if parser.pending_len() > MAX_PARSER_PENDING {
+            break;
         }
     }
 
     // =========================================================================
-    // Единый путь завершения reader.
-    //
-    // Сюда попадают ВСЕ варианты выхода:
-    // stop, destroy, EOF, parser error, read error, mutex poison,
-    // ring buffer error, parser overflow.
+    // Единая очистка
     // =========================================================================
 
     active.store(false, Ordering::Release);
 
+    // На этом этапе reader завершён, поэтому parser можно спокойно очистить.
     parser.cleanup();
     frames.clear();
 }

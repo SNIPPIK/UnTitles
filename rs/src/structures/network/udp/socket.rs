@@ -72,6 +72,7 @@ impl SocketBuffered {
             last_send_ms: AtomicU64::new(0),
             keepalive_counter: AtomicU32::new(0),
             consecutive_failures: AtomicU32::new(0),
+            in_flight: AtomicUsize::new(0),
         });
 
         // Генерируем случайный идентификатор для этой сессии.
@@ -133,38 +134,46 @@ impl SocketBuffered {
 
     /// Добавляет пакет в очередь на отправку.
     ///
-    /// Пустой пакет будет отфильтрован внутренним `push`.
+    /// Пустые пакеты игнорируются и не занимают слот очереди.
+    ///
+    /// Метод не блокирует JS/N-API поток:
+    /// если очередь заполнена, пакет учитывается как drop.
+    ///
+    /// Для внутреннего native producer'а, где допустимо backpressure,
+    /// используется `push_blocking`.
     ///
     /// # Аргументы
     /// * `packet` — данные для отправки.
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        // to_owned() даёт Vec<u8> без заимствования из Buffer.
-        self.inner.push(packet.to_owned());
+        if packet.is_empty() {
+            return;
+        }
+
+        self.inner.push(packet.to_vec());
     }
 
-    /// Добавляет несколько пакетов в очередь с проверкой мусора.
+    /// Добавляет несколько пакетов в очередь.
     ///
     /// Пустые буферы отбрасываются до передачи в Rust-очередь,
-    /// чтобы не занимать слоты впустую.
+    /// чтобы не занимать слоты.
+    ///
+    /// Метод не блокирует JS/N-API поток.
     ///
     /// # Аргументы
     /// * `packets` — массив Buffer с данными для отправки.
     #[napi]
     pub fn push_packets(&self, packets: Vec<Buffer>) {
-        // Фильтруем пустые буферы и конвертируем в Vec<u8> заранее.
         let packets = packets
             .into_iter()
-            .filter_map(|packet| {
-                if packet.is_empty() {
-                    None
-                } else {
-                    Some(packet.to_vec())
-                }
-            })
+            .filter(|packet| !packet.is_empty())
+            .map(|packet| packet.to_vec())
             .collect::<Vec<_>>();
 
-        // Передаём подготовленный вектор массовой вставкой.
+        if packets.is_empty() {
+            return;
+        }
+
         self.inner.push_many(packets);
     }
 
@@ -317,7 +326,6 @@ impl SocketBuffered {
         // Очищаем внутренний кольцевой буфер отправки.
         if let Some(inner) = Arc::get_mut(&mut self.inner) {
             inner.buffer.clear();
-            inner.buffer.shrink_to_fit();
         }
 
         // Сбрасываем счётчик отброшенных пакетов (для статистики).

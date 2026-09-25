@@ -73,6 +73,8 @@ export interface iAudioEngine {
      */
     set position(pos: number);
 
+    get readable(): boolean;
+
     /**
      * Создаёт новый экземпляр AudioEngine.
      *
@@ -494,43 +496,132 @@ export interface iMLSSession {
     encrypt(packets: Array<Buffer>): Array<Buffer> | null;
 }
 
-/** Результат обработки proposals: commit и опциональный welcome. */
+/**
+ * Результат обработки proposals: commit и опциональный welcome.
+ *
+ * Возвращается из `process_proposals`. Поле `commit` присутствует, если
+ * нативная сессия сформировала новый commit для группы; `welcome` — только
+ * если в группу добавляются новые участники и им нужно приглашение.
+ */
 export interface ProposalsResult {
-    /** Данные commit. */
-    commit?: Buffer;
-
-    /** Данные welcome (только при добавлении новых участников). */
-    welcome?: Buffer;
+    /** Данные commit. `None`, если commit не требуется. */
+    commit?: Buffer
+    /** Данные welcome. `None`, если новых участников нет. */
+    welcome?: Buffer
 }
 
-/** Результат обработки commit/welcome. */
+/**
+ * Результат обработки commit или welcome.
+ *
+ * Возвращается из `process_commit` и `process_welcome`.
+ */
 export interface TransitionResult {
-    /** Идентификатор перехода. */
-    transition_id: number;
-
+    /** Идентификатор перехода (первые 2 байта payload). */
+    transition_id: number
     /** `true`, если обработка завершилась успешно. */
-    success: boolean;
-
-    /** `true`, если переход признан невалидным и требует повторной инициализации. */
-    invalidated: boolean;
+    success: boolean
+    /**
+     * `true`, если переход признан невалидным и требует повторной инициализации.
+     * Устанавливается только при первой ошибке; повторные ошибки во время
+     * уже начатой повторной инициализации сигнал не выставляют.
+     */
+    invalidated: boolean
 }
 
 
-
+/**
+ * Обёртка Voice WebSocket для JavaScript.
+ *
+ * Управляет подключением к Discord Voice Gateway, отправкой/приёмом
+ * сообщений и эмиссией событий в JS через threadsafe-функции.
+ * Вся работа с сетью и таймерами выполняется в Tokio-runtime, JS-сторона
+ * получает только события и управляет жизненным циклом.
+ */
 export interface iVoiceWebSocket {
-    constructor(): void
-    get ready(): boolean
-    get status(): number
-    get sequence(): number
-    /** Подписка на событие. `payload` — строка JSON, `binary` — Buffer. */
-    on(event: string, callback: Function): void
-    /** Первый вариант — Buffer (binary), второй — строка JSON. */
-    set packet(payload: Buffer | string)
-    connect(endpoint: string, code?: number | undefined | null): void
-    reset(): void
-    destroy(): void
-    /** Псевдоним для `send_packet`. */
-    setPacket(payload: Buffer | string): void
+    /** Создаёт объект без активного подключения. */
+    constructor(): void;
+
+    /** `true`, если WebSocket-соединение активно. */
+    get ready(): boolean;
+
+    /** Текущий статус соединения (код из `ws_status`). */
+    get status(): number;
+
+    /** Последний полученный seq от Discord (для Resume). */
+    get sequence(): number;
+
+    /**
+     * Регистрирует обработчик JS-события.
+     *
+     * Внутри создаётся threadsafe-функция, которая при срабатывании
+     * преобразует `EmitData` в набор JSON-значений и передаёт их
+     * JS-функции как позиционные аргументы.
+     *
+     * Формат аргументов зависит от имени события:
+     * * `open` | `resumed` | `disconnect` — без аргументов;
+     * * `info` — строка;
+     * * `error` — объект `{ message, stack }`;
+     * * `close` — `(code: number, reason: string)`;
+     * * `binary` — `{ op, payload: number[] }`;
+     * * прочие события — разобранным JSON-payload.
+     *
+     * # Аргументы
+     * * `event` — имя события.
+     * * `callback` — JS-функция-обработчик.
+     *
+     * # Ошибки
+     * Возвращает ошибку, если не удалось построить threadsafe-функцию.
+     */
+    on(event: string, callback: Function): void;
+
+    /**
+     * Отправляет пакет в WebSocket.
+     *
+     * Если соединение ещё не готово, пакет помещается в очередь
+     * и будет отправлен после установления соединения.
+     *
+     * # Аргументы
+     * * `payload` — `Buffer` (бинарный) или `String` (текстовый).
+     */
+    set packet(payload: Buffer | string);
+
+    /**
+     * Открывает WebSocket-подключение к указанному endpoint'у.
+     *
+     * Нормализует переданный адрес: убирает схему (`ws://`, `wss://`)
+     * и ведущий `/`, после чего формирует итоговый URL с `/?v=8` —
+     * так Discord ожидает на голосовом шлюзе.
+     *
+     * # Аргументы
+     * * `endpoint` — адрес шлюза (может содержать схему или нет).
+     * * `_code` — необязательный код переподключения (не используется).
+     */
+    connect(endpoint: string, code?: number | undefined | null): void;
+
+    /**
+     * Сбрасывает текущее соединение и очищает ресурсы.
+     *
+     * Прерывает runtime-задачу, останавливает heartbeat, закрывает канал
+     * отправки, очищает очередь и приводит флаги к состоянию "отключено".
+     * Безопасен для повторного вызова.
+     */
+    reset(): void;
+
+    /**
+     * Полностью уничтожает объект WebSocket.
+     *
+     * Помимо `reset` очищает зарегистрированные события и сбрасывает
+     * sequence в -1. Повторное использование после вызова невозможно.
+     */
+    destroy(): void;
+
+    /**
+     * Устанавливает пакет для отправки.
+     *
+     * Синоним для `send_packet`, используется там, где ожидается
+     * setter-семантика (например, при `ws.packet = value`).
+     */
+    setPacket(payload: Buffer | string): void;
 }
 
 /* ────────────────────────────────────────────────
@@ -545,7 +636,7 @@ export const {
     AudioEngine,
     UDPSocket,
     MLSSession,
-    VoiceWebSocket
+    VoiceWebSocket,
 } = Native as {
     VoiceWebSocket: NativeClass<iVoiceWebSocket>
     MLSSession:    NativeClass<iMLSSession>;

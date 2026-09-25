@@ -6,7 +6,7 @@ use crate::structures::audio::{
     opus::SILENT_FRAME
 };
 use std::io::{Error, ErrorKind, Result};
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{Buf, BytesMut};
 use memchr::memmem;
 
 // ============================================================================
@@ -70,27 +70,57 @@ impl OggOpusDemuxer {
     }
 
     /// Точка входа для разбора фрагмента данных.
-    /// Если `chunk` пуст — принудительно выталкивает последний незавершённый пакет.
-    /// Иначе запускает основной парсер с возвратом, копирующим данные в `output`.
+    ///
+    /// Если `chunk` пуст — ничего не делает (в текущей реализации flush)
+    /// Иначе запускает основной парсер с возвратом, который склеивает
+    /// переданные части в один непрерывный `Vec<u8>` и добавляет
+    /// в `output` вместе с типом пакета.
+    ///
+    /// # Аргументы
+    /// * `chunk` — новый фрагмент данных.
+    /// * `output` — вектор, куда складываются готовые пакеты.
+    ///
+    /// # Возвращаемое значение
+    /// `Ok(())` при успешном разборе; `Err` при ошибке из возврата.
     pub fn parse_internal(&mut self, chunk: &[u8], output: &mut Vec<ParsedPacket>) -> Result<()> {
+        // Пустой фрагмент — нечего обрабатывать.
         if chunk.is_empty() { return Ok(()); }
 
-        self.parse_core(chunk, |packet_type, data| {
-            output.push((packet_type, data.to_vec()));
+        // Запускаем ядро парсера.
+        self.parse_core(chunk, |packet_type, parts| {
+            // Считаем итоговую длину всех частей одним проходом.
+            let total_len: usize = parts.iter().map(|p| p.len()).sum();
+            // Резервируем место и складываем части подряд.
+            let mut data = Vec::with_capacity(total_len);
+
+            for part in parts {
+                data.extend_from_slice(part);
+            }
+
+            // Публикуем готовый пакет.
+            output.push((packet_type, data));
             Ok(())
         })
     }
 
-    /// Основной цикл разбора:
+    /// Основной цикл разбора.
+    ///
+    /// Шаги:
     /// 1. Добавляет новые данные в `remainder`.
     /// 2. Ищет сигнатуру "OggS".
     /// 3. Проверяет заголовок страницы.
     /// 4. Обрабатывает полные страницы через `handle_page_core`.
     /// 5. Удаляет обработанные байты из `remainder`.
-    fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()> where
-        F: FnMut(PacketType, &[u8]) -> Result<()>,
+    ///
+    /// # Аргументы
+    /// * `chunk` — новые данные.
+    /// * `on_packet` — возврат, получающий тип и части пакета.
+    fn parse_core<F>(&mut self, chunk: &[u8], mut on_packet: F) -> Result<()>
+    where
+        F: FnMut(PacketType, &[&[u8]]) -> Result<()>,
     {
-        self.remainder.put_slice(chunk);
+        // Дописываем новый фрагмент к накопленному остатку.
+        self.remainder.extend_from_slice(chunk);
 
         // Защита от неограниченного роста при повреждённом входе.
         if self.remainder.len() > MAX_REMAINDER_SIZE {
@@ -99,92 +129,86 @@ impl OggOpusDemuxer {
         }
 
         loop {
-            // Нам хотя бы нужен capture pattern.
-            if self.remainder.len() < 4 { break; }
+            let buf = &self.remainder;
 
-            // Ищем следующую сигнатуру "OggS".
-            let pos = match memmem::find(&self.remainder, b"OggS") {
-                Some(pos) => pos,
+            // Минимум для заголовка страницы без таблицы сегментов.
+            if buf.len() < 27 {
+                break;
+            }
+
+            // Ищем сигнатуру страницы Ogg.
+            let pos = match memmem::find(buf, b"OggS") {
+                Some(v) => v,
                 None => {
-                    // Сигнатура не найдена: оставляем хвост в 3 байта,
-                    // на случай если "OggS" разрезана пополам.
-                    //
-                    // Сохраняем последние 3 байта:
-                    // они могут оказаться началом "OggS" в следующем chunk.
-                    let keep = self.remainder.len().min(3);
-                    let drop_len = self.remainder.len() - keep;
-
-                    if drop_len != 0 {
-                        self.remainder.advance(drop_len);
+                    // Мусор без OggS — оставляем только хвост,
+                    // где сигнатура может быть разорвана между фрагментами.
+                    let keep = buf.len().min(3);
+                    let drop = buf.len() - keep;
+                    if drop != 0 {
+                        self.remainder.advance(drop);
                     }
-
                     break;
                 }
             };
 
-            // Отбрасываем мусор перед сигнатурой.
-            if pos != 0 { self.remainder.advance(pos); }
-
-            // Недостаточно данных для заголовка Ogg-страницы.
-            else if self.remainder.len() < 27 { break; }
-
-            // Дополнительная проверка capture pattern.
-            // Здесь уже обязательно OggS.
-            debug_assert_eq!(&self.remainder[..4], b"OggS");
-
-            // Версия Ogg: должна быть 0.
-            if self.remainder[4] != 0 {
-                self.remainder.advance(1);
+            // Отбрасываем всё до найденной сигнатуры.
+            if pos != 0 {
+                self.remainder.advance(pos);
                 continue;
             }
 
-            let segment_count = self.remainder[26] as usize;
+            // Число сегментов в странице.
+            let segment_count = buf[26] as usize;
+            // Полный размер заголовка с таблицей сегментов.
             let header_size = 27 + segment_count;
 
-            // Ждём полную таблицу сегментов.
-            if self.remainder.len() < header_size {
+            // Ждём полной таблицы сегментов.
+            if buf.len() < header_size {
                 break;
             }
 
-            let segment_table = &self.remainder[27..header_size];
+            // Считаем размер payload одним проходом.
+            let mut payload_size = 0usize;
+            for &v in &buf[27..header_size] {
+                payload_size += v as usize;
+            }
 
-            let payload_size = segment_table
-                .iter()
-                .map(|&len| len as usize)
-                .sum::<usize>();
-
-            // Защита от переполнения при вычислении конца страницы.
+            // Полный размер страницы: заголовок + payload.
             let page_size = match header_size.checked_add(payload_size) {
-                Some(size) => size,
+                Some(v) => v,
                 None => {
+                    // Переполнение размера — пропускаем сигнатуру и ищем дальше.
                     self.remainder.advance(4);
                     continue;
                 }
             };
 
-            // Ждём полный payload.
-            // Вся страница ещё не пришла.
-            if self.remainder.len() < page_size { break; }
+            // Ждём полного payload.
+            if buf.len() < page_size {
+                break;
+            }
 
-            let page = &self.remainder[..page_size];
+            // Выделяем полную страницу.
+            let page = &buf[..page_size];
 
-            // Обработка страницы; при ошибке формата очищаем состояние переноса.
-            match Self::handle_page_core(page, &mut self.packet_carry, &mut self.bitstream_serial, &mut on_packet) {
-                Ok(()) => {
-                    self.remainder.advance(page_size);
-                }
+            match Self::handle_page_core(
+                page,
+                &mut self.packet_carry,
+                &mut self.bitstream_serial,
+                &mut on_packet,
+            ) {
+                // Страница успешно обработана — пропускаем её.
+                Ok(_) => self.remainder.advance(page_size),
 
+                // Повреждённая страница: сбрасываем состояние и пропускаем.
                 Err(PageError::Malformed(_)) => {
-                    // Повреждённая страница не должна ломать весь stream.
                     self.packet_carry.clear();
                     self.bitstream_serial = None;
                     self.remainder.advance(page_size);
                 }
 
-                Err(PageError::Callback(err)) => {
-                    // Ошибку потребителя нельзя проглатывать.
-                    return Err(err);
-                }
+                // Ошибка из возврата — пробрасываем наружу как есть.
+                Err(PageError::Callback(e)) => return Err(e),
             }
         }
 
@@ -205,167 +229,103 @@ impl OggOpusDemuxer {
     ///
     /// Незавершённые пакеты сохраняются в `packet_carry` и продолжаются
     /// на следующей странице.
-    fn handle_page_core<F>(page: &[u8], packet_carry: &mut Vec<u8>, bitstream_serial: &mut Option<u32>, on_packet: &mut F) -> std::result::Result<(), PageError> where
-        F: FnMut(PacketType, &[u8]) -> Result<()>,
+    ///
+    /// # Аргументы
+    /// * `page` — полная страница.
+    /// * `packet_carry` — буфер для переноса незавершённого пакета.
+    /// * `bitstream_serial` — текущий serial логического потока.
+    /// * `on_packet` — возврат для готовых пакетов.
+    fn handle_page_core<F>(page: &[u8], packet_carry: &mut Vec<u8>, bitstream_serial: &mut Option<u32>, on_packet: &mut F) -> std::result::Result<(), PageError>
+    where
+        F: FnMut(PacketType, &[&[u8]]) -> Result<()>,
     {
-        // Минимальный размер Ogg page header.
-        if page.len() < 27 {
+        // Проверка базовой длины и сигнатуры, а также версии страницы (должна быть 0).
+        if page.len() < 27 || &page[..4] != b"OggS" || page[4] != 0 {
             return Err(PageError::malformed("Invalid OGG page"));
-        }
-
-        // Capture pattern.
-        else if &page[..4] != b"OggS" {
-            return Err(PageError::malformed("Invalid OGG capture pattern"));
-        }
-
-        // Ogg version.
-        else if page[4] != 0 {
-            return Err(PageError::malformed("Unsupported OGG version"));
         }
 
         let header_type = page[5];
 
-        // В Ogg используются только младшие 3 бита:
-        // 0x01 = continued, 0x02 = BOS, 0x04 = EOS.
-        // Остальные биты зарезервированы и должны быть нулевыми.
-        // Ogg использует только 3 младших флага.
+        // Зарезервированные биты должны быть нулевыми.
         if header_type & 0xF8 != 0 {
             return Err(PageError::malformed("Invalid OGG header flags"));
         }
 
-        let continued = (header_type & 0x01) != 0;
-        let bos = (header_type & 0x02) != 0;
-        let eos = (header_type & 0x04) != 0;
+        // Разбор отдельных флагов.
+        let continued = header_type & 0x01 != 0;
+        let bos = header_type & 0x02 != 0;
+        let eos = header_type & 0x04 != 0;
 
-        // Serial number.
-        let serial = u32::from_le_bytes(
-            page[14..18]
-                .try_into()
-                .map_err(|_| PageError::malformed("Invalid OGG serial"))?,
-        );
-
-        let segment_count = page[26] as usize;
-        let header_size = 27 + segment_count;
-
-        if page.len() < header_size {
-            return Err(PageError::malformed("Invalid OGG segment table"));
+        // BOS и continuation не могут стоять одновременно.
+        if bos && continued {
+            return Err(PageError::malformed("Invalid BOS continuation"));
         }
 
-        // ------------------------------------------------------------------
-        // BOS
-        // ------------------------------------------------------------------
+        // Serial из байт 14..18.
+        let serial = u32::from_le_bytes(page[14..18].try_into().unwrap());
 
-        // BOS-страница не может быть continuation.
-        else if bos && continued {
-            return Err(PageError::malformed("Invalid OGG BOS continuation"));
-        }
-
-        // ------------------------------------------------------------------
-        // Logical bitstream
-        // ------------------------------------------------------------------
-
+        // При смене serial сбрасываем незавершённый пакет.
         if *bitstream_serial != Some(serial) {
-            // Если это новый logical bitstream — старый незавершённый
-            // packet больше не имеет отношения к новому потоку.
-            // Новый logical stream.
-            //
-            // Старый незавершённый packet больше нельзя продолжать.
             packet_carry.clear();
             *bitstream_serial = Some(serial);
         }
 
-        // ------------------------------------------------------------------
-        // CONTINUATION
-        // ------------------------------------------------------------------
-
-        // Проверяем continuation до обработки сегментов.
-        if continued {
-            // Если страница объявляет продолжение, у нас обязательно
-            // должен существовать packet, начатый предыдущей страницей.
-            if packet_carry.is_empty() {
-                return Err(PageError::malformed(
-                    "OGG continuation without previous packet",
-                ));
-            }
-        } else if !packet_carry.is_empty() {
-            // Предыдущая страница закончилась segment=255, то есть packet
-            // должен был продолжиться здесь, но continuation отсутствует.
-            return Err(PageError::malformed(
-                "OGG packet continuation mismatch",
-            ));
+        // Флаг continuation должен соответствовать наличию незавершённого пакета.
+        if continued != !packet_carry.is_empty() {
+            return Err(PageError::malformed("Packet continuation mismatch"));
         }
 
-        // ------------------------------------------------------------------
-        // SEGMENTS
-        // ------------------------------------------------------------------
+        // Число сегментов и размер заголовка.
+        let segment_count = page[26] as usize;
+        let header_size = 27 + segment_count;
 
-        let segment_table = &page[27..header_size];
+        if page.len() < header_size {
+            return Err(PageError::malformed("Invalid segment table"));
+        }
+
+        // Указатель на начало payload.
         let mut offset = header_size;
 
-        for &segment_len_u8 in segment_table {
-            let segment_len = segment_len_u8 as usize;
+        // Перебираем lacing values.
+        for &len_u8 in &page[27..header_size] {
+            let len = len_u8 as usize;
+            let end = offset + len;
 
-            let end = offset
-                .checked_add(segment_len)
-                .ok_or_else(|| PageError::malformed("OGG segment overflow"))?;
-
+            // Сегмент не должен выходить за пределы страницы.
             if end > page.len() {
                 packet_carry.clear();
-
-                return Err(PageError::malformed(
-                    "OGG segment out of bounds",
-                ));
+                return Err(PageError::malformed("Segment out of bounds"));
             }
 
-            // Проверяем размер ещё до расширения Vec.
-            // Ограничение размера Opus packet.
-            let new_len = packet_carry
-                .len()
-                .checked_add(segment_len)
-                .ok_or_else(|| PageError::malformed("Opus packet overflow"))?;
+            // Дописываем данные в собираемый пакет.
+            if len != 0 {
+                // Защита от переполнения размера пакета.
+                if packet_carry.len() + len > MAX_PACKET_SIZE {
+                    packet_carry.clear();
+                    return Err(PageError::malformed("Packet too large"));
+                }
 
-            if new_len > MAX_PACKET_SIZE {
-                packet_carry.clear();
-
-                return Err(PageError::malformed(
-                    "Opus packet exceeds maximum size",
-                ));
-            }
-
-            if segment_len != 0 {
                 packet_carry.extend_from_slice(&page[offset..end]);
             }
 
             offset = end;
 
-            // Lacing value < 255 означает конец packet.
-            if segment_len_u8 < 255 {
+            // Значение < 255 завершает текущий пакет.
+            if len_u8 != 255 {
                 Self::finish_packet(packet_carry, on_packet)?;
             }
         }
 
-        // Для Ogg page payload должен полностью соответствовать
-        // lacing table.
+        // После обхода всех сегментов offset должен совпадать с длиной страницы.
         if offset != page.len() {
             packet_carry.clear();
-
-            return Err(PageError::malformed(
-                "OGG page payload size mismatch",
-            ));
+            return Err(PageError::malformed("Payload mismatch"));
         }
 
-        // ------------------------------------------------------------------
-        // EOS
-        // ------------------------------------------------------------------
-
-        // EOS с незавершённым packet означает обрезанный поток.
-        // Проверяем ПОСЛЕ обработки всех сегментов.
-        else if eos && !packet_carry.is_empty() {
+        // EOS с незавершённым пакетом — повреждение.
+        if eos && !packet_carry.is_empty() {
             packet_carry.clear();
-
-            return Err(PageError::malformed(
-                "OGG EOS with unfinished packet",
-            ));
+            return Err(PageError::malformed("EOS with unfinished packet"));
         }
 
         Ok(())
@@ -377,44 +337,47 @@ impl OggOpusDemuxer {
     /// - `PLC` заменяется на `Silent` с использованием `SILENT_FRAME`;
     /// - `VBR` превращается в `SVBR` (SILENT_FRAME + оригинальный payload);
     /// - остальные типы передаются без изменений.
+    ///
+    /// `on_packet` получает данные как срез срезов (`&[&[u8]]`), а не
+    /// готовый непрерывный буфер: для SVBR это позволяет вызывающей
+    /// стороне (`parse_internal`) собрать итоговый `Vec<u8>` за одно
+    /// выделение и одно копирование, вместо того чтобы сначала строить
+    /// временный `SILENT_FRAME + packet_carry` буфер здесь, а потом
+    /// копировать его ещё раз на выходе.
+    ///
+    /// # Аргументы
+    /// * `packet_carry` — собранный пакет (очищается в конце).
+    /// * `on_packet` — возврат получателя.
     #[inline]
-    fn finish_packet<F>(packet_carry: &mut Vec<u8>, on_packet: &mut F) -> std::result::Result<(), PageError> where
-        F: FnMut(PacketType, &[u8]) -> Result<()>,
+    fn finish_packet<F>(packet_carry: &mut Vec<u8>, on_packet: &mut F) -> std::result::Result<(), PageError>
+    where
+        F: FnMut(PacketType, &[&[u8]]) -> Result<()>,
     {
-        // Для Opus пустой packet не имеет смысла.
+        // Пустой Opus-пакет не имеет смысла.
         if packet_carry.is_empty() { return Ok(()); }
+
+        // Определяем тип пакета по его содержимому.
         let packet_type = PacketType::detect_packet_type(packet_carry);
 
-        // Более деликатно разбираем типы пакета.
+        // Обрабатываем типы, требующие коррекции.
         match packet_type {
+            // Пустышки
             PacketType::PLC => {
-                // Удаляем мусорный PLC, отправляем Silent.
-                on_packet(PacketType::Silent, &SILENT_FRAME)
-                    .map_err(PageError::callback)?;
+                on_packet(PacketType::Silent, &[&SILENT_FRAME]).map_err(PageError::callback)?;
             }
 
+            // SVBR = SILENT_FRAME + оригинальный payload
             PacketType::VBR => {
-                // Не используем splice():
-                // он двигает весь существующий packet.
-                //
-                // Создаём временный буфер только для SVBR:
-                // вставляем SILENT_FRAME в начало, остаток (старый carry)
-                // идёт следом.
-                let mut svbr = Vec::with_capacity(SILENT_FRAME.len() + packet_carry.len());
-
-                svbr.extend_from_slice(&SILENT_FRAME);
-                svbr.extend_from_slice(packet_carry);
-
-                on_packet(PacketType::SVBR, &svbr)
-                    .map_err(PageError::callback)?;
+                on_packet(packet_type, &[&SILENT_FRAME, packet_carry.as_slice()]).map_err(PageError::callback)?;
             }
 
+            // Обычный пакет передаётся как есть.
             _ => {
-                on_packet(packet_type, packet_carry)
-                    .map_err(PageError::callback)?;
+                on_packet(packet_type, &[packet_carry.as_slice()]).map_err(PageError::callback)?;
             }
         }
 
+        // Готовим буфер к следующему пакету.
         packet_carry.clear();
 
         Ok(())

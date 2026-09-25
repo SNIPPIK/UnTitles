@@ -1,4 +1,4 @@
-//! Запуск ffmpeg и фонового потока чтения.
+//! Запуск FFmpeg и фонового потока чтения.
 
 use super::{
     constants::{FFMPEG_PREFIX, RECONNECT_FLAGS},
@@ -51,7 +51,7 @@ impl AudioEngine {
         }
 
         // Ищем позицию `-i http...` — только туда вставляем reconnect-флаги.
-        // filter отбрасывает случаи, где после `-i` идёт локальный путь или флаг.
+        // Filter отбрасывает случаи, где после `-i` идёт локальный путь или флаг.
         let reconnect_pos = args
             .iter()
             .position(|v| v == "-i")
@@ -107,7 +107,7 @@ impl AudioEngine {
         };
 
         // Сохраняем процесс. Если движок уничтожили между spawn и сохранением —
-        // убиваем ffmpeg и выходим с ошибкой.
+        // убиваем FFmpeg и выходим с ошибкой.
         {
             let mut guard = self.child.lock().unwrap();
             if self.destroyed.load(Ordering::Acquire) {

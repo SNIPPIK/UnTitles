@@ -13,10 +13,13 @@ const MAX_SEND_BURST: u8 = 3;
 /// для своевременной доставки.
 ///
 /// Соответствие:
-/// 20 ms      → normal
-/// 20–30 ms   → burst 2
-/// >30 ms     → burst 3
+/// 20 ms → normal
+/// 20–30 ms → burst 2
+/// >30 ms → burst 3
 const BURST_THRESHOLD_1: Duration = Duration::from_millis(3);
+
+/// Второй порог отставания: при его превышении разрешается максимальный
+/// burst (`MAX_SEND_BURST`).
 const BURST_THRESHOLD_2: Duration = Duration::from_millis(10);
 
 /// -------------------------------------------------------------------------
@@ -24,12 +27,16 @@ const BURST_THRESHOLD_2: Duration = Duration::from_millis(10);
 /// -------------------------------------------------------------------------
 ///
 /// Планировщик отвечает только за timing.
+///
+/// Нижний уровень (Player/Session/UDP) сам решает, сколько пакетов
+/// фактически отправить в пределах разрешённого бюджета.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SendBudget {
     /// Обычный режим — один пакет за тик.
     Normal,
+
     /// Burst-режим — до N пакетов за тик.
-    Burst(u8),
+    Burst(u8)
 }
 
 impl SendBudget {
@@ -39,46 +46,45 @@ impl SendBudget {
     #[inline]
     pub const fn packets(self) -> u8 {
         match self {
+            // Обычный режим: ровно один пакет.
             Self::Normal => NORMAL_SEND_BUDGET,
+            
+            // Burst-режим: количество, зафиксированное в варианте.
             Self::Burst(count) => count,
         }
-    }
-
-    /// Возвращает `true`, если бюджет соответствует burst-режиму.
-    #[inline]
-    pub const fn is_burst(self) -> bool {
-        matches!(self, Self::Burst(_))
     }
 
     /// Определяет дополнительный send budget, который имеет смысл дать сессии.
     ///
     /// Важно: `late` не равно числу пропущенных тиков.
-    /// Оценивается именно timing debt.
-    ///
-    /// Пример:
-    ///   deadline = 20 ms
-    ///   планировщик проснулся через 26 ms
-    ///
-    /// Формально один дедлайн пропущен, но это не значит, что нужно
-    /// «отправить два тика». Просто разрешается burst из 2 пакетов.
+    /// Оценивается именно timing debt — насколько мы опоздали к дедлайну.
     ///
     /// # Аргументы
     /// * `late` — насколько фактическое пробуждение опоздало относительно дедлайна.
     ///
     /// # Возвращаемое значение
-    /// `SendBudget::Normal` при малом опоздании,
-    /// `SendBudget::Burst(2..=MAX_SEND_BURST)` — при существенном.
+    /// * `SendBudget::Normal` — при малом опоздании (< `BURST_THRESHOLD_1`).
+    /// * `SendBudget::Burst(2)` — при умеренном отставании
+    ///   (`>= BURST_THRESHOLD_1`, `< BURST_THRESHOLD_2`).
+    /// * `SendBudget::Burst(MAX_SEND_BURST)` — при сильном отставании
+    ///   (`>= BURST_THRESHOLD_2`).
     #[inline]
     pub fn calculate_send_budget(late: Duration) -> SendBudget {
-        if late >= BURST_THRESHOLD_2 {
+        match late {
             // Сильно отстали — разрешаем максимальный burst.
-            SendBudget::Burst(MAX_SEND_BURST)
-        } else if late >= BURST_THRESHOLD_1 {
+            BURST_THRESHOLD_2 => {
+                SendBudget::Burst(MAX_SEND_BURST)
+            }
+
             // Умеренное отставание — двойной burst.
-            SendBudget::Burst(2)
-        } else {
+            BURST_THRESHOLD_1 => {
+                SendBudget::Burst(2)
+            }
+
             // В пределах нормы — обычный режим.
-            SendBudget::Normal
+            _ => {
+                SendBudget::Normal
+            }
         }
     }
 }

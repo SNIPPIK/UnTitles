@@ -200,15 +200,6 @@ impl fmt::Display for OpusPacketError {
             // полностью прочитан.
             Self::TruncatedLengthField => write!(f, "truncated length field"),
 
-            // Указанный packet padding больше оставшегося
-            // доступного пространства.
-            /*Self::PaddingExceedsPacket { padding, available } => write!(
-                f,
-                "padding {} exceeds available {}",
-                padding,
-                available
-            ),*/
-
             // Оставшегося payload недостаточно даже для минимального
             // размещения указанного количества кадров.
             Self::PayloadTooShort { payload, frames } => write!(
@@ -227,19 +218,6 @@ impl fmt::Display for OpusPacketError {
                 frames
             ),
 
-            // Размер конкретного кадра превысил максимальное значение,
-            // допустимое для одного Opus frame.
-            /*Self::FrameTooLarge(n) => write!(
-                f,
-                "frame {} exceeds {} bytes",
-                n,
-                MAX_OPUS_FRAME_BYTES
-            ),*/
-
-            // Конфигурация определила невозможную длительность
-            // аудио-фрейма.
-            /*Self::InvalidDuration => write!(f, "invalid duration"),*/
-
             // Получен размер кадра, который не соответствует
             // ожидаемым ограничениям packet framing.
             Self::InvalidFrameSize(n) => write!(
@@ -257,19 +235,7 @@ impl fmt::Display for OpusPacketError {
                 "payload mismatch: expected {}, actual {}",
                 expected,
                 actual
-            ),
-
-            // Полный размер пакета не совпадает с размером,
-            // рассчитанным на основании его структуры.
-            //
-            // Это последняя проверка согласованности после разбора
-            // всех внутренних полей.
-            Self::PacketSizeMismatch { expected, actual } => write!(
-                f,
-                "packet size mismatch: expected {}, actual {}",
-                expected,
-                actual
-            ),
+            )
         }
     }
 }
@@ -304,16 +270,6 @@ pub enum OpusPacketError {
     /// Содержит фактическое значение, извлечённое из пакета.
     InvalidFrameCount(u8),
 
-    /// Padding объявлен, но его размер или расположение
-    /// невозможно корректно интерпретировать.
-    /*PaddingExceedsPacket {
-        /// Размер padding, заявленный пакетом.
-        padding: usize,
-
-        /// Количество байт, доступных в текущем packet payload.
-        available: usize,
-    },*/
-
     /// Payload слишком мал для указанного количества кадров.
     ///
     /// Даже минимальный допустимый frame требует хотя бы одного
@@ -336,9 +292,6 @@ pub enum OpusPacketError {
         frames: usize,
     },
 
-    /// Размер одного кадра превышает RFC-ограничение.
-    /*FrameTooLarge(usize),*/
-
     /// Length field имеет некорректное значение или структуру.
     ///
     /// Используется, когда поле технически прочитано, но его
@@ -350,9 +303,6 @@ pub enum OpusPacketError {
     /// В отличие от `InvalidLengthField`, здесь проблема именно
     /// в недостатке входных данных.
     TruncatedLengthField,
-
-    /// TOC определяет невозможную длительность кадра.
-    /*InvalidDuration,*/
 
     /// Рассчитанный размер конкретного кадра не соответствует
     /// допустимым ограничениям.
@@ -368,17 +318,5 @@ pub enum OpusPacketError {
 
         /// Размер, реально обнаруженный в packet.
         actual: usize,
-    },
-
-    /// Рассчитанный полный размер пакета не совпал с фактическим.
-    ///
-    /// Используется как финальная проверка целостности структурного
-    /// разбора.
-    PacketSizeMismatch {
-        /// Размер, который должен был иметь пакет.
-        expected: usize,
-
-        /// Фактический размер входного buffer.
-        actual: usize,
-    },
+    }
 }
