@@ -123,7 +123,16 @@ impl SocketBuffered {
     /// Текущее количество пакетов в очереди на отправку.
     #[napi(getter)]
     pub fn packets(&self) -> u32 {
-        self.inner.buffer.len() as u32
+        let queued = self.inner.buffer.len();
+
+        let in_flight = self
+            .inner
+            .in_flight
+            .load(Ordering::Acquire);
+
+        queued
+            .saturating_add(in_flight)
+            .min(u32::MAX as usize) as u32
     }
 
     /// Количество пакетов, сброшенных из-за переполнения очереди или временных ошибок.
@@ -146,10 +155,7 @@ impl SocketBuffered {
     /// * `packet` — данные для отправки.
     #[napi]
     pub fn push_packet(&self, packet: Buffer) {
-        if packet.is_empty() {
-            return;
-        }
-
+        if packet.is_empty() { return; }
         self.inner.push(packet.to_vec());
     }
 
@@ -164,15 +170,14 @@ impl SocketBuffered {
     /// * `packets` — массив Buffer с данными для отправки.
     #[napi]
     pub fn push_packets(&self, packets: Vec<Buffer>) {
+        // Если пакеты пустые
+        if packets.is_empty() { return; }
+
         let packets = packets
             .into_iter()
             .filter(|packet| !packet.is_empty())
             .map(|packet| packet.to_vec())
             .collect::<Vec<_>>();
-
-        if packets.is_empty() {
-            return;
-        }
 
         self.inner.push_many(packets);
     }
