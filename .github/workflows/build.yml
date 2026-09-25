@@ -10,106 +10,207 @@ jobs:
   build:
     strategy:
       fail-fast: false
+
       matrix:
         settings:
+          # ============================================================
           # macOS
+          # ============================================================
           - host: macos-latest
             target: x86_64-apple-darwin
+
           - host: macos-latest
             target: aarch64-apple-darwin
 
+          # ============================================================
           # Windows
+          # ============================================================
           - host: windows-latest
             target: x86_64-pc-windows-msvc
+
           - host: windows-latest
             target: aarch64-pc-windows-msvc
 
+          # ============================================================
           # Linux (glibc)
+          # ============================================================
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             cross: true
+
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
             cross: true
 
-          # Linux (musl - для Alpine Docker)
+          # ============================================================
+          # Linux (musl)
+          # ============================================================
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
             cross: true
+
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
             cross: true
+
+          # ============================================================
+          # Linux (RISC-V)
+          # ============================================================
           - host: ubuntu-latest
             target: riscv64gc-unknown-linux-gnu
             cross: true
 
+          # ============================================================
           # Android
+          # ============================================================
           - host: ubuntu-latest
             target: aarch64-linux-android
-            cross: true
+
           - host: ubuntu-latest
             target: armv7-linux-androideabi
-            cross: true
 
     name: build-${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
-
     steps:
-      - uses: actions/checkout@v7
+      # ================================================================
+      # Checkout
+      # ================================================================
+      - name: Checkout
+        uses: actions/checkout@v7
 
-      - name: Setup node
+      # ================================================================
+      # Node.js
+      # ================================================================
+      - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 25
-          cache: 'npm'
+          cache: npm
 
+      # ================================================================
+      # Prepare rs/package.json
+      # ================================================================
       - name: Setup package.json
         run: npm run build:copy
 
+      # ================================================================
+      # Rust
+      # ================================================================
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.settings.target }}
 
+      # ================================================================
+      # Rust cache
+      # ================================================================
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
         with:
           key: ${{ matrix.settings.target }}
 
+      # ================================================================
+      # Zig
+      #
+      # Используется только для обычных Linux cross-targets.
+      # Android сюда намеренно НЕ попадает.
+      # ================================================================
       - name: Install Zig
         if: ${{ matrix.settings.cross }}
         uses: goto-bus-stop/setup-zig@v2
 
+      # ================================================================
+      # Android NDK validation
+      # ================================================================
+      - name: Verify Android NDK
+        if: startsWith(matrix.settings.target, 'aarch64-linux-android') || startsWith(matrix.settings.target, 'armv7-linux-androideabi')
+        shell: bash
+        run: |
+          echo "ANDROID_NDK_LATEST_HOME=$ANDROID_NDK_LATEST_HOME"
+          
+          test -n "$ANDROID_NDK_LATEST_HOME"
+          
+          LLVM_BIN="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          
+          test -d "$LLVM_BIN"
+          test -x "$LLVM_BIN/clang"
+          
+          echo "Android NDK:"
+          "$LLVM_BIN/clang" --version
+          
+          echo "Android target compilers:"
+          ls "$LLVM_BIN" | grep -E 'aarch64-linux-android|armv7a-linux-androideabi' || true
+
+      # ================================================================
+      # Dependencies
+      # ================================================================
       - name: Install dependencies
         run: npm install
 
+      # ================================================================
+      # Build native module
+      # ================================================================
       - name: Build
         shell: bash
         run: |
-          # Общие флаги CLI
+          set -e
           ARGS="--release --target ${{ matrix.settings.target }} --platform"
           
+          # ------------------------------------------------------------
+          # Обычный cross compilation:
+          #
+          # Linux ARM / musl / RISC-V
+          # ------------------------------------------------------------
           if [ "${{ matrix.settings.cross }}" == "true" ]; then
             ARGS="$ARGS --cross-compile"
           fi
           
-          # MACOS:
+          # ------------------------------------------------------------
+          # macOS
+          # ------------------------------------------------------------
           if [[ "${{ matrix.settings.target }}" == *"-apple-darwin"* ]]; then
             export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
           fi
           
-          npx napi build $ARGS --cwd ./rs --esm --js index.mjs
+          echo "========================================"
+          echo "Building:"
+          echo "Target: ${{ matrix.settings.target }}"
+          echo "Cross:  ${{ matrix.settings.cross }}"
+          echo "Args:   $ARGS"
+          echo "========================================"
+          
+          npx napi build \
+            $ARGS \
+            --cwd ./rs \
+            --esm \
+            --js index.mjs
 
+      # ================================================================
+      # Prepare native build folder
+      # ================================================================
       - name: Prepare native build folder
         shell: bash
         run: |
+          set -e
+          
           mkdir -p build/native
+          
           cp rs/*.ts build/native/ 2>/dev/null || true
           cp rs/*.mjs build/native/ 2>/dev/null || true
           cp rs/*.node build/native/ 2>/dev/null || true
+          
+          echo "========================================"
+          echo "Native build contents:"
+          echo "========================================"
+          
+          ls -lah build/native
 
+      # ================================================================
+      # Upload artifact
+      # ================================================================
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
