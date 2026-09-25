@@ -362,7 +362,7 @@ impl OggOpusDemuxer {
         // Обрабатываем типы, требующие коррекции.
         match packet_type {
             // Пустышки
-            PacketType::PLC => {
+            PacketType::PLC | PacketType::End => {
                 on_packet(PacketType::Silent, &[&SILENT_FRAME]).map_err(PageError::callback)?;
             }
 

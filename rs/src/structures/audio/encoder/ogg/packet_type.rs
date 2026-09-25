@@ -50,7 +50,6 @@ impl PacketType {
                 | Self::VBR
                 | Self::PLC
                 | Self::Head
-                | Self::OggPage
         )
     }
 
