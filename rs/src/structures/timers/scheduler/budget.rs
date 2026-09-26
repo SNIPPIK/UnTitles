@@ -16,7 +16,7 @@ const MAX_SEND_BURST: u8 = 3;
 /// 20 ms → normal
 /// 20–30 ms → burst 2
 /// >30 ms → burst 3
-const BURST_THRESHOLD_1: Duration = Duration::from_millis(3);
+const BURST_THRESHOLD_1: Duration = Duration::from_millis(1);
 
 /// Второй порог отставания: при его превышении разрешается максимальный
 /// burst (`MAX_SEND_BURST`).
@@ -48,7 +48,7 @@ impl SendBudget {
         match self {
             // Обычный режим: ровно один пакет.
             Self::Normal => NORMAL_SEND_BUDGET,
-            
+
             // Burst-режим: количество, зафиксированное в варианте.
             Self::Burst(count) => count,
         }

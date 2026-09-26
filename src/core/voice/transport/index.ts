@@ -204,7 +204,9 @@ export class Transport extends TypedEmitter<TransportEvents> {
         /**
          * При закрытии WS пытаемся переподключиться или завершаем работу.
          */
-        this._ws.on("close", (code, reason = "Unknown") => {
+        this._ws.on("close", (argument) => {
+            const {code, reason} = argument;
+
             // Коды, при которых переподключение запрещено
             // Три неудачные попытки — завершаем
             if (STOP_CODES.includes(code)) {

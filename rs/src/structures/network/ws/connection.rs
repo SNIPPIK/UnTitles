@@ -42,20 +42,20 @@ fn ensure_crypto_provider() {
 ///
 /// Отвечает за:
 /// - установку TCP/TLS-соединения с указанным URL;
-/// - пересылку сообщений из `rx` в сокет;
-/// - приём входящих сообщений и их диспетчеризацию по хендлерам
-///   (`handle_text` / `handle_binary`);
+/// - создание канала исходящих сообщений и его публикацию в `Inner`
+///   (см. `Inner::mark_connected`) сразу после успешного хендшейка;
+/// - приём входящих сообщений и их диспетчеризацию по хендлерам;
 /// - обновление статуса соединения и эмиссию событий в JS.
+///
+/// Канал отправки сообщений теперь создаётся здесь, а не в момент вызова
+/// `connect()` — до успешного хендшейка отправлять всё равно некуда,
+/// а `Inner::enqueue_or_send` корректно буферизует сообщения до этого
+/// момента без гонок (см. `inner.rs`).
 ///
 /// # Аргументы
 /// * `inner` — общее состояние WebSocket-клиента.
 /// * `url` — полный URL для подключения.
-/// * `rx` — канал исходящих сообщений от JS-стороны.
-///
-/// Функция завершается при закрытии соединения, ошибке или остановке
-/// write-задачи.
-pub async fn run(inner: Arc<Inner>, url: String, mut rx: mpsc::UnboundedReceiver<Message>) {
-    // Инициализируем TLS-провайдер до первого соединения.
+pub async fn run(inner: Arc<Inner>, url: String) {
     ensure_crypto_provider();
 
     // Статус "устанавливается соединение".
@@ -63,7 +63,7 @@ pub async fn run(inner: Arc<Inner>, url: String, mut rx: mpsc::UnboundedReceiver
 
     // Формируем HTTP-запрос для WebSocket-хендшейка.
     let request = match url.as_str().into_client_request() {
-        Ok(req) => { req }
+        Ok(req) => req,
         Err(e) => {
             // Невалидный URL — вызываем ошибку и close, затем выходим.
             let msg = format!("invalid url: {e}");
@@ -97,19 +97,13 @@ pub async fn run(inner: Arc<Inner>, url: String, mut rx: mpsc::UnboundedReceiver
     inner.ready.store(true, Ordering::SeqCst);
     inner.status.store(ws_status::OPEN, Ordering::SeqCst);
 
-    // Слив очереди: собираем в Vec, чтобы не держать guard через .await.
-    let pending: Vec<Message> = {
-        let mut queue = inner.queue.lock();
-        queue.drain(..).collect()
-    };
-    // Отправляем накопленные сообщения по порядку.
-    for msg in pending {
-        if sink.send(msg).await.is_err() {
-            break;
-        }
-    }
+    // Канал создаётся именно сейчас — соединение готово принимать данные.
+    let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
-    // Оповещаем JS об открытии.
+    // Атомарно публикуем канал и переносим в него всё, что накопилось
+    // за время установления соединения (см. Inner::mark_connected).
+    inner.mark_connected(tx);
+
     inner.emit("open", None, None);
     inner.emit_json("info", json!("[WebSocket] has open connection"));
 
@@ -137,7 +131,7 @@ pub async fn run(inner: Arc<Inner>, url: String, mut rx: mpsc::UnboundedReceiver
             Ok(Message::Close(frame)) => {
                 let (code, reason) = match frame {
                     Some(f) => (u16::from(f.code) as u32, f.reason.to_string()),
-                    None => (1000, String::new()), // штатное закрытие по умолчанию
+                    None => (1000, String::new()),
                 };
                 inner.emit_json("close", json!({ "code": code, "reason": reason }));
                 break;
@@ -158,8 +152,9 @@ pub async fn run(inner: Arc<Inner>, url: String, mut rx: mpsc::UnboundedReceiver
     inner.status.store(ws_status::CLOSING, Ordering::SeqCst);
     inner.ready.store(false, Ordering::SeqCst);
 
-    // Очищаем канал отправки, чтобы write-задача завершилась.
-    inner.ws_tx.lock().take();
+    // Возвращаем sink в буферизующее состояние и дропаем прежний канал —
+    // это разбудит write-задачу (rx.recv() вернёт None), если она ещё жива.
+    let _ = inner.mark_disconnected();
 
     // Останавливаем write-задачу и heartbeat.
     write_task.abort();

@@ -30,7 +30,12 @@ pub enum PacketType {
     PLC,
 
     /// VBR Opus packet.
-    VBR
+    VBR,
+
+    /// Сегмент, полученный ДО того, как для текущего логического потока был
+    /// найден `OpusHead`, либо принадлежащий не-primary логическому потоку
+    /// после того, как primary уже определён
+    Unclassified,
 }
 
 /// Готовый пакет: тип и его содержимое.
@@ -112,6 +117,42 @@ impl PacketType {
                 Err(_) => PacketType::Broken,
             },
         }
+    }
+
+    /// Определяет тип пакета и, если это `Head`, впервые фиксирует
+    /// `primary_serial` для соответствующего потока.
+    #[inline]
+    pub fn classify_static(packet: &[u8], serial: u32, primary_serial: &mut Option<u32>) -> PacketType {
+        // Пытаемся определить тип пакета по его содержимому.
+        //    Это чистая функция от `packet`, серийник тут не участвует.
+        let detected = PacketType::detect_packet_type(packet);
+
+        // Ленивая инициализация: первый встреченный `Head` "залипает"
+        //    как primary_serial. Все последующие `Head` уже не перезапишут его.
+        //    NB: `serial` тут только пишется, но нигде дальше не читается —
+        //    по факту это просто "запомнить первый серийник, увидевший Head".
+        if detected == PacketType::Head && primary_serial.is_none() {
+            *primary_serial = Some(serial);
+        }
+
+        // Пока primary_serial не определён, всё, что не является заголовком,
+        // не может быть надёжно отнесено к "основному" аудио-потоку —
+        // это соответствует поведению TS: до нахождения OpusHead любые
+        // сегменты уходят в unknownSegment.
+        //
+        // Отсечка: если Head ещё не видели и текущий пакет — не Head,
+        //    возвращаем Unclassified (аналог unknownSegment).
+        //    Т.е. любой `Tags`/`Comment`/etc. до первого Head будет проглочен
+        //    и превращён в Unclassified.
+        if primary_serial.is_none() && detected != PacketType::Head {
+            return PacketType::Unclassified;
+        }
+
+        // Сюда попадаем в двух случаях:
+        //    - нашли первый Head (primary только что выставлен);
+        //    - primary уже был установлен ранее (любой тип пакета проходит как есть,
+        //      включая `Head` от ЧУЖОГО серийника — фильтрации по `serial` нет).
+        detected
     }
 }
 

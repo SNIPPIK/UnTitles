@@ -36,8 +36,7 @@ fn now_ms() -> u64 {
 ///
 /// # Аргументы
 /// * `inner` — общее состояние WebSocket-клиента.
-/// * `interval_ms` — интервал между heartbeat в миллисекундах (обычно
-///   получается из `HELLO` от Discord).
+/// * `interval_ms` — интервал между heartbeat в миллисекундах.
 pub fn start(inner: Arc<Inner>, interval_ms: u64) {
     // Прерываем предыдущий heartbeat, если он ещё работает.
     if let Some(prev) = inner.hb_task.lock().take() {
@@ -85,10 +84,9 @@ pub fn start(inner: Arc<Inner>, interval_ms: u64) {
                 }
             });
 
-            // Отправляем в канал сокета, если он ещё открыт.
-            if let Some(tx) = inner_task.ws_tx.lock().as_ref() {
-                let _ = tx.send(Message::Text(packet.to_string().into()));
-            }
+            // Отправляем, только если соединение активно — heartbeat не
+            // имеет смысла буферизовать до подключения (см. Inner::send_if_connected).
+            inner_task.send_if_connected(Message::Text(packet.to_string().into()));
         }
     });
 
@@ -96,13 +94,7 @@ pub fn start(inner: Arc<Inner>, interval_ms: u64) {
     *inner.hb_task.lock() = Some(handle);
 }
 
-/// Останавливает цикл heartbeat.
-///
-/// Прерывает задачу, если она запущена, и сбрасывает флаг ожидания ACK.
-/// Безопасен для повторного вызова.
-///
-/// # Аргументы
-/// * `inner` — общее состояние WebSocket-клиента.
+/// Останавливает цикл heartbeat. Безопасен для повторного вызова.
 pub fn stop(inner: &Arc<Inner>) {
     // Прерываем задачу heartbeat, если она активна.
     if let Some(handle) = inner.hb_task.lock().take() { handle.abort(); }
@@ -112,12 +104,6 @@ pub fn stop(inner: &Arc<Inner>) {
 }
 
 /// Обрабатывает получение ACK на heartbeat.
-///
-/// Сбрасывает флаг `hb_pending`, сигнализируя циклу, что предыдущий
-/// heartbeat был подтверждён и можно отправлять следующий.
-///
-/// # Аргументы
-/// * `inner` — общее состояние WebSocket-клиента.
 pub fn ack(inner: &Arc<Inner>) {
     inner.hb_pending.store(false, Ordering::SeqCst);
 }

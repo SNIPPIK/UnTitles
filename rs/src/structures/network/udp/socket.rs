@@ -377,6 +377,8 @@ impl Drop for SocketBuffered {
 
         // Очищаем внутренний кольцевой буфер отправки.
         // Это освобождает накопленные, но ещё не отправленные пакеты.
-        self.inner.buffer.clear();
+        if let Some(inner) = Arc::get_mut(&mut self.inner) {
+            inner.buffer.clear();
+        }
     }
 }

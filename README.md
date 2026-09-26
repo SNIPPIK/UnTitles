@@ -119,7 +119,7 @@ for (let i = 0; i < 4; i++) {
 
 ---
 
-## 🎵 [`Audio Quality`](https://youtu.be/SwmPmEEDI58)
+## 🎵 [`Audio Quality`](https://www.youtube.com/watch?v=CvwyNO9-4bM)
 
 * **No artificial bitrate limitations** — the audio pipeline does not impose a bitrate limit on the source material. In theory, a stream with a bitrate higher than Discord's standard capabilities can be passed through, although the actual quality is ultimately limited by Discord itself and the audio codec in use.
 * **Hot Audio Swap** — instant and seamless switching between audio streams without noticeable gaps between tracks.

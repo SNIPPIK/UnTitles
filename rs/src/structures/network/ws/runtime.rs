@@ -13,8 +13,7 @@ static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 /// драйверами (I/O, timers) и именем потока `voice-ws`.
 ///
 /// # Паника
-/// Паникует, если не удалось создать runtime. Это фатальная ошибка —
-/// без runtime работа голосовых WebSocket-сессий невозможна.
+/// Паникует, если не удалось создать runtime — фатальная ошибка.
 pub fn runtime() -> &'static Runtime {
     RUNTIME.get_or_init(|| {
         Builder::new_multi_thread()
@@ -43,4 +42,24 @@ where
     F::Output: Send + 'static,
 {
     runtime().spawn(future)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    #[test]
+    fn spawn_runs_future_on_global_runtime() {
+        let flag = Arc::new(AtomicBool::new(false));
+        let flag_in_task = flag.clone();
+
+        let handle = spawn(async move {
+            flag_in_task.store(true, Ordering::SeqCst);
+        });
+
+        runtime().block_on(handle).expect("spawned task must not panic");
+        assert!(flag.load(Ordering::SeqCst));
+    }
 }

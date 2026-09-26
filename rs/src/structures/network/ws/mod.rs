@@ -13,7 +13,6 @@ use std::sync::{
     atomic::Ordering,
     Arc
 };
-use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 use crate::structures::network::ws::{
     inner::{EmitData, EventFn, Inner},
@@ -173,44 +172,43 @@ impl VoiceWebSocket {
 
     /// Отправляет пакет в WebSocket.
     ///
-    /// Если соединение ещё не готово, пакет помещается в очередь
-    /// и будет отправлен после установления соединения.
+    /// Если соединение ещё не готово, пакет буферизуется и будет
+    /// отправлен после установления соединения (см. `Inner::enqueue_or_send`).
     ///
-    /// # Аргументы
-    /// * `payload` — `Buffer` (бинарный) или `String` (текстовый).
+    /// # Ошибки
+    /// Возвращает ошибку, если объект уже уничтожен через `destroy()`.
     #[napi(js_name = "packet", setter)]
     pub fn send_packet(&self, payload: Either<Buffer, String>) -> Result<()> {
-        // Преобразуем вход в формат tungstenite.
+        if self.inner.destroyed.load(Ordering::SeqCst) {
+            return Err(Error::from_reason(
+                "VoiceWebSocket has been destroyed and cannot send packets",
+            ));
+        }
+
         let msg = match payload {
             Either::A(buf) => Message::Binary(buf.to_vec().into()),
             Either::B(s) => Message::Text(s.into()),
         };
 
-        // Если соединение ещё не готово — кладём в очередь.
-        if !self.inner.ready.load(Ordering::SeqCst) {
-            self.inner.queue.lock().push(msg);
-            return Ok(());
-        }
-
-        // Иначе отправляем через канал в runtime-задачу.
-        if let Some(tx) = self.inner.ws_tx.lock().as_ref() {
-            let _ = tx.send(msg);
-        }
+        self.inner.enqueue_or_send(msg);
         Ok(())
     }
 
     /// Открывает WebSocket-подключение к указанному endpoint'у.
     ///
-    /// Нормализует переданный адрес: убирает схему (`ws://`, `wss://`)
-    /// и ведущий `/`, после чего формирует итоговый URL с `/?v=8` —
-    /// так Discord ожидает на голосовом шлюзе.
-    ///
-    /// # Аргументы
-    /// * `endpoint` — адрес шлюза (может содержать схему или нет).
-    /// * `_code` — необязательный код переподключения (не используется).
+    /// # Ошибки
+    /// Возвращает ошибку, если объект уже уничтожен через `destroy()` —
+    /// ранее это не проверялось, что позволяло "воскресить" уничтоженный
+    /// объект и получить неработающие события (таблица обработчиков уже
+    /// очищена `destroy()`).
     #[napi]
     pub fn connect(&self, endpoint: String, _code: Option<u32>) -> Result<()> {
-        // Сбрасываем предыдущее соединение, если оно было.
+        if self.inner.destroyed.load(Ordering::SeqCst) {
+            return Err(Error::from_reason(
+                "VoiceWebSocket has been destroyed and cannot be reused",
+            ));
+        }
+
         self.reset();
 
         // Нормализация endpoint: убираем схему и ведущий "/".
@@ -223,13 +221,10 @@ impl VoiceWebSocket {
         let url = format!("wss://{host}/?v=8");
         let inner = self.inner.clone();
 
-        // Канал для отправки сообщений в runtime-задачу.
-        let (tx, rx) = mpsc::unbounded_channel::<Message>();
-        *inner.ws_tx.lock() = Some(tx);
-
-        // Запускаем задачу в Tokio-runtime — она держит соединение и обрабатывает сообщения.
+        // Канал отправки теперь создаётся внутри `connection::run`, сразу
+        // после успешного хендшейка (см. изменения в connection.rs/inner.rs).
         let handle = runtime::spawn(async move {
-            connection::run(inner, url, rx).await;
+            connection::run(inner, url).await;
         });
         *self.inner.conn_task.lock() = Some(handle);
         Ok(())
@@ -249,12 +244,9 @@ impl VoiceWebSocket {
         // Останавливаем heartbeat.
         heartbeat::stop(&self.inner);
 
-        // Закрываем канал отправки (drop tx завершит recv в задаче).
-        if let Some(tx) = self.inner.ws_tx.lock().take() {
-            drop(tx);
-        }
-        // Очищаем очередь отложенных сообщений.
-        self.inner.queue.lock().clear();
+        // Возвращаем sink в буферизующее состояние, дропая прежний канал
+        // (если был) — это закроет rx у write-задачи, если она ещё жива.
+        let _ = self.inner.mark_disconnected();
 
         // Приводим флаги к исходному состоянию.
         self.inner.ready.store(false, Ordering::SeqCst);
@@ -262,10 +254,8 @@ impl VoiceWebSocket {
         self.inner.hb_pending.store(false, Ordering::SeqCst);
     }
 
-    /// Полностью уничтожает объект WebSocket.
-    ///
-    /// Помимо `reset` очищает зарегистрированные события и сбрасывает
-    /// sequence в -1. Повторное использование после вызова невозможно.
+    /// Полностью уничтожает объект WebSocket. Повторное использование
+    /// после вызова невозможно (`connect`/`packet` вернут ошибку).
     #[napi]
     pub fn destroy(&self) {
         // Освобождаем соединение и все связанные ресурсы.
@@ -281,10 +271,7 @@ impl VoiceWebSocket {
         self.inner.sequence.store(-1, Ordering::SeqCst);
     }
 
-    /// Устанавливает пакет для отправки.
-    ///
-    /// Синоним для `send_packet`, используется там, где ожидается
-    /// setter-семантика (например, при `ws.packet = value`).
+    /// Синоним для `send_packet`.
     #[napi]
     pub fn set_packet(&self, payload: Either<Buffer, String>) -> Result<()> {
         self.send_packet(payload)

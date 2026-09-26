@@ -1,7 +1,7 @@
+use crate::structures::network::udp::socket::SocketBuffered;
+use arc_swap::ArcSwap;
 use std::collections::HashMap;
 use std::sync::Arc;
-use arc_swap::ArcSwap;
-use crate::structures::network::udp::socket::SocketBuffered;
 
 /// Реестр активных UDP-сессий.
 ///
@@ -14,10 +14,19 @@ pub struct SessionRegistry {
     sessions: ArcSwap<HashMap<u32, Arc<SocketBuffered>>>,
 }
 
+impl Default for SessionRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SessionRegistry {
     /// Создаёт пустой реестр.
+    #[must_use]
     pub fn new() -> Self {
-        Self { sessions: ArcSwap::from_pointee(HashMap::new()) }
+        Self {
+            sessions: ArcSwap::from_pointee(HashMap::new()),
+        }
     }
 
     /// Добавляет сессию в реестр (или заменяет существующую с тем же id).
@@ -26,7 +35,9 @@ impl SessionRegistry {
     /// * `id` — идентификатор сессии.
     /// * `session` — обёртка UDP-сессии.
     pub fn add(&self, id: u32, session: Arc<SocketBuffered>) {
-        self.update(|map| { map.insert(id, session); });
+        self.update(|map| {
+            map.insert(id, session);
+        });
     }
 
     /// Удаляет сессию по идентификатору.
@@ -36,18 +47,29 @@ impl SessionRegistry {
     /// # Аргументы
     /// * `id` — идентификатор удаляемой сессии.
     pub fn remove(&self, id: u32) {
-        self.update(|map| { map.remove(&id); });
+        self.update(|map| {
+            map.remove(&id);
+        });
     }
 
     /// Проверяет, что реестр не содержит ни одной сессии.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.sessions.load().is_empty()
+    }
+
+    /// Количество зарегистрированных сессий (snapshot; может устареть сразу
+    /// после возврата при конкурентных обновлениях).
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.sessions.load().len()
     }
 
     /// Возвращает снимок карты сессий.
     ///
     /// Снимок отражает состояние на момент вызова и не изменяется
     /// при последующих обновлениях реестра.
+    #[must_use]
     pub fn snapshot(&self) -> Arc<HashMap<u32, Arc<SocketBuffered>>> {
         self.sessions.load_full()
     }
@@ -64,16 +86,9 @@ impl SessionRegistry {
     where
         F: FnOnce(&mut HashMap<u32, Arc<SocketBuffered>>),
     {
-        // Загружаем текущий Arc на карту.
         let mut current = self.sessions.load_full();
-
-        // Копируем карту только при наличии конкурентов.
         let map = Arc::make_mut(&mut current);
-
-        // Применяем изменение.
         update_fn(map);
-
-        // Публикуем обновлённый снимок.
         self.sessions.store(current);
     }
 }

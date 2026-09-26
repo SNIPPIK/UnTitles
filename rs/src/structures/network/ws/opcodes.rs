@@ -87,6 +87,21 @@ pub mod op {
         code >= DAVE_PREPARE_TRANSITION
             && code <= DAVE_MLS_INVALID_COMMIT_WELCOME
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn is_dave_boundaries() {
+            assert!(!is_dave(0));
+            assert!(!is_dave(DAVE_PREPARE_TRANSITION - 1));
+            assert!(is_dave(DAVE_PREPARE_TRANSITION));
+            assert!(is_dave(DAVE_MLS_INVALID_COMMIT_WELCOME));
+            assert!(!is_dave(DAVE_MLS_INVALID_COMMIT_WELCOME + 1));
+            assert!(!is_dave(255));
+        }
+    }
 }
 
 /// Статусы WebSocket-соединения.

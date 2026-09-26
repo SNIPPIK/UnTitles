@@ -130,7 +130,7 @@ impl AudioEngine {
         // Можно безопасно очищать его.
         // ------------------------------------------------------------------
         {
-            let buffer = self
+            let mut buffer = self
                 .buffer
                 .0
                 .lock()
